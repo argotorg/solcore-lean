@@ -34,13 +34,16 @@ Lean status:
 | `meta.versioning` | separation of language version, profile, and baseline | normative | implemented | M0 | ADR-0001 |
 | `meta.verdicts` | separation of the six language verdicts from protocol errors | normative | implemented | M0 | ADR-0003 |
 | `meta.observation` | versioned observation envelope | directionAccepted | partialSupport | M0 | ADR-0008 |
-| `core.unit` | unit value and unit type | directionAccepted | partialSupport | M1 | ADR-0009 |
-| `core.bool` | boolean value and conditional branching | directionAccepted | partialSupport | M1 | ADR-0009 |
-| `core.word` | 256-bit word literals and values; operations are not implemented | directionAccepted | partialSupport | M1 | ADR-0009 |
+| `coreUnit` | unit type, literal, value, typing, and evaluation | normative | implemented | M1b | ADR-0010 |
+| `coreBool` | bool type, literal, value, typing, and evaluation | normative | implemented | M1b | ADR-0010 |
+| `coreWord` | bounded 256-bit word type, literal, and value; excludes operations | normative | implemented | M1b | ADR-0010 |
+| `corePrimitives` | aggregate feature including primitive operations | directionAccepted | partialSupport | M1 | ADR-0009 |
 | `core.function` | function definition, application, and return | directionAccepted | planned | M1 | ADR-0002, ADR-0005 |
-| `core.let` | lexical local binding | directionAccepted | partialSupport | M1 | ADR-0009 |
+| `coreImmutableLet` | initialized immutable de Bruijn binding | normative | implemented | M1b | ADR-0010 |
+| `core.let` | aggregate feature for source-level local bindings | directionAccepted | partialSupport | M1 | ADR-0009 |
 | `core.assignment` | local assignment | directionAccepted | planned | M1 | ADR-0002 |
-| `core.if` | conditional evaluation | directionAccepted | partialSupport | M1 | ADR-0009 |
+| `coreConditional` | condition-first, selected-branch-only conditional | normative | implemented | M1b | ADR-0010 |
+| `core.if` | aggregate feature for source-level conditionals | directionAccepted | partialSupport | M1 | ADR-0009 |
 | `core.product` | product/tuple value | directionAccepted | planned | M1 | ADR-0002 |
 | `core.sum` | sum value | directionAccepted | planned | M1 | ADR-0002 |
 | `core.adt` | user-defined algebraic data type | directionAccepted | planned | M1 | ADR-0002 |

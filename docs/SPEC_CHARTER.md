@@ -1,19 +1,19 @@
 # Solcore Lean Specification Charter
 
 - Status: Draft
-- Target specification: `solcore/0.1.0-draft.1`
-- Enacted: 2026-07-23
+- Target specification: `solcore/0.1.0-draft.2`
+- Adopted: 2026-07-23
 
 ## Purpose
 
-`solcore-lean` is an executable formal specification of the Solcore language
-and a reference implementation independent of the Haskell and Rust
-implementations. Its eventual role is to serve as an oracle for semantic
-differential fuzzing by comparing the observations produced by each
-implementation for the same input program and execution environment.
+`solcore-lean` is an executable formal specification of the Solcore language and
+a reference implementation independent of the Haskell and Rust implementations.
+Its eventual purpose is to serve as the oracle for semantic differential
+fuzzing by comparing the observations produced by each implementation for the
+same input program and execution environment.
 
-To serve this purpose, the specification provides the following three elements
-as a unified whole:
+To achieve this purpose, the specification provides the following three
+elements as one coherent whole:
 
 1. Declarative relations describing typing, class constraints, evaluation, and
    execution-state transitions
@@ -24,22 +24,21 @@ as a unified whole:
 
 ## Specification authority
 
-Sources of semantic information have the following precedence:
+Sources of semantic information have the following order of precedence:
 
-1. The versioned declarative Lean specification
-2. Accepted ADRs and the version manifests they designate
-3. Lean executors whose correspondence with the declarative specification has
-   been proved
+1. The versioned Lean declarative specification
+2. Accepted ADRs and the version manifests designated by those ADRs
+3. Lean executors proved to correspond to the declarative specification
 4. Normative conformance tests
 5. Existing language documentation, the Haskell implementation, the Rust
    implementation, the standard library, and existing test corpora
 
-When higher- and lower-priority sources conflict, the higher-priority source
-prevails. A conflict between the declarative specification and an executor is
-treated as a defect in the executor or its correspondence proof. Agreement
-between the two existing implementations, a majority decision, long-standing
-behavior, or inclusion in a test corpus does not by itself constitute a
-specification decision.
+When a higher-ranked source conflicts with a lower-ranked source, the
+higher-ranked source prevails. A conflict between the declarative specification
+and an executor is treated as a defect in the executor or its correspondence
+proof. Agreement between the two existing implementations, a majority vote,
+long-standing behavior, or inclusion in a test corpus does not by itself
+constitute a specification decision.
 
 Every new specification choice or observable change requires an Accepted ADR.
 The component versions of all affected areas—grammar, static semantics, dynamic
@@ -47,17 +46,17 @@ semantics, ABI, and storage layout—must be updated.
 
 ## Design principles
 
-- The boundaries between Surface, Resolved, and Semantic Core are explicit.
+- Make the boundaries between Surface, Resolved, and Semantic Core explicit.
 - Surface preserves source order, spans, and syntactic boundaries.
 - Semantic Core directly represents lexical closures, pattern matching, type
   application, class evidence, and comptime/runtime stages.
-- Hull, Yul, and EVM bytecode are not the core of the specification; they are
-  targets for future verified lowering.
-- The semantic kernel is constructed from pure, total functions and does not
-  depend on `partial`, `unsafe`, or actual IO.
-- Potentially nonterminating evaluation and search use explicit resource
-  limits. A limit does not change the semantics and is used only to make a
-  result inconclusive.
+- Hull, Yul, and EVM bytecode are not the specification kernel; they are targets
+  of future verified lowering.
+- The semantic kernel is pure and total, and does not depend on `partial`,
+  `unsafe`, or real I/O.
+- Evaluation or search that may not terminate uses an explicit resource limit.
+  A limit does not change the semantics; it can only make the result
+  inconclusive.
 - The host, block context, initial state, and transaction sequence are explicit
   inputs rather than implicit global state.
 - Semantically irrelevant differences, such as generated names, internal map
@@ -67,71 +66,71 @@ semantics, ABI, and storage layout—must be updated.
 ## Versions and comparison baselines
 
 `LanguageVersion` identifies the component versions for grammar, static
-semantics, dynamic semantics, ABI, and storage layout, as well as the
-standard-library digest and known feature IDs. A component version whose
-normative rules are incomplete is `none`. The EVM revision and gas schedule do
-not enter the pure Core; they are fixed by a contract-scope
+semantics, dynamic semantics, ABI, and storage layout, together with the
+standard-library digest and known feature IDs. A component whose normative rules
+are incomplete has version `none`. EVM revisions and gas schedules are not mixed
+into the pure Core; they are fixed by a contract-scoped
 `ContractRuntimeProfile`.
 
-Feature status distinguishes between a known ID, a design direction decided by
-an Accepted ADR, completed normative rules, enablement in a profile, and an
-implementation in Lean. A successful query requires
-`implemented ⊆ enabled ⊆ normative ⊆ known`. At M0, normative rules for
-language features are incomplete, and `enabledFeatures` is empty in `core-v1`.
+Feature status distinguishes whether an ID is known, an Accepted ADR has chosen
+its design direction, its normative rules are complete, a profile enables it,
+and Lean implements it. Successful queries require
+`implemented ⊆ enabled ⊆ normative ⊆ known`. At M0, no language feature has
+complete normative rules, so `core-v1` has an empty `enabledFeatures` list.
 
-Haskell and Rust commits, solver modes, dispatch configuration, backends,
-resource limits, and related implementation settings are recorded separately
-in `ImplementationBaseline`. Updating an implementation does not by itself
-change the language version.
+The Haskell and Rust commits, solver mode, dispatch setting, backend, resource
+limits, and similar implementation settings are recorded separately in an
+`ImplementationBaseline`. Updating an implementation does not by itself change
+the language version.
 
-All of the following must match in a comparison:
+Every comparison must align all of the following:
 
 - Language version and feature profile
 - Standard-library contents
 - Solver policy
-- Phase reached, including frontend, specialization, and dispatch
+- Reached phase, such as frontend, specialization, or dispatch
 - EVM revision and deterministic host
 - Initial state and transaction sequence
-- Semantic-observation policy
+- Semantic observation policy
 
-In addition to the request ID, an oracle response returns the specification,
-profile ID and digest, and query kind so that the comparison conditions can be
-identified from the response record alone.
+In addition to the request ID, every oracle response returns the specification,
+profile ID and digest, and query kind, so that a response record identifies its
+comparison conditions by itself.
 
-## Verdict categories
+## Verdicts
 
-An oracle language query has one of the following six verdicts:
+The oracle has the following six language verdicts:
 
 | Verdict | Meaning |
 | --- | --- |
-| `accepted` | Completed the requested static phase successfully |
-| `rejected` | Violated a language rule defined by the target profile |
+| `accepted` | The requested static phase completed successfully |
+| `rejected` | The input violates a language rule defined by the target profile |
 | `unsupported` | A required feature or its semantics is undefined in the target profile |
 | `inconclusive` | A resource limit prevented a definitive verdict or execution result |
-| `executed` | Ran a dynamic query and obtained a normative observation |
-| `internalError` | An invariant violation or implementation defect occurred in the oracle |
+| `executed` | A dynamic query ran and produced a normative observation |
+| `internalError` | The oracle itself encountered an invariant violation or implementation defect |
 
-Malformed JSON, duplicate object keys, unknown schemas, unsafe source paths,
-and similar conditions are not properties of the language. They are handled as
-`protocolError` outside the verdict categories above.
+Malformed JSON, duplicate object keys, unknown schemas, unsafe source paths, and
+similar conditions are not language properties. They are reported as
+`protocolError`, outside the verdicts above.
 
-The following reinterpretations are prohibited:
+The following reinterpretations are forbidden:
 
-- An unimplemented feature must not be returned as `rejected`.
-- A timeout, exhausted solver fuel, or exhausted evaluation fuel must not be
-  returned as `rejected`.
-- A crash or invariant violation must not be returned as `rejected` for the
-  source program.
-- A runtime `revert` or defined `trap` must not be returned as `internalError`.
+- Do not report an unimplemented feature as `rejected`.
+- Do not report a timeout, exhausted solver fuel, or exhausted evaluation fuel
+  as `rejected`.
+- Do not report a crash or invariant violation as `rejected` for the source
+  program.
+- Do not report a runtime `revert` or defined `trap` as `internalError`.
 
 ## Observational equivalence
 
-Static queries compare diagnostic codes, phases, severities, UTF-8 byte spans,
-and structured arguments normatively. English messages and presentation layout
+Static queries normatively compare diagnostic codes, phases, severities, UTF-8
+byte spans, and structured arguments. English messages and presentation layout
 are not compared.
 
-Value evaluation compares canonical values and halt statuses. Contract
-execution compares at least the following for each transaction:
+Value evaluation compares canonical values and halt status. Contract execution
+compares at least the following for every transaction:
 
 - The distinction between return, revert, and trap
 - Return data or revert data
@@ -139,67 +138,66 @@ execution compares at least the following for each transaction:
 - Balance delta
 - Logs
 - External-call trace
-- Addresses and code of created contracts
+- Address and code of each created contract
 
-The standard profile does not compare gas. If gas becomes part of the
-specification, it uses a dedicated profile that fixes the EVM revision, gas
-schedule, warm/cold state, and other relevant conditions.
+The standard profile does not compare gas. A dedicated profile that fixes the
+EVM revision, gas schedule, warm/cold state, and related parameters is required
+before gas becomes part of the specification.
 
 ## Non-goals
 
-At least during the initial stages, the following are not goals:
+At least during the initial stages, the project does not aim to:
 
-- Reproducing the current behavior of the Haskell or Rust implementation
+- Reproduce the current behavior of the Haskell or Rust implementation
   unconditionally
-- Matching Hull, Yul, bytecode, generated names, or optimizer output
-- Defining Lean semantics through a backend
-- Proving the correctness of both existing implementations in their entirety
-  at once
-- Guessing and implementing undecided ABI, storage, or inline Yul behavior
-- Exactly matching diagnostic prose, colors, or display order
-- Matching gas consumption in the standard profile
-- Treating resource exhaustion as a language rejection
+- Match Hull, Yul, bytecode, generated names, or optimizer output
+- Define Lean semantics through a backend
+- Prove both existing implementations correct in their entirety at once
+- Guess unresolved ABI, storage, or inline-Yul behavior
+- Match diagnostic prose, colors, or presentation order exactly
+- Match gas consumption in the standard profile
+- Treat resource exhaustion as language rejection
 
 ## Conformance-test requirements
 
-As a rule, every normative rule has all of the following:
+Every normative rule should normally have all of the following:
 
 1. A minimal positive witness that satisfies the rule
 2. A minimal negative witness that violates only that rule
-3. The expected verdict category and, for a failure, its phase
+3. The expected verdict and, for a failure, its phase
 4. A theorem or property test checking correspondence between the declarative
-   specification and the executor
-5. A golden test of the oracle's canonical serialization
+   specification and executor
+5. A golden test for the oracle's canonical serialization
 
 The following are additionally required:
 
-- When a difference from Haskell or Rust is resolved, its minimized witness is
-  added to the normative corpus.
-- Equivalent input orderings, JSON key orderings, and map construction orders
-  must produce the same canonical output.
-- Tests distinguish `unsupported`, `inconclusive`, and `internalError` from
-  `rejected`.
-- Contract tests run every implementation with the same EVM revision, initial
-  state, and transaction sequence.
-- Revert tests also check state rollback.
-- ABI tests exercise every path through metadata, selector spelling, decoding,
-  and encoding.
-- Tests verify that selector collisions are detected before code generation.
-- The semantic kernel contains no `sorry`, `admit`, `partial`, or `unsafe`.
+- When a Haskell/Rust discrepancy is resolved, add the minimized witness to the
+  normative corpus.
+- Verify that semantically equivalent input ordering, JSON key ordering, and map
+  construction ordering produce the same canonical output.
+- Include tests that distinguish `unsupported`, `inconclusive`, and
+  `internalError` from `rejected`.
+- Run contract tests against every implementation with the same EVM revision,
+  initial state, and transaction sequence.
+- A revert test also verifies state rollback.
+- An ABI test exercises the complete metadata, selector spelling, decode, and
+  encode paths.
+- Verify that selector collisions are detected before code generation.
+- Leave no `sorry`, `admit`, `partial`, or `unsafe` in the semantic kernel.
 
-A conformance corpus is evidence used to discover the specification; it is not
-by itself a specification authority. A change to an expected result must
-include the corresponding specification change or ADR in the same change.
+The conformance corpus is evidence for discovering the specification, not an
+authority by itself. A change to an expected result must include the
+corresponding specification change or ADR.
 
 ## M0 completion criteria
 
 M0 is complete when all of the following hold:
 
-- The boundaries among language versions, profiles, and baselines are defined
-  in types and documentation.
-- Accepted ADRs are consistent with the feature and compatibility matrices.
-- A versioned NDJSON schema and the verdict categories are implemented.
-- The `capabilities` query returns the version, profile, and baseline
-  deterministically.
-- Unimplemented semantic queries return `unsupported`.
+- The boundaries between the language version, profile, and baseline are
+  defined in types and documentation.
+- Accepted ADRs agree with the feature and compatibility matrices.
+- The versioned NDJSON schema and verdict taxonomy are implemented.
+- The `capabilities` query deterministically returns the version, profile, and
+  baseline.
+- Queries for unimplemented semantics return `unsupported`.
 - Tests for schemas, canonicalization, path validation, and streaming pass.

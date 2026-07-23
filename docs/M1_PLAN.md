@@ -7,7 +7,7 @@ correspondence proofs.
 Even when an M0 feature is `directionAccepted`, it is not promoted to
 `normative` or `implemented` until it satisfies the completion criteria below.
 
-## Current progress: M1a kernel
+## Current progress: M1b publication
 
 Following ADR-0009, the project implements the closed fragment consisting of
 unit/bool/word literals, de Bruijn variables, initialized immutable `let`, and
@@ -26,13 +26,23 @@ conditionals. The semantic kernel establishes:
 - finite-fuel termination and fault unreachability for well-typed closed
   programs
 
-At this stage, primitive operations, functions, mutation, ADTs, and other
-components remain unimplemented, so the corresponding features remain
-`partialSupport`. The M0 profile and digest and the Oracle v1 wire schema and
-query support remain unchanged. The implementation-progress metadata in v1
-capabilities, however, reflects the M1a state. The Core wire contract and Oracle
-v2 will be connected after the feature granularity and profile for the
-published fragment have been finalized.
+Following ADR-0010, the completed fragment is divided into `coreUnit`,
+`coreBool`, `coreWord`, `coreImmutableLet`, and `coreConditional`, then
+published as normative and implemented in the `core-m1a-v1` profile of
+`solcore/0.1.0-draft.2`. M1b additionally implements:
+
+- a strict decoder and canonical encoder for `solcore-semantic-core/v1`
+- a fixed-width lowercase hexadecimal wire representation for words
+- stable type-error codes, AST paths, and structured arguments
+- the `solcore-oracle/v2` `capabilities`, `coreCheck`, and `coreEval` queries
+- independent `inconclusive` outcomes for Core depth/node limits and CEK
+  evaluation fuel
+- mixed v1/v2 streams, canonical output, and a negative wire corpus
+
+The existing aggregate features remain `partialSupport` or `planned` because
+primitive operations, functions, mutation, ADTs, and other components are not
+yet implemented. The M0 profile and digest, the Oracle v1 wire schema and query
+support, and the golden bytes remain unchanged.
 
 ## Input boundary
 
@@ -41,12 +51,12 @@ M0 `solcore-oracle/v1` defines a typed result only for `capabilities`. Kinds fro
 return `unsupported` in M0. An undecided Core AST must not be smuggled through
 an arbitrary field such as `scenario : Json`.
 
-M1 adds all of the following together:
+M1b adds all of the following together:
 
 1. the versioned `solcore-semantic-core/v1` JSON Schema
 2. a strict decoder and canonical encoder for Core ASTs and values
-3. the next Oracle schema revision, with queries that directly evaluate Core
-   input, typed observations, and the detailed phases required by Core
+3. Oracle v2 queries that directly evaluate Core input, typed observations, and
+   the detailed phases required by Core
 4. round-trip and golden tests between Core JSON fixtures and Lean values
 
 The M2 parser, resolver, and elaborator are responsible for converting a
@@ -88,7 +98,8 @@ implementation witness.
 3. Define a small-step or CEK transition relation and its multi-step closure.
 4. Implement a total evaluator that takes explicit fuel.
 5. Map checker/evaluator results to `rejected`, `inconclusive`, and `executed`.
-6. Add the Core JSON codec and Oracle queries.
+   Complete.
+6. Add the Core JSON codec and Oracle queries. Complete.
 7. Preserve minimal Haskell/Rust source witnesses as candidates for elaboration
    tests in M2 and later.
 
@@ -112,5 +123,6 @@ implementation witness.
 
 Only features satisfying these conditions are changed to `normative` /
 `implemented`. The same change updates `staticSemanticsVersion`,
-`dynamicSemanticsVersion`, the specification release when necessary, and
-`core-v1`'s `enabledFeatures` and digest.
+`dynamicSemanticsVersion`, the specification release when necessary, and the
+new profile's `enabledFeatures` and digest. The frozen `core-v1` remains
+unchanged for backward compatibility.
