@@ -12,6 +12,76 @@ internal Core syntax. This closed AST keeps the v1 encoder total without
 silently assigning v1 encodings to constructors introduced by later profiles.
 -/
 
+inductive Ty where
+  | unit
+  | bool
+  | word
+  deriving Repr, BEq, DecidableEq
+
+namespace Ty
+
+def toCore : Ty → Solcore.Core.Ty
+  | .unit => .unit
+  | .bool => .bool
+  | .word => .word
+
+/-!
+The fallback is intentionally unreachable for the current Core. Keeping it
+makes this frozen projection reject future Core type constructors without
+editing the v1 definition.
+-/
+set_option match.ignoreUnusedAlts true in
+def ofCore? : Solcore.Core.Ty → Option Ty
+  | .unit => some .unit
+  | .bool => some .bool
+  | .word => some .word
+  | _ => none
+
+@[simp] theorem ofCore?_toCore (type : Ty) :
+    ofCore? type.toCore = some type := by
+  cases type <;> rfl
+
+end Ty
+
+inductive Value where
+  | unit
+  | bool (value : Bool)
+  | word (value : Solcore.Core.Word)
+  deriving Repr, BEq, DecidableEq
+
+namespace Value
+
+def type : Value → Ty
+  | .unit => .unit
+  | .bool _ => .bool
+  | .word _ => .word
+
+def toCore : Value → Solcore.Core.Value
+  | .unit => .unit
+  | .bool value => .bool value
+  | .word value => .word value
+
+/-!
+As with types, the final equation preserves v1 as a closed projection when the
+internal Core gains value constructors.
+-/
+set_option match.ignoreUnusedAlts true in
+def ofCore? : Solcore.Core.Value → Option Value
+  | .unit => some .unit
+  | .bool value => some (.bool value)
+  | .word value => some (.word value)
+  | _ => none
+
+@[simp] theorem ofCore?_toCore (value : Value) :
+    ofCore? value.toCore = some value := by
+  cases value <;> rfl
+
+@[simp] theorem toCore_type (value : Value) :
+    value.toCore.type = value.type.toCore := by
+  cases value <;> rfl
+
+end Value
+
 inductive Expr where
   | unit
   | bool (value : Bool)
@@ -22,7 +92,7 @@ inductive Expr where
   deriving Repr, BEq, DecidableEq
 
 structure Program where
-  resultType : Solcore.Core.Ty
+  resultType : Ty
   body : Expr
   deriving Repr, BEq, DecidableEq
 
@@ -37,6 +107,7 @@ def toCore : Expr → Solcore.Core.Expr
   | .ifE condition thenBranch elseBranch =>
       .ifE condition.toCore thenBranch.toCore elseBranch.toCore
 
+set_option match.ignoreUnusedAlts true in
 def ofCore? : Solcore.Core.Expr → Option Expr
   | .unit => some .unit
   | .bool value => some (.bool value)
@@ -53,6 +124,7 @@ def ofCore? : Solcore.Core.Expr → Option Expr
       some (.ifE condition thenBranch elseBranch)
   | .unary _ _ => none
   | .binary _ _ _ => none
+  | _ => none
 
 @[simp] theorem ofCore?_toCore (expr : Expr) :
     ofCore? expr.toCore = some expr := by
@@ -68,14 +140,15 @@ end Expr
 namespace Program
 
 def toCore (program : Program) : Solcore.Core.Program := {
-  resultType := program.resultType
+  resultType := program.resultType.toCore
   body := program.body.toCore
 }
 
 def ofCore? (program : Solcore.Core.Program) : Option Program := do
+  let resultType ← Ty.ofCore? program.resultType
   let body ← Expr.ofCore? program.body
   some {
-    resultType := program.resultType
+    resultType
     body
   }
 

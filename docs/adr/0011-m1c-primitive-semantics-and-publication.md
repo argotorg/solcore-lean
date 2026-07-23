@@ -148,11 +148,13 @@ Primitive expression constructors require a new closed Core schema:
 - unary expressions contain `op` and `operand`;
 - binary expressions contain `op`, `left`, and `right`.
 
-Each wire version has its own closed AST and total encoder. A wire AST embeds
-into the internal Core AST, while converting an arbitrary internal expression
-back to an older wire version is partial. This prevents future internal syntax
-growth from silently widening a frozen schema and preserves unconditional
-version-specific encoder/decoder round-trip theorems.
+Each wire version has its own closed type, value, expression, and program
+types, with total encoders defined only over those version-local types. They
+embed into the internal Core types, while conversion from arbitrary internal
+types, values, expressions, and programs back to a wire version is partial.
+This prevents future internal type or syntax growth from silently widening a
+frozen schema and preserves unconditional version-specific encoder/decoder
+round-trip theorems.
 
 Publish the new profile through `solcore-oracle/v3`. It supports the same query
 names as v2: `capabilities`, `coreCheck`, and `coreEval`. The versioned envelope

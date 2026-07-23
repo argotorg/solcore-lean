@@ -34,42 +34,60 @@ private def checkPathStepName : Core.CheckPathStep → String
   | .ifThen => "ifThen"
   | .ifElse => "ifElse"
 
-private def checkErrorArguments : Core.CheckErrorData → Lean.Json
+private def encodeCoreType? (type : Core.Ty) : Option Lean.Json :=
+  Core.Wire.V2.encodeType <$> Core.Wire.V2.Ty.ofCore? type
+
+private def checkErrorArguments : Core.CheckErrorData → Option Lean.Json
   | .unboundVariable index contextSize =>
-      .mkObj [
+      some (.mkObj [
         ("index", Lean.toJson index),
         ("contextSize", Lean.toJson contextSize)
-      ]
-  | .expectedBool actual =>
-      .mkObj [("actual", Core.Wire.V2.encodeType actual)]
-  | .primitiveOperandTypeMismatch expected actual =>
-      .mkObj [
-        ("expected", Core.Wire.V2.encodeType expected),
-        ("actual", Core.Wire.V2.encodeType actual)
-      ]
-  | .branchTypeMismatch thenType elseType =>
-      .mkObj [
-        ("thenType", Core.Wire.V2.encodeType thenType),
-        ("elseType", Core.Wire.V2.encodeType elseType)
-      ]
-  | .declaredResultTypeMismatch declaredType inferredType =>
-      .mkObj [
-        ("declaredType", Core.Wire.V2.encodeType declaredType),
-        ("inferredType", Core.Wire.V2.encodeType inferredType)
-      ]
+      ])
+  | .expectedBool actual => do
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [("actual", actual)])
+  | .primitiveOperandTypeMismatch expected actual => do
+      let expected ← encodeCoreType? expected
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [
+        ("expected", expected),
+        ("actual", actual)
+      ])
+  | .branchTypeMismatch thenType elseType => do
+      let thenType ← encodeCoreType? thenType
+      let elseType ← encodeCoreType? elseType
+      pure (.mkObj [
+        ("thenType", thenType),
+        ("elseType", elseType)
+      ])
+  | .declaredResultTypeMismatch declaredType inferredType => do
+      let declaredType ← encodeCoreType? declaredType
+      let inferredType ← encodeCoreType? inferredType
+      pure (.mkObj [
+        ("declaredType", declaredType),
+        ("inferredType", inferredType)
+      ])
 
-private def diagnosticOfCheckError (error : Core.CheckError) : Diagnostic := {
-  code := error.codeName
-  phase := .coreChecking
-  path := error.path.toArray.map checkPathStepName
-  arguments := checkErrorArguments error.data
-}
+private def diagnosticOfCheckError (error : Core.CheckError) : Option Diagnostic := do
+  let arguments ← checkErrorArguments error.data
+  pure {
+    code := error.codeName
+    phase := .coreChecking
+    path := error.path.toArray.map checkPathStepName
+    arguments
+  }
 
 private def rejectedFor
     (request : Request)
     (error : Core.CheckError) :
     Response :=
-  responseFor request (.rejected .coreChecking (diagnosticOfCheckError error) #[])
+  match diagnosticOfCheckError error with
+  | some diagnostic =>
+      responseFor request (.rejected .coreChecking diagnostic #[])
+  | none =>
+      responseFor request (.internalError
+        (some .coreChecking)
+        "unsupported-core-type-in-diagnostic")
 
 private def coreWirePointer (error : Core.Wire.V2.DecodeError) : String :=
   "/query/program" ++ error.path.toPointer
@@ -88,13 +106,13 @@ private def coreWireProtocolError
 private def decodeProgram
     (request : Request)
     (json : Lean.Json) :
-    Except ProtocolError (Except Response Core.Program) :=
+    Except ProtocolError (Except Response Core.Wire.V2.Program) :=
   let limits : Core.Wire.V2.DecodeLimits := {
     maxDepth := request.limits.inputDepth
     maxNodes := request.limits.inputNodes
   }
   match Core.Wire.V2.decodeProgramWith limits json with
-  | .ok program => pure (.ok program.toCore)
+  | .ok program => pure (.ok program)
   | .error error =>
       match error.code with
       | .depthLimitExceeded =>
@@ -105,29 +123,42 @@ private def decodeProgram
             .coreDecoding .inputNodes request.limits.inputNodes none)))
       | _ => throw (coreWireProtocolError request error)
 
-private def handleCheck (request : Request) (program : Core.Program) : Response :=
-  match program.checkDetailed with
-  | .error error => rejectedFor request error
-  | .ok resultType =>
-      responseFor request (.accepted .coreChecking {
-        schema := checkResultSchema
-        value := .mkObj [("resultType", Core.Wire.V2.encodeType resultType)]
-      })
-
-private def handleEval (request : Request) (program : Core.Program) : Response :=
-  match program.checkDetailed with
+private def handleCheck
+    (request : Request)
+    (program : Core.Wire.V2.Program) :
+    Response :=
+  match program.toCore.checkDetailed with
   | .error error => rejectedFor request error
   | .ok _ =>
-      match program.run request.limits.evaluationSteps with
+      responseFor request (.accepted .coreChecking {
+        schema := checkResultSchema
+        value := .mkObj [("resultType", Core.Wire.V2.encodeType program.resultType)]
+      })
+
+private def handleEval
+    (request : Request)
+    (program : Core.Wire.V2.Program) :
+    Response :=
+  let coreProgram := program.toCore
+  match coreProgram.checkDetailed with
+  | .error error => rejectedFor request error
+  | .ok _ =>
+      match coreProgram.run request.limits.evaluationSteps with
       | .done value =>
-          if value.type == program.resultType then
-            responseFor request (.executed {
-              schema := valueObservationSchema
-              value := .mkObj [
-                ("resultType", Core.Wire.V2.encodeType program.resultType),
-                ("value", Core.Wire.V2.encodeValue value)
-              ]
-            })
+          if value.type == coreProgram.resultType then
+            match Core.Wire.V2.Value.ofCore? value with
+            | some wireValue =>
+                responseFor request (.executed {
+                  schema := valueObservationSchema
+                  value := .mkObj [
+                    ("resultType", Core.Wire.V2.encodeType program.resultType),
+                    ("value", Core.Wire.V2.encodeValue wireValue)
+                  ]
+                })
+            | none =>
+                responseFor request (.internalError
+                  (some .coreEvaluation)
+                  "unsupported-core-value")
           else
             responseFor request (.internalError
               (some .coreEvaluation)

@@ -338,18 +338,21 @@ def testM1cProfile : IO Unit := do
     "checked-in draft.3 profile differs from the Lean profile"
 
 def testCoreWire : IO Unit := do
-  for type in [Ty.unit, Ty.bool, Ty.word] do
+  let types : Array Core.Wire.V1.Ty := #[.unit, .bool, .word]
+  for type in types do
     match Core.Wire.V1.decodeType (Core.Wire.V1.encodeType type) with
     | .ok decoded =>
         assertTrue (decoded == type) s!"Core type failed to round-trip: {reprStr type}"
     | .error error =>
         throw (IO.userError
           s!"encoded Core type did not decode: {(Lean.toJson error).compress}")
+    assertTrue (Core.Wire.V1.Ty.ofCore? type.toCore == some type)
+      "the Semantic Core v1 type embedding must have a partial inverse"
   let word42 ←
     match Word.ofNat? 42 with
     | some value => pure value
     | none => throw (IO.userError "42 must be an in-range Core word")
-  let values : Array Value := #[
+  let values : Array Core.Wire.V1.Value := #[
     .unit,
     .bool false,
     .bool true,
@@ -363,6 +366,8 @@ def testCoreWire : IO Unit := do
     | .error error =>
         throw (IO.userError
           s!"encoded Core value did not decode: {(Lean.toJson error).compress}")
+    assertTrue (Core.Wire.V1.Value.ofCore? value.toCore == some value)
+      "the Semantic Core v1 value embedding must have a partial inverse"
   let expressions : Array Core.Wire.V1.Expr := #[
     .unit,
     .bool false,
@@ -505,6 +510,38 @@ def assertCoreWireV2Error {α : Type}
         s!"{name} failed at {error.path.toPointer}, expected {path}"
 
 def testCoreWireV2 : IO Unit := do
+  let types : Array Core.Wire.V2.Ty := #[.unit, .bool, .word]
+  for type in types do
+    match Core.Wire.V2.decodeType (Core.Wire.V2.encodeType type) with
+    | .ok decoded =>
+        assertTrue (decoded == type)
+          s!"Semantic Core v2 type failed to round-trip: {reprStr type}"
+    | .error error =>
+        throw (IO.userError
+          s!"encoded v2 type did not decode: {(Lean.toJson error).compress}")
+    assertTrue (Core.Wire.V2.Ty.ofCore? type.toCore == some type)
+      "the Semantic Core v2 type embedding must have a partial inverse"
+  let word42 ←
+    match Word.ofNat? 42 with
+    | some value => pure value
+    | none => throw (IO.userError "42 must be an in-range Core word")
+  let values : Array Core.Wire.V2.Value := #[
+    .unit,
+    .bool false,
+    .bool true,
+    .word Word.zero,
+    .word word42
+  ]
+  for value in values do
+    match Core.Wire.V2.decodeValue (Core.Wire.V2.encodeValue value) with
+    | .ok decoded =>
+        assertTrue (decoded == value)
+          s!"Semantic Core v2 value failed to round-trip: {reprStr value}"
+    | .error error =>
+        throw (IO.userError
+          s!"encoded v2 value did not decode: {(Lean.toJson error).compress}")
+    assertTrue (Core.Wire.V2.Value.ofCore? value.toCore == some value)
+      "the Semantic Core v2 value embedding must have a partial inverse"
   let unaryOps : Array Core.Wire.V2.UnaryOp := #[
     .boolNot,
     .wordNot
