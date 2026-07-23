@@ -97,11 +97,12 @@ for (const schema of schemas) {
 
 const oracleV2SchemaId = "urn:solcore:oracle:v2";
 const oracleV1SchemaId = "urn:solcore:oracle:v1";
-const semanticCoreSchemaId = "urn:solcore:semantic-core:v1";
+const semanticCoreV1SchemaId = "urn:solcore:semantic-core:v1";
+const semanticCoreV2SchemaId = "urn:solcore:semantic-core:v2";
 const permittedExternalRefs = new Map([
-  [oracleV2SchemaId, new Set([oracleV1SchemaId, semanticCoreSchemaId])],
+  [oracleV2SchemaId, new Set([oracleV1SchemaId, semanticCoreV1SchemaId])],
 ]);
-let semanticCoreReferenceCount = 0;
+let semanticCoreV1ReferenceCount = 0;
 
 function resolveJsonPointer(document, fragment) {
   let pointer;
@@ -149,9 +150,9 @@ function verifySchemaRef(ref, schema, path) {
     }
     if (
       schema.value.$id === oracleV2SchemaId &&
-      targetId === semanticCoreSchemaId
+      targetId === semanticCoreV1SchemaId
     ) {
-      semanticCoreReferenceCount += 1;
+      semanticCoreV1ReferenceCount += 1;
     }
   }
   if (!resolveJsonPointer(targetSchema.value, fragment)) {
@@ -198,11 +199,15 @@ assert(
   "schema/oracle-v2.schema.json is not registered by $id",
 );
 assert(
-  schemasById.has(semanticCoreSchemaId),
+  schemasById.has(semanticCoreV1SchemaId),
   "schema/semantic-core-v1.schema.json is not registered by $id",
 );
 assert(
-  semanticCoreReferenceCount > 0,
+  schemasById.has(semanticCoreV2SchemaId),
+  "schema/semantic-core-v2.schema.json is not registered by $id",
+);
+assert(
+  semanticCoreV1ReferenceCount > 0,
   "oracle v2 schema does not reference the registered Semantic Core v1 schema",
 );
 assert(schemaIssues.length === 0, schemaIssues.join("\n"));
