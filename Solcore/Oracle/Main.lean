@@ -10,7 +10,8 @@ private def help : String :=
     "",
     "Usage:",
     "  solcore-oracle                 Read NDJSON requests from standard input",
-    "  solcore-oracle capabilities    Print the M0 capability report",
+    "  solcore-oracle capabilities    Print the Oracle v1 capability report",
+    "  solcore-oracle capabilities-v2 Print the M1b Core capability report",
     "  solcore-oracle --version       Print the specification version",
     "  solcore-oracle --help          Print this help"
   ]
@@ -45,6 +46,18 @@ private def capabilitiesRequest : Request := {
   query := { kind := .capabilities }
 }
 
+private def capabilitiesV2Request : V2.Request := {
+  schema := V2.schemaVersion
+  id := "capabilities-v2"
+  spec := m1aLanguage.id
+  profile := {
+    id := m1aCoreProfile.id
+    digest := m1aCoreProfileDigest
+  }
+  limits := V2.CoreLimits.default
+  query := { kind := .capabilities }
+}
+
 def run (args : List String) : IO UInt32 := do
   match args with
   | ["--help"] | ["-h"] =>
@@ -60,6 +73,14 @@ def run (args : List String) : IO UInt32 := do
           return 0
       | .error error =>
           emitProtocolError error
+          return 1
+  | ["capabilities-v2"] =>
+      match V2.handle capabilitiesV2Request with
+      | .ok response =>
+          emitJson (Lean.toJson response)
+          return 0
+      | .error error =>
+          emitJson (Lean.toJson error)
           return 1
   | [] =>
       serve (← IO.getStdin)
