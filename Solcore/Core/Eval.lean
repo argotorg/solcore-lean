@@ -14,6 +14,19 @@ inductive Evaluates : Environment → Expr → Value → Prop where
   | var {environment : Environment} {index : Nat} {value : Value} :
       environment[index]? = some value →
       Evaluates environment (.var index) value
+  | unary
+      {environment : Environment} {op : UnaryOp} {operand : Expr}
+      {operandValue result : Value} :
+      Evaluates environment operand operandValue →
+      op.apply operandValue = some result →
+      Evaluates environment (.unary op operand) result
+  | binary
+      {environment : Environment} {op : BinaryOp} {left right : Expr}
+      {leftValue rightValue result : Value} :
+      Evaluates environment left leftValue →
+      Evaluates environment right rightValue →
+      op.apply leftValue rightValue = some result →
+      Evaluates environment (.binary op left right) result
   | letE
       {environment : Environment} {value body : Expr}
       {boundValue result : Value} :
@@ -53,6 +66,21 @@ theorem evaluation_deterministic
       | var rightLookup =>
           rw [leftLookup] at rightLookup
           cases rightLookup
+          rfl
+  | unary _ leftApplied operandIH =>
+      cases rightEvaluation with
+      | unary rightOperand rightApplied =>
+          cases operandIH rightOperand
+          rw [leftApplied] at rightApplied
+          cases rightApplied
+          rfl
+  | binary _ _ leftApplied leftIH rightIH =>
+      cases rightEvaluation with
+      | binary otherLeft otherRight rightApplied =>
+          cases leftIH otherLeft
+          cases rightIH otherRight
+          rw [leftApplied] at rightApplied
+          cases rightApplied
           rfl
   | letE _ _ boundIH bodyIH =>
       cases rightEvaluation with

@@ -120,4 +120,20 @@ theorem apply_result_type
 
 end BinaryOp
 
+namespace Expr
+
+def wordNe (left right : Expr) : Expr :=
+  .unary .boolNot (.binary .wordEq left right)
+
+def wordLt (left right : Expr) : Expr :=
+  .binary .wordGt right left
+
+def wordLe (left right : Expr) : Expr :=
+  .unary .boolNot (.binary .wordGt left right)
+
+def wordGe (left right : Expr) : Expr :=
+  .unary .boolNot (.binary .wordGt right left)
+
+end Expr
+
 end Solcore.Core

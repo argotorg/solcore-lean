@@ -31,6 +31,14 @@ theorem advance_next_iff {state next : State} :
                 simp [advance, lookup] at advanced
                 cases advanced
                 exact .var lookup
+        | unary op operand =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterUnary
+        | binary op left right =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterBinary
         | letE value body =>
             simp [advance] at advanced
             cases advanced
@@ -44,6 +52,24 @@ theorem advance_next_iff {state next : State} :
         | nil => simp [advance] at advanced
         | cons frame continuation =>
             cases frame with
+            | unaryApply op =>
+                cases applied : op.apply value with
+                | none => simp [advance, applied] at advanced
+                | some result =>
+                    simp [advance, applied] at advanced
+                    cases advanced
+                    exact .applyUnary applied
+            | binaryRight op right environment =>
+                simp [advance] at advanced
+                cases advanced
+                exact .enterBinaryRight
+            | binaryApply op leftValue =>
+                cases applied : op.apply leftValue value with
+                | none => simp [advance, applied] at advanced
+                | some result =>
+                    simp [advance, applied] at advanced
+                    cases advanced
+                    exact .applyBinary applied
             | letBody body environment =>
                 simp [advance] at advanced
                 cases advanced
@@ -73,7 +99,7 @@ theorem advance_done_iff {state : State} {value : Value} :
     cases control with
     | eval expr environment =>
         cases expr with
-        | unit | bool | word | letE | ifE => simp [advance] at advanced
+        | unit | bool | word | unary | binary | letE | ifE => simp [advance] at advanced
         | var index =>
             cases lookup : environment[index]? <;> simp [advance, lookup] at advanced
     | ret returned =>
@@ -84,6 +110,14 @@ theorem advance_done_iff {state : State} {value : Value} :
             rfl
         | cons frame continuation =>
             cases frame with
+            | unaryApply op =>
+                cases applied : op.apply returned <;>
+                  simp [advance, applied] at advanced
+            | binaryRight op right environment =>
+                simp [advance] at advanced
+            | binaryApply op leftValue =>
+                cases applied : op.apply leftValue returned <;>
+                  simp [advance, applied] at advanced
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with

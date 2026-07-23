@@ -10,6 +10,9 @@ inductive Control where
   deriving Repr, BEq, DecidableEq
 
 inductive Frame where
+  | unaryApply (op : UnaryOp)
+  | binaryRight (op : BinaryOp) (right : Expr) (environment : Environment)
+  | binaryApply (op : BinaryOp) (leftValue : Value)
   | letBody (body : Expr) (environment : Environment)
   | ifBranches (thenBranch : Expr) (elseBranch : Expr) (environment : Environment)
   deriving Repr, BEq, DecidableEq
@@ -51,6 +54,38 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.eval (.var index) environment, continuation⟩
         ⟨.ret value, continuation⟩
+  | enterUnary
+      {environment : Environment} {op : UnaryOp} {operand : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.unary op operand) environment, continuation⟩
+        ⟨.eval operand environment, .unaryApply op :: continuation⟩
+  | applyUnary
+      {op : UnaryOp} {operand result : Value} {continuation : List Frame} :
+      op.apply operand = some result →
+      Transition
+        ⟨.ret operand, .unaryApply op :: continuation⟩
+        ⟨.ret result, continuation⟩
+  | enterBinary
+      {environment : Environment} {op : BinaryOp} {left right : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.binary op left right) environment, continuation⟩
+        ⟨.eval left environment,
+          .binaryRight op right environment :: continuation⟩
+  | enterBinaryRight
+      {environment : Environment} {op : BinaryOp} {right : Expr}
+      {leftValue : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret leftValue, .binaryRight op right environment :: continuation⟩
+        ⟨.eval right environment, .binaryApply op leftValue :: continuation⟩
+  | applyBinary
+      {op : BinaryOp} {leftValue rightValue result : Value}
+      {continuation : List Frame} :
+      op.apply leftValue rightValue = some result →
+      Transition
+        ⟨.ret rightValue, .binaryApply op leftValue :: continuation⟩
+        ⟨.ret result, continuation⟩
   | enterLet
       {environment : Environment} {value body : Expr} {continuation : List Frame} :
       Transition
@@ -87,6 +122,8 @@ inductive Transition : State → State → Prop where
 inductive MachineFault where
   | unboundVariable (index : Nat)
   | expectedBool (actual : Value)
+  | invalidUnaryOperand (op : UnaryOp) (actual : Value)
+  | invalidBinaryOperands (op : BinaryOp) (left right : Value)
   deriving Repr, BEq, DecidableEq
 
 inductive AdvanceResult where
@@ -106,6 +143,11 @@ def advance (state : State) : AdvanceResult :=
           match environment[index]? with
           | some value => .next ⟨.ret value, state.continuation⟩
           | none => .fault (.unboundVariable index)
+      | .unary op operand =>
+          .next ⟨.eval operand environment, .unaryApply op :: state.continuation⟩
+      | .binary op left right =>
+          .next ⟨.eval left environment,
+            .binaryRight op right environment :: state.continuation⟩
       | .letE value body =>
           .next ⟨.eval value environment,
             .letBody body environment :: state.continuation⟩
@@ -115,6 +157,16 @@ def advance (state : State) : AdvanceResult :=
   | .ret value =>
       match state.continuation with
       | [] => .done value
+      | .unaryApply op :: continuation =>
+          match op.apply value with
+          | some result => .next ⟨.ret result, continuation⟩
+          | none => .fault (.invalidUnaryOperand op value)
+      | .binaryRight op right environment :: continuation =>
+          .next ⟨.eval right environment, .binaryApply op value :: continuation⟩
+      | .binaryApply op leftValue :: continuation =>
+          match op.apply leftValue value with
+          | some result => .next ⟨.ret result, continuation⟩
+          | none => .fault (.invalidBinaryOperands op leftValue value)
       | .letBody body environment :: continuation =>
           .next ⟨.eval body (value :: environment), continuation⟩
       | .ifBranches thenBranch elseBranch environment :: continuation =>

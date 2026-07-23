@@ -5,6 +5,9 @@ set_option autoImplicit false
 namespace Solcore.Core
 
 inductive CheckPathStep where
+  | unaryOperand
+  | binaryLeft
+  | binaryRight
   | letValue
   | letBody
   | ifCondition
@@ -20,6 +23,7 @@ def CheckPath.child (path : CheckPath) (step : CheckPathStep) : CheckPath :=
 inductive CheckErrorCode where
   | unboundVariable
   | expectedBool
+  | primitiveOperandTypeMismatch
   | branchTypeMismatch
   | declaredResultTypeMismatch
   deriving Repr, BEq, DecidableEq
@@ -27,12 +31,15 @@ inductive CheckErrorCode where
 def CheckErrorCode.name : CheckErrorCode → String
   | .unboundVariable => "core.check.unbound-variable"
   | .expectedBool => "core.check.expected-bool"
+  | .primitiveOperandTypeMismatch =>
+      "core.check.primitive-operand-type-mismatch"
   | .branchTypeMismatch => "core.check.branch-type-mismatch"
   | .declaredResultTypeMismatch => "core.check.declared-result-type-mismatch"
 
 inductive CheckErrorData where
   | unboundVariable (index contextSize : Nat)
   | expectedBool (actual : Ty)
+  | primitiveOperandTypeMismatch (expected actual : Ty)
   | branchTypeMismatch (thenType elseType : Ty)
   | declaredResultTypeMismatch (declaredType inferredType : Ty)
   deriving Repr, BEq, DecidableEq
@@ -40,6 +47,7 @@ inductive CheckErrorData where
 def CheckErrorData.code : CheckErrorData → CheckErrorCode
   | .unboundVariable .. => .unboundVariable
   | .expectedBool .. => .expectedBool
+  | .primitiveOperandTypeMismatch .. => .primitiveOperandTypeMismatch
   | .branchTypeMismatch .. => .branchTypeMismatch
   | .declaredResultTypeMismatch .. => .declaredResultTypeMismatch
 
@@ -66,6 +74,40 @@ def inferDetailed (context : Context) (path : CheckPath := []) : Expr → Except
             path
             data := .unboundVariable index context.length
           }
+  | .unary op operand =>
+      let operandPath := path.child .unaryOperand
+      match inferDetailed context operandPath operand with
+      | .error error => .error error
+      | .ok operandType =>
+          if operandType = op.operandType then
+            .ok op.resultType
+          else
+            .error {
+              path := operandPath
+              data := .primitiveOperandTypeMismatch op.operandType operandType
+            }
+  | .binary op left right =>
+      let leftPath := path.child .binaryLeft
+      match inferDetailed context leftPath left with
+      | .error error => .error error
+      | .ok leftType =>
+          if leftType = op.leftType then
+            let rightPath := path.child .binaryRight
+            match inferDetailed context rightPath right with
+            | .error error => .error error
+            | .ok rightType =>
+                if rightType = op.rightType then
+                  .ok op.resultType
+                else
+                  .error {
+                    path := rightPath
+                    data := .primitiveOperandTypeMismatch op.rightType rightType
+                  }
+          else
+            .error {
+              path := leftPath
+              data := .primitiveOperandTypeMismatch op.leftType leftType
+            }
   | .letE value body =>
       match inferDetailed context (path.child .letValue) value with
       | .error error => .error error
@@ -103,6 +145,109 @@ theorem inferDetailed_toOption
   | var index =>
       cases lookup : context[index]? <;>
         simp [inferDetailed, infer?, Except.toOption, lookup]
+  | unary op operand operandIH =>
+      cases operandDetailed :
+          inferDetailed context (path.child .unaryOperand) operand with
+      | error error =>
+          have operandNotInferred : infer? context operand = none := by
+            simpa [operandDetailed, Except.toOption] using
+              (operandIH context (path.child .unaryOperand)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            operandDetailed,
+            operandNotInferred
+          ]
+      | ok operandType =>
+          have operandInferred : infer? context operand = some operandType := by
+            simpa [operandDetailed, Except.toOption] using
+              (operandIH context (path.child .unaryOperand)).symm
+          by_cases matchingType : operandType = op.operandType
+          · subst operandType
+            simp [
+              inferDetailed,
+              infer?,
+              Except.toOption,
+              operandDetailed,
+              operandInferred
+            ]
+          · simp [
+              inferDetailed,
+              infer?,
+              Except.toOption,
+              operandDetailed,
+              operandInferred,
+              matchingType
+            ]
+  | binary op left right leftIH rightIH =>
+      cases leftDetailed :
+          inferDetailed context (path.child .binaryLeft) left with
+      | error error =>
+          have leftNotInferred : infer? context left = none := by
+            simpa [leftDetailed, Except.toOption] using
+              (leftIH context (path.child .binaryLeft)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            leftDetailed,
+            leftNotInferred
+          ]
+      | ok leftType =>
+          have leftInferred : infer? context left = some leftType := by
+            simpa [leftDetailed, Except.toOption] using
+              (leftIH context (path.child .binaryLeft)).symm
+          by_cases matchingLeft : leftType = op.leftType
+          · subst leftType
+            cases rightDetailed :
+                inferDetailed context (path.child .binaryRight) right with
+            | error error =>
+                have rightNotInferred : infer? context right = none := by
+                  simpa [rightDetailed, Except.toOption] using
+                    (rightIH context (path.child .binaryRight)).symm
+                simp [
+                  inferDetailed,
+                  infer?,
+                  Except.toOption,
+                  leftDetailed,
+                  leftInferred,
+                  rightDetailed,
+                  rightNotInferred
+                ]
+            | ok rightType =>
+                have rightInferred : infer? context right = some rightType := by
+                  simpa [rightDetailed, Except.toOption] using
+                    (rightIH context (path.child .binaryRight)).symm
+                by_cases matchingRight : rightType = op.rightType
+                · subst rightType
+                  simp [
+                    inferDetailed,
+                    infer?,
+                    Except.toOption,
+                    leftDetailed,
+                    leftInferred,
+                    rightDetailed,
+                    rightInferred
+                  ]
+                · simp [
+                    inferDetailed,
+                    infer?,
+                    Except.toOption,
+                    leftDetailed,
+                    leftInferred,
+                    rightDetailed,
+                    rightInferred,
+                    matchingRight
+                  ]
+          · simp [
+              inferDetailed,
+              infer?,
+              Except.toOption,
+              leftDetailed,
+              leftInferred,
+              matchingLeft
+            ]
   | letE value body valueIH bodyIH =>
       cases valueDetailed :
           inferDetailed context (path.child .letValue) value with

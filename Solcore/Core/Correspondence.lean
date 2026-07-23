@@ -33,6 +33,53 @@ theorem Evaluates.toStepsWithContinuation
       exact ⟨1, .cons .word .refl⟩
   | var lookup =>
       exact ⟨1, .cons (.var lookup) .refl⟩
+  | @unary environment op operand operandValue result
+      operandEvaluation applied operandIH =>
+      obtain ⟨operandSteps, operandPath⟩ :=
+        operandIH (.unaryApply op :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.unary op operand) environment, continuation⟩
+          ⟨.eval operand environment, .unaryApply op :: continuation⟩ :=
+        .cons
+          (@Transition.enterUnary environment op operand continuation)
+          .refl
+      let applyPath : Steps 1
+          ⟨.ret operandValue, .unaryApply op :: continuation⟩
+          ⟨.ret result, continuation⟩ :=
+        .cons
+          (@Transition.applyUnary op operandValue result continuation applied)
+          .refl
+      exact ⟨_, enterPath.trans (operandPath.trans applyPath)⟩
+  | @binary environment op left right leftValue rightValue result
+      leftEvaluation rightEvaluation applied leftIH rightIH =>
+      obtain ⟨leftSteps, leftPath⟩ :=
+        leftIH (.binaryRight op right environment :: continuation)
+      obtain ⟨rightSteps, rightPath⟩ :=
+        rightIH (.binaryApply op leftValue :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.binary op left right) environment, continuation⟩
+          ⟨.eval left environment,
+            .binaryRight op right environment :: continuation⟩ :=
+        .cons
+          (@Transition.enterBinary environment op left right continuation)
+          .refl
+      let rightEntryPath : Steps 1
+          ⟨.ret leftValue, .binaryRight op right environment :: continuation⟩
+          ⟨.eval right environment, .binaryApply op leftValue :: continuation⟩ :=
+        .cons
+          (@Transition.enterBinaryRight environment op right leftValue continuation)
+          .refl
+      let applyPath : Steps 1
+          ⟨.ret rightValue, .binaryApply op leftValue :: continuation⟩
+          ⟨.ret result, continuation⟩ :=
+        .cons
+          (@Transition.applyBinary op leftValue rightValue result continuation applied)
+          .refl
+      exact ⟨_,
+        enterPath.trans
+          (leftPath.trans
+            (rightEntryPath.trans
+              (rightPath.trans applyPath)))⟩
   | @letE environment bound body boundValue result
       boundEvaluation bodyEvaluation boundIH bodyIH =>
       obtain ⟨boundSteps, boundPath⟩ :=
@@ -102,6 +149,31 @@ theorem Evaluates.toSteps
 inductive Continues : List Frame → Value → Value → Prop where
   | done {value : Value} :
       Continues [] value value
+  | unaryApply
+      {op : UnaryOp} {continuation : List Frame}
+      {operand result finalValue : Value} :
+      op.apply operand = some result →
+      Continues continuation result finalValue →
+      Continues (.unaryApply op :: continuation) operand finalValue
+  | binaryRight
+      {op : BinaryOp} {right : Expr} {environment : Environment}
+      {continuation : List Frame} {leftValue rightValue result finalValue : Value} :
+      Evaluates environment right rightValue →
+      op.apply leftValue rightValue = some result →
+      Continues continuation result finalValue →
+      Continues
+        (.binaryRight op right environment :: continuation)
+        leftValue
+        finalValue
+  | binaryApply
+      {op : BinaryOp} {leftValue rightValue result finalValue : Value}
+      {continuation : List Frame} :
+      op.apply leftValue rightValue = some result →
+      Continues continuation result finalValue →
+      Continues
+        (.binaryApply op leftValue :: continuation)
+        rightValue
+        finalValue
   | letBody
       {body : Expr} {environment : Environment} {continuation : List Frame}
       {boundValue result finalValue : Value} :
@@ -157,6 +229,32 @@ theorem transition_reflects_denotation
   | var lookup =>
       cases denotes with
       | ret continuation => exact .eval (.var lookup) continuation
+  | enterUnary =>
+      cases denotes with
+      | eval operandEvaluation continuation =>
+          cases continuation with
+          | unaryApply applied rest =>
+              exact .eval (.unary operandEvaluation applied) rest
+  | applyUnary applied =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.unaryApply applied continuation)
+  | enterBinary =>
+      cases denotes with
+      | eval leftEvaluation continuation =>
+          cases continuation with
+          | binaryRight rightEvaluation applied rest =>
+              exact .eval (.binary leftEvaluation rightEvaluation applied) rest
+  | enterBinaryRight =>
+      cases denotes with
+      | eval rightEvaluation continuation =>
+          cases continuation with
+          | binaryApply applied rest =>
+              exact .ret (.binaryRight rightEvaluation applied rest)
+  | applyBinary applied =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.binaryApply applied continuation)
   | enterLet =>
       cases denotes with
       | eval boundEvaluation continuation =>

@@ -25,6 +25,9 @@ private def responseFor
 }
 
 private def checkPathStepName : Core.CheckPathStep → String
+  | .unaryOperand => "unaryOperand"
+  | .binaryLeft => "binaryLeft"
+  | .binaryRight => "binaryRight"
   | .letValue => "letValue"
   | .letBody => "letBody"
   | .ifCondition => "ifCondition"
@@ -39,6 +42,11 @@ private def checkErrorArguments : Core.CheckErrorData → Lean.Json
       ]
   | .expectedBool actual =>
       .mkObj [("actual", Core.Wire.V1.encodeType actual)]
+  | .primitiveOperandTypeMismatch expected actual =>
+      .mkObj [
+        ("expected", Core.Wire.V1.encodeType expected),
+        ("actual", Core.Wire.V1.encodeType actual)
+      ]
   | .branchTypeMismatch thenType elseType =>
       .mkObj [
         ("thenType", Core.Wire.V1.encodeType thenType),

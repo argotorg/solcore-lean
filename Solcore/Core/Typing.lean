@@ -1,4 +1,4 @@
-import Solcore.Core.Syntax
+import Solcore.Core.Primitive
 
 set_option autoImplicit false
 
@@ -11,6 +11,15 @@ inductive HasType : Context → Expr → Ty → Prop where
   | var {context : Context} {index : Nat} {type : Ty} :
       context[index]? = some type →
       HasType context (.var index) type
+  | unary
+      {context : Context} {op : UnaryOp} {operand : Expr} :
+      HasType context operand op.operandType →
+      HasType context (.unary op operand) op.resultType
+  | binary
+      {context : Context} {op : BinaryOp} {left right : Expr} :
+      HasType context left op.leftType →
+      HasType context right op.rightType →
+      HasType context (.binary op left right) op.resultType
   | letE :
       {context : Context} → {value body : Expr} → {valueType bodyType : Ty} →
       HasType context value valueType →
@@ -28,6 +37,19 @@ def infer? (context : Context) : Expr → Option Ty
   | .bool _ => some .bool
   | .word _ => some .word
   | .var index => context[index]?
+  | .unary op operand =>
+      if infer? context operand = some op.operandType then
+        some op.resultType
+      else
+        none
+  | .binary op left right =>
+      if infer? context left = some op.leftType then
+        if infer? context right = some op.rightType then
+          some op.resultType
+        else
+          none
+      else
+        none
   | .letE value body =>
       match infer? context value with
       | some valueType => infer? (valueType :: context) body
@@ -44,6 +66,8 @@ theorem infer_complete
     infer? context expr = some type := by
   induction typing with
   | unit | bool | word | var => simp_all [infer?]
+  | unary _ operandIH => simp [infer?, operandIH]
+  | binary _ _ leftIH rightIH => simp [infer?, leftIH, rightIH]
   | letE _ _ valueIH bodyIH => simp_all [infer?]
   | ifE _ _ _ conditionIH thenIH elseIH => simp_all [infer?]
 
@@ -66,6 +90,29 @@ theorem infer_sound
       exact .word
   | var index =>
       exact .var inferred
+  | unary op operand operandIH =>
+      by_cases operandInferred :
+          infer? context operand = some op.operandType
+      · have resultType : op.resultType = type := by
+          exact Option.some.inj (by
+            simpa [infer?, operandInferred] using inferred)
+        subst type
+        exact .unary (operandIH operandInferred)
+      · simp [infer?, operandInferred] at inferred
+  | binary op left right leftIH rightIH =>
+      by_cases leftInferred :
+          infer? context left = some op.leftType
+      · by_cases rightInferred :
+            infer? context right = some op.rightType
+        · have resultType : op.resultType = type := by
+            exact Option.some.inj (by
+              simpa [infer?, leftInferred, rightInferred] using inferred)
+          subst type
+          exact .binary
+            (leftIH leftInferred)
+            (rightIH rightInferred)
+        · simp [infer?, leftInferred, rightInferred] at inferred
+      · simp [infer?, leftInferred] at inferred
   | letE value body valueIH bodyIH =>
       cases valueInferred : infer? context value with
       | none => simp [infer?, valueInferred] at inferred

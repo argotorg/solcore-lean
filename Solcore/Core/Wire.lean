@@ -51,6 +51,8 @@ def ofCore? : Solcore.Core.Expr → Option Expr
       let thenBranch ← ofCore? thenBranch
       let elseBranch ← ofCore? elseBranch
       some (.ifE condition thenBranch elseBranch)
+  | .unary _ _ => none
+  | .binary _ _ _ => none
 
 @[simp] theorem ofCore?_toCore (expr : Expr) :
     ofCore? expr.toCore = some expr := by

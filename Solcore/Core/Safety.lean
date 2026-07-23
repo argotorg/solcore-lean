@@ -44,6 +44,22 @@ theorem ValueHasType.bool_shape
   cases typing with
   | bool => exact ⟨_, rfl⟩
 
+theorem ValueHasType.type_eq
+    {value : Value} {type : Ty}
+    (typing : ValueHasType value type) :
+    value.type = type := by
+  cases typing <;> rfl
+
+theorem ValueHasType.of_type_eq
+    {value : Value} {type : Ty}
+    (typeEquality : value.type = type) :
+    ValueHasType value type := by
+  cases value <;> simp [Value.type] at typeEquality <;>
+    subst type
+  · exact .unit
+  · exact .bool
+  · exact .word
+
 theorem evaluation_preserves_type
     {environment : Environment} {context : Context}
     {expr : Expr} {value : Value} {type : Ty}
@@ -69,6 +85,16 @@ theorem evaluation_preserves_type
           rw [valueLookup] at foundLookup
           cases foundLookup
           exact foundTyping
+  | unary operandEvaluation applied operandIH =>
+      cases typing with
+      | unary operandTyping =>
+          exact ValueHasType.of_type_eq
+            (UnaryOp.apply_result_type applied)
+  | binary leftEvaluation rightEvaluation applied leftIH rightIH =>
+      cases typing with
+      | binary leftTyping rightTyping =>
+          exact ValueHasType.of_type_eq
+            (BinaryOp.apply_result_type applied)
   | letE boundEvaluation bodyEvaluation boundIH bodyIH =>
       cases typing with
       | letE boundTyping bodyTyping =>
@@ -97,6 +123,43 @@ theorem well_typed_evaluates
   | var typeLookup =>
       obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
       exact ⟨value, .var valueLookup⟩
+  | unary operandTyping operandIH =>
+      obtain ⟨operandValue, operandEvaluation⟩ :=
+        operandIH environmentTyping
+      have operandValueTyping :=
+        evaluation_preserves_type
+          operandEvaluation
+          operandTyping
+          environmentTyping
+      obtain ⟨result, applied, _⟩ :=
+        UnaryOp.apply_total_of_type
+          _
+          operandValue
+          operandValueTyping.type_eq
+      exact ⟨result, .unary operandEvaluation applied⟩
+  | binary leftTyping rightTyping leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation⟩ :=
+        leftIH environmentTyping
+      obtain ⟨rightValue, rightEvaluation⟩ :=
+        rightIH environmentTyping
+      have leftValueTyping :=
+        evaluation_preserves_type
+          leftEvaluation
+          leftTyping
+          environmentTyping
+      have rightValueTyping :=
+        evaluation_preserves_type
+          rightEvaluation
+          rightTyping
+          environmentTyping
+      obtain ⟨result, applied, _⟩ :=
+        BinaryOp.apply_total_of_types
+          _
+          leftValue
+          rightValue
+          leftValueTyping.type_eq
+          rightValueTyping.type_eq
+      exact ⟨result, .binary leftEvaluation rightEvaluation applied⟩
   | letE boundTyping bodyTyping boundIH bodyIH =>
       obtain ⟨boundValue, boundEvaluation⟩ := boundIH environmentTyping
       have boundValueTyping :=
@@ -150,6 +213,25 @@ theorem closed_well_typed_run_has_sufficient_fuel
     completes⟩
 
 inductive FrameHasType : Frame → Ty → Ty → Prop where
+  | unaryApply
+      {op : UnaryOp} :
+      FrameHasType (.unaryApply op) op.operandType op.resultType
+  | binaryRight
+      {op : BinaryOp} {right : Expr} {environment : Environment}
+      {context : Context} :
+      EnvironmentHasTypes environment context →
+      HasType context right op.rightType →
+      FrameHasType
+        (.binaryRight op right environment)
+        op.leftType
+        op.resultType
+  | binaryApply
+      {op : BinaryOp} {leftValue : Value} :
+      ValueHasType leftValue op.leftType →
+      FrameHasType
+        (.binaryApply op leftValue)
+        op.rightType
+        op.resultType
   | letBody
       {body : Expr} {environment : Environment} {context : Context}
       {inputType outputType : Ty} :
@@ -222,6 +304,59 @@ theorem transition_preserves_state_type
               rw [valueLookup] at foundLookup
               cases foundLookup
               exact .ret foundTyping continuationTyping
+  | enterUnary =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | unary operandTyping =>
+              exact .eval
+                environmentTyping
+                operandTyping
+                (.cons .unaryApply continuationTyping)
+  | applyUnary applied =>
+      cases stateTyping with
+      | ret operandTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | unaryApply =>
+                  exact .ret
+                    (ValueHasType.of_type_eq
+                      (UnaryOp.apply_result_type applied))
+                    restTyping
+  | enterBinary =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | binary leftTyping rightTyping =>
+              exact .eval
+                environmentTyping
+                leftTyping
+                (.cons
+                  (.binaryRight environmentTyping rightTyping)
+                  continuationTyping)
+  | enterBinaryRight =>
+      cases stateTyping with
+      | ret leftTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | binaryRight environmentTyping rightTyping =>
+                  exact .eval
+                    environmentTyping
+                    rightTyping
+                    (.cons (.binaryApply leftTyping) restTyping)
+  | applyBinary applied =>
+      cases stateTyping with
+      | ret rightTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | binaryApply leftTyping =>
+                  exact .ret
+                    (ValueHasType.of_type_eq
+                      (BinaryOp.apply_result_type applied))
+                    restTyping
   | enterLet =>
       cases stateTyping with
       | eval environmentTyping exprTyping continuationTyping =>
@@ -284,6 +419,10 @@ theorem state_progress
       | var typeLookup =>
           obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
           exact .inr ⟨_, .var valueLookup⟩
+      | unary =>
+          exact .inr ⟨_, .enterUnary⟩
+      | binary =>
+          exact .inr ⟨_, .enterBinary⟩
       | letE => exact .inr ⟨_, .enterLet⟩
       | ifE => exact .inr ⟨_, .enterIf⟩
   | ret valueTyping continuationTyping =>
@@ -291,6 +430,24 @@ theorem state_progress
       | nil => exact .inl ⟨_, rfl⟩
       | cons frameTyping restTyping =>
           cases frameTyping with
+          | unaryApply =>
+              obtain ⟨result, applied, _⟩ :=
+                UnaryOp.apply_total_of_type
+                  _
+                  _
+                  valueTyping.type_eq
+              exact .inr ⟨_, .applyUnary applied⟩
+          | binaryRight =>
+              exact .inr ⟨_, .enterBinaryRight⟩
+          | binaryApply leftTyping =>
+              obtain ⟨result, applied, _⟩ :=
+                BinaryOp.apply_total_of_types
+                  _
+                  _
+                  _
+                  leftTyping.type_eq
+                  valueTyping.type_eq
+              exact .inr ⟨_, .applyBinary applied⟩
           | letBody =>
               exact .inr ⟨_, .bindLet⟩
           | ifBranches =>

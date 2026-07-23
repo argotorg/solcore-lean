@@ -83,6 +83,8 @@ inductive Expr where
   | bool (value : Bool)
   | word (value : Word)
   | var (index : Nat)
+  | unary (op : UnaryOp) (operand : Expr)
+  | binary (op : BinaryOp) (left : Expr) (right : Expr)
   | letE (value : Expr) (body : Expr)
   | ifE (condition : Expr) (thenBranch : Expr) (elseBranch : Expr)
   deriving Repr, BEq, DecidableEq

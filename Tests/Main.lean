@@ -205,6 +205,63 @@ def testPrimitiveAlgebra : IO Unit := do
     (BinaryOp.wordAdd.apply (.bool true) (.word one) == none)
     "an unchecked binary primitive must reject invalid operands"
 
+def testM1cKernel : IO Unit := do
+  let one ←
+    match Word.ofNat? 1 with
+    | some value => pure value
+    | none => throw (IO.userError "one must be an in-range Core word")
+  let addWrap : Program := {
+    resultType := .word
+    body := .binary .wordAdd (.word Word.maximum) (.word one)
+  }
+  assertTrue addWrap.check
+    "a wordAdd expression with word operands must type-check"
+  assertTrue (addWrap.run 4 == .outOfFuel)
+    "four CEK transitions must be insufficient for a binary literal expression"
+  assertTrue (addWrap.run 5 == .done (.word Word.zero))
+    "wordAdd must complete exactly at its five-transition boundary"
+  let negated : Program := {
+    resultType := .bool
+    body := .unary .boolNot (.bool true)
+  }
+  assertTrue negated.check
+    "a boolNot expression with a bool operand must type-check"
+  assertTrue (negated.run 2 == .outOfFuel)
+    "two CEK transitions must be insufficient for a unary literal expression"
+  assertTrue (negated.run 3 == .done (.bool false))
+    "boolNot must complete exactly at its three-transition boundary"
+  let derivedLessThan : Program := {
+    resultType := .bool
+    body := Expr.wordLt (.word Word.zero) (.word one)
+  }
+  assertTrue derivedLessThan.check
+    "the derived wordLt combinator must type-check"
+  assertTrue (derivedLessThan.run 5 == .done (.bool true))
+    "wordLt must reverse wordGt operands without changing its result"
+  let leftFaultsFirst : Program := {
+    resultType := .word
+    body := .binary .wordAdd (.var 11) (.var 22)
+  }
+  assertTrue
+    (leftFaultsFirst.run 1 == .fault (.unboundVariable 11))
+    "the unchecked binary machine must evaluate the left operand first"
+  let rightBeforeInvalidApplication : Program := {
+    resultType := .word
+    body := .binary .wordAdd .unit (.var 22)
+  }
+  assertTrue
+    (rightBeforeInvalidApplication.run 3 == .fault (.unboundVariable 22))
+    "the unchecked binary machine must evaluate the right operand before applying the operator"
+  let invalidUnary : Program := {
+    resultType := .bool
+    body := .unary .boolNot .unit
+  }
+  assertTrue
+    (invalidUnary.run 2 == .fault (.invalidUnaryOperand .boolNot .unit))
+    "the unchecked machine must expose an invalid unary operand"
+  assertTrue (Core.Wire.V1.Program.ofCore? addWrap).isNone
+    "Semantic Core v1 must not encode M1c primitive expressions"
+
 def assertCoreWireError {α : Type}
     (name : String)
     (result : Except Core.Wire.V1.DecodeError α)
@@ -455,6 +512,36 @@ def testDetailedCoreChecker : IO Unit := do
   assertTrue
     (resultError.data == .declaredResultTypeMismatch .unit .bool)
     "declared-result-mismatch diagnostic arguments changed"
+  let unaryMismatch : Program := {
+    resultType := .bool
+    body := .unary .boolNot .unit
+  }
+  let unaryError ←
+    assertCheckError "unary operand mismatch" unaryMismatch
+      .primitiveOperandTypeMismatch [.unaryOperand]
+  assertTrue
+    (unaryError.data == .primitiveOperandTypeMismatch .bool .unit)
+    "unary primitive diagnostic arguments changed"
+  let binaryLeftMismatch : Program := {
+    resultType := .word
+    body := .binary .wordAdd (.bool true) (.var 99)
+  }
+  let binaryLeftError ←
+    assertCheckError "binary left operand mismatch" binaryLeftMismatch
+      .primitiveOperandTypeMismatch [.binaryLeft]
+  assertTrue
+    (binaryLeftError.data == .primitiveOperandTypeMismatch .word .bool)
+    "binary-left primitive diagnostic arguments changed"
+  let binaryRightMismatch : Program := {
+    resultType := .word
+    body := .binary .wordAdd (.word Word.zero) (.bool true)
+  }
+  let binaryRightError ←
+    assertCheckError "binary right operand mismatch" binaryRightMismatch
+      .primitiveOperandTypeMismatch [.binaryRight]
+  assertTrue
+    (binaryRightError.data == .primitiveOperandTypeMismatch .word .bool)
+    "binary-right primitive diagnostic arguments changed"
 
 def requestV2For
     (kind : Oracle.V2.QueryKind)
@@ -940,6 +1027,7 @@ def run : IO Unit := do
   testFeatureMatrix
   testSemanticCore
   testPrimitiveAlgebra
+  testM1cKernel
   testM1bProfile
   testCoreWire
   testDetailedCoreChecker
