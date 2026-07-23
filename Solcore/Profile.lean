@@ -30,6 +30,11 @@ inductive Feature where
   | storage
   | storageArrays
   | inlineYul
+  | coreUnit
+  | coreBool
+  | coreWord
+  | coreImmutableLet
+  | coreConditional
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
 inductive SpecMaturity where
@@ -42,7 +47,7 @@ inductive SpecMaturity where
 
 namespace Feature
 
-def all : Array Feature := #[
+def legacyAll : Array Feature := #[
   .corePrimitives,
   .functions,
   .lambdas,
@@ -64,7 +69,23 @@ def all : Array Feature := #[
   .inlineYul
 ]
 
+def m1aAll : Array Feature :=
+  legacyAll ++ #[
+    .coreUnit,
+    .coreBool,
+    .coreWord,
+    .coreImmutableLet,
+    .coreConditional
+  ]
+
+def all : Array Feature := m1aAll
+
 def specMaturity : Feature → SpecMaturity
+  | .coreUnit
+  | .coreBool
+  | .coreWord
+  | .coreImmutableLet
+  | .coreConditional => .normative
   | .corePrimitives
   | .functions
   | .lambdas
@@ -296,7 +317,7 @@ def draftLanguage : LanguageVersion := {
   abiVersion := none
   storageLayoutVersion := none
   standardLibrary := canonicalStd
-  knownFeatures := Feature.all
+  knownFeatures := Feature.legacyAll
 }
 
 def draftCoreProfile : SpecProfile := {
@@ -316,6 +337,48 @@ def draftCoreProfileDigest : String :=
 
 theorem draftCoreProfile_valid : draftCoreProfile.Valid := by
   change draftCoreProfile.validationErrors = []
+  native_decide
+
+def m1aLanguage : LanguageVersion := {
+  id := "solcore/0.1.0-draft.2"
+  release := {
+    major := 0
+    minor := 1
+    patch := 0
+    prerelease := some "draft.2"
+  }
+  grammarVersion := none
+  staticSemanticsVersion := some 1
+  dynamicSemanticsVersion := some 1
+  abiVersion := none
+  storageLayoutVersion := none
+  standardLibrary := canonicalStd
+  knownFeatures := Feature.m1aAll
+}
+
+def m1aCoreProfile : SpecProfile := {
+  id := "core-m1a-v1"
+  language := m1aLanguage
+  scope := .core
+  enabledFeatures := #[
+    .coreUnit,
+    .coreBool,
+    .coreWord,
+    .coreImmutableLet,
+    .coreConditional
+  ]
+  solver := .tabled
+  observation := .valueV1
+  contractRuntime := none
+  spanUnit := .utf8Byte
+  sourceEncoding := "UTF-8"
+}
+
+def m1aCoreProfileDigest : String :=
+  "sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867"
+
+theorem m1aCoreProfile_valid : m1aCoreProfile.Valid := by
+  change m1aCoreProfile.validationErrors = []
   native_decide
 
 end Solcore

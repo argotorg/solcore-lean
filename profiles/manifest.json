@@ -7,6 +7,12 @@
       "spec": "solcore/0.1.0-draft.1",
       "path": "profiles/solcore-0.1.0-draft.1-core.json",
       "digest": "sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8"
+    },
+    {
+      "id": "core-m1a-v1",
+      "spec": "solcore/0.1.0-draft.2",
+      "path": "profiles/solcore-0.1.0-draft.2-core-m1a.json",
+      "digest": "sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867"
     }
   ]
 }

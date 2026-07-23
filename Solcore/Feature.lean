@@ -46,6 +46,20 @@ def featureMatrix : Array FeatureRow := #[
   ⟨.inlineYul, .deferred, "M4", .unsupported, some "0002", "Specified as a lowering boundary."⟩
 ]
 
+def m1aFeatureMatrix : Array FeatureRow :=
+  featureMatrix ++ #[
+    ⟨.coreUnit, .normative, "M1b", .implemented, some "0010",
+      "Unit type, literal, value, typing, and evaluation are normative."⟩,
+    ⟨.coreBool, .normative, "M1b", .implemented, some "0010",
+      "Boolean type, literals, values, typing, and evaluation are normative."⟩,
+    ⟨.coreWord, .normative, "M1b", .implemented, some "0010",
+      "Range-checked 256-bit word type, literals, values, typing, and evaluation are normative."⟩,
+    ⟨.coreImmutableLet, .normative, "M1b", .implemented, some "0010",
+      "Initialized immutable de Bruijn bindings are normative."⟩,
+    ⟨.coreConditional, .normative, "M1b", .implemented, some "0010",
+      "Condition-first, selected-branch-only Core conditionals are normative."⟩
+  ]
+
 private def hasDuplicates {α : Type} [BEq α] : List α → Bool
   | [] => false
   | item :: rest => rest.contains item || hasDuplicates rest
@@ -53,22 +67,42 @@ private def hasDuplicates {α : Type} [BEq α] : List α → Bool
 def featureMatrixIsComplete : Bool :=
   let features := featureMatrix.toList.map (·.feature)
   !hasDuplicates features &&
-    Feature.all.all features.contains &&
-    features.all Feature.all.contains &&
+    Feature.legacyAll.all features.contains &&
+    features.all Feature.legacyAll.contains &&
     featureMatrix.all fun row => row.specStatus == row.feature.specMaturity
 
-def featureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
-  featureMatrix.all fun row =>
+def m1aFeatureMatrixIsComplete : Bool :=
+  let features := m1aFeatureMatrix.toList.map (·.feature)
+  !hasDuplicates features &&
+    Feature.m1aAll.all features.contains &&
+    features.all Feature.m1aAll.contains &&
+    m1aFeatureMatrix.all fun row => row.specStatus == row.feature.specMaturity
+
+def rowsRespectProfile (rows : Array FeatureRow) (profile : SpecProfile) : Bool :=
+  rows.all fun row =>
     if row.leanStatus == .implemented then
       row.specStatus == .normative && profile.enabledFeatures.contains row.feature
     else
       true
+
+def featureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
+  rowsRespectProfile featureMatrix profile
+
+def m1aFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
+  rowsRespectProfile m1aFeatureMatrix profile
 
 theorem featureMatrix_complete : featureMatrixIsComplete = true := by
   native_decide
 
 theorem draftFeatureMatrix_respectsProfile :
     featureMatrixRespectsProfile draftCoreProfile = true := by
+  native_decide
+
+theorem m1aFeatureMatrix_complete : m1aFeatureMatrixIsComplete = true := by
+  native_decide
+
+theorem m1aFeatureMatrix_respectsProfile :
+    m1aFeatureMatrixRespectsProfile m1aCoreProfile = true := by
   native_decide
 
 end Solcore
