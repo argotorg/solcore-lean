@@ -3,6 +3,7 @@ import Solcore
 set_option autoImplicit false
 
 open Solcore
+open Solcore.Core
 open Solcore.Oracle
 
 namespace Tests
@@ -68,6 +69,78 @@ def testFeatureMatrix : IO Unit := do
     "feature matrix must contain every feature exactly once"
   assertTrue (featureMatrixRespectsProfile draftCoreProfile)
     "implemented features must be enabled and normative"
+
+def coreConditionalProgram : Program := {
+  resultType := .bool
+  body :=
+    .letE
+      (.bool true)
+      (.ifE (.var 0) (.bool false) (.bool true))
+}
+
+def testSemanticCore : IO Unit := do
+  assertTrue coreConditionalProgram.check
+    "the closed let/if Core witness must type-check"
+  assertTrue (coreConditionalProgram.run 6 == .outOfFuel)
+    "six CEK transitions must be insufficient for the seven-step witness"
+  assertTrue (coreConditionalProgram.run 7 == .done (.bool false))
+    "the Core evaluator must finish exactly at the seven-transition boundary"
+  for fuel in [0, 1, 2, 3, 4, 5, 6, 7, 8] do
+    match coreConditionalProgram.run fuel with
+    | .fault error =>
+        throw (IO.userError s!"well-typed Core program faulted: {reprStr error}")
+    | _ => pure ()
+  let lazyBranchProgram : Program := {
+    resultType := .bool
+    body := .ifE (.bool true) (.bool false) (.var 99)
+  }
+  assertTrue (lazyBranchProgram.run 3 == .outOfFuel)
+    "three CEK transitions must stop before the selected branch returns"
+  assertTrue (lazyBranchProgram.run 4 == .done (.bool false))
+    "if must evaluate only the selected branch"
+  let nearestBindingProgram : Program := {
+    resultType := .bool
+    body :=
+      .letE
+        (.bool true)
+        (.letE
+          (.bool false)
+          (.ifE (.var 0) (.bool false) (.var 1)))
+  }
+  assertTrue nearestBindingProgram.check
+    "nested de Bruijn bindings must type-check"
+  assertTrue (nearestBindingProgram.run 16 == .done (.bool true))
+    "index 0 must be the nearest binding and index 1 the next outer binding"
+  let openProgram : Program := {
+    resultType := .bool
+    body := .var 0
+  }
+  assertTrue (!openProgram.check)
+    "an unbound de Bruijn index must be rejected statically"
+  let nonBooleanCondition : Program := {
+    resultType := .bool
+    body := .ifE .unit (.bool true) (.bool false)
+  }
+  assertTrue (!nonBooleanCondition.check)
+    "if conditions must have bool type"
+  assertTrue (nonBooleanCondition.run 2 == .fault (.expectedBool .unit))
+    "the unchecked machine must expose a non-bool condition as a fault"
+  let branchMismatch : Program := {
+    resultType := .bool
+    body := .ifE (.bool true) .unit (.bool false)
+  }
+  assertTrue (!branchMismatch.check)
+    "if branches must have the same type"
+  let declaredResultMismatch : Program := {
+    resultType := .unit
+    body := .bool true
+  }
+  assertTrue (!declaredResultMismatch.check)
+    "the inferred Core result must equal the declared result type"
+  assertTrue (Word.ofNat? 42).isSome
+    "an in-range word literal must construct a Core word"
+  assertTrue (Word.ofNat? wordModulus).isNone
+    "a Core word must reject the first out-of-range natural"
 
 def testOracle : IO Unit := do
   assertJsonRoundTrip "request" (requestFor .check)
@@ -277,6 +350,7 @@ def testSchemaJson : IO Unit := do
 def run : IO Unit := do
   testProfile
   testFeatureMatrix
+  testSemanticCore
   testOracle
   testSchemaJson
 
@@ -284,5 +358,5 @@ end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0 tests passed"
+  IO.println "solcore-lean M0/M1a tests passed"
   return 0
