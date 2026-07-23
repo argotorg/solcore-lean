@@ -1,8 +1,10 @@
 import Solcore.Surface.Source
 import Solcore.Surface.Token
 import Solcore.Surface.Syntax
+import Solcore.Surface.LexicalGrammar
 import Solcore.Surface.Lexer
 import Solcore.Surface.Grammar
+import Solcore.Surface.GrammarProperties
 import Solcore.Surface.Parser
 import Solcore.Surface.Properties
 
