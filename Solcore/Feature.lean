@@ -60,6 +60,26 @@ def m1aFeatureMatrix : Array FeatureRow :=
       "Condition-first, selected-branch-only Core conditionals are normative."⟩
   ]
 
+def m1cFeatureMatrix : Array FeatureRow :=
+  (m1aFeatureMatrix.map fun row =>
+    if row.feature == .corePrimitives then
+      { row with
+        note :=
+          "M1c implements the normative bool-not and word-operation subset; " ++
+          "the aggregate remains partial."
+      }
+    else
+      row) ++ #[
+    ⟨.coreBoolNot, .normative, "M1c", .implemented, some "0011",
+      "Boolean negation is normative."⟩,
+    ⟨.coreWordArithmetic, .normative, "M1c", .implemented, some "0011",
+      "Modular add/subtract/multiply and total unsigned divide/modulo are normative."⟩,
+    ⟨.coreWordComparison, .normative, "M1c", .implemented, some "0011",
+      "Unsigned word equality and greater-than are normative."⟩,
+    ⟨.coreWordBitwise, .normative, "M1c", .implemented, some "0011",
+      "Fixed-width word bitwise operations and bounded logical shifts are normative."⟩
+  ]
+
 private def hasDuplicates {α : Type} [BEq α] : List α → Bool
   | [] => false
   | item :: rest => rest.contains item || hasDuplicates rest
@@ -78,6 +98,13 @@ def m1aFeatureMatrixIsComplete : Bool :=
     features.all Feature.m1aAll.contains &&
     m1aFeatureMatrix.all fun row => row.specStatus == row.feature.specMaturity
 
+def m1cFeatureMatrixIsComplete : Bool :=
+  let features := m1cFeatureMatrix.toList.map (·.feature)
+  !hasDuplicates features &&
+    Feature.m1cAll.all features.contains &&
+    features.all Feature.m1cAll.contains &&
+    m1cFeatureMatrix.all fun row => row.specStatus == row.feature.specMaturity
+
 def rowsRespectProfile (rows : Array FeatureRow) (profile : SpecProfile) : Bool :=
   rows.all fun row =>
     if row.leanStatus == .implemented then
@@ -91,6 +118,9 @@ def featureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
 def m1aFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
   rowsRespectProfile m1aFeatureMatrix profile
 
+def m1cFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
+  rowsRespectProfile m1cFeatureMatrix profile
+
 theorem featureMatrix_complete : featureMatrixIsComplete = true := by
   native_decide
 
@@ -103,6 +133,13 @@ theorem m1aFeatureMatrix_complete : m1aFeatureMatrixIsComplete = true := by
 
 theorem m1aFeatureMatrix_respectsProfile :
     m1aFeatureMatrixRespectsProfile m1aCoreProfile = true := by
+  native_decide
+
+theorem m1cFeatureMatrix_complete : m1cFeatureMatrixIsComplete = true := by
+  native_decide
+
+theorem m1cFeatureMatrix_respectsProfile :
+    m1cFeatureMatrixRespectsProfile m1cCoreProfile = true := by
   native_decide
 
 end Solcore

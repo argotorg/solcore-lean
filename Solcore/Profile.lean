@@ -35,6 +35,10 @@ inductive Feature where
   | coreWord
   | coreImmutableLet
   | coreConditional
+  | coreBoolNot
+  | coreWordArithmetic
+  | coreWordComparison
+  | coreWordBitwise
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
 inductive SpecMaturity where
@@ -78,14 +82,26 @@ def m1aAll : Array Feature :=
     .coreConditional
   ]
 
-def all : Array Feature := m1aAll
+def m1cAll : Array Feature :=
+  m1aAll ++ #[
+    .coreBoolNot,
+    .coreWordArithmetic,
+    .coreWordComparison,
+    .coreWordBitwise
+  ]
+
+def all : Array Feature := m1cAll
 
 def specMaturity : Feature → SpecMaturity
   | .coreUnit
   | .coreBool
   | .coreWord
   | .coreImmutableLet
-  | .coreConditional => .normative
+  | .coreConditional
+  | .coreBoolNot
+  | .coreWordArithmetic
+  | .coreWordComparison
+  | .coreWordBitwise => .normative
   | .corePrimitives
   | .functions
   | .lambdas
@@ -379,6 +395,52 @@ def m1aCoreProfileDigest : String :=
 
 theorem m1aCoreProfile_valid : m1aCoreProfile.Valid := by
   change m1aCoreProfile.validationErrors = []
+  native_decide
+
+def m1cLanguage : LanguageVersion := {
+  id := "solcore/0.1.0-draft.3"
+  release := {
+    major := 0
+    minor := 1
+    patch := 0
+    prerelease := some "draft.3"
+  }
+  grammarVersion := none
+  staticSemanticsVersion := some 2
+  dynamicSemanticsVersion := some 2
+  abiVersion := none
+  storageLayoutVersion := none
+  standardLibrary := canonicalStd
+  knownFeatures := Feature.m1cAll
+}
+
+def m1cCoreProfile : SpecProfile := {
+  id := "core-m1c-v1"
+  language := m1cLanguage
+  scope := .core
+  enabledFeatures := #[
+    .coreUnit,
+    .coreBool,
+    .coreWord,
+    .coreImmutableLet,
+    .coreConditional,
+    .coreBoolNot,
+    .coreWordArithmetic,
+    .coreWordComparison,
+    .coreWordBitwise
+  ]
+  solver := .tabled
+  observation := .valueV1
+  contractRuntime := none
+  spanUnit := .utf8Byte
+  sourceEncoding := "UTF-8"
+}
+
+def m1cCoreProfileDigest : String :=
+  "sha256:111ad60f90a5dca6eaafa582475b6582d081bc081ee59766d6040173061f2693"
+
+theorem m1cCoreProfile_valid : m1cCoreProfile.Valid := by
+  change m1cCoreProfile.validationErrors = []
   native_decide
 
 end Solcore

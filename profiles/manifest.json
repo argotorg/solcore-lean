@@ -13,6 +13,12 @@
       "spec": "solcore/0.1.0-draft.2",
       "path": "profiles/solcore-0.1.0-draft.2-core-m1a.json",
       "digest": "sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867"
+    },
+    {
+      "id": "core-m1c-v1",
+      "spec": "solcore/0.1.0-draft.3",
+      "path": "profiles/solcore-0.1.0-draft.3-core-m1c.json",
+      "digest": "sha256:111ad60f90a5dca6eaafa582475b6582d081bc081ee59766d6040173061f2693"
     }
   ]
 }

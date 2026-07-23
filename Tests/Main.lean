@@ -304,6 +304,37 @@ def testM1bProfile : IO Unit := do
   assertTrue (profileJson == Lean.toJson m1aCoreProfile)
     "checked-in draft.2 profile differs from the Lean profile"
 
+def testM1cProfile : IO Unit := do
+  assertTrue m1cCoreProfile.validationErrors.isEmpty
+    s!"draft.3 Core profile is invalid: {m1cCoreProfile.validationErrors}"
+  assertTrue m1cFeatureMatrixIsComplete
+    "M1c feature matrix must contain every draft.3 feature exactly once"
+  assertTrue (m1cFeatureMatrixRespectsProfile m1cCoreProfile)
+    "implemented M1c features must be normative and enabled"
+  assertTrue (m1cLanguage.id == "solcore/0.1.0-draft.3")
+    "M1c must be published as draft.3"
+  assertTrue
+    (m1cLanguage.staticSemanticsVersion == some 2 &&
+      m1cLanguage.dynamicSemanticsVersion == some 2)
+    "M1c must publish static and dynamic semantics version 2"
+  assertTrue (m1cCoreProfile.enabledFeatures.size == 9)
+    "the M1c profile must enable exactly nine normative Core features"
+  assertTrue
+    (m1cCoreProfile.enabledFeatures.all fun feature =>
+      feature.specMaturity == .normative)
+    "every M1c profile feature must be normative"
+  assertJsonRoundTrip "draft.3 Core profile" m1cCoreProfile
+  assertJsonRoundTrip "M1c feature matrix" m1cFeatureMatrix
+  let profileText ←
+    IO.FS.readFile "profiles/solcore-0.1.0-draft.3-core-m1c.json"
+  let profileJson ←
+    match Lean.Json.parse profileText with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"draft.3 profile JSON is invalid: {error}")
+  assertTrue (profileJson == Lean.toJson m1cCoreProfile)
+    "checked-in draft.3 profile differs from the Lean profile"
+
 def testCoreWire : IO Unit := do
   for type in [Ty.unit, Ty.bool, Ty.word] do
     match Core.Wire.V1.decodeType (Core.Wire.V1.encodeType type) with
@@ -975,6 +1006,7 @@ def testSchemaJson : IO Unit := do
         "schema/semantic-core-v1.schema.json", "metadata/baselines.json",
         "metadata/standard-library.json", "profiles/manifest.json",
         "profiles/solcore-0.1.0-draft.2-core-m1a.json",
+        "profiles/solcore-0.1.0-draft.3-core-m1c.json",
         "Tests/golden/wire-manifest.json"] do
     let text ← IO.FS.readFile path
     match Lean.Json.parse text with
@@ -1029,6 +1061,7 @@ def run : IO Unit := do
   testPrimitiveAlgebra
   testM1cKernel
   testM1bProfile
+  testM1cProfile
   testCoreWire
   testDetailedCoreChecker
   testOracle
