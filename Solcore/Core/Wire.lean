@@ -4,7 +4,86 @@ import Solcore.Foundation.Json
 
 set_option autoImplicit false
 
-namespace Solcore.Core.Wire
+namespace Solcore.Core.Wire.V1
+
+/-!
+The Semantic Core v1 wire language is deliberately independent of the evolving
+internal Core syntax. This closed AST keeps the v1 encoder total without
+silently assigning v1 encodings to constructors introduced by later profiles.
+-/
+
+inductive Expr where
+  | unit
+  | bool (value : Bool)
+  | word (value : Solcore.Core.Word)
+  | var (index : Nat)
+  | letE (initializer : Expr) (body : Expr)
+  | ifE (condition : Expr) (thenBranch : Expr) (elseBranch : Expr)
+  deriving Repr, BEq, DecidableEq
+
+structure Program where
+  resultType : Solcore.Core.Ty
+  body : Expr
+  deriving Repr, BEq, DecidableEq
+
+namespace Expr
+
+def toCore : Expr → Solcore.Core.Expr
+  | .unit => .unit
+  | .bool value => .bool value
+  | .word value => .word value
+  | .var index => .var index
+  | .letE initializer body => .letE initializer.toCore body.toCore
+  | .ifE condition thenBranch elseBranch =>
+      .ifE condition.toCore thenBranch.toCore elseBranch.toCore
+
+def ofCore? : Solcore.Core.Expr → Option Expr
+  | .unit => some .unit
+  | .bool value => some (.bool value)
+  | .word value => some (.word value)
+  | .var index => some (.var index)
+  | .letE initializer body => do
+      let initializer ← ofCore? initializer
+      let body ← ofCore? body
+      some (.letE initializer body)
+  | .ifE condition thenBranch elseBranch => do
+      let condition ← ofCore? condition
+      let thenBranch ← ofCore? thenBranch
+      let elseBranch ← ofCore? elseBranch
+      some (.ifE condition thenBranch elseBranch)
+
+@[simp] theorem ofCore?_toCore (expr : Expr) :
+    ofCore? expr.toCore = some expr := by
+  induction expr with
+  | unit | bool | word | var => rfl
+  | letE initializer body initializerIH bodyIH =>
+      simp [toCore, ofCore?, initializerIH, bodyIH]
+  | ifE condition thenBranch elseBranch conditionIH thenIH elseIH =>
+      simp [toCore, ofCore?, conditionIH, thenIH, elseIH]
+
+end Expr
+
+namespace Program
+
+def toCore (program : Program) : Solcore.Core.Program := {
+  resultType := program.resultType
+  body := program.body.toCore
+}
+
+def ofCore? (program : Solcore.Core.Program) : Option Program := do
+  let body ← Expr.ofCore? program.body
+  some {
+    resultType := program.resultType
+    body
+  }
+
+@[simp] theorem ofCore?_toCore (program : Program) :
+    ofCore? program.toCore = some program := by
+  cases program with
+  | mk resultType body =>
+      simp [toCore, ofCore?, Expr.ofCore?_toCore]
+
+end Program
 
 def schemaVersion : String := "solcore-semantic-core/v1"
 
@@ -875,4 +954,4 @@ theorem canonicalizeProgramWith_idempotent
   exact canonicalizeProgramWith_encodeProgram
     limits program depthEnough nodesEnough
 
-end Solcore.Core.Wire
+end Solcore.Core.Wire.V1

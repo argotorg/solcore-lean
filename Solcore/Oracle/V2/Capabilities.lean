@@ -26,7 +26,7 @@ def capabilityReport : CapabilityReport := {
   spec := m1aLanguage.id
   profile := m1aCoreProfile
   profileDigest := m1aCoreProfileDigest
-  coreSchema := Core.Wire.schemaVersion
+  coreSchema := Core.Wire.V1.schemaVersion
   checkResultSchema
   valueObservationSchema
   baselines := implementationBaselines

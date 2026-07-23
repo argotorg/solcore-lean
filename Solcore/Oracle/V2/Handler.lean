@@ -38,16 +38,16 @@ private def checkErrorArguments : Core.CheckErrorData → Lean.Json
         ("contextSize", Lean.toJson contextSize)
       ]
   | .expectedBool actual =>
-      .mkObj [("actual", Core.Wire.encodeType actual)]
+      .mkObj [("actual", Core.Wire.V1.encodeType actual)]
   | .branchTypeMismatch thenType elseType =>
       .mkObj [
-        ("thenType", Core.Wire.encodeType thenType),
-        ("elseType", Core.Wire.encodeType elseType)
+        ("thenType", Core.Wire.V1.encodeType thenType),
+        ("elseType", Core.Wire.V1.encodeType elseType)
       ]
   | .declaredResultTypeMismatch declaredType inferredType =>
       .mkObj [
-        ("declaredType", Core.Wire.encodeType declaredType),
-        ("inferredType", Core.Wire.encodeType inferredType)
+        ("declaredType", Core.Wire.V1.encodeType declaredType),
+        ("inferredType", Core.Wire.V1.encodeType inferredType)
       ]
 
 private def diagnosticOfCheckError (error : Core.CheckError) : Diagnostic := {
@@ -63,12 +63,12 @@ private def rejectedFor
     Response :=
   responseFor request (.rejected .coreChecking (diagnosticOfCheckError error) #[])
 
-private def coreWirePointer (error : Core.Wire.DecodeError) : String :=
+private def coreWirePointer (error : Core.Wire.V1.DecodeError) : String :=
   "/query/program" ++ error.path.toPointer
 
 private def coreWireProtocolError
     (request : Request)
-    (error : Core.Wire.DecodeError) :
+    (error : Core.Wire.V1.DecodeError) :
     ProtocolError := {
   id := some request.id
   code := "core.wire." ++ error.code.wireName
@@ -81,12 +81,12 @@ private def decodeProgram
     (request : Request)
     (json : Lean.Json) :
     Except ProtocolError (Except Response Core.Program) :=
-  let limits : Core.Wire.DecodeLimits := {
+  let limits : Core.Wire.V1.DecodeLimits := {
     maxDepth := request.limits.inputDepth
     maxNodes := request.limits.inputNodes
   }
-  match Core.Wire.decodeProgramWith limits json with
-  | .ok program => pure (.ok program)
+  match Core.Wire.V1.decodeProgramWith limits json with
+  | .ok program => pure (.ok program.toCore)
   | .error error =>
       match error.code with
       | .depthLimitExceeded =>
@@ -103,7 +103,7 @@ private def handleCheck (request : Request) (program : Core.Program) : Response 
   | .ok resultType =>
       responseFor request (.accepted .coreChecking {
         schema := checkResultSchema
-        value := .mkObj [("resultType", Core.Wire.encodeType resultType)]
+        value := .mkObj [("resultType", Core.Wire.V1.encodeType resultType)]
       })
 
 private def handleEval (request : Request) (program : Core.Program) : Response :=
@@ -116,8 +116,8 @@ private def handleEval (request : Request) (program : Core.Program) : Response :
             responseFor request (.executed {
               schema := valueObservationSchema
               value := .mkObj [
-                ("resultType", Core.Wire.encodeType program.resultType),
-                ("value", Core.Wire.encodeValue value)
+                ("resultType", Core.Wire.V1.encodeType program.resultType),
+                ("value", Core.Wire.V1.encodeValue value)
               ]
             })
           else

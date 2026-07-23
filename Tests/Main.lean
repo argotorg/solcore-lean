@@ -207,8 +207,8 @@ def testPrimitiveAlgebra : IO Unit := do
 
 def assertCoreWireError {α : Type}
     (name : String)
-    (result : Except Core.Wire.DecodeError α)
-    (code : Core.Wire.DecodeErrorCode)
+    (result : Except Core.Wire.V1.DecodeError α)
+    (code : Core.Wire.V1.DecodeErrorCode)
     (path : String) :
     IO Unit := do
   match result with
@@ -249,7 +249,7 @@ def testM1bProfile : IO Unit := do
 
 def testCoreWire : IO Unit := do
   for type in [Ty.unit, Ty.bool, Ty.word] do
-    match Core.Wire.decodeType (Core.Wire.encodeType type) with
+    match Core.Wire.V1.decodeType (Core.Wire.V1.encodeType type) with
     | .ok decoded =>
         assertTrue (decoded == type) s!"Core type failed to round-trip: {reprStr type}"
     | .error error =>
@@ -267,13 +267,13 @@ def testCoreWire : IO Unit := do
     .word word42
   ]
   for value in values do
-    match Core.Wire.decodeValue (Core.Wire.encodeValue value) with
+    match Core.Wire.V1.decodeValue (Core.Wire.V1.encodeValue value) with
     | .ok decoded =>
         assertTrue (decoded == value) s!"Core value failed to round-trip: {reprStr value}"
     | .error error =>
         throw (IO.userError
           s!"encoded Core value did not decode: {(Lean.toJson error).compress}")
-  let expressions : Array Expr := #[
+  let expressions : Array Core.Wire.V1.Expr := #[
     .unit,
     .bool false,
     .word word42,
@@ -282,25 +282,37 @@ def testCoreWire : IO Unit := do
     .ifE (.bool false) (.word Word.zero) (.word word42)
   ]
   for expr in expressions do
-    match Core.Wire.decodeExpr (Core.Wire.encodeExpr expr) with
+    match Core.Wire.V1.decodeExpr (Core.Wire.V1.encodeExpr expr) with
     | .ok decoded =>
         assertTrue (decoded == expr) s!"Core expression failed to round-trip: {reprStr expr}"
     | .error error =>
         throw (IO.userError
           s!"encoded Core expression did not decode: {(Lean.toJson error).compress}")
-  match Core.Wire.decodeProgram (Core.Wire.encodeProgram coreConditionalProgram) with
+  let wireProgram : Core.Wire.V1.Program := {
+    resultType := .bool
+    body :=
+      .letE
+        (.bool true)
+        (.ifE (.var 0) (.bool false) (.bool true))
+  }
+  assertTrue (wireProgram.toCore == coreConditionalProgram)
+    "the Semantic Core v1 AST embedding changed the represented Core program"
+  assertTrue
+    (Core.Wire.V1.Program.ofCore? coreConditionalProgram == some wireProgram)
+    "the M1a Core witness must remain representable in Semantic Core v1"
+  match Core.Wire.V1.decodeProgram (Core.Wire.V1.encodeProgram wireProgram) with
   | .ok decoded =>
-      assertTrue (decoded == coreConditionalProgram)
-        "Core Program failed to round-trip"
+      assertTrue (decoded == wireProgram)
+        "Semantic Core v1 Program failed to round-trip"
   | .error error =>
       throw (IO.userError
         s!"encoded Core Program did not decode: {(Lean.toJson error).compress}")
   let zeroText := "0x" ++ String.ofList (List.replicate 64 '0')
   let maximumText := "0x" ++ String.ofList (List.replicate 64 'f')
   let uppercaseText := "0x" ++ String.ofList (List.replicate 64 'F')
-  assertTrue (Core.Wire.encodeWordText Word.zero == zeroText)
+  assertTrue (Core.Wire.V1.encodeWordText Word.zero == zeroText)
     "Core word zero must use fixed-width lowercase hexadecimal"
-  match Core.Wire.decodeWordText maximumText with
+  match Core.Wire.V1.decodeWordText maximumText with
   | .ok value =>
       assertTrue (value.val + 1 == wordModulus)
         "the maximum 256-bit Core word decoded incorrectly"
@@ -308,36 +320,39 @@ def testCoreWire : IO Unit := do
       throw (IO.userError
         s!"the maximum Core word did not decode: {(Lean.toJson error).compress}")
   assertCoreWireError "uppercase Core word"
-    (Core.Wire.decodeWordText uppercaseText) .invalidWord ""
+    (Core.Wire.V1.decodeWordText uppercaseText) .invalidWord ""
   assertCoreWireError "short Core word"
-    (Core.Wire.decodeWordText "0x00") .invalidWord ""
+    (Core.Wire.V1.decodeWordText "0x00") .invalidWord ""
   assertCoreWireError "missing Core word prefix"
-    (Core.Wire.decodeWordText (String.ofList (List.replicate 64 '0')))
+    (Core.Wire.V1.decodeWordText (String.ofList (List.replicate 64 '0')))
     .invalidWord ""
   let unitWithUnknownField : Lean.Json :=
     .mkObj [("tag", "unit"), ("surprise", true)]
   assertCoreWireError "unknown expression field"
-    (Core.Wire.decodeExpr unitWithUnknownField) .unknownField "/surprise"
+    (Core.Wire.V1.decodeExpr unitWithUnknownField) .unknownField "/surprise"
   let boolWithVariantField : Lean.Json :=
     .mkObj [("tag", "bool"), ("value", true), ("index", 0)]
   assertCoreWireError "field from another expression variant"
-    (Core.Wire.decodeExpr boolWithVariantField) .unknownField "/index"
+    (Core.Wire.V1.decodeExpr boolWithVariantField) .unknownField "/index"
   let missingBoolValue : Lean.Json := .mkObj [("tag", "bool")]
   assertCoreWireError "missing expression field"
-    (Core.Wire.decodeExpr missingBoolValue) .missingField "/value"
+    (Core.Wire.V1.decodeExpr missingBoolValue) .missingField "/value"
   let unknownTag : Lean.Json := .mkObj [("tag", "call")]
   assertCoreWireError "unknown expression tag"
-    (Core.Wire.decodeExpr unknownTag) .invalidTag "/tag"
+    (Core.Wire.V1.decodeExpr unknownTag) .invalidTag "/tag"
+  let postV1PrimitiveTag : Lean.Json := .mkObj [("tag", "unary")]
+  assertCoreWireError "post-v1 primitive expression tag"
+    (Core.Wire.V1.decodeExpr postV1PrimitiveTag) .invalidTag "/tag"
   let nonNaturalIndex : Lean.Json :=
     .mkObj [("tag", "var"), ("index", "zero")]
   assertCoreWireError "non-natural de Bruijn index"
-    (Core.Wire.decodeExpr nonNaturalIndex) .expectedNatural "/index"
+    (Core.Wire.V1.decodeExpr nonNaturalIndex) .expectedNatural "/index"
   let decimalIntegralIndex ←
     match StrictJson.parse "{\"tag\":\"var\",\"index\":1.0}" with
     | .ok value => pure value
     | .error error =>
         throw (IO.userError s!"integral decimal Core fixture did not parse: {error}")
-  match Core.Wire.decodeExpr decimalIntegralIndex with
+  match Core.Wire.V1.decodeExpr decimalIntegralIndex with
   | .ok (.var 1) => pure ()
   | .ok value =>
       throw (IO.userError
@@ -351,37 +366,37 @@ def testCoreWire : IO Unit := do
     | .error error =>
         throw (IO.userError s!"fractional Core fixture did not parse: {error}")
   assertCoreWireError "fractional de Bruijn index"
-    (Core.Wire.decodeExpr fractionalIndex) .expectedNatural "/index"
+    (Core.Wire.V1.decodeExpr fractionalIndex) .expectedNatural "/index"
   let negativeIndex ←
     match StrictJson.parse "{\"tag\":\"var\",\"index\":-1}" with
     | .ok value => pure value
     | .error error =>
         throw (IO.userError s!"negative Core fixture did not parse: {error}")
   assertCoreWireError "negative de Bruijn index"
-    (Core.Wire.decodeExpr negativeIndex) .expectedNatural "/index"
+    (Core.Wire.V1.decodeExpr negativeIndex) .expectedNatural "/index"
   let wrongSchema :=
-    (Core.Wire.encodeProgram coreConditionalProgram).setObjVal!
+    (Core.Wire.V1.encodeProgram wireProgram).setObjVal!
       "schema" "solcore-semantic-core/v999"
   assertCoreWireError "unknown Core schema"
-    (Core.Wire.decodeProgram wrongSchema) .invalidSchema "/schema"
+    (Core.Wire.V1.decodeProgram wrongSchema) .invalidSchema "/schema"
   let wrongResultType :=
-    (Core.Wire.encodeProgram coreConditionalProgram).setObjVal!
+    (Core.Wire.V1.encodeProgram wireProgram).setObjVal!
       "resultType" "boolean"
   assertCoreWireError "unknown Core result type"
-    (Core.Wire.decodeProgram wrongResultType) .invalidType "/resultType"
+    (Core.Wire.V1.decodeProgram wrongResultType) .invalidType "/resultType"
   let uppercaseWordProgram : Lean.Json :=
     .mkObj [
-      ("schema", Core.Wire.schemaVersion),
+      ("schema", Core.Wire.V1.schemaVersion),
       ("resultType", "word"),
       ("body", .mkObj [("tag", "word"), ("value", uppercaseText)])
     ]
   assertCoreWireError "uppercase word in Program"
-    (Core.Wire.decodeProgram uppercaseWordProgram) .invalidWord "/body/value"
+    (Core.Wire.V1.decodeProgram uppercaseWordProgram) .invalidWord "/body/value"
   assertCoreWireError "Core expression depth limit"
-    (Core.Wire.decodeExprWith { maxDepth := 0, maxNodes := 10 } (.mkObj [("tag", "unit")]))
+    (Core.Wire.V1.decodeExprWith { maxDepth := 0, maxNodes := 10 } (.mkObj [("tag", "unit")]))
     .depthLimitExceeded ""
   assertCoreWireError "Core expression node limit"
-    (Core.Wire.decodeExprWith { maxDepth := 10, maxNodes := 0 } (.mkObj [("tag", "unit")]))
+    (Core.Wire.V1.decodeExprWith { maxDepth := 10, maxNodes := 0 } (.mkObj [("tag", "unit")]))
     .nodeLimitExceeded ""
 
 def assertCheckError
@@ -456,7 +471,8 @@ def requestV2For
   limits
   query := {
     kind
-    program := program.map Core.Wire.encodeProgram
+    program := program.bind fun coreProgram =>
+      (Core.Wire.V1.Program.ofCore? coreProgram).map Core.Wire.V1.encodeProgram
   }
 }
 
@@ -481,8 +497,8 @@ def assertExecutedBool
         s!"{name} used the wrong observation schema"
       assertTrue
         (observation.value == .mkObj [
-          ("resultType", Core.Wire.encodeType .bool),
-          ("value", Core.Wire.encodeValue (.bool expected))
+          ("resultType", Core.Wire.V1.encodeType .bool),
+          ("value", Core.Wire.V1.encodeValue (.bool expected))
         ])
         s!"{name} returned an unexpected observation"
   | _ =>
@@ -500,7 +516,7 @@ def testOracleV2 : IO Unit := do
         (result.value.getObjValD "spec" == m1aLanguage.id)
         "Oracle v2 capabilities must identify draft.2"
       assertTrue
-        (result.value.getObjValD "coreSchema" == Core.Wire.schemaVersion)
+        (result.value.getObjValD "coreSchema" == Core.Wire.V1.schemaVersion)
         "Oracle v2 capabilities must identify the Core wire schema"
   | _ =>
       throw (IO.userError "Oracle v2 capabilities were not accepted")
