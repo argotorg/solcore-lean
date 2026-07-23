@@ -1403,6 +1403,8 @@ def expectSurfaceLex (content : String) : IO Surface.Lexed := do
   | .ok lexed =>
       assertTrue (lexed.spansValidFor file)
         "successful Surface lexing must return valid token and comment spans"
+      assertTrue (Surface.LexicalGrammar.accepts file lexed)
+        "successful Surface lexing must satisfy the declarative lexical grammar"
       pure lexed
 
 def expectSurfaceParse (content : String) : IO Surface.ParsedFile := do
@@ -1520,6 +1522,10 @@ def testSurfaceLexer : IO Unit := do
         "the lexer must report the first invalid character"
       assertSurfaceSpan error.span 8 9
         "invalid-character span must use UTF-8 byte offsets"
+      assertTrue
+        (Surface.LexicalGrammar.failureAt
+          (surfaceFile "/*🙂*/@") error.span.startByte == some error)
+        "the lexical rejection checker must reconstruct the lexer error"
   | outcome =>
       throw (IO.userError s!"expected invalid-character failure, got {reprStr outcome}")
 
@@ -1529,6 +1535,10 @@ def testSurfaceLexer : IO Unit := do
         "a non-ASCII identifier character must remain outside M2a"
       assertSurfaceSpan error.span 7 9
         "a multibyte invalid character must occupy its complete UTF-8 range"
+      assertTrue
+        (Surface.LexicalGrammar.failureAt
+          (surfaceFile "//🙂\nλ") error.span.startByte == some error)
+        "the lexical rejection checker must preserve a multibyte error"
   | outcome =>
       throw (IO.userError s!"expected non-ASCII identifier failure, got {reprStr outcome}")
 
@@ -1585,6 +1595,10 @@ def testSurfaceLexer : IO Unit := do
         "nested comment exhaustion must identify the outer unmatched comment"
       assertSurfaceSpan error.span 0 8
         "unterminated-comment span must end at EOF"
+      assertTrue
+        (Surface.LexicalGrammar.failureAt
+          (surfaceFile "/*a/*b*/") error.span.startByte == some error)
+        "the lexical rejection checker must reconstruct nested exhaustion"
   | outcome =>
       throw (IO.userError s!"expected unterminated-comment failure, got {reprStr outcome}")
 
@@ -1878,6 +1892,35 @@ def testSurfaceValidityBoundaries : IO Unit := do
   assertTrue (!gapped.isValidFor (surfaceFile "a@b"))
     "lexical validity must reject an uncovered non-whitespace byte"
 
+  let sourceSpan (startByte endByte : Nat) : Surface.SourceSpan := {
+    source := "main.solc"
+    startByte
+    endByte
+  }
+  let assertRejectedAlternative
+      (source : String)
+      (tokens : List Surface.Token) : IO Unit := do
+    let file := surfaceFile source
+    let forged : Surface.Lexed := { tokens, comments := [] }
+    assertTrue (forged.isValidFor file)
+      s!"the alternate stream for {source} must be structurally valid"
+    assertTrue (!Surface.LexicalGrammar.accepts file forged)
+      s!"the lexical grammar accepted an alternate stream for {source}"
+
+  assertRejectedAlternative "0x1" [
+    { kind := .decimal "0", span := sourceSpan 0 1 },
+    { kind := .identifier "x1", span := sourceSpan 1 3 }
+  ]
+  assertRejectedAlternative "->" [
+    { kind := .minus, span := sourceSpan 0 1 },
+    { kind := .greater, span := sourceSpan 1 2 }
+  ]
+  assertRejectedAlternative "//x" [
+    { kind := .slash, span := sourceSpan 0 1 },
+    { kind := .slash, span := sourceSpan 1 2 },
+    { kind := .identifier "x", span := sourceSpan 2 3 }
+  ]
+
   match Surface.Parser.parseLexed (surfaceFile "x") {
       tokens := []
       comments := []
@@ -1914,6 +1957,9 @@ def testSurfaceValidityBoundaries : IO Unit := do
       }
       assertTrue (forged.isValidFor (surfaceFile fusedSource))
         "source-partition validity is intentionally separate from maximal munch"
+      assertTrue
+        (!Surface.LexicalGrammar.accepts (surfaceFile fusedSource) forged)
+        "the declarative lexical grammar must reject a split identifier"
       match Surface.Parser.parseLexed (surfaceFile fusedSource) forged with
       | .error (.internal (.invalidInput _)) => pure ()
       | outcome =>
