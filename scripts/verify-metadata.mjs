@@ -95,14 +95,17 @@ for (const schema of schemas) {
   }
 }
 
-const oracleV2SchemaId = "urn:solcore:oracle:v2";
 const oracleV1SchemaId = "urn:solcore:oracle:v1";
+const oracleV2SchemaId = "urn:solcore:oracle:v2";
+const oracleV3SchemaId = "urn:solcore:oracle:v3";
 const semanticCoreV1SchemaId = "urn:solcore:semantic-core:v1";
 const semanticCoreV2SchemaId = "urn:solcore:semantic-core:v2";
 const permittedExternalRefs = new Map([
   [oracleV2SchemaId, new Set([oracleV1SchemaId, semanticCoreV1SchemaId])],
+  [oracleV3SchemaId, new Set([oracleV1SchemaId, semanticCoreV2SchemaId])],
 ]);
 let semanticCoreV1ReferenceCount = 0;
+let semanticCoreV2ReferenceCount = 0;
 
 function resolveJsonPointer(document, fragment) {
   let pointer;
@@ -154,6 +157,12 @@ function verifySchemaRef(ref, schema, path) {
     ) {
       semanticCoreV1ReferenceCount += 1;
     }
+    if (
+      schema.value.$id === oracleV3SchemaId &&
+      targetId === semanticCoreV2SchemaId
+    ) {
+      semanticCoreV2ReferenceCount += 1;
+    }
   }
   if (!resolveJsonPointer(targetSchema.value, fragment)) {
     schemaIssues.push(`${schema.path}${path}: unresolved JSON pointer ${ref}`);
@@ -199,6 +208,10 @@ assert(
   "schema/oracle-v2.schema.json is not registered by $id",
 );
 assert(
+  schemasById.has(oracleV3SchemaId),
+  "schema/oracle-v3.schema.json is not registered by $id",
+);
+assert(
   schemasById.has(semanticCoreV1SchemaId),
   "schema/semantic-core-v1.schema.json is not registered by $id",
 );
@@ -209,6 +222,55 @@ assert(
 assert(
   semanticCoreV1ReferenceCount > 0,
   "oracle v2 schema does not reference the registered Semantic Core v1 schema",
+);
+assert(
+  semanticCoreV2ReferenceCount > 0,
+  "oracle v3 schema does not reference the registered Semantic Core v2 schema",
+);
+
+const semanticCoreV1Schema = schemasById.get(semanticCoreV1SchemaId).value;
+const semanticCoreV2Schema = schemasById.get(semanticCoreV2SchemaId).value;
+const frozenCoreDefinitionNames = [
+  "nat",
+  "type",
+  "word256",
+  "unitExpr",
+  "boolExpr",
+  "wordExpr",
+  "varExpr",
+  "letExpr",
+  "ifExpr",
+  "value",
+];
+for (const definitionName of frozenCoreDefinitionNames) {
+  assert(
+    JSON.stringify(sortedObject(semanticCoreV2Schema.$defs[definitionName])) ===
+      JSON.stringify(sortedObject(semanticCoreV1Schema.$defs[definitionName])),
+    `Semantic Core v2 changed frozen v1 definition ${definitionName}`,
+  );
+}
+assert(
+  JSON.stringify(semanticCoreV2Schema.$defs.unaryExpr.properties.op.enum) ===
+    JSON.stringify(["boolNot", "wordNot"]),
+  "Semantic Core v2 unary operator enum differs from ADR-0011",
+);
+assert(
+  JSON.stringify(semanticCoreV2Schema.$defs.binaryExpr.properties.op.enum) ===
+    JSON.stringify([
+      "wordAdd",
+      "wordSub",
+      "wordMul",
+      "wordDiv",
+      "wordMod",
+      "wordEq",
+      "wordGt",
+      "wordAnd",
+      "wordOr",
+      "wordXor",
+      "wordShl",
+      "wordShr",
+    ]),
+  "Semantic Core v2 binary operator enum differs from ADR-0011",
 );
 assert(schemaIssues.length === 0, schemaIssues.join("\n"));
 
@@ -259,6 +321,36 @@ assert(
   oracleV2Schema.$defs.profileRef.properties.digest.const ===
     registeredM1aProfile.entry.digest,
   "Oracle v2 schema profile digest differs from the profile manifest",
+);
+const registeredM1cProfile = registeredProfiles.get("core-m1c-v1");
+assert(registeredM1cProfile !== undefined, "core-m1c-v1 profile is not registered");
+const oracleV3Schema = schemasById.get(oracleV3SchemaId).value;
+assert(
+  oracleV3Schema.$defs.request.properties.spec.const ===
+    registeredM1cProfile.entry.spec &&
+    oracleV3Schema.$defs.profileRef.properties.id.const ===
+      registeredM1cProfile.entry.id,
+  "Oracle v3 schema spec or profile id differs from the profile manifest",
+);
+assert(
+  JSON.stringify(sortedObject(oracleV3Schema.$defs.m1cProfile.const)) ===
+    JSON.stringify(sortedObject(registeredM1cProfile.profile)),
+  "Oracle v3 schema profile const differs from the registered M1c profile",
+);
+assert(
+  oracleV3Schema.$defs.profileRef.properties.digest.const ===
+    registeredM1cProfile.entry.digest,
+  "Oracle v3 schema profile digest differs from the profile manifest",
+);
+assert(
+  oracleV3Schema.$defs.capabilityReport.properties.profileDigest.const ===
+    registeredM1cProfile.entry.digest,
+  "Oracle v3 capability profile digest differs from the profile manifest",
+);
+assert(
+  oracleV3Schema.$defs.capabilityReport.properties.coreSchema.const ===
+    semanticCoreV2Schema.$defs.program.properties.schema.const,
+  "Oracle v3 schema does not bind the registered Semantic Core v2 schema",
 );
 
 const baselineManifest = readJson("metadata/baselines.json");
@@ -333,6 +425,23 @@ verifyCapabilityProfile(
   v2Capabilities.response,
   v2Capabilities.report,
 );
+const v3Capabilities = readCapabilityOutput("capabilities-v3");
+verifyCapabilityProfile(
+  "capabilities-v3",
+  "core-m1c-v1",
+  v3Capabilities.response,
+  v3Capabilities.report,
+);
+assert(
+  v3Capabilities.response.schema === "solcore-oracle/v3" &&
+    v3Capabilities.report.schema === "solcore-capabilities/v3",
+  "capabilities-v3 returned an incompatible Oracle or capability schema",
+);
+assert(
+  v3Capabilities.report.coreSchema ===
+    semanticCoreV2Schema.$defs.program.properties.schema.const,
+  "capabilities-v3 does not bind the registered Semantic Core v2 schema",
+);
 const report = v1Capabilities.report;
 
 const expectedStandardLibrary = {
@@ -348,7 +457,7 @@ assert(
 );
 
 const adrFiles = readdirSync(join(root, "docs", "adr"));
-for (const capability of [v1Capabilities, v2Capabilities]) {
+for (const capability of [v1Capabilities, v2Capabilities, v3Capabilities]) {
   for (const feature of capability.report.features) {
     if (feature.adr !== null) {
       assert(

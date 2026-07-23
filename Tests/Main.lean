@@ -1,6 +1,8 @@
 import Solcore
 import Solcore.Core.Wire
+import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
+import Solcore.Oracle.V3.Handler
 
 set_option autoImplicit false
 
@@ -487,6 +489,111 @@ def testCoreWire : IO Unit := do
     (Core.Wire.V1.decodeExprWith { maxDepth := 10, maxNodes := 0 } (.mkObj [("tag", "unit")]))
     .nodeLimitExceeded ""
 
+def assertCoreWireV2Error {α : Type}
+    (name : String)
+    (result : Except Core.Wire.V2.DecodeError α)
+    (code : Core.Wire.V2.DecodeErrorCode)
+    (path : String) :
+    IO Unit := do
+  match result with
+  | .ok _ =>
+      throw (IO.userError s!"{name} unexpectedly decoded")
+  | .error error =>
+      assertTrue (error.code == code)
+        s!"{name} returned {error.code.wireName}, expected {code.wireName}"
+      assertTrue (error.path.toPointer == path)
+        s!"{name} failed at {error.path.toPointer}, expected {path}"
+
+def testCoreWireV2 : IO Unit := do
+  let unaryOps : Array Core.Wire.V2.UnaryOp := #[
+    .boolNot,
+    .wordNot
+  ]
+  for op in unaryOps do
+    match Core.Wire.V2.decodeUnaryOp (Core.Wire.V2.encodeUnaryOp op) with
+    | .ok decoded =>
+        assertTrue (decoded == op)
+          s!"Semantic Core v2 unary op failed to round-trip: {reprStr op}"
+    | .error error =>
+        throw (IO.userError
+          s!"encoded v2 unary op did not decode: {(Lean.toJson error).compress}")
+  let binaryOps : Array Core.Wire.V2.BinaryOp := #[
+    .wordAdd,
+    .wordSub,
+    .wordMul,
+    .wordDiv,
+    .wordMod,
+    .wordEq,
+    .wordGt,
+    .wordAnd,
+    .wordOr,
+    .wordXor,
+    .wordShl,
+    .wordShr
+  ]
+  for op in binaryOps do
+    match Core.Wire.V2.decodeBinaryOp (Core.Wire.V2.encodeBinaryOp op) with
+    | .ok decoded =>
+        assertTrue (decoded == op)
+          s!"Semantic Core v2 binary op failed to round-trip: {reprStr op}"
+    | .error error =>
+        throw (IO.userError
+          s!"encoded v2 binary op did not decode: {(Lean.toJson error).compress}")
+  let wireProgram : Core.Wire.V2.Program := {
+    resultType := .word
+    body :=
+      .binary .wordAdd
+        (.unary .wordNot (.word Word.zero))
+        (.word (Word.ofNatModulo 1))
+  }
+  match Core.Wire.V2.decodeProgram (Core.Wire.V2.encodeProgram wireProgram) with
+  | .ok decoded =>
+      assertTrue (decoded == wireProgram)
+        "Semantic Core v2 Program failed to round-trip"
+  | .error error =>
+      throw (IO.userError
+        s!"encoded v2 Program did not decode: {(Lean.toJson error).compress}")
+  assertTrue
+    (Core.Wire.V2.Program.ofCore? wireProgram.toCore == some wireProgram)
+    "the Semantic Core v2 embedding must have a partial inverse"
+  assertTrue (wireProgram.toCore.run 8 == .done (.word Word.zero))
+    "the decoded v2 primitive program must use the M1c evaluator"
+  let encoded := Core.Wire.V2.encodeProgram wireProgram
+  assertCoreWireError "Semantic Core v1 rejects a v2 program"
+    (Core.Wire.V1.decodeProgram encoded) .invalidSchema "/schema"
+  let v1Program : Core.Wire.V1.Program := {
+    resultType := .bool
+    body := .bool true
+  }
+  assertCoreWireV2Error "Semantic Core v2 rejects a v1 program"
+    (Core.Wire.V2.decodeProgram (Core.Wire.V1.encodeProgram v1Program))
+    .invalidSchema "/schema"
+  let invalidOperator : Lean.Json :=
+    .mkObj [
+      ("schema", Core.Wire.V2.schemaVersion),
+      ("resultType", "word"),
+      ("body", .mkObj [
+        ("tag", "binary"),
+        ("op", "wordPow"),
+        ("left", .mkObj [("tag", "word"), ("value", Core.Wire.V2.encodeWord Word.zero)]),
+        ("right", .mkObj [("tag", "word"), ("value", Core.Wire.V2.encodeWord Word.zero)])
+      ])
+    ]
+  assertCoreWireV2Error "unknown Semantic Core v2 operator"
+    (Core.Wire.V2.decodeProgram invalidOperator) .invalidTag "/body/op"
+  let binaryExpr : Core.Wire.V2.Expr :=
+    .binary .wordAdd (.word Word.zero) (.word Word.zero)
+  assertCoreWireV2Error "Semantic Core v2 expression depth limit"
+    (Core.Wire.V2.decodeExprWith
+      { maxDepth := 1, maxNodes := 10 }
+      (Core.Wire.V2.encodeExpr binaryExpr))
+    .depthLimitExceeded "/left"
+  assertCoreWireV2Error "Semantic Core v2 expression node limit"
+    (Core.Wire.V2.decodeExprWith
+      { maxDepth := 10, maxNodes := 2 }
+      (Core.Wire.V2.encodeExpr binaryExpr))
+    .nodeLimitExceeded "/right"
+
 def assertCheckError
     (name : String)
     (program : Program)
@@ -790,7 +897,181 @@ def testOracleV2 : IO Unit := do
       throw (IO.userError
         s!"Oracle v2 rejected an integral decimal limit: {error.display}")
 
+def requestV3For
+    (kind : Oracle.V3.QueryKind)
+    (program : Option Program := none)
+    (limits : Oracle.V3.CoreLimits := Oracle.V3.CoreLimits.default) :
+    Oracle.V3.Request := {
+  schema := Oracle.V3.schemaVersion
+  id := "test-v3-request"
+  spec := m1cLanguage.id
+  profile := {
+    id := m1cCoreProfile.id
+    digest := m1cCoreProfileDigest
+  }
+  limits
+  query := {
+    kind
+    program := program.bind fun coreProgram =>
+      (Core.Wire.V2.Program.ofCore? coreProgram).map Core.Wire.V2.encodeProgram
+  }
+}
+
+def handleV3OrThrow (request : Oracle.V3.Request) : IO Oracle.V3.Response := do
+  match Oracle.V3.handle request with
+  | .ok response =>
+      let errors := Oracle.V3.Response.validationErrors response
+      assertTrue errors.isEmpty
+        s!"Oracle v3 produced an invalid response: {errors}"
+      pure response
+  | .error error =>
+      throw (IO.userError
+        s!"valid Oracle v3 request failed: {(Lean.toJson error).compress}")
+
+def assertV3ExecutedWord
+    (name : String)
+    (response : Oracle.V3.Response)
+    (expected : Word) :
+    IO Unit := do
+  match response.verdict with
+  | .executed observation =>
+      assertTrue (observation.schema == Oracle.V3.valueObservationSchema)
+        s!"{name} used the wrong observation schema"
+      assertTrue
+        (observation.value == .mkObj [
+          ("resultType", Core.Wire.V2.encodeType .word),
+          ("value", Core.Wire.V2.encodeValue (.word expected))
+        ])
+        s!"{name} returned an unexpected word observation"
+  | _ =>
+      throw (IO.userError
+        s!"{name} was not executed: {(Lean.toJson response).compress}")
+
+def testOracleV3 : IO Unit := do
+  let capabilities ←
+    handleV3OrThrow (requestV3For .capabilities)
+  match capabilities.verdict with
+  | .accepted .protocol result =>
+      assertTrue (result.schema == Oracle.V3.capabilitiesSchema)
+        "Oracle v3 capability result schema changed"
+      assertTrue
+        (result.value.getObjValD "spec" == m1cLanguage.id)
+        "Oracle v3 capabilities must identify draft.3"
+      assertTrue
+        (result.value.getObjValD "coreSchema" == Core.Wire.V2.schemaVersion)
+        "Oracle v3 capabilities must identify Semantic Core v2"
+  | _ =>
+      throw (IO.userError "Oracle v3 capabilities were not accepted")
+  let one := Word.ofNatModulo 1
+  let two := Word.ofNatModulo 2
+  let three := Word.ofNatModulo 3
+  let addition : Program := {
+    resultType := .word
+    body := .binary .wordAdd (.word one) (.word two)
+  }
+  let checked ←
+    handleV3OrThrow (requestV3For .coreCheck (some addition))
+  match checked.verdict with
+  | .accepted .coreChecking result =>
+      assertTrue
+        (result.schema == Oracle.V3.checkResultSchema &&
+          result.value.getObjValD "resultType" == "word")
+        "Oracle v3 Core check returned an unexpected result"
+  | _ =>
+      throw (IO.userError
+        s!"Oracle v3 did not accept wordAdd: {(Lean.toJson checked).compress}")
+  let fuel4 : Oracle.V3.CoreLimits := {
+    Oracle.V3.CoreLimits.default with
+    evaluationSteps := 4
+  }
+  let outOfFuel ←
+    handleV3OrThrow (requestV3For .coreEval (some addition) fuel4)
+  match outOfFuel.verdict with
+  | .inconclusive .coreEvaluation .evaluationSteps 4 (some 4) => pure ()
+  | _ =>
+      throw (IO.userError
+        s!"Oracle v3 fuel boundary changed: {(Lean.toJson outOfFuel).compress}")
+  let fuel5 : Oracle.V3.CoreLimits := {
+    Oracle.V3.CoreLimits.default with
+    evaluationSteps := 5
+  }
+  let executed ←
+    handleV3OrThrow (requestV3For .coreEval (some addition) fuel5)
+  assertV3ExecutedWord "Oracle v3 wordAdd" executed three
+  let unaryMismatch : Program := {
+    resultType := .bool
+    body := .unary .boolNot .unit
+  }
+  let rejected ←
+    handleV3OrThrow (requestV3For .coreCheck (some unaryMismatch))
+  match rejected.verdict with
+  | .rejected .coreChecking diagnostic additional =>
+      assertTrue
+        (diagnostic.code == "core.check.primitive-operand-type-mismatch" &&
+          diagnostic.path == #["unaryOperand"] &&
+          diagnostic.arguments == .mkObj [
+            ("expected", "bool"),
+            ("actual", "unit")
+          ] &&
+          additional.isEmpty)
+        "Oracle v3 primitive diagnostic changed"
+  | _ =>
+      throw (IO.userError
+        s!"Oracle v3 did not reject an invalid boolNot: {(Lean.toJson rejected).compress}")
+  let v2Wire ←
+    match Core.Wire.V2.Program.ofCore? addition with
+    | some program => pure (Core.Wire.V2.encodeProgram program)
+    | none => throw (IO.userError "wordAdd must be representable in Semantic Core v2")
+  let v2RequestWithV2Wire : Oracle.V2.Request := {
+    requestV2For .coreCheck with
+    query := {
+      kind := .coreCheck
+      program := some v2Wire
+    }
+  }
+  match Oracle.V2.handle v2RequestWithV2Wire with
+  | .error error =>
+      assertTrue (error.code == "core.wire.invalid-schema")
+        "Oracle v2 must reject Semantic Core v2"
+  | .ok response =>
+      throw (IO.userError
+        s!"Oracle v2 accepted Semantic Core v2: {(Lean.toJson response).compress}")
+  let v1Wire : Core.Wire.V1.Program := {
+    resultType := .bool
+    body := .bool true
+  }
+  let v3RequestWithV1Wire : Oracle.V3.Request := {
+    requestV3For .coreCheck with
+    query := {
+      kind := .coreCheck
+      program := some (Core.Wire.V1.encodeProgram v1Wire)
+    }
+  }
+  match Oracle.V3.handle v3RequestWithV1Wire with
+  | .error error =>
+      assertTrue (error.code == "core.wire.invalid-schema")
+        "Oracle v3 must reject Semantic Core v1"
+  | .ok response =>
+      throw (IO.userError
+        s!"Oracle v3 accepted Semantic Core v1: {(Lean.toJson response).compress}")
+
 def testOracleVersionDispatch : IO Unit := do
+  let v3Program : Program := {
+    resultType := .bool
+    body := .unary .boolNot (.bool false)
+  }
+  let v3Eval :=
+    processJsonLine
+      (Lean.toJson
+        (requestV3For .coreEval (some v3Program) {
+          Oracle.V3.CoreLimits.default with
+          evaluationSteps := 3
+        })).compress
+  assertTrue (v3Eval.getObjValD "schema" == Oracle.V3.schemaVersion)
+    "stream dispatcher did not route an Oracle v3 record"
+  assertTrue
+    ((v3Eval.getObjValD "verdict").getObjValD "kind" == "executed")
+    "stream dispatcher did not execute a valid Oracle v3 primitive request"
   let v2Eval :=
     processJsonLine
       (Lean.toJson
@@ -821,7 +1102,7 @@ def testOracleVersionDispatch : IO Unit := do
     processJsonLine (Lean.toJson (requestFor .capabilities)).compress
   assertTrue
     ((v1Capabilities.getObjValD "verdict").getObjValD "kind" == "accepted")
-    "Oracle v1 capabilities must remain accepted after adding v2"
+    "Oracle v1 capabilities must remain accepted after adding v2 and v3"
 
 def testOracle : IO Unit := do
   assertJsonRoundTrip "request" (requestFor .check)
@@ -1003,7 +1284,8 @@ def testOracle : IO Unit := do
 def testSchemaJson : IO Unit := do
   for path in
       ["schema/oracle-v1.schema.json", "schema/oracle-v2.schema.json",
-        "schema/semantic-core-v1.schema.json", "metadata/baselines.json",
+        "schema/semantic-core-v1.schema.json", "schema/semantic-core-v2.schema.json",
+        "metadata/baselines.json",
         "metadata/standard-library.json", "profiles/manifest.json",
         "profiles/solcore-0.1.0-draft.2-core-m1a.json",
         "profiles/solcore-0.1.0-draft.3-core-m1c.json",
@@ -1063,9 +1345,11 @@ def run : IO Unit := do
   testM1bProfile
   testM1cProfile
   testCoreWire
+  testCoreWireV2
   testDetailedCoreChecker
   testOracle
   testOracleV2
+  testOracleV3
   testOracleVersionDispatch
   testSchemaJson
 
