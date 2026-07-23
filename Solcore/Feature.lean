@@ -22,12 +22,15 @@ structure FeatureRow where
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
 def featureMatrix : Array FeatureRow := #[
-  ⟨.corePrimitives, .directionAccepted, "M1", .planned, some "0002", "Primitive values and operations."⟩,
+  ⟨.corePrimitives, .directionAccepted, "M1", .partialSupport, some "0009",
+    "M1a implements unit/bool/word literals; primitive operations remain."⟩,
   ⟨.functions, .directionAccepted, "M1", .planned, some "0002", "First-class invokable functions."⟩,
   ⟨.lambdas, .directionAccepted, "M1", .planned, some "0002", "Lexical closures."⟩,
-  ⟨.localBindings, .directionAccepted, "M1", .planned, some "0002", "Immutable local bindings."⟩,
+  ⟨.localBindings, .directionAccepted, "M1", .partialSupport, some "0009",
+    "M1a implements initialized immutable de Bruijn bindings."⟩,
   ⟨.localMutation, .directionAccepted, "M1", .planned, some "0002", "Mutable local cells."⟩,
-  ⟨.conditionals, .directionAccepted, "M1", .planned, some "0002", "Conditional expressions."⟩,
+  ⟨.conditionals, .directionAccepted, "M1", .partialSupport, some "0009",
+    "M1a evaluates the condition and only the selected branch."⟩,
   ⟨.products, .directionAccepted, "M1", .planned, some "0002", "Tuple/product values."⟩,
   ⟨.sumTypes, .directionAccepted, "M1", .planned, some "0002", "Sum-type values."⟩,
   ⟨.userAdts, .directionAccepted, "M1", .planned, some "0002", "User-defined algebraic data types."⟩,

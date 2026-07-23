@@ -7,6 +7,33 @@ correspondence proofs.
 Even when an M0 feature is `directionAccepted`, it is not promoted to
 `normative` or `implemented` until it satisfies the completion criteria below.
 
+## Current progress: M1a kernel
+
+Following ADR-0009, the project implements the closed fragment consisting of
+unit/bool/word literals, de Bruijn variables, initialized immutable `let`, and
+conditionals. The semantic kernel establishes:
+
+- soundness and completeness of the executable inferencer with respect to
+  declarative typing
+- typing uniqueness
+- determinism of declarative big-step evaluation
+- correspondence between CEK transitions and executable `advance`, and their
+  determinism
+- soundness and completeness of the fuelled runner
+- bidirectional correspondence between big-step evaluation and the CEK machine
+- value, environment, and state typing
+- progress and preservation of CEK transitions
+- finite-fuel termination and fault unreachability for well-typed closed
+  programs
+
+At this stage, primitive operations, functions, mutation, ADTs, and other
+components remain unimplemented, so the corresponding features remain
+`partialSupport`. The M0 profile and digest and the Oracle v1 wire schema and
+query support remain unchanged. The implementation-progress metadata in v1
+capabilities, however, reflects the M1a state. The Core wire contract and Oracle
+v2 will be connected after the feature granularity and profile for the
+published fragment have been finalized.
+
 ## Input boundary
 
 M0 `solcore-oracle/v1` defines a typed result only for `capabilities`. Kinds from

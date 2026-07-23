@@ -4,11 +4,13 @@
 specification of the Solcore language and a reference implementation for semantic
 differential fuzzing.
 
-The project is currently at **M0 (freezing the specification boundary and
-execution contract)**. The language semantics themselves have not yet been
-implemented. This phase establishes the specification authority, version and
-profile, comparison baselines, standard-library content, Oracle protocol, verdict
-categories, and unresolved decisions in a machine-checkable form.
+The project is currently at **M1a (Semantic Core kernel)**. M0 fixed the
+specification boundary and execution contract. M1a implements a closed Core of
+unit, boolean, and word literals, immutable `let`, and conditionals, together with
+declarative semantics, a CEK executor, and correspondence and safety theorems.
+The published profile, digest, Oracle v1 wire schema, and query support remain at
+M0; no incomplete fragment is enabled as a normative feature. Only the
+implementation-progress metadata in capabilities reflects the M1a state.
 
 ## What M0 fixes
 
@@ -31,6 +33,21 @@ categories, and unresolved decisions in a machine-checkable form.
 - NDJSON request/response contract for `solcore-oracle/v1`
 - `accepted / rejected / unsupported / inconclusive / executed / internalError`
   verdicts separated from protocol errors
+
+## What M1a implements
+
+- Range-bounded word values represented by `Fin (2^256)`
+- Immutable lexical bindings represented by de Bruijn indices
+- Condition-first, selected-branch-only conditionals
+- Soundness and completeness between declarative typing and the executable checker
+- Bidirectional correspondence between declarative big-step evaluation and the
+  fuel-bounded CEK machine
+- Transition determinism, progress, and preservation
+- Finite-fuel termination and machine-fault unreachability for well-typed closed
+  programs
+
+The detailed semantic decisions are recorded in
+[`ADR-0009`](docs/adr/0009-m1a-core-machine-and-evaluation-order.md).
 
 Haskell and Rust implementation defaults are not part of the specification.
 They are isolated in [`Solcore/Baseline.lean`](Solcore/Baseline.lean) as

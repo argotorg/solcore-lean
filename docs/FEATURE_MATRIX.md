@@ -34,13 +34,13 @@ Lean status:
 | `meta.versioning` | separation of language version, profile, and baseline | normative | implemented | M0 | ADR-0001 |
 | `meta.verdicts` | separation of the six language verdicts from protocol errors | normative | implemented | M0 | ADR-0003 |
 | `meta.observation` | versioned observation envelope | directionAccepted | partialSupport | M0 | ADR-0008 |
-| `core.unit` | unit value and unit type | directionAccepted | planned | M1 | ADR-0002 |
-| `core.bool` | boolean value and conditional branching | directionAccepted | planned | M1 | ADR-0002 |
-| `core.word` | pure operations on 256-bit words | directionAccepted | planned | M1 | ADR-0002 |
+| `core.unit` | unit value and unit type | directionAccepted | partialSupport | M1 | ADR-0009 |
+| `core.bool` | boolean value and conditional branching | directionAccepted | partialSupport | M1 | ADR-0009 |
+| `core.word` | 256-bit word literals and values; operations are not implemented | directionAccepted | partialSupport | M1 | ADR-0009 |
 | `core.function` | function definition, application, and return | directionAccepted | planned | M1 | ADR-0002, ADR-0005 |
-| `core.let` | lexical local binding | directionAccepted | planned | M1 | ADR-0002 |
+| `core.let` | lexical local binding | directionAccepted | partialSupport | M1 | ADR-0009 |
 | `core.assignment` | local assignment | directionAccepted | planned | M1 | ADR-0002 |
-| `core.if` | conditional evaluation | directionAccepted | planned | M1 | ADR-0002 |
+| `core.if` | conditional evaluation | directionAccepted | partialSupport | M1 | ADR-0009 |
 | `core.product` | product/tuple value | directionAccepted | planned | M1 | ADR-0002 |
 | `core.sum` | sum value | directionAccepted | planned | M1 | ADR-0002 |
 | `core.adt` | user-defined algebraic data type | directionAccepted | planned | M1 | ADR-0002 |
