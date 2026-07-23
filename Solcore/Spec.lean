@@ -1,5 +1,6 @@
 import Solcore.Feature
 import Solcore.Profile
+import Solcore.Core
 
 /-!
 Umbrella module for the pure specification side of the project.

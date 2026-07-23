@@ -1,0 +1,232 @@
+import Solcore.Core.MachineProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Core
+
+theorem Steps.trans
+    {leftSteps rightSteps : Nat} {start middle finish : State}
+    (left : Steps leftSteps start middle)
+    (right : Steps rightSteps middle finish) :
+    Steps (leftSteps + rightSteps) start finish := by
+  induction left with
+  | refl => simpa using right
+  | cons transition tail tailIH =>
+      have combined := tailIH right
+      have prefixed := Steps.cons transition combined
+      simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using prefixed
+
+theorem Evaluates.toStepsWithContinuation
+    {environment : Environment} {expr : Expr} {value : Value}
+    (evaluation : Evaluates environment expr value)
+    (continuation : List Frame) :
+    ∃ steps,
+      Steps steps
+        ⟨.eval expr environment, continuation⟩
+        ⟨.ret value, continuation⟩ := by
+  induction evaluation generalizing continuation with
+  | unit =>
+      exact ⟨1, .cons .unit .refl⟩
+  | bool =>
+      exact ⟨1, .cons .bool .refl⟩
+  | word =>
+      exact ⟨1, .cons .word .refl⟩
+  | var lookup =>
+      exact ⟨1, .cons (.var lookup) .refl⟩
+  | @letE environment bound body boundValue result
+      boundEvaluation bodyEvaluation boundIH bodyIH =>
+      obtain ⟨boundSteps, boundPath⟩ :=
+        boundIH (.letBody body environment :: continuation)
+      obtain ⟨bodySteps, bodyPath⟩ := bodyIH continuation
+      let enterPath : Steps 1
+          ⟨.eval (.letE bound body) environment, continuation⟩
+          ⟨.eval bound environment, .letBody body environment :: continuation⟩ :=
+        .cons (@Transition.enterLet environment bound body continuation) .refl
+      let bindPath : Steps 1
+          ⟨.ret boundValue, .letBody body environment :: continuation⟩
+          ⟨.eval body (boundValue :: environment), continuation⟩ :=
+        .cons (@Transition.bindLet environment boundValue body continuation) .refl
+      exact ⟨_,
+        enterPath.trans (boundPath.trans (bindPath.trans bodyPath))⟩
+  | @ifTrue environment condition thenBranch elseBranch result
+      conditionEvaluation branchEvaluation conditionIH branchIH =>
+      obtain ⟨conditionSteps, conditionPath⟩ :=
+        conditionIH (.ifBranches thenBranch elseBranch environment :: continuation)
+      obtain ⟨branchSteps, branchPath⟩ := branchIH continuation
+      let enterPath : Steps 1
+          ⟨.eval (.ifE condition thenBranch elseBranch) environment, continuation⟩
+          ⟨.eval condition environment,
+            .ifBranches thenBranch elseBranch environment :: continuation⟩ :=
+        .cons
+          (@Transition.enterIf environment condition thenBranch elseBranch continuation)
+          .refl
+      let choosePath : Steps 1
+          ⟨.ret (.bool true),
+            .ifBranches thenBranch elseBranch environment :: continuation⟩
+          ⟨.eval thenBranch environment, continuation⟩ :=
+        .cons
+          (@Transition.chooseTrue environment thenBranch elseBranch continuation)
+          .refl
+      exact ⟨_,
+        enterPath.trans (conditionPath.trans (choosePath.trans branchPath))⟩
+  | @ifFalse environment condition thenBranch elseBranch result
+      conditionEvaluation branchEvaluation conditionIH branchIH =>
+      obtain ⟨conditionSteps, conditionPath⟩ :=
+        conditionIH (.ifBranches thenBranch elseBranch environment :: continuation)
+      obtain ⟨branchSteps, branchPath⟩ := branchIH continuation
+      let enterPath : Steps 1
+          ⟨.eval (.ifE condition thenBranch elseBranch) environment, continuation⟩
+          ⟨.eval condition environment,
+            .ifBranches thenBranch elseBranch environment :: continuation⟩ :=
+        .cons
+          (@Transition.enterIf environment condition thenBranch elseBranch continuation)
+          .refl
+      let choosePath : Steps 1
+          ⟨.ret (.bool false),
+            .ifBranches thenBranch elseBranch environment :: continuation⟩
+          ⟨.eval elseBranch environment, continuation⟩ :=
+        .cons
+          (@Transition.chooseFalse environment thenBranch elseBranch continuation)
+          .refl
+      exact ⟨_,
+        enterPath.trans (conditionPath.trans (choosePath.trans branchPath))⟩
+
+theorem Evaluates.toSteps
+    {environment : Environment} {expr : Expr} {value : Value}
+    (evaluation : Evaluates environment expr value) :
+    ∃ steps,
+      Steps steps (State.initial expr environment) (State.final value) := by
+  simpa [State.initial, State.final] using
+    evaluation.toStepsWithContinuation []
+
+inductive Continues : List Frame → Value → Value → Prop where
+  | done {value : Value} :
+      Continues [] value value
+  | letBody
+      {body : Expr} {environment : Environment} {continuation : List Frame}
+      {boundValue result finalValue : Value} :
+      Evaluates (boundValue :: environment) body result →
+      Continues continuation result finalValue →
+      Continues (.letBody body environment :: continuation) boundValue finalValue
+  | ifTrue
+      {thenBranch elseBranch : Expr} {environment : Environment}
+      {continuation : List Frame} {result finalValue : Value} :
+      Evaluates environment thenBranch result →
+      Continues continuation result finalValue →
+      Continues
+        (.ifBranches thenBranch elseBranch environment :: continuation)
+        (.bool true)
+        finalValue
+  | ifFalse
+      {thenBranch elseBranch : Expr} {environment : Environment}
+      {continuation : List Frame} {result finalValue : Value} :
+      Evaluates environment elseBranch result →
+      Continues continuation result finalValue →
+      Continues
+        (.ifBranches thenBranch elseBranch environment :: continuation)
+        (.bool false)
+        finalValue
+
+inductive StateDenotes : State → Value → Prop where
+  | eval
+      {expr : Expr} {environment : Environment} {continuation : List Frame}
+      {value finalValue : Value} :
+      Evaluates environment expr value →
+      Continues continuation value finalValue →
+      StateDenotes ⟨.eval expr environment, continuation⟩ finalValue
+  | ret
+      {value finalValue : Value} {continuation : List Frame} :
+      Continues continuation value finalValue →
+      StateDenotes ⟨.ret value, continuation⟩ finalValue
+
+theorem transition_reflects_denotation
+    {state next : State} {value : Value}
+    (transition : Transition state next)
+    (denotes : StateDenotes next value) :
+    StateDenotes state value := by
+  cases transition with
+  | unit =>
+      cases denotes with
+      | ret continuation => exact .eval .unit continuation
+  | bool =>
+      cases denotes with
+      | ret continuation => exact .eval .bool continuation
+  | word =>
+      cases denotes with
+      | ret continuation => exact .eval .word continuation
+  | var lookup =>
+      cases denotes with
+      | ret continuation => exact .eval (.var lookup) continuation
+  | enterLet =>
+      cases denotes with
+      | eval boundEvaluation continuation =>
+          cases continuation with
+          | letBody bodyEvaluation rest =>
+              exact .eval (.letE boundEvaluation bodyEvaluation) rest
+  | bindLet =>
+      cases denotes with
+      | eval bodyEvaluation continuation =>
+          exact .ret (.letBody bodyEvaluation continuation)
+  | enterIf =>
+      cases denotes with
+      | eval conditionEvaluation continuation =>
+          cases continuation with
+          | ifTrue branchEvaluation rest =>
+              exact .eval (.ifTrue conditionEvaluation branchEvaluation) rest
+          | ifFalse branchEvaluation rest =>
+              exact .eval (.ifFalse conditionEvaluation branchEvaluation) rest
+  | chooseTrue =>
+      cases denotes with
+      | eval branchEvaluation continuation =>
+          exact .ret (.ifTrue branchEvaluation continuation)
+  | chooseFalse =>
+      cases denotes with
+      | eval branchEvaluation continuation =>
+          exact .ret (.ifFalse branchEvaluation continuation)
+
+theorem steps_reflect_denotation
+    {steps : Nat} {start finish : State} {value : Value}
+    (path : Steps steps start finish)
+    (denotes : StateDenotes finish value) :
+    StateDenotes start value := by
+  induction path with
+  | refl => exact denotes
+  | cons transition tail tailIH =>
+      exact transition_reflects_denotation transition (tailIH denotes)
+
+theorem steps_from_initial_sound
+    {steps : Nat} {environment : Environment} {expr : Expr} {value : Value}
+    (path : Steps steps (State.initial expr environment) (State.final value)) :
+    Evaluates environment expr value := by
+  have finalDenotes : StateDenotes (State.final value) value :=
+    .ret .done
+  have initialDenotes := steps_reflect_denotation path finalDenotes
+  cases initialDenotes with
+  | eval evaluation continuation =>
+      cases continuation
+      exact evaluation
+
+theorem run_evaluation_sound
+    {fuel : Nat} {environment : Environment} {expr : Expr} {value : Value}
+    (result : run fuel (State.initial expr environment) = .done value) :
+    Evaluates environment expr value := by
+  obtain ⟨steps, _, path⟩ := run_sound result
+  exact steps_from_initial_sound path
+
+theorem evaluation_run_complete
+    {environment : Environment} {expr : Expr} {value : Value}
+    (evaluation : Evaluates environment expr value) :
+    ∃ fuel, run fuel (State.initial expr environment) = .done value := by
+  obtain ⟨steps, path⟩ := evaluation.toSteps
+  exact ⟨steps, run_complete_with_fuel path (Nat.le_refl steps)⟩
+
+theorem evaluation_run_complete_with_sufficient_fuel
+    {environment : Environment} {expr : Expr} {value : Value}
+    (evaluation : Evaluates environment expr value) :
+    ∃ required,
+      ∀ fuel, required ≤ fuel →
+        run fuel (State.initial expr environment) = .done value := by
+  obtain ⟨steps, path⟩ := evaluation.toSteps
+  exact ⟨steps, fun fuel enough => run_complete_with_fuel path enough⟩
+
+end Solcore.Core
