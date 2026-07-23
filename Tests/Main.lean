@@ -920,7 +920,7 @@ def requestV3For
 def handleV3OrThrow (request : Oracle.V3.Request) : IO Oracle.V3.Response := do
   match Oracle.V3.handle request with
   | .ok response =>
-      let errors := Oracle.V3.Response.validationErrors response
+      let errors := response.validationErrors
       assertTrue errors.isEmpty
         s!"Oracle v3 produced an invalid response: {errors}"
       pure response
@@ -948,8 +948,20 @@ def assertV3ExecutedWord
         s!"{name} was not executed: {(Lean.toJson response).compress}")
 
 def testOracleV3 : IO Unit := do
+  let validRequest := requestV3For .capabilities
+  assertTrue validRequest.validationErrors.isEmpty
+    "Oracle v3 field notation must use the v3 request validator"
+  match Oracle.V3.decodeRequest (.mkObj []) with
+  | .error error =>
+      let protocolError := error.toProtocolError
+      assertTrue
+        ((Lean.toJson protocolError).getObjValD "schema" ==
+          Oracle.V3.schemaVersion)
+        "Oracle v3 field notation must produce a v3 protocol error"
+  | .ok _ =>
+      throw (IO.userError "Oracle v3 accepted an empty request object")
   let capabilities ←
-    handleV3OrThrow (requestV3For .capabilities)
+    handleV3OrThrow validRequest
   match capabilities.verdict with
   | .accepted .protocol result =>
       assertTrue (result.schema == Oracle.V3.capabilitiesSchema)

@@ -144,7 +144,7 @@ private def handleEval (request : Request) (program : Core.Program) : Response :
             "typed-core-machine-fault")
 
 def handle (request : Request) : Except ProtocolError Response := do
-  match V3.Request.validationErrors request with
+  match request.validationErrors with
   | error :: _ =>
       throw {
         id := if request.id.isEmpty then none else some request.id
@@ -173,7 +173,7 @@ def handle (request : Request) : Except ProtocolError Response := do
               code := "invalid-request"
               display := "query/program invariant violated"
             }
-      match V3.Response.validationErrors response with
+      match response.validationErrors with
       | [] => pure response
       | _ =>
           pure (responseFor request (.internalError none "oracle-response-invariant"))

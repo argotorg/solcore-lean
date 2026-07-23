@@ -42,7 +42,14 @@ def CoreLimits.default : CoreLimits := V2.CoreLimits.default
 
 abbrev Query := V2.Query
 
-abbrev Request := V2.Request
+structure Request where
+  schema : String
+  id : String
+  spec : String
+  profile : ProfileRef
+  limits : CoreLimits := CoreLimits.default
+  query : Query
+  deriving BEq, Lean.ToJson
 
 abbrev ResultPayload := V2.ResultPayload
 
@@ -52,7 +59,14 @@ abbrev Diagnostic := V2.Diagnostic
 
 abbrev Verdict := V2.Verdict
 
-abbrev Response := V2.Response
+structure Response where
+  schema : String
+  id : String
+  spec : String
+  profile : ProfileRef
+  query : QueryKind
+  verdict : Verdict
+  deriving BEq, Lean.ToJson
 
 structure ProtocolError where
   kind : String := "protocolError"
@@ -64,10 +78,31 @@ structure ProtocolError where
   display : String
   deriving BEq, Lean.ToJson
 
-abbrev DecodeError := V2.DecodeError
+structure DecodeError where
+  code : String
+  path : String
+  arguments : Lean.Json := .null
+  display : String
+  deriving BEq
 
 def decodeRequest (json : Lean.Json) : Except DecodeError Request :=
-  V2.decodeRequest json
+  match V2.decodeRequest json with
+  | .ok request =>
+      .ok {
+        schema := request.schema
+        id := request.id
+        spec := request.spec
+        profile := request.profile
+        limits := request.limits
+        query := request.query
+      }
+  | .error error =>
+      .error {
+        code := error.code
+        path := error.path
+        arguments := error.arguments
+        display := error.display
+      }
 
 def Request.validationErrors (request : Request) : List String :=
   (if request.schema == schemaVersion then [] else ["unknown oracle schema"]) ++
