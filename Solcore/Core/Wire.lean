@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import Solcore.Core.Syntax
+import Solcore.Foundation.Json
 
 set_option autoImplicit false
 
@@ -163,9 +164,9 @@ private def decodeBoolAt (path : DecodePath) (json : Lean.Json) : DecodeResult B
   | _ => failAt path .expectedBool (expectedArguments "boolean" json)
 
 private def decodeNatAt (path : DecodePath) (json : Lean.Json) : DecodeResult Nat :=
-  match json.getNat? with
-  | .ok value => pure value
-  | .error _ => failAt path .expectedNatural (expectedArguments "natural" json)
+  match Foundation.jsonNatural? json with
+  | some value => pure value
+  | none => failAt path .expectedNatural (expectedArguments "natural" json)
 
 def encodeType : Ty → Lean.Json
   | .unit => "unit"
@@ -191,12 +192,20 @@ def decodeType (json : Lean.Json) : DecodeResult Ty :=
     decodeType (encodeType type) = .ok type := by
   cases type <;> rfl
 
-private def paddedHexDigits (value : Nat) : String :=
-  let digits := Nat.toDigits 16 value
-  String.ofList (List.replicate (64 - digits.length) '0' ++ digits)
+private def encodeHexDigits : Nat → Nat → List Char
+  | 0, _ => []
+  | width + 1, value =>
+      Nat.digitChar (value / 16 ^ width) ::
+        encodeHexDigits width (value % 16 ^ width)
+
+private theorem encodeHexDigits_length (width value : Nat) :
+    (encodeHexDigits width value).length = width := by
+  induction width generalizing value with
+  | zero => rfl
+  | succ width ih => simp [encodeHexDigits, ih]
 
 def encodeWordText (value : Word) : String :=
-  "0x" ++ paddedHexDigits value.val
+  "0x" ++ String.ofList (encodeHexDigits 64 value.val)
 
 private def hexDigitValue? : Char → Option Nat
   | '0' => some 0
@@ -217,12 +226,52 @@ private def hexDigitValue? : Char → Option Nat
   | 'f' => some 15
   | _ => none
 
-private def parseHexDigits : List Char → Nat → Option Nat
-  | [], result => some result
-  | digit :: rest, result =>
-      match hexDigitValue? digit with
-      | some value => parseHexDigits rest (result * 16 + value)
-      | none => none
+private theorem hexDigitValue_digitChar
+    (value : Nat)
+    (inRange : value < 16) :
+    hexDigitValue? (Nat.digitChar value) = some value := by
+  have cases :
+      value = 0 ∨ value = 1 ∨ value = 2 ∨ value = 3 ∨
+      value = 4 ∨ value = 5 ∨ value = 6 ∨ value = 7 ∨
+      value = 8 ∨ value = 9 ∨ value = 10 ∨ value = 11 ∨
+      value = 12 ∨ value = 13 ∨ value = 14 ∨ value = 15 := by
+    omega
+  rcases cases with
+    h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h <;>
+    subst value <;> rfl
+
+private def parseHexDigits : Nat → List Char → Option Nat
+  | 0, [] => some 0
+  | 0, _ :: _ => none
+  | _ + 1, [] => none
+  | width + 1, digit :: rest => do
+      let value ← hexDigitValue? digit
+      let suffix ← parseHexDigits width rest
+      some (value * 16 ^ width + suffix)
+
+private theorem parseHexDigits_encodeHexDigits
+    (width value : Nat)
+    (inRange : value < 16 ^ width) :
+    parseHexDigits width (encodeHexDigits width value) = some value := by
+  induction width generalizing value with
+  | zero =>
+      have valueZero : value = 0 := by simpa using inRange
+      subst value
+      rfl
+  | succ width ih =>
+      have powerPositive : 0 < 16 ^ width := Nat.pow_pos (by decide)
+      have quotientInRange : value / 16 ^ width < 16 := by
+        apply (Nat.div_lt_iff_lt_mul powerPositive).2
+        simpa [Nat.pow_succ'] using inRange
+      have remainderInRange : value % 16 ^ width < 16 ^ width :=
+        Nat.mod_lt value powerPositive
+      simp [
+        encodeHexDigits,
+        parseHexDigits,
+        hexDigitValue_digitChar _ quotientInRange,
+        ih _ remainderInRange
+      ]
+      simpa [Nat.add_comm, Nat.mul_comm] using Nat.mod_add_div' value (16 ^ width)
 
 def decodeWordTextAt (path : DecodePath) (text : String) : DecodeResult Word :=
   match text.toList with
@@ -234,7 +283,7 @@ def decodeWordTextAt (path : DecodePath) (text : String) : DecodeResult Word :=
           ("actualHexDigits", digits.length)
         ])
       else
-        match parseHexDigits digits 0 with
+        match parseHexDigits 64 digits with
         | none =>
             failAt path .invalidWord (.mkObj [("reason", "lowercase-hex")])
         | some value =>
@@ -246,6 +295,29 @@ def decodeWordTextAt (path : DecodePath) (text : String) : DecodeResult Word :=
 def decodeWordText (text : String) : DecodeResult Word :=
   decodeWordTextAt .root text
 
+@[simp] theorem decodeWordTextAt_encodeWordText
+    (path : DecodePath)
+    (value : Word) :
+    decodeWordTextAt path (encodeWordText value) = .ok value := by
+  have inRange : value.val < 16 ^ 64 := by
+    rw [show (16 : Nat) ^ 64 = wordModulus by decide]
+    exact value.isLt
+  have reconstructed : Word.ofNat? value.val = some value := by
+    simp [Word.ofNat?, value.isLt]
+  simp [
+    decodeWordTextAt,
+    encodeWordText,
+    String.toList_append,
+    encodeHexDigits_length,
+    parseHexDigits_encodeHexDigits _ _ inRange,
+    reconstructed
+  ]
+  rfl
+
+@[simp] theorem decodeWordText_encodeWordText (value : Word) :
+    decodeWordText (encodeWordText value) = .ok value :=
+  decodeWordTextAt_encodeWordText .root value
+
 def encodeWord (value : Word) : Lean.Json :=
   encodeWordText value
 
@@ -254,6 +326,14 @@ def decodeWordAt (path : DecodePath) (json : Lean.Json) : DecodeResult Word := d
 
 def decodeWord (json : Lean.Json) : DecodeResult Word :=
   decodeWordAt .root json
+
+@[simp] theorem decodeWordAt_encodeWord (path : DecodePath) (value : Word) :
+    decodeWordAt path (encodeWord value) = .ok value := by
+  simp [decodeWordAt, encodeWord, decodeStringAt]
+
+@[simp] theorem decodeWord_encodeWord (value : Word) :
+    decodeWord (encodeWord value) = .ok value :=
+  decodeWordAt_encodeWord .root value
 
 def encodeExpr : Expr → Lean.Json
   | .unit =>
@@ -355,10 +435,272 @@ private def decodeExprAt
             ("allowed", .arr #["unit", "bool", "word", "var", "let", "if"])
           ])
 
+def exprDepth : Expr → Nat
+  | .unit | .bool _ | .word _ | .var _ => 1
+  | .letE initializer body =>
+      Nat.max (exprDepth initializer) (exprDepth body) + 1
+  | .ifE condition thenBranch elseBranch =>
+      Nat.max (exprDepth condition) (Nat.max (exprDepth thenBranch) (exprDepth elseBranch)) + 1
+
+def exprNodes : Expr → Nat
+  | .unit | .bool _ | .word _ | .var _ => 1
+  | .letE initializer body =>
+      1 + exprNodes initializer + exprNodes body
+  | .ifE condition thenBranch elseBranch =>
+      1 + exprNodes condition + exprNodes thenBranch + exprNodes elseBranch
+
+@[simp] private theorem decodeExprAt_encodeUnitStep
+    (limits : DecodeLimits)
+    (depth nodes : Nat)
+    (path : DecodePath) :
+    decodeExprAt limits (depth + 1) (nodes + 1) path (encodeExpr .unit) =
+      .ok (.unit, nodes) := by
+  rfl
+
+@[simp] private theorem decodeExprAt_encodeBoolStep
+    (limits : DecodeLimits)
+    (depth nodes : Nat)
+    (path : DecodePath)
+    (value : Bool) :
+    decodeExprAt limits (depth + 1) (nodes + 1) path (encodeExpr (.bool value)) =
+      .ok (.bool value, nodes) := by
+  cases value <;> rfl
+
+@[simp] private theorem decodeExprAt_encodeWordStep
+    (limits : DecodeLimits)
+    (depth nodes : Nat)
+    (path : DecodePath)
+    (value : Word) :
+    decodeExprAt limits (depth + 1) (nodes + 1) path (encodeExpr (.word value)) =
+      .ok (.word value, nodes) := by
+  change (do
+    let decoded ← decodeWordAt (path.field "value") (encodeWord value)
+    pure (Expr.word decoded, nodes)) = .ok (Expr.word value, nodes)
+  simp
+  rfl
+
+@[simp] private theorem decodeExprAt_encodeVarStep
+    (limits : DecodeLimits)
+    (depth nodes : Nat)
+    (path : DecodePath)
+    (index : Nat) :
+    decodeExprAt limits (depth + 1) (nodes + 1) path (encodeExpr (.var index)) =
+      .ok (.var index, nodes) := by
+  change (do
+    let decoded ← decodeNatAt (path.field "index") (Lean.toJson index)
+    pure (Expr.var decoded, nodes)) = .ok (Expr.var index, nodes)
+  simp [decodeNatAt]
+  rfl
+
+private theorem decodeExprAt_encodeLetStep
+    (limits : DecodeLimits)
+    (depth nodes : Nat)
+    (path : DecodePath)
+    (initializer body : Expr) :
+    decodeExprAt limits (depth + 1) (nodes + 1) path
+        (encodeExpr (.letE initializer body)) = (do
+      let (decodedInitializer, afterInitializer) ←
+        decodeExprAt limits depth nodes (path.field "initializer") (encodeExpr initializer)
+      let (decodedBody, afterBody) ←
+        decodeExprAt limits depth afterInitializer (path.field "body") (encodeExpr body)
+      pure (.letE decodedInitializer decodedBody, afterBody)) := by
+  rfl
+
+private theorem decodeExprAt_encodeIfStep
+    (limits : DecodeLimits)
+    (depth nodes : Nat)
+    (path : DecodePath)
+    (condition thenBranch elseBranch : Expr) :
+    decodeExprAt limits (depth + 1) (nodes + 1) path
+        (encodeExpr (.ifE condition thenBranch elseBranch)) = (do
+      let (decodedCondition, afterCondition) ←
+        decodeExprAt limits depth nodes (path.field "condition") (encodeExpr condition)
+      let (decodedThen, afterThen) ←
+        decodeExprAt limits depth afterCondition (path.field "thenBranch")
+          (encodeExpr thenBranch)
+      let (decodedElse, afterElse) ←
+        decodeExprAt limits depth afterThen (path.field "elseBranch") (encodeExpr elseBranch)
+      pure (.ifE decodedCondition decodedThen decodedElse, afterElse)) := by
+  rfl
+
+private theorem decodeExprAt_encodeExpr
+    (limits : DecodeLimits)
+    (expr : Expr)
+    (path : DecodePath)
+    (depthBudget nodesBudget : Nat)
+    (depthEnough : exprDepth expr ≤ depthBudget)
+    (nodesEnough : exprNodes expr ≤ nodesBudget) :
+    decodeExprAt limits depthBudget nodesBudget path (encodeExpr expr) =
+      .ok (expr, nodesBudget - exprNodes expr) := by
+  induction expr generalizing depthBudget nodesBudget path with
+  | unit =>
+      cases depthBudget with
+      | zero => simp [exprDepth] at depthEnough
+      | succ depth =>
+          cases nodesBudget with
+          | zero => simp [exprNodes] at nodesEnough
+          | succ nodes => simp [exprNodes]
+  | bool value =>
+      cases depthBudget with
+      | zero => simp [exprDepth] at depthEnough
+      | succ depth =>
+          cases nodesBudget with
+          | zero => simp [exprNodes] at nodesEnough
+          | succ nodes => simp [exprNodes]
+  | word value =>
+      cases depthBudget with
+      | zero => simp [exprDepth] at depthEnough
+      | succ depth =>
+          cases nodesBudget with
+          | zero => simp [exprNodes] at nodesEnough
+          | succ nodes => simp [exprNodes]
+  | var index =>
+      cases depthBudget with
+      | zero => simp [exprDepth] at depthEnough
+      | succ depth =>
+          cases nodesBudget with
+          | zero => simp [exprNodes] at nodesEnough
+          | succ nodes => simp [exprNodes]
+  | letE initializer body initializerIH bodyIH =>
+      cases depthBudget with
+      | zero => simp [exprDepth] at depthEnough
+      | succ depth =>
+          cases nodesBudget with
+          | zero => simp [exprNodes] at nodesEnough
+          | succ nodes =>
+              have bothDepth :
+                  Nat.max (exprDepth initializer) (exprDepth body) ≤ depth := by
+                simpa [exprDepth] using depthEnough
+              have initializerDepth : exprDepth initializer ≤ depth :=
+                (Nat.max_le.mp bothDepth).1
+              have bodyDepth : exprDepth body ≤ depth :=
+                (Nat.max_le.mp bothDepth).2
+              have combinedNodes :
+                  exprNodes initializer + exprNodes body ≤ nodes := by
+                simp [exprNodes] at nodesEnough
+                omega
+              have initializerNodes : exprNodes initializer ≤ nodes := by
+                omega
+              have bodyNodes :
+                  exprNodes body ≤ nodes - exprNodes initializer := by
+                omega
+              rw [decodeExprAt_encodeLetStep]
+              rw [initializerIH
+                (path := path.field "initializer")
+                (depthBudget := depth)
+                (nodesBudget := nodes)
+                initializerDepth initializerNodes]
+              change (do
+                let (decodedBody, afterBody) ←
+                  decodeExprAt limits depth (nodes - exprNodes initializer)
+                    (path.field "body") (encodeExpr body)
+                pure (Expr.letE initializer decodedBody, afterBody)) =
+                  .ok (Expr.letE initializer body,
+                    nodes + 1 - exprNodes (Expr.letE initializer body))
+              rw [bodyIH
+                (path := path.field "body")
+                (depthBudget := depth)
+                (nodesBudget := nodes - exprNodes initializer)
+                bodyDepth bodyNodes]
+              change Except.ok (Expr.letE initializer body,
+                (nodes - exprNodes initializer) - exprNodes body) =
+                  Except.ok (Expr.letE initializer body,
+                    nodes + 1 - (1 + exprNodes initializer + exprNodes body))
+              congr 2
+              omega
+  | ifE condition thenBranch elseBranch conditionIH thenIH elseIH =>
+      cases depthBudget with
+      | zero => simp [exprDepth] at depthEnough
+      | succ depth =>
+          cases nodesBudget with
+          | zero => simp [exprNodes] at nodesEnough
+          | succ nodes =>
+              have allDepth :
+                  Nat.max (exprDepth condition)
+                    (Nat.max (exprDepth thenBranch) (exprDepth elseBranch)) ≤ depth := by
+                simpa [exprDepth] using depthEnough
+              have conditionDepth : exprDepth condition ≤ depth :=
+                (Nat.max_le.mp allDepth).1
+              have branchDepths :
+                  Nat.max (exprDepth thenBranch) (exprDepth elseBranch) ≤ depth :=
+                (Nat.max_le.mp allDepth).2
+              have thenDepth : exprDepth thenBranch ≤ depth :=
+                (Nat.max_le.mp branchDepths).1
+              have elseDepth : exprDepth elseBranch ≤ depth :=
+                (Nat.max_le.mp branchDepths).2
+              have combinedNodes :
+                  exprNodes condition + exprNodes thenBranch + exprNodes elseBranch ≤ nodes := by
+                simp [exprNodes] at nodesEnough
+                omega
+              have conditionNodes : exprNodes condition ≤ nodes := by
+                omega
+              have thenNodes :
+                  exprNodes thenBranch ≤ nodes - exprNodes condition := by
+                omega
+              have elseNodes :
+                  exprNodes elseBranch ≤
+                    (nodes - exprNodes condition) - exprNodes thenBranch := by
+                omega
+              rw [decodeExprAt_encodeIfStep]
+              rw [conditionIH
+                (path := path.field "condition")
+                (depthBudget := depth)
+                (nodesBudget := nodes)
+                conditionDepth conditionNodes]
+              change (do
+                let (decodedThen, afterThen) ←
+                  decodeExprAt limits depth (nodes - exprNodes condition)
+                    (path.field "thenBranch") (encodeExpr thenBranch)
+                let (decodedElse, afterElse) ←
+                  decodeExprAt limits depth afterThen
+                    (path.field "elseBranch") (encodeExpr elseBranch)
+                pure (Expr.ifE condition decodedThen decodedElse, afterElse)) =
+                  .ok (Expr.ifE condition thenBranch elseBranch,
+                    nodes + 1 - exprNodes (Expr.ifE condition thenBranch elseBranch))
+              rw [thenIH
+                (path := path.field "thenBranch")
+                (depthBudget := depth)
+                (nodesBudget := nodes - exprNodes condition)
+                thenDepth thenNodes]
+              change (do
+                let (decodedElse, afterElse) ←
+                  decodeExprAt limits depth
+                    ((nodes - exprNodes condition) - exprNodes thenBranch)
+                    (path.field "elseBranch") (encodeExpr elseBranch)
+                pure (Expr.ifE condition thenBranch decodedElse, afterElse)) =
+                  .ok (Expr.ifE condition thenBranch elseBranch,
+                    nodes + 1 - exprNodes (Expr.ifE condition thenBranch elseBranch))
+              rw [elseIH
+                (path := path.field "elseBranch")
+                (depthBudget := depth)
+                (nodesBudget :=
+                  (nodes - exprNodes condition) - exprNodes thenBranch)
+                elseDepth elseNodes]
+              change Except.ok (Expr.ifE condition thenBranch elseBranch,
+                ((nodes - exprNodes condition) - exprNodes thenBranch) -
+                  exprNodes elseBranch) =
+                    Except.ok (Expr.ifE condition thenBranch elseBranch,
+                      nodes + 1 -
+                        (1 + exprNodes condition + exprNodes thenBranch +
+                          exprNodes elseBranch))
+              congr 2
+              omega
+
 def decodeExprWith (limits : DecodeLimits) (json : Lean.Json) : DecodeResult Expr := do
   let (expr, _) ←
     decodeExprAt limits limits.maxDepth limits.maxNodes .root json
   pure expr
+
+theorem decodeExprWith_encodeExpr
+    (limits : DecodeLimits)
+    (expr : Expr)
+    (depthEnough : exprDepth expr ≤ limits.maxDepth)
+    (nodesEnough : exprNodes expr ≤ limits.maxNodes) :
+    decodeExprWith limits (encodeExpr expr) = .ok expr := by
+  rw [decodeExprWith]
+  rw [decodeExprAt_encodeExpr
+    limits expr .root limits.maxDepth limits.maxNodes depthEnough nodesEnough]
+  rfl
 
 def decodeExpr (json : Lean.Json) : DecodeResult Expr :=
   decodeExprWith DecodeLimits.default json
@@ -373,7 +715,11 @@ def decodeExpr (json : Lean.Json) : DecodeResult Expr :=
 
 @[simp] theorem decodeExpr_encodeVar (index : Nat) :
     decodeExpr (encodeExpr (.var index)) = .ok (.var index) := by
-  rfl
+  exact decodeExprWith_encodeExpr
+    DecodeLimits.default
+    (.var index)
+    (by simp [exprDepth, DecodeLimits.default])
+    (by simp [exprNodes, DecodeLimits.default])
 
 def encodeValue : Value → Lean.Json
   | .unit =>
@@ -422,6 +768,21 @@ def decodeValue (json : Lean.Json) : DecodeResult Value :=
     decodeValue (encodeValue (.bool value)) = .ok (.bool value) := by
   cases value <;> rfl
 
+@[simp] theorem decodeValue_encodeWord (value : Word) :
+    decodeValue (encodeValue (.word value)) = .ok (.word value) := by
+  change (do
+    let decoded ← decodeWordAt (DecodePath.root.field "value") (encodeWord value)
+    pure (Value.word decoded)) = .ok (Value.word value)
+  simp
+  rfl
+
+theorem decodeValue_encodeValue (value : Value) :
+    decodeValue (encodeValue value) = .ok value := by
+  cases value with
+  | unit => exact decodeValue_encodeUnit
+  | bool value => exact decodeValue_encodeBool value
+  | word value => exact decodeValue_encodeWord value
+
 def encodeProgram (program : Program) : Lean.Json :=
   .mkObj [
     ("schema", schemaVersion),
@@ -453,6 +814,31 @@ def decodeProgramWith
 def decodeProgram (json : Lean.Json) : DecodeResult Program :=
   decodeProgramWith DecodeLimits.default json
 
+private theorem decodeProgramWith_encodeProgramStep
+    (limits : DecodeLimits)
+    (program : Program) :
+    decodeProgramWith limits (encodeProgram program) = (do
+      let (body, _) ←
+        decodeExprAt limits limits.maxDepth limits.maxNodes
+          (DecodePath.root.field "body") (encodeExpr program.body)
+      pure { resultType := program.resultType, body }) := by
+  cases program with
+  | mk resultType body =>
+      cases resultType <;> rfl
+
+theorem decodeProgramWith_encodeProgram
+    (limits : DecodeLimits)
+    (program : Program)
+    (depthEnough : exprDepth program.body ≤ limits.maxDepth)
+    (nodesEnough : exprNodes program.body ≤ limits.maxNodes) :
+    decodeProgramWith limits (encodeProgram program) = .ok program := by
+  rw [decodeProgramWith_encodeProgramStep]
+  rw [decodeExprAt_encodeExpr
+    limits program.body (DecodePath.root.field "body")
+      limits.maxDepth limits.maxNodes depthEnough nodesEnough]
+  cases program
+  rfl
+
 def canonicalizeProgramWith
     (limits : DecodeLimits)
     (json : Lean.Json) :
@@ -461,5 +847,32 @@ def canonicalizeProgramWith
 
 def canonicalizeProgram (json : Lean.Json) : DecodeResult Lean.Json :=
   canonicalizeProgramWith DecodeLimits.default json
+
+theorem canonicalizeProgramWith_encodeProgram
+    (limits : DecodeLimits)
+    (program : Program)
+    (depthEnough : exprDepth program.body ≤ limits.maxDepth)
+    (nodesEnough : exprNodes program.body ≤ limits.maxNodes) :
+    canonicalizeProgramWith limits (encodeProgram program) =
+      .ok (encodeProgram program) := by
+  simp [
+    canonicalizeProgramWith,
+    decodeProgramWith_encodeProgram limits program depthEnough nodesEnough
+  ]
+  rfl
+
+theorem canonicalizeProgramWith_idempotent
+    (limits : DecodeLimits)
+    (json : Lean.Json)
+    (program : Program)
+    (decoded : decodeProgramWith limits json = .ok program)
+    (depthEnough : exprDepth program.body ≤ limits.maxDepth)
+    (nodesEnough : exprNodes program.body ≤ limits.maxNodes) :
+    canonicalizeProgramWith limits json >>=
+        canonicalizeProgramWith limits =
+      canonicalizeProgramWith limits json := by
+  simp [canonicalizeProgramWith, decoded]
+  exact canonicalizeProgramWith_encodeProgram
+    limits program depthEnough nodesEnough
 
 end Solcore.Core.Wire
