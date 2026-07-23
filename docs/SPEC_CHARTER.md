@@ -1,16 +1,18 @@
 # Solcore Lean Specification Charter
 
 - Status: Draft
-- Target specification: `solcore/0.1.0-draft.2`
+- Target specification: `solcore/0.1.0-draft.3`
 - Adopted: 2026-07-23
 
 ## Purpose
 
-`solcore-lean` is an executable formal specification of the Solcore language and
-a reference implementation independent of the Haskell and Rust implementations.
-Its eventual purpose is to serve as the oracle for semantic differential
-fuzzing by comparing the observations produced by each implementation for the
-same input program and execution environment.
+`solcore-lean` is an executable formal specification of the Solcore language,
+developed independently of the Haskell and Rust implementations. Its eventual
+purpose is to serve as the reference oracle for semantic differential fuzzing
+by comparing the observations produced by each implementation for the same
+input program and execution environment. At the current milestone, its
+executable reference boundary is the published closed Semantic Core; a
+source-level parser, resolver, and elaborator are not yet part of that boundary.
 
 To achieve this purpose, the specification provides the following three
 elements as one coherent whole:
@@ -78,6 +80,29 @@ and Lean implements it. Successful queries require
 `implemented ⊆ enabled ⊆ normative ⊆ known`. At M0, no language feature has
 complete normative rules, so `core-v1` has an empty `enabledFeatures` list.
 
+M1b published the first closed Core as `solcore/0.1.0-draft.2`, profile
+`core-m1a-v1`, `solcore-semantic-core/v1`, and `solcore-oracle/v2`. M1c
+publishes the primitive extension as `solcore/0.1.0-draft.3`, profile
+[`core-m1c-v1`](../profiles/solcore-0.1.0-draft.3-core-m1c.json),
+[`solcore-semantic-core/v2`](../schema/semantic-core-v2.schema.json), and
+[`solcore-oracle/v3`](../schema/oracle-v3.schema.json). The exact semantics and
+publication boundary are fixed by
+[`ADR-0011`](adr/0011-m1c-primitive-semantics-and-publication.md).
+
+The M1c profile enables boolean negation and the specified word arithmetic,
+comparison, bitwise, and shift operations in addition to the five M1b
+features. Primitive operands are evaluated exactly once, binary operands from
+left to right; arithmetic is modulo `2^256`; division and modulo by zero return
+zero; and shifts by at least 256 return zero. The declarative and executable
+typing/evaluation layers are connected by soundness, completeness,
+determinism, CEK correspondence, progress, preservation, sufficient-fuel, and
+fault-unreachability results for this fragment.
+
+All draft.1 and draft.2 language/profile documents, digests, Core/Oracle schema
+contracts, capability bytes, and golden streams are immutable. Semantic changes
+are appended under new version identifiers; Oracle v2 remains bound to
+Semantic Core v1 and Oracle v3 remains bound to Semantic Core v2.
+
 The Haskell and Rust commits, solver mode, dispatch setting, backend, resource
 limits, and similar implementation settings are recorded separately in an
 `ImplementationBaseline`. Updating an implementation does not by itself change
@@ -96,6 +121,12 @@ Every comparison must align all of the following:
 In addition to the request ID, every oracle response returns the specification,
 profile ID and digest, and query kind, so that a response record identifies its
 comparison conditions by itself.
+
+`capabilities-v3` is the current capability report. It identifies draft.3,
+`core-m1c-v1`, the canonical profile digest, Semantic Core v2, supported Core
+queries, observation schemas, feature states, and resource limits. It does not
+claim that either existing compiler accepts the Core wire format or that
+source-level differential conformance has been established.
 
 ## Verdicts
 
@@ -189,6 +220,12 @@ The conformance corpus is evidence for discovering the specification, not an
 authority by itself. A change to an expected result must include the
 corresponding specification change or ADR.
 
+Short-circuit boolean conjunction/disjunction, boolean/word conversions, and
+functions, closures, application, and return remain outside the M1c normative
+fragment. They require explicit source/Core elaboration rules and any necessary
+new feature, language, and wire versions before an Oracle may report them as
+supported.
+
 ## M0 completion criteria
 
 M0 is complete when all of the following hold:
@@ -201,3 +238,20 @@ M0 is complete when all of the following hold:
   baseline.
 - Queries for unimplemented semantics return `unsupported`.
 - Tests for schemas, canonicalization, path validation, and streaming pass.
+
+## Current M1c publication criteria
+
+M1c is published only because all of the following hold for its closed Core
+fragment:
+
+- the primitive signatures and edge cases are fixed independently of compiler
+  defaults
+- declarative typing and evaluation include every published unary and binary
+  expression
+- executable checking and evaluation are proof-connected to those relations
+- progress, preservation, sufficient-fuel completion, and typed fault
+  unreachability cover the extended machine
+- Semantic Core v2 and Oracle v3 are closed, version-bound schemas with
+  canonical codecs and cross-version rejection tests
+- the draft.1/Oracle v1 and draft.2/Oracle v2 artifacts retain their existing
+  bytes

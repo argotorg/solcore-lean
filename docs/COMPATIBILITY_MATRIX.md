@@ -99,6 +99,44 @@ observation through normative elaboration on the Lean side. The M1b golden
 corpus serves as the standard that keeps the comparison adapter from conflating
 `rejected`, `inconclusive`, `executed`, and protocol errors.
 
+## M1c primitive source-inspection evidence
+
+ADR-0011 records the primitive audit at the pinned M0 revisions. This is
+source-inspection evidence, not a rerun of an end-to-end source corpus and not a
+claim that either compiler conforms to `core-m1c-v1`.
+
+| Rule | Haskell evidence | Rust evidence | M1c specification |
+| --- | --- | --- | --- |
+| word arithmetic | executable paths use bounded/modular word results | executable paths use 256-bit modular words | add, subtract, and multiply modulo `2^256` |
+| unsigned division/modulo | executable witness uses unsigned operations | executable witness uses unsigned operations | zero divisor returns zero |
+| direct word equality typing | primitive table assigns the direct `eqWord` builtin the wrong result type | primitive table assigns the direct `eqWord` builtin the wrong result type | `wordEq : word × word -> bool` |
+| primitive coverage | the partial evaluator implements only a subset of the specified operation set | no corresponding partial-evaluator discrepancy is adopted as normative | every listed M1c primitive is total on well-typed operands |
+| large shifts | sufficiently large amounts can pass through a host `Int` conversion | implementation/EVM-shaped behavior returns zero outside the word width | `wordShl` and `wordShr` return zero when the amount is at least 256 |
+| operand order | source lowering visits ordinary primitive operands in source order | source lowering visits ordinary primitive operands in source order | each binary operand is evaluated once, left to right |
+| boolean conjunction/disjunction | standard library implements eager functions while noting that they should short-circuit | standard library implements eager functions while noting that they should short-circuit | deferred; future elaboration must use selected-branch-only conditionals |
+
+The Lean specification deliberately does not reproduce the builtin result-type
+error, partial-folding gaps, host-integer shift path, or eager boolean-library
+behavior. Those are current discrepancy candidates at the pinned revisions.
+They require aligned source fixtures before either implementation can be
+classified as `conformant` or `divergent`.
+
+## M1c Oracle boundary
+
+`solcore-oracle/v3` accepts only `solcore-semantic-core/v2` under
+`solcore/0.1.0-draft.3` and `core-m1c-v1`. It provides canonical Core checking
+and evaluation observations for the M1b fragment plus the M1c primitive set.
+The `capabilities-v3` report publishes the exact profile digest, Core schema,
+feature statuses, limits, and unchanged v1 check-result/value-observation
+schemas.
+
+The previous bindings are immutable: Oracle v1 remains the draft.1 capability
+protocol, and Oracle v2 remains bound to draft.2, `core-m1a-v1`, and Semantic
+Core v1. Neither upstream compiler consumes Semantic Core v1 or v2 directly.
+Until M2 supplies normative parsing, resolution, and elaboration from a shared
+`.solc` workspace, Oracle v3 is a reference for closed Core fixtures rather
+than evidence of source-level three-implementation conformance.
+
 ## Historical std external ABI evidence
 
 The following table summarizes path inspection from an older snapshot; it is

@@ -1,12 +1,14 @@
 # solcore-lean
 
 `solcore-lean` builds an executable formal specification of the Solcore language
-and a reference implementation for semantic differential fuzzing in Lean 4.
+in Lean 4, intended to become the reference implementation for semantic
+differential fuzzing.
 
-The project is currently at **M1b (Semantic Core publication)**. It publishes the
-closed Core implemented and proved in M1a—unit/bool/word literals, immutable
-`let`, and conditionals—through strict Core JSON and the Oracle v2 `coreCheck`
-and `coreEval` queries. The M0 language/profile and Oracle v1 remain frozen for
+The project is currently at **M1c (primitive Semantic Core publication)**. It
+extends the closed M1b Core with boolean negation and a fixed set of total
+256-bit word operations, then publishes that fragment as
+`solcore/0.1.0-draft.3`, profile `core-m1c-v1`, Semantic Core v2, and Oracle v3.
+The draft.1/Oracle v1 and draft.2/Oracle v2 contracts remain frozen for
 compatibility.
 
 ## What M0 fixes
@@ -61,6 +63,47 @@ The detailed semantic choices are recorded in
 The publication boundary and v1 compatibility are recorded in
 [`ADR-0010`](docs/adr/0010-m1b-core-wire-and-oracle-v2.md).
 
+## What M1c publishes
+
+- the `solcore/0.1.0-draft.3` language version and `core-m1c-v1` profile
+- boolean negation `boolNot` and `wordNot`, the complement of all 256 bits of a
+  word
+- word addition, subtraction, and multiplication modulo `2^256`
+- total unsigned word division and remainder, returning zero for a zero divisor
+- word equality and unsigned greater-than
+- 256-bit `and`, `or`, and `xor`, plus logical shifts that return zero for a
+  shift amount greater than or equal to 256
+- exactly-once unary evaluation and exactly-once, left-to-right binary operand
+  evaluation
+- four fine-grained normative features: `coreBoolNot`,
+  `coreWordArithmetic`, `coreWordComparison`, and `coreWordBitwise`
+- the closed `solcore-semantic-core/v2` wire format, which adds tagged unary and
+  binary expressions without widening Semantic Core v1
+- the `solcore-oracle/v3` `capabilities`, `coreCheck`, and `coreEval` queries
+
+The proof coverage extends over the M1c expressions: executable type inference
+is sound and complete; detailed checking agrees with declarative typing;
+primitive application is total and result-type preserving for well-typed
+operands; evaluation and CEK transitions are deterministic; big-step and CEK
+evaluation correspond in both directions; and progress, preservation,
+sufficient-fuel completion, and typed-machine fault unreachability continue to
+hold. Semantic Core v2 also has bounded decoder/encoder round-trip and
+canonicalization theorems.
+
+Short-circuit `&&` and `||` are deliberately not eager primitives. Their future
+source elaboration must use selected-branch-only conditionals. Boolean/word
+conversions and other unlisted primitive families are also deferred, as are
+functions, closures, application, and return.
+
+The primitive audit found upstream behavior that is evidence, not specification
+authority: both primitive tables type direct word equality incorrectly, the
+Haskell partial evaluator covers only a subset of operations, large Haskell
+shifts can pass through a host `Int`, and both standard libraries currently
+encode boolean conjunction/disjunction as eager functions despite noting that
+they should short-circuit. See the
+[compatibility matrix](docs/COMPATIBILITY_MATRIX.md) and
+[`ADR-0011`](docs/adr/0011-m1c-primitive-semantics-and-publication.md).
+
 The Haskell and Rust implementation defaults are not specification authority.
 They are isolated in [`Solcore/Baseline.lean`](Solcore/Baseline.lean) as evidence
 for differential investigation.
@@ -76,7 +119,12 @@ lake exe solcoreOracle --help
 lake exe solcoreOracle --version
 lake exe solcoreOracle capabilities
 lake exe solcoreOracle capabilities-v2
+lake exe solcoreOracle capabilities-v3
 ```
+
+For compatibility, `--version` retains its original Oracle v1 meaning and
+prints the draft.1 specification ID. Use `capabilities-v3` for the current M1c
+language, profile, schema, and digest binding.
 
 To verify the raw bytes of the canonical standard library as well, run
 `node scripts/verify-metadata.mjs --canonical-source-root <solcore>/std` against
@@ -86,7 +134,10 @@ When invoked without arguments, the Oracle reads one NDJSON request per line
 from standard input and emits one response per line in the same order. In
 Oracle v1, only `capabilities` succeeds; source-level queries remain
 `unsupported`. In Oracle v2, `coreCheck` and `coreEval` are available for the
-M1b profile's Semantic Core.
+M1b profile's Semantic Core v1. Oracle v3 provides the same Core-level queries
+for the M1c profile and requires Semantic Core v2 input. No published Oracle
+currently parses or elaborates a `.solc` workspace, so this is not yet
+source-level differential conformance.
 
 ## Specification documents
 
@@ -97,9 +148,13 @@ M1b profile's Semantic Core.
 - [Architecture decision records](docs/adr)
 - [Checked-in core profile](profiles/solcore-0.1.0-draft.1-core.json)
 - [Checked-in M1b Core profile](profiles/solcore-0.1.0-draft.2-core-m1a.json)
+- [Checked-in M1c Core profile](profiles/solcore-0.1.0-draft.3-core-m1c.json)
 - [Oracle v1 JSON Schema](schema/oracle-v1.schema.json)
 - [Oracle v2 JSON Schema](schema/oracle-v2.schema.json)
-- [Semantic Core JSON Schema](schema/semantic-core-v1.schema.json)
+- [Oracle v3 JSON Schema](schema/oracle-v3.schema.json)
+- [Semantic Core v1 JSON Schema](schema/semantic-core-v1.schema.json)
+- [Semantic Core v2 JSON Schema](schema/semantic-core-v2.schema.json)
+- [M1c primitive semantics and publication ADR](docs/adr/0011-m1c-primitive-semantics-and-publication.md)
 
 ## Implementation roadmap
 

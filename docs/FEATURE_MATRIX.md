@@ -27,6 +27,10 @@ Lean status:
 - `blocked`: must not be implemented until an additional ADR is Accepted
 - `unsupported`: the Oracle explicitly returns `unsupported`
 
+The current publication is `solcore/0.1.0-draft.3` with profile
+`core-m1c-v1`. Its nine enabled features are the five M1b features and the four
+M1c primitive features listed as `normative` / `implemented` below.
+
 ## Matrix
 
 | Feature ID | Description | Specification status | Lean status | Milestone | Basis |
@@ -37,7 +41,11 @@ Lean status:
 | `coreUnit` | unit type, literal, value, typing, and evaluation | normative | implemented | M1b | ADR-0010 |
 | `coreBool` | bool type, literal, value, typing, and evaluation | normative | implemented | M1b | ADR-0010 |
 | `coreWord` | bounded 256-bit word type, literal, and value; excludes operations | normative | implemented | M1b | ADR-0010 |
-| `corePrimitives` | aggregate feature including primitive operations | directionAccepted | partialSupport | M1 | ADR-0009 |
+| `corePrimitives` | aggregate feature; M1c implements only bool-not and the specified word subset | directionAccepted | partialSupport | M1 | ADR-0009, ADR-0011 |
+| `coreBoolNot` | total boolean negation | normative | implemented | M1c | ADR-0011 |
+| `coreWordArithmetic` | modular add/subtract/multiply and total unsigned divide/modulo | normative | implemented | M1c | ADR-0011 |
+| `coreWordComparison` | word equality and unsigned greater-than | normative | implemented | M1c | ADR-0011 |
+| `coreWordBitwise` | 256-bit not/and/or/xor and bounded logical shifts | normative | implemented | M1c | ADR-0011 |
 | `core.function` | function definition, application, and return | directionAccepted | planned | M1 | ADR-0002, ADR-0005 |
 | `coreImmutableLet` | initialized immutable de Bruijn binding | normative | implemented | M1b | ADR-0010 |
 | `core.let` | aggregate feature for source-level local bindings | directionAccepted | partialSupport | M1 | ADR-0009 |
@@ -73,6 +81,31 @@ Lean status:
 | `runtime.external-call` | call traces and external state transitions | proposed | planned | M3 | ADR-0008 |
 | `assembly.inline-yul` | inline Yul/EVM primitive | deferred | unsupported | M4 | ADR-0002 |
 | `observation.gas` | fork-pinned gas observation | deferred | unsupported | M4+ | ADR-0008 |
+
+## M1c publication boundary
+
+The four M1c feature rows denote exactly these primitive tags:
+
+- unary: `boolNot`, `wordNot`
+- arithmetic: `wordAdd`, `wordSub`, `wordMul`, `wordDiv`, `wordMod`
+- comparison: `wordEq`, `wordGt`
+- bitwise: `wordAnd`, `wordOr`, `wordXor`, `wordShl`, `wordShr`
+
+Arithmetic results are modulo `2^256`; unsigned division and modulo by zero
+return zero. Shifts take `(value, amount)` and return zero when `amount >= 256`.
+Binary operands are evaluated once, left to right. Derived `wordNe`, `wordLt`,
+`wordLe`, and `wordGe` do not expand the primitive tag set.
+
+Short-circuit boolean conjunction/disjunction, boolean/word conversions, signed
+operations, exponentiation, ternary modular operations, byte selection,
+arithmetic shift, and count-leading-zero are not part of M1c. Functions,
+closures, application, and return also remain planned. A query that needs any
+of these features cannot succeed under `core-m1c-v1`.
+
+M1c is exposed through `solcore-semantic-core/v2`,
+`solcore-oracle/v3`, and `solcore-capabilities/v3`. The draft.1/Oracle v1 and
+draft.2/Semantic Core v1/Oracle v2 feature arrays, profiles, digests, schemas,
+and capability bytes remain immutable.
 
 ## Rules for profile inclusion
 

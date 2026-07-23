@@ -13,7 +13,7 @@ private def help : String :=
     "  solcore-oracle capabilities    Print the Oracle v1 capability report",
     "  solcore-oracle capabilities-v2 Print the M1b Core capability report",
     "  solcore-oracle capabilities-v3 Print the M1c Core capability report",
-    "  solcore-oracle --version       Print the specification version",
+    "  solcore-oracle --version       Print the legacy Oracle v1 specification version",
     "  solcore-oracle --help          Print this help"
   ]
 
