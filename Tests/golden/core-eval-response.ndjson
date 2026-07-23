@@ -1,0 +1,1 @@
+{"id":"golden-core-eval","profile":{"digest":"sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867","id":"core-m1a-v1"},"query":"coreEval","schema":"solcore-oracle/v2","spec":"solcore/0.1.0-draft.2","verdict":{"kind":"executed","observation":{"schema":"solcore-core-value-observation/v1","value":{"resultType":"bool","value":{"tag":"bool","value":false}}}}}

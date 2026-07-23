@@ -1,4 +1,6 @@
 import Solcore
+import Solcore.Core.Wire
+import Solcore.Oracle.V2.Handler
 
 set_option autoImplicit false
 
@@ -141,6 +143,490 @@ def testSemanticCore : IO Unit := do
     "an in-range word literal must construct a Core word"
   assertTrue (Word.ofNat? wordModulus).isNone
     "a Core word must reject the first out-of-range natural"
+
+def assertCoreWireError {α : Type}
+    (name : String)
+    (result : Except Core.Wire.DecodeError α)
+    (code : Core.Wire.DecodeErrorCode)
+    (path : String) :
+    IO Unit := do
+  match result with
+  | .ok _ =>
+      throw (IO.userError s!"{name} unexpectedly decoded")
+  | .error error =>
+      assertTrue (error.code == code)
+        s!"{name} returned {error.code.wireName}, expected {code.wireName}"
+      assertTrue (error.path.toPointer == path)
+        s!"{name} failed at {error.path.toPointer}, expected {path}"
+
+def testM1bProfile : IO Unit := do
+  assertTrue m1aCoreProfile.validationErrors.isEmpty
+    s!"draft.2 Core profile is invalid: {m1aCoreProfile.validationErrors}"
+  assertTrue m1aFeatureMatrixIsComplete
+    "M1a feature matrix must contain every draft.2 feature exactly once"
+  assertTrue (m1aFeatureMatrixRespectsProfile m1aCoreProfile)
+    "implemented M1a features must be normative and enabled"
+  assertTrue (m1aLanguage.id == "solcore/0.1.0-draft.2")
+    "M1a must be published as draft.2"
+  assertTrue (m1aCoreProfile.enabledFeatures.size == 5)
+    "the M1a profile must enable exactly the five normative Core features"
+  assertTrue
+    (m1aCoreProfile.enabledFeatures.all fun feature =>
+      feature.specMaturity == .normative)
+    "every M1a profile feature must be normative"
+  assertJsonRoundTrip "draft.2 Core profile" m1aCoreProfile
+  assertJsonRoundTrip "M1a feature matrix" m1aFeatureMatrix
+  let profileText ←
+    IO.FS.readFile "profiles/solcore-0.1.0-draft.2-core-m1a.json"
+  let profileJson ←
+    match Lean.Json.parse profileText with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"draft.2 profile JSON is invalid: {error}")
+  assertTrue (profileJson == Lean.toJson m1aCoreProfile)
+    "checked-in draft.2 profile differs from the Lean profile"
+
+def testCoreWire : IO Unit := do
+  for type in [Ty.unit, Ty.bool, Ty.word] do
+    match Core.Wire.decodeType (Core.Wire.encodeType type) with
+    | .ok decoded =>
+        assertTrue (decoded == type) s!"Core type failed to round-trip: {reprStr type}"
+    | .error error =>
+        throw (IO.userError
+          s!"encoded Core type did not decode: {(Lean.toJson error).compress}")
+  let word42 ←
+    match Word.ofNat? 42 with
+    | some value => pure value
+    | none => throw (IO.userError "42 must be an in-range Core word")
+  let values : Array Value := #[
+    .unit,
+    .bool false,
+    .bool true,
+    .word Word.zero,
+    .word word42
+  ]
+  for value in values do
+    match Core.Wire.decodeValue (Core.Wire.encodeValue value) with
+    | .ok decoded =>
+        assertTrue (decoded == value) s!"Core value failed to round-trip: {reprStr value}"
+    | .error error =>
+        throw (IO.userError
+          s!"encoded Core value did not decode: {(Lean.toJson error).compress}")
+  let expressions : Array Expr := #[
+    .unit,
+    .bool false,
+    .word word42,
+    .var 3,
+    .letE (.bool true) (.var 0),
+    .ifE (.bool false) (.word Word.zero) (.word word42)
+  ]
+  for expr in expressions do
+    match Core.Wire.decodeExpr (Core.Wire.encodeExpr expr) with
+    | .ok decoded =>
+        assertTrue (decoded == expr) s!"Core expression failed to round-trip: {reprStr expr}"
+    | .error error =>
+        throw (IO.userError
+          s!"encoded Core expression did not decode: {(Lean.toJson error).compress}")
+  match Core.Wire.decodeProgram (Core.Wire.encodeProgram coreConditionalProgram) with
+  | .ok decoded =>
+      assertTrue (decoded == coreConditionalProgram)
+        "Core Program failed to round-trip"
+  | .error error =>
+      throw (IO.userError
+        s!"encoded Core Program did not decode: {(Lean.toJson error).compress}")
+  let zeroText := "0x" ++ String.ofList (List.replicate 64 '0')
+  let maximumText := "0x" ++ String.ofList (List.replicate 64 'f')
+  let uppercaseText := "0x" ++ String.ofList (List.replicate 64 'F')
+  assertTrue (Core.Wire.encodeWordText Word.zero == zeroText)
+    "Core word zero must use fixed-width lowercase hexadecimal"
+  match Core.Wire.decodeWordText maximumText with
+  | .ok value =>
+      assertTrue (value.val + 1 == wordModulus)
+        "the maximum 256-bit Core word decoded incorrectly"
+  | .error error =>
+      throw (IO.userError
+        s!"the maximum Core word did not decode: {(Lean.toJson error).compress}")
+  assertCoreWireError "uppercase Core word"
+    (Core.Wire.decodeWordText uppercaseText) .invalidWord ""
+  assertCoreWireError "short Core word"
+    (Core.Wire.decodeWordText "0x00") .invalidWord ""
+  assertCoreWireError "missing Core word prefix"
+    (Core.Wire.decodeWordText (String.ofList (List.replicate 64 '0')))
+    .invalidWord ""
+  let unitWithUnknownField : Lean.Json :=
+    .mkObj [("tag", "unit"), ("surprise", true)]
+  assertCoreWireError "unknown expression field"
+    (Core.Wire.decodeExpr unitWithUnknownField) .unknownField "/surprise"
+  let boolWithVariantField : Lean.Json :=
+    .mkObj [("tag", "bool"), ("value", true), ("index", 0)]
+  assertCoreWireError "field from another expression variant"
+    (Core.Wire.decodeExpr boolWithVariantField) .unknownField "/index"
+  let missingBoolValue : Lean.Json := .mkObj [("tag", "bool")]
+  assertCoreWireError "missing expression field"
+    (Core.Wire.decodeExpr missingBoolValue) .missingField "/value"
+  let unknownTag : Lean.Json := .mkObj [("tag", "call")]
+  assertCoreWireError "unknown expression tag"
+    (Core.Wire.decodeExpr unknownTag) .invalidTag "/tag"
+  let nonNaturalIndex : Lean.Json :=
+    .mkObj [("tag", "var"), ("index", "zero")]
+  assertCoreWireError "non-natural de Bruijn index"
+    (Core.Wire.decodeExpr nonNaturalIndex) .expectedNatural "/index"
+  let decimalIntegralIndex ←
+    match StrictJson.parse "{\"tag\":\"var\",\"index\":1.0}" with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"integral decimal Core fixture did not parse: {error}")
+  match Core.Wire.decodeExpr decimalIntegralIndex with
+  | .ok (.var 1) => pure ()
+  | .ok value =>
+      throw (IO.userError
+        s!"integral decimal index decoded unexpectedly: {reprStr value}")
+  | .error error =>
+      throw (IO.userError
+        s!"integral decimal index did not decode: {(Lean.toJson error).compress}")
+  let fractionalIndex ←
+    match StrictJson.parse "{\"tag\":\"var\",\"index\":1.5}" with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"fractional Core fixture did not parse: {error}")
+  assertCoreWireError "fractional de Bruijn index"
+    (Core.Wire.decodeExpr fractionalIndex) .expectedNatural "/index"
+  let negativeIndex ←
+    match StrictJson.parse "{\"tag\":\"var\",\"index\":-1}" with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"negative Core fixture did not parse: {error}")
+  assertCoreWireError "negative de Bruijn index"
+    (Core.Wire.decodeExpr negativeIndex) .expectedNatural "/index"
+  let wrongSchema :=
+    (Core.Wire.encodeProgram coreConditionalProgram).setObjVal!
+      "schema" "solcore-semantic-core/v999"
+  assertCoreWireError "unknown Core schema"
+    (Core.Wire.decodeProgram wrongSchema) .invalidSchema "/schema"
+  let wrongResultType :=
+    (Core.Wire.encodeProgram coreConditionalProgram).setObjVal!
+      "resultType" "boolean"
+  assertCoreWireError "unknown Core result type"
+    (Core.Wire.decodeProgram wrongResultType) .invalidType "/resultType"
+  let uppercaseWordProgram : Lean.Json :=
+    .mkObj [
+      ("schema", Core.Wire.schemaVersion),
+      ("resultType", "word"),
+      ("body", .mkObj [("tag", "word"), ("value", uppercaseText)])
+    ]
+  assertCoreWireError "uppercase word in Program"
+    (Core.Wire.decodeProgram uppercaseWordProgram) .invalidWord "/body/value"
+  assertCoreWireError "Core expression depth limit"
+    (Core.Wire.decodeExprWith { maxDepth := 0, maxNodes := 10 } (.mkObj [("tag", "unit")]))
+    .depthLimitExceeded ""
+  assertCoreWireError "Core expression node limit"
+    (Core.Wire.decodeExprWith { maxDepth := 10, maxNodes := 0 } (.mkObj [("tag", "unit")]))
+    .nodeLimitExceeded ""
+
+def assertCheckError
+    (name : String)
+    (program : Program)
+    (code : CheckErrorCode)
+    (path : CheckPath) :
+    IO CheckError := do
+  match program.checkDetailed with
+  | .ok type =>
+      throw (IO.userError s!"{name} unexpectedly checked as {reprStr type}")
+  | .error error =>
+      assertTrue (error.code == code)
+        s!"{name} returned {error.codeName}, expected {code.name}"
+      assertTrue (error.path == path)
+        s!"{name} returned path {reprStr error.path}, expected {reprStr path}"
+      pure error
+
+def testDetailedCoreChecker : IO Unit := do
+  let unbound : Program := {
+    resultType := .bool
+    body :=
+      .letE (.bool true)
+        (.ifE (.bool true) (.var 2) (.bool false))
+  }
+  let unboundError ←
+    assertCheckError "unbound variable" unbound .unboundVariable
+      [.letBody, .ifThen]
+  assertTrue (unboundError.data == .unboundVariable 2 1)
+    "unbound-variable diagnostic arguments changed"
+  let expectedBool : Program := {
+    resultType := .bool
+    body := .ifE .unit (.bool true) (.bool false)
+  }
+  let expectedBoolError ←
+    assertCheckError "non-bool condition" expectedBool .expectedBool
+      [.ifCondition]
+  assertTrue (expectedBoolError.data == .expectedBool .unit)
+    "expected-bool diagnostic arguments changed"
+  let branchMismatch : Program := {
+    resultType := .bool
+    body := .ifE (.bool true) .unit (.bool false)
+  }
+  let branchError ←
+    assertCheckError "branch type mismatch" branchMismatch .branchTypeMismatch
+      [.ifElse]
+  assertTrue (branchError.data == .branchTypeMismatch .unit .bool)
+    "branch-mismatch diagnostic arguments changed"
+  let resultMismatch : Program := {
+    resultType := .unit
+    body := .bool true
+  }
+  let resultError ←
+    assertCheckError "declared result mismatch" resultMismatch
+      .declaredResultTypeMismatch []
+  assertTrue
+    (resultError.data == .declaredResultTypeMismatch .unit .bool)
+    "declared-result-mismatch diagnostic arguments changed"
+
+def requestV2For
+    (kind : Oracle.V2.QueryKind)
+    (program : Option Program := none)
+    (limits : Oracle.V2.CoreLimits := Oracle.V2.CoreLimits.default) :
+    Oracle.V2.Request := {
+  schema := Oracle.V2.schemaVersion
+  id := "test-v2-request"
+  spec := m1aLanguage.id
+  profile := {
+    id := m1aCoreProfile.id
+    digest := m1aCoreProfileDigest
+  }
+  limits
+  query := {
+    kind
+    program := program.map Core.Wire.encodeProgram
+  }
+}
+
+def handleV2OrThrow (request : Oracle.V2.Request) : IO Oracle.V2.Response := do
+  match Oracle.V2.handle request with
+  | .ok response =>
+      assertTrue response.validationErrors.isEmpty
+        s!"Oracle v2 produced an invalid response: {response.validationErrors}"
+      pure response
+  | .error error =>
+      throw (IO.userError
+        s!"valid Oracle v2 request failed: {(Lean.toJson error).compress}")
+
+def assertExecutedBool
+    (name : String)
+    (response : Oracle.V2.Response)
+    (expected : Bool) :
+    IO Unit := do
+  match response.verdict with
+  | .executed observation =>
+      assertTrue (observation.schema == Oracle.V2.valueObservationSchema)
+        s!"{name} used the wrong observation schema"
+      assertTrue
+        (observation.value == .mkObj [
+          ("resultType", Core.Wire.encodeType .bool),
+          ("value", Core.Wire.encodeValue (.bool expected))
+        ])
+        s!"{name} returned an unexpected observation"
+  | _ =>
+      throw (IO.userError
+        s!"{name} was not executed: {(Lean.toJson response).compress}")
+
+def testOracleV2 : IO Unit := do
+  let capabilities ←
+    handleV2OrThrow (requestV2For .capabilities)
+  match capabilities.verdict with
+  | .accepted .protocol result =>
+      assertTrue (result.schema == Oracle.V2.capabilitiesSchema)
+        "Oracle v2 capability result schema changed"
+      assertTrue
+        (result.value.getObjValD "spec" == m1aLanguage.id)
+        "Oracle v2 capabilities must identify draft.2"
+      assertTrue
+        (result.value.getObjValD "coreSchema" == Core.Wire.schemaVersion)
+        "Oracle v2 capabilities must identify the Core wire schema"
+  | _ =>
+      throw (IO.userError "Oracle v2 capabilities were not accepted")
+  let checked ←
+    handleV2OrThrow (requestV2For .coreCheck (some coreConditionalProgram))
+  match checked.verdict with
+  | .accepted .coreChecking result =>
+      assertTrue (result.schema == Oracle.V2.checkResultSchema)
+        "Core check result schema changed"
+      assertTrue (result.value.getObjValD "resultType" == "bool")
+        "Core check returned the wrong result type"
+  | _ =>
+      throw (IO.userError
+        s!"well-typed Core program was not accepted: {(Lean.toJson checked).compress}")
+  let illTyped : Program := {
+    resultType := .bool
+    body := .ifE .unit (.bool true) (.bool false)
+  }
+  let rejected ←
+    handleV2OrThrow (requestV2For .coreCheck (some illTyped))
+  match rejected.verdict with
+  | .rejected .coreChecking diagnostic additional =>
+      assertTrue (diagnostic.code == "core.check.expected-bool")
+        "Oracle v2 Core diagnostic code changed"
+      assertTrue (diagnostic.path == #["ifCondition"])
+        "Oracle v2 Core diagnostic path changed"
+      assertTrue additional.isEmpty
+        "the deterministic Core checker must emit one primary diagnostic"
+  | _ =>
+      throw (IO.userError
+        s!"ill-typed Core program was not rejected: {(Lean.toJson rejected).compress}")
+  let evalRejected ←
+    handleV2OrThrow (requestV2For .coreEval (some illTyped))
+  match evalRejected.verdict with
+  | .rejected .coreChecking diagnostic additional =>
+      assertTrue
+        (diagnostic.code == "core.check.expected-bool" &&
+          diagnostic.path == #["ifCondition"] &&
+          additional.isEmpty)
+        "coreEval must use the same deterministic checker rejection as coreCheck"
+  | _ =>
+      throw (IO.userError
+        s!"coreEval did not reject an ill-typed program: {(Lean.toJson evalRejected).compress}")
+  let fuel6 : Oracle.V2.CoreLimits := {
+    Oracle.V2.CoreLimits.default with
+    evaluationSteps := 6
+  }
+  let outOfFuel ←
+    handleV2OrThrow
+      (requestV2For .coreEval (some coreConditionalProgram) fuel6)
+  match outOfFuel.verdict with
+  | .inconclusive .coreEvaluation .evaluationSteps 6 (some 6) => pure ()
+  | _ =>
+      throw (IO.userError
+        s!"fuel 6 did not produce the exact resource result: {(Lean.toJson outOfFuel).compress}")
+  let fuel7 : Oracle.V2.CoreLimits := {
+    Oracle.V2.CoreLimits.default with
+    evaluationSteps := 7
+  }
+  let executed ←
+    handleV2OrThrow
+      (requestV2For .coreEval (some coreConditionalProgram) fuel7)
+  assertExecutedBool "fuel 7 Core evaluation" executed false
+  let expensiveUnselectedBranch : Program := {
+    resultType := .bool
+    body :=
+      .ifE (.bool true) (.bool false)
+        (.letE (.bool true)
+          (.letE (.bool false)
+            (.letE (.bool true) (.var 0))))
+  }
+  let selectedBranchLimits : Oracle.V2.CoreLimits := {
+    Oracle.V2.CoreLimits.default with
+    evaluationSteps := 4
+  }
+  let selectedOnly ←
+    handleV2OrThrow
+      (requestV2For .coreEval (some expensiveUnselectedBranch) selectedBranchLimits)
+  assertExecutedBool "selected-branch-only Core evaluation" selectedOnly false
+  let depthZero : Oracle.V2.CoreLimits := {
+    Oracle.V2.CoreLimits.default with
+    inputDepth := 0
+  }
+  let depthLimited ←
+    handleV2OrThrow
+      (requestV2For .coreCheck (some {
+        resultType := .unit
+        body := .unit
+      }) depthZero)
+  match depthLimited.verdict with
+  | .inconclusive .coreDecoding .inputDepth 0 none => pure ()
+  | _ =>
+      throw (IO.userError
+        s!"input depth limit was not reported: {(Lean.toJson depthLimited).compress}")
+  let nodeOne : Oracle.V2.CoreLimits := {
+    Oracle.V2.CoreLimits.default with
+    inputNodes := 1
+  }
+  let nodesLimited ←
+    handleV2OrThrow
+      (requestV2For .coreCheck (some {
+        resultType := .bool
+        body := .ifE (.bool true) (.bool true) (.bool false)
+      }) nodeOne)
+  match nodesLimited.verdict with
+  | .inconclusive .coreDecoding .inputNodes 1 none => pure ()
+  | _ =>
+      throw (IO.userError
+        s!"input node limit was not reported: {(Lean.toJson nodesLimited).compress}")
+  let wrongProfile : Oracle.V2.Request := {
+    requestV2For .coreCheck (some coreConditionalProgram) with
+    profile := {
+      id := draftCoreProfile.id
+      digest := draftCoreProfileDigest
+    }
+  }
+  match Oracle.V2.handle wrongProfile with
+  | .error error =>
+      assertTrue (error.code == "invalid-request")
+        "profile mismatch must be an Oracle v2 protocol error"
+  | .ok response =>
+      throw (IO.userError
+        s!"draft.1 profile accessed M1a semantics: {(Lean.toJson response).compress}")
+  let wrongDigest : Oracle.V2.Request := {
+    requestV2For .coreCheck (some coreConditionalProgram) with
+    profile := {
+      id := m1aCoreProfile.id
+      digest := draftCoreProfileDigest
+    }
+  }
+  assertTrue (isError (Oracle.V2.handle wrongDigest))
+    "a mismatched M1a profile digest must be rejected"
+  let requestWithUnknownField :=
+    (Lean.toJson (requestV2For .capabilities)).setObjVal! "surprise" true
+  match Oracle.V2.decodeRequest requestWithUnknownField with
+  | .error error =>
+      assertTrue (error.code == "unknown-field" && error.path == "/surprise")
+        "Oracle v2 must strictly reject unknown request fields"
+  | .ok _ =>
+      throw (IO.userError "Oracle v2 accepted an unknown request field")
+  let decimalLimit : Lean.Json := .num {
+    mantissa := 10
+    exponent := 1
+  }
+  let requestJson := Lean.toJson (requestV2For .capabilities)
+  let decimalLimits :=
+    (requestJson.getObjValD "limits").setObjVal! "inputDepth" decimalLimit
+  match Oracle.V2.decodeRequest (requestJson.setObjVal! "limits" decimalLimits) with
+  | .ok request =>
+      assertTrue (request.limits.inputDepth == 1)
+        "Oracle v2 integral decimal limits must use their mathematical value"
+  | .error error =>
+      throw (IO.userError
+        s!"Oracle v2 rejected an integral decimal limit: {error.display}")
+
+def testOracleVersionDispatch : IO Unit := do
+  let v2Eval :=
+    processJsonLine
+      (Lean.toJson
+        (requestV2For .coreEval (some coreConditionalProgram) {
+          Oracle.V2.CoreLimits.default with
+          evaluationSteps := 7
+        })).compress
+  assertTrue (v2Eval.getObjValD "schema" == Oracle.V2.schemaVersion)
+    "stream dispatcher did not route an Oracle v2 record"
+  assertTrue (v2Eval.getObjValD "query" == "coreEval")
+    "stream dispatcher changed the Oracle v2 query"
+  assertTrue
+    ((v2Eval.getObjValD "verdict").getObjValD "kind" == "executed")
+    "stream dispatcher did not execute a valid Oracle v2 Core request"
+  let v1Check :=
+    processJsonLine (Lean.toJson (requestFor .check)).compress
+  assertTrue (v1Check.getObjValD "schema" == schemaVersion)
+    "stream dispatcher did not preserve Oracle v1"
+  assertTrue
+    ((v1Check.getObjValD "verdict").getObjValD "kind" == "unsupported")
+    "Oracle v1 check must remain unsupported"
+  let v1Eval :=
+    processJsonLine (Lean.toJson (requestFor .eval)).compress
+  assertTrue
+    ((v1Eval.getObjValD "verdict").getObjValD "kind" == "unsupported")
+    "Oracle v1 eval must remain unsupported"
+  let v1Capabilities :=
+    processJsonLine (Lean.toJson (requestFor .capabilities)).compress
+  assertTrue
+    ((v1Capabilities.getObjValD "verdict").getObjValD "kind" == "accepted")
+    "Oracle v1 capabilities must remain accepted after adding v2"
 
 def testOracle : IO Unit := do
   assertJsonRoundTrip "request" (requestFor .check)
@@ -321,8 +807,10 @@ def testOracle : IO Unit := do
 
 def testSchemaJson : IO Unit := do
   for path in
-      ["schema/oracle-v1.schema.json", "metadata/baselines.json",
+      ["schema/oracle-v1.schema.json", "schema/oracle-v2.schema.json",
+        "schema/semantic-core-v1.schema.json", "metadata/baselines.json",
         "metadata/standard-library.json", "profiles/manifest.json",
+        "profiles/solcore-0.1.0-draft.2-core-m1a.json",
         "Tests/golden/wire-manifest.json"] do
     let text ← IO.FS.readFile path
     match Lean.Json.parse text with
@@ -346,17 +834,45 @@ def testSchemaJson : IO Unit := do
       assertTrue (Lean.toJson response == responseJson)
         "golden response is not the canonical Lean encoding"
   | .error error => throw (IO.userError s!"golden response violates the wire contract: {error}")
+  let coreGoldenPairs := [
+    ("Tests/golden/core-check-rejected-request.ndjson",
+      "Tests/golden/core-check-rejected-response.ndjson"),
+    ("Tests/golden/core-eval-out-of-fuel-request.ndjson",
+      "Tests/golden/core-eval-out-of-fuel-response.ndjson"),
+    ("Tests/golden/core-eval-request.ndjson",
+      "Tests/golden/core-eval-response.ndjson"),
+    ("Tests/golden/core-eval-selected-branch-request.ndjson",
+      "Tests/golden/core-eval-selected-branch-response.ndjson"),
+    ("Tests/golden/core-wire-invalid-request.ndjson",
+      "Tests/golden/core-wire-invalid-response.ndjson")
+  ]
+  for (requestPath, responsePath) in coreGoldenPairs do
+    let coreRequestText ← IO.FS.readFile requestPath
+    let expectedText ← IO.FS.readFile responsePath
+    let expected ←
+      match StrictJson.parse expectedText.trimAscii.copy with
+      | .ok value => pure value
+      | .error error =>
+          throw (IO.userError s!"{responsePath} is invalid strict JSON: {error}")
+    let actual := processJsonLine coreRequestText
+    assertTrue (actual == expected)
+      s!"{requestPath} did not produce its checked-in golden response"
 
 def run : IO Unit := do
   testProfile
   testFeatureMatrix
   testSemanticCore
+  testM1bProfile
+  testCoreWire
+  testDetailedCoreChecker
   testOracle
+  testOracleV2
+  testOracleVersionDispatch
   testSchemaJson
 
 end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a tests passed"
+  IO.println "solcore-lean M0/M1a/M1b tests passed"
   return 0

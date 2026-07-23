@@ -72,36 +72,139 @@ for (const snapshot of standardLibrary.compatibilitySnapshots) {
   verifyFileSet(snapshot);
 }
 
-const oracleSchema = readJson("schema/oracle-v1.schema.json");
+const schemaPaths = readdirSync(join(root, "schema"))
+  .filter((file) => file.endsWith(".schema.json"))
+  .sort()
+  .map((file) => `schema/${file}`);
+const schemas = schemaPaths.map((path) => ({
+  path,
+  value: readJson(path),
+}));
+const schemasById = new Map();
 const schemaIssues = [];
-function verifySchemaNode(value, path = "$") {
+
+for (const schema of schemas) {
+  assert(
+    typeof schema.value.$id === "string" && schema.value.$id.length > 0,
+    `${schema.path}: schema has no $id`,
+  );
+  if (schemasById.has(schema.value.$id)) {
+    schemaIssues.push(`${schema.path}: duplicate schema id ${schema.value.$id}`);
+  } else {
+    schemasById.set(schema.value.$id, schema);
+  }
+}
+
+const oracleV2SchemaId = "urn:solcore:oracle:v2";
+const oracleV1SchemaId = "urn:solcore:oracle:v1";
+const semanticCoreSchemaId = "urn:solcore:semantic-core:v1";
+const permittedExternalRefs = new Map([
+  [oracleV2SchemaId, new Set([oracleV1SchemaId, semanticCoreSchemaId])],
+]);
+let semanticCoreReferenceCount = 0;
+
+function resolveJsonPointer(document, fragment) {
+  let pointer;
+  try {
+    pointer = decodeURIComponent(fragment);
+  } catch {
+    return false;
+  }
+  if (pointer === "") {
+    return true;
+  }
+  if (!pointer.startsWith("/")) {
+    return false;
+  }
+  let current = document;
+  for (const encodedToken of pointer.slice(1).split("/")) {
+    const token = encodedToken.replaceAll("~1", "/").replaceAll("~0", "~");
+    if (
+      current === null ||
+      typeof current !== "object" ||
+      !Object.prototype.hasOwnProperty.call(current, token)
+    ) {
+      return false;
+    }
+    current = current[token];
+  }
+  return true;
+}
+
+function verifySchemaRef(ref, schema, path) {
+  const hashIndex = ref.indexOf("#");
+  const targetId = hashIndex < 0 ? ref : ref.slice(0, hashIndex);
+  const fragment = hashIndex < 0 ? "" : ref.slice(hashIndex + 1);
+  const targetSchema =
+    targetId === "" ? schema : schemasById.get(targetId);
+  if (targetSchema === undefined) {
+    schemaIssues.push(`${schema.path}${path}: unresolved schema ref ${ref}`);
+    return;
+  }
+  if (targetId !== "" && targetId !== schema.value.$id) {
+    const permitted = permittedExternalRefs.get(schema.value.$id);
+    if (permitted === undefined || !permitted.has(targetId)) {
+      schemaIssues.push(`${schema.path}${path}: external schema ref is not permitted: ${ref}`);
+      return;
+    }
+    if (
+      schema.value.$id === oracleV2SchemaId &&
+      targetId === semanticCoreSchemaId
+    ) {
+      semanticCoreReferenceCount += 1;
+    }
+  }
+  if (!resolveJsonPointer(targetSchema.value, fragment)) {
+    schemaIssues.push(`${schema.path}${path}: unresolved JSON pointer ${ref}`);
+  }
+}
+
+function verifySchemaNode(value, schema, path = "$") {
   if (Array.isArray(value)) {
-    value.forEach((entry, index) => verifySchemaNode(entry, `${path}[${index}]`));
+    value.forEach((entry, index) =>
+      verifySchemaNode(entry, schema, `${path}[${index}]`),
+    );
     return;
   }
   if (value === null || typeof value !== "object") {
     return;
   }
   if (value.type === "object" && value.additionalProperties !== false) {
-    schemaIssues.push(`${path}: protocol object is not closed`);
+    schemaIssues.push(`${schema.path}${path}: schema object is not closed`);
   }
   if (
     Array.isArray(value.required) &&
     new Set(value.required).size !== value.required.length
   ) {
-    schemaIssues.push(`${path}: required contains duplicates`);
+    schemaIssues.push(`${schema.path}${path}: required contains duplicates`);
   }
-  if (typeof value.$ref === "string" && value.$ref.startsWith("#/$defs/")) {
-    const name = value.$ref.slice("#/$defs/".length);
-    if (oracleSchema.$defs[name] === undefined) {
-      schemaIssues.push(`${path}: unresolved local ref ${value.$ref}`);
-    }
+  if (typeof value.$ref === "string") {
+    verifySchemaRef(value.$ref, schema, `${path}.$ref`);
   }
   for (const [key, entry] of Object.entries(value)) {
-    verifySchemaNode(entry, `${path}.${key}`);
+    verifySchemaNode(entry, schema, `${path}.${key}`);
   }
 }
-verifySchemaNode(oracleSchema);
+
+for (const schema of schemas) {
+  verifySchemaNode(schema.value, schema);
+}
+assert(
+  schemasById.has(oracleV1SchemaId),
+  "schema/oracle-v1.schema.json is not registered by $id",
+);
+assert(
+  schemasById.has(oracleV2SchemaId),
+  "schema/oracle-v2.schema.json is not registered by $id",
+);
+assert(
+  schemasById.has(semanticCoreSchemaId),
+  "schema/semantic-core-v1.schema.json is not registered by $id",
+);
+assert(
+  semanticCoreReferenceCount > 0,
+  "oracle v2 schema does not reference the registered Semantic Core v1 schema",
+);
 assert(schemaIssues.length === 0, schemaIssues.join("\n"));
 
 const argumentValue = (name) => {
@@ -124,6 +227,7 @@ assert(
   profileManifest.digestAlgorithm === "lean-json-compress-sha256-v1",
   "unknown profile digest algorithm",
 );
+const registeredProfiles = new Map();
 for (const entry of profileManifest.profiles) {
   const profile = readJson(entry.path);
   assert(profile.id === entry.id, `${entry.path}: profile id mismatch`);
@@ -131,7 +235,26 @@ for (const entry of profileManifest.profiles) {
   const encoded = JSON.stringify(sortedObject(profile));
   const digest = `sha256:${sha256(encoded)}`;
   assert(digest === entry.digest, `${entry.path}: profile digest mismatch (${digest})`);
+  assert(
+    !registeredProfiles.has(entry.id),
+    `${entry.path}: duplicate profile id ${entry.id}`,
+  );
+  registeredProfiles.set(entry.id, { entry, profile });
 }
+
+const registeredM1aProfile = registeredProfiles.get("core-m1a-v1");
+assert(registeredM1aProfile !== undefined, "core-m1a-v1 profile is not registered");
+const oracleV2Schema = schemasById.get(oracleV2SchemaId).value;
+assert(
+  JSON.stringify(sortedObject(oracleV2Schema.$defs.m1aProfile.const)) ===
+    JSON.stringify(sortedObject(registeredM1aProfile.profile)),
+  "Oracle v2 schema profile const differs from the registered M1a profile",
+);
+assert(
+  oracleV2Schema.$defs.profileRef.properties.digest.const ===
+    registeredM1aProfile.entry.digest,
+  "Oracle v2 schema profile digest differs from the profile manifest",
+);
 
 const baselineManifest = readJson("metadata/baselines.json");
 const bundleIds = new Set([
@@ -146,26 +269,66 @@ for (const implementation of baselineManifest.implementations) {
 }
 
 const oraclePath = join(root, ".lake", "build", "bin", "solcore-oracle");
-const oracle = spawnSync(oraclePath, ["capabilities"], { encoding: "utf8" });
-assert(
-  oracle.status === 0,
-  `oracle capabilities failed: ${oracle.error?.message ?? oracle.stderr}`,
+function readCapabilityOutput(argument) {
+  const oracle = spawnSync(oraclePath, [argument], { encoding: "utf8" });
+  assert(
+    oracle.status === 0,
+    `oracle ${argument} failed: ${oracle.error?.message ?? oracle.stderr}`,
+  );
+  const response = JSON.parse(oracle.stdout);
+  assert(
+    response.verdict?.kind === "accepted" &&
+      response.verdict.result?.value !== undefined,
+    `oracle ${argument} did not return an accepted capability report`,
+  );
+  return { response, report: response.verdict.result.value };
+}
+
+function verifyCapabilityProfile(argument, expectedProfileId, response, report) {
+  const registered = registeredProfiles.get(expectedProfileId);
+  assert(
+    registered !== undefined,
+    `oracle ${argument} expected profile is not registered`,
+  );
+  assert(
+    report.profile?.id === expectedProfileId,
+    `oracle ${argument} returned profile ${report.profile?.id ?? "<missing>"} instead of ${expectedProfileId}`,
+  );
+  assert(
+    response.spec === registered.entry.spec && report.spec === registered.entry.spec,
+    `oracle ${argument} spec differs from profiles/manifest.json`,
+  );
+  assert(
+    response.profile?.id === registered.entry.id &&
+      response.profile?.digest === registered.entry.digest,
+    `oracle ${argument} response profile differs from profiles/manifest.json`,
+  );
+  assert(
+    report.profileDigest === registered.entry.digest,
+    `oracle ${argument} profile digest differs from profiles/manifest.json`,
+  );
+  assert(
+    JSON.stringify(sortedObject(report.profile)) ===
+      JSON.stringify(sortedObject(registered.profile)),
+    `oracle ${argument} profile differs from the checked-in profile`,
+  );
+}
+
+const v1Capabilities = readCapabilityOutput("capabilities");
+verifyCapabilityProfile(
+  "capabilities",
+  "core-v1",
+  v1Capabilities.response,
+  v1Capabilities.report,
 );
-const response = JSON.parse(oracle.stdout);
-const report = response.verdict.result.value;
-const profileEntry = profileManifest.profiles.find(
-  (entry) => entry.id === report.profile.id,
+const v2Capabilities = readCapabilityOutput("capabilities-v2");
+verifyCapabilityProfile(
+  "capabilities-v2",
+  "core-m1a-v1",
+  v2Capabilities.response,
+  v2Capabilities.report,
 );
-assert(profileEntry !== undefined, "oracle returned an unregistered profile");
-assert(
-  report.profileDigest === profileEntry.digest,
-  "oracle profile digest differs from profiles/manifest.json",
-);
-assert(
-  JSON.stringify(sortedObject(report.profile)) ===
-    JSON.stringify(sortedObject(readJson(profileEntry.path))),
-  "oracle profile differs from the checked-in profile",
-);
+const report = v1Capabilities.report;
 
 const expectedStandardLibrary = {
   sourceRevision: standardLibrary.canonical.sourceRevision,
@@ -180,12 +343,14 @@ assert(
 );
 
 const adrFiles = readdirSync(join(root, "docs", "adr"));
-for (const feature of report.features) {
-  if (feature.adr !== null) {
-    assert(
-      adrFiles.some((file) => file.startsWith(`${feature.adr}-`)),
-      `${feature.feature}: referenced ADR-${feature.adr} does not exist`,
-    );
+for (const capability of [v1Capabilities, v2Capabilities]) {
+  for (const feature of capability.report.features) {
+    if (feature.adr !== null) {
+      assert(
+        adrFiles.some((file) => file.startsWith(`${feature.adr}-`)),
+        `${feature.feature}: referenced ADR-${feature.adr} does not exist`,
+      );
+    }
   }
 }
 

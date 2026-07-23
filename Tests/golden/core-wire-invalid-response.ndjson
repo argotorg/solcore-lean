@@ -1,0 +1,1 @@
+{"arguments":{"reason":"lowercase-hex"},"code":"core.wire.invalid-word","display":"invalid Semantic Core program","id":"golden-core-wire-invalid","kind":"protocolError","path":"/query/program/body/value","schema":"solcore-oracle/v2"}

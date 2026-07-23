@@ -22,6 +22,56 @@
       "arguments": [],
       "stdinLiteral": "{\n",
       "sha256": "69477b38b033dce2ebc0d6580f4ba86ede20d3e9f15b4e2ebdf9e46c4773b02c"
+    },
+    {
+      "id": "capabilities-v2",
+      "arguments": [
+        "capabilities-v2"
+      ],
+      "stdin": null,
+      "sha256": "ad8e015f928decbed27d20d42ec1707cdebdd05b3e86f67be7c9e87b608a724c"
+    },
+    {
+      "id": "core-eval",
+      "arguments": [],
+      "stdin": "Tests/golden/core-eval-request.ndjson",
+      "expected": "Tests/golden/core-eval-response.ndjson",
+      "sha256": "832a3d23cc2b585b48e839e2d7db6649e3e7563470a66aa39ad1f5f10261cb87"
+    },
+    {
+      "id": "core-eval-out-of-fuel",
+      "arguments": [],
+      "stdin": "Tests/golden/core-eval-out-of-fuel-request.ndjson",
+      "expected": "Tests/golden/core-eval-out-of-fuel-response.ndjson",
+      "sha256": "33cc518c2ac76e536589999dfdade7fcd2a17dc6c3d60944d31a1d0919cc6c63"
+    },
+    {
+      "id": "core-check-rejected",
+      "arguments": [],
+      "stdin": "Tests/golden/core-check-rejected-request.ndjson",
+      "expected": "Tests/golden/core-check-rejected-response.ndjson",
+      "sha256": "b0d28126e2735ba6c203fa8f86b1fe036bd38474c3a3a6d4b5b34bb52cbf1ff1"
+    },
+    {
+      "id": "core-wire-invalid",
+      "arguments": [],
+      "stdin": "Tests/golden/core-wire-invalid-request.ndjson",
+      "expected": "Tests/golden/core-wire-invalid-response.ndjson",
+      "sha256": "3970e84f1fb39c47c4c2f6adb9a2e678e5d51e59d5a31c3051f2f1d6e60c29a6"
+    },
+    {
+      "id": "core-eval-selected-branch",
+      "arguments": [],
+      "stdin": "Tests/golden/core-eval-selected-branch-request.ndjson",
+      "expected": "Tests/golden/core-eval-selected-branch-response.ndjson",
+      "sha256": "c81248835f4cd570282f34f1114202913ecc0f5309274569dce049391a717ea4"
+    },
+    {
+      "id": "mixed-v1-v2-stream-recovery",
+      "arguments": [],
+      "stdin": "Tests/golden/mixed-stream-request.ndjson",
+      "expected": "Tests/golden/mixed-stream-response.ndjson",
+      "sha256": "1e6637f558ed820436859c246af15fb1eebba359fb20f40f66e23e7e1707b77b"
     }
   ]
 }
