@@ -122,17 +122,40 @@ end BinaryOp
 
 namespace Expr
 
+def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
+  match expr with
+  | .unit => .unit
+  | .bool value => .bool value
+  | .word value => .word value
+  | .var index =>
+      if cutoff ≤ index then .var (index + 1) else .var index
+  | .unary op operand => .unary op (operand.weakenAt cutoff)
+  | .binary op left right =>
+      .binary op (left.weakenAt cutoff) (right.weakenAt cutoff)
+  | .letE value body =>
+      .letE (value.weakenAt cutoff) (body.weakenAt (cutoff + 1))
+  | .ifE condition thenBranch elseBranch =>
+      .ifE
+        (condition.weakenAt cutoff)
+        (thenBranch.weakenAt cutoff)
+        (elseBranch.weakenAt cutoff)
+
+private def wordGtWithSwappedValues (left right : Expr) : Expr :=
+  .letE left
+    (.letE (right.weakenAt 0)
+      (.binary .wordGt (.var 0) (.var 1)))
+
 def wordNe (left right : Expr) : Expr :=
   .unary .boolNot (.binary .wordEq left right)
 
 def wordLt (left right : Expr) : Expr :=
-  .binary .wordGt right left
+  wordGtWithSwappedValues left right
 
 def wordLe (left right : Expr) : Expr :=
   .unary .boolNot (.binary .wordGt left right)
 
 def wordGe (left right : Expr) : Expr :=
-  .unary .boolNot (.binary .wordGt right left)
+  .unary .boolNot (wordGtWithSwappedValues left right)
 
 end Expr
 

@@ -85,6 +85,13 @@ wordLe(x, y) = boolNot(wordGt(x, y))
 wordGe(x, y) = boolNot(wordGt(y, x))
 ```
 
+These are value-level equations. The executable `wordLt` and `wordGe`
+expression combinators bind `x` and then `y` exactly once before applying the
+swapped `wordGt`; they weaken free de Bruijn indices in `y` when introducing
+the first binding. They must not be implemented by syntactically swapping
+arbitrary operand expressions, because that would reverse observable fault
+order in the unchecked machine and would be unsafe for future elaboration.
+
 Every unary operand is evaluated exactly once. Every binary left operand is
 evaluated exactly once before the right operand, which is then evaluated exactly
 once. Primitive application itself is total for operands having the declared

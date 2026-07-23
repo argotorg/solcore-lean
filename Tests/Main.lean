@@ -155,6 +155,7 @@ def testPrimitiveAlgebra : IO Unit := do
   let two ← word 2
   let three ← word 3
   let seven ← word 7
+  let shift0 ← word 0
   let shift255 ← word 255
   let shift256 ← word 256
   let doubledMaximum ← word (wordModulus - 2)
@@ -181,16 +182,22 @@ def testPrimitiveAlgebra : IO Unit := do
     "word bitwise xor must operate on 256 bits"
   assertTrue (Word.zero.bitNot == Word.maximum)
     "word bitwise not must complement exactly 256 bits"
+  assertTrue (one.shiftLeft shift0 == one)
+    "word left shift by zero must preserve the value"
   assertTrue (one.shiftLeft shift255 == highBit)
     "word left shift by 255 must retain the high bit"
   assertTrue (one.shiftLeft shift256 == Word.zero)
     "word left shift by 256 must return zero"
   assertTrue (one.shiftLeft Word.maximum == Word.zero)
     "word left shift by the maximum word must return zero"
+  assertTrue (Word.maximum.shiftRight shift0 == Word.maximum)
+    "word right shift by zero must preserve the value"
   assertTrue (Word.maximum.shiftRight shift255 == one)
     "logical word right shift by 255 must retain the low bit"
   assertTrue (Word.maximum.shiftRight shift256 == Word.zero)
     "word right shift by 256 must return zero"
+  assertTrue (Word.maximum.shiftRight Word.maximum == Word.zero)
+    "word right shift by the maximum word must return zero"
   assertTrue
     (UnaryOp.boolNot.apply (.bool true) == some (.bool false))
     "boolNot must negate a boolean"
@@ -201,8 +208,24 @@ def testPrimitiveAlgebra : IO Unit := do
     (BinaryOp.wordEq.apply (.word one) (.word one) == some (.bool true))
     "wordEq must return a Core boolean"
   assertTrue
+    (BinaryOp.wordEq.apply (.word Word.zero) (.word Word.maximum) ==
+      some (.bool false))
+    "wordEq must distinguish the minimum and maximum words"
+  assertTrue
+    (BinaryOp.wordEq.apply (.word Word.maximum) (.word Word.maximum) ==
+      some (.bool true))
+    "wordEq must identify equal maximum words"
+  assertTrue
     (BinaryOp.wordGt.apply (.word two) (.word one) == some (.bool true))
     "wordGt must compare words as unsigned values"
+  assertTrue
+    (BinaryOp.wordGt.apply (.word Word.maximum) (.word Word.zero) ==
+      some (.bool true))
+    "wordGt must order the maximum word above zero"
+  assertTrue
+    (BinaryOp.wordGt.apply (.word Word.zero) (.word Word.maximum) ==
+      some (.bool false))
+    "wordGt must not order zero above the maximum word"
   assertTrue
     (BinaryOp.wordAdd.apply (.bool true) (.word one) == none)
     "an unchecked binary primitive must reject invalid operands"
@@ -238,8 +261,35 @@ def testM1cKernel : IO Unit := do
   }
   assertTrue derivedLessThan.check
     "the derived wordLt combinator must type-check"
-  assertTrue (derivedLessThan.run 5 == .done (.bool true))
-    "wordLt must reverse wordGt operands without changing its result"
+  assertTrue (derivedLessThan.run 11 == .done (.bool true))
+    "wordLt must bind operands in source order before applying wordGt"
+  let derivedLtLeftFaultsFirst : Program := {
+    resultType := .bool
+    body := Expr.wordLt (.var 11) (.var 22)
+  }
+  assertTrue
+    (derivedLtLeftFaultsFirst.run 1 == .fault (.unboundVariable 11))
+    "wordLt must preserve left-to-right operand fault order"
+  let derivedGeLeftFaultsFirst : Program := {
+    resultType := .bool
+    body := Expr.wordGe (.var 11) (.var 22)
+  }
+  assertTrue
+    (derivedGeLeftFaultsFirst.run 2 == .fault (.unboundVariable 11))
+    "wordGe must preserve left-to-right operand fault order"
+  let derivedComparisonsAvoidCapture : Program := {
+    resultType := .bool
+    body :=
+      .letE (.word one)
+        (.ifE
+          (Expr.wordLt (.word Word.zero) (.var 0))
+          (Expr.wordGe (.word Word.zero) (.var 0))
+          (.bool true))
+  }
+  assertTrue derivedComparisonsAvoidCapture.check
+    "derived swapped comparisons must preserve free de Bruijn references"
+  assertTrue (derivedComparisonsAvoidCapture.run 30 == .done (.bool false))
+    "wordLt and wordGe must weaken the right operand before binding the left"
   let leftFaultsFirst : Program := {
     resultType := .word
     body := .binary .wordAdd (.var 11) (.var 22)
