@@ -1,0 +1,115 @@
+{
+  "schema": "solcore-standard-library-baselines-v1",
+  "digestAlgorithm": {
+    "id": "solcore-fileset-sha256-v1",
+    "hash": "sha256",
+    "fileContent": "raw-bytes",
+    "pathEncoding": "UTF-8",
+    "pathOrder": "ascending-C-byte-order",
+    "header": "solcore-fileset-sha256-v1\n",
+    "entryFormat": "<relative-path>\\t<decimal-byte-size>\\t<lowercase-file-sha256>\\n",
+    "includesFinalNewline": true,
+    "manifestDigest": "sha256(header || entries)"
+  },
+  "canonical": {
+    "id": "canonical-haskell-1d490d8",
+    "role": "canonical",
+    "repository": "https://github.com/argotorg/solcore",
+    "sourceRevision": "1d490d8bb5f374356f06e0720655496482eb1fb4",
+    "sourceRoot": "std",
+    "selection": "tracked-*.solc",
+    "manifestSha256": "3f81bebfd1fc161ee08972be9e7a52150d02bdf55dd7449dfa058cd81cfafc22",
+    "files": [
+      {
+        "path": "ABIGeneric.solc",
+        "byteSize": 5540,
+        "sha256": "b14f31abd374d65e194c7706183086082558ab2a60d230ec5b9e6f1b9c9b9ae2"
+      },
+      {
+        "path": "Generic.solc",
+        "byteSize": 445,
+        "sha256": "913a02e32829e0230e31db6512151c36e019f5630e3dbd0be9d033a9019194d7"
+      },
+      {
+        "path": "StorageGeneric.solc",
+        "byteSize": 10546,
+        "sha256": "8d68601447f40a6e662de8b6cff06031998628339ca23ec917a970157c301a6a"
+      },
+      {
+        "path": "dispatch.solc",
+        "byteSize": 11249,
+        "sha256": "b723ec9a0a76a6abf091d49a12467c6a4628b634c48d8c34e82e2c45d6e939f5"
+      },
+      {
+        "path": "opcodes.solc",
+        "byteSize": 10377,
+        "sha256": "a6a08beed16ccdf722f65c60af835dcfd0eaec61f34f041082bbc0fca1e69bab"
+      },
+      {
+        "path": "std.solc",
+        "byteSize": 72958,
+        "sha256": "e8ec755232347bbf4a130dcc05c7c5a3230c4d0cb0223445a2d82260d4474fec"
+      }
+    ]
+  },
+  "compatibilitySnapshots": [
+    {
+      "id": "rust-compatibility-ac6f8957",
+      "role": "compatibilitySnapshot",
+      "repository": "https://github.com/argotorg/solcore-rs",
+      "vendoredAtRevision": "38f4778ea461edfe59106bdb1f9f08c3307b0fc0",
+      "upstreamRepository": "https://github.com/argotorg/solcore",
+      "sourceRevision": "ac6f8957a78dc53248dbe053f1ddbc2a2201b81f",
+      "sourceRoot": "std",
+      "selection": "tracked-*.solc",
+      "manifestSha256": "c23c43897bb3f9e8d55abc5369dc9bb1ae984e9da1ef9457440aee642923f430",
+      "files": [
+        {
+          "path": "ABIGeneric.solc",
+          "byteSize": 4945,
+          "sha256": "e1c7ad2e46de60c0c185d6476c8463aafa9652bc968abeebdd65c9b0f06bf347"
+        },
+        {
+          "path": "Generic.solc",
+          "byteSize": 445,
+          "sha256": "913a02e32829e0230e31db6512151c36e019f5630e3dbd0be9d033a9019194d7"
+        },
+        {
+          "path": "dispatch.solc",
+          "byteSize": 10016,
+          "sha256": "94db411afe24ca0d109a894e4f0fd9057220e7797c4597f4155c4fd4fe0c1860"
+        },
+        {
+          "path": "opcodes.solc",
+          "byteSize": 10377,
+          "sha256": "a6a08beed16ccdf722f65c60af835dcfd0eaec61f34f041082bbc0fca1e69bab"
+        },
+        {
+          "path": "std.solc",
+          "byteSize": 62719,
+          "sha256": "5ac06de3325625a1e88aa92e668d87b5b91c087a1f68603a04f220bb2e6824b6"
+        }
+      ],
+      "mirrors": [
+        {
+          "root": "crates/parser/tests/fixtures/corpus/ok/std",
+          "byteIdentical": true
+        }
+      ],
+      "repositoryMetadata": {
+        "trackedTreeManifestSha256": "9b76fde8ea473e87b3c28ec9e7a859a906a69ef7b0e27d61be32b3323770227b",
+        "nonSourceFiles": [
+          {
+            "path": "README.md",
+            "byteSize": 1909,
+            "sha256": "c318f13cf675caa7e22d58997df2e32bfa3ea815b08c68c124f28f5d54342940"
+          }
+        ]
+      },
+      "notes": [
+        "This snapshot is comparison evidence and is not the normative standard library.",
+        "Generic.solc and opcodes.solc are byte-identical to the canonical bundle; the other shared source files differ."
+      ]
+    }
+  ]
+}

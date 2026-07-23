@@ -1,0 +1,4 @@
+/.lake/
+/build/
+/.upstream/
+.DS_Store

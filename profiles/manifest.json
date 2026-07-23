@@ -1,0 +1,12 @@
+{
+  "schema": "solcore-profile-manifest-v1",
+  "digestAlgorithm": "lean-json-compress-sha256-v1",
+  "profiles": [
+    {
+      "id": "core-v1",
+      "spec": "solcore/0.1.0-draft.1",
+      "path": "profiles/solcore-0.1.0-draft.1-core.json",
+      "digest": "sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8"
+    }
+  ]
+}
