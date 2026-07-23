@@ -1,19 +1,8 @@
-import Solcore.Surface.Token
+import Solcore.Surface.LexicalGrammar
 
 set_option autoImplicit false
 
 namespace Solcore.Surface
-
-inductive LexErrorKind where
-  | invalidCharacter (character : Char)
-  | unterminatedBlockComment
-  deriving Repr, BEq, DecidableEq
-
-structure LexError where
-  code : String
-  span : SourceSpan
-  kind : LexErrorKind
-  deriving Repr, BEq, DecidableEq
 
 inductive LexerInvariant where
   | fuelExhausted (span : SourceSpan)
@@ -308,33 +297,127 @@ private def lexAux
             | invalid, _ =>
                 .error (.source (invalidCharacter file offset invalid))
 
+private theorem lexAux_fuel_sufficient
+    (file : SourceFile)
+    (fuel : Nat)
+    (characters : List Char)
+    (offset : Nat)
+    (tokens : List Token)
+    (comments : List Comment)
+    (sufficient : characters.length < fuel)
+    (span : SourceSpan) :
+    lexAux file fuel characters offset tokens comments ≠
+      .error (.internal (.fuelExhausted span)) := by
+  induction fuel generalizing characters offset tokens comments with
+  | zero =>
+      omega
+  | succ fuel inductionHypothesis =>
+      cases characters with
+      | nil =>
+          simp [lexAux]
+      | cons character rest =>
+          simp only [lexAux]
+          split
+          · simp
+          · apply inductionHypothesis
+            have remainderBound :=
+              takeWhile_remainder_length_le (· != '\n') rest.tail
+            simp_all
+            omega
+          · split
+            · simp
+            · rename_i remaining endByte success
+              apply inductionHypothesis
+              have remainderBound :=
+                skipBlockComment_remainder_length_le
+                  file offset _ remaining 1 (offset + 2) endByte success
+              simp_all
+              omega
+          · split
+            · apply inductionHypothesis
+              have remainderBound :=
+                takeWhile_remainder_length_le isAsciiHexDigit (rest.drop 2)
+              simp_all
+              omega
+            · apply inductionHypothesis
+              simp_all only [List.cons.injEq, List.length_cons]
+              omega
+          · split
+            · apply inductionHypothesis
+              simp_all only [List.cons.injEq, List.length_cons]
+              omega
+            · split
+              · apply inductionHypothesis
+                have remainderBound :=
+                  takeWhile_remainder_length_le isIdentifierContinue rest
+                simp_all
+                omega
+              · split
+                · apply inductionHypothesis
+                  have remainderBound :=
+                    takeWhile_remainder_length_le isAsciiDigit rest
+                  simp_all
+                  omega
+                · split <;> simp_all <;>
+                    apply inductionHypothesis <;> omega
+
 private def lexUnchecked (file : SourceFile) : Except LexFailure Lexed :=
   let characters := file.content.toList
   lexAux file (characters.length + 1) characters 0 [] []
+
+private theorem lexUnchecked_ne_fuel_exhausted
+    (file : SourceFile)
+    (span : SourceSpan) :
+    lexUnchecked file ≠
+      .error (.internal (.fuelExhausted span)) := by
+  unfold lexUnchecked
+  apply lexAux_fuel_sufficient
+  omega
 
 def lex (file : SourceFile) : Except LexFailure Lexed :=
   match lexUnchecked file with
   | .error failure => .error failure
   | .ok lexed =>
-      if lexed.spansValidFor file then
+      if LexicalGrammar.accepts file lexed then
         .ok lexed
       else
         .error (.internal (.invalidOutput lexed))
 
-theorem lex_success_valid
+theorem lex_ne_fuel_exhausted
+    (file : SourceFile)
+    (span : SourceSpan) :
+    lex file ≠ .error (.internal (.fuelExhausted span)) := by
+  cases resultEquation : lexUnchecked file with
+  | error failure =>
+      simp only [lex, resultEquation]
+      intro outputEquation
+      cases outputEquation
+      exact lexUnchecked_ne_fuel_exhausted file span resultEquation
+  | ok lexed =>
+      simp only [lex, resultEquation]
+      split <;> simp
+
+theorem lex_success_lexes
     (file : SourceFile)
     (lexed : Lexed)
     (success : lex file = .ok lexed) :
-    lexed.ValidFor file := by
+    LexicalGrammar.Lexes file lexed := by
   unfold lex at success
   split at success
   · contradiction
   · rename_i unchecked
     split at success
-    · rename_i valid
+    · rename_i accepted
       cases success
-      exact (Lexed.spansValidFor_eq_true_iff lexed file).mp valid
+      exact (LexicalGrammar.accepts_eq_true_iff file lexed).mp accepted
     · contradiction
+
+theorem lex_success_valid
+    (file : SourceFile)
+    (lexed : Lexed)
+    (success : lex file = .ok lexed) :
+    lexed.ValidFor file :=
+  (lex_success_lexes file lexed success).1
 
 end Lexer
 
