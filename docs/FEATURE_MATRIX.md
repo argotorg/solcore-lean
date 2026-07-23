@@ -107,6 +107,22 @@ M1c is exposed through `solcore-semantic-core/v2`,
 draft.2/Semantic Core v1/Oracle v2 feature arrays, profiles, digests, schemas,
 and capability bytes remain immutable.
 
+## M2a internal parser boundary
+
+ADR-0012 defines an internal parse-only Surface fragment, and its lexer/parser
+kernel is under implementation. This work does not promote a language feature,
+add an enabled profile feature, or change the current `grammarVersion = none`
+publication. Oracle v1 `parse` remains `unsupported`.
+
+The internal parser preserves UTF-8 byte spans, comments, raw integer spelling,
+grouping, calls, and keyword conditionals for one restricted function fixture.
+It deliberately leaves names, source literal typing, standard-library
+identities, and Core elaboration unresolved. Parser publication requires a new
+language/profile/Surface-wire/Oracle version and will be recorded separately.
+The declarative lexical judgment, direct executor-to-parser-grammar derivation,
+relational determinism/completeness, and frontend fuel-sufficiency proofs remain
+open, so this internal work is not marked `implemented` in the matrix.
+
 ## Rules for profile inclusion
 
 - `known` means only that a stable feature ID exists; it does not mean that the

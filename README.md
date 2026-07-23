@@ -4,12 +4,11 @@
 in Lean 4, intended to become the reference implementation for semantic
 differential fuzzing.
 
-The project is currently at **M1c (primitive Semantic Core publication)**. It
-extends the closed M1b Core with boolean negation and a fixed set of total
-256-bit word operations, then publishes that fragment as
-`solcore/0.1.0-draft.3`, profile `core-m1c-v1`, Semantic Core v2, and Oracle v3.
-The draft.1/Oracle v1 and draft.2/Oracle v2 contracts remain frozen for
-compatibility.
+The project is currently developing **M2a (the Surface parser kernel)**. The
+published reference boundary remains M1c: `solcore/0.1.0-draft.3`, profile
+`core-m1c-v1`, Semantic Core v2, and Oracle v3. M2a adds an internal parse-only
+frontend without widening any published Oracle. The draft.1/Oracle v1 and
+draft.2/Oracle v2 contracts remain frozen for compatibility.
 
 ## What M0 fixes
 
@@ -108,6 +107,46 @@ The Haskell and Rust implementation defaults are not specification authority.
 They are isolated in [`Solcore/Baseline.lean`](Solcore/Baseline.lean) as evidence
 for differential investigation.
 
+## What the M2a work implements internally
+
+- a source-owned Surface AST independent of Oracle wire types
+- half-open UTF-8 byte spans for tokens, comments, names, operators, and nodes
+- ASCII-only maximal-munch lexing with line comments and nested block comments
+- exact lexical source partition checks for tokens, comments, and discarded
+  whitespace
+- raw decimal and hexadecimal literal spelling
+- unresolved names and generic calls, without spelling-based intrinsics
+- explicit grouping, unit syntax, and keyword conditionals
+- the pinned implementations' shared precedence and associativity
+- a closed single-function fixture envelope with typed immutable bindings and a
+  final return
+- an independent full-token difference-list grammar judgment
+- executable span, grammar-shape, and AST/token correspondence checks connected
+  to declarative predicates
+- success provenance theorems linking the public parser to the exact lexer
+  result, complete token correspondence, and grammar validity
+
+`true` and `false` remain unresolved names. Word-not and shift syntax remains
+ordinary calls to such names as `bnotWord`, `bshlWord`, and `bshrWord` until
+resolution can identify canonical declarations. Source integer conversion,
+name resolution, type checking, and Core elaboration are not part of M2a.
+
+M2a proof work is still in progress. The public lexer validates structural
+source partition invariants, and `parseLexed` accepts only the exact token stream
+returned by that lexer. Public parser success additionally implies the
+grammar-shape and full AST/token correspondence predicates. The remaining work
+includes an independent maximal-munch lexer judgment, a direct derivation from
+the private parser construction to the difference-list grammar, relational
+determinism/completeness results, and lexer/parser fuel sufficiency. Fuel
+exhaustion is an internal invariant and can never be reported as a source
+rejection.
+
+The parser is deliberately not exposed by Oracle v1, v2, or v3. A later,
+additive parser publication will require a closed Surface wire AST, a new
+grammar version and frontend profile, and a new Oracle version. The exact
+internal boundary is recorded in
+[`ADR-0012`](docs/adr/0012-m2a-surface-parser-kernel.md).
+
 ## Running
 
 ```sh
@@ -145,6 +184,7 @@ source-level differential conformance.
 - [Feature matrix](docs/FEATURE_MATRIX.md)
 - [Compatibility matrix](docs/COMPATIBILITY_MATRIX.md)
 - [M1 Semantic Core plan](docs/M1_PLAN.md)
+- [M2 frontend plan](docs/M2_PLAN.md)
 - [Architecture decision records](docs/adr)
 - [Checked-in core profile](profiles/solcore-0.1.0-draft.1-core.json)
 - [Checked-in M1b Core profile](profiles/solcore-0.1.0-draft.2-core-m1a.json)
@@ -155,6 +195,7 @@ source-level differential conformance.
 - [Semantic Core v1 JSON Schema](schema/semantic-core-v1.schema.json)
 - [Semantic Core v2 JSON Schema](schema/semantic-core-v2.schema.json)
 - [M1c primitive semantics and publication ADR](docs/adr/0011-m1c-primitive-semantics-and-publication.md)
+- [M2a Surface parser kernel ADR](docs/adr/0012-m2a-surface-parser-kernel.md)
 
 ## Implementation roadmap
 

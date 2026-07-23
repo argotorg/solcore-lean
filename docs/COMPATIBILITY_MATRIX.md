@@ -137,6 +137,33 @@ Until M2 supplies normative parsing, resolution, and elaboration from a shared
 `.solc` workspace, Oracle v3 is a reference for closed Core fixtures rather
 than evidence of source-level three-implementation conformance.
 
+## M2a parser source-inspection evidence
+
+ADR-0012 uses the following common syntax at the pinned revisions. This is
+source-inspection evidence for the internal parser, not an end-to-end
+conformance result.
+
+| Surface rule | Haskell evidence | Rust evidence | M2a decision |
+| --- | --- | --- | --- |
+| function envelope | `Parser/Decl.hs:246-251,279-290` | `parse/items.rs:165-267` | one nullary function with `->` return type |
+| initialized typed let | `Parser/Stmt.hs:41-55` | `parse/stmt.rs:136-164` | require type, `=`, initializer, and semicolon |
+| final return | `Parser/Stmt.hs:48-55` | `parse/stmt.rs:136-155` | require one value-returning final statement |
+| keyword conditional | `Parser/Expr.hs:28-47` | `parse/expr_pat.rs:106-136` | preserve as a distinct Surface constructor |
+| precedence | `Parser/Expr.hs:52-113` | `parse/expr_pat.rs:256-417` | shared unary/arithmetic/bitwise/relation/equality order |
+| comments | `Lexer/SolcoreLexer.hs:23-27` | `lexer.rs:272-330` | retain outer spans and support nesting |
+| source offsets | character offset stored as byte fields | UTF-8 byte ranges | normative half-open UTF-8 byte ranges |
+
+The parser does not adopt Rust-only `let :=`, value-free return, or
+unparenthesized statement-if extensions. It also does not adopt either
+resolver's branch-scope leakage, duplicate-local overwriting, or source literal
+wrapping.
+
+Both implementations resolve `true` and `false` as shadowable names. M2a
+preserves them as names and defers their static meaning. Neither implementation
+has source operators for word not or shifts; `bnotWord`, `bshlWord`, and
+`bshrWord` are ordinary standard-library calls. M2a parses such calls but does
+not treat their spelling as primitive identity.
+
 ## Historical std external ABI evidence
 
 The following table summarizes path inspection from an older snapshot; it is

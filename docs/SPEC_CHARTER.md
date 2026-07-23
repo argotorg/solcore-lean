@@ -14,6 +14,16 @@ input program and execution environment. At the current milestone, its
 executable reference boundary is the published closed Semantic Core; a
 source-level parser, resolver, and elaborator are not yet part of that boundary.
 
+The internal M2a kernel now lexes and parses the closed fragment fixed by
+[ADR-0012](adr/0012-m2a-surface-parser-kernel.md). It is intentionally not a
+published reference boundary: it has no versioned Surface wire format or
+Oracle query, and it performs no name resolution, checking, or elaboration.
+Its public success path is checked against declarative span, grammar, and
+token-correspondence predicates. A declarative maximal-munch lexer judgment,
+direct construction of the full parser grammar derivation, relational
+determinism/completeness, and frontend fuel sufficiency remain proof
+obligations.
+
 To achieve this purpose, the specification provides the following three
 elements as one coherent whole:
 

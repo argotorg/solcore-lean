@@ -133,7 +133,9 @@ version from an expression tag.
 The M2 parser, resolver, and elaborator are responsible for converting a
 `.solc` workspace into Core. M1 semantics are not defined by the existing
 compilers' lowering behavior or by an ad hoc source parser specific to M1.
-Consequently, the current Oracle is a reference implementation for the
+ADR-0012 now supplies the first internal parse-only Surface fragment, but it has
+no resolver, elaborator, versioned Surface wire format, or Oracle query.
+Consequently, the current Oracle remains a reference implementation for the
 published closed Core, not yet a source-level conformance oracle.
 
 ## Candidates for M1
