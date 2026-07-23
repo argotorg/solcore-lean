@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out pinned canonical standard library
+        uses: actions/checkout@v4
+        with:
+          repository: argotorg/solcore
+          ref: 1d490d8bb5f374356f06e0720655496482eb1fb4
+          path: .upstream/solcore
+          sparse-checkout: std
+          persist-credentials: false
+      - uses: leanprover/lean-action@v1
+        with:
+          auto-config: false
+          build: true
+          test: true
+          build-args: "--wfail"
+          test-args: "--wfail"
+          nanoda: true
+          nanoda-allow-sorry: false
+      - name: Verify pinned metadata
+        run: >-
+          node scripts/verify-metadata.mjs
+          --canonical-source-root .upstream/solcore/std
+      - name: Enforce semantic kernel policy
+        run: node scripts/check-kernel.mjs
