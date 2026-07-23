@@ -1,0 +1,78 @@
+import Solcore.Core.Typing
+
+set_option autoImplicit false
+
+namespace Solcore.Core
+
+inductive Evaluates : Environment → Expr → Value → Prop where
+  | unit {environment : Environment} :
+      Evaluates environment .unit .unit
+  | bool {environment : Environment} {value : Bool} :
+      Evaluates environment (.bool value) (.bool value)
+  | word {environment : Environment} {value : Word} :
+      Evaluates environment (.word value) (.word value)
+  | var {environment : Environment} {index : Nat} {value : Value} :
+      environment[index]? = some value →
+      Evaluates environment (.var index) value
+  | letE
+      {environment : Environment} {value body : Expr}
+      {boundValue result : Value} :
+      Evaluates environment value boundValue →
+      Evaluates (boundValue :: environment) body result →
+      Evaluates environment (.letE value body) result
+  | ifTrue
+      {environment : Environment} {condition thenBranch elseBranch : Expr}
+      {result : Value} :
+      Evaluates environment condition (.bool true) →
+      Evaluates environment thenBranch result →
+      Evaluates environment (.ifE condition thenBranch elseBranch) result
+  | ifFalse
+      {environment : Environment} {condition thenBranch elseBranch : Expr}
+      {result : Value} :
+      Evaluates environment condition (.bool false) →
+      Evaluates environment elseBranch result →
+      Evaluates environment (.ifE condition thenBranch elseBranch) result
+
+theorem evaluation_deterministic
+    {environment : Environment} {expr : Expr} {left right : Value}
+    (leftEvaluation : Evaluates environment expr left)
+    (rightEvaluation : Evaluates environment expr right) :
+    left = right := by
+  induction leftEvaluation generalizing right with
+  | unit =>
+      cases rightEvaluation
+      rfl
+  | bool =>
+      cases rightEvaluation
+      rfl
+  | word =>
+      cases rightEvaluation
+      rfl
+  | var leftLookup =>
+      cases rightEvaluation with
+      | var rightLookup =>
+          rw [leftLookup] at rightLookup
+          cases rightLookup
+          rfl
+  | letE _ _ boundIH bodyIH =>
+      cases rightEvaluation with
+      | letE rightBound rightBody =>
+          have boundEquality := boundIH rightBound
+          cases boundEquality
+          exact bodyIH rightBody
+  | ifTrue _ _ conditionIH branchIH =>
+      cases rightEvaluation with
+      | ifTrue rightCondition rightBranch =>
+          exact branchIH rightBranch
+      | ifFalse rightCondition _ =>
+          have impossible := conditionIH rightCondition
+          contradiction
+  | ifFalse _ _ conditionIH branchIH =>
+      cases rightEvaluation with
+      | ifTrue rightCondition _ =>
+          have impossible := conditionIH rightCondition
+          contradiction
+      | ifFalse rightCondition rightBranch =>
+          exact branchIH rightBranch
+
+end Solcore.Core
