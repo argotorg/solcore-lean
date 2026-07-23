@@ -1,0 +1,89 @@
+# M1: Semantic Core implementation plan
+
+The objective of M1 is to implement the smallest Semantic Core that can be
+evaluated without passing through the Solcore source parser or backend, together
+with all three of a declarative specification, an executable evaluator, and
+correspondence proofs.
+Even when an M0 feature is `directionAccepted`, it is not promoted to
+`normative` or `implemented` until it satisfies the completion criteria below.
+
+## Input boundary
+
+M0 `solcore-oracle/v1` defines a typed result only for `capabilities`. Kinds from
+`parse` through `contract` are reserved for capability negotiation and always
+return `unsupported` in M0. An undecided Core AST must not be smuggled through
+an arbitrary field such as `scenario : Json`.
+
+M1 adds all of the following together:
+
+1. the versioned `solcore-semantic-core/v1` JSON Schema
+2. a strict decoder and canonical encoder for Core ASTs and values
+3. the next Oracle schema revision, with queries that directly evaluate Core
+   input, typed observations, and the detailed phases required by Core
+4. round-trip and golden tests between Core JSON fixtures and Lean values
+
+The M2 parser, resolver, and elaborator are responsible for converting a
+`.solc` workspace into Core. M1 semantics are not defined by the existing
+compilers' lowering behavior or by an ad hoc source parser specific to M1.
+
+## Candidates for M1
+
+- unit, bool, and 256-bit words
+- lexical local bindings and an explicit local store
+- conditionals and explicitly specified short-circuiting
+- first-class functions, lexical closures, application, and return
+- products, sums, user ADTs, constructors, and direct pattern matching
+- closed Core programs with explicit types
+
+Modules/imports, type inference, polymorphism, type class resolution, and
+comptime remain in M2. The ABI, storage, contract host, and EVM remain in M3.
+
+## Items requiring an Accepted ADR before implementation
+
+- modulo behavior for word operations, division by zero, and shift ranges
+- evaluation order for function arguments, primitive operands, and assignment
+- short-circuit behavior for `&&` and `||`
+- closure capture, recursion, and mutable local-cell identity
+- constructor identity, ADT field order, and pattern selection order
+- match exhaustiveness and unreachable match failure
+- control transfer such as return
+- the relationship between divergence and the fuelled evaluator
+
+These choices are not decided solely by agreement or majority between the
+Haskell and Rust implementations. Each choice must include a minimal
+implementation witness.
+
+## Implementation order
+
+1. Define `Core.Ty`, `Core.Expr`, `Core.Value`, environments, stores, and control
+   results.
+2. Define well-formedness and the declarative typing judgment.
+3. Define a small-step or CEK transition relation and its multi-step closure.
+4. Implement a total evaluator that takes explicit fuel.
+5. Map checker/evaluator results to `rejected`, `inconclusive`, and `executed`.
+6. Add the Core JSON codec and Oracle queries.
+7. Preserve minimal Haskell/Rust source witnesses as candidates for elaboration
+   tests in M2 and later.
+
+## Completion criteria for each feature
+
+- An aggregate feature such as `corePrimitives` does not become `implemented`
+  when only some of its components are complete. If independently promoting a
+  component becomes necessary, an ADR that splits the feature ID must be
+  Accepted before changing the profile.
+- Declarative typing and evaluation rules exist.
+- An executable checker and evaluator exist.
+- Checker soundness is proved.
+- Evaluator soundness is proved.
+- Determinism is proved.
+- Progress and preservation are proved for the target fragment.
+- An explicit completeness theorem for sufficient fuel exists, or the
+  limitation of an unproved direction is documented.
+- Positive and negative witnesses and canonical wire golden cases exist.
+- The semantic kernel contains no `sorry`, `admit`, `partial`, `unsafe`, or
+  undeclared axioms.
+
+Only features satisfying these conditions are changed to `normative` /
+`implemented`. The same change updates `staticSemanticsVersion`,
+`dynamicSemanticsVersion`, the specification release when necessary, and
+`core-v1`'s `enabledFeatures` and digest.
