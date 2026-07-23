@@ -1380,6 +1380,593 @@ def testOracle : IO Unit := do
         "a\\main.solc"] do
     assertTrue (!isSafeSourcePath unsafePath) s!"unsafe path was accepted: {unsafePath}"
 
+def surfaceFile (content : String) : Surface.SourceFile := {
+  path := "main.solc"
+  content
+}
+
+def assertSurfaceSpan
+    (actual : Surface.SourceSpan)
+    (startByte endByte : Nat)
+    (message : String) : IO Unit :=
+  assertTrue
+    (actual.source == "main.solc" &&
+      actual.startByte == startByte &&
+      actual.endByte == endByte)
+    s!"{message}: got {reprStr actual}"
+
+def expectSurfaceLex (content : String) : IO Surface.Lexed := do
+  let file := surfaceFile content
+  match Surface.Lexer.lex file with
+  | .error failure =>
+      throw (IO.userError s!"Surface lexing failed: {reprStr failure}")
+  | .ok lexed =>
+      assertTrue (lexed.spansValidFor file)
+        "successful Surface lexing must return valid token and comment spans"
+      pure lexed
+
+def expectSurfaceParse (content : String) : IO Surface.ParsedFile := do
+  let file := surfaceFile content
+  let lexed ← expectSurfaceLex content
+  match Surface.Parser.parse file with
+  | .error failure =>
+      throw (IO.userError s!"Surface parsing failed: {reprStr failure}")
+  | .ok parsed =>
+      assertTrue (parsed.spansValidFor file)
+        "successful Surface parsing must return a valid span tree"
+      assertTrue parsed.grammarValid
+        "successful Surface parsing must satisfy the grammar-shape predicate"
+      assertTrue (parsed.correspondsTo lexed)
+        "successful Surface parsing must correspond to the complete token stream"
+      pure parsed
+
+def expectSurfaceSyntaxError (content : String) : IO Surface.ParseError := do
+  match Surface.Parser.parse (surfaceFile content) with
+  | .error (.syntactic error) => pure error
+  | .error failure =>
+      throw (IO.userError s!"expected a syntax error, got {reprStr failure}")
+  | .ok parsed =>
+      throw (IO.userError s!"expected a syntax error, parsed {reprStr parsed}")
+
+def surfaceBinaryOpName : Surface.BinaryOp → String
+  | .mul => "mul"
+  | .div => "div"
+  | .mod => "mod"
+  | .add => "add"
+  | .sub => "sub"
+  | .bitAnd => "bitAnd"
+  | .bitXor => "bitXor"
+  | .bitOr => "bitOr"
+  | .lt => "lt"
+  | .gt => "gt"
+  | .le => "le"
+  | .ge => "ge"
+  | .eq => "eq"
+  | .ne => "ne"
+
+def surfaceExpressionShape : Surface.Expr → String
+  | .unit _ => "unit"
+  | .integer literal =>
+      match literal.base with
+      | .decimal => literal.digits
+      | .hexadecimal => "0x" ++ literal.digits
+  | .name name => name.value
+  | .group _ inner => "group(" ++ surfaceExpressionShape inner ++ ")"
+  | .call _ callee arguments =>
+      callee.value ++ "(" ++
+        String.intercalate "," (arguments.map surfaceExpressionShape) ++ ")"
+  | .unary _ _ operand =>
+      "not(" ++ surfaceExpressionShape operand ++ ")"
+  | .binary _ operator left right =>
+      surfaceBinaryOpName operator.value ++ "(" ++
+        surfaceExpressionShape left ++ "," ++
+        surfaceExpressionShape right ++ ")"
+  | .ifThenElse _ condition thenBranch elseBranch =>
+      "if(" ++ surfaceExpressionShape condition ++ "," ++
+        surfaceExpressionShape thenBranch ++ "," ++
+        surfaceExpressionShape elseBranch ++ ")"
+termination_by expression => sizeOf expression
+
+def testSurfaceLexer : IO Unit := do
+  let operatorFixture := "-> == != <= >= / //x\n/*a/*b*/c*/"
+  let lexed ← expectSurfaceLex operatorFixture
+  assertTrue
+    (lexed.tokens.map (·.kind) == [
+      .arrow, .equalEqual, .bangEqual, .lessEqual, .greaterEqual, .slash
+    ])
+    "the Surface lexer must use maximal munch for shared operators"
+  match lexed.comments with
+  | [line, block] =>
+      assertTrue (line.kind == .line)
+        "the first retained trivia item must be a line comment"
+      assertTrue (block.kind == .block)
+        "the nested comment must be one retained block-comment item"
+      assertSurfaceSpan line.span 17 20
+        "line-comment span must exclude its terminating LF"
+      assertSurfaceSpan block.span 21 32
+        "nested block-comment span must cover the outer trivia item"
+  | comments =>
+      throw (IO.userError s!"unexpected comment records: {reprStr comments}")
+
+  let identifierFixture :=
+    "functionx then true false bool word A0_z 123 0x0A"
+  let identifiers ← expectSurfaceLex identifierFixture
+  assertTrue
+    (identifiers.tokens.map (·.kind) == [
+      .identifier "functionx",
+      .identifier "then",
+      .identifier "true",
+      .identifier "false",
+      .identifier "bool",
+      .identifier "word",
+      .identifier "A0_z",
+      .decimal "123",
+      .hexadecimal "0A"
+    ])
+    "contextual words and raw integer spelling must survive lexing"
+
+  let malformedHex ← expectSurfaceLex "0x 0x1g"
+  assertTrue
+    (malformedHex.tokens.map (·.kind) == [
+      .decimal "0", .identifier "x", .hexadecimal "1", .identifier "g"
+    ])
+    "malformed hexadecimal prefixes must follow regular maximal munch"
+
+  match Surface.Lexer.lex (surfaceFile "/*🙂*/@") with
+  | .error (.source error) =>
+      assertTrue (error.code == "SL0001")
+        "an invalid character must use the stable lexical code"
+      assertTrue (error.kind == .invalidCharacter '@')
+        "the lexer must report the first invalid character"
+      assertSurfaceSpan error.span 8 9
+        "invalid-character span must use UTF-8 byte offsets"
+  | outcome =>
+      throw (IO.userError s!"expected invalid-character failure, got {reprStr outcome}")
+
+  match Surface.Lexer.lex (surfaceFile "//🙂\nλ") with
+  | .error (.source error) =>
+      assertTrue (error.kind == .invalidCharacter 'λ')
+        "a non-ASCII identifier character must remain outside M2a"
+      assertSurfaceSpan error.span 7 9
+        "a multibyte invalid character must occupy its complete UTF-8 range"
+  | outcome =>
+      throw (IO.userError s!"expected non-ASCII identifier failure, got {reprStr outcome}")
+
+  let crlf ← expectSurfaceLex "//x\r\n0"
+  match crlf.comments, crlf.tokens with
+  | [comment], [number] =>
+      assertSurfaceSpan comment.span 0 4
+        "CR before LF must remain part of the line-comment span"
+      assertSurfaceSpan number.span 5 6
+        "lexing must resume after the LF in a CRLF sequence"
+  | comments, tokens =>
+      throw (IO.userError
+        s!"unexpected CRLF lexing result: {reprStr comments}, {reprStr tokens}")
+
+  let lineAtEof ← expectSurfaceLex "// tail"
+  match lineAtEof.comments, lineAtEof.tokens with
+  | [comment], [] =>
+      assertTrue (comment.kind == .line)
+        "a line comment must be retained when EOF replaces its terminating LF"
+      assertSurfaceSpan comment.span 0 7
+        "a line comment at EOF must extend through the final byte"
+  | comments, tokens =>
+      throw (IO.userError
+        s!"unexpected EOF line-comment result: {reprStr comments}, {reprStr tokens}")
+
+  let bareCrComment ← expectSurfaceLex "//x\ry"
+  match bareCrComment.comments, bareCrComment.tokens with
+  | [comment], [] =>
+      assertSurfaceSpan comment.span 0 5
+        "a bare CR must not terminate a line comment"
+  | comments, tokens =>
+      throw (IO.userError
+        s!"unexpected bare-CR line-comment result: {reprStr comments}, {reprStr tokens}")
+
+  let bareCr ← expectSurfaceLex "a\rb"
+  match bareCr.tokens, bareCr.comments with
+  | [left, right], [] =>
+      assertTrue
+        (left.kind == .identifier "a" && right.kind == .identifier "b")
+        "a bare CR must separate adjacent tokens as whitespace"
+      assertSurfaceSpan left.span 0 1
+        "the token before a bare CR must end before the separator"
+      assertSurfaceSpan right.span 2 3
+        "the token after a bare CR must start after the separator"
+  | tokens, comments =>
+      throw (IO.userError
+        s!"unexpected bare-CR lexing result: {reprStr tokens}, {reprStr comments}")
+
+  match Surface.Lexer.lex (surfaceFile "/*a/*b*/") with
+  | .error (.source error) =>
+      assertTrue (error.code == "SL0002")
+        "an unterminated block comment must use the stable lexical code"
+      assertTrue (error.kind == .unterminatedBlockComment)
+        "nested comment exhaustion must identify the outer unmatched comment"
+      assertSurfaceSpan error.span 0 8
+        "unterminated-comment span must end at EOF"
+  | outcome =>
+      throw (IO.userError s!"expected unterminated-comment failure, got {reprStr outcome}")
+
+  let nested := String.ofList (List.replicate 128 'a')
+  let deepComment :=
+    String.intercalate "" (List.replicate 128 "/*") ++ nested ++
+      String.intercalate "" (List.replicate 128 "*/")
+  let deeplyLexed ← expectSurfaceLex deepComment
+  assertTrue (deeplyLexed.tokens.isEmpty)
+    "a deeply nested comment must not produce tokens"
+  assertTrue (deeplyLexed.comments.length == 1)
+    "a deeply nested comment must remain one trivia record"
+
+def testSurfaceParserAst : IO Unit := do
+  let fixture :=
+    "function f() -> word { let then: word = 0x0A; return if then < 10 then g((then + 1), !x) else (); }"
+  let parsed ← expectSurfaceParse fixture
+  assertTrue (fixture.utf8ByteSize == 99)
+    "the comprehensive Surface fixture byte length changed"
+  assertSurfaceSpan parsed.span 0 99
+    "parsed-file span must cover the declaration and exclude no syntax"
+  assertSurfaceSpan parsed.function.name.span 9 10
+    "function name span must be exact"
+  assertSurfaceSpan parsed.function.returnType.span 16 20
+    "contextual word type span must be exact"
+  match parsed.function.bindings with
+  | [binding] =>
+      assertSurfaceSpan binding.span 23 45
+        "let statement span must include its semicolon"
+      assertTrue (binding.name.value == "then")
+        "`then` must remain an identifier in binder position"
+      assertSurfaceSpan binding.name.span 27 31
+        "contextual binder span must be exact"
+      assertTrue (surfaceExpressionShape binding.value == "0x0A")
+        "hexadecimal radix and digits must survive parsing"
+  | bindings =>
+      throw (IO.userError s!"unexpected Surface bindings: {reprStr bindings}")
+  assertTrue
+    (surfaceExpressionShape parsed.function.result.value ==
+      "if(lt(then,10),g(group(add(then,1)),not(x)),unit)")
+    "the Surface AST must preserve conditional, call, group, and operator structure"
+  assertSurfaceSpan parsed.function.result.span 46 97
+    "return statement span must include its semicolon"
+  match parsed.function.result.value with
+  | .ifThenElse conditionalSpan condition thenBranch elseBranch =>
+      assertSurfaceSpan conditionalSpan 53 96
+        "conditional span must run from `if` through its else branch"
+      assertSurfaceSpan condition.span 56 65
+        "conditional condition span must preserve relational syntax"
+      assertSurfaceSpan thenBranch.span 71 88
+        "call span must include its closing parenthesis"
+      assertSurfaceSpan elseBranch.span 94 96
+        "unit expression span must include both delimiters"
+  | expression =>
+      throw (IO.userError s!"expected a conditional, got {reprStr expression}")
+
+  let contextual :=
+    "function then() -> bool { let bool: word = true; return if then then false else word; }"
+  let contextualParsed ← expectSurfaceParse contextual
+  assertTrue (contextualParsed.function.name.value == "then")
+    "`then` must remain available as a function name"
+  match contextualParsed.function.bindings with
+  | [binding] =>
+      assertTrue (binding.name.value == "bool")
+        "`bool` must remain available as a binder name"
+      assertTrue (surfaceExpressionShape binding.value == "true")
+        "`true` must remain an unresolved Surface name"
+  | _ => throw (IO.userError "contextual fixture must have one binding")
+  assertTrue
+    (surfaceExpressionShape contextualParsed.function.result.value ==
+      "if(then,false,word)")
+    "`then`, `false`, and `word` must retain their contextual/name distinction"
+
+  let coverageFixture :=
+    "/* leading */ function unitFn/* name */() -> /* type */() { let x: word = g(); /* between */ let y: bool = false; // before return\n return (); } /* trailing */"
+  let coverageParsed ← expectSurfaceParse coverageFixture
+  match coverageParsed.function.returnType with
+  | .unit _ => pure ()
+  | returnType =>
+      throw (IO.userError s!"expected a unit return type, got {reprStr returnType}")
+  match coverageParsed.function.bindings with
+  | [first, second] =>
+      assertTrue
+        (first.name.value == "x" && second.name.value == "y")
+        "multiple let bindings must retain source order"
+      assertTrue (surfaceExpressionShape first.value == "g()")
+        "a zero-argument call must remain a call node"
+      assertTrue (surfaceExpressionShape second.value == "false")
+        "the second let binding must retain its initializer"
+  | bindings =>
+      throw (IO.userError
+        s!"expected two Surface bindings, got {reprStr bindings}")
+  assertTrue
+    (surfaceExpressionShape coverageParsed.function.result.value == "unit")
+    "a unit-valued return expression must remain a unit node"
+  assertTrue
+    (coverageParsed.comments.map (·.kind) ==
+      [.block, .block, .block, .block, .line, .block])
+    "leading, interleaved, and trailing comments must be retained in source order"
+
+def parseSurfaceResultExpression (expression : String) : IO Surface.Expr := do
+  let parsed ←
+    expectSurfaceParse s!"function p() -> bool \{ return {expression}; }"
+  pure parsed.function.result.value
+
+def testSurfacePrecedence : IO Unit := do
+  let expression ←
+    parseSurfaceResultExpression "a == b < c | d ^ e & f + g * !h"
+  assertTrue
+    (surfaceExpressionShape expression ==
+      "eq(a,lt(b,bitOr(c,bitXor(d,bitAnd(e,add(f,mul(g,not(h))))))))")
+    "Surface precedence must match the pinned common grammar"
+
+  for (source, expectedShape) in [
+      ("a | b | c", "bitOr(bitOr(a,b),c)"),
+      ("a ^ b ^ c", "bitXor(bitXor(a,b),c)"),
+      ("a & b & c", "bitAnd(bitAnd(a,b),c)"),
+      ("a - b + c", "add(sub(a,b),c)"),
+      ("a / b % c * d", "mul(mod(div(a,b),c),d)")
+    ] do
+    let parsed ← parseSurfaceResultExpression source
+    assertTrue (surfaceExpressionShape parsed == expectedShape)
+      s!"left associativity changed for {source}"
+
+  let mixed ← parseSurfaceResultExpression "a < b == c >= d"
+  assertTrue (surfaceExpressionShape mixed == "eq(lt(a,b),ge(c,d))")
+    "one relational expression must remain valid on each side of equality"
+
+  for (source, expectedShape) in [
+      ("a != b", "ne(a,b)"),
+      ("a > b", "gt(a,b)"),
+      ("a <= b", "le(a,b)")
+    ] do
+    let parsed ← parseSurfaceResultExpression source
+    assertTrue (surfaceExpressionShape parsed == expectedShape)
+      s!"the Surface AST changed for operator expression {source}"
+
+  for (source, expectedStart, expectedEnd) in [
+      ("a == b != c", 37, 39),
+      ("a < b >= c", 36, 38)
+    ] do
+    let error ←
+      expectSurfaceSyntaxError s!"function p() -> bool \{ return {source}; }"
+    assertTrue (error.code == "SP0002")
+      "a repeated non-associative operator must use SP0002"
+    assertSurfaceSpan error.span expectedStart expectedEnd
+      "non-associative error must point at the second operator"
+
+  let grouped ← parseSurfaceResultExpression "(a + b) * c"
+  assertTrue (surfaceExpressionShape grouped == "mul(group(add(a,b)),c)")
+    "explicit grouping must remain a Surface node"
+
+  let nestedConditional ←
+    parseSurfaceResultExpression "if a then if b then c else d else e"
+  assertTrue
+    (surfaceExpressionShape nestedConditional == "if(a,if(b,c,d),e)")
+    "`else` must associate with the nearest unmatched keyword conditional"
+
+def testSurfaceUtf8Spans : IO Unit := do
+  let fixture := "// λ🙂\n/*x*/function f() -> word { return 0; }"
+  assertTrue (fixture.utf8ByteSize == 49)
+    "the UTF-8 Surface fixture byte length changed"
+  let lexed ← expectSurfaceLex fixture
+  match lexed.comments with
+  | [line, block] =>
+      assertSurfaceSpan line.span 0 9
+        "line-comment span must count multibyte UTF-8 contents"
+      assertSurfaceSpan block.span 10 15
+        "block-comment span after UTF-8 trivia must use byte offsets"
+  | comments =>
+      throw (IO.userError s!"unexpected UTF-8 trivia: {reprStr comments}")
+  let parsed ← expectSurfaceParse fixture
+  assertSurfaceSpan parsed.span 15 49
+    "parsed file must exclude leading trivia and retain UTF-8 byte offsets"
+  assertSurfaceSpan parsed.function.result.value.span 45 46
+    "integer span after UTF-8 trivia must be byte-based"
+
+def testSurfaceParserErrors : IO Unit := do
+  for (source, expectedStart, expectedEnd) in [
+      ("", 0, 0),
+      ("function if() -> word { return 0; }", 9, 11),
+      ("function f(x) -> word { return 0; }", 11, 12),
+      ("function f() -> word { return 0 }", 32, 33),
+      ("function f() -> word { return 0; } function g() -> word { return 0; }",
+        35, 43),
+      ("function f() -> word { return 0x; }", 31, 32)
+    ] do
+    let error ← expectSurfaceSyntaxError source
+    assertTrue (error.code == "SP0001")
+      "malformed M2a fixture syntax must use SP0001"
+    assertSurfaceSpan error.span expectedStart expectedEnd
+      "syntax error must point at the first unexpected token"
+
+  let structured ←
+    expectSurfaceSyntaxError "function f( -> word { return 0; }"
+  assertTrue
+    (structured.kind ==
+      .expected (.token .rightParen) (some .arrow))
+    "SP0001 must carry a closed structured expectation"
+
+def testSurfaceFrontendLexicalErrors : IO Unit := do
+  match Surface.Parser.parse (surfaceFile "@") with
+  | .error (.lexical error) =>
+      assertTrue
+        (error.code == "SL0001" && error.kind == .invalidCharacter '@')
+        "the public parser must preserve invalid-character lexical diagnostics"
+      assertSurfaceSpan error.span 0 1
+        "the public parser must preserve the lexical error span"
+  | outcome =>
+      throw (IO.userError
+        s!"expected a public lexical error, got {reprStr outcome}")
+
+  match Surface.Parser.parse (surfaceFile "/* open") with
+  | .error (.lexical error) =>
+      assertTrue
+        (error.code == "SL0002" && error.kind == .unterminatedBlockComment)
+        "the public parser must preserve unterminated-comment diagnostics"
+      assertSurfaceSpan error.span 0 7
+        "the public parser must preserve the unterminated-comment span"
+  | outcome =>
+      throw (IO.userError
+        s!"expected an unterminated-comment lexical error, got {reprStr outcome}")
+
+def testSurfaceValidityBoundaries : IO Unit := do
+  let keywordFile := surfaceFile "function"
+  let mislabeledKeyword : Surface.Token := {
+    kind := .identifier "function"
+    span := {
+      source := "main.solc"
+      startByte := 0
+      endByte := 8
+    }
+  }
+  assertTrue (!mislabeledKeyword.isValidFor keywordFile)
+    "a hard keyword must not validate as an identifier token"
+
+  let emptyDecimal : Surface.Token := {
+    kind := .decimal ""
+    span := {
+      source := "main.solc"
+      startByte := 0
+      endByte := 0
+    }
+  }
+  assertTrue (!emptyDecimal.isValidFor (surfaceFile ""))
+    "an empty decimal payload must not be a canonical token"
+
+  let truncatedLine : Surface.Comment := {
+    kind := .line
+    span := {
+      source := "main.solc"
+      startByte := 0
+      endByte := 2
+    }
+  }
+  assertTrue (!truncatedLine.isValidFor (surfaceFile "//x\n"))
+    "a line-comment record must extend to LF or EOF"
+
+  let mislabeledBlock : Surface.Comment := {
+    kind := .line
+    span := {
+      source := "main.solc"
+      startByte := 0
+      endByte := 5
+    }
+  }
+  assertTrue (!mislabeledBlock.isValidFor (surfaceFile "/*x*/"))
+    "comment kind must agree with its exact delimiters"
+
+  let gapped : Surface.Lexed := {
+    tokens := [
+      {
+        kind := .identifier "a"
+        span := {
+          source := "main.solc"
+          startByte := 0
+          endByte := 1
+        }
+      },
+      {
+        kind := .identifier "b"
+        span := {
+          source := "main.solc"
+          startByte := 2
+          endByte := 3
+        }
+      }
+    ]
+    comments := []
+  }
+  assertTrue (!gapped.isValidFor (surfaceFile "a@b"))
+    "lexical validity must reject an uncovered non-whitespace byte"
+
+  match Surface.Parser.parseLexed (surfaceFile "x") {
+      tokens := []
+      comments := []
+    } with
+  | .error (.internal (.invalidInput _)) => pure ()
+  | outcome =>
+      throw (IO.userError
+        s!"invalid token streams must fail internally: {reprStr outcome}")
+
+  let fusedSource := "functionfoo() -> word { return 0; }"
+  let fusedLexed ← expectSurfaceLex fusedSource
+  match fusedLexed.tokens with
+  | _ :: remaining =>
+      let forged : Surface.Lexed := {
+        tokens := [
+          {
+            kind := .keywordFunction
+            span := {
+              source := "main.solc"
+              startByte := 0
+              endByte := 8
+            }
+          },
+          {
+            kind := .identifier "foo"
+            span := {
+              source := "main.solc"
+              startByte := 8
+              endByte := 11
+            }
+          }
+        ] ++ remaining
+        comments := []
+      }
+      assertTrue (forged.isValidFor (surfaceFile fusedSource))
+        "source-partition validity is intentionally separate from maximal munch"
+      match Surface.Parser.parseLexed (surfaceFile fusedSource) forged with
+      | .error (.internal (.invalidInput _)) => pure ()
+      | outcome =>
+          throw (IO.userError
+            s!"parseLexed accepted a noncanonical tokenization: {reprStr outcome}")
+  | [] =>
+      throw (IO.userError "the fused identifier fixture must lex to tokens")
+
+  let source := "function p() -> word { return a + b + c; }"
+  let lexed ← expectSurfaceLex source
+  let parsed ← expectSurfaceParse source
+  match parsed.function.result.value with
+  | .binary outerSpan secondOperator
+      (.binary innerSpan firstOperator left middle) right =>
+      let wrongInner : Surface.Expr :=
+        .binary innerSpan
+          { firstOperator with value := .sub }
+          left middle
+      let wrongResult := {
+        parsed.function.result with
+        value := .binary outerSpan secondOperator wrongInner right
+      }
+      let wrongFunction := { parsed.function with result := wrongResult }
+      let wrongParsed := { parsed with function := wrongFunction }
+      assertTrue (!wrongParsed.correspondsTo lexed)
+        "operator identity and span must correspond to the source token"
+
+      let rightNested : Surface.Expr :=
+        .binary
+          (Surface.SourceSpan.cover middle.span right.span)
+          secondOperator middle right
+      let rightAssociated : Surface.Expr :=
+        .binary outerSpan firstOperator left rightNested
+      let reassociatedResult := {
+        parsed.function.result with
+        value := rightAssociated
+      }
+      let reassociatedFunction := {
+        parsed.function with
+        result := reassociatedResult
+      }
+      let reassociated := {
+        parsed with
+        function := reassociatedFunction
+      }
+      assertTrue (reassociated.correspondsTo lexed)
+        "token correspondence must remain independent of associativity"
+      assertTrue (!reassociated.grammarValid)
+        "the grammar-shape predicate must reject right-associated addition"
+  | expression =>
+      throw (IO.userError
+        s!"expected a left-associated additive witness, got {reprStr expression}")
+
 def testSchemaJson : IO Unit := do
   for path in
       ["schema/oracle-v1.schema.json", "schema/oracle-v2.schema.json",
@@ -1466,11 +2053,18 @@ def run : IO Unit := do
   testOracleV2
   testOracleV3
   testOracleVersionDispatch
+  testSurfaceLexer
+  testSurfaceParserAst
+  testSurfacePrecedence
+  testSurfaceUtf8Spans
+  testSurfaceParserErrors
+  testSurfaceFrontendLexicalErrors
+  testSurfaceValidityBoundaries
   testSchemaJson
 
 end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c primitive tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a parser tests passed"
   return 0
