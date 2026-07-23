@@ -1383,6 +1383,7 @@ def testOracle : IO Unit := do
 def testSchemaJson : IO Unit := do
   for path in
       ["schema/oracle-v1.schema.json", "schema/oracle-v2.schema.json",
+        "schema/oracle-v3.schema.json",
         "schema/semantic-core-v1.schema.json", "schema/semantic-core-v2.schema.json",
         "metadata/baselines.json",
         "metadata/standard-library.json", "profiles/manifest.json",
@@ -1421,19 +1422,34 @@ def testSchemaJson : IO Unit := do
     ("Tests/golden/core-eval-selected-branch-request.ndjson",
       "Tests/golden/core-eval-selected-branch-response.ndjson"),
     ("Tests/golden/core-wire-invalid-request.ndjson",
-      "Tests/golden/core-wire-invalid-response.ndjson")
+      "Tests/golden/core-wire-invalid-response.ndjson"),
+    ("Tests/golden/m1c-eval-operations-request.ndjson",
+      "Tests/golden/m1c-eval-operations-response.ndjson"),
+    ("Tests/golden/m1c-check-rejected-request.ndjson",
+      "Tests/golden/m1c-check-rejected-response.ndjson"),
+    ("Tests/golden/m1c-wire-invalid-request.ndjson",
+      "Tests/golden/m1c-wire-invalid-response.ndjson"),
+    ("Tests/golden/mixed-v1-v2-v3-request.ndjson",
+      "Tests/golden/mixed-v1-v2-v3-response.ndjson")
   ]
   for (requestPath, responsePath) in coreGoldenPairs do
     let coreRequestText ← IO.FS.readFile requestPath
     let expectedText ← IO.FS.readFile responsePath
-    let expected ←
-      match StrictJson.parse expectedText.trimAscii.copy with
-      | .ok value => pure value
-      | .error error =>
-          throw (IO.userError s!"{responsePath} is invalid strict JSON: {error}")
-    let actual := processJsonLine coreRequestText
-    assertTrue (actual == expected)
-      s!"{requestPath} did not produce its checked-in golden response"
+    let requestRecords :=
+      (coreRequestText.splitOn "\n").filter fun line => !line.trimAscii.isEmpty
+    let expectedRecords :=
+      (expectedText.splitOn "\n").filter fun line => !line.trimAscii.isEmpty
+    assertTrue (requestRecords.length == expectedRecords.length)
+      s!"{requestPath} and {responsePath} contain different record counts"
+    for (requestRecord, expectedRecord) in requestRecords.zip expectedRecords do
+      let expected ←
+        match StrictJson.parse expectedRecord.trimAscii.copy with
+        | .ok value => pure value
+        | .error error =>
+            throw (IO.userError s!"{responsePath} is invalid strict JSON: {error}")
+      let actual := processJsonLine requestRecord.trimAscii.copy
+      assertTrue (actual == expected)
+        s!"{requestPath} did not produce its checked-in golden response"
 
 def run : IO Unit := do
   testProfile

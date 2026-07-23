@@ -72,6 +72,42 @@
       "stdin": "Tests/golden/mixed-stream-request.ndjson",
       "expected": "Tests/golden/mixed-stream-response.ndjson",
       "sha256": "1e6637f558ed820436859c246af15fb1eebba359fb20f40f66e23e7e1707b77b"
+    },
+    {
+      "id": "capabilities-v3",
+      "arguments": [
+        "capabilities-v3"
+      ],
+      "stdin": null,
+      "sha256": "149bd9d249d2547de654363274bb19a2e7369d1129d25a9b887dde5eafc5aa66"
+    },
+    {
+      "id": "m1c-eval-operations",
+      "arguments": [],
+      "stdin": "Tests/golden/m1c-eval-operations-request.ndjson",
+      "expected": "Tests/golden/m1c-eval-operations-response.ndjson",
+      "sha256": "7c161eaef53a60275944d42e266937ca6bfd08afb125f0bb5262776d22a28536"
+    },
+    {
+      "id": "m1c-check-rejected",
+      "arguments": [],
+      "stdin": "Tests/golden/m1c-check-rejected-request.ndjson",
+      "expected": "Tests/golden/m1c-check-rejected-response.ndjson",
+      "sha256": "77c14b2051a82697f787e8f78d80e804dfed739a1ce1a7d1d122560735a6c8c3"
+    },
+    {
+      "id": "m1c-wire-invalid",
+      "arguments": [],
+      "stdin": "Tests/golden/m1c-wire-invalid-request.ndjson",
+      "expected": "Tests/golden/m1c-wire-invalid-response.ndjson",
+      "sha256": "d8b3d24f9ab2662fdb1906002a42112d42f47b67fba46a6a4abd9a8e53d3d9a7"
+    },
+    {
+      "id": "mixed-v1-v2-v3-stream-recovery",
+      "arguments": [],
+      "stdin": "Tests/golden/mixed-v1-v2-v3-request.ndjson",
+      "expected": "Tests/golden/mixed-v1-v2-v3-response.ndjson",
+      "sha256": "34b0e02cece92d7855270c1dbd560941d6568c9035aeb077df76bc5e724bbf1f"
     }
   ]
 }
