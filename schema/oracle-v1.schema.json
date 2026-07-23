@@ -1,0 +1,1081 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:solcore:oracle:v1",
+  "title": "Solcore executable specification oracle protocol v1",
+  "description": "One NDJSON record exchanged with the Solcore oracle. A record is a request, a response, or a protocol-level error.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    },
+    {
+      "$ref": "#/$defs/protocolError"
+    }
+  ],
+  "$defs": {
+    "nat": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "jsonValue": {
+      "description": "An intentionally opaque Lean Json value. Objects inside this value are payload data, not protocol records.",
+      "type": [
+        "null",
+        "boolean",
+        "object",
+        "array",
+        "number",
+        "string"
+      ]
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nullableNat": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/nat"
+        }
+      ]
+    },
+    "sourcePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![\\s\\S]*\\\\)(?![\\s\\S]*:)(?![\\s\\S]*\\u0000)(?![\\s\\S]*//)(?!\\.{1,2}(?:/|$))(?![\\s\\S]*/\\.{1,2}(?:/|$))[\\s\\S]*\\.solc$",
+      "description": "A relative, forward-slash-only .solc path. Absolute paths, empty segments, drive prefixes, NUL, backslashes, and path segments equal to . or .. are forbidden."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gitCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "queryKind": {
+      "type": "string",
+      "enum": [
+        "capabilities",
+        "parse",
+        "resolve",
+        "check",
+        "elaborate",
+        "eval",
+        "contract"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "protocol",
+        "parsing",
+        "resolution",
+        "checking",
+        "elaboration",
+        "evaluation",
+        "contractExecution"
+      ]
+    },
+    "nullablePhase": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/phase"
+        }
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warning",
+        "information"
+      ]
+    },
+    "resourceKind": {
+      "type": "string",
+      "enum": [
+        "solverSteps",
+        "solverTables",
+        "solverAnswers",
+        "evaluationSteps",
+        "callDepth",
+        "transactions"
+      ]
+    },
+    "verdictKind": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "rejected",
+        "unsupported",
+        "inconclusive",
+        "executed",
+        "internalError"
+      ]
+    },
+    "feature": {
+      "type": "string",
+      "enum": [
+        "corePrimitives",
+        "functions",
+        "lambdas",
+        "localBindings",
+        "localMutation",
+        "conditionals",
+        "products",
+        "sumTypes",
+        "userAdts",
+        "patternMatching",
+        "modules",
+        "polymorphism",
+        "typeClasses",
+        "comptime",
+        "contracts",
+        "externalAbi",
+        "storage",
+        "storageArrays",
+        "inlineYul"
+      ]
+    },
+    "evmRevision": {
+      "type": "string",
+      "enum": [
+        "prague",
+        "osaka"
+      ]
+    },
+    "nullableEvmRevision": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/evmRevision"
+        }
+      ]
+    },
+    "baselineRole": {
+      "type": "string",
+      "enum": [
+        "upstreamEvidence",
+        "comparisonImplementation",
+        "compatibilitySnapshot"
+      ]
+    },
+    "solverMode": {
+      "type": "string",
+      "enum": [
+        "legacy",
+        "tabled"
+      ]
+    },
+    "specMaturity": {
+      "type": "string",
+      "enum": [
+        "directionAccepted",
+        "normative",
+        "proposed",
+        "deferred",
+        "unsupported"
+      ]
+    },
+    "implementationStatus": {
+      "type": "string",
+      "enum": [
+        "implemented",
+        "partialSupport",
+        "planned",
+        "blocked",
+        "unsupported"
+      ]
+    },
+    "sourceSpan": {
+      "type": "object",
+      "description": "A half-open source span [startByte, endByte), measured in zero-based UTF-8 byte offsets.",
+      "$comment": "Producers must ensure startByte <= endByte and source names a file in the request workspace.",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/sourcePath"
+        },
+        "startByte": {
+          "$ref": "#/$defs/nat"
+        },
+        "endByte": {
+          "$ref": "#/$defs/nat"
+        }
+      },
+      "required": [
+        "source",
+        "startByte",
+        "endByte"
+      ]
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "primary": {
+          "$ref": "#/$defs/sourceSpan"
+        },
+        "related": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceSpan"
+          }
+        },
+        "arguments": {
+          "$ref": "#/$defs/jsonValue"
+        },
+        "display": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "phase",
+        "primary",
+        "related",
+        "arguments",
+        "display"
+      ]
+    },
+    "sourceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/sourcePath"
+        },
+        "content": {
+          "type": "string",
+          "description": "Source text transported as a JSON string and interpreted as UTF-8."
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ]
+    },
+    "workspace": {
+      "type": "object",
+      "description": "A virtual source workspace. Source paths must be unique, and entry must exactly equal one source path.",
+      "$comment": "Uniqueness by path and membership of entry in sources are enforced by the oracle.",
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/sourcePath"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sourceFile"
+          }
+        }
+      },
+      "required": [
+        "entry",
+        "sources"
+      ]
+    },
+    "profileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "core-v1"
+        },
+        "digest": {
+              "const": "sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ]
+    },
+    "oracleLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "solverSteps": {
+          "$ref": "#/$defs/nat",
+          "default": 100000
+        },
+        "solverTables": {
+          "$ref": "#/$defs/nat",
+          "default": 10000
+        },
+        "solverAnswers": {
+          "$ref": "#/$defs/nat",
+          "default": 100000
+        },
+        "evaluationSteps": {
+          "$ref": "#/$defs/nat",
+          "default": 1000000
+        },
+        "callDepth": {
+          "$ref": "#/$defs/nat",
+          "default": 1024
+        },
+        "transactions": {
+          "$ref": "#/$defs/nat",
+          "default": 64
+        }
+      },
+      "required": [
+        "solverSteps",
+        "solverTables",
+        "solverAnswers",
+        "evaluationSteps",
+        "callDepth",
+        "transactions"
+      ]
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/queryKind"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "request": {
+      "type": "object",
+      "title": "Request",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "solcore-oracle/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec": {
+          "const": "solcore/0.1.0-draft.1"
+        },
+        "profile": {
+          "$ref": "#/$defs/profileRef"
+        },
+        "workspace": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/workspace"
+            }
+          ]
+        },
+        "limits": {
+          "$ref": "#/$defs/oracleLimits"
+        },
+        "query": {
+          "$ref": "#/$defs/query"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "spec",
+        "profile",
+        "workspace",
+        "limits",
+        "query"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "query": {
+                "properties": {
+                  "kind": {
+                    "const": "capabilities"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "query"
+            ]
+          },
+          "then": {
+            "properties": {
+              "workspace": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "workspace": {
+                "$ref": "#/$defs/workspace"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "resultPayload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/capabilitiesResultPayload"
+        }
+      ]
+    },
+    "observationPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "$ref": "#/$defs/jsonValue"
+        }
+      },
+      "required": [
+        "schema",
+        "value"
+      ]
+    },
+    "acceptedVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "accepted"
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "result": {
+          "$ref": "#/$defs/resultPayload"
+        }
+      },
+      "required": [
+        "kind",
+        "phase",
+        "result"
+      ]
+    },
+    "rejectedVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rejected"
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "diagnostics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "phase",
+        "diagnostics"
+      ]
+    },
+    "unsupportedVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "unsupported"
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/feature"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "phase",
+        "features"
+      ]
+    },
+    "inconclusiveVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "inconclusive"
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "resource": {
+          "$ref": "#/$defs/resourceKind"
+        },
+        "limit": {
+          "$ref": "#/$defs/nat"
+        },
+        "consumed": {
+          "$ref": "#/$defs/nullableNat"
+        }
+      },
+      "required": [
+        "kind",
+        "phase",
+        "resource",
+        "limit",
+        "consumed"
+      ]
+    },
+    "executedVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "executed"
+        },
+        "observation": {
+          "$ref": "#/$defs/observationPayload"
+        }
+      },
+      "required": [
+        "kind",
+        "observation"
+      ]
+    },
+    "internalErrorVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "internalError"
+        },
+        "phase": {
+          "$ref": "#/$defs/nullablePhase"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "phase",
+        "code"
+      ]
+    },
+    "verdict": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/acceptedVerdict"
+        },
+        {
+          "$ref": "#/$defs/rejectedVerdict"
+        },
+        {
+          "$ref": "#/$defs/unsupportedVerdict"
+        },
+        {
+          "$ref": "#/$defs/inconclusiveVerdict"
+        },
+        {
+          "$ref": "#/$defs/executedVerdict"
+        },
+        {
+          "$ref": "#/$defs/internalErrorVerdict"
+        }
+      ]
+    },
+    "semVer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "major": {
+          "const": 0
+        },
+        "minor": {
+          "const": 1
+        },
+        "patch": {
+          "const": 0
+        },
+        "prerelease": {
+          "const": "draft.1"
+        }
+      },
+      "required": [
+        "major",
+        "minor",
+        "patch",
+        "prerelease"
+      ]
+    },
+    "stdFileDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/sourcePath"
+        },
+        "byteSize": {
+          "$ref": "#/$defs/nat"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "path",
+        "byteSize",
+        "sha256"
+      ]
+    },
+    "stdBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceRevision": {
+          "const": "1d490d8bb5f374356f06e0720655496482eb1fb4"
+        },
+        "manifestAlgorithm": {
+          "const": "solcore-fileset-sha256-v1"
+        },
+        "manifestSha256": {
+          "const": "3f81bebfd1fc161ee08972be9e7a52150d02bdf55dd7449dfa058cd81cfafc22"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stdFileDigest"
+          }
+        }
+      },
+      "required": [
+        "sourceRevision",
+        "manifestAlgorithm",
+        "manifestSha256",
+        "files"
+      ]
+    },
+    "languageVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "solcore/0.1.0-draft.1"
+        },
+        "release": {
+          "$ref": "#/$defs/semVer"
+        },
+        "grammarVersion": {
+          "type": "null"
+        },
+        "staticSemanticsVersion": {
+          "type": "null"
+        },
+        "dynamicSemanticsVersion": {
+          "type": "null"
+        },
+        "abiVersion": {
+          "type": "null"
+        },
+        "storageLayoutVersion": {
+          "type": "null"
+        },
+        "standardLibrary": {
+          "$ref": "#/$defs/stdBundle"
+        },
+        "knownFeatures": {
+          "const": [
+            "corePrimitives",
+            "functions",
+            "lambdas",
+            "localBindings",
+            "localMutation",
+            "conditionals",
+            "products",
+            "sumTypes",
+            "userAdts",
+            "patternMatching",
+            "modules",
+            "polymorphism",
+            "typeClasses",
+            "comptime",
+            "contracts",
+            "externalAbi",
+            "storage",
+            "storageArrays",
+            "inlineYul"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "release",
+        "grammarVersion",
+        "staticSemanticsVersion",
+        "dynamicSemanticsVersion",
+        "abiVersion",
+        "storageLayoutVersion",
+        "standardLibrary",
+        "knownFeatures"
+      ]
+    },
+    "specProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "core-v1"
+        },
+        "language": {
+          "$ref": "#/$defs/languageVersion"
+        },
+        "scope": {
+          "const": "core"
+        },
+        "enabledFeatures": {
+          "const": []
+        },
+        "solver": {
+          "const": "tabled"
+        },
+        "observation": {
+          "const": "valueV1"
+        },
+        "contractRuntime": {
+          "type": "null"
+        },
+        "spanUnit": {
+          "const": "utf8Byte"
+        },
+        "sourceEncoding": {
+          "const": "UTF-8"
+        }
+      },
+      "required": [
+        "id",
+        "language",
+        "scope",
+        "enabledFeatures",
+        "solver",
+        "observation",
+        "contractRuntime",
+        "spanUnit",
+        "sourceEncoding"
+      ]
+    },
+    "implementationSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "solver": {
+          "$ref": "#/$defs/solverMode"
+        },
+        "generatedDispatch": {
+          "type": "boolean"
+        },
+        "primitiveSurface": {
+          "$ref": "#/$defs/evmRevision"
+        },
+        "bytecodeRuntime": {
+          "$ref": "#/$defs/evmRevision"
+        },
+        "nativeBackendTarget": {
+          "$ref": "#/$defs/nullableEvmRevision"
+        },
+        "externalYulCompilerTarget": {
+          "$ref": "#/$defs/nullableEvmRevision"
+        }
+      },
+      "required": [
+        "solver",
+        "generatedDispatch",
+        "primitiveSurface",
+        "bytecodeRuntime",
+        "nativeBackendTarget",
+        "externalYulCompilerTarget"
+      ]
+    },
+    "implementationBaseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "implementation": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revision": {
+          "$ref": "#/$defs/gitCommit"
+        },
+        "role": {
+          "$ref": "#/$defs/baselineRole"
+        },
+        "standardLibraryBundle": {
+          "type": "string"
+        },
+        "nativeSettings": {
+          "$ref": "#/$defs/implementationSettings"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "implementation",
+        "repository",
+        "revision",
+        "role",
+        "standardLibraryBundle",
+        "nativeSettings",
+        "notes"
+      ]
+    },
+    "featureRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "feature": {
+          "$ref": "#/$defs/feature"
+        },
+        "specStatus": {
+          "$ref": "#/$defs/specMaturity"
+        },
+        "leanTarget": {
+          "type": "string"
+        },
+        "leanStatus": {
+          "$ref": "#/$defs/implementationStatus"
+        },
+        "adr": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "feature",
+        "specStatus",
+        "leanTarget",
+        "leanStatus",
+        "adr",
+        "note"
+      ]
+    },
+    "capabilityReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "solcore-capabilities/v1"
+        },
+        "spec": {
+          "const": "solcore/0.1.0-draft.1"
+        },
+        "profile": {
+          "$ref": "#/$defs/specProfile"
+        },
+        "profileDigest": {
+          "const": "sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8"
+        },
+        "baselines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/implementationBaseline"
+          }
+        },
+        "implementedQueries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/queryKind"
+          }
+        },
+        "unavailableQueries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/queryKind"
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/featureRow"
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "spec",
+        "profile",
+        "profileDigest",
+        "baselines",
+        "implementedQueries",
+        "unavailableQueries",
+        "features"
+      ]
+    },
+    "capabilitiesResultPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "solcore-capabilities/v1"
+        },
+        "value": {
+          "$ref": "#/$defs/capabilityReport"
+        }
+      },
+      "required": [
+        "schema",
+        "value"
+      ]
+    },
+    "response": {
+      "type": "object",
+      "title": "Response",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "solcore-oracle/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec": {
+          "const": "solcore/0.1.0-draft.1"
+        },
+        "profile": {
+          "$ref": "#/$defs/profileRef"
+        },
+        "query": {
+          "$ref": "#/$defs/queryKind"
+        },
+        "verdict": {
+          "$ref": "#/$defs/verdict"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "spec",
+        "profile",
+        "query",
+        "verdict"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "properties": {
+                  "kind": {
+                    "const": "accepted"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "verdict"
+            ]
+          },
+          "then": {
+            "properties": {
+              "query": {
+                "const": "capabilities"
+              },
+              "verdict": {
+                "properties": {
+                  "phase": {
+                    "const": "protocol"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "protocolError": {
+      "type": "object",
+      "title": "ProtocolError",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "protocolError"
+        },
+        "schema": {
+          "const": "solcore-oracle/v1"
+        },
+        "id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "code": {
+          "type": "string"
+        },
+        "display": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "schema",
+        "id",
+        "code",
+        "display"
+      ]
+    }
+  }
+}

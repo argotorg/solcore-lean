@@ -1,0 +1,27 @@
+{
+  "schema": "solcore-wire-golden-manifest-v1",
+  "digestAlgorithm": "sha256-full-stdout-including-final-lf",
+  "cases": [
+    {
+      "id": "capabilities",
+      "arguments": [
+        "capabilities"
+      ],
+      "stdin": null,
+      "sha256": "284280a9675eb2c365010384310287625f1ac05a2d85d23fd82b7caa90ddacac"
+    },
+    {
+      "id": "unsupported-check",
+      "arguments": [],
+      "stdin": "Tests/golden/check-request.ndjson",
+      "expected": "Tests/golden/check-response.ndjson",
+      "sha256": "ff1c224cf5c080a3679c340665b17ab1183ef83d1188ee01a50b68139ded4bb5"
+    },
+    {
+      "id": "malformed-json",
+      "arguments": [],
+      "stdinLiteral": "{\n",
+      "sha256": "69477b38b033dce2ebc0d6580f4ba86ede20d3e9f15b4e2ebdf9e46c4773b02c"
+    }
+  ]
+}
