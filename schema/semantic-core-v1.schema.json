@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:solcore:semantic-core:v1",
+  "title": "Solcore Semantic Core program v1",
+  "description": "The strict, versioned wire representation of a closed-candidate Solcore Semantic Core program. Well-typedness is checked after decoding.",
+  "$ref": "#/$defs/program",
+  "$defs": {
+    "nat": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "unit",
+        "bool",
+        "word"
+      ]
+    },
+    "word256": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "unitExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "unit"
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "boolExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "bool"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tag",
+        "value"
+      ]
+    },
+    "wordExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "word"
+        },
+        "value": {
+          "$ref": "#/$defs/word256"
+        }
+      },
+      "required": [
+        "tag",
+        "value"
+      ]
+    },
+    "varExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "var"
+        },
+        "index": {
+          "$ref": "#/$defs/nat"
+        }
+      },
+      "required": [
+        "tag",
+        "index"
+      ]
+    },
+    "letExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "let"
+        },
+        "initializer": {
+          "$ref": "#/$defs/expr"
+        },
+        "body": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "tag",
+        "initializer",
+        "body"
+      ]
+    },
+    "ifExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "if"
+        },
+        "condition": {
+          "$ref": "#/$defs/expr"
+        },
+        "thenBranch": {
+          "$ref": "#/$defs/expr"
+        },
+        "elseBranch": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "tag",
+        "condition",
+        "thenBranch",
+        "elseBranch"
+      ]
+    },
+    "expr": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/unitExpr"
+        },
+        {
+          "$ref": "#/$defs/boolExpr"
+        },
+        {
+          "$ref": "#/$defs/wordExpr"
+        },
+        {
+          "$ref": "#/$defs/varExpr"
+        },
+        {
+          "$ref": "#/$defs/letExpr"
+        },
+        {
+          "$ref": "#/$defs/ifExpr"
+        }
+      ]
+    },
+    "value": {
+      "description": "A canonical Semantic Core value; the three literal expression encodings are reused deliberately.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/unitExpr"
+        },
+        {
+          "$ref": "#/$defs/boolExpr"
+        },
+        {
+          "$ref": "#/$defs/wordExpr"
+        }
+      ]
+    },
+    "program": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "solcore-semantic-core/v1"
+        },
+        "resultType": {
+          "$ref": "#/$defs/type"
+        },
+        "body": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "schema",
+        "resultType",
+        "body"
+      ]
+    }
+  }
+}
