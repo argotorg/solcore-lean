@@ -56,14 +56,19 @@ Oracle v1 source queries remain `unsupported`, and Oracle v2 and v3 remain
 closed Core protocols.
 
 This change starts, but does not declare completion of, the M2a proof work. The
-Lean layer includes an independent full-token difference-list grammar and an
-executable conformance predicate for source spans, grammar shape, and exact
-AST/token correspondence. Public parser success implies that conformance
-predicate and accepts only the exact stream returned by the lexer. An
-independent maximal-munch lexer judgment, direct derivation of the
-difference-list parser judgment from the private parser construction,
-relational determinism/completeness, and lexer/parser fuel sufficiency remain
-explicit obligations.
+Lean layer now includes independent maximal-munch lexer and full-token
+difference-list parser judgments, plus executable conformance predicates for
+source spans, grammar shape, and exact AST/token correspondence. Public lexer
+success is gated by the lexical judgment. The private parser constructs its
+`FileParses` derivation alongside the AST, and public parser success implies
+that derivation and the conformance predicate for the exact lexer stream.
+Relational determinism and lexer/parser fuel sufficiency are proved.
+
+The reverse parser completeness theorem remains open: a canonical, conforming
+`FileParses` derivation is not yet proved to make the executor succeed. Global
+uniqueness of accepted lexical judgments and the connection from every public
+lexer source failure to its reachable cursor-local rejection judgment also
+remain explicit obligations.
 
 A later publication ADR must add a new language version with
 `grammarVersion = 1`, a version-local Surface wire schema, a frontend profile,
@@ -187,12 +192,14 @@ they do not yet assign entry-point or Core elaboration semantics to that
 function.
 
 The executable parser is deterministic, consumes the complete non-trivia token
-stream on success, and is fail-fast. Relational determinism and completeness
-remain conformance proof obligations. Parser recursion is bounded by a
-termination measure derived only from the finite token stream, not by a
-configurable semantic resource limit. Until sufficiency of the current bound is
-proved, exhaustion is an internal parser invariant. It cannot produce `SP0001`
-or any other source rejection.
+stream on success, and is fail-fast. Relational determinism is proved; the
+reverse theorem that every suitable declarative derivation makes the executor
+succeed remains open. Parser recursion is bounded by a termination measure
+derived only from the finite token stream, not by a configurable semantic
+resource limit. The input-derived bounds are proved sufficient.
+`fuelExhausted` remains an internal parser invariant for defensive
+classification, but public parsing proves it unreachable. It cannot produce
+`SP0001` or any other source rejection.
 
 An unexpected token uses code `SP0001` and that token's exact span. An
 unexpected end of file uses code `SP0001` and the empty span at the source's

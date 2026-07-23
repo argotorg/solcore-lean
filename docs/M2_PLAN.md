@@ -30,27 +30,36 @@ spans. Its public success path validates a complete, ordered, non-overlapping
 source partition. The AST preserves grouping, operator spans, raw literal
 spelling, call boundaries, and keyword conditional syntax.
 
-The current proof layer contains an independent full-token difference-list
-parser grammar and executable checks for span validity, grammar shape, and exact
-AST/token correspondence. `parseLexed` accepts only the exact stream returned
-by the lexer. Successful public parsing has a provenance theorem that retains
-that lexer result and parser result, and proves complete token correspondence
-plus source validity.
+The proof layer now contains:
 
-The following proof obligations remain before M2a is complete:
+1. an independent maximal-munch lexical judgment and executable checker that
+   gates public lexer success;
+2. an independent full-token difference-list parser grammar;
+3. proof-carrying private parser results that construct a `FileParses`
+   derivation without using the public conformance gate;
+4. relational determinism for expressions, prefix and infix parsing,
+   arguments, types, statements, functions, and complete files;
+5. executable checks for span validity, grammar shape, and exact AST/token
+   correspondence; and
+6. sufficient-fuel theorems for both lexer and parser input-derived bounds.
 
-1. define an independent maximal-munch lexical judgment and connect the lexer
-   executor to it;
-2. construct a `FileParses` derivation directly from every successful private
-   parser construction, instead of relying on the public conformance gate; and
-3. prove relational determinism and parser completeness, or record the exact
-   remaining completeness limitation; and
-4. prove that the lexer and parser input-derived termination bounds are
-   sufficient, or replace them with structurally justified recursion.
+Successful public parsing retains the exact lexer and parser results and proves
+the lexical judgment, complete token correspondence, source validity, grammar
+validity, and `FileParses`. Fuel exhaustion remains represented as an internal
+invariant for defensive classification, but public lexer and parser theorems
+prove it unreachable.
 
-Until the fourth obligation is discharged, exhaustion is represented only as
-an internal frontend invariant. It is never an `SL0001`, `SL0002`, or `SP0001`
-source rejection. Parser completeness is therefore not claimed yet.
+The exact remaining completeness limitation is the reverse executor theorem.
+The repository does not yet prove that every canonical, conforming
+`FileParses lexed parsed` derivation makes `parseLexed file lexed` return
+`parsed`. Soundness and relational uniqueness are proved: if execution
+succeeds, its result is the unique result permitted by any existing derivation.
+The cursor-local lexical rejection judgment also lacks a theorem connecting
+every public lexer source failure to a reachable rejection cursor. Global
+uniqueness of two `Lexes` derivations still requires public structural
+eliminators for ordered token/comment partitions, same-cursor choice
+uniqueness, and a merged-stream cursor proof. These limitations must be
+discharged or carried explicitly into the M2b publication decision.
 
 M2a is not a published language profile. Oracle v1 source queries remain
 `unsupported`; Oracle v2 and v3 continue to accept only their frozen Semantic
@@ -132,8 +141,10 @@ is `inconclusive`, not `rejected`.
 ## Implementation order
 
 1. Surface source ownership, tokens, syntax, lexer, parser, and correspondence.
-   In progress for the internal M2a fragment; lexical judgment, direct parser
-   derivation, relational equivalence, and fuel sufficiency remain open.
+   Soundness, direct parser derivation, relational determinism, and fuel
+   sufficiency are implemented for the internal M2a fragment. Reverse parser
+   completeness, lexical uniqueness, and lexer-failure reachability remain
+   open.
 2. Version-local Surface wire and parse-only Oracle publication.
 3. Workspace validation and module/import resolution.
 4. Resolved identifiers and declarative resolution correspondence.

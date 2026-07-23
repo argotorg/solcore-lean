@@ -19,10 +19,11 @@ The internal M2a kernel now lexes and parses the closed fragment fixed by
 published reference boundary: it has no versioned Surface wire format or
 Oracle query, and it performs no name resolution, checking, or elaboration.
 Its public success path is checked against declarative span, grammar, and
-token-correspondence predicates. A declarative maximal-munch lexer judgment,
-direct construction of the full parser grammar derivation, relational
-determinism/completeness, and frontend fuel sufficiency remain proof
-obligations.
+token-correspondence predicates. The maximal-munch lexical judgment, direct
+construction of the full parser grammar derivation, relational determinism,
+and frontend fuel sufficiency are proved. Reverse parser completeness, global
+lexical uniqueness, and reachability of cursor-local lexical rejection
+judgments remain proof obligations.
 
 To achieve this purpose, the specification provides the following three
 elements as one coherent whole:

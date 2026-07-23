@@ -120,8 +120,10 @@ It deliberately leaves names, source literal typing, standard-library
 identities, and Core elaboration unresolved. Parser publication requires a new
 language/profile/Surface-wire/Oracle version and will be recorded separately.
 The declarative lexical judgment, direct executor-to-parser-grammar derivation,
-relational determinism/completeness, and frontend fuel-sufficiency proofs remain
-open, so this internal work is not marked `implemented` in the matrix.
+relational determinism, and frontend fuel-sufficiency proofs are implemented.
+Reverse parser completeness, global lexical uniqueness, and lexer-failure
+reachability remain open, so this internal work is not marked `implemented` in
+the matrix.
 
 ## Rules for profile inclusion
 

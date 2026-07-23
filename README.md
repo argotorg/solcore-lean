@@ -120,26 +120,37 @@ for differential investigation.
 - the pinned implementations' shared precedence and associativity
 - a closed single-function fixture envelope with typed immutable bindings and a
   final return
+- an independent maximal-munch lexical judgment with an executable checker
 - an independent full-token difference-list grammar judgment
 - executable span, grammar-shape, and AST/token correspondence checks connected
   to declarative predicates
 - success provenance theorems linking the public parser to the exact lexer
-  result, complete token correspondence, and grammar validity
+  result, complete token correspondence, grammar validity, and a `FileParses`
+  derivation
+- relational determinism for every parser grammar layer
+- proved lexer and parser fuel sufficiency at the configured input-derived
+  bounds
 
 `true` and `false` remain unresolved names. Word-not and shift syntax remains
 ordinary calls to such names as `bnotWord`, `bshlWord`, and `bshrWord` until
 resolution can identify canonical declarations. Source integer conversion,
 name resolution, type checking, and Core elaboration are not part of M2a.
 
-M2a proof work is still in progress. The public lexer validates structural
-source partition invariants, and `parseLexed` accepts only the exact token stream
-returned by that lexer. Public parser success additionally implies the
-grammar-shape and full AST/token correspondence predicates. The remaining work
-includes an independent maximal-munch lexer judgment, a direct derivation from
-the private parser construction to the difference-list grammar, relational
-determinism/completeness results, and lexer/parser fuel sufficiency. Fuel
-exhaustion is an internal invariant and can never be reported as a source
-rejection.
+M2a proof work is still in progress. The public lexer gates success with the
+independent lexical judgment, and `parseLexed` accepts only that exact lexer
+result. The private parser constructs its declarative derivation alongside the
+AST, and public success implies the grammar-shape, full AST/token
+correspondence, and `FileParses` predicates. The grammar is relationally
+deterministic. Input-derived lexer and parser fuel bounds are proved sufficient,
+so public execution cannot report fuel exhaustion.
+
+The exact remaining completeness limitation is the reverse executor direction:
+the repository does not yet prove that every canonical, conforming
+`FileParses` derivation is accepted by `parseLexed`. The cursor-local lexical
+rejection judgment is executable, but a theorem connecting every public lexer
+source failure to a reachable rejection cursor is also still open. Global
+uniqueness of two accepted lexical judgments has not yet been proved from the
+ordered source-partition invariants.
 
 The parser is deliberately not exposed by Oracle v1, v2, or v3. A later,
 additive parser publication will require a closed Surface wire AST, a new
