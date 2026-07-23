@@ -144,6 +144,67 @@ def testSemanticCore : IO Unit := do
   assertTrue (Word.ofNat? wordModulus).isNone
     "a Core word must reject the first out-of-range natural"
 
+def testPrimitiveAlgebra : IO Unit := do
+  let word (value : Nat) : IO Word :=
+    match Word.ofNat? value with
+    | some result => pure result
+    | none => throw (IO.userError s!"{value} must be an in-range Core word")
+  let one ← word 1
+  let two ← word 2
+  let three ← word 3
+  let seven ← word 7
+  let shift255 ← word 255
+  let shift256 ← word 256
+  let doubledMaximum ← word (wordModulus - 2)
+  let highBit ← word (2 ^ 255)
+  assertTrue (Word.maximum.add one == Word.zero)
+    "word addition must wrap modulo 2^256"
+  assertTrue (Word.zero.sub one == Word.maximum)
+    "word subtraction must wrap modulo 2^256"
+  assertTrue (Word.maximum.mul two == doubledMaximum)
+    "word multiplication must wrap modulo 2^256"
+  assertTrue (seven.udiv three == two)
+    "word division must use the unsigned quotient"
+  assertTrue (seven.udiv Word.zero == Word.zero)
+    "word division by zero must return zero"
+  assertTrue (seven.umod three == one)
+    "word modulo must use the unsigned remainder"
+  assertTrue (seven.umod Word.zero == Word.zero)
+    "word modulo by zero must return zero"
+  assertTrue (Word.maximum.bitAnd Word.zero == Word.zero)
+    "word bitwise and must operate on 256 bits"
+  assertTrue (Word.maximum.bitOr Word.zero == Word.maximum)
+    "word bitwise or must operate on 256 bits"
+  assertTrue (Word.maximum.bitXor Word.maximum == Word.zero)
+    "word bitwise xor must operate on 256 bits"
+  assertTrue (Word.zero.bitNot == Word.maximum)
+    "word bitwise not must complement exactly 256 bits"
+  assertTrue (one.shiftLeft shift255 == highBit)
+    "word left shift by 255 must retain the high bit"
+  assertTrue (one.shiftLeft shift256 == Word.zero)
+    "word left shift by 256 must return zero"
+  assertTrue (one.shiftLeft Word.maximum == Word.zero)
+    "word left shift by the maximum word must return zero"
+  assertTrue (Word.maximum.shiftRight shift255 == one)
+    "logical word right shift by 255 must retain the low bit"
+  assertTrue (Word.maximum.shiftRight shift256 == Word.zero)
+    "word right shift by 256 must return zero"
+  assertTrue
+    (UnaryOp.boolNot.apply (.bool true) == some (.bool false))
+    "boolNot must negate a boolean"
+  assertTrue
+    (UnaryOp.boolNot.apply (.word one) == none)
+    "an unchecked unary primitive must reject an invalid operand"
+  assertTrue
+    (BinaryOp.wordEq.apply (.word one) (.word one) == some (.bool true))
+    "wordEq must return a Core boolean"
+  assertTrue
+    (BinaryOp.wordGt.apply (.word two) (.word one) == some (.bool true))
+    "wordGt must compare words as unsigned values"
+  assertTrue
+    (BinaryOp.wordAdd.apply (.bool true) (.word one) == none)
+    "an unchecked binary primitive must reject invalid operands"
+
 def assertCoreWireError {α : Type}
     (name : String)
     (result : Except Core.Wire.DecodeError α)
@@ -862,6 +923,7 @@ def run : IO Unit := do
   testProfile
   testFeatureMatrix
   testSemanticCore
+  testPrimitiveAlgebra
   testM1bProfile
   testCoreWire
   testDetailedCoreChecker
@@ -874,5 +936,5 @@ end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c primitive tests passed"
   return 0

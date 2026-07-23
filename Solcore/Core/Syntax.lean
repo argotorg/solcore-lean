@@ -24,6 +24,60 @@ inductive Ty where
   | word
   deriving Repr, BEq, DecidableEq
 
+inductive UnaryOp where
+  | boolNot
+  | wordNot
+  deriving Repr, BEq, DecidableEq
+
+namespace UnaryOp
+
+def operandType : UnaryOp → Ty
+  | .boolNot => .bool
+  | .wordNot => .word
+
+def resultType : UnaryOp → Ty
+  | .boolNot => .bool
+  | .wordNot => .word
+
+end UnaryOp
+
+inductive BinaryOp where
+  | wordAdd
+  | wordSub
+  | wordMul
+  | wordDiv
+  | wordMod
+  | wordEq
+  | wordGt
+  | wordAnd
+  | wordOr
+  | wordXor
+  | wordShl
+  | wordShr
+  deriving Repr, BEq, DecidableEq
+
+namespace BinaryOp
+
+def leftType (_ : BinaryOp) : Ty := .word
+
+def rightType (_ : BinaryOp) : Ty := .word
+
+def resultType : BinaryOp → Ty
+  | .wordEq
+  | .wordGt => .bool
+  | .wordAdd
+  | .wordSub
+  | .wordMul
+  | .wordDiv
+  | .wordMod
+  | .wordAnd
+  | .wordOr
+  | .wordXor
+  | .wordShl
+  | .wordShr => .word
+
+end BinaryOp
+
 inductive Expr where
   | unit
   | bool (value : Bool)
