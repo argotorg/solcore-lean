@@ -1,10 +1,11 @@
 import Solcore.Feature
 import Solcore.Profile
 import Solcore.Core
+import Solcore.Surface
 
 /-!
 Umbrella module for the pure specification side of the project.
 
-Semantic Core modules introduced in M1 import this module and must not import
-`Solcore.Oracle.Main` or perform `IO`.
+Semantic Core and Surface modules must not import `Solcore.Oracle.Main` or
+perform `IO`.
 -/

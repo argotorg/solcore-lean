@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)));
-const kernelRoots = ["Solcore/Core", "Solcore/Semantics"];
+const kernelRoots = [
+  "Solcore/Core",
+  "Solcore/Semantics",
+  "Solcore/Surface",
+  "Solcore/Surface.lean",
+];
 const forbidden = /\b(sorry|admit|partial|unsafe|axiom|noncomputable|extern|implemented_by)\b/;
 const violations = [];
 
@@ -28,6 +33,15 @@ for (const relative of kernelRoots) {
   try {
     if (statSync(path).isDirectory()) {
       visit(path);
+    } else if (path.endsWith(".lean")) {
+      const lines = readFileSync(path, "utf8").split("\n");
+      lines.forEach((line, index) => {
+        if (forbidden.test(line)) {
+          violations.push(
+            `${path.slice(root.length + 1)}:${index + 1}: ${line.trim()}`,
+          );
+        }
+      });
     }
   } catch (error) {
     if (error.code !== "ENOENT") {
