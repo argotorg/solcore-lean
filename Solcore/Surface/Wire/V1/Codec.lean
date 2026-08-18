@@ -100,7 +100,7 @@ structure DecodeLimits where
 
 abbrev DecodeResult (α : Type) := Except DecodeError α
 
-private def failAt {α : Type}
+def failAt {α : Type}
     (path : DecodePath)
     (code : DecodeErrorCode)
     (arguments : Lean.Json := .null) :
@@ -124,7 +124,7 @@ private def expectedArguments
     ("actual", jsonKind actual)
   ]
 
-private def ensureExactObject
+def ensureExactObject
     (path : DecodePath)
     (json : Lean.Json)
     (allowed required : List String) :
@@ -142,7 +142,7 @@ private def ensureExactObject
           failAt (path.field key) .missingField (.mkObj [("field", key)])
       | none => pure ()
 
-private def requireField
+def requireField
     (path : DecodePath)
     (json : Lean.Json)
     (name : String) :
@@ -155,7 +155,7 @@ private def requireField
           failAt (path.field name) .missingField (.mkObj [("field", name)])
   | _ => failAt path .expectedObject (expectedArguments "object" json)
 
-private def decodeStringAt
+def decodeStringAt
     (path : DecodePath)
     (json : Lean.Json) :
     DecodeResult String :=
