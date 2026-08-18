@@ -2,6 +2,7 @@ import Solcore.Oracle.Capabilities
 import Solcore.Oracle.StrictJson
 import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
+import Solcore.Oracle.V4
 
 set_option autoImplicit false
 
@@ -43,6 +44,14 @@ private def processV3Json (json : Lean.Json) : Lean.Json :=
       | .ok response => Lean.toJson response
       | .error error => Lean.toJson error
 
+private def processV4Json (json : Lean.Json) : Lean.Json :=
+  let id := V4.recoverRequestId? json
+  match V4.decodeRequest json with
+  | .error error =>
+      V4.encodeProtocolError (V4.DecodeError.toProtocolError error id)
+  | .ok request =>
+      V4.encodeResponse (V4.handle request)
+
 def processJsonLine (line : String) : Lean.Json :=
   match StrictJson.parse line.trimAscii.copy with
   | .error message =>
@@ -53,7 +62,9 @@ def processJsonLine (line : String) : Lean.Json :=
   | .ok json =>
       match json.getObjVal? "schema" >>= Lean.Json.getStr? with
       | .ok schema =>
-          if schema == V3.schemaVersion then
+          if schema == V4.schemaVersion then
+            processV4Json json
+          else if schema == V3.schemaVersion then
             processV3Json json
           else if schema == V2.schemaVersion then
             processV2Json json

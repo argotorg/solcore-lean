@@ -71,6 +71,15 @@ private def capabilitiesV3Request : V3.Request := {
   query := { kind := .capabilities }
 }
 
+private def capabilitiesV4Request : V4.Request := {
+  id := {
+    value := "capabilities-v4"
+    valid := by decide
+  }
+  limits := V4.Limits.default
+  query := .capabilities
+}
+
 def run (args : List String) : IO UInt32 := do
   match args with
   | ["--help"] | ["-h"] =>
@@ -103,6 +112,9 @@ def run (args : List String) : IO UInt32 := do
       | .error error =>
           emitJson (Lean.toJson error)
           return 1
+  | ["capabilities-v4"] =>
+      emitJson (V4.encodeResponse (V4.handle capabilitiesV4Request))
+      return 0
   | [] =>
       serve (← IO.getStdin)
       return 0
