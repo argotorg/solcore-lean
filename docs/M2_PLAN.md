@@ -104,8 +104,14 @@ golden bytes.
 
 ### M2c: workspace and resolution
 
-Extend from one source file to a workspace only after an Accepted resolver ADR
-fixes:
+[ADR-0014](adr/0014-m2c-workspace-identity.md) fixes the first internal M2c
+subphase: canonical logical paths, structured library/source/module identities,
+the exact raw and validated user-workspace shapes, complete deterministic
+structural errors, and an independently specified pure validator. It does not
+reinterpret the opaque Oracle v4 path and does not publish a workspace profile.
+
+After that identity kernel is complete, extend from validated source records to
+module and name resolution only after a separate Accepted resolver ADR fixes:
 
 - safe canonical source paths and entry-file selection;
 - module path derivation;
@@ -115,10 +121,13 @@ fixes:
 - local scope, including independent conditional branches;
 - the identity and visibility of the canonical standard-library bundle.
 
-The Resolved layer uses structured identifiers derived from source paths and
-declaration indices. It must not replace identity with raw name strings.
-Successful resolution must construct a declarative resolution derivation and
-establish uniqueness and non-dangling references.
+That resolver ADR must also define the closed multi-module Surface algebra,
+separate lexically resolved occurrences from type-directed selectors, and fix
+the intrinsic dependencies needed to resolve the canonical standard-library
+sources. The Resolved layer uses structured identifiers derived from source
+paths, syntactic roles, and declaration indices. It must not replace identity
+with raw name strings. Successful resolution must construct a declarative
+resolution derivation and establish uniqueness and non-dangling references.
 
 ### M2d: checking and Core elaboration
 
@@ -161,13 +170,15 @@ is `inconclusive`, not `rejected`.
    implemented for the internal M2a fragment.
 2. Version-local Surface wire and parse-only Oracle publication. Implemented
    in M2b as Surface v1, parse-result v1, and Oracle v4.
-3. Workspace validation and module/import resolution.
-4. Resolved identifiers and declarative resolution correspondence.
-5. Source typing and typed elaboration for literals, immutable bindings,
+3. Workspace identity and structural validation, as fixed by ADR-0014.
+4. Multi-module Surface syntax and an Accepted resolver ADR.
+5. Module/import resolution, structured identifiers, and declarative
+   resolution correspondence.
+6. Source typing and typed elaboration for literals, immutable bindings,
    conditionals, calls, and the operator-backed M1c subset.
-6. Standard-library identity refinement for word not and shifts.
-7. Polymorphism, tabled class resolution, and staging.
-8. Source-to-Core differential fixtures and shrinkable conformance corpora.
+7. Standard-library identity refinement for word not and shifts.
+8. Polymorphism, tabled class resolution, and staging.
+9. Source-to-Core differential fixtures and shrinkable conformance corpora.
 
 ## Completion criteria for a frontend feature
 

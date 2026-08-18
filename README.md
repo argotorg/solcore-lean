@@ -181,6 +181,13 @@ types to source literals, identify standard-library declarations, elaborate to
 Core, or evaluate a program. Those phases remain future M2 work, so M2b is not
 yet full source-level semantic differential conformance.
 
+[`ADR-0014`](docs/adr/0014-m2c-workspace-identity.md) fixes the next internal
+boundary: pure canonical workspace paths, structured source/module identities,
+and deterministic validation of a closed main/external workspace. It does not
+publish a new protocol or authorize name resolution; a separate resolver ADR
+must first close the multi-module Surface algebra, imports, exports, scopes,
+intrinsics, and standard-library resolution.
+
 ## Running
 
 ```sh
@@ -238,6 +245,7 @@ semantic differential conformance.
 - [M1c primitive semantics and publication ADR](docs/adr/0011-m1c-primitive-semantics-and-publication.md)
 - [M2a Surface parser kernel ADR](docs/adr/0012-m2a-surface-parser-kernel.md)
 - [M2b Surface parser publication ADR](docs/adr/0013-m2b-surface-parser-publication.md)
+- [M2c workspace identity ADR](docs/adr/0014-m2c-workspace-identity.md)
 
 ## Implementation roadmap
 

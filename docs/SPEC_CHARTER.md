@@ -30,6 +30,13 @@ the `surfaceGrammar` feature under `solcore/0.1.0-draft.4` and the frontend-only
 returns a closed Surface v1 parse result. This publication does not add name
 resolution, checking, elaboration, or evaluation.
 
+[ADR-0014](adr/0014-m2c-workspace-identity.md) accepts the next internal
+foundation without publishing it: canonical logical paths, structured
+library/source/module identities, and deterministic validation of a closed
+user workspace. Full module and name resolution remains behind a separate
+Accepted ADR because it requires a new multi-module Surface algebra and exact
+rules for public interfaces, scopes, intrinsics, and standard-library source.
+
 To achieve this purpose, the specification provides the following three
 elements as one coherent whole:
 
