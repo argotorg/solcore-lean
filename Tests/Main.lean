@@ -387,6 +387,53 @@ def testM1cProfile : IO Unit := do
   assertTrue (profileJson == Lean.toJson m1cCoreProfile)
     "checked-in draft.3 profile differs from the Lean profile"
 
+def testM2bFrontendProfile : IO Unit := do
+  assertTrue m2bFrontendProfile.validationErrors.isEmpty
+    s!"draft.4 frontend profile is invalid: {m2bFrontendProfile.validationErrors}"
+  assertTrue m2bFrontendFeatureMatrixIsComplete
+    "M2b frontend feature matrix must contain exactly the Surface grammar feature"
+  assertTrue
+    (m2bFrontendFeatureMatrixRespectsProfile m2bFrontendProfile)
+    "implemented M2b frontend features must be normative and enabled"
+  assertTrue (m2bLanguage.id == "solcore/0.1.0-draft.4")
+    "M2b frontend metadata must be published as draft.4"
+  assertTrue
+    (draftLanguage.grammarVersion.isNone &&
+      m1aLanguage.grammarVersion.isNone &&
+      m1cLanguage.grammarVersion.isNone)
+    "draft.1 through draft.3 must remain grammar-version neutral"
+  assertTrue
+    (!draftLanguage.knownFeatures.contains .surfaceGrammar &&
+      !m1aLanguage.knownFeatures.contains .surfaceGrammar &&
+      !m1cLanguage.knownFeatures.contains .surfaceGrammar)
+    "the Surface grammar feature must not appear in earlier language versions"
+  assertTrue
+    (m2bLanguage.grammarVersion == some 1 &&
+      m2bLanguage.staticSemanticsVersion == some 2 &&
+      m2bLanguage.dynamicSemanticsVersion == some 2)
+    "draft.4 must add grammar version 1 and carry forward semantics version 2"
+  assertTrue
+    (m2bLanguage.knownFeatures == m1cLanguage.knownFeatures ++ #[.surfaceGrammar])
+    "draft.4 must append only the Surface grammar to the draft.3 known features"
+  assertTrue
+    (m2bFrontendProfile.scope == .frontend &&
+      m2bFrontendProfile.observation == .staticVerdictV1 &&
+      m2bFrontendProfile.contractRuntime.isNone)
+    "the M2b profile must expose only static frontend observations"
+  assertTrue (m2bFrontendProfile.enabledFeatures == #[.surfaceGrammar])
+    "the M2b frontend profile must enable only the Surface grammar"
+  assertJsonRoundTrip "draft.4 frontend profile" m2bFrontendProfile
+  assertJsonRoundTrip "M2b frontend feature matrix" m2bFrontendFeatureMatrix
+  let profileText ←
+    IO.FS.readFile "profiles/solcore-0.1.0-draft.4-frontend-m2b.json"
+  let profileJson ←
+    match Lean.Json.parse profileText with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"draft.4 profile JSON is invalid: {error}")
+  assertTrue (profileJson == Lean.toJson m2bFrontendProfile)
+    "checked-in draft.4 profile differs from the Lean profile"
+
 def testCoreWire : IO Unit := do
   let types : Array Core.Wire.V1.Ty := #[.unit, .bool, .word]
   for type in types do
@@ -2022,6 +2069,7 @@ def testSchemaJson : IO Unit := do
         "metadata/standard-library.json", "profiles/manifest.json",
         "profiles/solcore-0.1.0-draft.2-core-m1a.json",
         "profiles/solcore-0.1.0-draft.3-core-m1c.json",
+        "profiles/solcore-0.1.0-draft.4-frontend-m2b.json",
         "Tests/golden/wire-manifest.json"] do
     let text ← IO.FS.readFile path
     match Lean.Json.parse text with
@@ -2092,6 +2140,7 @@ def run : IO Unit := do
   testM1cKernel
   testM1bProfile
   testM1cProfile
+  testM2bFrontendProfile
   testCoreWire
   testCoreWireV2
   testDetailedCoreChecker
@@ -2112,5 +2161,5 @@ end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a parser tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b metadata tests passed"
   return 0

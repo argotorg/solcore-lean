@@ -353,6 +353,54 @@ assert(
   "Oracle v3 schema does not bind the registered Semantic Core v2 schema",
 );
 
+const legacyProfileIds = ["core-v1", "core-m1a-v1", "core-m1c-v1"];
+for (const profileId of legacyProfileIds) {
+  const registered = registeredProfiles.get(profileId);
+  assert(registered !== undefined, `${profileId} profile is not registered`);
+  assert(
+    registered.profile.language.grammarVersion === null,
+    `${profileId} unexpectedly acquired a grammar version`,
+  );
+  assert(
+    !registered.profile.language.knownFeatures.includes("surfaceGrammar"),
+    `${profileId} unexpectedly acquired the Surface grammar feature`,
+  );
+}
+
+const registeredM2bProfile = registeredProfiles.get("frontend-m2b-v1");
+assert(
+  registeredM2bProfile !== undefined,
+  "frontend-m2b-v1 profile is not registered",
+);
+const m2bProfile = registeredM2bProfile.profile;
+assert(
+  registeredM2bProfile.entry.spec === "solcore/0.1.0-draft.4" &&
+    m2bProfile.language.id === registeredM2bProfile.entry.spec,
+  "M2b frontend profile is not bound to draft.4",
+);
+assert(
+  m2bProfile.language.grammarVersion === 1 &&
+    m2bProfile.language.staticSemanticsVersion === 2 &&
+    m2bProfile.language.dynamicSemanticsVersion === 2,
+  "draft.4 does not add grammar version 1 while carrying semantics version 2",
+);
+assert(
+  JSON.stringify(m2bProfile.language.knownFeatures) ===
+    JSON.stringify([
+      ...registeredM1cProfile.profile.language.knownFeatures,
+      "surfaceGrammar",
+    ]),
+  "draft.4 known features do not extend draft.3 by exactly surfaceGrammar",
+);
+assert(
+  m2bProfile.scope === "frontend" &&
+    m2bProfile.observation === "staticVerdictV1" &&
+    m2bProfile.contractRuntime === null &&
+    JSON.stringify(m2bProfile.enabledFeatures) ===
+      JSON.stringify(["surfaceGrammar"]),
+  "M2b frontend profile has an incompatible scope, observation, or feature set",
+);
+
 const baselineManifest = readJson("metadata/baselines.json");
 const bundleIds = new Set([
   standardLibrary.canonical.id,

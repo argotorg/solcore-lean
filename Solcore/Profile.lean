@@ -39,6 +39,7 @@ inductive Feature where
   | coreWordArithmetic
   | coreWordComparison
   | coreWordBitwise
+  | surfaceGrammar
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
 inductive SpecMaturity where
@@ -90,7 +91,12 @@ def m1cAll : Array Feature :=
     .coreWordBitwise
   ]
 
-def all : Array Feature := m1cAll
+def m2bAll : Array Feature :=
+  m1cAll ++ #[
+    .surfaceGrammar
+  ]
+
+def all : Array Feature := m2bAll
 
 def specMaturity : Feature → SpecMaturity
   | .coreUnit
@@ -101,7 +107,8 @@ def specMaturity : Feature → SpecMaturity
   | .coreBoolNot
   | .coreWordArithmetic
   | .coreWordComparison
-  | .coreWordBitwise => .normative
+  | .coreWordBitwise
+  | .surfaceGrammar => .normative
   | .corePrimitives
   | .functions
   | .lambdas
@@ -441,6 +448,42 @@ def m1cCoreProfileDigest : String :=
 
 theorem m1cCoreProfile_valid : m1cCoreProfile.Valid := by
   change m1cCoreProfile.validationErrors = []
+  native_decide
+
+def m2bLanguage : LanguageVersion := {
+  id := "solcore/0.1.0-draft.4"
+  release := {
+    major := 0
+    minor := 1
+    patch := 0
+    prerelease := some "draft.4"
+  }
+  grammarVersion := some 1
+  staticSemanticsVersion := some 2
+  dynamicSemanticsVersion := some 2
+  abiVersion := none
+  storageLayoutVersion := none
+  standardLibrary := canonicalStd
+  knownFeatures := Feature.m2bAll
+}
+
+def m2bFrontendProfile : SpecProfile := {
+  id := "frontend-m2b-v1"
+  language := m2bLanguage
+  scope := .frontend
+  enabledFeatures := #[.surfaceGrammar]
+  solver := .tabled
+  observation := .staticVerdictV1
+  contractRuntime := none
+  spanUnit := .utf8Byte
+  sourceEncoding := "UTF-8"
+}
+
+def m2bFrontendProfileDigest : String :=
+  "sha256:292e8c423bfc2d7e77f7a9756e743af473f6a952073e590c62a05c676e3bf33a"
+
+theorem m2bFrontendProfile_valid : m2bFrontendProfile.Valid := by
+  change m2bFrontendProfile.validationErrors = []
   native_decide
 
 end Solcore
