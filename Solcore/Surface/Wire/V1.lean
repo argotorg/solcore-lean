@@ -1,5 +1,7 @@
 import Solcore.Surface.Wire.V1.Syntax
 import Solcore.Surface.Wire.V1.Codec
+import Solcore.Surface.Wire.V1.Diagnostic
+import Solcore.Surface.Wire.V1.ParseResult
 import Solcore.Surface.Wire.V1.Properties
 
 /-!
