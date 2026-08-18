@@ -11,9 +11,11 @@ pure, total lexer and parser. The proof kernel now connects successful execution
 to independent lexical and parsing judgments in both directions, proves lexical
 uniqueness and relational determinism, connects public lexical failures to
 cursor-local rejection judgments, and proves the defensive lexer and parser
-fuel failures and the lexer output-validation failure unreachable. The parser's
-defensive invalid-input and invalid-output classifications remain to be proved
-unreachable at the publication boundary.
+fuel failures and the lexer output-validation failure unreachable. The M2b
+publication proof layer additionally classifies every unchecked parser result,
+proves the parser's defensive invalid-input and invalid-output classifications
+unreachable, and proves that every successful parser result projects to the
+closed Surface v1 wire language.
 
 M2a deliberately did not publish that kernel. No published profile enables a
 normative grammar, Oracle v1 `parse` remains unsupported, and Oracle v2 and v3
@@ -509,17 +511,13 @@ its own final validator is an `internalError` with code
 implementation defects. They must never be converted to `rejected`, assigned
 an `SL` or `SP` code, or blamed on source text.
 
-The existing frontend proofs make lexer fuel exhaustion, lexer invalid output,
-and parser fuel exhaustion unreachable for public execution. They do not yet
-make the parser's defensive invalid-input or invalid-output classifications
-unreachable. Publication requires the missing unchecked-executor error
-classification and public unreachability theorems for both cases. It also
-requires a theorem that every successful parser result projects to v1, making
-`surface-wire-projection-failed` unreachable for draft.4. Until those
-obligations are discharged, the defensive cases map to `frontend-invariant`
-rather than to a source rejection. The error variants remain defensive
-boundaries so that later internal growth fails closed if the corresponding
-proof or mapping is not extended.
+The frontend proofs make lexer fuel exhaustion, lexer invalid output, parser
+fuel exhaustion, parser invalid input, and parser invalid output unreachable
+for public execution. The publication proofs also show that every successful
+parser result projects to v1, making `surface-wire-projection-failed`
+unreachable for draft.4. The defensive cases still map to `internalError`,
+never to a source rejection, and remain in the protocol so that later internal
+growth fails closed if the corresponding proof or mapping is not extended.
 
 ### Compatibility and immutability
 
