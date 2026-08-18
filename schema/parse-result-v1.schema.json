@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:solcore:parse-result:v1",
+  "title": "Solcore parse result v1",
+  "description": "The strict, versioned wrapper for one complete Solcore Surface v1 parse result.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "solcore-parse-result/v1"
+    },
+    "value": {
+      "$ref": "urn:solcore:surface:v1"
+    }
+  },
+  "required": [
+    "schema",
+    "value"
+  ]
+}

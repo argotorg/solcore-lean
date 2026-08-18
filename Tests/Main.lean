@@ -2503,6 +2503,7 @@ def testSchemaJson : IO Unit := do
   for path in
       ["schema/oracle-v1.schema.json", "schema/oracle-v2.schema.json",
         "schema/oracle-v3.schema.json",
+        "schema/parse-result-v1.schema.json",
         "schema/semantic-core-v1.schema.json", "schema/semantic-core-v2.schema.json",
         "schema/surface-v1.schema.json",
         "metadata/baselines.json",

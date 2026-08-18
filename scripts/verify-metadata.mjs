@@ -101,12 +101,15 @@ const oracleV3SchemaId = "urn:solcore:oracle:v3";
 const semanticCoreV1SchemaId = "urn:solcore:semantic-core:v1";
 const semanticCoreV2SchemaId = "urn:solcore:semantic-core:v2";
 const surfaceV1SchemaId = "urn:solcore:surface:v1";
+const parseResultV1SchemaId = "urn:solcore:parse-result:v1";
 const permittedExternalRefs = new Map([
   [oracleV2SchemaId, new Set([oracleV1SchemaId, semanticCoreV1SchemaId])],
   [oracleV3SchemaId, new Set([oracleV1SchemaId, semanticCoreV2SchemaId])],
+  [parseResultV1SchemaId, new Set([surfaceV1SchemaId])],
 ]);
 let semanticCoreV1ReferenceCount = 0;
 let semanticCoreV2ReferenceCount = 0;
+let surfaceV1ParseResultReferenceCount = 0;
 
 function resolveJsonPointer(document, fragment) {
   let pointer;
@@ -163,6 +166,12 @@ function verifySchemaRef(ref, schema, path) {
       targetId === semanticCoreV2SchemaId
     ) {
       semanticCoreV2ReferenceCount += 1;
+    }
+    if (
+      schema.value.$id === parseResultV1SchemaId &&
+      targetId === surfaceV1SchemaId
+    ) {
+      surfaceV1ParseResultReferenceCount += 1;
     }
   }
   if (!resolveJsonPointer(targetSchema.value, fragment)) {
@@ -225,6 +234,10 @@ assert(
   "schema/surface-v1.schema.json is not registered by $id",
 );
 assert(
+  schemasById.has(parseResultV1SchemaId),
+  "schema/parse-result-v1.schema.json is not registered by $id",
+);
+assert(
   semanticCoreV1ReferenceCount > 0,
   "oracle v2 schema does not reference the registered Semantic Core v1 schema",
 );
@@ -232,16 +245,33 @@ assert(
   semanticCoreV2ReferenceCount > 0,
   "oracle v3 schema does not reference the registered Semantic Core v2 schema",
 );
+assert(
+  surfaceV1ParseResultReferenceCount === 1,
+  "parse-result v1 schema must reference the registered Surface v1 schema exactly once",
+);
 
 const semanticCoreV1Schema = schemasById.get(semanticCoreV1SchemaId).value;
 const semanticCoreV2Schema = schemasById.get(semanticCoreV2SchemaId).value;
 const surfaceV1Schema = schemasById.get(surfaceV1SchemaId).value;
+const parseResultV1Schema = schemasById.get(parseResultV1SchemaId).value;
 assert(
   surfaceV1Schema.$ref === "#/$defs/file" &&
     surfaceV1Schema.$defs.file.properties.schema.const ===
       "solcore-surface/v1" &&
     surfaceV1Schema.$defs.file.required.includes("schema"),
   "Surface v1 schema does not enforce its root schema discriminator",
+);
+assert(
+  parseResultV1Schema.type === "object" &&
+    parseResultV1Schema.additionalProperties === false &&
+    JSON.stringify(Object.keys(parseResultV1Schema.properties).sort()) ===
+      JSON.stringify(["schema", "value"]) &&
+    JSON.stringify([...parseResultV1Schema.required].sort()) ===
+      JSON.stringify(["schema", "value"]) &&
+    parseResultV1Schema.properties.schema.const ===
+      "solcore-parse-result/v1" &&
+    parseResultV1Schema.properties.value.$ref === surfaceV1Schema.$id,
+  "Parse-result v1 schema is not the strict Surface v1 wrapper",
 );
 const frozenCoreDefinitionNames = [
   "nat",
