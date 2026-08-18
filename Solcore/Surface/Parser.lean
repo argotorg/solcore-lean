@@ -217,6 +217,95 @@ private def parseType
   | tokens =>
       .error (.source (expected file .type tokens))
 
+private theorem expectKind_complete
+    (file : SourceFile)
+    (kind : TokenKind)
+    (token : Token)
+    (remaining : List Token)
+    (kindEq : token.kind = kind) :
+    expectKind file kind (token :: remaining) = .ok {
+      token
+      remaining
+      inputEq := rfl
+      kindEq
+    } := by
+  cases token with
+  | mk actual span =>
+      simp only at kindEq
+      subst actual
+      simp [expectKind]
+
+private theorem expectIdentifier_complete
+    (file : SourceFile)
+    (token : Token)
+    (text : String)
+    (remaining : List Token)
+    (kindEq : token.kind = .identifier text) :
+    expectIdentifier file (token :: remaining) = .ok {
+      token
+      text
+      remaining
+      inputEq := rfl
+      kindEq
+    } := by
+  cases token with
+  | mk actual span =>
+      simp only at kindEq
+      subst actual
+      simp [expectIdentifier]
+
+private theorem expectContextual_complete
+    (file : SourceFile)
+    (text : String)
+    (token : Token)
+    (remaining : List Token)
+    (kindEq : token.kind = .identifier text) :
+    expectContextual file text (token :: remaining) = .ok {
+      token
+      remaining
+      inputEq := rfl
+      kindEq
+    } := by
+  cases token with
+  | mk actual span =>
+      simp only at kindEq
+      subst actual
+      simp [expectContextual]
+
+private theorem parseType_complete
+    (file : SourceFile)
+    {input remaining : List Token}
+    {type : TypeSyntax}
+    (derivation : TypeParses input type remaining) :
+    parseType file input = .ok {
+      type
+      remaining
+      parses := derivation
+    } := by
+  cases derivation with
+  | unit left right remaining leftKind rightKind =>
+      cases left with
+      | mk actualLeft leftSpan =>
+          simp only at leftKind
+          subst actualLeft
+          cases right with
+          | mk actualRight rightSpan =>
+              simp only at rightKind
+              subst actualRight
+              simp [parseType]
+  | bool token remaining kind =>
+      cases token with
+      | mk actual span =>
+          simp only at kind
+          subst actual
+          simp [parseType]
+  | word token remaining kind =>
+      cases token with
+      | mk actual span =>
+          simp only at kind
+          subst actual
+          simp [parseType]
+
 private def exhausted
     {α : Type}
     (file : SourceFile)
@@ -508,6 +597,21 @@ private theorem prefixParses_remaining_length_lt
       expression
       derivation
       (.stop 8 expression remaining (infixBlockedAtEight remaining)))
+
+private theorem exprParses_cannot_start_with_right_paren
+    {minimum : Nat}
+    {token : Token}
+    {tail remaining : List Token}
+    {expression : Expr}
+    (derivation :
+      ExprParses minimum (token :: tail) expression remaining)
+    (rightParenKind : token.kind = .rightParen) :
+    False := by
+  cases derivation with
+  | conditional =>
+      simp_all
+  | ordinary _ _ _ _ _ _ prefixParse _ =>
+      cases prefixParse <;> simp_all
 
 mutual
 
@@ -938,6 +1042,58 @@ private def parseInfixFuel
 
 end
 
+private theorem parseInfixFuel_leftStep_complete
+    (file : SourceFile)
+    (fuel minimum precedence : Nat)
+    (left right result : Expr)
+    (operatorToken : Token)
+    (operator : BinaryOp)
+    (afterOperator afterRight remaining : List Token)
+    (binding :
+      BinaryBinding operatorToken.kind operator precedence .left)
+    (eligible : minimum ≤ precedence)
+    (rightParse :
+      ExprParses (precedence + 1) afterOperator right afterRight)
+    (tailParse :
+      InfixParses minimum
+        (.binary
+          (SourceSpan.cover left.span right.span)
+          { value := operator, span := operatorToken.span }
+          left right)
+        afterRight result remaining)
+    (rightExecution :
+      parseExpressionFuel file fuel (precedence + 1) afterOperator = .ok {
+        expression := right
+        remaining := afterRight
+        parses := rightParse
+      })
+    (tailExecution :
+      parseInfixFuel file fuel minimum
+          (.binary
+            (SourceSpan.cover left.span right.span)
+            { value := operator, span := operatorToken.span }
+            left right)
+          afterRight = .ok {
+        expression := result
+        remaining
+        parses := tailParse
+      }) :
+    parseInfixFuel file (fuel + 1) minimum left
+        (operatorToken :: afterOperator) = .ok {
+      expression := result
+      remaining
+      parses := .leftStep minimum precedence left right result
+        operatorToken operator afterOperator afterRight remaining
+        binding eligible rightParse tailParse
+    } := by
+  cases operatorToken with
+  | mk operatorKind operatorSpan =>
+      cases binding <;>
+        simp [parseInfixFuel, peekBinary, binaryInfo,
+          Nat.not_lt.mpr eligible, rightExecution] <;>
+        simp only [bind, Except.bind] <;>
+        rw [tailExecution]
+
 private def expressionRank (tokens : List Token) : Nat :=
   2 * tokens.length + 2
 
@@ -1343,6 +1499,542 @@ private theorem expressionParserFuelSafe (fuel : Nat) :
                     exact noFuelExhaustion_ok _
         · exact noFuelExhaustion_ok _
 
+private structure ExpressionParserComplete (fuel : Nat) : Prop where
+  expressionComplete :
+    ∀ (file : SourceFile) (minimum : Nat) (input : List Token)
+        (expression : Expr) (remaining : List Token),
+      (derivation : ExprParses minimum input expression remaining) →
+      expressionRank input ≤ fuel →
+      parseExpressionFuel file fuel minimum input = .ok {
+        expression
+        remaining
+        parses := derivation
+      }
+  prefixComplete :
+    ∀ (file : SourceFile) (input : List Token)
+        (expression : Expr) (remaining : List Token),
+      (derivation : PrefixParses input expression remaining) →
+      prefixRank input ≤ fuel →
+      parsePrefixFuel file fuel input = .ok {
+        expression
+        remaining
+        parses := derivation
+      }
+  argumentsComplete :
+    ∀ (file : SourceFile) (input : List Token)
+        (arguments : List Expr) (right : Token)
+        (remaining : List Token),
+      (derivation : ArgumentsParse input arguments right remaining) →
+      argumentsRank input ≤ fuel →
+      parseArgumentsFuel file fuel input = .ok {
+        arguments
+        right
+        remaining
+        parses := derivation
+      }
+  argumentTailComplete :
+    ∀ (file : SourceFile) (input : List Token)
+        (arguments : List Expr) (right : Token)
+        (remaining : List Token),
+      (derivation : ArgumentTailParses input arguments right remaining) →
+      argumentTailRank input ≤ fuel →
+      parseArgumentTailFuel file fuel input = .ok {
+        arguments
+        right
+        remaining
+        parses := derivation
+      }
+  infixComplete :
+    ∀ (file : SourceFile) (minimum : Nat) (left : Expr)
+        (input : List Token) (expression : Expr)
+        (remaining : List Token),
+      (derivation :
+        InfixParses minimum left input expression remaining) →
+      infixRank input ≤ fuel →
+      parseInfixFuel file fuel minimum left input = .ok {
+        expression
+        remaining
+        parses := derivation
+      }
+
+private theorem expressionParserComplete (fuel : Nat) :
+    ExpressionParserComplete fuel := by
+  induction fuel with
+  | zero =>
+      refine {
+        expressionComplete := ?_
+        prefixComplete := ?_
+        argumentsComplete := ?_
+        argumentTailComplete := ?_
+        infixComplete := ?_
+      }
+      · intro _ _ input _ _ _ sufficient
+        simp [expressionRank] at sufficient
+      · intro _ input _ _ _ sufficient
+        simp [prefixRank] at sufficient
+      · intro _ input _ _ _ _ sufficient
+        simp [argumentsRank] at sufficient
+      · intro _ input _ _ _ _ sufficient
+        simp [argumentTailRank] at sufficient
+      · intro _ _ _ input _ _ _ sufficient
+        simp [infixRank] at sufficient
+  | succ fuel inductionHypothesis =>
+      refine {
+        expressionComplete := ?_
+        prefixComplete := ?_
+        argumentsComplete := ?_
+        argumentTailComplete := ?_
+        infixComplete := ?_
+      }
+      · intro file minimum input expression remaining derivation sufficient
+        cases derivation with
+        | conditional ifToken thenToken elseToken afterIf afterThen afterElse
+            remaining condition thenBranch elseBranch ifKind conditionParse
+            thenKind thenParse elseKind elseParse =>
+            cases ifToken with
+            | mk actualIf ifSpan =>
+                simp only at ifKind
+                subst actualIf
+                have conditionExecution :=
+                  inductionHypothesis.expressionComplete
+                    file 0 afterIf condition (thenToken :: afterThen)
+                    conditionParse (by
+                      simp only [expressionRank, List.length_cons]
+                        at sufficient ⊢
+                      omega)
+                have thenTokenExecution :=
+                  expectContextual_complete
+                    file "then" thenToken afterThen thenKind
+                have thenExecution :=
+                  inductionHypothesis.expressionComplete
+                    file 0 afterThen thenBranch (elseToken :: afterElse)
+                    thenParse (by
+                      have conditionShort :=
+                        exprParses_remaining_length_lt conditionParse
+                      simp only [expressionRank, List.length_cons]
+                        at sufficient conditionShort ⊢
+                      omega)
+                have elseTokenExecution :=
+                  expectKind_complete
+                    file .keywordElse elseToken afterElse elseKind
+                have elseExecution :=
+                  inductionHypothesis.expressionComplete
+                    file 0 afterElse elseBranch remaining elseParse (by
+                      have conditionShort :=
+                        exprParses_remaining_length_lt conditionParse
+                      have thenShort :=
+                        exprParses_remaining_length_lt thenParse
+                      simp only [expressionRank, List.length_cons]
+                        at sufficient conditionShort thenShort ⊢
+                      omega)
+                simp only [parseExpressionFuel, beq_self_eq_true]
+                rw [conditionExecution]
+                simp only [bind, Except.bind]
+                rw [thenTokenExecution]
+                simp only
+                rw [thenExecution]
+                simp only
+                rw [elseTokenExecution]
+                simp only
+                rw [elseExecution]
+                simp
+        | ordinary minimum input afterPrefix remaining initial result
+            prefixParse infixParse =>
+            have prefixExecution :=
+              inductionHypothesis.prefixComplete
+                file input initial afterPrefix prefixParse (by
+                  simp only [expressionRank, prefixRank]
+                    at sufficient ⊢
+                  omega)
+            have infixExecution :=
+              inductionHypothesis.infixComplete
+                file minimum initial afterPrefix expression remaining
+                infixParse (by
+                  have prefixShort :=
+                    prefixParses_remaining_length_lt prefixParse
+                  simp only [expressionRank, infixRank]
+                    at sufficient prefixShort ⊢
+                  omega)
+            cases prefixParse with
+            | not operatorToken _ _ _ operatorKind _ =>
+                cases operatorToken with
+                | mk actualKind operatorSpan =>
+                    simp only at operatorKind
+                    subst actualKind
+                    simp only [parseExpressionFuel]
+                    rw [prefixExecution]
+                    simp only [bind, Except.bind]
+                    rw [infixExecution]
+            | unit left _ _ leftKind _ =>
+                cases left with
+                | mk actualKind leftSpan =>
+                    simp only at leftKind
+                    subst actualKind
+                    simp only [parseExpressionFuel]
+                    rw [prefixExecution]
+                    simp only [bind, Except.bind]
+                    rw [infixExecution]
+            | group left _ _ _ _ leftKind _ _ =>
+                cases left with
+                | mk actualKind leftSpan =>
+                    simp only at leftKind
+                    subst actualKind
+                    simp only [parseExpressionFuel]
+                    rw [prefixExecution]
+                    simp only [bind, Except.bind]
+                    rw [infixExecution]
+            | decimal token _ _ kind =>
+                cases token with
+                | mk actualKind tokenSpan =>
+                    simp only at kind
+                    subst actualKind
+                    simp only [parseExpressionFuel]
+                    rw [prefixExecution]
+                    simp only [bind, Except.bind]
+                    rw [infixExecution]
+            | hexadecimal token _ _ kind =>
+                cases token with
+                | mk actualKind tokenSpan =>
+                    simp only at kind
+                    subst actualKind
+                    simp only [parseExpressionFuel]
+                    rw [prefixExecution]
+                    simp only [bind, Except.bind]
+                    rw [infixExecution]
+            | name token _ _ kind _ =>
+                cases token with
+                | mk actualKind tokenSpan =>
+                    simp only at kind
+                    subst actualKind
+                    simp only [parseExpressionFuel]
+                    rw [prefixExecution]
+                    simp only [bind, Except.bind]
+                    rw [infixExecution]
+            | call identifier _ _ _ _ _ _ identifierKind _ _ =>
+                cases identifier with
+                | mk actualKind identifierSpan =>
+                    simp only at identifierKind
+                    subst actualKind
+                    simp only [parseExpressionFuel]
+                    rw [prefixExecution]
+                    simp only [bind, Except.bind]
+                    rw [infixExecution]
+      · intro file input expression remaining derivation sufficient
+        cases derivation with
+        | not operatorToken afterOperator remaining operand operatorKind
+            operandParse =>
+            cases operatorToken with
+            | mk actualKind operatorSpan =>
+                simp only at operatorKind
+                subst actualKind
+                have operandExecution :=
+                  inductionHypothesis.prefixComplete
+                    file afterOperator operand remaining operandParse (by
+                      simp only [prefixRank, List.length_cons]
+                        at sufficient ⊢
+                      omega)
+                simp only [parsePrefixFuel]
+                rw [operandExecution]
+                rfl
+        | unit left right remaining leftKind rightKind =>
+            cases left with
+            | mk actualLeft leftSpan =>
+                simp only at leftKind
+                subst actualLeft
+                cases right with
+                | mk actualRight rightSpan =>
+                    simp only at rightKind
+                    subst actualRight
+                    simp [parsePrefixFuel]
+        | group left right afterLeft remaining inner leftKind innerParse
+            rightKind =>
+            cases left with
+            | mk actualLeft leftSpan =>
+                simp only at leftKind
+                subst actualLeft
+                have innerExecution :=
+                  inductionHypothesis.expressionComplete
+                    file 0 afterLeft inner (right :: remaining)
+                    innerParse (by
+                      simp only [prefixRank, expressionRank,
+                        List.length_cons] at sufficient ⊢
+                      omega)
+                have rightExecution :=
+                  expectKind_complete
+                    file .rightParen right remaining rightKind
+                cases afterLeft with
+                | nil =>
+                    have innerShort :=
+                      exprParses_remaining_length_lt innerParse
+                    simp at innerShort
+                | cons first tail =>
+                    cases first with
+                    | mk firstKind firstSpan =>
+                        cases firstKind <;>
+                          first
+                          | exact False.elim
+                              (exprParses_cannot_start_with_right_paren
+                                innerParse rfl)
+                          | (simp only [parsePrefixFuel]
+                             rw [innerExecution]
+                             simp only [bind, Except.bind]
+                             rw [rightExecution])
+        | decimal token digits remaining kind =>
+            cases token with
+            | mk actual tokenSpan =>
+                simp only at kind
+                subst actual
+                simp [parsePrefixFuel]
+        | hexadecimal token digits remaining kind =>
+            cases token with
+            | mk actual tokenSpan =>
+                simp only at kind
+                subst actual
+                simp [parsePrefixFuel]
+        | name token text remaining kind notCall =>
+            cases token with
+            | mk actual tokenSpan =>
+                simp only at kind
+                subst actual
+                cases remaining with
+                | nil =>
+                    simp [parsePrefixFuel]
+                | cons next tail =>
+                    have different : next.kind ≠ .leftParen := by
+                      intro nextKind
+                      exact notCall next tail rfl nextKind
+                    simp [parsePrefixFuel, different]
+        | call identifier left right text afterLeft remaining arguments
+            identifierKind leftKind argumentsParse =>
+            cases identifier with
+            | mk actualIdentifier identifierSpan =>
+                simp only at identifierKind
+                subst actualIdentifier
+                cases left with
+                | mk actualLeft leftSpan =>
+                    simp only at leftKind
+                    subst actualLeft
+                    have argumentsExecution :=
+                      inductionHypothesis.argumentsComplete
+                        file afterLeft arguments right remaining
+                        argumentsParse (by
+                          simp only [prefixRank, argumentsRank,
+                            List.length_cons] at sufficient ⊢
+                          omega)
+                    simp only [parsePrefixFuel, decide_true]
+                    rw [argumentsExecution]
+                    simp only [bind, Except.bind]
+                    rfl
+      · intro file input arguments right remaining derivation sufficient
+        cases derivation with
+        | empty right remaining rightKind =>
+            cases right with
+            | mk actual rightSpan =>
+                simp only at rightKind
+                subst actual
+                simp [parseArgumentsFuel]
+        | nonempty input afterFirst remaining first tail right firstParse
+            tailParse =>
+            have firstExecution :=
+              inductionHypothesis.expressionComplete
+                file 0 input first afterFirst firstParse (by
+                  simp only [argumentsRank, expressionRank]
+                    at sufficient ⊢
+                  omega)
+            have tailExecution :=
+              inductionHypothesis.argumentTailComplete
+                file afterFirst tail right remaining tailParse (by
+                  have firstShort :=
+                    exprParses_remaining_length_lt firstParse
+                  simp only [argumentsRank, argumentTailRank]
+                    at sufficient ⊢
+                  omega)
+            simp only [parseArgumentsFuel]
+            split
+            · rename_i rightSpan rest inputEq
+              have impossible :=
+                exprParses_cannot_start_with_right_paren
+                  firstParse (by simp_all)
+              contradiction
+            · rw [firstExecution]
+              simp only [bind, Except.bind]
+              rw [tailExecution]
+      · intro file input arguments right remaining derivation sufficient
+        cases derivation with
+        | done right remaining rightKind =>
+            cases right with
+            | mk actual rightSpan =>
+                simp only at rightKind
+                subst actual
+                simp [parseArgumentTailFuel]
+        | more comma right afterComma afterNext remaining next tail commaKind
+            nextParse tailParse =>
+            cases comma with
+            | mk actual commaSpan =>
+                simp only at commaKind
+                subst actual
+                have nextExecution :=
+                  inductionHypothesis.expressionComplete
+                    file 0 afterComma next afterNext nextParse (by
+                      simp only [argumentTailRank, expressionRank,
+                        List.length_cons] at sufficient ⊢
+                      omega)
+                have tailExecution :=
+                  inductionHypothesis.argumentTailComplete
+                    file afterNext tail right remaining tailParse (by
+                      have nextShort :=
+                        exprParses_remaining_length_lt nextParse
+                      simp only [argumentTailRank, List.length_cons]
+                        at sufficient ⊢
+                      omega)
+                simp only [parseArgumentTailFuel]
+                rw [nextExecution]
+                simp only [bind, Except.bind]
+                rw [tailExecution]
+      · intro file minimum left input expression remaining derivation sufficient
+        cases derivation with
+        | stop minimum left input blocked =>
+            simp only [parseInfixFuel]
+            split
+            · rename_i head binaryAtHead
+              have lower :=
+                blocked head.token head.remaining head.info.operator
+                  head.info.precedence head.info.associativity
+                  head.inputEq head.info.binding
+              simp [lower]
+            · rfl
+        | leftStep minimum precedence left right result operatorToken operator
+            afterOperator afterRight remaining binding eligible rightParse
+            tailParse =>
+            have rightExecution :=
+              inductionHypothesis.expressionComplete
+                file (precedence + 1) afterOperator right afterRight
+                rightParse (by
+                  simp only [infixRank, expressionRank,
+                    List.length_cons] at sufficient ⊢
+                  omega)
+            have tailExecution :=
+              inductionHypothesis.infixComplete
+                file minimum
+                  (.binary
+                    (SourceSpan.cover left.span right.span)
+                    { value := operator, span := operatorToken.span }
+                    left right)
+                  afterRight expression remaining tailParse (by
+                    have rightShort :=
+                      exprParses_remaining_length_lt rightParse
+                    simp only [infixRank, List.length_cons]
+                      at sufficient rightShort ⊢
+                    omega)
+            exact parseInfixFuel_leftStep_complete
+              file fuel minimum precedence left right expression
+              operatorToken operator afterOperator afterRight remaining
+              binding eligible rightParse tailParse rightExecution
+              tailExecution
+        | nonAssociativeStep minimum precedence left right result
+            operatorToken operator afterOperator afterRight remaining
+            binding eligible rightParse notRepeated tailParse =>
+            have rightSufficient :
+                expressionRank afterOperator ≤ fuel := by
+              simp only [infixRank, expressionRank,
+                List.length_cons] at sufficient ⊢
+              omega
+            have tailSufficient :
+                infixRank afterRight ≤ fuel := by
+              have rightShort :=
+                exprParses_remaining_length_lt rightParse
+              simp only [infixRank, List.length_cons]
+                at sufficient rightShort ⊢
+              omega
+            simp only [parseInfixFuel]
+            split
+            · rename_i head binaryAtHead
+              have headInput := head.inputEq
+              injection headInput with tokenEq remainingEq
+              have headBinding :
+                  BinaryBinding operatorToken.kind head.info.operator
+                    head.info.precedence head.info.associativity := by
+                simpa only [tokenEq] using head.info.binding
+              have unique :=
+                binaryBinding_unique binding headBinding
+              have lowerFalse :
+                  ¬head.info.precedence < minimum := by
+                rw [← unique.2.1]
+                omega
+              have rightParseHead :
+                  ExprParses (head.info.precedence + 1) head.remaining
+                    right afterRight := by
+                simpa only [← remainingEq, ← unique.2.1]
+                  using rightParse
+              have rightSufficientHead :
+                  expressionRank head.remaining ≤ fuel := by
+                simpa only [← remainingEq] using rightSufficient
+              have rightExecutionHead :=
+                inductionHypothesis.expressionComplete
+                  file (head.info.precedence + 1) head.remaining
+                  right afterRight rightParseHead rightSufficientHead
+              have tailParseHead :
+                  InfixParses minimum
+                    (.binary
+                      (SourceSpan.cover left.span right.span)
+                      {
+                        value := head.info.operator
+                        span := head.token.span
+                      }
+                      left right)
+                    afterRight expression remaining := by
+                simpa only [← tokenEq, ← unique.1] using tailParse
+              have tailExecutionHead :=
+                inductionHypothesis.infixComplete
+                  file minimum
+                    (.binary
+                      (SourceSpan.cover left.span right.span)
+                      {
+                        value := head.info.operator
+                        span := head.token.span
+                      }
+                      left right)
+                    afterRight expression remaining tailParseHead
+                    tailSufficient
+              simp only [lowerFalse]
+              rw [rightExecutionHead]
+              simp only [bind, Except.bind]
+              split
+              · rename_i lowerProof
+                contradiction
+              · rename_i notLowerProof
+                split
+                · rename_i associativityAtHead
+                  have impossible :
+                      (.nonAssociative : Associativity) = .left :=
+                    unique.2.2.trans associativityAtHead
+                  contradiction
+                · rename_i associativityAtHead
+                  split
+                  · rename_i second secondAtHead
+                    have different :
+                        second.info.precedence ≠ precedence :=
+                      notRepeated second.token second.remaining
+                        second.info.operator second.info.precedence
+                        second.info.associativity second.inputEq
+                        second.info.binding
+                    have differentHead :
+                        second.info.precedence ≠ head.info.precedence := by
+                      intro equal
+                      exact different (equal.trans unique.2.1.symm)
+                    simp only [beq_eq_false_iff_ne.mpr differentHead,
+                      Bool.false_eq_true]
+                    rw [tailExecutionHead]
+                    simp
+                  · rw [tailExecutionHead]
+            · rename_i noBinary
+              have lower :=
+                infixBlockedOfNoBinary minimum
+                    (operatorToken :: afterOperator) noBinary
+                  operatorToken afterOperator operator precedence
+                    .nonAssociative rfl binding
+              omega
+
 private def expressionFuel (tokens : List Token) : Nat :=
   32 * (tokens.length + 1)
 
@@ -1351,6 +2043,21 @@ private def parseExpression
     (tokens : List Token) :
     Except ParseFailure (ExpressionResult 0 tokens) :=
   parseExpressionFuel file (expressionFuel tokens) 0 tokens
+
+private theorem parseExpression_complete
+    (file : SourceFile)
+    {input remaining : List Token}
+    {expression : Expr}
+    (derivation : ExprParses 0 input expression remaining) :
+    parseExpression file input = .ok {
+      expression
+      remaining
+      parses := derivation
+    } := by
+  apply (expressionParserComplete
+    (expressionFuel input)).expressionComplete
+  simp only [expressionFuel, expressionRank]
+  omega
 
 private theorem parseExpression_noFuelExhaustion
     (file : SourceFile)
@@ -1479,6 +2186,50 @@ private def parseLet
                 direct))
       }
 
+private theorem parseLet_complete
+    (file : SourceFile)
+    {input remaining : List Token}
+    {statement : LetStatement}
+    (derivation : LetParses input statement remaining) :
+    parseLet file input = .ok {
+      statement
+      remaining
+      parses := derivation
+    } := by
+  cases derivation with
+  | intro letToken nameToken colonToken equalToken semicolonToken nameText
+      afterColon afterEqual remaining type value letKind nameKind colonKind
+      typeParse equalKind valueParse semicolonKind =>
+      have letExecution :=
+        expectKind_complete file .keywordLet letToken
+          (nameToken :: colonToken :: afterColon) letKind
+      have nameExecution :=
+        expectIdentifier_complete file nameToken nameText
+          (colonToken :: afterColon) nameKind
+      have colonExecution :=
+        expectKind_complete file .colon colonToken afterColon colonKind
+      have typeExecution := parseType_complete file typeParse
+      have equalExecution :=
+        expectKind_complete file .equal equalToken afterEqual equalKind
+      have valueExecution := parseExpression_complete file valueParse
+      have semicolonExecution :=
+        expectKind_complete file .semicolon semicolonToken remaining
+          semicolonKind
+      simp only [parseLet]
+      rw [letExecution]
+      simp only [bind, Except.bind]
+      rw [nameExecution]
+      simp only
+      rw [colonExecution]
+      simp only
+      rw [typeExecution]
+      simp only
+      rw [equalExecution]
+      simp only
+      rw [valueExecution]
+      simp only
+      rw [semicolonExecution]
+
 private theorem parseLet_noFuelExhaustion
     (file : SourceFile)
     (tokens : List Token) :
@@ -1575,6 +2326,63 @@ private def parseBindings
       | _ =>
           .error (.source (expected file .bindingOrReturn tokens))
 
+private theorem parseBindings_complete
+    (file : SourceFile)
+    {input remaining : List Token}
+    {bindings : List LetStatement}
+    (derivation : BindingsParse input bindings remaining)
+    (fuel : Nat)
+    (sufficient : input.length < fuel) :
+    parseBindings file fuel input = .ok {
+      bindings
+      remaining
+      parses := derivation
+    } := by
+  induction fuel generalizing input bindings remaining with
+  | zero =>
+      omega
+  | succ fuel inductionHypothesis =>
+      cases derivation with
+      | done returnToken remaining returnKind =>
+          cases returnToken with
+          | mk actualKind returnSpan =>
+              simp only at returnKind
+              subst actualKind
+              simp [parseBindings]
+      | more input afterBinding remaining binding bindings bindingParse
+          tailParse =>
+          obtain ⟨letToken, afterLet, inputEq, letKind⟩ :
+              ∃ letToken afterLet,
+                input = letToken :: afterLet ∧
+                  letToken.kind = .keywordLet := by
+            cases bindingParse with
+            | intro letToken nameToken colonToken _ _ _ afterColon _ _ _ _
+                letKind _ _ _ _ _ _ =>
+                exact ⟨
+                  letToken,
+                  nameToken :: colonToken :: afterColon,
+                  rfl,
+                  letKind
+                ⟩
+          subst input
+          cases letToken with
+          | mk actualKind letSpan =>
+              simp only at letKind
+              subst actualKind
+              have bindingExecution :=
+                parseLet_complete file bindingParse
+              have bindingShort :=
+                letParses_remaining_length_lt bindingParse
+              have tailExecution :=
+                inductionHypothesis tailParse (by
+                  simp only [List.length_cons]
+                    at sufficient bindingShort
+                  omega)
+              simp only [parseBindings]
+              rw [bindingExecution]
+              simp only [bind, Except.bind]
+              rw [tailExecution]
+
 private theorem parseBindings_noFuelExhaustion
     (file : SourceFile)
     (fuel : Nat)
@@ -1644,6 +2452,33 @@ private def parseReturn
               ReturnParses input statement semicolon.remaining)
             direct
       }
+
+private theorem parseReturn_complete
+    (file : SourceFile)
+    {input remaining : List Token}
+    {statement : ReturnStatement}
+    (derivation : ReturnParses input statement remaining) :
+    parseReturn file input = .ok {
+      statement
+      remaining
+      parses := derivation
+    } := by
+  cases derivation with
+  | intro returnToken semicolonToken afterReturn remaining value returnKind
+      valueParse semicolonKind =>
+      have returnExecution :=
+        expectKind_complete file .keywordReturn returnToken afterReturn
+          returnKind
+      have valueExecution := parseExpression_complete file valueParse
+      have semicolonExecution :=
+        expectKind_complete file .semicolon semicolonToken remaining
+          semicolonKind
+      simp only [parseReturn]
+      rw [returnExecution]
+      simp only [bind, Except.bind]
+      rw [valueExecution]
+      simp only
+      rw [semicolonExecution]
 
 private theorem parseReturn_noFuelExhaustion
     (file : SourceFile)
@@ -1771,6 +2606,69 @@ private def parseFunction
                 direct))))
   }
 
+private theorem parseFunction_complete
+    (file : SourceFile)
+    {input remaining : List Token}
+    {declaration : FunctionDecl}
+    (derivation : FunctionParses input declaration remaining) :
+    parseFunction file input = .ok {
+      declaration
+      remaining
+      parses := derivation
+    } := by
+  cases derivation with
+  | intro functionToken nameToken leftParen rightParen arrow leftBrace
+      rightBrace nameText afterArrow afterLeftBrace afterBindings afterResult
+      ignored returnType bindings result functionKind nameKind leftParenKind
+      rightParenKind arrowKind typeParse leftBraceKind bindingsParse
+      resultParse rightBraceKind =>
+      have functionExecution :=
+        expectKind_complete file .keywordFunction functionToken
+          (nameToken :: leftParen :: rightParen :: arrow :: afterArrow)
+          functionKind
+      have nameExecution :=
+        expectIdentifier_complete file nameToken nameText
+          (leftParen :: rightParen :: arrow :: afterArrow) nameKind
+      have leftParenExecution :=
+        expectKind_complete file .leftParen leftParen
+          (rightParen :: arrow :: afterArrow) leftParenKind
+      have rightParenExecution :=
+        expectKind_complete file .rightParen rightParen
+          (arrow :: afterArrow) rightParenKind
+      have arrowExecution :=
+        expectKind_complete file .arrow arrow afterArrow arrowKind
+      have typeExecution := parseType_complete file typeParse
+      have leftBraceExecution :=
+        expectKind_complete file .leftBrace leftBrace afterLeftBrace
+          leftBraceKind
+      have bindingsExecution :=
+        parseBindings_complete file bindingsParse
+          (afterLeftBrace.length + 1) (by omega)
+      have resultExecution := parseReturn_complete file resultParse
+      have rightBraceExecution :=
+        expectKind_complete file .rightBrace rightBrace remaining
+          rightBraceKind
+      simp only [parseFunction]
+      rw [functionExecution]
+      simp only [bind, Except.bind]
+      rw [nameExecution]
+      simp only
+      rw [leftParenExecution]
+      simp only
+      rw [rightParenExecution]
+      simp only
+      rw [arrowExecution]
+      simp only
+      rw [typeExecution]
+      simp only
+      rw [leftBraceExecution]
+      simp only
+      rw [bindingsExecution]
+      simp only
+      rw [resultExecution]
+      simp only
+      rw [rightBraceExecution]
+
 private theorem parseFunction_noFuelExhaustion
     (file : SourceFile)
     (tokens : List Token) :
@@ -1847,12 +2745,39 @@ private def parseLexedUncheckedCertified
       .error (.source
         (expected file .endOfFile function.remaining))
 
+private theorem parseLexedUncheckedCertified_complete
+    (file : SourceFile)
+    (lexed : Lexed)
+    (parsed : ParsedFile)
+    (derivation : FileParses lexed parsed) :
+    parseLexedUncheckedCertified file lexed = .ok {
+      parsed
+      parses := derivation
+    } := by
+  cases derivation with
+  | intro tokens comments declaration functionParse =>
+      have functionExecution :=
+        parseFunction_complete file functionParse
+      simp only [parseLexedUncheckedCertified]
+      rw [functionExecution]
+      simp only [bind, Except.bind]
+
 private def parseLexedUnchecked
     (file : SourceFile)
     (lexed : Lexed) : Except ParseFailure ParsedFile :=
   match parseLexedUncheckedCertified file lexed with
   | .error failure => .error failure
   | .ok result => .ok result.parsed
+
+private theorem parseLexedUnchecked_complete
+    (file : SourceFile)
+    (lexed : Lexed)
+    (parsed : ParsedFile)
+    (derivation : FileParses lexed parsed) :
+    parseLexedUnchecked file lexed = .ok parsed := by
+  unfold parseLexedUnchecked
+  rw [parseLexedUncheckedCertified_complete
+    file lexed parsed derivation]
 
 private theorem parseLexedUncheckedCertified_noFuelExhaustion
     (file : SourceFile)
@@ -1925,6 +2850,21 @@ def parseLexed
               .error (.internal (.invalidOutput parsed))
       else
         .error (.internal (.invalidInput lexed))
+
+theorem parseLexed_complete
+    (file : SourceFile)
+    (lexed : Lexed)
+    (parsed : ParsedFile)
+    (lexing : Lexer.lex file = .ok lexed)
+    (conformance : parsed.ConformsTo file lexed)
+    (derivation : FileParses lexed parsed) :
+    parseLexed file lexed = .ok parsed := by
+  have parsing :=
+    parseLexedUnchecked_complete file lexed parsed derivation
+  have outputValidity : parsed.conformsTo file lexed = true :=
+    (ParsedFile.conformsTo_eq_true_iff parsed file lexed).mpr
+      conformance
+  simp [parseLexed, lexing, parsing, outputValidity]
 
 theorem parseLexed_ne_fuel_exhausted
     (file : SourceFile)
@@ -2088,6 +3028,18 @@ def parse (file : SourceFile) : Except FrontendError ParsedFile :=
       | .error (.internal invariant) =>
           .error (.internal (.parser invariant))
       | .ok parsed => .ok parsed
+
+theorem parse_complete
+    (file : SourceFile)
+    (lexed : Lexed)
+    (parsed : ParsedFile)
+    (lexing : Lexer.lex file = .ok lexed)
+    (conformance : parsed.ConformsTo file lexed)
+    (derivation : FileParses lexed parsed) :
+    parse file = .ok parsed := by
+  have parsing :=
+    parseLexed_complete file lexed parsed lexing conformance derivation
+  simp [parse, lexing, parsing]
 
 theorem parse_ne_parser_fuel_exhausted
     (file : SourceFile)
