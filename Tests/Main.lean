@@ -3,6 +3,7 @@ import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
+import Solcore.Surface.Wire.V1.Codec
 
 set_option autoImplicit false
 
@@ -433,6 +434,444 @@ def testM2bFrontendProfile : IO Unit := do
         throw (IO.userError s!"draft.4 profile JSON is invalid: {error}")
   assertTrue (profileJson == Lean.toJson m2bFrontendProfile)
     "checked-in draft.4 profile differs from the Lean profile"
+
+def expectStrictJson (name source : String) : IO Lean.Json :=
+  match StrictJson.parse source with
+  | .ok json => pure json
+  | .error error =>
+      throw (IO.userError s!"{name} is invalid strict JSON: {error}")
+
+def expectSurfaceWireIdentifier
+    (value : String) : IO Surface.Wire.V1.IdentifierText :=
+  match Surface.Wire.V1.IdentifierText.ofString? value with
+  | some text => pure text
+  | none =>
+      throw (IO.userError s!"{value} must be a valid Surface wire identifier")
+
+def expectSurfaceWireDecimal
+    (value : String) : IO Surface.Wire.V1.DecimalDigits :=
+  match Surface.Wire.V1.DecimalDigits.ofString? value with
+  | some digits => pure digits
+  | none =>
+      throw (IO.userError s!"{value} must be valid Surface wire decimal digits")
+
+def expectSurfaceWireHexadecimal
+    (value : String) : IO Surface.Wire.V1.HexadecimalDigits :=
+  match Surface.Wire.V1.HexadecimalDigits.ofString? value with
+  | some digits => pure digits
+  | none =>
+      throw (IO.userError
+        s!"{value} must be valid Surface wire hexadecimal digits")
+
+def assertSurfaceWireRoundTrip {alpha : Type} [BEq alpha]
+    (name : String)
+    (encode : alpha -> Lean.Json)
+    (decode : Lean.Json -> Surface.Wire.V1.DecodeResult alpha)
+    (value : alpha) :
+    IO Unit := do
+  match decode (encode value) with
+  | .ok decoded =>
+      assertTrue (decoded == value)
+        s!"{name} changed during Surface wire v1 round-trip"
+  | .error error =>
+      throw (IO.userError
+        s!"encoded {name} did not decode: {(Lean.toJson error).compress}")
+
+def assertSurfaceWireError {alpha : Type}
+    (name : String)
+    (result : Surface.Wire.V1.DecodeResult alpha)
+    (code : Surface.Wire.V1.DecodeErrorCode)
+    (path : String) :
+    IO Unit := do
+  match result with
+  | .ok _ =>
+      throw (IO.userError s!"{name} unexpectedly decoded")
+  | .error error =>
+      assertTrue (error.code == code)
+        s!"{name} returned {error.code.wireName}, expected {code.wireName}"
+      assertTrue (error.path.toPointer == path)
+        s!"{name} failed at {error.path.toPointer}, expected {path}"
+
+def testSurfaceWireAtoms : IO Unit := do
+  let identifier <- expectSurfaceWireIdentifier "Alpha_9"
+  let decimal <- expectSurfaceWireDecimal "00123"
+  let hexadecimal <- expectSurfaceWireHexadecimal "0aB9"
+  assertSurfaceWireRoundTrip "identifier text"
+    Surface.Wire.V1.encodeIdentifierText
+    Surface.Wire.V1.decodeIdentifierText identifier
+  assertSurfaceWireRoundTrip "decimal digits"
+    Surface.Wire.V1.encodeDecimalDigits
+    Surface.Wire.V1.decodeDecimalDigits decimal
+  assertSurfaceWireRoundTrip "hexadecimal digits"
+    Surface.Wire.V1.encodeHexadecimalDigits
+    Surface.Wire.V1.decodeHexadecimalDigits hexadecimal
+  for value in ["", "_hidden", "function", "has-hyphen"] do
+    assertSurfaceWireError s!"invalid identifier {reprStr value}"
+      (Surface.Wire.V1.decodeIdentifierText value)
+      .invalidIdentifierText ""
+  for value in ["", "+1", "1_0", "12a"] do
+    assertSurfaceWireError s!"invalid decimal digits {reprStr value}"
+      (Surface.Wire.V1.decodeDecimalDigits value)
+      .invalidDecimalDigits ""
+  for value in ["", "0x1", "+ff", "12g"] do
+    assertSurfaceWireError s!"invalid hexadecimal digits {reprStr value}"
+      (Surface.Wire.V1.decodeHexadecimalDigits value)
+      .invalidHexadecimalDigits ""
+  assertSurfaceWireError "non-string identifier"
+    (Surface.Wire.V1.decodeIdentifierText (42 : Lean.Json))
+    .expectedString ""
+  let span : Surface.Wire.V1.SourceSpan := {
+    source := "main.solc"
+    startByte := 1
+    endByte := 20
+  }
+  assertSurfaceWireRoundTrip "source span"
+    Surface.Wire.V1.encodeSourceSpan Surface.Wire.V1.decodeSourceSpan span
+  let integralSpan <-
+    expectStrictJson "integral-decimal Surface span"
+      "{\"source\":\"main.solc\",\"startByte\":1.0,\"endByte\":20.0}"
+  match Surface.Wire.V1.decodeSourceSpan integralSpan with
+  | .ok decoded =>
+      assertTrue (decoded == span)
+        "integral decimal span offsets must decode as natural numbers"
+  | .error error =>
+      throw (IO.userError
+        s!"integral decimal span did not decode: {(Lean.toJson error).compress}")
+  let negativeStart <-
+    expectStrictJson "negative Surface span"
+      "{\"source\":\"main.solc\",\"startByte\":-1,\"endByte\":20}"
+  assertSurfaceWireError "negative Surface span start"
+    (Surface.Wire.V1.decodeSourceSpan negativeStart)
+    .expectedNatural "/startByte"
+  let fractionalEnd <-
+    expectStrictJson "fractional Surface span"
+      "{\"source\":\"main.solc\",\"startByte\":1,\"endByte\":20.5}"
+  assertSurfaceWireError "fractional Surface span end"
+    (Surface.Wire.V1.decodeSourceSpan fractionalEnd)
+    .expectedNatural "/endByte"
+  assertSurfaceWireError "string Surface span start"
+    (Surface.Wire.V1.decodeSourceSpan (.mkObj [
+      ("source", "main.solc"), ("startByte", "1"), ("endByte", 20)]))
+    .expectedNatural "/startByte"
+  assertSurfaceWireError "missing Surface span source"
+    (Surface.Wire.V1.decodeSourceSpan (.mkObj [
+      ("startByte", 1), ("endByte", 20)]))
+    .missingField "/source"
+  assertSurfaceWireError "extra Surface span field"
+    (Surface.Wire.V1.decodeSourceSpan
+      ((Surface.Wire.V1.encodeSourceSpan span).setObjVal! "line" 1))
+    .unknownField "/line"
+
+def testSurfaceWireSyntaxRoundTrips : IO Unit := do
+  let limits : Surface.Wire.V1.DecodeLimits := {
+    maxDepth := 32
+    maxNodes := 512
+  }
+  let span : Surface.Wire.V1.SourceSpan := {
+    source := "main.solc"
+    startByte := 0
+    endByte := 1
+  }
+  let wideSpan : Surface.Wire.V1.SourceSpan := {
+    source := "main.solc"
+    startByte := 0
+    endByte := 100
+  }
+  let mainText <- expectSurfaceWireIdentifier "main"
+  let valueText <- expectSurfaceWireIdentifier "value_2"
+  let decimal <- expectSurfaceWireDecimal "42"
+  let hexadecimal <- expectSurfaceWireHexadecimal "Ab09"
+  let mainName : Surface.Wire.V1.Name := { span, text := mainText }
+  let valueName : Surface.Wire.V1.Name := { span, text := valueText }
+  assertSurfaceWireRoundTrip "name" Surface.Wire.V1.encodeName
+    (Surface.Wire.V1.decodeName limits) mainName
+  let typeSpellings : List Surface.Wire.V1.TypeSpelling := [.bool, .word]
+  for spelling in typeSpellings do
+    assertSurfaceWireRoundTrip "type spelling"
+      Surface.Wire.V1.encodeTypeSpelling
+      Surface.Wire.V1.decodeTypeSpelling spelling
+  let boolOccurrence : Surface.Wire.V1.TypeSpellingOccurrence := {
+    span
+    text := .bool
+  }
+  let wordOccurrence : Surface.Wire.V1.TypeSpellingOccurrence := {
+    span
+    text := .word
+  }
+  for occurrence in [boolOccurrence, wordOccurrence] do
+    assertSurfaceWireRoundTrip "type spelling occurrence"
+      Surface.Wire.V1.encodeTypeSpellingOccurrence
+      (Surface.Wire.V1.decodeTypeSpellingOccurrence limits) occurrence
+  let types : List (String × Surface.Wire.V1.TypeSyntax) := [
+    ("unit type", .unit span),
+    ("named bool type", .named boolOccurrence),
+    ("named word type", .named wordOccurrence)
+  ]
+  for (name, type) in types do
+    assertSurfaceWireRoundTrip name Surface.Wire.V1.encodeTypeSyntax
+      (Surface.Wire.V1.decodeTypeSyntax limits) type
+  let literals : List (String × Surface.Wire.V1.IntegerLiteral) := [
+    ("decimal integer literal", .decimal span decimal),
+    ("hexadecimal integer literal", .hexadecimal span hexadecimal)
+  ]
+  for (name, literal) in literals do
+    assertSurfaceWireRoundTrip name Surface.Wire.V1.encodeIntegerLiteral
+      Surface.Wire.V1.decodeIntegerLiteral literal
+  let unaryOps : List Surface.Wire.V1.UnaryOp := [.not]
+  for operator in unaryOps do
+    assertSurfaceWireRoundTrip "unary operator"
+      Surface.Wire.V1.encodeUnaryOp Surface.Wire.V1.decodeUnaryOp operator
+    let occurrence : Surface.Wire.V1.UnaryOperator := { span, operator }
+    assertSurfaceWireRoundTrip "unary operator occurrence"
+      Surface.Wire.V1.encodeUnaryOperator
+      (Surface.Wire.V1.decodeUnaryOperator limits) occurrence
+  let binaryOps : List (String × Surface.Wire.V1.BinaryOp) := [
+    ("mul", .mul), ("div", .div), ("mod", .mod), ("add", .add),
+    ("sub", .sub), ("bitAnd", .bitAnd), ("bitXor", .bitXor),
+    ("bitOr", .bitOr), ("lt", .lt), ("gt", .gt), ("le", .le),
+    ("ge", .ge), ("eq", .eq), ("ne", .ne)
+  ]
+  for (name, operator) in binaryOps do
+    assertSurfaceWireRoundTrip s!"{name} binary operator"
+      Surface.Wire.V1.encodeBinaryOp Surface.Wire.V1.decodeBinaryOp operator
+    let occurrence : Surface.Wire.V1.BinaryOperator := { span, operator }
+    assertSurfaceWireRoundTrip s!"{name} binary operator occurrence"
+      Surface.Wire.V1.encodeBinaryOperator
+      (Surface.Wire.V1.decodeBinaryOperator limits) occurrence
+  let unitExpr : Surface.Wire.V1.Expr := .unit span
+  let decimalExpr : Surface.Wire.V1.Expr :=
+    .integer (.decimal span decimal)
+  let hexadecimalExpr : Surface.Wire.V1.Expr :=
+    .integer (.hexadecimal span hexadecimal)
+  let nameExpr : Surface.Wire.V1.Expr := .name valueName
+  let groupExpr : Surface.Wire.V1.Expr := .group wideSpan nameExpr
+  let callExpr : Surface.Wire.V1.Expr :=
+    .call wideSpan mainName [decimalExpr, nameExpr]
+  let unaryOperator : Surface.Wire.V1.UnaryOperator := {
+    span
+    operator := .not
+  }
+  let unaryExpr : Surface.Wire.V1.Expr :=
+    .unary wideSpan unaryOperator nameExpr
+  let binaryOperator : Surface.Wire.V1.BinaryOperator := {
+    span
+    operator := .add
+  }
+  let binaryExpr : Surface.Wire.V1.Expr :=
+    .binary wideSpan binaryOperator decimalExpr hexadecimalExpr
+  let conditionalExpr : Surface.Wire.V1.Expr :=
+    .ifThenElse wideSpan nameExpr callExpr unitExpr
+  let expressions : List (String × Surface.Wire.V1.Expr) := [
+    ("unit expression", unitExpr),
+    ("decimal integer expression", decimalExpr),
+    ("hexadecimal integer expression", hexadecimalExpr),
+    ("name expression", nameExpr),
+    ("group expression", groupExpr),
+    ("call expression", callExpr),
+    ("unary expression", unaryExpr),
+    ("binary expression", binaryExpr),
+    ("conditional expression", conditionalExpr)
+  ]
+  for (name, expression) in expressions do
+    assertSurfaceWireRoundTrip name Surface.Wire.V1.encodeExpr
+      (Surface.Wire.V1.decodeExpr limits) expression
+  let binding : Surface.Wire.V1.LetStatement := {
+    span := wideSpan
+    name := valueName
+    type := .named boolOccurrence
+    value := binaryExpr
+  }
+  let result : Surface.Wire.V1.ReturnStatement := {
+    span := wideSpan
+    value := conditionalExpr
+  }
+  let declaration : Surface.Wire.V1.FunctionDecl := {
+    span := wideSpan
+    name := mainName
+    returnType := .named wordOccurrence
+    bindings := [binding]
+    result
+  }
+  let comments : List Surface.Wire.V1.Comment := [
+    { kind := .line, span },
+    { kind := .block, span := wideSpan }
+  ]
+  for kind in [Surface.Wire.V1.CommentKind.line, .block] do
+    assertSurfaceWireRoundTrip "comment kind"
+      Surface.Wire.V1.encodeCommentKind
+      Surface.Wire.V1.decodeCommentKind kind
+  for comment in comments do
+    assertSurfaceWireRoundTrip "comment" Surface.Wire.V1.encodeComment
+      (Surface.Wire.V1.decodeComment limits) comment
+  assertSurfaceWireRoundTrip "let statement"
+    Surface.Wire.V1.encodeLetStatement
+    (Surface.Wire.V1.decodeLetStatement limits) binding
+  assertSurfaceWireRoundTrip "return statement"
+    Surface.Wire.V1.encodeReturnStatement
+    (Surface.Wire.V1.decodeReturnStatement limits) result
+  assertSurfaceWireRoundTrip "function declaration"
+    Surface.Wire.V1.encodeFunctionDecl
+    (Surface.Wire.V1.decodeFunctionDecl limits) declaration
+  let file : Surface.Wire.V1.File := {
+    span := wideSpan
+    function := declaration
+    comments
+  }
+  assertSurfaceWireRoundTrip "Surface file" Surface.Wire.V1.encodeFile
+    (Surface.Wire.V1.decodeFile limits) file
+
+def testSurfaceWireStrictnessAndBounds : IO Unit := do
+  let limits : Surface.Wire.V1.DecodeLimits := {
+    maxDepth := 32
+    maxNodes := 512
+  }
+  let span : Surface.Wire.V1.SourceSpan := {
+    source := "main.solc"
+    startByte := 0
+    endByte := 1
+  }
+  let mainText <- expectSurfaceWireIdentifier "main"
+  let mainName : Surface.Wire.V1.Name := { span, text := mainText }
+  let spanJson := Surface.Wire.V1.encodeSourceSpan span
+  assertSurfaceWireError "missing expression span"
+    (Surface.Wire.V1.decodeExpr limits (.mkObj [("tag", "unit")]))
+    .missingField "/span"
+  assertSurfaceWireError "unknown expression field"
+    (Surface.Wire.V1.decodeExpr limits (.mkObj [
+      ("tag", "unit"), ("span", spanJson), ("surprise", true)]))
+    .unknownField "/surprise"
+  assertSurfaceWireError "field from another expression variant"
+    (Surface.Wire.V1.decodeExpr limits (.mkObj [
+      ("tag", "unit"), ("span", spanJson),
+      ("name", Surface.Wire.V1.encodeName mainName)]))
+    .unknownField "/name"
+  assertSurfaceWireError "unknown expression tag"
+    (Surface.Wire.V1.decodeExpr limits (.mkObj [("tag", "future")]))
+    .invalidTag "/tag"
+  assertSurfaceWireError "non-string expression tag"
+    (Surface.Wire.V1.decodeExpr limits (.mkObj [("tag", true)]))
+    .expectedString "/tag"
+  assertSurfaceWireError "non-object expression"
+    (Surface.Wire.V1.decodeExpr limits "unit")
+    .expectedObject ""
+  assertSurfaceWireError "non-object expression span"
+    (Surface.Wire.V1.decodeExpr limits (.mkObj [
+      ("tag", "unit"), ("span", "0..1")]))
+    .expectedObject "/span"
+  assertSurfaceWireError "non-array call arguments"
+    (Surface.Wire.V1.decodeExpr limits (.mkObj [
+      ("tag", "call"), ("span", spanJson),
+      ("callee", Surface.Wire.V1.encodeName mainName),
+      ("arguments", .mkObj [])]))
+    .expectedArray "/arguments"
+  assertSurfaceWireError "unknown type tag"
+    (Surface.Wire.V1.decodeTypeSyntax limits (.mkObj [("tag", "future")]))
+    .invalidTag "/tag"
+  assertSurfaceWireError "field from another type variant"
+    (Surface.Wire.V1.decodeTypeSyntax limits (.mkObj [
+      ("tag", "unit"), ("span", spanJson),
+      ("name", .mkObj [("span", spanJson), ("text", "bool")])]))
+    .unknownField "/name"
+  assertSurfaceWireError "missing named type occurrence"
+    (Surface.Wire.V1.decodeTypeSyntax limits (.mkObj [("tag", "named")]))
+    .missingField "/name"
+  assertSurfaceWireError "unknown unary operator"
+    (Surface.Wire.V1.decodeUnaryOp "neg") .invalidTag ""
+  assertSurfaceWireError "unknown binary operator"
+    (Surface.Wire.V1.decodeBinaryOp "pow") .invalidTag ""
+  assertSurfaceWireError "unknown comment kind"
+    (Surface.Wire.V1.decodeCommentKind "doc") .invalidTag ""
+  let minimalResult : Surface.Wire.V1.ReturnStatement := {
+    span
+    value := .unit span
+  }
+  let minimalFunction : Surface.Wire.V1.FunctionDecl := {
+    span
+    name := mainName
+    returnType := .unit span
+    bindings := []
+    result := minimalResult
+  }
+  let minimalFile : Surface.Wire.V1.File := {
+    span
+    function := minimalFunction
+    comments := []
+  }
+  let encodedMinimal := Surface.Wire.V1.encodeFile minimalFile
+  assertTrue (Surface.Wire.V1.fileDepth minimalFile == 1)
+    "the minimal Surface file must require exactly one expression-depth unit"
+  assertTrue (Surface.Wire.V1.fileNodes minimalFile == 6)
+    "the minimal Surface file must contain exactly six budgeted nodes"
+  let exactLimits : Surface.Wire.V1.DecodeLimits := {
+    maxDepth := 1
+    maxNodes := 6
+  }
+  match Surface.Wire.V1.decodeFile exactLimits encodedMinimal with
+  | .ok decoded =>
+      assertTrue (decoded == minimalFile)
+        "the minimal Surface file changed at its exact decode limits"
+  | .error error =>
+      throw (IO.userError
+        s!"the minimal Surface file failed at exact limits: {(Lean.toJson error).compress}")
+  assertSurfaceWireError "Surface file depth one below exact demand"
+    (Surface.Wire.V1.decodeFile { maxDepth := 0, maxNodes := 6 }
+      encodedMinimal)
+    .depthLimitExceeded "/function/result/value"
+  assertSurfaceWireError "Surface file nodes one below exact demand"
+    (Surface.Wire.V1.decodeFile { maxDepth := 1, maxNodes := 5 }
+      encodedMinimal)
+    .nodeLimitExceeded "/function/result/value"
+  assertSurfaceWireError "missing Surface file comments"
+    (Surface.Wire.V1.decodeFile limits
+      (.mkObj [
+        ("schema", Surface.Wire.V1.schemaVersion),
+        ("span", spanJson),
+        ("function", Surface.Wire.V1.encodeFunctionDecl minimalFunction)]))
+    .missingField "/comments"
+  assertSurfaceWireError "unknown Surface file field"
+    (Surface.Wire.V1.decodeFile limits
+      (encodedMinimal.setObjVal! "tokens" (.arr #[])))
+    .unknownField "/tokens"
+  assertSurfaceWireError "unknown Surface schema"
+    (Surface.Wire.V1.decodeFile limits
+      (encodedMinimal.setObjVal! "schema" "solcore-surface/v2"))
+    .invalidSchema "/schema"
+  assertSurfaceWireError "non-string Surface schema"
+    (Surface.Wire.V1.decodeFile limits
+      (encodedMinimal.setObjVal! "schema" 1))
+    .expectedString "/schema"
+  let integralSpanJson <-
+    expectStrictJson "non-canonical integral Surface span"
+      "{\"source\":\"main.solc\",\"startByte\":0.0,\"endByte\":1.0}"
+  let nonCanonicalMinimal : Lean.Json := .mkObj [
+    ("comments", .arr #[]),
+    ("function", .mkObj [
+      ("bindings", .arr #[]),
+      ("name", .mkObj [("span", integralSpanJson), ("text", "main")]),
+      ("result", .mkObj [
+        ("span", integralSpanJson),
+        ("value", .mkObj [("span", integralSpanJson), ("tag", "unit")])]),
+      ("returnType", .mkObj [
+        ("span", integralSpanJson), ("tag", "unit")]),
+      ("span", integralSpanJson)]),
+    ("schema", Surface.Wire.V1.schemaVersion),
+    ("span", integralSpanJson)
+  ]
+  let canonical <-
+    match Surface.Wire.V1.canonicalizeFile exactLimits nonCanonicalMinimal with
+    | .ok json => pure json
+    | .error error =>
+        throw (IO.userError
+          s!"valid Surface file did not canonicalize: {(Lean.toJson error).compress}")
+  assertTrue (canonical == encodedMinimal)
+    "Surface file canonicalization must use the total canonical encoder"
+  match Surface.Wire.V1.canonicalizeFile exactLimits canonical with
+  | .ok canonicalAgain =>
+      assertTrue (canonicalAgain == canonical)
+        "Surface file canonicalization must be idempotent"
+  | .error error =>
+      throw (IO.userError
+        s!"canonical Surface file did not canonicalize again: {(Lean.toJson error).compress}")
 
 def testCoreWire : IO Unit := do
   let types : Array Core.Wire.V1.Ty := #[.unit, .bool, .word]
@@ -2142,6 +2581,9 @@ def run : IO Unit := do
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile
+  testSurfaceWireAtoms
+  testSurfaceWireSyntaxRoundTrips
+  testSurfaceWireStrictnessAndBounds
   testCoreWire
   testCoreWireV2
   testDetailedCoreChecker
@@ -2162,5 +2604,5 @@ end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b metadata tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b tests passed"
   return 0
