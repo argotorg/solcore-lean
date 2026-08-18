@@ -27,6 +27,100 @@ structure ParseError where
   kind : ParseErrorKind
   deriving Repr, BEq, DecidableEq
 
+namespace ParseExpectation
+
+/-- A parse expectation contains only payloads admitted by the Surface lexer. -/
+def WellFormed : ParseExpectation → Prop
+  | .token kind => kind.Canonical
+  | .identifier
+  | .type
+  | .expression
+  | .argumentOrRightParen
+  | .commaOrRightParen
+  | .bindingOrReturn
+  | .endOfFile => True
+
+/-- Executable decision procedure for `WellFormed`. -/
+def isWellFormed : ParseExpectation → Bool
+  | .token kind => kind.isCanonical
+  | .identifier
+  | .type
+  | .expression
+  | .argumentOrRightParen
+  | .commaOrRightParen
+  | .bindingOrReturn
+  | .endOfFile => true
+
+theorem isWellFormed_eq_true_iff (expectation : ParseExpectation) :
+    expectation.isWellFormed = true ↔ expectation.WellFormed := by
+  cases expectation <;>
+    simp [isWellFormed, WellFormed, TokenKind.isCanonical_eq_true_iff]
+
+end ParseExpectation
+
+namespace ParseError
+
+/--
+A source parser error has the frozen code-to-kind pairing and reconstructs the
+exact source token, or the exact empty end-of-file span, that caused it.
+-/
+def WellFormedFor (error : ParseError) (file : SourceFile) : Prop :=
+  match error.kind with
+  | .expected expectation found =>
+      error.code = "SP0001" ∧
+        expectation.WellFormed ∧
+        match found with
+        | some kind =>
+            (Token.mk kind error.span).ValidFor file
+        | none =>
+            error.span = {
+              source := file.path
+              startByte := file.content.utf8ByteSize
+              endByte := file.content.utf8ByteSize
+            }
+  | .nonAssociative operator =>
+      error.code = "SP0002" ∧
+        operator.associativity = .nonAssociative ∧
+        (Token.mk operator.tokenKind error.span).ValidFor file
+
+/-- Executable decision procedure for `WellFormedFor`. -/
+def isWellFormedFor (error : ParseError) (file : SourceFile) : Bool :=
+  match error.kind with
+  | .expected expectation found =>
+      error.code == "SP0001" &&
+        expectation.isWellFormed &&
+        match found with
+        | some kind =>
+            (Token.mk kind error.span).isValidFor file
+        | none =>
+            decide (error.span = {
+              source := file.path
+              startByte := file.content.utf8ByteSize
+              endByte := file.content.utf8ByteSize
+            })
+  | .nonAssociative operator =>
+      error.code == "SP0002" &&
+        decide (operator.associativity = .nonAssociative) &&
+        (Token.mk operator.tokenKind error.span).isValidFor file
+
+theorem isWellFormedFor_eq_true_iff
+    (error : ParseError)
+    (file : SourceFile) :
+    error.isWellFormedFor file = true ↔ error.WellFormedFor file := by
+  cases error with
+  | mk code span kind =>
+      cases kind with
+      | expected expectation found =>
+          cases found <;>
+            simp [isWellFormedFor, WellFormedFor,
+              ParseExpectation.isWellFormed_eq_true_iff,
+              Token.isValidFor_eq_true_iff, decide_eq_true_eq, and_assoc]
+      | nonAssociative operator =>
+          simp [isWellFormedFor, WellFormedFor,
+            Token.isValidFor_eq_true_iff, decide_eq_true_eq, and_assoc]
+
+end ParseError
+
 inductive ParserPhase where
   | expression
   | prefix
@@ -84,6 +178,59 @@ private def nonAssociative (token : Token) (operator : BinaryOp) : ParseError :=
   span := token.span
   kind := .nonAssociative operator
 }
+
+private def TokensValidFor
+    (file : SourceFile)
+    (tokens : List Token) : Prop :=
+  ∀ token ∈ tokens, token.ValidFor file
+
+private theorem tokensValidFor_tail
+    {file : SourceFile}
+    {head : Token}
+    {tail : List Token}
+    (valid : TokensValidFor file (head :: tail)) :
+    TokensValidFor file tail := by
+  intro token member
+  exact valid token (by simp [member])
+
+private theorem expected_wellFormedFor
+    (file : SourceFile)
+    (expectation : ParseExpectation)
+    (tokens : List Token)
+    (expectationWellFormed : expectation.WellFormed)
+    (tokensValid : TokensValidFor file tokens) :
+    (expected file expectation tokens).WellFormedFor file := by
+  cases tokens with
+  | nil =>
+      exact ⟨rfl, expectationWellFormed, rfl⟩
+  | cons token rest =>
+      refine ⟨rfl, expectationWellFormed, ?_⟩
+      simpa [expected, errorSpan] using tokensValid token (by simp)
+
+private theorem binaryBinding_kind_eq
+    {kind : TokenKind}
+    {operator : BinaryOp}
+    {precedence : Nat}
+    {associativity : Associativity}
+    (binding :
+      BinaryBinding kind operator precedence associativity) :
+    kind = operator.tokenKind := by
+  cases binding <;> rfl
+
+private theorem nonAssociative_wellFormedFor
+    (file : SourceFile)
+    (token : Token)
+    (operator : BinaryOp)
+    (tokenValid : token.ValidFor file)
+    (kindEq : token.kind = operator.tokenKind)
+    (associativityEq : operator.associativity = .nonAssociative) :
+    (nonAssociative token operator).WellFormedFor file := by
+  refine ⟨rfl, associativityEq, ?_⟩
+  cases token with
+  | mk kind span =>
+      simp only at kindEq
+      subst kind
+      exact tokenValid
 
 private structure ExpectedKindResult
     (kind : TokenKind)
@@ -1269,6 +1416,336 @@ private theorem expectContextual_executorResult
           | _ =>
               exact .source _
 
+/--
+Classification of an executor result that composes source-error soundness with
+the invariant required of every successful intermediate result.
+-/
+private inductive SoundExecutorResult
+    {α : Type}
+    (file : SourceFile)
+    (successValid : α → Prop) :
+    Except ParseFailure α → Prop where
+  | ok (value : α) (valid : successValid value) :
+      SoundExecutorResult file successValid (.ok value)
+  | source (error : ParseError) (wellFormed : error.WellFormedFor file) :
+      SoundExecutorResult file successValid (.error (.source error))
+  | fuel (phase : ParserPhase) (span : SourceSpan) :
+      SoundExecutorResult file successValid
+        (.error (.internal (.fuelExhausted phase span)))
+
+private theorem soundExecutorResult_bind
+    {α β : Type}
+    {file : SourceFile}
+    {firstValid : α → Prop}
+    {secondValid : β → Prop}
+    {result : Except ParseFailure α}
+    {next : α → Except ParseFailure β}
+    (resultClassified : SoundExecutorResult file firstValid result)
+    (nextClassified : ∀ value, firstValid value →
+      SoundExecutorResult file secondValid (next value)) :
+    SoundExecutorResult file secondValid (result >>= next) := by
+  cases resultClassified with
+  | ok value valid =>
+      change SoundExecutorResult file secondValid (next value)
+      exact nextClassified value valid
+  | source error wellFormed => exact .source error wellFormed
+  | fuel phase span => exact .fuel phase span
+
+private theorem expectKind_soundExecutorResult
+    (file : SourceFile)
+    (kind : TokenKind)
+    (tokens : List Token)
+    (kindCanonical : kind.Canonical)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (expectKind file kind tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+        (expected_wellFormedFor file (.token kind) [] kindCanonical
+          tokensValid)
+  | cons token rest =>
+      simp only [expectKind]
+      split
+      · exact .ok _ (tokensValidFor_tail tokensValid)
+      · exact .source _
+          (expected_wellFormedFor file (.token kind) (token :: rest)
+            kindCanonical tokensValid)
+
+private theorem expectContextual_soundExecutorResult
+    (file : SourceFile)
+    (text : String)
+    (tokens : List Token)
+    (kindCanonical : (TokenKind.identifier text).Canonical)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (expectContextual file text tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+        (expected_wellFormedFor file (.token (.identifier text)) []
+          kindCanonical tokensValid)
+  | cons token rest =>
+      cases token with
+      | mk kind span =>
+          cases kind with
+          | identifier actual =>
+              simp only [expectContextual]
+              split
+              · exact .ok _ (tokensValidFor_tail tokensValid)
+              · exact .source _
+                  (expected_wellFormedFor file
+                    (.token (.identifier text))
+                    ({ kind := .identifier actual, span } :: rest)
+                    kindCanonical tokensValid)
+          | _ =>
+              exact .source _
+                (expected_wellFormedFor file
+                  (.token (.identifier text)) _
+                  kindCanonical tokensValid)
+
+private theorem binaryBinding_operator_nonAssociative_of_same_precedence
+    {firstKind secondKind : TokenKind}
+    {firstOperator secondOperator : BinaryOp}
+    {firstPrecedence secondPrecedence : Nat}
+    {secondAssociativity : Associativity}
+    (firstBinding :
+      BinaryBinding firstKind firstOperator firstPrecedence .nonAssociative)
+    (secondBinding :
+      BinaryBinding secondKind secondOperator secondPrecedence
+        secondAssociativity)
+    (samePrecedence : secondPrecedence = firstPrecedence) :
+    secondOperator.associativity = .nonAssociative := by
+  cases firstBinding <;> cases secondBinding <;>
+    simp_all [BinaryOp.associativity]
+
+private structure ExpressionParserSound (fuel : Nat) : Prop where
+  expressionSound :
+    ∀ (file : SourceFile) (minimum : Nat) (tokens : List Token),
+      TokensValidFor file tokens →
+      SoundExecutorResult file
+        (fun result => TokensValidFor file result.remaining)
+        (parseExpressionFuel file fuel minimum tokens)
+  prefixSound :
+    ∀ (file : SourceFile) (tokens : List Token),
+      TokensValidFor file tokens →
+      SoundExecutorResult file
+        (fun result => TokensValidFor file result.remaining)
+        (parsePrefixFuel file fuel tokens)
+  argumentsSound :
+    ∀ (file : SourceFile) (tokens : List Token),
+      TokensValidFor file tokens →
+      SoundExecutorResult file
+        (fun result => TokensValidFor file result.remaining)
+        (parseArgumentsFuel file fuel tokens)
+  argumentTailSound :
+    ∀ (file : SourceFile) (tokens : List Token),
+      TokensValidFor file tokens →
+      SoundExecutorResult file
+        (fun result => TokensValidFor file result.remaining)
+        (parseArgumentTailFuel file fuel tokens)
+  infixSound :
+    ∀ (file : SourceFile) (minimum : Nat) (left : Expr)
+        (tokens : List Token),
+      TokensValidFor file tokens →
+      SoundExecutorResult file
+        (fun result => TokensValidFor file result.remaining)
+        (parseInfixFuel file fuel minimum left tokens)
+
+private theorem expressionParserSound (fuel : Nat) :
+    ExpressionParserSound fuel := by
+  induction fuel with
+  | zero =>
+      refine {
+        expressionSound := ?_
+        prefixSound := ?_
+        argumentsSound := ?_
+        argumentTailSound := ?_
+        infixSound := ?_
+      }
+      · intro file _ tokens _
+        exact .fuel .expression (errorSpan file tokens)
+      · intro file tokens _
+        exact .fuel .prefix (errorSpan file tokens)
+      · intro file tokens _
+        exact .fuel .arguments (errorSpan file tokens)
+      · intro file tokens _
+        exact .fuel .argumentTail (errorSpan file tokens)
+      · intro file _ _ tokens tokensValid
+        simp only [parseInfixFuel]
+        split
+        · exact .fuel .infix (errorSpan file tokens)
+        · exact .ok _ tokensValid
+  | succ fuel inductionHypothesis =>
+      refine {
+        expressionSound := ?_
+        prefixSound := ?_
+        argumentsSound := ?_
+        argumentTailSound := ?_
+        infixSound := ?_
+      }
+      · intro file minimum tokens tokensValid
+        simp only [parseExpressionFuel]
+        split
+        · split
+          · apply soundExecutorResult_bind
+            · exact inductionHypothesis.expressionSound file 0 _
+                (tokensValidFor_tail tokensValid)
+            · intro condition conditionRemainingValid
+              apply soundExecutorResult_bind
+              · exact expectContextual_soundExecutorResult
+                  file "then" condition.remaining (by rfl)
+                  conditionRemainingValid
+              · intro thenToken thenRemainingValid
+                apply soundExecutorResult_bind
+                · exact inductionHypothesis.expressionSound file 0 _
+                    thenRemainingValid
+                · intro thenBranch thenBranchRemainingValid
+                  apply soundExecutorResult_bind
+                  · exact expectKind_soundExecutorResult
+                      file .keywordElse thenBranch.remaining (by rfl)
+                      thenBranchRemainingValid
+                  · intro elseToken elseRemainingValid
+                    apply soundExecutorResult_bind
+                    · exact inductionHypothesis.expressionSound file 0 _
+                        elseRemainingValid
+                    · intro elseBranch elseBranchRemainingValid
+                      exact .ok _ elseBranchRemainingValid
+          · apply soundExecutorResult_bind
+            · exact inductionHypothesis.prefixSound file _ tokensValid
+            · intro prefixResult prefixRemainingValid
+              apply soundExecutorResult_bind
+              · exact inductionHypothesis.infixSound
+                  file minimum prefixResult.expression _
+                  prefixRemainingValid
+              · intro _ infixRemainingValid
+                exact .ok _ infixRemainingValid
+        · apply soundExecutorResult_bind
+          · exact inductionHypothesis.prefixSound file _ tokensValid
+          · intro prefixResult prefixRemainingValid
+            apply soundExecutorResult_bind
+            · exact inductionHypothesis.infixSound
+                file minimum prefixResult.expression _
+                prefixRemainingValid
+            · intro _ infixRemainingValid
+              exact .ok _ infixRemainingValid
+      · intro file tokens tokensValid
+        simp only [parsePrefixFuel]
+        split
+        · apply soundExecutorResult_bind
+          · exact inductionHypothesis.prefixSound file _
+              (tokensValidFor_tail tokensValid)
+          · intro _ remainingValid
+            exact .ok _ remainingValid
+        · exact .ok _
+            (tokensValidFor_tail (tokensValidFor_tail tokensValid))
+        · apply soundExecutorResult_bind
+          · exact inductionHypothesis.expressionSound file 0 _
+              (tokensValidFor_tail tokensValid)
+          · intro inner innerRemainingValid
+            apply soundExecutorResult_bind
+            · exact expectKind_soundExecutorResult
+                file .rightParen inner.remaining (by rfl)
+                innerRemainingValid
+            · intro _ remainingValid
+              exact .ok _ remainingValid
+        · exact .ok _ (tokensValidFor_tail tokensValid)
+        · exact .ok _ (tokensValidFor_tail tokensValid)
+        · split
+          · exact .ok _ (by simp [TokensValidFor])
+          · split
+            · apply soundExecutorResult_bind
+              · exact inductionHypothesis.argumentsSound file _
+                  (tokensValidFor_tail
+                    (tokensValidFor_tail tokensValid))
+              · intro _ remainingValid
+                exact .ok _ remainingValid
+            · exact .ok _ (tokensValidFor_tail tokensValid)
+        · exact .source _
+            (expected_wellFormedFor file .expression tokens trivial
+              tokensValid)
+      · intro file tokens tokensValid
+        simp only [parseArgumentsFuel]
+        split
+        · exact .ok _ (tokensValidFor_tail tokensValid)
+        · apply soundExecutorResult_bind
+          · exact inductionHypothesis.expressionSound file 0 _ tokensValid
+          · intro first firstRemainingValid
+            apply soundExecutorResult_bind
+            · exact inductionHypothesis.argumentTailSound
+                file first.remaining firstRemainingValid
+            · intro _ remainingValid
+              exact .ok _ remainingValid
+      · intro file tokens tokensValid
+        simp only [parseArgumentTailFuel]
+        split
+        · exact .ok _ (tokensValidFor_tail tokensValid)
+        · apply soundExecutorResult_bind
+          · exact inductionHypothesis.expressionSound file 0 _
+              (tokensValidFor_tail tokensValid)
+          · intro next nextRemainingValid
+            apply soundExecutorResult_bind
+            · exact inductionHypothesis.argumentTailSound
+                file next.remaining nextRemainingValid
+            · intro _ remainingValid
+              exact .ok _ remainingValid
+        · exact .source _
+            (expected_wellFormedFor file .commaOrRightParen tokens trivial
+              tokensValid)
+      · intro file minimum left tokens tokensValid
+        simp only [parseInfixFuel]
+        split
+        · split
+          · exact .ok _ tokensValid
+          · rename_i head binaryAtHead notLower
+            have headRemainingValid :
+                TokensValidFor file head.remaining := by
+              rw [head.inputEq] at tokensValid
+              exact tokensValidFor_tail tokensValid
+            apply soundExecutorResult_bind
+            · exact inductionHypothesis.expressionSound file _ _
+                headRemainingValid
+            · intro right rightRemainingValid
+              split
+              · rename_i associativityEq
+                apply soundExecutorResult_bind
+                · exact inductionHypothesis.infixSound
+                    file minimum _ _ rightRemainingValid
+                · intro _ remainingValid
+                  exact .ok _ remainingValid
+              · rename_i associativityEq
+                split
+                · split
+                  · rename_i second secondAtHead repeated
+                    have secondTokenValid :
+                        second.token.ValidFor file := by
+                      rw [second.inputEq] at rightRemainingValid
+                      exact rightRemainingValid second.token (by simp)
+                    have samePrecedence :
+                        second.info.precedence = head.info.precedence :=
+                      beq_iff_eq.mp repeated
+                    exact .source _
+                      (nonAssociative_wellFormedFor file second.token
+                        second.info.operator secondTokenValid
+                        (binaryBinding_kind_eq second.info.binding)
+                        (binaryBinding_operator_nonAssociative_of_same_precedence
+                          (by simpa only [associativityEq] using
+                            head.info.binding)
+                          second.info.binding samePrecedence))
+                  · apply soundExecutorResult_bind
+                    · exact inductionHypothesis.infixSound
+                        file minimum _ _ rightRemainingValid
+                    · intro _ remainingValid
+                      exact .ok _ remainingValid
+                · apply soundExecutorResult_bind
+                  · exact inductionHypothesis.infixSound
+                      file minimum _ _ rightRemainingValid
+                  · intro _ remainingValid
+                    exact .ok _ remainingValid
+        · exact .ok _ tokensValid
+
 private structure ExpressionParserClassified (fuel : Nat) : Prop where
   expressionClassified :
     ∀ (file : SourceFile) (minimum : Nat) (tokens : List Token),
@@ -2294,6 +2771,16 @@ private theorem parseExpression_executorResult
   (expressionParserClassified
     (expressionFuel tokens)).expressionClassified file 0 tokens
 
+private theorem parseExpression_soundExecutorResult
+    (file : SourceFile)
+    (tokens : List Token)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (parseExpression file tokens) :=
+  (expressionParserSound
+    (expressionFuel tokens)).expressionSound file 0 tokens tokensValid
+
 private theorem parseExpression_noFuelExhaustion
     (file : SourceFile)
     (tokens : List Token) :
@@ -2321,6 +2808,27 @@ private theorem expectIdentifier_executorResult
           cases kind <;> simp only [expectIdentifier]
           all_goals first | exact .ok _ | exact .source _
 
+private theorem expectIdentifier_soundExecutorResult
+    (file : SourceFile)
+    (tokens : List Token)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (expectIdentifier file tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+        (expected_wellFormedFor file .identifier [] trivial tokensValid)
+  | cons token rest =>
+      cases token with
+      | mk kind span =>
+          cases kind <;> simp only [expectIdentifier]
+          all_goals first
+            | exact .ok _ (tokensValidFor_tail tokensValid)
+            | exact .source _
+                (expected_wellFormedFor file .identifier _ trivial
+                  tokensValid)
+
 private theorem parseType_executorResult
     (file : SourceFile)
     (tokens : List Token) :
@@ -2345,6 +2853,46 @@ private theorem parseType_executorResult
                     simp only [parseType] <;>
                     (try split) <;>
                     first | exact .ok _ | exact .source _
+
+private theorem parseType_soundExecutorResult
+    (file : SourceFile)
+    (tokens : List Token)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (parseType file tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+        (expected_wellFormedFor file .type [] trivial tokensValid)
+  | cons first rest =>
+      cases first with
+      | mk firstKind firstSpan =>
+          cases rest with
+          | nil =>
+              cases firstKind <;>
+                simp only [parseType] <;>
+                (try split) <;>
+                first
+                  | exact .ok _ (tokensValidFor_tail tokensValid)
+                  | exact .source _
+                      (expected_wellFormedFor file .type _ trivial
+                        tokensValid)
+          | cons second tail =>
+              cases second with
+              | mk secondKind secondSpan =>
+                  cases firstKind <;>
+                    cases secondKind <;>
+                    simp only [parseType] <;>
+                    (try split) <;>
+                    first
+                      | exact .ok _ (tokensValidFor_tail tokensValid)
+                      | exact .ok _
+                          (tokensValidFor_tail
+                            (tokensValidFor_tail tokensValid))
+                      | exact .source _
+                          (expected_wellFormedFor file .type _ trivial
+                            tokensValid)
 
 private theorem expectIdentifier_noFuelExhaustion
     (file : SourceFile)
@@ -2567,6 +3115,45 @@ private theorem parseLet_executorResult
               · intro _
                 exact .ok _
 
+private theorem parseLet_soundExecutorResult
+    (file : SourceFile)
+    (tokens : List Token)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (parseLet file tokens) := by
+  simp only [parseLet]
+  apply soundExecutorResult_bind
+  · exact expectKind_soundExecutorResult
+      file .keywordLet tokens (by rfl) tokensValid
+  · intro letToken letRemainingValid
+    apply soundExecutorResult_bind
+    · exact expectIdentifier_soundExecutorResult
+        file letToken.remaining letRemainingValid
+    · intro name nameRemainingValid
+      apply soundExecutorResult_bind
+      · exact expectKind_soundExecutorResult
+          file .colon name.remaining (by rfl) nameRemainingValid
+      · intro colon colonRemainingValid
+        apply soundExecutorResult_bind
+        · exact parseType_soundExecutorResult
+            file colon.remaining colonRemainingValid
+        · intro type typeRemainingValid
+          apply soundExecutorResult_bind
+          · exact expectKind_soundExecutorResult
+              file .equal type.remaining (by rfl) typeRemainingValid
+          · intro equal equalRemainingValid
+            apply soundExecutorResult_bind
+            · exact parseExpression_soundExecutorResult
+                file equal.remaining equalRemainingValid
+            · intro value valueRemainingValid
+              apply soundExecutorResult_bind
+              · exact expectKind_soundExecutorResult
+                  file .semicolon value.remaining (by rfl)
+                  valueRemainingValid
+              · intro _ remainingValid
+                exact .ok _ remainingValid
+
 private theorem typeParses_remaining_length_lt
     {input remaining : List Token}
     {type : TypeSyntax}
@@ -2732,6 +3319,33 @@ private theorem parseBindings_executorResult
       · exact .ok _
       · exact .source _
 
+private theorem parseBindings_soundExecutorResult
+    (file : SourceFile)
+    (fuel : Nat)
+    (tokens : List Token)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (parseBindings file fuel tokens) := by
+  induction fuel generalizing tokens with
+  | zero =>
+      exact .fuel .bindings (errorSpan file tokens)
+  | succ fuel inductionHypothesis =>
+      simp only [parseBindings]
+      split
+      · apply soundExecutorResult_bind
+        · exact parseLet_soundExecutorResult file _ tokensValid
+        · intro binding bindingRemainingValid
+          apply soundExecutorResult_bind
+          · exact inductionHypothesis binding.remaining
+              bindingRemainingValid
+          · intro _ remainingValid
+            exact .ok _ remainingValid
+      · exact .ok _ tokensValid
+      · exact .source _
+          (expected_wellFormedFor file .bindingOrReturn tokens trivial
+            tokensValid)
+
 private structure ReturnResult (input : List Token) where
   statement : ReturnStatement
   remaining : List Token
@@ -2837,6 +3451,28 @@ private theorem parseReturn_executorResult
       · exact expectKind_executorResult file .semicolon value.remaining
       · intro _
         exact .ok _
+
+private theorem parseReturn_soundExecutorResult
+    (file : SourceFile)
+    (tokens : List Token)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (parseReturn file tokens) := by
+  simp only [parseReturn]
+  apply soundExecutorResult_bind
+  · exact expectKind_soundExecutorResult
+      file .keywordReturn tokens (by rfl) tokensValid
+  · intro returnToken returnRemainingValid
+    apply soundExecutorResult_bind
+    · exact parseExpression_soundExecutorResult
+        file returnToken.remaining returnRemainingValid
+    · intro value valueRemainingValid
+      apply soundExecutorResult_bind
+      · exact expectKind_soundExecutorResult
+          file .semicolon value.remaining (by rfl) valueRemainingValid
+      · intro _ remainingValid
+        exact .ok _ remainingValid
 
 private structure FunctionResult (input : List Token) where
   declaration : FunctionDecl
@@ -3096,6 +3732,61 @@ private theorem parseFunction_executorResult
                     · intro _
                       exact .ok _
 
+private theorem parseFunction_soundExecutorResult
+    (file : SourceFile)
+    (tokens : List Token)
+    (tokensValid : TokensValidFor file tokens) :
+    SoundExecutorResult file
+      (fun result => TokensValidFor file result.remaining)
+      (parseFunction file tokens) := by
+  simp only [parseFunction]
+  apply soundExecutorResult_bind
+  · exact expectKind_soundExecutorResult
+      file .keywordFunction tokens (by rfl) tokensValid
+  · intro functionToken functionRemainingValid
+    apply soundExecutorResult_bind
+    · exact expectIdentifier_soundExecutorResult
+        file functionToken.remaining functionRemainingValid
+    · intro name nameRemainingValid
+      apply soundExecutorResult_bind
+      · exact expectKind_soundExecutorResult
+          file .leftParen name.remaining (by rfl) nameRemainingValid
+      · intro leftParen leftParenRemainingValid
+        apply soundExecutorResult_bind
+        · exact expectKind_soundExecutorResult
+            file .rightParen leftParen.remaining (by rfl)
+            leftParenRemainingValid
+        · intro rightParen rightParenRemainingValid
+          apply soundExecutorResult_bind
+          · exact expectKind_soundExecutorResult
+              file .arrow rightParen.remaining (by rfl)
+              rightParenRemainingValid
+          · intro arrow arrowRemainingValid
+            apply soundExecutorResult_bind
+            · exact parseType_soundExecutorResult
+                file arrow.remaining arrowRemainingValid
+            · intro returnType returnTypeRemainingValid
+              apply soundExecutorResult_bind
+              · exact expectKind_soundExecutorResult
+                  file .leftBrace returnType.remaining (by rfl)
+                  returnTypeRemainingValid
+              · intro leftBrace leftBraceRemainingValid
+                apply soundExecutorResult_bind
+                · exact parseBindings_soundExecutorResult
+                    file (leftBrace.remaining.length + 1)
+                    leftBrace.remaining leftBraceRemainingValid
+                · intro bindings bindingsRemainingValid
+                  apply soundExecutorResult_bind
+                  · exact parseReturn_soundExecutorResult
+                      file bindings.remaining bindingsRemainingValid
+                  · intro result resultRemainingValid
+                    apply soundExecutorResult_bind
+                    · exact expectKind_soundExecutorResult
+                        file .rightBrace result.remaining (by rfl)
+                        resultRemainingValid
+                    · intro _ remainingValid
+                      exact .ok _ remainingValid
+
 private structure ParsedResult (lexed : Lexed) where
   parsed : ParsedFile
   parses : FileParses lexed parsed
@@ -3161,6 +3852,23 @@ private theorem parseLexedUncheckedCertified_executorResult
     · exact .ok _
     · exact .source _
 
+private theorem parseLexedUncheckedCertified_soundExecutorResult
+    (file : SourceFile)
+    (lexed : Lexed)
+    (tokensValid : TokensValidFor file lexed.tokens) :
+    SoundExecutorResult file (fun _ => True)
+      (parseLexedUncheckedCertified file lexed) := by
+  simp only [parseLexedUncheckedCertified]
+  apply soundExecutorResult_bind
+  · exact parseFunction_soundExecutorResult
+      file lexed.tokens tokensValid
+  · intro function remainingValid
+    split
+    · exact .ok _ trivial
+    · exact .source _
+        (expected_wellFormedFor file .endOfFile function.remaining
+          trivial remainingValid)
+
 private theorem parseLexedUnchecked_executorResult
     (file : SourceFile)
     (lexed : Lexed) :
@@ -3176,6 +3884,39 @@ private theorem parseLexedUnchecked_executorResult
       cases classified with
       | source error => exact .source error
       | fuel phase span => exact .fuel phase span
+
+private theorem parseLexedUnchecked_soundExecutorResult
+    (file : SourceFile)
+    (lexed : Lexed)
+    (tokensValid : TokensValidFor file lexed.tokens) :
+    SoundExecutorResult file (fun _ => True)
+      (parseLexedUnchecked file lexed) := by
+  unfold parseLexedUnchecked
+  cases equation : parseLexedUncheckedCertified file lexed with
+  | ok result =>
+      exact .ok _ trivial
+  | error failure =>
+      have classified :=
+        parseLexedUncheckedCertified_soundExecutorResult
+          file lexed tokensValid
+      rw [equation] at classified
+      cases classified with
+      | source error wellFormed => exact .source error wellFormed
+      | fuel phase span => exact .fuel phase span
+
+private theorem parseLexedUnchecked_source_failure_wellFormed
+    (file : SourceFile)
+    (lexed : Lexed)
+    (error : ParseError)
+    (tokensValid : TokensValidFor file lexed.tokens)
+    (failure :
+      parseLexedUnchecked file lexed = .error (.source error)) :
+    error.WellFormedFor file := by
+  have classified :=
+    parseLexedUnchecked_soundExecutorResult file lexed tokensValid
+  rw [failure] at classified
+  cases classified with
+  | source _ wellFormed => exact wellFormed
 
 private theorem parseLexedUnchecked_ne_invalid_input
     (file : SourceFile)
@@ -3279,6 +4020,78 @@ def parseLexed
               .error (.internal (.invalidOutput parsed))
       else
         .error (.internal (.invalidInput lexed))
+
+/--
+Any source error returned past the public wrapper has the frozen parser-error
+shape whenever every supplied token reconstructs from the source file.
+-/
+theorem parseLexed_source_failure_wellFormed_of_tokens_valid
+    (file : SourceFile)
+    (lexed : Lexed)
+    (error : ParseError)
+    (tokensValid : ∀ token ∈ lexed.tokens, token.ValidFor file)
+    (failure : parseLexed file lexed = .error (.source error)) :
+    error.WellFormedFor file := by
+  unfold parseLexed at failure
+  cases lexing : Lexer.lex file with
+  | error lexFailure =>
+      simp [lexing] at failure
+  | ok canonical =>
+      cases canonicality : decide (canonical = lexed) with
+      | false =>
+          simp [lexing, canonicality] at failure
+      | true =>
+          cases parsing : parseLexedUnchecked file lexed with
+          | ok parsed =>
+              cases outputValidity : parsed.conformsTo file lexed <;>
+                simp [lexing, canonicality, parsing, outputValidity]
+                  at failure
+          | error parseFailure =>
+              cases parseFailure with
+              | source actual =>
+                  simp [lexing, canonicality, parsing] at failure
+                  cases failure
+                  exact parseLexedUnchecked_source_failure_wellFormed
+                    file lexed error tokensValid parsing
+              | internal invariant =>
+                  simp [lexing, canonicality, parsing] at failure
+
+/--
+A source failure returned by the public wrapper proves that its supplied token
+stream is the exact canonical lexer output, and that the error is well-formed.
+-/
+theorem parseLexed_source_failure_provenance
+    (file : SourceFile)
+    (lexed : Lexed)
+    (error : ParseError)
+    (failure : parseLexed file lexed = .error (.source error)) :
+    Lexer.lex file = .ok lexed ∧ error.WellFormedFor file := by
+  have lexing : Lexer.lex file = .ok lexed := by
+    cases equation : Lexer.lex file with
+    | error lexFailure =>
+        simp [parseLexed, equation] at failure
+    | ok canonical =>
+        cases canonicality : decide (canonical = lexed) with
+        | false =>
+            simp [parseLexed, equation, canonicality] at failure
+        | true =>
+            have canonicalEquals : canonical = lexed :=
+              of_decide_eq_true canonicality
+            exact congrArg Except.ok canonicalEquals
+  exact ⟨
+    lexing,
+    parseLexed_source_failure_wellFormed_of_tokens_valid
+      file lexed error (Lexer.lex_success_valid file lexed lexing).1 failure
+  ⟩
+
+/-- Every source failure returned by the public parser is well-formed. -/
+theorem parseLexed_source_failure_wellFormed
+    (file : SourceFile)
+    (lexed : Lexed)
+    (error : ParseError)
+    (failure : parseLexed file lexed = .error (.source error)) :
+    error.WellFormedFor file :=
+  (parseLexed_source_failure_provenance file lexed error failure).2
 
 /--
 An `invalidInput` result can only come from the public canonical-input guard.
@@ -3533,6 +4346,29 @@ def parse (file : SourceFile) : Except FrontendError ParsedFile :=
       | .error (.internal invariant) =>
           .error (.internal (.parser invariant))
       | .ok parsed => .ok parsed
+
+/-- Every syntactic failure returned by the public frontend is well-formed. -/
+theorem parse_syntactic_failure_wellFormed
+    (file : SourceFile)
+    (error : ParseError)
+    (failure : parse file = .error (.syntactic error)) :
+    error.WellFormedFor file := by
+  cases lexing : Lexer.lex file with
+  | error lexFailure =>
+      cases lexFailure <;> simp [parse, lexing] at failure
+  | ok lexed =>
+      cases parsing : parseLexed file lexed with
+      | ok parsed =>
+          simp [parse, lexing, parsing] at failure
+      | error parseFailure =>
+          cases parseFailure with
+          | source actual =>
+              simp [parse, lexing, parsing] at failure
+              cases failure
+              exact parseLexed_source_failure_wellFormed
+                file lexed error parsing
+          | internal invariant =>
+              simp [parse, lexing, parsing] at failure
 
 /-- Every public parser invariant comes from parsing the exact lexer output. -/
 theorem parse_parser_invariant_provenance
