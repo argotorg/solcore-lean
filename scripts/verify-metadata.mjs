@@ -627,6 +627,31 @@ assert(
     semanticCoreV2Schema.$defs.program.properties.schema.const,
   "capabilities-v3 does not bind the registered Semantic Core v2 schema",
 );
+const v4Capabilities = readCapabilityOutput("capabilities-v4");
+verifyCapabilityProfile(
+  "capabilities-v4",
+  "frontend-m2b-v1",
+  v4Capabilities.response,
+  v4Capabilities.report,
+);
+assert(
+  v4Capabilities.response.schema === "solcore-oracle/v4" &&
+    v4Capabilities.report.schema === "solcore-capabilities/v4",
+  "capabilities-v4 returned an incompatible Oracle or capability schema",
+);
+assert(
+  v4Capabilities.report.surfaceSchema ===
+      surfaceV1Schema.$defs.file.properties.schema.const &&
+    v4Capabilities.report.parseResultSchema ===
+      parseResultV1Schema.properties.schema.const,
+  "capabilities-v4 does not bind the registered Surface publication schemas",
+);
+assert(
+  JSON.stringify(v4Capabilities.report.implementedQueries) ===
+      JSON.stringify(["capabilities", "parse"]) &&
+    v4Capabilities.report.defaultLimits?.sourceBytes === 1048576,
+  "capabilities-v4 returned an incompatible query set or default limit",
+);
 const report = v1Capabilities.report;
 
 const expectedStandardLibrary = {
@@ -642,7 +667,12 @@ assert(
 );
 
 const adrFiles = readdirSync(join(root, "docs", "adr"));
-for (const capability of [v1Capabilities, v2Capabilities, v3Capabilities]) {
+for (const capability of [
+  v1Capabilities,
+  v2Capabilities,
+  v3Capabilities,
+  v4Capabilities,
+]) {
   for (const feature of capability.report.features) {
     if (feature.adr !== null) {
       assert(
