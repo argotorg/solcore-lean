@@ -8,6 +8,7 @@ const kernelRoots = [
   "Solcore/Semantics",
   "Solcore/Surface",
   "Solcore/Surface.lean",
+  "Solcore/Workspace",
 ];
 const forbidden = /\b(sorry|admit|partial|unsafe|axiom|noncomputable|extern|implemented_by)\b/;
 const violations = [];
