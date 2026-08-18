@@ -1,0 +1,542 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:solcore:surface:v1",
+  "title": "Solcore Surface file v1",
+  "description": "The strict, versioned wire representation of one parsed Solcore Surface file. Request-relative source ownership and span geometry are validated by Oracle integration.",
+  "$ref": "#/$defs/file",
+  "$defs": {
+    "nat": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "identifierText": {
+      "allOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+        },
+        {
+          "not": {
+            "enum": [
+              "function",
+              "let",
+              "if",
+              "else",
+              "return"
+            ]
+          }
+        }
+      ]
+    },
+    "decimalDigits": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "hexadecimalDigits": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]+$"
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "startByte": {
+          "$ref": "#/$defs/nat"
+        },
+        "endByte": {
+          "$ref": "#/$defs/nat"
+        }
+      },
+      "required": [
+        "source",
+        "startByte",
+        "endByte"
+      ]
+    },
+    "name": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "text": {
+          "$ref": "#/$defs/identifierText"
+        }
+      },
+      "required": [
+        "span",
+        "text"
+      ]
+    },
+    "typeSpellingOccurrence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "text": {
+          "type": "string",
+          "enum": [
+            "bool",
+            "word"
+          ]
+        }
+      },
+      "required": [
+        "span",
+        "text"
+      ]
+    },
+    "unitType": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "unit"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        }
+      },
+      "required": [
+        "tag",
+        "span"
+      ]
+    },
+    "namedType": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "named"
+        },
+        "name": {
+          "$ref": "#/$defs/typeSpellingOccurrence"
+        }
+      },
+      "required": [
+        "tag",
+        "name"
+      ]
+    },
+    "typeSyntax": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/unitType"
+        },
+        {
+          "$ref": "#/$defs/namedType"
+        }
+      ]
+    },
+    "unaryOperator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "operator": {
+          "const": "not"
+        }
+      },
+      "required": [
+        "span",
+        "operator"
+      ]
+    },
+    "binaryOperator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "mul",
+            "div",
+            "mod",
+            "add",
+            "sub",
+            "bitAnd",
+            "bitXor",
+            "bitOr",
+            "lt",
+            "gt",
+            "le",
+            "ge",
+            "eq",
+            "ne"
+          ]
+        }
+      },
+      "required": [
+        "span",
+        "operator"
+      ]
+    },
+    "unitExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "unit"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        }
+      },
+      "required": [
+        "tag",
+        "span"
+      ]
+    },
+    "decimalIntegerExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "integer"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "base": {
+          "const": "decimal"
+        },
+        "digits": {
+          "$ref": "#/$defs/decimalDigits"
+        }
+      },
+      "required": [
+        "tag",
+        "span",
+        "base",
+        "digits"
+      ]
+    },
+    "hexadecimalIntegerExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "integer"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "base": {
+          "const": "hexadecimal"
+        },
+        "digits": {
+          "$ref": "#/$defs/hexadecimalDigits"
+        }
+      },
+      "required": [
+        "tag",
+        "span",
+        "base",
+        "digits"
+      ]
+    },
+    "nameExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "name"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        }
+      },
+      "required": [
+        "tag",
+        "name"
+      ]
+    },
+    "groupExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "group"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "inner": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "tag",
+        "span",
+        "inner"
+      ]
+    },
+    "callExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "call"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "callee": {
+          "$ref": "#/$defs/name"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/expr"
+          }
+        }
+      },
+      "required": [
+        "tag",
+        "span",
+        "callee",
+        "arguments"
+      ]
+    },
+    "unaryExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "unary"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "operator": {
+          "$ref": "#/$defs/unaryOperator"
+        },
+        "operand": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "tag",
+        "span",
+        "operator",
+        "operand"
+      ]
+    },
+    "binaryExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "binary"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "operator": {
+          "$ref": "#/$defs/binaryOperator"
+        },
+        "left": {
+          "$ref": "#/$defs/expr"
+        },
+        "right": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "tag",
+        "span",
+        "operator",
+        "left",
+        "right"
+      ]
+    },
+    "ifThenElseExpr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "const": "ifThenElse"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "condition": {
+          "$ref": "#/$defs/expr"
+        },
+        "thenBranch": {
+          "$ref": "#/$defs/expr"
+        },
+        "elseBranch": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "tag",
+        "span",
+        "condition",
+        "thenBranch",
+        "elseBranch"
+      ]
+    },
+    "expr": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/unitExpr"
+        },
+        {
+          "$ref": "#/$defs/decimalIntegerExpr"
+        },
+        {
+          "$ref": "#/$defs/hexadecimalIntegerExpr"
+        },
+        {
+          "$ref": "#/$defs/nameExpr"
+        },
+        {
+          "$ref": "#/$defs/groupExpr"
+        },
+        {
+          "$ref": "#/$defs/callExpr"
+        },
+        {
+          "$ref": "#/$defs/unaryExpr"
+        },
+        {
+          "$ref": "#/$defs/binaryExpr"
+        },
+        {
+          "$ref": "#/$defs/ifThenElseExpr"
+        }
+      ]
+    },
+    "letStatement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "type": {
+          "$ref": "#/$defs/typeSyntax"
+        },
+        "value": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "span",
+        "name",
+        "type",
+        "value"
+      ]
+    },
+    "returnStatement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "value": {
+          "$ref": "#/$defs/expr"
+        }
+      },
+      "required": [
+        "span",
+        "value"
+      ]
+    },
+    "functionDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "returnType": {
+          "$ref": "#/$defs/typeSyntax"
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/letStatement"
+          }
+        },
+        "result": {
+          "$ref": "#/$defs/returnStatement"
+        }
+      },
+      "required": [
+        "span",
+        "name",
+        "returnType",
+        "bindings",
+        "result"
+      ]
+    },
+    "comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "line",
+            "block"
+          ]
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        }
+      },
+      "required": [
+        "kind",
+        "span"
+      ]
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "solcore-surface/v1"
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "function": {
+          "$ref": "#/$defs/functionDeclaration"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/comment"
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "span",
+        "function",
+        "comments"
+      ]
+    }
+  }
+}

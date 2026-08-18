@@ -2065,6 +2065,7 @@ def testSchemaJson : IO Unit := do
       ["schema/oracle-v1.schema.json", "schema/oracle-v2.schema.json",
         "schema/oracle-v3.schema.json",
         "schema/semantic-core-v1.schema.json", "schema/semantic-core-v2.schema.json",
+        "schema/surface-v1.schema.json",
         "metadata/baselines.json",
         "metadata/standard-library.json", "profiles/manifest.json",
         "profiles/solcore-0.1.0-draft.2-core-m1a.json",

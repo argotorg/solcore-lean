@@ -100,6 +100,7 @@ const oracleV2SchemaId = "urn:solcore:oracle:v2";
 const oracleV3SchemaId = "urn:solcore:oracle:v3";
 const semanticCoreV1SchemaId = "urn:solcore:semantic-core:v1";
 const semanticCoreV2SchemaId = "urn:solcore:semantic-core:v2";
+const surfaceV1SchemaId = "urn:solcore:surface:v1";
 const permittedExternalRefs = new Map([
   [oracleV2SchemaId, new Set([oracleV1SchemaId, semanticCoreV1SchemaId])],
   [oracleV3SchemaId, new Set([oracleV1SchemaId, semanticCoreV2SchemaId])],
@@ -220,6 +221,10 @@ assert(
   "schema/semantic-core-v2.schema.json is not registered by $id",
 );
 assert(
+  schemasById.has(surfaceV1SchemaId),
+  "schema/surface-v1.schema.json is not registered by $id",
+);
+assert(
   semanticCoreV1ReferenceCount > 0,
   "oracle v2 schema does not reference the registered Semantic Core v1 schema",
 );
@@ -230,6 +235,14 @@ assert(
 
 const semanticCoreV1Schema = schemasById.get(semanticCoreV1SchemaId).value;
 const semanticCoreV2Schema = schemasById.get(semanticCoreV2SchemaId).value;
+const surfaceV1Schema = schemasById.get(surfaceV1SchemaId).value;
+assert(
+  surfaceV1Schema.$ref === "#/$defs/file" &&
+    surfaceV1Schema.$defs.file.properties.schema.const ===
+      "solcore-surface/v1" &&
+    surfaceV1Schema.$defs.file.required.includes("schema"),
+  "Surface v1 schema does not enforce its root schema discriminator",
+);
 const frozenCoreDefinitionNames = [
   "nat",
   "type",
