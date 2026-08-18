@@ -3,7 +3,7 @@ import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
-import Solcore.Surface.Wire.V1.Codec
+import Solcore.Surface.Wire.V1.PublicationCodec
 
 set_option autoImplicit false
 
@@ -872,6 +872,435 @@ def testSurfaceWireStrictnessAndBounds : IO Unit := do
   | .error error =>
       throw (IO.userError
         s!"canonical Surface file did not canonicalize again: {(Lean.toJson error).compress}")
+
+def testSurfacePublicationTokenKinds : IO Unit := do
+  let identifier <- expectSurfaceWireIdentifier "token_1"
+  let decimal <- expectSurfaceWireDecimal "001"
+  let hexadecimal <- expectSurfaceWireHexadecimal "aB09"
+  let kinds : List Surface.Wire.V1.TokenKind := [
+    .keywordFunction,
+    .keywordLet,
+    .keywordIf,
+    .keywordElse,
+    .keywordReturn,
+    .identifier identifier,
+    .decimal decimal,
+    .hexadecimal hexadecimal,
+    .arrow,
+    .equal,
+    .equalEqual,
+    .bang,
+    .bangEqual,
+    .less,
+    .lessEqual,
+    .greater,
+    .greaterEqual,
+    .plus,
+    .minus,
+    .star,
+    .slash,
+    .percent,
+    .ampersand,
+    .caret,
+    .pipe,
+    .leftParen,
+    .rightParen,
+    .leftBrace,
+    .rightBrace,
+    .colon,
+    .semicolon,
+    .comma
+  ]
+  assertTrue (kinds.length == 32)
+    "the Surface publication token fixture must cover all 32 v1 tags"
+  for kind in kinds do
+    assertSurfaceWireRoundTrip "publication token kind"
+      Surface.Wire.V1.encodeTokenKind
+      Surface.Wire.V1.decodeTokenKind kind
+  assertSurfaceWireError "invalid publication identifier payload"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "identifier"), ("text", "function")]))
+    .invalidIdentifierText "/text"
+  assertSurfaceWireError "invalid publication decimal payload"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "decimal"), ("digits", "")]))
+    .invalidDecimalDigits "/digits"
+  assertSurfaceWireError "invalid publication hexadecimal payload"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "hexadecimal"), ("digits", "0x1")]))
+    .invalidHexadecimalDigits "/digits"
+  assertSurfaceWireError "non-string publication identifier payload"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "identifier"), ("text", 1)]))
+    .expectedString "/text"
+  assertSurfaceWireError "missing publication identifier payload"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [("kind", "identifier")]))
+    .missingField "/text"
+  assertSurfaceWireError "missing publication decimal payload"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [("kind", "decimal")]))
+    .missingField "/digits"
+  assertSurfaceWireError "missing publication hexadecimal payload"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [("kind", "hexadecimal")]))
+    .missingField "/digits"
+  assertSurfaceWireError "payload on a payload-free publication token"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "plus"), ("text", "token")]))
+    .unknownField "/text"
+  assertSurfaceWireError "decimal payload on an identifier token"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "identifier"), ("text", "token"), ("digits", "1")]))
+    .unknownField "/digits"
+  assertSurfaceWireError "identifier payload on a decimal token"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "decimal"), ("digits", "1"), ("text", "token")]))
+    .unknownField "/text"
+  assertSurfaceWireError "identifier payload on a hexadecimal token"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "hexadecimal"), ("digits", "ff"), ("text", "token")]))
+    .unknownField "/text"
+  assertSurfaceWireError "unknown publication token field"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [
+      ("kind", "comma"), ("span", .null)]))
+    .unknownField "/span"
+  assertSurfaceWireError "unknown publication token tag"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [("kind", "question")]))
+    .invalidTag "/kind"
+  assertSurfaceWireError "non-string publication token tag"
+    (Surface.Wire.V1.decodeTokenKind (.mkObj [("kind", true)]))
+    .expectedString "/kind"
+
+def testSurfacePublicationExpectations : IO Unit := do
+  let identifier <- expectSurfaceWireIdentifier "expected"
+  let expectations : List Surface.Wire.V1.ParseExpectation := [
+    .token (.identifier identifier),
+    .identifier,
+    .type,
+    .expression,
+    .argumentOrRightParen,
+    .commaOrRightParen,
+    .bindingOrReturn,
+    .endOfFile
+  ]
+  assertTrue (expectations.length == 8)
+    "the publication expectation fixture must cover all eight v1 forms"
+  for expectation in expectations do
+    assertSurfaceWireRoundTrip "publication parse expectation"
+      Surface.Wire.V1.encodeParseExpectation
+      Surface.Wire.V1.decodeParseExpectation expectation
+  assertSurfaceWireError "missing token expectation payload"
+    (Surface.Wire.V1.decodeParseExpectation
+      (.mkObj [("kind", "token")]))
+    .missingField "/token"
+  assertSurfaceWireError "token payload on a simple expectation"
+    (Surface.Wire.V1.decodeParseExpectation (.mkObj [
+      ("kind", "identifier"),
+      ("token", Surface.Wire.V1.encodeTokenKind .comma)]))
+    .unknownField "/token"
+  assertSurfaceWireError "invalid nested expectation token payload"
+    (Surface.Wire.V1.decodeParseExpectation (.mkObj [
+      ("kind", "token"),
+      ("token", .mkObj [("kind", "identifier"), ("text", "let")])]))
+    .invalidIdentifierText "/token/text"
+  assertSurfaceWireError "unknown publication expectation"
+    (Surface.Wire.V1.decodeParseExpectation
+      (.mkObj [("kind", "statement")]))
+    .invalidTag "/kind"
+  assertSurfaceWireError "non-string publication expectation tag"
+    (Surface.Wire.V1.decodeParseExpectation (.mkObj [("kind", 1)]))
+    .expectedString "/kind"
+
+def testSurfacePublicationDiagnostics : IO Unit := do
+  let span : Surface.Wire.V1.SourceSpan := {
+    source := "main.solc"
+    startByte := 4
+    endByte := 5
+  }
+  let identifier <- expectSurfaceWireIdentifier "found"
+  let asciiInvalid : Surface.Wire.V1.Diagnostic := {
+    primary := span
+    kind := .invalidCharacter '@'
+    display := none
+  }
+  let multibyteInvalid : Surface.Wire.V1.Diagnostic := {
+    primary := { span with endByte := 6 }
+    kind := .invalidCharacter 'λ'
+    display := some "unexpected lambda"
+  }
+  let unterminated : Surface.Wire.V1.Diagnostic := {
+    primary := { span with startByte := 0, endByte := 12 }
+    kind := .unterminatedBlockComment
+    display := none
+  }
+  let expectedAtEof : Surface.Wire.V1.Diagnostic := {
+    primary := { span with startByte := 12, endByte := 12 }
+    kind := .expected .endOfFile none
+    display := some "expected end of file"
+  }
+  let expectedFound : Surface.Wire.V1.Diagnostic := {
+    primary := span
+    kind := .expected (.token .rightParen) (some (.identifier identifier))
+    display := none
+  }
+  for diagnostic in
+      [asciiInvalid, multibyteInvalid, unterminated, expectedAtEof,
+        expectedFound] do
+    assertSurfaceWireRoundTrip s!"publication diagnostic {diagnostic.code}"
+      Surface.Wire.V1.encodeDiagnostic
+      Surface.Wire.V1.decodeDiagnostic diagnostic
+  assertTrue
+    ((Surface.Wire.V1.encodeDiagnostic asciiInvalid).getObjValD "display" ==
+      .null)
+    "a missing publication diagnostic display must encode as null"
+  assertTrue
+    ((Surface.Wire.V1.encodeDiagnostic multibyteInvalid).getObjValD
+      "display" == "unexpected lambda")
+    "a present publication diagnostic display must encode as a string"
+  assertTrue
+    (((Surface.Wire.V1.encodeDiagnostic asciiInvalid).getObjValD
+      "arguments").getObjValD "character" == "@")
+    "SL0001 must preserve an ASCII Unicode scalar"
+  assertTrue
+    (((Surface.Wire.V1.encodeDiagnostic multibyteInvalid).getObjValD
+      "arguments").getObjValD "character" == "λ")
+    "SL0001 must preserve one multibyte Unicode scalar"
+  assertTrue
+    (((Surface.Wire.V1.encodeDiagnostic expectedAtEof).getObjValD
+      "arguments").getObjValD "found" == .null)
+    "SP0001 must encode an absent found token as null"
+  assertTrue
+    (((Surface.Wire.V1.encodeDiagnostic expectedFound).getObjValD
+      "arguments").getObjValD "found" ==
+        Surface.Wire.V1.encodeTokenKind (.identifier identifier))
+    "SP0001 must encode a present found token with the closed token codec"
+  let nonAssociativeOperators : List
+      Surface.Wire.V1.NonAssociativeBinaryOp := [
+    .lt, .gt, .le, .ge, .eq, .ne
+  ]
+  assertTrue (nonAssociativeOperators.length == 6)
+    "SP0002 must expose exactly the six non-associative operators"
+  for operator in nonAssociativeOperators do
+    assertSurfaceWireRoundTrip "non-associative publication operator"
+      Surface.Wire.V1.encodeNonAssociativeBinaryOp
+      Surface.Wire.V1.decodeNonAssociativeBinaryOp operator
+    let diagnostic : Surface.Wire.V1.Diagnostic := {
+      primary := span
+      kind := .nonAssociative operator
+      display := none
+    }
+    assertSurfaceWireRoundTrip "SP0002 publication diagnostic"
+      Surface.Wire.V1.encodeDiagnostic
+      Surface.Wire.V1.decodeDiagnostic diagnostic
+  assertTrue
+    (asciiInvalid.code == "SL0001" &&
+      unterminated.code == "SL0002" &&
+      expectedFound.code == "SP0001")
+    "the publication diagnostic fixture must cover SL0001, SL0002, and SP0001"
+  let nonAssociative : Surface.Wire.V1.Diagnostic := {
+    primary := span
+    kind := .nonAssociative .lt
+    display := none
+  }
+  assertTrue (nonAssociative.code == "SP0002")
+    "the publication diagnostic fixture must cover SP0002"
+  let asciiJson := Surface.Wire.V1.encodeDiagnostic asciiInvalid
+  assertSurfaceWireError "zero-scalar SL0001 character"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "arguments" (.mkObj [("character", "")])))
+    .invalidTag "/arguments/character"
+  assertSurfaceWireError "two-scalar SL0001 character"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "arguments" (.mkObj [("character", "ab")])))
+    .invalidTag "/arguments/character"
+  assertSurfaceWireError "non-string SL0001 character"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "arguments" (.mkObj [("character", 64)])))
+    .expectedString "/arguments/character"
+  assertSurfaceWireError "wrong publication diagnostic severity"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "severity" "warning"))
+    .invalidTag "/severity"
+  assertSurfaceWireError "wrong publication diagnostic phase"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "phase" "surfaceParsing"))
+    .invalidTag "/phase"
+  assertSurfaceWireError "unknown publication diagnostic code"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "code" "SX9999"))
+    .invalidTag "/code"
+  assertSurfaceWireError "malformed publication diagnostic arguments"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "arguments" true))
+    .expectedObject "/arguments"
+  assertSurfaceWireError "missing SL0001 character argument"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "arguments" (.mkObj [])))
+    .missingField "/arguments/character"
+  assertSurfaceWireError "excess SL0001 argument"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "arguments" (.mkObj [
+        ("character", "@"), ("offset", 4)])))
+    .unknownField "/arguments/offset"
+  let unterminatedJson := Surface.Wire.V1.encodeDiagnostic unterminated
+  assertSurfaceWireError "excess SL0002 argument"
+    (Surface.Wire.V1.decodeDiagnostic
+      (unterminatedJson.setObjVal! "arguments"
+        (.mkObj [("character", "*")])))
+    .unknownField "/arguments/character"
+  let expectedJson := Surface.Wire.V1.encodeDiagnostic expectedAtEof
+  assertSurfaceWireError "missing SP0001 found argument"
+    (Surface.Wire.V1.decodeDiagnostic
+      (expectedJson.setObjVal! "arguments" (.mkObj [
+        ("expectation",
+          Surface.Wire.V1.encodeParseExpectation .endOfFile)])))
+    .missingField "/arguments/found"
+  assertSurfaceWireError "malformed SP0001 found token"
+    (Surface.Wire.V1.decodeDiagnostic
+      (expectedJson.setObjVal! "arguments" (.mkObj [
+        ("expectation",
+          Surface.Wire.V1.encodeParseExpectation .endOfFile),
+        ("found", "comma")])))
+    .expectedObject "/arguments/found"
+  assertSurfaceWireError "excess SP0001 argument"
+    (Surface.Wire.V1.decodeDiagnostic
+      (expectedJson.setObjVal! "arguments"
+        ((expectedJson.getObjValD "arguments").setObjVal!
+          "recovery" .null)))
+    .unknownField "/arguments/recovery"
+  let nonAssociativeJson :=
+    Surface.Wire.V1.encodeDiagnostic nonAssociative
+  assertSurfaceWireError "missing SP0002 operator argument"
+    (Surface.Wire.V1.decodeDiagnostic
+      (nonAssociativeJson.setObjVal! "arguments" (.mkObj [])))
+    .missingField "/arguments/operator"
+  assertSurfaceWireError "associative SP0002 operator"
+    (Surface.Wire.V1.decodeDiagnostic
+      (nonAssociativeJson.setObjVal! "arguments"
+        (.mkObj [("operator", "add")])))
+    .invalidTag "/arguments/operator"
+  let missingDisplay : Lean.Json := .mkObj [
+    ("code", "SL0001"),
+    ("severity", "error"),
+    ("phase", "surfaceLexing"),
+    ("primary", Surface.Wire.V1.encodeSourceSpan span),
+    ("arguments", .mkObj [("character", "@")])
+  ]
+  assertSurfaceWireError "missing publication diagnostic display"
+    (Surface.Wire.V1.decodeDiagnostic missingDisplay)
+    .missingField "/display"
+  assertSurfaceWireError "unknown publication diagnostic field"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "related" (.arr #[])))
+    .unknownField "/related"
+  assertSurfaceWireError "invalid publication diagnostic display"
+    (Surface.Wire.V1.decodeDiagnostic
+      (asciiJson.setObjVal! "display" false))
+    .expectedString "/display"
+
+def testSurfacePublicationParseResult : IO Unit := do
+  let span : Surface.Wire.V1.SourceSpan := {
+    source := "main.solc"
+    startByte := 0
+    endByte := 1
+  }
+  let mainText <- expectSurfaceWireIdentifier "main"
+  let mainName : Surface.Wire.V1.Name := { span, text := mainText }
+  let resultStatement : Surface.Wire.V1.ReturnStatement := {
+    span
+    value := .unit span
+  }
+  let declaration : Surface.Wire.V1.FunctionDecl := {
+    span
+    name := mainName
+    returnType := .unit span
+    bindings := []
+    result := resultStatement
+  }
+  let file : Surface.Wire.V1.File := {
+    span
+    function := declaration
+    comments := []
+  }
+  let result : Surface.Wire.V1.ParseResult := { value := file }
+  let exactLimits : Surface.Wire.V1.DecodeLimits := {
+    maxDepth := 1
+    maxNodes := 6
+  }
+  let encoded := Surface.Wire.V1.encodeParseResult result
+  let expectedWrapper : Lean.Json := .mkObj [
+    ("schema", Surface.Wire.V1.parseResultSchemaVersion),
+    ("value", Surface.Wire.V1.encodeFile file)
+  ]
+  assertTrue (encoded == expectedWrapper)
+    "the parse result encoder must emit only the exact schema and value wrapper"
+  assertTrue
+    (encoded.getObjValD "schema" ==
+      Surface.Wire.V1.parseResultSchemaVersion)
+    "the parse result wrapper must emit its fixed schema version"
+  assertTrue
+    ((encoded.getObjValD "value").getObjValD "schema" ==
+      Surface.Wire.V1.schemaVersion)
+    "the nested Surface file must retain its own fixed schema version"
+  assertSurfaceWireRoundTrip "publication parse result"
+    Surface.Wire.V1.encodeParseResult
+    (Surface.Wire.V1.decodeParseResult exactLimits) result
+  assertSurfaceWireError "unknown parse result schema"
+    (Surface.Wire.V1.decodeParseResult exactLimits
+      (encoded.setObjVal! "schema" "solcore-parse-result/v2"))
+    .invalidSchema "/schema"
+  assertSurfaceWireError "non-string parse result schema"
+    (Surface.Wire.V1.decodeParseResult exactLimits
+      (encoded.setObjVal! "schema" 1))
+    .expectedString "/schema"
+  assertSurfaceWireError "missing parse result schema"
+    (Surface.Wire.V1.decodeParseResult exactLimits (.mkObj [
+      ("value", Surface.Wire.V1.encodeFile file)]))
+    .missingField "/schema"
+  assertSurfaceWireError "missing parse result value"
+    (Surface.Wire.V1.decodeParseResult exactLimits (.mkObj [
+      ("schema", Surface.Wire.V1.parseResultSchemaVersion)]))
+    .missingField "/value"
+  assertSurfaceWireError "unknown parse result field"
+    (Surface.Wire.V1.decodeParseResult exactLimits
+      (encoded.setObjVal! "diagnostics" (.arr #[])))
+    .unknownField "/diagnostics"
+  assertSurfaceWireError "non-object nested Surface file"
+    (Surface.Wire.V1.decodeParseResult exactLimits
+      (encoded.setObjVal! "value" .null))
+    .expectedObject "/value"
+  let nestedFile := encoded.getObjValD "value"
+  assertSurfaceWireError "invalid nested Surface file schema"
+    (Surface.Wire.V1.decodeParseResult exactLimits
+      (encoded.setObjVal! "value"
+        (nestedFile.setObjVal! "schema" "solcore-surface/v2")))
+    .invalidSchema "/value/schema"
+  assertSurfaceWireError "unknown nested Surface file field"
+    (Surface.Wire.V1.decodeParseResult exactLimits
+      (encoded.setObjVal! "value"
+        (nestedFile.setObjVal! "tokens" (.arr #[]))))
+    .unknownField "/value/tokens"
+  assertSurfaceWireError "parse result depth one below exact demand"
+    (Surface.Wire.V1.decodeParseResult
+      { maxDepth := 0, maxNodes := 6 } encoded)
+    .depthLimitExceeded "/value/function/result/value"
+  assertSurfaceWireError "parse result nodes one below exact demand"
+    (Surface.Wire.V1.decodeParseResult
+      { maxDepth := 1, maxNodes := 5 } encoded)
+    .nodeLimitExceeded "/value/function/result/value"
+  let canonical <-
+    match Surface.Wire.V1.canonicalizeParseResult exactLimits encoded with
+    | .ok json => pure json
+    | .error error =>
+        throw (IO.userError
+          s!"valid parse result did not canonicalize: {(Lean.toJson error).compress}")
+  assertTrue (canonical == encoded)
+    "parse result canonicalization must use the exact total encoder"
+  match Surface.Wire.V1.canonicalizeParseResult exactLimits canonical with
+  | .ok canonicalAgain =>
+      assertTrue (canonicalAgain == canonical)
+        "parse result canonicalization must be idempotent"
+  | .error error =>
+      throw (IO.userError
+        s!"canonical parse result did not canonicalize again: {(Lean.toJson error).compress}")
 
 def testCoreWire : IO Unit := do
   let types : Array Core.Wire.V1.Ty := #[.unit, .bool, .word]
@@ -2585,6 +3014,10 @@ def run : IO Unit := do
   testSurfaceWireAtoms
   testSurfaceWireSyntaxRoundTrips
   testSurfaceWireStrictnessAndBounds
+  testSurfacePublicationTokenKinds
+  testSurfacePublicationExpectations
+  testSurfacePublicationDiagnostics
+  testSurfacePublicationParseResult
   testCoreWire
   testCoreWireV2
   testDetailedCoreChecker
