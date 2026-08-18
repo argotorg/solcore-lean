@@ -133,15 +133,16 @@ schemas.
 The previous bindings are immutable: Oracle v1 remains the draft.1 capability
 protocol, and Oracle v2 remains bound to draft.2, `core-m1a-v1`, and Semantic
 Core v1. Neither upstream compiler consumes Semantic Core v1 or v2 directly.
-Until M2 supplies normative parsing, resolution, and elaboration from a shared
-`.solc` workspace, Oracle v3 is a reference for closed Core fixtures rather
-than evidence of source-level three-implementation conformance.
+Oracle v4 now supplies normative parsing for one source file, but resolution,
+checking, and elaboration from a shared `.solc` workspace remain future work.
+Oracle v3 is therefore still a reference for closed Core fixtures rather than
+evidence of source-level three-implementation conformance.
 
-## M2a parser source-inspection evidence
+## M2a/M2b parser source-inspection evidence
 
 ADR-0012 uses the following common syntax at the pinned revisions. This is
-source-inspection evidence for the internal parser, not an end-to-end
-conformance result.
+source-inspection evidence for the parser later published by ADR-0013, not an
+end-to-end conformance result.
 
 | Surface rule | Haskell evidence | Rust evidence | M2a decision |
 | --- | --- | --- | --- |
@@ -158,11 +159,35 @@ unparenthesized statement-if extensions. It also does not adopt either
 resolver's branch-scope leakage, duplicate-local overwriting, or source literal
 wrapping.
 
-Both implementations resolve `true` and `false` as shadowable names. M2a
-preserves them as names and defers their static meaning. Neither implementation
-has source operators for word not or shifts; `bnotWord`, `bshlWord`, and
-`bshrWord` are ordinary standard-library calls. M2a parses such calls but does
-not treat their spelling as primitive identity.
+Both implementations resolve `true` and `false` as shadowable names. The M2b
+Surface language preserves them as names and defers their static meaning.
+Neither implementation has source operators for word not or shifts;
+`bnotWord`, `bshlWord`, and `bshrWord` are ordinary standard-library calls.
+M2b parses such calls but does not treat their spelling as primitive identity.
+
+## M2b Oracle boundary
+
+`solcore-oracle/v4` publishes parse-only observations under
+`solcore/0.1.0-draft.4` and `frontend-m2b-v1`. The profile enables exactly
+`surfaceGrammar`; its accepted result uses `solcore-surface/v1` inside a
+`solcore-parse-result/v1` envelope. `capabilities-v4` reports those bindings,
+the profile digest, the one enabled feature, the `capabilities` and `parse`
+queries, and the default `sourceBytes` limit.
+
+A parse request contains one source content string and a nonempty opaque source
+label. The label is copied unchanged into result spans but is not normalized,
+opened, or resolved as a path. `sourceBytes` counts the UTF-8 bytes of source
+content only; exceeding the requested limit yields `inconclusive` before
+lexing. Accepted results are connected to the exact lexer result, complete
+token correspondence, grammar validity, and a `FileParses` derivation.
+
+Oracle v3 and v4 are complementary comparison boundaries. Oracle v3 provides
+closed Core checking and evaluation, while Oracle v4 provides closed Surface
+parsing without resolution, checking, Core elaboration, or evaluation. Oracle
+v1 through v3, their profiles, schemas, capability bytes, and existing golden
+streams remain frozen. M2b can serve as the reference for parser-level
+differential fixtures, but it does not establish full source semantic
+conformance for either existing compiler.
 
 ## Historical std external ABI evidence
 

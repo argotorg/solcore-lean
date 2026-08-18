@@ -1,7 +1,7 @@
 # Solcore Lean Specification Charter
 
 - Status: Draft
-- Target specification: `solcore/0.1.0-draft.3`
+- Target specification: `solcore/0.1.0-draft.4`
 - Adopted: 2026-07-23
 
 ## Purpose
@@ -10,21 +10,25 @@
 developed independently of the Haskell and Rust implementations. Its eventual
 purpose is to serve as the reference oracle for semantic differential fuzzing
 by comparing the observations produced by each implementation for the same
-input program and execution environment. At the current milestone, its
-executable reference boundary is the published closed Semantic Core; a
-source-level parser, resolver, and elaborator are not yet part of that boundary.
+input program and execution environment. At the current milestone, it has two
+complementary executable reference boundaries: the closed M1c Semantic Core
+through Oracle v3 and the M2b parse-only Surface language through Oracle v4.
+Name and import resolution, source checking, Core elaboration, and source
+execution are not yet published boundaries.
 
-The internal M2a kernel now lexes and parses the closed fragment fixed by
-[ADR-0012](adr/0012-m2a-surface-parser-kernel.md). It is intentionally not a
-published reference boundary: it has no versioned Surface wire format or
-Oracle query, and it performs no name resolution, checking, or elaboration.
-Its public success path is checked against declarative span, grammar, and
-token-correspondence predicates. The maximal-munch lexical judgment, direct
-construction of the full parser grammar derivation, relational determinism,
-reverse parser completeness, global lexical uniqueness, reachability of
-cursor-local lexical rejection judgments, and frontend fuel sufficiency are
-proved. Publication remains separate because the kernel has no versioned
-Surface wire format, frontend profile, or Oracle query.
+The M2a kernel lexes and parses the closed fragment fixed historically by
+[ADR-0012](adr/0012-m2a-surface-parser-kernel.md). Its public success path is
+checked against declarative span, grammar, and token-correspondence predicates.
+The maximal-munch lexical judgment, direct construction of the full parser
+grammar derivation, relational determinism, reverse parser completeness,
+global lexical uniqueness, reachability of cursor-local lexical rejection
+judgments, and frontend fuel sufficiency are proved.
+
+[ADR-0013](adr/0013-m2b-surface-parser-publication.md) publishes that parser as
+the `surfaceGrammar` feature under `solcore/0.1.0-draft.4` and the frontend-only
+`frontend-m2b-v1` profile. Oracle v4 accepts one opaque-labeled `SourceFile` and
+returns a closed Surface v1 parse result. This publication does not add name
+resolution, checking, elaboration, or evaluation.
 
 To achieve this purpose, the specification provides the following three
 elements as one coherent whole:
@@ -101,6 +105,16 @@ publishes the primitive extension as `solcore/0.1.0-draft.3`, profile
 publication boundary are fixed by
 [`ADR-0011`](adr/0011-m1c-primitive-semantics-and-publication.md).
 
+M2b publishes parsing as `solcore/0.1.0-draft.4`, profile
+[`frontend-m2b-v1`](../profiles/solcore-0.1.0-draft.4-frontend-m2b.json),
+[`solcore-surface/v1`](../schema/surface-v1.schema.json),
+[`solcore-parse-result/v1`](../schema/parse-result-v1.schema.json), and
+[`solcore-oracle/v4`](../schema/oracle-v4.schema.json). The profile enables
+only `surfaceGrammar`; the static and dynamic component version numbers are
+carried forward but no Core feature or Core query is enabled. The exact M2b
+boundary is fixed by
+[`ADR-0013`](adr/0013-m2b-surface-parser-publication.md).
+
 The M1c profile enables boolean negation and the specified word arithmetic,
 comparison, bitwise, and shift operations in addition to the five M1b
 features. Primitive operands are evaluated exactly once, binary operands from
@@ -110,10 +124,11 @@ typing/evaluation layers are connected by soundness, completeness,
 determinism, CEK correspondence, progress, preservation, sufficient-fuel, and
 fault-unreachability results for this fragment.
 
-All draft.1 and draft.2 language/profile documents, digests, Core/Oracle schema
-contracts, capability bytes, and golden streams are immutable. Semantic changes
-are appended under new version identifiers; Oracle v2 remains bound to
-Semantic Core v1 and Oracle v3 remains bound to Semantic Core v2.
+All draft.1 through draft.3 language/profile documents, digests, Core/Oracle
+schema contracts, capability bytes, and golden streams are immutable. Semantic
+changes are appended under new version identifiers; Oracle v2 remains bound to
+Semantic Core v1, Oracle v3 remains bound to Semantic Core v2, and Oracle v4
+accepts raw source only for parse-only Surface publication.
 
 The Haskell and Rust commits, solver mode, dispatch setting, backend, resource
 limits, and similar implementation settings are recorded separately in an
@@ -134,11 +149,20 @@ In addition to the request ID, every oracle response returns the specification,
 profile ID and digest, and query kind, so that a response record identifies its
 comparison conditions by itself.
 
-`capabilities-v3` is the current capability report. It identifies draft.3,
-`core-m1c-v1`, the canonical profile digest, Semantic Core v2, supported Core
-queries, observation schemas, feature states, and resource limits. It does not
-claim that either existing compiler accepts the Core wire format or that
-source-level differential conformance has been established.
+The capability reports describe complementary boundaries. `capabilities-v3`
+identifies draft.3, `core-m1c-v1`, the canonical profile digest, Semantic Core
+v2, supported Core queries, observation schemas, feature states, and resource
+limits. `capabilities-v4` identifies draft.4, `frontend-m2b-v1`, Surface v1,
+parse-result v1, the single `surfaceGrammar` feature, and the default
+`sourceBytes` limit of 1048576. Neither report claims full source-level
+semantic conformance among Lean and the existing compilers.
+
+Oracle v4 `parse` accepts exactly one source content string paired with a
+nonempty opaque source label. The label is copied exactly into result spans and
+is not normalized, resolved, or used for file I/O. `sourceBytes` counts only
+the UTF-8 bytes of the content; path bytes and wire-envelope bytes are excluded.
+Exceeding the selected limit is `inconclusive` at source preflight and does not
+run the lexer or parser.
 
 ## Verdicts
 
@@ -153,9 +177,11 @@ The oracle has the following six language verdicts:
 | `executed` | A dynamic query ran and produced a normative observation |
 | `internalError` | The oracle itself encountered an invariant violation or implementation defect |
 
-Malformed JSON, duplicate object keys, unknown schemas, unsafe source paths, and
-similar conditions are not language properties. They are reported as
-`protocolError`, outside the verdicts above.
+Malformed JSON, duplicate object keys, unknown schemas, empty source labels,
+and similar structural conditions are not language properties. They are
+reported as `protocolError`, outside the verdicts above. Oracle v4 otherwise
+treats a source label as opaque; filesystem path policy belongs to the future
+workspace boundary.
 
 The following reinterpretations are forbidden:
 
@@ -233,10 +259,11 @@ authority by itself. A change to an expected result must include the
 corresponding specification change or ADR.
 
 Short-circuit boolean conjunction/disjunction, boolean/word conversions, and
-functions, closures, application, and return remain outside the M1c normative
-fragment. They require explicit source/Core elaboration rules and any necessary
-new feature, language, and wire versions before an Oracle may report them as
-supported.
+the Core/static meanings of functions, closures, application, and return remain
+outside the M1c normative fragment. M2b parses its restricted function fixture
+without assigning those meanings. They require explicit source/Core
+elaboration rules and any necessary new feature, language, and wire versions
+before a semantic Oracle may report them as supported.
 
 ## M0 completion criteria
 
@@ -251,7 +278,7 @@ M0 is complete when all of the following hold:
 - Queries for unimplemented semantics return `unsupported`.
 - Tests for schemas, canonicalization, path validation, and streaming pass.
 
-## Current M1c publication criteria
+## Historical M1c publication criteria
 
 M1c is published only because all of the following hold for its closed Core
 fragment:
@@ -267,3 +294,27 @@ fragment:
   canonical codecs and cross-version rejection tests
 - the draft.1/Oracle v1 and draft.2/Oracle v2 artifacts retain their existing
   bytes
+
+## Current M2b publication criteria
+
+M2b is published only because all of the following hold for its closed
+parse-only Surface fragment:
+
+- `surfaceGrammar` fixes the lexer, grammar, spans, comments, syntax tree, and
+  source diagnostic vocabulary without claiming resolution or elaboration
+- successful parser execution is connected to the exact lexer result, complete
+  token correspondence, grammar validity, and a `FileParses` derivation
+- reverse parser completeness, relational determinism, lexical uniqueness,
+  rejection reachability, and sufficient-fuel results cover the published path
+- Surface v1, parse-result v1, and Oracle v4 are closed, version-bound schemas
+  with canonical codecs, request-relative result validation, and
+  cross-version rejection tests
+- the one-file request treats its nonempty path as an opaque source label and
+  applies `sourceBytes` only to the UTF-8 byte length of content
+- the draft.1 through draft.3 profiles, schemas, Oracle behavior, capability
+  bytes, and golden artifacts retain their existing bytes
+
+Workspace construction, module and name resolution, source checking, Core
+elaboration, and execution remain future scope. Until those layers are fixed
+and proof-connected, M2b is a parser reference rather than a complete source
+semantic reference implementation.

@@ -4,12 +4,13 @@
 in Lean 4, intended to become the reference implementation for semantic
 differential fuzzing.
 
-The project has completed the internal **M2a Surface parser proof kernel** and
-is preparing its separate M2b publication layer. The published reference
-boundary remains M1c: `solcore/0.1.0-draft.3`, profile `core-m1c-v1`, Semantic
-Core v2, and Oracle v3. M2a adds an internal parse-only frontend without
-widening any published Oracle. The draft.1/Oracle v1 and draft.2/Oracle v2
-contracts remain frozen for compatibility.
+The project now has two complementary executable reference boundaries. Oracle
+v3 publishes the closed M1c Semantic Core under
+`solcore/0.1.0-draft.3`/`core-m1c-v1`, while Oracle v4 publishes parse-only
+Surface results under `solcore/0.1.0-draft.4`/`frontend-m2b-v1`. The M2b
+profile enables only `surfaceGrammar`; it does not enable resolution, checking,
+Core elaboration, or evaluation. Oracle v1 through v3 and every draft.1 through
+draft.3 artifact remain frozen for compatibility.
 
 ## What M0 fixes
 
@@ -108,7 +109,7 @@ The Haskell and Rust implementation defaults are not specification authority.
 They are isolated in [`Solcore/Baseline.lean`](Solcore/Baseline.lean) as evidence
 for differential investigation.
 
-## What the M2a work implements internally
+## What M2b publishes
 
 - a source-owned Surface AST independent of Oracle wire types
 - half-open UTF-8 byte spans for tokens, comments, names, operators, and nodes
@@ -135,31 +136,50 @@ for differential investigation.
   exact lexer output
 - proved lexer and parser fuel sufficiency at the configured input-derived
   bounds
+- the `solcore/0.1.0-draft.4` language version and frontend-only
+  `frontend-m2b-v1` profile, enabling exactly `surfaceGrammar`
+- the closed `solcore-surface/v1` and `solcore-parse-result/v1` wire formats
+- the `solcore-oracle/v4` `capabilities` and `parse` queries, plus the
+  `solcore-capabilities/v4` report
+- one `SourceFile` input consisting of source content and a nonempty opaque
+  source label that is copied unchanged into returned spans
+- a `sourceBytes` request limit over the UTF-8 byte length of source content
+  only, with over-limit inputs reported as `inconclusive`
+- canonical lexical and syntactic diagnostics, strict codecs, and positive,
+  negative, resource-boundary, malformed-wire, and mixed-version golden cases
 
 `true` and `false` remain unresolved names. Word-not and shift syntax remains
 ordinary calls to such names as `bnotWord`, `bshlWord`, and `bshrWord` until
 resolution can identify canonical declarations. Source integer conversion,
-name resolution, type checking, and Core elaboration are not part of M2a.
+name resolution, type checking, and Core elaboration are not part of M2b.
 
-The M2a proof kernel is complete at its internal boundary. The public lexer
-gates success with the independent lexical judgment, and accepted lexical
-partitions are globally unique. Every public source-level lexer failure is
-connected to an implementation-reached cursor and the executable local
+The M2a proof kernel remains the foundation of the M2b publication. The public
+lexer gates success with the independent lexical judgment, and accepted
+lexical partitions are globally unique. Every public source-level lexer failure
+is connected to an implementation-reached cursor and the executable local
 rejection judgment. `parseLexed` accepts only the exact lexer result; its
 private parser constructs a declarative derivation alongside the AST. Public
 success implies grammar shape, full AST/token correspondence, and
 `FileParses`, while every `FileParses` derivation for the exact lexer stream
-makes the executor return that tree. The grammar is relationally
-deterministic. Input-derived lexer and parser fuel bounds are proved sufficient,
-so public execution cannot report fuel exhaustion. The lexer's defensive
-output-validation error is also proved unreachable from raw executor
-soundness.
+makes the executor return that tree. The grammar is relationally deterministic.
+Input-derived lexer and parser fuel bounds are proved sufficient, so public
+execution cannot report fuel exhaustion. The lexer's defensive
+output-validation error is also proved unreachable from raw executor soundness.
 
-The parser is deliberately not exposed by Oracle v1, v2, or v3. A later,
-additive parser publication will require a closed Surface wire AST, a new
-grammar version and frontend profile, and a new Oracle version. The exact
-internal boundary is recorded in
-[`ADR-0012`](docs/adr/0012-m2a-surface-parser-kernel.md).
+Oracle v4 exposes this parser through a separately validated Surface
+projection: every accepted result has proved provenance to the exact lexer
+output, satisfies the declarative grammar and AST/token correspondence
+predicates, and carries a `FileParses` derivation for the request source. The
+publication is additive;
+Oracle v1 through v3 retain their prior behavior and bytes. ADR-0012 remains
+the historical record of the internal kernel, and the published boundary is
+fixed by [`ADR-0013`](docs/adr/0013-m2b-surface-parser-publication.md).
+
+Oracle v4 parses one opaque-labeled source file. It does not load a workspace,
+interpret the label as a filesystem path, resolve imports or names, assign
+types to source literals, identify standard-library declarations, elaborate to
+Core, or evaluate a program. Those phases remain future M2 work, so M2b is not
+yet full source-level semantic differential conformance.
 
 ## Running
 
@@ -173,11 +193,12 @@ lake exe solcoreOracle --version
 lake exe solcoreOracle capabilities
 lake exe solcoreOracle capabilities-v2
 lake exe solcoreOracle capabilities-v3
+lake exe solcoreOracle capabilities-v4
 ```
 
 For compatibility, `--version` retains its original Oracle v1 meaning and
-prints the draft.1 specification ID. Use `capabilities-v3` for the current M1c
-language, profile, schema, and digest binding.
+prints the draft.1 specification ID. Use `capabilities-v3` for the closed M1c
+Core boundary and `capabilities-v4` for the M2b parse-only Surface boundary.
 
 To verify the raw bytes of the canonical standard library as well, run
 `node scripts/verify-metadata.mjs --canonical-source-root <solcore>/std` against
@@ -188,9 +209,11 @@ from standard input and emits one response per line in the same order. In
 Oracle v1, only `capabilities` succeeds; source-level queries remain
 `unsupported`. In Oracle v2, `coreCheck` and `coreEval` are available for the
 M1b profile's Semantic Core v1. Oracle v3 provides the same Core-level queries
-for the M1c profile and requires Semantic Core v2 input. No published Oracle
-currently parses or elaborates a `.solc` workspace, so this is not yet
-source-level differential conformance.
+for the M1c profile and requires Semantic Core v2 input. Oracle v4 supports
+`capabilities` and parse-only processing of one source file under the M2b
+frontend profile. It does not parse a workspace or perform resolution,
+checking, elaboration, or execution, so this is not yet full source-level
+semantic differential conformance.
 
 ## Specification documents
 
@@ -203,13 +226,18 @@ source-level differential conformance.
 - [Checked-in core profile](profiles/solcore-0.1.0-draft.1-core.json)
 - [Checked-in M1b Core profile](profiles/solcore-0.1.0-draft.2-core-m1a.json)
 - [Checked-in M1c Core profile](profiles/solcore-0.1.0-draft.3-core-m1c.json)
+- [Checked-in M2b frontend profile](profiles/solcore-0.1.0-draft.4-frontend-m2b.json)
 - [Oracle v1 JSON Schema](schema/oracle-v1.schema.json)
 - [Oracle v2 JSON Schema](schema/oracle-v2.schema.json)
 - [Oracle v3 JSON Schema](schema/oracle-v3.schema.json)
+- [Oracle v4 JSON Schema](schema/oracle-v4.schema.json)
 - [Semantic Core v1 JSON Schema](schema/semantic-core-v1.schema.json)
 - [Semantic Core v2 JSON Schema](schema/semantic-core-v2.schema.json)
+- [Surface v1 JSON Schema](schema/surface-v1.schema.json)
+- [Parse result v1 JSON Schema](schema/parse-result-v1.schema.json)
 - [M1c primitive semantics and publication ADR](docs/adr/0011-m1c-primitive-semantics-and-publication.md)
 - [M2a Surface parser kernel ADR](docs/adr/0012-m2a-surface-parser-kernel.md)
+- [M2b Surface parser publication ADR](docs/adr/0013-m2b-surface-parser-publication.md)
 
 ## Implementation roadmap
 

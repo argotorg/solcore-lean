@@ -27,9 +27,11 @@ Lean status:
 - `blocked`: must not be implemented until an additional ADR is Accepted
 - `unsupported`: the Oracle explicitly returns `unsupported`
 
-The current publication is `solcore/0.1.0-draft.3` with profile
-`core-m1c-v1`. Its nine enabled features are the five M1b features and the four
-M1c primitive features listed as `normative` / `implemented` below.
+The current publication has two complementary profiles. `core-m1c-v1` under
+`solcore/0.1.0-draft.3` enables the five M1b Core features and four M1c
+primitive features. `frontend-m2b-v1` under `solcore/0.1.0-draft.4` enables
+only `surfaceGrammar` for parse-only Surface observations. The frontend profile
+does not inherit or enable any Core feature.
 
 ## Matrix
 
@@ -57,6 +59,7 @@ M1c primitive features listed as `normative` / `implemented` below.
 | `core.adt` | user-defined algebraic data type | directionAccepted | planned | M1 | ADR-0002 |
 | `core.match` | direct pattern matching | directionAccepted | planned | M1 | ADR-0002 |
 | `core.lambda` | lexical closure | directionAccepted | planned | M1 | ADR-0002, ADR-0005 |
+| `surfaceGrammar` | closed M2b lexer, parser, Surface syntax, spans, comments, and source diagnostics | normative | implemented | M2b | ADR-0012, ADR-0013 |
 | `syntax.for-post-let` | `let` in a `for` post clause | proposed | blocked | M2 | requires re-verification against the current baseline |
 | `modules.import-export` | modules, imports, and exports | proposed | blocked | M2 | requires a shadowing ADR |
 | `types.polymorphism` | parametric polymorphism | directionAccepted | planned | M2 | ADR-0002 |
@@ -107,23 +110,34 @@ M1c is exposed through `solcore-semantic-core/v2`,
 draft.2/Semantic Core v1/Oracle v2 feature arrays, profiles, digests, schemas,
 and capability bytes remain immutable.
 
-## M2a internal parser boundary
+## M2b parser publication boundary
 
-ADR-0012 defines an internal parse-only Surface fragment, and its lexer/parser
-proof kernel is complete. This work does not promote a language feature, add an
-enabled profile feature, or change the current `grammarVersion = none`
-publication. Oracle v1 `parse` remains `unsupported`.
+ADR-0012 defines the internal parse-only Surface fragment and proof kernel.
+ADR-0013 publishes that exact fragment as `surfaceGrammar` under
+`solcore/0.1.0-draft.4`, whose `grammarVersion` is 1. The frontend-only
+`frontend-m2b-v1` profile enables no other feature. Oracle v4 exposes the
+closed `solcore-surface/v1` result representation and
+`solcore-parse-result/v1` envelope through `capabilities` and `parse` queries.
 
-The internal parser preserves UTF-8 byte spans, comments, raw integer spelling,
-grouping, calls, and keyword conditionals for one restricted function fixture.
-It deliberately leaves names, source literal typing, standard-library
-identities, and Core elaboration unresolved. Parser publication requires a new
-language/profile/Surface-wire/Oracle version and will be recorded separately.
-The declarative lexical judgment, direct executor-to-parser-grammar derivation,
-reverse parser completeness, relational determinism, global lexical
-uniqueness, lexer-failure reachability, and frontend fuel-sufficiency proofs are
-implemented. This internal work is not marked `implemented` in the matrix
-because publication still requires the separate versioned M2b boundary.
+The parser accepts one `SourceFile`: a source string and a nonempty opaque label
+that is copied unchanged into every returned span. It preserves half-open
+UTF-8 byte spans, comments, raw integer spelling, grouping, calls, and keyword
+conditionals for one restricted function fixture. The `sourceBytes` limit
+measures only the UTF-8 bytes of the source content; exceeding it is
+`inconclusive`, not `rejected`.
+
+Accepted results are connected to the exact lexer output, complete token
+correspondence, grammar validity, and a `FileParses` derivation. The declarative
+lexical judgment, executor-to-grammar derivation, reverse parser completeness,
+relational determinism, global lexical uniqueness, lexer-failure reachability,
+and frontend fuel-sufficiency proofs cover the published parser. Name and
+import resolution, source literal typing, standard-library identity, Core
+elaboration, and evaluation remain outside `surfaceGrammar`.
+
+The publication is additive. Draft.1 through draft.3, Semantic Core v1 and v2,
+Oracle v1 through v3, their profiles, schemas, capability reports, and golden
+bytes remain frozen. Oracle v3 therefore remains the closed Core reference
+boundary while Oracle v4 is the complementary parse-only Surface boundary.
 
 ## Rules for profile inclusion
 

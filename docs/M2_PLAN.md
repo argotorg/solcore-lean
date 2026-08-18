@@ -6,7 +6,7 @@ and elaboration phases. M2 must make source-level differential testing possible
 without treating either existing compiler's lowering pipeline as the
 specification.
 
-## Current progress: M2a parser proof kernel complete
+## Current progress: M2b parser publication complete
 
 Following
 [ADR-0012](adr/0012-m2a-surface-parser-kernel.md), the repository contains an
@@ -60,34 +60,47 @@ complete-file derivation for the exact lexer stream is accepted; its full
 source conformance follows from the lexical and grammatical derivations.
 Two accepted lexical partitions of one source are equal, and every public
 source-level lexer failure is connected to an implementation-reached cursor
-that satisfies the executable local rejection judgment. These results close
+that satisfies the executable local rejection judgment. These results supplied
 the proof-kernel prerequisites for the M2b publication decision.
 
-M2a is not a published language profile. Oracle v1 source queries remain
-`unsupported`; Oracle v2 and v3 continue to accept only their frozen Semantic
-Core inputs. The current source parser therefore does not yet establish
-source-level differential conformance.
+[ADR-0013](adr/0013-m2b-surface-parser-publication.md) now publishes the exact
+fragment as `surfaceGrammar` under `solcore/0.1.0-draft.4` and the frontend-only
+`frontend-m2b-v1` profile. The publication adds the closed
+`solcore-surface/v1` and `solcore-parse-result/v1` schemas and Oracle v4, whose
+only queries are `capabilities` and `parse`.
+
+Oracle v4 accepts one source string paired with a nonempty opaque source label.
+It copies that label exactly into every returned span and does not interpret it
+as a filesystem path. Its `sourceBytes` limit measures only the UTF-8 byte
+length of the content: a content length at or below the requested limit reaches
+the parser, while a greater length is `inconclusive` at source preflight.
+
+The M2b boundary is complementary to, rather than a replacement for, the M1c
+Core boundary. Oracle v3 continues to accept only frozen Semantic Core v2
+inputs. Oracle v1 through v3 and draft.1 through draft.3 artifacts retain their
+existing bytes. Because M2b does not resolve workspaces, names, types, or
+standard-library identities and does not elaborate or execute source, it does
+not yet establish full source-level semantic differential conformance.
 
 ## Phase boundaries
 
 ### M2b: parser publication
 
-Publish parsing only after all of the following are complete:
+Parsing is published with all of the following completed:
 
 1. a closed, version-local `solcore-surface/v1` wire AST;
 2. bounded decoder/encoder round-trip and canonicalization theorems;
 3. a parse-result schema with stable phase, code, UTF-8 span, and structured
    arguments;
-4. a new language version with `grammarVersion = 1`;
-5. a frontend-only profile that enables only the completed Surface grammar;
-6. a new Oracle and capability version supporting only `capabilities` and
-   `parse`;
+4. `solcore/0.1.0-draft.4` with `grammarVersion = 1`;
+5. frontend-only profile `frontend-m2b-v1`, enabling only `surfaceGrammar`;
+6. Oracle v4 and capabilities v4, supporting only `capabilities` and `parse`;
 7. positive, negative, malformed-wire, resource, cross-version, and mixed
    stream golden cases.
 
-The publication must be additive. It must not modify draft.1 through draft.3,
-Semantic Core v1 or v2, Oracle v1 through v3, their profiles, or their golden
-bytes.
+The publication is additive. It does not modify draft.1 through draft.3,
+Semantic Core v1 or v2, Oracle v1 through v3, their profiles, or their existing
+golden bytes.
 
 ### M2c: workspace and resolution
 
@@ -146,7 +159,8 @@ is `inconclusive`, not `rejected`.
    Soundness, completeness, direct parser derivation, relational determinism,
    lexical uniqueness, lexer-failure reachability, and fuel sufficiency are
    implemented for the internal M2a fragment.
-2. Version-local Surface wire and parse-only Oracle publication.
+2. Version-local Surface wire and parse-only Oracle publication. Implemented
+   in M2b as Surface v1, parse-result v1, and Oracle v4.
 3. Workspace validation and module/import resolution.
 4. Resolved identifiers and declarative resolution correspondence.
 5. Source typing and typed elaboration for literals, immutable bindings,
