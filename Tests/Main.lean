@@ -3,7 +3,8 @@ import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
-import Solcore.Surface.Wire.V1.PublicationCodec
+import Solcore.Oracle.V4
+import Solcore.Oracle.Stream
 
 set_option autoImplicit false
 
@@ -2118,6 +2119,573 @@ def testOracleVersionDispatch : IO Unit := do
     ((v1Capabilities.getObjValD "verdict").getObjValD "kind" == "accepted")
     "Oracle v1 capabilities must remain accepted after adding v2 and v3"
 
+def oracleV4SurfaceLimits : Surface.Wire.V1.DecodeLimits := {
+  maxDepth := 128
+  maxNodes := 4096
+}
+
+def expectOracleV4RequestId (value : String) : IO Oracle.V4.RequestId :=
+  match Oracle.V4.RequestId.ofString? value with
+  | some id => pure id
+  | none => throw (IO.userError s!"invalid Oracle v4 request id: {reprStr value}")
+
+def expectOracleV4Source
+    (path content : String) : IO Oracle.V4.SourceInput := do
+  match Oracle.V4.SourcePath.ofString? path with
+  | some sourcePath => pure { path := sourcePath, content }
+  | none => throw (IO.userError s!"invalid Oracle v4 source path: {reprStr path}")
+
+def oracleV4Request
+    (id : Oracle.V4.RequestId)
+    (query : Oracle.V4.Query)
+    (limits : Oracle.V4.Limits := Oracle.V4.Limits.default) :
+    Oracle.V4.Request := {
+  id
+  limits
+  query
+}
+
+def assertOracleV4RoundTrip {alpha : Type} [BEq alpha]
+    (name : String)
+    (encode : alpha -> Lean.Json)
+    (decode : Lean.Json -> Surface.Wire.V1.DecodeResult alpha)
+    (value : alpha) : IO Unit := do
+  match decode (encode value) with
+  | .ok decoded =>
+      assertTrue (decoded == value)
+        s!"{name} changed during Oracle v4 round-trip"
+  | .error error =>
+      throw (IO.userError
+        s!"encoded {name} did not decode: {(Lean.toJson error).compress}")
+
+def assertOracleV4DecodeError {alpha : Type}
+    (name : String)
+    (result : Surface.Wire.V1.DecodeResult alpha)
+    (code : Surface.Wire.V1.DecodeErrorCode)
+    (path : String) : IO Unit := do
+  match result with
+  | .ok _ => throw (IO.userError s!"{name} unexpectedly decoded")
+  | .error error =>
+      assertTrue (error.code == code)
+        s!"{name} returned {error.code.wireName}, expected {code.wireName}"
+      assertTrue (error.path.toPointer == path)
+        s!"{name} failed at {error.path.toPointer}, expected {path}"
+
+def testOracleV4Codecs : IO Unit := do
+  let id <- expectOracleV4RequestId "v4-codec"
+  let source <- expectOracleV4Source "nested/main.solc"
+    "function main() -> word { return 0; }"
+  let capabilitiesRequest := oracleV4Request id .capabilities
+  let parseRequest := oracleV4Request id (.parse source) { sourceBytes := 80 }
+  assertOracleV4RoundTrip "capabilities request"
+    Oracle.V4.encodeRequest Oracle.V4.decodeRequest capabilitiesRequest
+  assertOracleV4RoundTrip "parse request"
+    Oracle.V4.encodeRequest Oracle.V4.decodeRequest parseRequest
+
+  let capabilityJson :=
+    Oracle.V4.encodeCapabilityReport Oracle.V4.capabilityReport
+  assertTrue
+    (capabilityJson == .mkObj [
+      ("schema", Oracle.V4.capabilitiesSchema),
+      ("spec", m2bLanguage.id),
+      ("profile", Lean.toJson m2bFrontendProfile),
+      ("profileDigest", m2bFrontendProfileDigest),
+      ("surfaceSchema", Surface.Wire.V1.schemaVersion),
+      ("parseResultSchema", Surface.Wire.V1.parseResultSchemaVersion),
+      ("baselines", Lean.toJson implementationBaselines),
+      ("implementedQueries", .arr #["capabilities", "parse"]),
+      ("features", Lean.toJson m2bFrontendFeatureMatrix),
+      ("defaultLimits", .mkObj [("sourceBytes", 1048576)])
+    ])
+    "Oracle v4 capability report changed"
+  assertOracleV4RoundTrip "capability report"
+    Oracle.V4.encodeCapabilityReport Oracle.V4.decodeCapabilityReport
+    Oracle.V4.capabilityReport
+
+  let capabilitiesResponse := Oracle.V4.handle capabilitiesRequest
+  assertTrue (capabilitiesResponse.isValidFor capabilitiesRequest)
+    "Oracle v4 capabilities handler produced an invalid response"
+  assertOracleV4RoundTrip "capabilities response"
+    Oracle.V4.encodeResponse
+    (Oracle.V4.decodeResponse oracleV4SurfaceLimits)
+    capabilitiesResponse
+  match capabilitiesResponse.body with
+  | .capabilities (.accepted report) =>
+      assertTrue (report == Oracle.V4.capabilityReport)
+        "Oracle v4 capabilities did not return the canonical report"
+  | body =>
+      throw (IO.userError
+        s!"Oracle v4 capabilities returned {reprStr body}")
+
+  let parseResponse := Oracle.V4.handle parseRequest
+  assertTrue (parseResponse.isValidFor parseRequest)
+    "Oracle v4 parse handler produced an invalid response"
+  assertOracleV4RoundTrip "parse response"
+    Oracle.V4.encodeResponse
+    (Oracle.V4.decodeResponse oracleV4SurfaceLimits)
+    parseResponse
+
+  let protocolError : Oracle.V4.ProtocolError := {
+    id := some id
+    code := "oracle.wire.invalid-tag"
+    path := "/profile/digest"
+    arguments := .mkObj [("expected", m2bFrontendProfileDigest)]
+    display := "invalid Oracle v4 request"
+  }
+  assertOracleV4RoundTrip "protocol error"
+    Oracle.V4.encodeProtocolError Oracle.V4.decodeProtocolError protocolError
+
+  let parseJson := Oracle.V4.encodeRequest parseRequest
+  assertOracleV4DecodeError "wrong Oracle v4 schema"
+    (Oracle.V4.decodeRequest
+      (parseJson.setObjVal! "schema" "solcore-oracle/v5"))
+    .invalidTag "/schema"
+  assertOracleV4DecodeError "empty Oracle v4 request id"
+    (Oracle.V4.decodeRequest (parseJson.setObjVal! "id" ""))
+    .invalidTag "/id"
+  let wrongProfile :=
+    (parseJson.getObjValD "profile").setObjVal! "id" "frontend-future"
+  assertOracleV4DecodeError "wrong Oracle v4 profile"
+    (Oracle.V4.decodeRequest (parseJson.setObjVal! "profile" wrongProfile))
+    .invalidTag "/profile/id"
+  let wrongDigest :=
+    (parseJson.getObjValD "profile").setObjVal! "digest" "sha256:wrong"
+  assertOracleV4DecodeError "wrong Oracle v4 profile digest"
+    (Oracle.V4.decodeRequest (parseJson.setObjVal! "profile" wrongDigest))
+    .invalidTag "/profile/digest"
+  let wrongQuery :=
+    (parseJson.getObjValD "query").setObjVal! "kind" "check"
+  assertOracleV4DecodeError "unknown Oracle v4 query"
+    (Oracle.V4.decodeRequest (parseJson.setObjVal! "query" wrongQuery))
+    .invalidTag "/query/kind"
+  assertOracleV4DecodeError "extra Oracle v4 request field"
+    (Oracle.V4.decodeRequest (parseJson.setObjVal! "surprise" true))
+    .unknownField "/surprise"
+  let missingLimits : Lean.Json := .mkObj [
+    ("schema", parseJson.getObjValD "schema"),
+    ("id", parseJson.getObjValD "id"),
+    ("spec", parseJson.getObjValD "spec"),
+    ("profile", parseJson.getObjValD "profile"),
+    ("query", parseJson.getObjValD "query")
+  ]
+  assertOracleV4DecodeError "missing Oracle v4 limits"
+    (Oracle.V4.decodeRequest missingLimits) .missingField "/limits"
+  let emptyPath :=
+    (parseJson.getObjValD "query").getObjValD "source" |>.setObjVal! "path" ""
+  let emptyPathQuery :=
+    (parseJson.getObjValD "query").setObjVal! "source" emptyPath
+  assertOracleV4DecodeError "empty Oracle v4 source path"
+    (Oracle.V4.decodeRequest (parseJson.setObjVal! "query" emptyPathQuery))
+    .invalidTag "/query/source/path"
+  let capabilitiesQueryWithSource :=
+    (Oracle.V4.encodeRequest capabilitiesRequest).getObjValD "query"
+      |>.setObjVal! "source" (Oracle.V4.encodeSourceInput source)
+  assertOracleV4DecodeError "source on capabilities query"
+    (Oracle.V4.decodeRequest
+      ((Oracle.V4.encodeRequest capabilitiesRequest).setObjVal!
+        "query" capabilitiesQueryWithSource))
+    .unknownField "/query/source"
+  assertOracleV4DecodeError "missing parse source"
+    (Oracle.V4.decodeRequest
+      (parseJson.setObjVal! "query" (.mkObj [("kind", "parse")])))
+    .missingField "/query/source"
+
+  let responseJson := Oracle.V4.encodeResponse capabilitiesResponse
+  assertOracleV4DecodeError "extra Oracle v4 response field"
+    (Oracle.V4.decodeResponse oracleV4SurfaceLimits
+      (responseJson.setObjVal! "surprise" true))
+    .unknownField "/surprise"
+  let missingVerdict : Lean.Json := .mkObj [
+    ("schema", responseJson.getObjValD "schema"),
+    ("id", responseJson.getObjValD "id"),
+    ("spec", responseJson.getObjValD "spec"),
+    ("profile", responseJson.getObjValD "profile"),
+    ("query", responseJson.getObjValD "query")
+  ]
+  assertOracleV4DecodeError "missing Oracle v4 response verdict"
+    (Oracle.V4.decodeResponse oracleV4SurfaceLimits missingVerdict)
+    .missingField "/verdict"
+  assertOracleV4DecodeError "capabilities verdict under parse query"
+    (Oracle.V4.decodeResponse oracleV4SurfaceLimits
+      (responseJson.setObjVal! "query" "parse"))
+    .invalidTag "/verdict/phase"
+  let acceptedWithDiagnostics :=
+    (responseJson.getObjValD "verdict").setObjVal! "diagnostics" (.arr #[])
+  assertOracleV4DecodeError "cross-variant response field"
+    (Oracle.V4.decodeResponse oracleV4SurfaceLimits
+      (responseJson.setObjVal! "verdict" acceptedWithDiagnostics))
+    .unknownField "/verdict/diagnostics"
+
+  let protocolJson := Oracle.V4.encodeProtocolError protocolError
+  assertOracleV4DecodeError "extra Oracle v4 protocol-error field"
+    (Oracle.V4.decodeProtocolError
+      (protocolJson.setObjVal! "surprise" true))
+    .unknownField "/surprise"
+  assertOracleV4DecodeError "empty recovered protocol-error id"
+    (Oracle.V4.decodeProtocolError (protocolJson.setObjVal! "id" ""))
+    .invalidTag "/id"
+
+  let duplicateLimitText :=
+    parseJson.compress.replace
+      "\"sourceBytes\":80"
+      "\"sourceBytes\":80,\"sourceBytes\":81"
+  match Oracle.V4.decodeRequestText duplicateLimitText with
+  | .error (.malformedJson _) => pure ()
+  | .error (.invalidValue error) =>
+      throw (IO.userError
+        s!"duplicate nested limit reached typed decoding: {(Lean.toJson error).compress}")
+  | .ok _ => throw (IO.userError "duplicate nested limit decoded")
+  let duplicatePathText :=
+    parseJson.compress.replace
+      "\"path\":\"nested/main.solc\""
+      "\"path\":\"nested/main.solc\",\"path\":\"shadow.solc\""
+  match Oracle.V4.decodeRequestText duplicatePathText with
+  | .error (.malformedJson _) => pure ()
+  | .error (.invalidValue error) =>
+      throw (IO.userError
+        s!"duplicate nested path reached typed decoding: {(Lean.toJson error).compress}")
+  | .ok _ => throw (IO.userError "duplicate nested source path decoded")
+
+def oracleV4DiagnosticJson
+    (source code phase : String)
+    (startByte endByte : Nat)
+    (arguments : Lean.Json) : Lean.Json :=
+  .mkObj [
+    ("code", code),
+    ("severity", "error"),
+    ("phase", phase),
+    ("primary", .mkObj [
+      ("source", source),
+      ("startByte", Lean.toJson startByte),
+      ("endByte", Lean.toJson endByte)
+    ]),
+    ("arguments", arguments),
+    ("display", .null)
+  ]
+
+def expectOracleV4Rejected
+    (idValue path content : String)
+    (sourceBytes : Nat := Oracle.V4.Limits.default.sourceBytes) :
+    IO (Oracle.V4.Request × Oracle.V4.Response ×
+      Surface.Wire.V1.Diagnostic) := do
+  let id <- expectOracleV4RequestId idValue
+  let source <- expectOracleV4Source path content
+  let request := oracleV4Request id (.parse source) { sourceBytes }
+  let response := Oracle.V4.handle request
+  assertTrue (response.isValidFor request)
+    s!"Oracle v4 rejected response for {idValue} is not valid for its request"
+  match response.body with
+  | .parse (.rejected diagnostic) =>
+      assertOracleV4RoundTrip s!"{idValue} rejected response"
+        Oracle.V4.encodeResponse
+        (Oracle.V4.decodeResponse oracleV4SurfaceLimits) response
+      pure (request, response, diagnostic)
+  | body =>
+      throw (IO.userError
+        s!"{idValue} did not produce a rejected parse verdict: {reprStr body}")
+
+def expectOracleV4Accepted
+    (idValue path content : String)
+    (sourceBytes : Nat := Oracle.V4.Limits.default.sourceBytes) :
+    IO (Oracle.V4.Request × Oracle.V4.Response ×
+      Surface.Wire.V1.ParseResult) := do
+  let id <- expectOracleV4RequestId idValue
+  let source <- expectOracleV4Source path content
+  let request := oracleV4Request id (.parse source) { sourceBytes }
+  let response := Oracle.V4.handle request
+  assertTrue (response.isValidFor request)
+    s!"Oracle v4 accepted response for {idValue} is not valid for its request"
+  match response.body with
+  | .parse (.accepted result) =>
+      assertOracleV4RoundTrip s!"{idValue} accepted response"
+        Oracle.V4.encodeResponse
+        (Oracle.V4.decodeResponse oracleV4SurfaceLimits) response
+      pure (request, response, result)
+  | body =>
+      throw (IO.userError
+        s!"{idValue} did not produce an accepted parse verdict: {reprStr body}")
+
+def oracleV4BoundaryContent (count : Nat) : String := Id.run do
+  let mut bytes := ByteArray.emptyWithCapacity count
+  for index in [:count] do
+    bytes := bytes.push (if index == 0 then 64 else 32)
+  return String.fromUTF8! bytes
+
+def assertOracleV4DefaultByteBoundary
+    (count : Nat)
+    (expectExceeded : Bool) : IO Unit := do
+  -- An immediate lexical error avoids allocating a token stream or AST below the limit.
+  let content := oracleV4BoundaryContent count
+  assertTrue (content.utf8ByteSize == count)
+    s!"Oracle v4 byte-boundary fixture has the wrong size for {count}"
+  let id <- expectOracleV4RequestId s!"bytes-{count}"
+  let source <- expectOracleV4Source "boundary.solc" content
+  let request := oracleV4Request id (.parse source)
+  let response := Oracle.V4.handle request
+  assertTrue (response.isValidFor request)
+    s!"Oracle v4 produced an invalid byte-boundary response for {count}"
+  match expectExceeded, response.body with
+  | true, .parse (.inconclusive exhaustion) =>
+      assertTrue
+        (exhaustion.limit == 1048576 && exhaustion.consumed == count)
+        s!"Oracle v4 reported the wrong default byte exhaustion for {count}"
+  | false, .parse (.rejected diagnostic) =>
+      assertTrue
+        (diagnostic.code == "SL0001" &&
+          diagnostic.primary.startByte == 0 &&
+          diagnostic.primary.endByte == 1)
+        s!"Oracle v4 did not enter lexing at the default boundary {count}"
+  | _, body =>
+      throw (IO.userError
+        s!"unexpected Oracle v4 byte-boundary verdict for {count}: {reprStr body}")
+
+def testOracleV4Handler : IO Unit := do
+  for path in [
+      "/absolute/main.solc",
+      "../main.solc",
+      "a/./main.solc",
+      "a//main.solc",
+      "C:\\main.solc",
+      "a\\main.solc",
+      "sources/λ🙂.solc"
+    ] do
+    let (request, response, diagnostic) <-
+      expectOracleV4Rejected s!"opaque-{path}" path "@" 1
+    match request.query with
+    | .parse source =>
+        assertTrue (source.path.value == path)
+          s!"Oracle v4 normalized opaque source path {reprStr path}"
+    | .capabilities =>
+        throw (IO.userError "opaque-path fixture changed query kind")
+    assertTrue (diagnostic.primary.source == path)
+      s!"Oracle v4 diagnostic did not echo opaque path {reprStr path}"
+    assertTrue
+      (((Surface.Wire.V1.encodeDiagnostic diagnostic).getObjValD "primary"
+        |>.getObjValD "source") == path)
+      s!"Oracle v4 response JSON did not echo opaque path {reprStr path}"
+
+  let (_, _, asciiDiagnostic) <-
+    expectOracleV4Rejected "diag-ascii" "main.solc" "@" 1
+  assertTrue
+    (Surface.Wire.V1.encodeDiagnostic asciiDiagnostic ==
+      oracleV4DiagnosticJson "main.solc" "SL0001" "surfaceLexing"
+        0 1 (.mkObj [("character", "@")]))
+    "Oracle v4 SL0001 ASCII diagnostic changed"
+
+  let (_, _, multibyteDiagnostic) <-
+    expectOracleV4Rejected "diag-multibyte" "unicode.solc" "λ" 2
+  assertTrue
+    (Surface.Wire.V1.encodeDiagnostic multibyteDiagnostic ==
+      oracleV4DiagnosticJson "unicode.solc" "SL0001" "surfaceLexing"
+        0 2 (.mkObj [("character", "λ")]))
+    "Oracle v4 SL0001 multibyte diagnostic changed"
+
+  let (_, _, unterminatedDiagnostic) <-
+    expectOracleV4Rejected "diag-comment" "comments.solc" "/*a/*b*/" 8
+  assertTrue
+    (Surface.Wire.V1.encodeDiagnostic unterminatedDiagnostic ==
+      oracleV4DiagnosticJson "comments.solc" "SL0002" "surfaceLexing"
+        0 8 (.mkObj []))
+    "Oracle v4 nested unterminated-comment diagnostic changed"
+
+  let unexpectedSource := "function if() -> word { return 0; }"
+  let (_, _, unexpectedDiagnostic) <-
+    expectOracleV4Rejected "diag-unexpected" "unexpected.solc"
+      unexpectedSource unexpectedSource.utf8ByteSize
+  assertTrue
+    (Surface.Wire.V1.encodeDiagnostic unexpectedDiagnostic ==
+      oracleV4DiagnosticJson "unexpected.solc" "SP0001" "surfaceParsing"
+        9 11 (.mkObj [
+          ("expectation", .mkObj [("kind", "identifier")]),
+          ("found", .mkObj [("kind", "keywordIf")])
+        ]))
+    "Oracle v4 SP0001 unexpected-token diagnostic changed"
+
+  let (_, _, eofDiagnostic) <-
+    expectOracleV4Rejected "diag-eof" "empty.solc" "" 0
+  assertTrue
+    (Surface.Wire.V1.encodeDiagnostic eofDiagnostic ==
+      oracleV4DiagnosticJson "empty.solc" "SP0001" "surfaceParsing"
+        0 0 (.mkObj [
+          ("expectation", .mkObj [
+            ("kind", "token"),
+            ("token", .mkObj [("kind", "keywordFunction")])
+          ]),
+          ("found", .null)
+        ]))
+    "Oracle v4 SP0001 end-of-file diagnostic changed"
+
+  let repeatedEquality :=
+    "function p() -> bool { return a == b != c; }"
+  let (_, _, equalityDiagnostic) <-
+    expectOracleV4Rejected "diag-equality" "equality.solc"
+      repeatedEquality repeatedEquality.utf8ByteSize
+  assertTrue
+    (Surface.Wire.V1.encodeDiagnostic equalityDiagnostic ==
+      oracleV4DiagnosticJson "equality.solc" "SP0002" "surfaceParsing"
+        37 39 (.mkObj [("operator", "ne")]))
+    "Oracle v4 SP0002 repeated-equality diagnostic changed"
+
+  let repeatedRelational :=
+    "function p() -> bool { return a < b >= c; }"
+  let (_, _, relationalDiagnostic) <-
+    expectOracleV4Rejected "diag-relational" "relational.solc"
+      repeatedRelational repeatedRelational.utf8ByteSize
+  assertTrue
+    (Surface.Wire.V1.encodeDiagnostic relationalDiagnostic ==
+      oracleV4DiagnosticJson "relational.solc" "SP0002" "surfaceParsing"
+        36 38 (.mkObj [("operator", "ge")]))
+    "Oracle v4 SP0002 repeated-relational diagnostic changed"
+
+  let id <- expectOracleV4RequestId "zero-nonempty"
+  let oneByte <- expectOracleV4Source "one-byte.solc" "@"
+  let zeroNonemptyRequest :=
+    oracleV4Request id (.parse oneByte) { sourceBytes := 0 }
+  let zeroNonemptyResponse := Oracle.V4.handle zeroNonemptyRequest
+  assertTrue (zeroNonemptyResponse.isValidFor zeroNonemptyRequest)
+    "Oracle v4 zero-limit response is not valid for its request"
+  match zeroNonemptyResponse.body with
+  | .parse (.inconclusive exhaustion) =>
+      assertTrue (exhaustion.limit == 0 && exhaustion.consumed == 1)
+        "Oracle v4 zero limit did not reject one source byte in preflight"
+      assertOracleV4RoundTrip "zero-limit inconclusive response"
+        Oracle.V4.encodeResponse
+        (Oracle.V4.decodeResponse oracleV4SurfaceLimits)
+        zeroNonemptyResponse
+  | body =>
+      throw (IO.userError
+        s!"zero limit and nonempty source produced {reprStr body}")
+
+  let multibyteSource <- expectOracleV4Source "two-byte.solc" "λ"
+  let multibyteRequest :=
+    oracleV4Request id (.parse multibyteSource) { sourceBytes := 1 }
+  let multibyteResponse := Oracle.V4.handle multibyteRequest
+  match multibyteResponse.body with
+  | .parse (.inconclusive exhaustion) =>
+      assertTrue (exhaustion.limit == 1 && exhaustion.consumed == 2)
+        "Oracle v4 sourceBytes must count UTF-8 bytes"
+  | body =>
+      throw (IO.userError
+        s!"one-byte limit for lambda produced {reprStr body}")
+
+  let acceptedContent := "function f() -> word { return 0; }"
+  let (acceptedRequest, acceptedResponse, acceptedResult) <-
+    expectOracleV4Accepted "accepted-exact" "accepted.solc"
+      acceptedContent acceptedContent.utf8ByteSize
+  assertTrue (acceptedResponse.isValidFor acceptedRequest)
+    "Oracle v4 exact-limit accepted response failed request validation"
+  assertTrue
+    (acceptedResult.value.span.source == "accepted.solc" &&
+      acceptedResult.value.span.endByte == acceptedContent.utf8ByteSize)
+    "Oracle v4 accepted result did not preserve its source span"
+
+  assertOracleV4DefaultByteBoundary 1048575 false
+  assertOracleV4DefaultByteBoundary 1048576 false
+  assertOracleV4DefaultByteBoundary 1048577 true
+
+  let forgedSource <- expectOracleV4Source "forged-accounting.solc" "ab"
+  let forgedAccountingRequest :=
+    oracleV4Request id (.parse forgedSource) { sourceBytes := 0 }
+  let forgedAccounting : Oracle.V4.Response := {
+    id
+    body := .parse (.inconclusive {
+      limit := 0
+      consumed := 1
+      exceeded := by decide
+    })
+  }
+  assertTrue (!forgedAccounting.isValidFor forgedAccountingRequest)
+    "Oracle v4 accepted forged source-byte accounting"
+
+  let otherContent := "function f() -> word { return 1; }"
+  let otherSource <- expectOracleV4Source "accepted.solc" otherContent
+  let forgedResultRequest := oracleV4Request acceptedRequest.id
+    (.parse otherSource) { sourceBytes := otherContent.utf8ByteSize }
+  let forgedResult : Oracle.V4.Response := {
+    id := acceptedRequest.id
+    body := .parse (.accepted acceptedResult)
+  }
+  assertTrue (!forgedResult.isValidFor forgedResultRequest)
+    "Oracle v4 accepted a parse result from a different source"
+
+  for (content, index) in [
+      "", "@", "λ", "/* open", unexpectedSource,
+      repeatedEquality, repeatedRelational, acceptedContent
+    ].zipIdx do
+    let source <- expectOracleV4Source "no-internal.solc" content
+    let request := oracleV4Request id (.parse source) {
+      sourceBytes := if index == 0 then 0 else content.utf8ByteSize
+    }
+    match (Oracle.V4.handle request).body with
+    | .parse (.internalError error) =>
+        throw (IO.userError
+          s!"public Oracle v4 handler emitted internal error: {reprStr error}")
+    | _ => pure ()
+
+def testOracleV4StreamDispatch : IO Unit := do
+  let id <- expectOracleV4RequestId "stream-v4"
+  let source <- expectOracleV4Source "stream.solc"
+    "function stream() -> word { return 0; }"
+  let v4Capabilities := oracleV4Request id .capabilities
+  let v4Parse := oracleV4Request id (.parse source) {
+    sourceBytes := source.content.utf8ByteSize
+  }
+  -- Each input is dispatched as one NDJSON record; neighboring versions share no state.
+  let v4CapabilitiesOutput :=
+    processJsonLine (Oracle.V4.encodeRequest v4Capabilities).compress
+  let v3CapabilitiesOutput :=
+    processJsonLine (Lean.toJson (requestV3For .capabilities)).compress
+  let v4ParseOutput :=
+    processJsonLine (Oracle.V4.encodeRequest v4Parse).compress
+  let v2CapabilitiesOutput :=
+    processJsonLine (Lean.toJson (requestV2For .capabilities)).compress
+  let v1CapabilitiesOutput :=
+    processJsonLine (Lean.toJson (requestFor .capabilities)).compress
+  assertTrue
+    (v4CapabilitiesOutput.getObjValD "schema" == Oracle.V4.schemaVersion &&
+      v4CapabilitiesOutput.getObjValD "query" == "capabilities" &&
+      (v4CapabilitiesOutput.getObjValD "verdict").getObjValD "kind" ==
+        "accepted")
+    "stream dispatcher changed Oracle v4 capabilities semantics"
+  assertTrue
+    (v3CapabilitiesOutput.getObjValD "schema" == Oracle.V3.schemaVersion &&
+      v3CapabilitiesOutput.getObjValD "query" == "capabilities" &&
+      (v3CapabilitiesOutput.getObjValD "verdict").getObjValD "kind" ==
+        "accepted")
+    "a neighboring Oracle v4 record changed Oracle v3 dispatch"
+  assertTrue
+    (v4ParseOutput.getObjValD "schema" == Oracle.V4.schemaVersion &&
+      v4ParseOutput.getObjValD "query" == "parse" &&
+      (v4ParseOutput.getObjValD "verdict").getObjValD "kind" ==
+        "accepted")
+    "stream dispatcher did not execute an Oracle v4 parse record"
+  assertTrue
+    (v2CapabilitiesOutput.getObjValD "schema" == Oracle.V2.schemaVersion &&
+      v2CapabilitiesOutput.getObjValD "query" == "capabilities" &&
+      (v2CapabilitiesOutput.getObjValD "verdict").getObjValD "kind" ==
+        "accepted")
+    "a neighboring Oracle v4 record changed Oracle v2 dispatch"
+  assertTrue
+    (v1CapabilitiesOutput.getObjValD "schema" == schemaVersion &&
+      (v1CapabilitiesOutput.getObjValD "verdict").getObjValD "kind" ==
+        "accepted")
+    "a neighboring Oracle v4 record changed Oracle v1 dispatch"
+
+  let invalidProfile :=
+    (Oracle.V4.encodeRequest v4Capabilities).getObjValD "profile"
+      |>.setObjVal! "id" "frontend-future"
+  let invalidRecord :=
+    (Oracle.V4.encodeRequest v4Capabilities).setObjVal!
+      "profile" invalidProfile
+  let protocolOutput := processJsonLine invalidRecord.compress
+  assertTrue
+    (protocolOutput.getObjValD "kind" == "protocolError" &&
+      protocolOutput.getObjValD "schema" == Oracle.V4.schemaVersion &&
+      protocolOutput.getObjValD "id" == id.value &&
+      protocolOutput.getObjValD "code" == "oracle.wire.invalid-tag" &&
+      protocolOutput.getObjValD "path" == "/profile/id")
+    "stream dispatcher did not preserve Oracle v4 protocol-error semantics"
+
 def testOracle : IO Unit := do
   assertJsonRoundTrip "request" (requestFor .check)
   assertJsonRoundTrip "capability report" capabilityReport
@@ -3026,6 +3594,9 @@ def run : IO Unit := do
   testOracleV2
   testOracleV3
   testOracleVersionDispatch
+  testOracleV4Codecs
+  testOracleV4Handler
+  testOracleV4StreamDispatch
   testSurfaceLexer
   testSurfaceParserAst
   testSurfacePrecedence
