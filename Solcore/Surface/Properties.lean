@@ -58,6 +58,61 @@ theorem parseLexed_eq_ok_iff
     exact parseLexed_complete
       file lexed parsed lexing conformance derivation
 
+/-- The parser accepts the exact lexer result past its canonical-input guard. -/
+theorem parseLexed_ne_invalid_input_of_lexing
+    (file : SourceFile)
+    (lexed invalid : Lexed)
+    (lexing : Lexer.lex file = .ok lexed) :
+    parseLexed file lexed ≠
+      .error (.internal (.invalidInput invalid)) := by
+  intro failure
+  exact (parseLexed_invalid_input_provenance
+    file lexed invalid failure) lexing
+
+/--
+The parser's output-validation branch is unreachable: reaching it already
+proves that the supplied stream is the exact lexer result, and the
+executor-produced derivation entails the conformance it checks.
+-/
+theorem parseLexed_ne_invalid_output
+    (file : SourceFile)
+    (lexed : Lexed)
+    (invalid : ParsedFile) :
+    parseLexed file lexed ≠
+      .error (.internal (.invalidOutput invalid)) := by
+  intro failure
+  obtain ⟨lexing, derivation, notConforming⟩ :=
+    parseLexed_invalid_output_provenance file lexed invalid failure
+  have lexical := Lexer.lex_success_lexes file lexed lexing
+  have conformance :=
+    FileParses.conformsTo_of_lexes file derivation lexical
+  exact notConforming conformance
+
+/-- Public frontend parsing cannot report a parser input invariant. -/
+theorem parse_ne_parser_invalid_input
+    (file : SourceFile)
+    (invalid : Lexed) :
+    parse file ≠
+      .error (.internal (.parser (.invalidInput invalid))) := by
+  intro failure
+  obtain ⟨lexed, lexing, parsing⟩ :=
+    parse_parser_invariant_provenance
+      file (.invalidInput invalid) failure
+  exact parseLexed_ne_invalid_input_of_lexing
+    file lexed invalid lexing parsing
+
+/-- Public frontend parsing cannot report a parser output invariant. -/
+theorem parse_ne_parser_invalid_output
+    (file : SourceFile)
+    (invalid : ParsedFile) :
+    parse file ≠
+      .error (.internal (.parser (.invalidOutput invalid))) := by
+  intro failure
+  obtain ⟨lexed, lexing, parsing⟩ :=
+    parse_parser_invariant_provenance
+      file (.invalidOutput invalid) failure
+  exact parseLexed_ne_invalid_output file lexed invalid parsing
+
 /--
 Any successful executor result is the unique result allowed by an existing
 complete-file grammar derivation for the same token stream.

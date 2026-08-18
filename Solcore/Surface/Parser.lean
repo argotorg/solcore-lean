@@ -1210,6 +1210,234 @@ private theorem expectContextual_noFuelExhaustion
           | _ =>
               exact noFuelExhaustion_source _
 
+/--
+The recursive parser executor can only succeed, reject the source, or exhaust
+its structurally bounded fuel. It cannot synthesize a wrapper invariant.
+-/
+private inductive ExecutorResult {α : Type} :
+    Except ParseFailure α → Prop where
+  | ok (value : α) : ExecutorResult (.ok value)
+  | source (error : ParseError) : ExecutorResult (.error (.source error))
+  | fuel (phase : ParserPhase) (span : SourceSpan) :
+      ExecutorResult (.error (.internal (.fuelExhausted phase span)))
+
+private theorem executorResult_bind
+    {α β : Type}
+    {result : Except ParseFailure α}
+    {next : α → Except ParseFailure β}
+    (resultClassified : ExecutorResult result)
+    (nextClassified : ∀ value, ExecutorResult (next value)) :
+    ExecutorResult (result >>= next) := by
+  cases resultClassified with
+  | ok value =>
+      change ExecutorResult (next value)
+      exact nextClassified value
+  | source error => exact .source error
+  | fuel phase span => exact .fuel phase span
+
+private theorem expectKind_executorResult
+    (file : SourceFile)
+    (kind : TokenKind)
+    (tokens : List Token) :
+    ExecutorResult (expectKind file kind tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+  | cons token rest =>
+      simp only [expectKind]
+      split
+      · exact .ok _
+      · exact .source _
+
+private theorem expectContextual_executorResult
+    (file : SourceFile)
+    (text : String)
+    (tokens : List Token) :
+    ExecutorResult (expectContextual file text tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+  | cons token rest =>
+      cases token with
+      | mk kind span =>
+          cases kind with
+          | identifier actual =>
+              simp only [expectContextual]
+              split
+              · exact .ok _
+              · exact .source _
+          | _ =>
+              exact .source _
+
+private structure ExpressionParserClassified (fuel : Nat) : Prop where
+  expressionClassified :
+    ∀ (file : SourceFile) (minimum : Nat) (tokens : List Token),
+      ExecutorResult (parseExpressionFuel file fuel minimum tokens)
+  prefixClassified :
+    ∀ (file : SourceFile) (tokens : List Token),
+      ExecutorResult (parsePrefixFuel file fuel tokens)
+  argumentsClassified :
+    ∀ (file : SourceFile) (tokens : List Token),
+      ExecutorResult (parseArgumentsFuel file fuel tokens)
+  argumentTailClassified :
+    ∀ (file : SourceFile) (tokens : List Token),
+      ExecutorResult (parseArgumentTailFuel file fuel tokens)
+  infixClassified :
+    ∀ (file : SourceFile) (minimum : Nat) (left : Expr)
+        (tokens : List Token),
+      ExecutorResult (parseInfixFuel file fuel minimum left tokens)
+
+private theorem expressionParserClassified (fuel : Nat) :
+    ExpressionParserClassified fuel := by
+  induction fuel with
+  | zero =>
+      refine {
+        expressionClassified := ?_
+        prefixClassified := ?_
+        argumentsClassified := ?_
+        argumentTailClassified := ?_
+        infixClassified := ?_
+      }
+      · intro file _ tokens
+        exact .fuel .expression (errorSpan file tokens)
+      · intro file tokens
+        exact .fuel .prefix (errorSpan file tokens)
+      · intro file tokens
+        exact .fuel .arguments (errorSpan file tokens)
+      · intro file tokens
+        exact .fuel .argumentTail (errorSpan file tokens)
+      · intro file _ left tokens
+        simp only [parseInfixFuel]
+        split
+        · exact .fuel .infix (errorSpan file tokens)
+        · exact .ok _
+  | succ fuel inductionHypothesis =>
+      refine {
+        expressionClassified := ?_
+        prefixClassified := ?_
+        argumentsClassified := ?_
+        argumentTailClassified := ?_
+        infixClassified := ?_
+      }
+      · intro file minimum tokens
+        simp only [parseExpressionFuel]
+        split
+        · split
+          · apply executorResult_bind
+            · exact inductionHypothesis.expressionClassified file 0 _
+            · intro condition
+              apply executorResult_bind
+              · exact expectContextual_executorResult
+                  file "then" condition.remaining
+              · intro thenToken
+                apply executorResult_bind
+                · exact inductionHypothesis.expressionClassified file 0 _
+                · intro thenBranch
+                  apply executorResult_bind
+                  · exact expectKind_executorResult
+                      file .keywordElse thenBranch.remaining
+                  · intro elseToken
+                    apply executorResult_bind
+                    · exact inductionHypothesis.expressionClassified file 0 _
+                    · intro _
+                      exact .ok _
+          · apply executorResult_bind
+            · exact inductionHypothesis.prefixClassified file _
+            · intro prefixResult
+              apply executorResult_bind
+              · exact inductionHypothesis.infixClassified
+                  file minimum prefixResult.expression _
+              · intro _
+                exact .ok _
+        · apply executorResult_bind
+          · exact inductionHypothesis.prefixClassified file _
+          · intro prefixResult
+            apply executorResult_bind
+            · exact inductionHypothesis.infixClassified
+                file minimum prefixResult.expression _
+            · intro _
+              exact .ok _
+      · intro file tokens
+        simp only [parsePrefixFuel]
+        split
+        · apply executorResult_bind
+          · exact inductionHypothesis.prefixClassified file _
+          · intro _
+            exact .ok _
+        · exact .ok _
+        · apply executorResult_bind
+          · exact inductionHypothesis.expressionClassified file 0 _
+          · intro inner
+            apply executorResult_bind
+            · exact expectKind_executorResult
+                file .rightParen inner.remaining
+            · intro _
+              exact .ok _
+        · exact .ok _
+        · exact .ok _
+        · split
+          · exact .ok _
+          · split
+            · apply executorResult_bind
+              · exact inductionHypothesis.argumentsClassified file _
+              · intro _
+                exact .ok _
+            · exact .ok _
+        · exact .source _
+      · intro file tokens
+        simp only [parseArgumentsFuel]
+        split
+        · exact .ok _
+        · apply executorResult_bind
+          · exact inductionHypothesis.expressionClassified file 0 _
+          · intro first
+            apply executorResult_bind
+            · exact inductionHypothesis.argumentTailClassified
+                file first.remaining
+            · intro _
+              exact .ok _
+      · intro file tokens
+        simp only [parseArgumentTailFuel]
+        split
+        · exact .ok _
+        · apply executorResult_bind
+          · exact inductionHypothesis.expressionClassified file 0 _
+          · intro next
+            apply executorResult_bind
+            · exact inductionHypothesis.argumentTailClassified
+                file next.remaining
+            · intro _
+              exact .ok _
+        · exact .source _
+      · intro file minimum left tokens
+        simp only [parseInfixFuel]
+        split
+        · split
+          · exact .ok _
+          · apply executorResult_bind
+            · exact inductionHypothesis.expressionClassified file _ _
+            · intro right
+              split
+              · apply executorResult_bind
+                · exact inductionHypothesis.infixClassified
+                    file minimum _ _
+                · intro _
+                  exact .ok _
+              · split
+                · split
+                  · exact .source _
+                  · apply executorResult_bind
+                    · exact inductionHypothesis.infixClassified
+                        file minimum _ _
+                    · intro _
+                      exact .ok _
+                · apply executorResult_bind
+                  · exact inductionHypothesis.infixClassified
+                      file minimum _ _
+                  · intro _
+                    exact .ok _
+        · exact .ok _
+
 private structure ExpressionParserFuelSafe (fuel : Nat) : Prop where
   expressionSafe :
     ∀ (file : SourceFile) (minimum : Nat) (tokens : List Token),
@@ -2059,6 +2287,13 @@ private theorem parseExpression_complete
   simp only [expressionFuel, expressionRank]
   omega
 
+private theorem parseExpression_executorResult
+    (file : SourceFile)
+    (tokens : List Token) :
+    ExecutorResult (parseExpression file tokens) :=
+  (expressionParserClassified
+    (expressionFuel tokens)).expressionClassified file 0 tokens
+
 private theorem parseExpression_noFuelExhaustion
     (file : SourceFile)
     (tokens : List Token) :
@@ -2072,6 +2307,44 @@ private structure LetResult (input : List Token) where
   statement : LetStatement
   remaining : List Token
   parses : LetParses input statement remaining
+
+private theorem expectIdentifier_executorResult
+    (file : SourceFile)
+    (tokens : List Token) :
+    ExecutorResult (expectIdentifier file tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+  | cons token rest =>
+      cases token with
+      | mk kind span =>
+          cases kind <;> simp only [expectIdentifier]
+          all_goals first | exact .ok _ | exact .source _
+
+private theorem parseType_executorResult
+    (file : SourceFile)
+    (tokens : List Token) :
+    ExecutorResult (parseType file tokens) := by
+  cases tokens with
+  | nil =>
+      exact .source _
+  | cons first rest =>
+      cases first with
+      | mk firstKind firstSpan =>
+          cases rest with
+          | nil =>
+              cases firstKind <;>
+                simp only [parseType] <;>
+                (try split) <;>
+                first | exact .ok _ | exact .source _
+          | cons second tail =>
+              cases second with
+              | mk secondKind secondSpan =>
+                  cases firstKind <;>
+                    cases secondKind <;>
+                    simp only [parseType] <;>
+                    (try split) <;>
+                    first | exact .ok _ | exact .source _
 
 private theorem expectIdentifier_noFuelExhaustion
     (file : SourceFile)
@@ -2265,6 +2538,35 @@ private theorem parseLet_noFuelExhaustion
               · intro _
                 exact noFuelExhaustion_ok _
 
+private theorem parseLet_executorResult
+    (file : SourceFile)
+    (tokens : List Token) :
+    ExecutorResult (parseLet file tokens) := by
+  simp only [parseLet]
+  apply executorResult_bind
+  · exact expectKind_executorResult file .keywordLet tokens
+  · intro letToken
+    apply executorResult_bind
+    · exact expectIdentifier_executorResult file letToken.remaining
+    · intro name
+      apply executorResult_bind
+      · exact expectKind_executorResult file .colon name.remaining
+      · intro colon
+        apply executorResult_bind
+        · exact parseType_executorResult file colon.remaining
+        · intro type
+          apply executorResult_bind
+          · exact expectKind_executorResult file .equal type.remaining
+          · intro equal
+            apply executorResult_bind
+            · exact parseExpression_executorResult file equal.remaining
+            · intro value
+              apply executorResult_bind
+              · exact expectKind_executorResult
+                  file .semicolon value.remaining
+              · intro _
+                exact .ok _
+
 private theorem typeParses_remaining_length_lt
     {input remaining : List Token}
     {type : TypeSyntax}
@@ -2409,6 +2711,27 @@ private theorem parseBindings_noFuelExhaustion
       · exact noFuelExhaustion_ok _
       · exact noFuelExhaustion_source _
 
+private theorem parseBindings_executorResult
+    (file : SourceFile)
+    (fuel : Nat)
+    (tokens : List Token) :
+    ExecutorResult (parseBindings file fuel tokens) := by
+  induction fuel generalizing tokens with
+  | zero =>
+      exact .fuel .bindings (errorSpan file tokens)
+  | succ fuel inductionHypothesis =>
+      simp only [parseBindings]
+      split
+      · apply executorResult_bind
+        · exact parseLet_executorResult file _
+        · intro binding
+          apply executorResult_bind
+          · exact inductionHypothesis binding.remaining
+          · intro _
+            exact .ok _
+      · exact .ok _
+      · exact .source _
+
 private structure ReturnResult (input : List Token) where
   statement : ReturnStatement
   remaining : List Token
@@ -2498,6 +2821,22 @@ private theorem parseReturn_noFuelExhaustion
           file .semicolon value.remaining
       · intro _
         exact noFuelExhaustion_ok _
+
+private theorem parseReturn_executorResult
+    (file : SourceFile)
+    (tokens : List Token) :
+    ExecutorResult (parseReturn file tokens) := by
+  simp only [parseReturn]
+  apply executorResult_bind
+  · exact expectKind_executorResult file .keywordReturn tokens
+  · intro returnToken
+    apply executorResult_bind
+    · exact parseExpression_executorResult file returnToken.remaining
+    · intro value
+      apply executorResult_bind
+      · exact expectKind_executorResult file .semicolon value.remaining
+      · intro _
+        exact .ok _
 
 private structure FunctionResult (input : List Token) where
   declaration : FunctionDecl
@@ -2716,6 +3055,47 @@ private theorem parseFunction_noFuelExhaustion
                     · intro _
                       exact noFuelExhaustion_ok _
 
+private theorem parseFunction_executorResult
+    (file : SourceFile)
+    (tokens : List Token) :
+    ExecutorResult (parseFunction file tokens) := by
+  simp only [parseFunction]
+  apply executorResult_bind
+  · exact expectKind_executorResult file .keywordFunction tokens
+  · intro functionToken
+    apply executorResult_bind
+    · exact expectIdentifier_executorResult file functionToken.remaining
+    · intro name
+      apply executorResult_bind
+      · exact expectKind_executorResult file .leftParen name.remaining
+      · intro leftParen
+        apply executorResult_bind
+        · exact expectKind_executorResult
+            file .rightParen leftParen.remaining
+        · intro rightParen
+          apply executorResult_bind
+          · exact expectKind_executorResult file .arrow rightParen.remaining
+          · intro arrow
+            apply executorResult_bind
+            · exact parseType_executorResult file arrow.remaining
+            · intro returnType
+              apply executorResult_bind
+              · exact expectKind_executorResult
+                  file .leftBrace returnType.remaining
+              · intro leftBrace
+                apply executorResult_bind
+                · exact parseBindings_executorResult
+                    file (leftBrace.remaining.length + 1) leftBrace.remaining
+                · intro bindings
+                  apply executorResult_bind
+                  · exact parseReturn_executorResult file bindings.remaining
+                  · intro result
+                    apply executorResult_bind
+                    · exact expectKind_executorResult
+                        file .rightBrace result.remaining
+                    · intro _
+                      exact .ok _
+
 private structure ParsedResult (lexed : Lexed) where
   parsed : ParsedFile
   parses : FileParses lexed parsed
@@ -2768,6 +3148,55 @@ private def parseLexedUnchecked
   match parseLexedUncheckedCertified file lexed with
   | .error failure => .error failure
   | .ok result => .ok result.parsed
+
+private theorem parseLexedUncheckedCertified_executorResult
+    (file : SourceFile)
+    (lexed : Lexed) :
+    ExecutorResult (parseLexedUncheckedCertified file lexed) := by
+  simp only [parseLexedUncheckedCertified]
+  apply executorResult_bind
+  · exact parseFunction_executorResult file lexed.tokens
+  · intro function
+    split
+    · exact .ok _
+    · exact .source _
+
+private theorem parseLexedUnchecked_executorResult
+    (file : SourceFile)
+    (lexed : Lexed) :
+    ExecutorResult (parseLexedUnchecked file lexed) := by
+  unfold parseLexedUnchecked
+  cases equation : parseLexedUncheckedCertified file lexed with
+  | ok result =>
+      exact .ok _
+  | error failure =>
+      have classified :=
+        parseLexedUncheckedCertified_executorResult file lexed
+      rw [equation] at classified
+      cases classified with
+      | source error => exact .source error
+      | fuel phase span => exact .fuel phase span
+
+private theorem parseLexedUnchecked_ne_invalid_input
+    (file : SourceFile)
+    (lexed invalid : Lexed) :
+    parseLexedUnchecked file lexed ≠
+      .error (.internal (.invalidInput invalid)) := by
+  intro failure
+  have classified := parseLexedUnchecked_executorResult file lexed
+  rw [failure] at classified
+  cases classified
+
+private theorem parseLexedUnchecked_ne_invalid_output
+    (file : SourceFile)
+    (lexed : Lexed)
+    (invalid : ParsedFile) :
+    parseLexedUnchecked file lexed ≠
+      .error (.internal (.invalidOutput invalid)) := by
+  intro failure
+  have classified := parseLexedUnchecked_executorResult file lexed
+  rw [failure] at classified
+  cases classified
 
 private theorem parseLexedUnchecked_complete
     (file : SourceFile)
@@ -2850,6 +3279,82 @@ def parseLexed
               .error (.internal (.invalidOutput parsed))
       else
         .error (.internal (.invalidInput lexed))
+
+/--
+An `invalidInput` result can only come from the public canonical-input guard.
+The recursive parser executor never synthesizes this invariant.
+-/
+theorem parseLexed_invalid_input_provenance
+    (file : SourceFile)
+    (lexed invalid : Lexed)
+    (failure : parseLexed file lexed =
+      .error (.internal (.invalidInput invalid))) :
+    Lexer.lex file ≠ .ok lexed := by
+  intro lexing
+  cases parsing : parseLexedUnchecked file lexed with
+  | ok parsed =>
+      cases outputValidity : parsed.conformsTo file lexed <;>
+        simp [parseLexed, lexing, parsing, outputValidity] at failure
+  | error parseFailure =>
+      have classified := parseLexedUnchecked_executorResult file lexed
+      rw [parsing] at classified
+      cases classified with
+      | source error =>
+          simp [parseLexed, lexing, parsing] at failure
+      | fuel phase span =>
+          simp [parseLexed, lexing, parsing] at failure
+
+/--
+An `invalidOutput` result records a genuine declarative parse for the exact
+canonical lexer output whose executable conformance check returned false.
+-/
+theorem parseLexed_invalid_output_provenance
+    (file : SourceFile)
+    (lexed : Lexed)
+    (parsed : ParsedFile)
+    (failure : parseLexed file lexed =
+      .error (.internal (.invalidOutput parsed))) :
+    Lexer.lex file = .ok lexed ∧
+      FileParses lexed parsed ∧
+      ¬parsed.ConformsTo file lexed := by
+  unfold parseLexed at failure
+  cases lexing : Lexer.lex file with
+  | error lexFailure =>
+      simp [lexing] at failure
+  | ok canonical =>
+      cases canonicality : decide (canonical = lexed) with
+      | false =>
+          simp [lexing, canonicality] at failure
+      | true =>
+          have canonicalEquals : canonical = lexed :=
+            of_decide_eq_true canonicality
+          subst canonical
+          cases parsing : parseLexedUnchecked file lexed with
+          | error parseFailure =>
+              have classified :=
+                parseLexedUnchecked_executorResult file lexed
+              rw [parsing] at classified
+              cases classified with
+              | source error =>
+                  simp [lexing, parsing] at failure
+              | fuel phase span =>
+                  simp [lexing, parsing] at failure
+          | ok parsedResult =>
+              cases outputValidity : parsedResult.conformsTo file lexed with
+              | false =>
+                  simp [lexing, parsing, outputValidity] at failure
+                  cases failure
+                  refine ⟨rfl, ?_, ?_⟩
+                  · exact parseLexedUnchecked_success_fileParses
+                      file lexed parsed parsing
+                  · intro conformance
+                    have accepted :
+                        parsed.conformsTo file lexed = true :=
+                      (ParsedFile.conformsTo_eq_true_iff
+                        parsed file lexed).mpr conformance
+                    simp_all
+              | true =>
+                  simp [lexing, parsing, outputValidity] at failure
 
 theorem parseLexed_complete
     (file : SourceFile)
@@ -3028,6 +3533,30 @@ def parse (file : SourceFile) : Except FrontendError ParsedFile :=
       | .error (.internal invariant) =>
           .error (.internal (.parser invariant))
       | .ok parsed => .ok parsed
+
+/-- Every public parser invariant comes from parsing the exact lexer output. -/
+theorem parse_parser_invariant_provenance
+    (file : SourceFile)
+    (invariant : ParserInvariant)
+    (failure : parse file = .error (.internal (.parser invariant))) :
+    ∃ lexed,
+      Lexer.lex file = .ok lexed ∧
+      parseLexed file lexed = .error (.internal invariant) := by
+  cases lexing : Lexer.lex file with
+  | error lexFailure =>
+      cases lexFailure <;> simp [parse, lexing] at failure
+  | ok lexed =>
+      cases parsing : parseLexed file lexed with
+      | ok parsed =>
+          simp [parse, lexing, parsing] at failure
+      | error parseFailure =>
+          cases parseFailure with
+          | source error =>
+              simp [parse, lexing, parsing] at failure
+          | internal actual =>
+              simp [parse, lexing, parsing] at failure
+              cases failure
+              exact ⟨lexed, rfl, parsing⟩
 
 theorem parse_complete
     (file : SourceFile)
