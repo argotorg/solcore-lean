@@ -341,8 +341,6 @@ theorem functional {raw : List (String × RawSourceFile)}
 
 end TaggedExternalFilesOf
 
-namespace Workspace
-
 /-- Raw-order values witnessing declarative workspace decoding. -/
 structure RelationalUserWorkspace where
   entryPath : CanonicalSourcePath
@@ -459,8 +457,6 @@ theorem functional {raw : RawWorkspace} {first second : List ValidationError}
     firstRejects.errorsFor secondRejects.errorsFor
 
 end Rejects
-
-end Workspace
 
 namespace RawWorkspace
 
