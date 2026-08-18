@@ -98,6 +98,7 @@ for (const schema of schemas) {
 const oracleV1SchemaId = "urn:solcore:oracle:v1";
 const oracleV2SchemaId = "urn:solcore:oracle:v2";
 const oracleV3SchemaId = "urn:solcore:oracle:v3";
+const oracleV4SchemaId = "urn:solcore:oracle:v4";
 const semanticCoreV1SchemaId = "urn:solcore:semantic-core:v1";
 const semanticCoreV2SchemaId = "urn:solcore:semantic-core:v2";
 const surfaceV1SchemaId = "urn:solcore:surface:v1";
@@ -105,11 +106,17 @@ const parseResultV1SchemaId = "urn:solcore:parse-result:v1";
 const permittedExternalRefs = new Map([
   [oracleV2SchemaId, new Set([oracleV1SchemaId, semanticCoreV1SchemaId])],
   [oracleV3SchemaId, new Set([oracleV1SchemaId, semanticCoreV2SchemaId])],
+  [oracleV4SchemaId, new Set([
+    surfaceV1SchemaId,
+    parseResultV1SchemaId,
+  ])],
   [parseResultV1SchemaId, new Set([surfaceV1SchemaId])],
 ]);
 let semanticCoreV1ReferenceCount = 0;
 let semanticCoreV2ReferenceCount = 0;
 let surfaceV1ParseResultReferenceCount = 0;
+let oracleV4SurfaceReferenceCount = 0;
+let oracleV4ParseResultReferenceCount = 0;
 
 function resolveJsonPointer(document, fragment) {
   let pointer;
@@ -173,6 +180,13 @@ function verifySchemaRef(ref, schema, path) {
     ) {
       surfaceV1ParseResultReferenceCount += 1;
     }
+    if (schema.value.$id === oracleV4SchemaId) {
+      if (targetId === surfaceV1SchemaId) {
+        oracleV4SurfaceReferenceCount += 1;
+      } else if (targetId === parseResultV1SchemaId) {
+        oracleV4ParseResultReferenceCount += 1;
+      }
+    }
   }
   if (!resolveJsonPointer(targetSchema.value, fragment)) {
     schemaIssues.push(`${schema.path}${path}: unresolved JSON pointer ${ref}`);
@@ -222,6 +236,10 @@ assert(
   "schema/oracle-v3.schema.json is not registered by $id",
 );
 assert(
+  schemasById.has(oracleV4SchemaId),
+  "schema/oracle-v4.schema.json is not registered by $id",
+);
+assert(
   schemasById.has(semanticCoreV1SchemaId),
   "schema/semantic-core-v1.schema.json is not registered by $id",
 );
@@ -249,11 +267,17 @@ assert(
   surfaceV1ParseResultReferenceCount === 1,
   "parse-result v1 schema must reference the registered Surface v1 schema exactly once",
 );
+assert(
+  oracleV4SurfaceReferenceCount === 7 &&
+    oracleV4ParseResultReferenceCount === 1,
+  "Oracle v4 schema has an unexpected external reference surface",
+);
 
 const semanticCoreV1Schema = schemasById.get(semanticCoreV1SchemaId).value;
 const semanticCoreV2Schema = schemasById.get(semanticCoreV2SchemaId).value;
 const surfaceV1Schema = schemasById.get(surfaceV1SchemaId).value;
 const parseResultV1Schema = schemasById.get(parseResultV1SchemaId).value;
+const oracleV4Schema = schemasById.get(oracleV4SchemaId).value;
 assert(
   surfaceV1Schema.$ref === "#/$defs/file" &&
     surfaceV1Schema.$defs.file.properties.schema.const ===
@@ -443,8 +467,78 @@ assert(
       JSON.stringify(["surfaceGrammar"]),
   "M2b frontend profile has an incompatible scope, observation, or feature set",
 );
+assert(
+  oracleV4Schema.$defs.request.properties.spec.const ===
+      registeredM2bProfile.entry.spec &&
+    oracleV4Schema.$defs.profileRef.properties.id.const ===
+      registeredM2bProfile.entry.id &&
+    oracleV4Schema.$defs.profileRef.properties.digest.const ===
+      registeredM2bProfile.entry.digest,
+  "Oracle v4 schema request binding differs from the profile manifest",
+);
+assert(
+  JSON.stringify(sortedObject(oracleV4Schema.$defs.m2bProfile.const)) ===
+    JSON.stringify(sortedObject(m2bProfile)),
+  "Oracle v4 schema profile const differs from the registered M2b profile",
+);
+assert(
+  oracleV4Schema.$defs.capabilityReport.properties.profileDigest.const ===
+      registeredM2bProfile.entry.digest &&
+    oracleV4Schema.$defs.capabilityReport.properties.surfaceSchema.const ===
+      surfaceV1Schema.$defs.file.properties.schema.const &&
+    oracleV4Schema.$defs.capabilityReport.properties.parseResultSchema.const ===
+      parseResultV1Schema.properties.schema.const,
+  "Oracle v4 capability schema bindings differ from registered publication schemas",
+);
+assert(
+  JSON.stringify(
+    oracleV4Schema.$defs.nonAssociativeBinaryOperator.enum,
+  ) === JSON.stringify(["lt", "gt", "le", "ge", "eq", "ne"]),
+  "Oracle v4 SP0002 operator set differs from ADR-0013",
+);
+for (const verdictName of [
+  "lexicalRejectedVerdict",
+  "parsingRejectedVerdict",
+]) {
+  const diagnostics =
+    oracleV4Schema.$defs[verdictName].properties.diagnostics;
+  assert(
+    diagnostics.minItems === 1 && diagnostics.maxItems === 1,
+    `Oracle v4 ${verdictName} does not require exactly one diagnostic`,
+  );
+}
+assert(
+  oracleV4Schema.$defs.parseAcceptedVerdict.properties.result.$ref ===
+    parseResultV1SchemaId,
+  "Oracle v4 accepted parse verdict does not use parse-result v1",
+);
 
 const baselineManifest = readJson("metadata/baselines.json");
+const expectedCapabilityBaselines = baselineManifest.implementations.map(
+  (implementation) => ({
+    implementation: implementation.id,
+    repository: implementation.repository,
+    revision: implementation.revision,
+    role: implementation.role,
+    standardLibraryBundle: implementation.standardLibraryBundle,
+    nativeSettings: {
+      solver: implementation.nativeSettings.solver.mode,
+      generatedDispatch: implementation.nativeSettings.generatedDispatch.enabled,
+      primitiveSurface: implementation.nativeSettings.evm.primitiveSurface,
+      bytecodeRuntime: implementation.nativeSettings.evm.bytecodeRuntime,
+      nativeBackendTarget: implementation.nativeSettings.evm.nativeBackendTarget,
+      externalYulCompilerTarget:
+        implementation.nativeSettings.evm.externalYulCompilerTarget,
+    },
+    notes: implementation.capabilityNote,
+  }),
+);
+assert(
+  JSON.stringify(sortedObject(
+    oracleV4Schema.$defs.capabilityReport.properties.baselines.const,
+  )) === JSON.stringify(sortedObject(expectedCapabilityBaselines)),
+  "Oracle v4 capability baselines differ from metadata/baselines.json",
+);
 const bundleIds = new Set([
   standardLibrary.canonical.id,
   ...standardLibrary.compatibilitySnapshots.map((snapshot) => snapshot.id),
