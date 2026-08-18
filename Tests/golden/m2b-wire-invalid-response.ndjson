@@ -1,0 +1,1 @@
+{"arguments":{"actual":"futureParse","expected":["capabilities","parse"]},"code":"oracle.wire.invalid-tag","display":"invalid Oracle v4 request","id":"m2b-wire-invalid-query","kind":"protocolError","path":"/query/kind","schema":"solcore-oracle/v4"}

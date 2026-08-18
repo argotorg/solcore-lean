@@ -108,6 +108,35 @@
       "stdin": "Tests/golden/mixed-v1-v2-v3-request.ndjson",
       "expected": "Tests/golden/mixed-v1-v2-v3-response.ndjson",
       "sha256": "34b0e02cece92d7855270c1dbd560941d6568c9035aeb077df76bc5e724bbf1f"
+    },
+    {
+      "id": "capabilities-v4",
+      "arguments": [
+        "capabilities-v4"
+      ],
+      "stdin": null,
+      "sha256": "30c0ed1a20ca6ae68bf866282d5c4f4ea2c6b39d564061c2e166622ffe12426e"
+    },
+    {
+      "id": "m2b-parse-outcomes",
+      "arguments": [],
+      "stdin": "Tests/golden/m2b-parse-outcomes-request.ndjson",
+      "expected": "Tests/golden/m2b-parse-outcomes-response.ndjson",
+      "sha256": "704ae4151b168af070fdc990b18ff120ce45b5f17368073fe17720707869876f"
+    },
+    {
+      "id": "m2b-wire-invalid",
+      "arguments": [],
+      "stdin": "Tests/golden/m2b-wire-invalid-request.ndjson",
+      "expected": "Tests/golden/m2b-wire-invalid-response.ndjson",
+      "sha256": "d004ff8f05646240fdc7cc896d2e8de3e6821163a511219759cba1d6838ace28"
+    },
+    {
+      "id": "mixed-v1-v2-v3-v4-stream-recovery",
+      "arguments": [],
+      "stdin": "Tests/golden/mixed-v1-v2-v3-v4-request.ndjson",
+      "expected": "Tests/golden/mixed-v1-v2-v3-v4-response.ndjson",
+      "sha256": "e8bfd9e09bd90b0fcc1959b2c918493d82a5d65295d08b508d255413e2e0d7ce"
     }
   ]
 }
