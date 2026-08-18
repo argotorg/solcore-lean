@@ -110,8 +110,8 @@ and capability bytes remain immutable.
 ## M2a internal parser boundary
 
 ADR-0012 defines an internal parse-only Surface fragment, and its lexer/parser
-kernel is under implementation. This work does not promote a language feature,
-add an enabled profile feature, or change the current `grammarVersion = none`
+proof kernel is complete. This work does not promote a language feature, add an
+enabled profile feature, or change the current `grammarVersion = none`
 publication. Oracle v1 `parse` remains `unsupported`.
 
 The internal parser preserves UTF-8 byte spans, comments, raw integer spelling,
@@ -120,10 +120,10 @@ It deliberately leaves names, source literal typing, standard-library
 identities, and Core elaboration unresolved. Parser publication requires a new
 language/profile/Surface-wire/Oracle version and will be recorded separately.
 The declarative lexical judgment, direct executor-to-parser-grammar derivation,
-relational determinism, and frontend fuel-sufficiency proofs are implemented.
-Reverse parser completeness, global lexical uniqueness, and lexer-failure
-reachability remain open, so this internal work is not marked `implemented` in
-the matrix.
+reverse parser completeness, relational determinism, global lexical
+uniqueness, lexer-failure reachability, and frontend fuel-sufficiency proofs are
+implemented. This internal work is not marked `implemented` in the matrix
+because publication still requires the separate versioned M2b boundary.
 
 ## Rules for profile inclusion
 

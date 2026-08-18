@@ -6,7 +6,7 @@ and elaboration phases. M2 must make source-level differential testing possible
 without treating either existing compiler's lowering pipeline as the
 specification.
 
-## Current progress: M2a parser kernel in progress
+## Current progress: M2a parser proof kernel complete
 
 Following
 [ADR-0012](adr/0012-m2a-surface-parser-kernel.md), the repository contains an
@@ -40,26 +40,28 @@ The proof layer now contains:
 4. relational determinism for expressions, prefix and infix parsing,
    arguments, types, statements, functions, and complete files;
 5. executable checks for span validity, grammar shape, and exact AST/token
-   correspondence; and
-6. sufficient-fuel theorems for both lexer and parser input-derived bounds.
+   correspondence;
+6. sufficient-fuel theorems for both lexer and parser input-derived bounds;
+7. global uniqueness of accepted lexical partitions and sound reachability for
+   every public source-level lexer failure; and
+8. reverse executor completeness for every `FileParses` derivation over the
+   exact lexer output.
 
 Successful public parsing retains the exact lexer and parser results and proves
 the lexical judgment, complete token correspondence, source validity, grammar
 validity, and `FileParses`. Fuel exhaustion remains represented as an internal
 invariant for defensive classification, but public lexer and parser theorems
-prove it unreachable.
+prove it unreachable. The lexer's defensive output-validation invariant is
+also proved unreachable from the raw executor's lexical-soundness theorem.
 
-The exact remaining completeness limitation is the reverse executor theorem.
-The repository does not yet prove that every canonical, conforming
-`FileParses lexed parsed` derivation makes `parseLexed file lexed` return
-`parsed`. Soundness and relational uniqueness are proved: if execution
-succeeds, its result is the unique result permitted by any existing derivation.
-The cursor-local lexical rejection judgment also lacks a theorem connecting
-every public lexer source failure to a reachable rejection cursor. Global
-uniqueness of two `Lexes` derivations still requires public structural
-eliminators for ordered token/comment partitions, same-cursor choice
-uniqueness, and a merged-stream cursor proof. These limitations must be
-discharged or carried explicitly into the M2b publication decision.
+The internal M2a proof obligations are discharged in both executor directions.
+Successful execution constructs the independent judgments, and every
+complete-file derivation for the exact lexer stream is accepted; its full
+source conformance follows from the lexical and grammatical derivations.
+Two accepted lexical partitions of one source are equal, and every public
+source-level lexer failure is connected to an implementation-reached cursor
+that satisfies the executable local rejection judgment. These results close
+the proof-kernel prerequisites for the M2b publication decision.
 
 M2a is not a published language profile. Oracle v1 source queries remain
 `unsupported`; Oracle v2 and v3 continue to accept only their frozen Semantic
@@ -141,10 +143,9 @@ is `inconclusive`, not `rejected`.
 ## Implementation order
 
 1. Surface source ownership, tokens, syntax, lexer, parser, and correspondence.
-   Soundness, direct parser derivation, relational determinism, and fuel
-   sufficiency are implemented for the internal M2a fragment. Reverse parser
-   completeness, lexical uniqueness, and lexer-failure reachability remain
-   open.
+   Soundness, completeness, direct parser derivation, relational determinism,
+   lexical uniqueness, lexer-failure reachability, and fuel sufficiency are
+   implemented for the internal M2a fragment.
 2. Version-local Surface wire and parse-only Oracle publication.
 3. Workspace validation and module/import resolution.
 4. Resolved identifiers and declarative resolution correspondence.

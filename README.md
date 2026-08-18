@@ -4,11 +4,12 @@
 in Lean 4, intended to become the reference implementation for semantic
 differential fuzzing.
 
-The project is currently developing **M2a (the Surface parser kernel)**. The
-published reference boundary remains M1c: `solcore/0.1.0-draft.3`, profile
-`core-m1c-v1`, Semantic Core v2, and Oracle v3. M2a adds an internal parse-only
-frontend without widening any published Oracle. The draft.1/Oracle v1 and
-draft.2/Oracle v2 contracts remain frozen for compatibility.
+The project has completed the internal **M2a Surface parser proof kernel** and
+is preparing its separate M2b publication layer. The published reference
+boundary remains M1c: `solcore/0.1.0-draft.3`, profile `core-m1c-v1`, Semantic
+Core v2, and Oracle v3. M2a adds an internal parse-only frontend without
+widening any published Oracle. The draft.1/Oracle v1 and draft.2/Oracle v2
+contracts remain frozen for compatibility.
 
 ## What M0 fixes
 
@@ -127,7 +128,11 @@ for differential investigation.
 - success provenance theorems linking the public parser to the exact lexer
   result, complete token correspondence, grammar validity, and a `FileParses`
   derivation
+- global uniqueness of accepted lexical partitions and reachability of every
+  public source-level lexical rejection
 - relational determinism for every parser grammar layer
+- reverse executor completeness for every `FileParses` derivation over the
+  exact lexer output
 - proved lexer and parser fuel sufficiency at the configured input-derived
   bounds
 
@@ -136,21 +141,19 @@ ordinary calls to such names as `bnotWord`, `bshlWord`, and `bshrWord` until
 resolution can identify canonical declarations. Source integer conversion,
 name resolution, type checking, and Core elaboration are not part of M2a.
 
-M2a proof work is still in progress. The public lexer gates success with the
-independent lexical judgment, and `parseLexed` accepts only that exact lexer
-result. The private parser constructs its declarative derivation alongside the
-AST, and public success implies the grammar-shape, full AST/token
-correspondence, and `FileParses` predicates. The grammar is relationally
+The M2a proof kernel is complete at its internal boundary. The public lexer
+gates success with the independent lexical judgment, and accepted lexical
+partitions are globally unique. Every public source-level lexer failure is
+connected to an implementation-reached cursor and the executable local
+rejection judgment. `parseLexed` accepts only the exact lexer result; its
+private parser constructs a declarative derivation alongside the AST. Public
+success implies grammar shape, full AST/token correspondence, and
+`FileParses`, while every `FileParses` derivation for the exact lexer stream
+makes the executor return that tree. The grammar is relationally
 deterministic. Input-derived lexer and parser fuel bounds are proved sufficient,
-so public execution cannot report fuel exhaustion.
-
-The exact remaining completeness limitation is the reverse executor direction:
-the repository does not yet prove that every canonical, conforming
-`FileParses` derivation is accepted by `parseLexed`. The cursor-local lexical
-rejection judgment is executable, but a theorem connecting every public lexer
-source failure to a reachable rejection cursor is also still open. Global
-uniqueness of two accepted lexical judgments has not yet been proved from the
-ordered source-partition invariants.
+so public execution cannot report fuel exhaustion. The lexer's defensive
+output-validation error is also proved unreachable from raw executor
+soundness.
 
 The parser is deliberately not exposed by Oracle v1, v2, or v3. A later,
 additive parser publication will require a closed Surface wire AST, a new

@@ -21,9 +21,10 @@ Oracle query, and it performs no name resolution, checking, or elaboration.
 Its public success path is checked against declarative span, grammar, and
 token-correspondence predicates. The maximal-munch lexical judgment, direct
 construction of the full parser grammar derivation, relational determinism,
-and frontend fuel sufficiency are proved. Reverse parser completeness, global
-lexical uniqueness, and reachability of cursor-local lexical rejection
-judgments remain proof obligations.
+reverse parser completeness, global lexical uniqueness, reachability of
+cursor-local lexical rejection judgments, and frontend fuel sufficiency are
+proved. Publication remains separate because the kernel has no versioned
+Surface wire format, frontend profile, or Oracle query.
 
 To achieve this purpose, the specification provides the following three
 elements as one coherent whole:

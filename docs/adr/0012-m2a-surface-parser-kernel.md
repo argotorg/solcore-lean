@@ -55,20 +55,22 @@ to the pre-publication M1a kernel. It is not assigned to a published
 Oracle v1 source queries remain `unsupported`, and Oracle v2 and v3 remain
 closed Core protocols.
 
-This change starts, but does not declare completion of, the M2a proof work. The
-Lean layer now includes independent maximal-munch lexer and full-token
-difference-list parser judgments, plus executable conformance predicates for
-source spans, grammar shape, and exact AST/token correspondence. Public lexer
-success is gated by the lexical judgment. The private parser constructs its
-`FileParses` derivation alongside the AST, and public parser success implies
-that derivation and the conformance predicate for the exact lexer stream.
-Relational determinism and lexer/parser fuel sufficiency are proved.
+The Lean layer completes the internal M2a proof kernel. It includes independent
+maximal-munch lexer and full-token difference-list parser judgments, plus
+executable conformance predicates for source spans, grammar shape, and exact
+AST/token correspondence. Public lexer success is gated by the lexical
+judgment, and accepted lexical partitions are globally unique. Every public
+source-level lexer failure is connected to an implementation-reached cursor
+and its cursor-local rejection judgment. The private parser constructs its
+`FileParses` derivation alongside the AST; public success implies that
+derivation and conformance for the exact lexer stream, and every derivation for
+that stream independently implies conformance and makes the executor succeed.
+Relational determinism and lexer/parser fuel sufficiency are also proved.
 
-The reverse parser completeness theorem remains open: a canonical, conforming
-`FileParses` derivation is not yet proved to make the executor succeed. Global
-uniqueness of accepted lexical judgments and the connection from every public
-lexer source failure to its reachable cursor-local rejection judgment also
-remain explicit obligations.
+The lexer retains an internal invalid-output classification as a defensive
+validation boundary. A direct induction over the raw lexer proves that every
+successful output satisfies the lexical judgment, so this classification is
+unreachable without relying circularly on the public validation gate.
 
 A later publication ADR must add a new language version with
 `grammarVersion = 1`, a version-local Surface wire schema, a frontend profile,
@@ -192,11 +194,11 @@ they do not yet assign entry-point or Core elaboration semantics to that
 function.
 
 The executable parser is deterministic, consumes the complete non-trivia token
-stream on success, and is fail-fast. Relational determinism is proved; the
-reverse theorem that every suitable declarative derivation makes the executor
-succeed remains open. Parser recursion is bounded by a termination measure
-derived only from the finite token stream, not by a configurable semantic
-resource limit. The input-derived bounds are proved sufficient.
+stream on success, and is fail-fast. Relational determinism and reverse
+executor completeness for every suitable declarative derivation are proved.
+Parser recursion is bounded by a termination measure derived only from the
+finite token stream, not by a configurable semantic resource limit. The
+input-derived bounds are proved sufficient.
 `fuelExhausted` remains an internal parser invariant for defensive
 classification, but public parsing proves it unreachable. It cannot produce
 `SP0001` or any other source rejection.
