@@ -4,6 +4,12 @@
 - Decision date: 2026-08-18
 - Scope: M2c workspace identity kernel
 
+Implementation status: complete and proof-audited. The independent judgments,
+pure validator, correspondence theorems, canonical error tests, permutation
+tests, measure tests, and public Lean umbrella are present. This status does not
+authorize or claim module or name resolution, standard-library assembly, a
+workspace wire format, or a new Oracle/profile publication.
+
 ## Context
 
 ADR-0013 publishes a parser for one source file. Its `path` is an opaque,

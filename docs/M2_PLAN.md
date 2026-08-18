@@ -6,7 +6,7 @@ and elaboration phases. M2 must make source-level differential testing possible
 without treating either existing compiler's lowering pipeline as the
 specification.
 
-## Current progress: M2b parser publication complete
+## Current progress: M2c Workspace Identity Kernel complete
 
 Following
 [ADR-0012](adr/0012-m2a-surface-parser-kernel.md), the repository contains an
@@ -82,6 +82,23 @@ existing bytes. Because M2b does not resolve workspaces, names, types, or
 standard-library identities and does not elaborate or execute source, it does
 not yet establish full source-level semantic differential conformance.
 
+[ADR-0014](adr/0014-m2c-workspace-identity.md)'s internal Workspace Identity
+Kernel is now implemented. It defines exact ASCII logical paths, structured
+library/source/module identities, raw and proof-carrying validated workspace
+types, all eight canonical structural errors, independent validation and
+rejection judgments, and a pure total validator. The proof boundary establishes
+executor soundness and completeness, functional validated output and rejection,
+success/rejection exclusivity, lookup and entry invariants, preservation of
+source counts and UTF-8 byte measures, and validation invariance under the
+specified raw-workspace equivalence. The public Lean umbrella and its theorem
+dependencies pass the semantic-kernel audit.
+
+This completion is internal and additive. It does not reinterpret Oracle v4's
+opaque source label, publish a workspace wire format or profile, assemble the
+standard library, or implement module or name resolution. Resolution remains
+blocked until a separate Accepted ADR closes the multi-module Surface algebra,
+imports, exports, scopes, intrinsic identities, and standard-library interface.
+
 ## Phase boundaries
 
 ### M2b: parser publication
@@ -102,16 +119,17 @@ The publication is additive. It does not modify draft.1 through draft.3,
 Semantic Core v1 or v2, Oracle v1 through v3, their profiles, or their existing
 golden bytes.
 
-### M2c: workspace and resolution
+### M2c: workspace identity complete; resolution deferred
 
 [ADR-0014](adr/0014-m2c-workspace-identity.md) fixes the first internal M2c
 subphase: canonical logical paths, structured library/source/module identities,
 the exact raw and validated user-workspace shapes, complete deterministic
-structural errors, and an independently specified pure validator. It does not
-reinterpret the opaque Oracle v4 path and does not publish a workspace profile.
+structural errors, and an independently specified pure validator. That subphase
+is implemented and proof-audited. It does not reinterpret the opaque Oracle v4
+path and does not publish a workspace profile.
 
-After that identity kernel is complete, extend from validated source records to
-module and name resolution only after a separate Accepted resolver ADR fixes:
+Extension from validated source records to module and name resolution begins
+only after a separate Accepted resolver ADR fixes:
 
 - safe canonical source paths and entry-file selection;
 - module path derivation;
@@ -171,6 +189,7 @@ is `inconclusive`, not `rejected`.
 2. Version-local Surface wire and parse-only Oracle publication. Implemented
    in M2b as Surface v1, parse-result v1, and Oracle v4.
 3. Workspace identity and structural validation, as fixed by ADR-0014.
+   Implemented and proof-audited by the Workspace Identity Kernel.
 4. Multi-module Surface syntax and an Accepted resolver ADR.
 5. Module/import resolution, structured identifiers, and declarative
    resolution correspondence.

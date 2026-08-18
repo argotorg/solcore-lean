@@ -5,7 +5,6 @@ import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
 import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
-import Solcore.Workspace.Validation
 
 set_option autoImplicit false
 
@@ -3607,6 +3606,7 @@ def testWorkspacePathIdentity : IO Unit := do
     ".solc",
     "a/.solc",
     "a//b.solc",
+    "a/./b.solc",
     "a/../b.solc",
     "a\\b.solc",
     "a:b.solc",
@@ -3666,6 +3666,18 @@ def testWorkspacePathIdentity : IO Unit := do
     (mainId != standardId && mainId != externalId &&
       standardId != externalId && mainId != otherMainId)
     "structured source identities must retain library and path distinctions"
+  let mainModuleId := Solcore.Workspace.SourceId.toModuleId mainId
+  let standardModuleId := Solcore.Workspace.SourceId.toModuleId standardId
+  let externalModuleId := Solcore.Workspace.SourceId.toModuleId externalId
+  let otherMainModuleId := Solcore.Workspace.SourceId.toModuleId otherMainId
+  assertTrue
+    (mainModuleId != standardModuleId &&
+      mainModuleId != externalModuleId &&
+      mainModuleId != otherMainModuleId &&
+      standardModuleId != externalModuleId &&
+      standardModuleId != otherMainModuleId &&
+      externalModuleId != otherMainModuleId)
+    "source-to-module conversion must not merge distinct source identities"
 
 def canonicalWorkspaceFixture : Solcore.Workspace.RawWorkspace := {
   entry := "Main.solc"
@@ -3812,6 +3824,46 @@ def testWorkspaceCanonicalValidation : IO Unit := do
       assertTrue (workspace.lookupSource absentId).isNone
         "an empty declared library must not synthesize a source"
 
+def testWorkspaceEqualContentIdentity : IO Unit := do
+  let raw : Solcore.Workspace.RawWorkspace := {
+    entry := "Shared.solc"
+    mainSources := [{ path := "Shared.solc", content := "same source text" }]
+    externalLibraries := [{
+      name := "Lib"
+      sources := [{ path := "Shared.solc", content := "same source text" }]
+    }]
+  }
+  let sharedPath ← expectCanonicalWorkspacePath "Shared.solc"
+  let libName ← expectExternalLibraryName "Lib"
+  let mainId : Solcore.Workspace.SourceId := {
+    library := .main
+    path := sharedPath
+  }
+  let externalId : Solcore.Workspace.SourceId := {
+    library := .external libName
+    path := sharedPath
+  }
+  assertTrue (mainId != externalId)
+    "equal source paths in different libraries must have distinct identities"
+  match Solcore.Workspace.validate raw with
+  | .error errors =>
+      throw (IO.userError
+        s!"equal-content identity fixture was rejected: {reprStr errors}")
+  | .ok workspace =>
+      match workspace.lookupSource mainId, workspace.lookupSource externalId with
+      | some mainFile, some externalFile =>
+          assertTrue
+            (mainFile.id == mainId && externalFile.id == externalId)
+            "validation must retain both structured source identities"
+          assertTrue
+            (mainFile.content == "same source text" &&
+              externalFile.content == "same source text" &&
+              mainFile.content == externalFile.content)
+            "validation must retain equal content under distinct source identities"
+      | _, _ =>
+          throw (IO.userError
+            "validation did not retain both equal-content sources")
+
 def workspaceAllErrorsFixture : Solcore.Workspace.RawWorkspace := {
   entry := "bad.entry"
   mainSources := [
@@ -3873,6 +3925,15 @@ def testWorkspaceValidationErrors : IO Unit := do
   assertTrue
     (Solcore.Workspace.validationErrors missingFixture == [.missingEntry missingPath])
     "a valid absent entry must produce exactly missingEntry"
+  let emptyMainFixture : Solcore.Workspace.RawWorkspace := {
+    entry := "Missing.solc"
+    mainSources := []
+    externalLibraries := []
+  }
+  assertTrue
+    (Solcore.Workspace.validationErrors emptyMainFixture ==
+      [.missingEntry missingPath])
+    "a valid entry with no main sources must produce exactly missingEntry"
   let invalidEntryFixture : Solcore.Workspace.RawWorkspace := {
     entry := "bad.entry"
     mainSources := []
@@ -4000,6 +4061,7 @@ def run : IO Unit := do
   testSchemaJson
   testWorkspacePathIdentity
   testWorkspaceCanonicalValidation
+  testWorkspaceEqualContentIdentity
   testWorkspaceValidationErrors
   testWorkspaceValidationEquivalence
 

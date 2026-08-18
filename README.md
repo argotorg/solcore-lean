@@ -188,6 +188,29 @@ publish a new protocol or authorize name resolution; a separate resolver ADR
 must first close the multi-module Surface algebra, imports, exports, scopes,
 intrinsics, and standard-library resolution.
 
+## What the M2c Workspace Identity Kernel implements
+
+- exact ASCII logical source paths with no host-filesystem access or silent
+  normalization;
+- structured library, source, and module identities that keep equal paths in
+  different libraries distinct;
+- separate raw and proof-carrying validated workspace representations;
+- all eight structural error forms as one canonical, sorted, duplicate-free
+  error list;
+- independent validation and rejection judgments connected to the pure
+  validator by soundness and completeness theorems;
+- unique validated output, lookup and entry invariants, exact source-count and
+  UTF-8 byte measures, and invariance under the accepted raw-workspace
+  equivalence; and
+- an umbrella Lean API whose theorem boundary passes the repository's
+  semantic-kernel and theorem-dependency audits.
+
+This is an internal specification kernel, not a new language publication. It
+does not change a profile, schema, capability report, or Oracle version. It
+does not parse a multi-file workspace, assemble the standard library, or
+resolve modules, declarations, imports, exports, names, selectors, or
+intrinsics. Those operations remain blocked on a separate resolver ADR.
+
 ## Running
 
 ```sh
