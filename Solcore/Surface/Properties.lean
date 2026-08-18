@@ -34,6 +34,31 @@ end Lexer
 namespace Parser
 
 /--
+Public parsing succeeds exactly when the supplied token stream is the lexer
+output and the requested tree satisfies the declarative grammar.
+-/
+theorem parseLexed_eq_ok_iff
+    (file : SourceFile)
+    (lexed : Lexed)
+    (parsed : ParsedFile) :
+    parseLexed file lexed = .ok parsed ↔
+      Lexer.lex file = .ok lexed ∧
+        FileParses lexed parsed := by
+  constructor
+  · intro success
+    have provenance :=
+      parseLexed_success_provenance file lexed parsed success
+    exact ⟨
+      provenance.1,
+      parseLexed_success_fileParses file lexed parsed success
+    ⟩
+  · rintro ⟨lexing, derivation⟩
+    have conformance := FileParses.conformsTo_of_lexes file derivation
+      (Lexer.lex_success_lexes file lexed lexing)
+    exact parseLexed_complete
+      file lexed parsed lexing conformance derivation
+
+/--
 Any successful executor result is the unique result allowed by an existing
 complete-file grammar derivation for the same token stream.
 -/
@@ -82,6 +107,28 @@ theorem parse_success_provenance
               file lexed parsed parsing).2
           · exact parseLexed_success_fileParses
               file lexed parsed parsing
+
+/--
+Frontend parsing succeeds exactly when some lexer output carries a complete
+declarative parse derivation for the requested tree.
+-/
+theorem parse_eq_ok_iff
+    (file : SourceFile)
+    (parsed : ParsedFile) :
+    parse file = .ok parsed ↔
+      ∃ lexed,
+        Lexer.lex file = .ok lexed ∧
+          FileParses lexed parsed := by
+  constructor
+  · intro success
+    obtain ⟨lexed, lexing, _, _, _, derivation⟩ :=
+      parse_success_provenance file parsed success
+    exact ⟨lexed, lexing, derivation⟩
+  · rintro ⟨lexed, lexing, derivation⟩
+    have conformance := FileParses.conformsTo_of_lexes file derivation
+      (Lexer.lex_success_lexes file lexed lexing)
+    exact parse_complete
+      file lexed parsed lexing conformance derivation
 
 theorem parse_success_has_valid_lexing
     (file : SourceFile)
