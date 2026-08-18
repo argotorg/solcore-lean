@@ -5,6 +5,7 @@ import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
 import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
+import Solcore.Workspace.Validation
 
 set_option autoImplicit false
 
@@ -3571,6 +3572,398 @@ def testSchemaJson : IO Unit := do
       assertTrue (actual == expected)
         s!"{requestPath} did not produce its checked-in golden response"
 
+def expectCanonicalWorkspacePath
+    (text : String) : IO Solcore.Workspace.CanonicalSourcePath :=
+  match Solcore.Workspace.CanonicalSourcePath.parse text with
+  | some path => pure path
+  | none =>
+      throw (IO.userError s!"{reprStr text} must be a canonical workspace path")
+
+def expectExternalLibraryName
+    (text : String) : IO Solcore.Workspace.ExternalLibraryName :=
+  match Solcore.Workspace.ExternalLibraryName.parse text with
+  | some name => pure name
+  | none =>
+      throw (IO.userError s!"{reprStr text} must be an external library name")
+
+def testWorkspacePathIdentity : IO Unit := do
+  let acceptedPaths := [
+    "a.solc",
+    "A0_b.solc",
+    "a/B2_c.solc",
+    "function.solc"
+  ]
+  for text in acceptedPaths do
+    let path ← expectCanonicalWorkspacePath text
+    assertTrue (path.render == text)
+      s!"canonical workspace path changed during rendering: {reprStr text}"
+    assertTrue
+      (Solcore.Workspace.CanonicalSourcePath.parse path.render == some path)
+      s!"rendered workspace path did not parse: {reprStr text}"
+  let nulPath := "a" ++ String.singleton (Char.ofNat 0) ++ "b.solc"
+  let rejectedPaths := [
+    "",
+    "/a.solc",
+    ".solc",
+    "a/.solc",
+    "a//b.solc",
+    "a/../b.solc",
+    "a\\b.solc",
+    "a:b.solc",
+    nulPath,
+    "λ.solc",
+    "a.sol",
+    "a.SOLC",
+    "a.solc.solc",
+    "a.solc?query",
+    "a.solc#fragment",
+    "a%2Fb.solc",
+    "a/",
+    "a/.solc/",
+    "1a.solc",
+    "_a.solc"
+  ]
+  for text in rejectedPaths do
+    assertTrue
+      (Solcore.Workspace.CanonicalSourcePath.parse text).isNone
+      s!"invalid workspace path was accepted: {reprStr text}"
+  let acceptedNames := ["A", "a0_b", "function"]
+  for text in acceptedNames do
+    let name ← expectExternalLibraryName text
+    assertTrue (name.render == text)
+      s!"external library name changed during rendering: {reprStr text}"
+    assertTrue
+      (Solcore.Workspace.ExternalLibraryName.parse name.render == some name)
+      s!"rendered external library name did not parse: {reprStr text}"
+  let nulName := "a" ++ String.singleton (Char.ofNat 0)
+  let rejectedNames := [
+    "", "lib.core", "lib/core", "λ", "lib-name", "1lib", "_lib", nulName
+  ]
+  for text in rejectedNames do
+    assertTrue
+      (Solcore.Workspace.ExternalLibraryName.parse text).isNone
+      s!"invalid external library name was accepted: {reprStr text}"
+  let sharedPath ← expectCanonicalWorkspacePath "Shared.solc"
+  let otherPath ← expectCanonicalWorkspacePath "Other.solc"
+  let externalName ← expectExternalLibraryName "Alpha"
+  let mainId : Solcore.Workspace.SourceId := {
+    library := .main
+    path := sharedPath
+  }
+  let standardId : Solcore.Workspace.SourceId := {
+    library := .standard
+    path := sharedPath
+  }
+  let externalId : Solcore.Workspace.SourceId := {
+    library := .external externalName
+    path := sharedPath
+  }
+  let otherMainId : Solcore.Workspace.SourceId := {
+    library := .main
+    path := otherPath
+  }
+  assertTrue
+    (mainId != standardId && mainId != externalId &&
+      standardId != externalId && mainId != otherMainId)
+    "structured source identities must retain library and path distinctions"
+
+def canonicalWorkspaceFixture : Solcore.Workspace.RawWorkspace := {
+  entry := "Main.solc"
+  mainSources := [
+    { path := "Zed.solc", content := "z" },
+    { path := "Main.solc", content := "λ🙂" },
+    { path := "Alpha/Util.solc", content := "" }
+  ]
+  externalLibraries := [
+    {
+      name := "zeta"
+      sources := [
+        { path := "Z.solc", content := "zz" },
+        { path := "A.solc", content := "a" }
+      ]
+    },
+    { name := "Empty", sources := [] },
+    {
+      name := "Alpha"
+      sources := [
+        { path := "Nested/Z.solc", content := "nested" },
+        { path := "A.solc", content := "α" }
+      ]
+    }
+  ]
+}
+
+def permutedCanonicalWorkspaceFixture : Solcore.Workspace.RawWorkspace := {
+  entry := "Main.solc"
+  mainSources := [
+    { path := "Alpha/Util.solc", content := "" },
+    { path := "Zed.solc", content := "z" },
+    { path := "Main.solc", content := "λ🙂" }
+  ]
+  externalLibraries := [
+    {
+      name := "Alpha"
+      sources := [
+        { path := "A.solc", content := "α" },
+        { path := "Nested/Z.solc", content := "nested" }
+      ]
+    },
+    {
+      name := "zeta"
+      sources := [
+        { path := "A.solc", content := "a" },
+        { path := "Z.solc", content := "zz" }
+      ]
+    },
+    { name := "Empty", sources := [] }
+  ]
+}
+
+def testWorkspaceCanonicalValidation : IO Unit := do
+  let raw := canonicalWorkspaceFixture
+  assertTrue ("λ🙂".utf8ByteSize == 6)
+    "the multibyte workspace fixture must occupy six UTF-8 bytes"
+  assertTrue (raw.sourceFiles == 7)
+    "raw workspace sourceFiles must count every source occurrence"
+  assertTrue (raw.sourceBytes == 18)
+    "raw workspace sourceBytes must count exact UTF-8 content bytes"
+  let mainPath ← expectCanonicalWorkspacePath "Main.solc"
+  let alphaUtilPath ← expectCanonicalWorkspacePath "Alpha/Util.solc"
+  let zedPath ← expectCanonicalWorkspacePath "Zed.solc"
+  let aPath ← expectCanonicalWorkspacePath "A.solc"
+  let nestedPath ← expectCanonicalWorkspacePath "Nested/Z.solc"
+  let externalZPath ← expectCanonicalWorkspacePath "Z.solc"
+  let alphaName ← expectExternalLibraryName "Alpha"
+  let emptyName ← expectExternalLibraryName "Empty"
+  let zetaName ← expectExternalLibraryName "zeta"
+  let expectedEntry : Solcore.Workspace.SourceId := {
+    library := .main
+    path := mainPath
+  }
+  let expectedFiles : List Solcore.Workspace.WorkspaceFile := [
+    {
+      id := { library := .main, path := alphaUtilPath }
+      content := ""
+    },
+    {
+      id := expectedEntry
+      content := "λ🙂"
+    },
+    {
+      id := { library := .main, path := zedPath }
+      content := "z"
+    },
+    {
+      id := { library := .external alphaName, path := aPath }
+      content := "α"
+    },
+    {
+      id := { library := .external alphaName, path := nestedPath }
+      content := "nested"
+    },
+    {
+      id := { library := .external zetaName, path := aPath }
+      content := "a"
+    },
+    {
+      id := { library := .external zetaName, path := externalZPath }
+      content := "zz"
+    }
+  ]
+  match Solcore.Workspace.validate raw with
+  | .error errors =>
+      throw (IO.userError
+        s!"canonical workspace was rejected: {reprStr errors}")
+  | .ok workspace =>
+      assertTrue (workspace.entry == expectedEntry)
+        "validated workspace entry must be the structured main source identity"
+      assertTrue
+        (workspace.declaredExternalLibraries == [alphaName, emptyName, zetaName])
+        "validated workspace must retain empty libraries in canonical order"
+      assertTrue (workspace.files == expectedFiles)
+        "validated workspace files or contents differ from canonical order"
+      assertTrue (workspace.sourceFiles == 7)
+        "validated sourceFiles must preserve the raw occurrence count"
+      assertTrue (workspace.sourceBytes == 18)
+        "validated sourceBytes must preserve exact UTF-8 content bytes"
+      assertTrue
+        (workspace.lookupSource expectedEntry == expectedFiles[1]?)
+        "entry lookup must return the exact canonical entry source"
+      let externalId : Solcore.Workspace.SourceId := {
+        library := .external alphaName
+        path := nestedPath
+      }
+      assertTrue
+        (workspace.lookupSource externalId == expectedFiles[4]?)
+        "external lookup must return the exact structured source"
+      assertTrue
+        (workspace.declaredExternalLibraries.contains alphaName)
+        "every external lookup target must retain its library declaration"
+      for file in workspace.files do
+        match file.id.library with
+        | .external name =>
+            assertTrue (workspace.declaredExternalLibraries.contains name)
+              "every validated external source must name a declared library"
+        | _ => pure ()
+      let absentId : Solcore.Workspace.SourceId := {
+        library := .external emptyName
+        path := aPath
+      }
+      assertTrue (workspace.lookupSource absentId).isNone
+        "an empty declared library must not synthesize a source"
+
+def workspaceAllErrorsFixture : Solcore.Workspace.RawWorkspace := {
+  entry := "bad.entry"
+  mainSources := [
+    { path := "z-path", content := "z" },
+    { path := "A-path", content := "first" },
+    { path := "A-path", content := "second" },
+    { path := "Dup.solc", content := "first" },
+    { path := "Dup.solc", content := "second" }
+  ]
+  externalLibraries := [
+    {
+      name := "bad-name"
+      sources := [
+        { path := "z:path", content := "z" },
+        { path := "A:path", content := "first" },
+        { path := "A:path", content := "second" }
+      ]
+    },
+    { name := "bad-name", sources := [] },
+    {
+      name := "Lib"
+      sources := [
+        { path := "Dup.solc", content := "first" },
+        { path := "Dup.solc", content := "second" }
+      ]
+    }
+  ]
+}
+
+def testWorkspaceValidationErrors : IO Unit := do
+  let duplicatePath ← expectCanonicalWorkspacePath "Dup.solc"
+  let libName ← expectExternalLibraryName "Lib"
+  let expected : List Solcore.Workspace.ValidationError := [
+    .invalidEntryPath "bad.entry",
+    .invalidExternalLibraryName "bad-name",
+    .duplicateExternalLibraryName "bad-name",
+    .invalidMainSourcePath "A-path",
+    .invalidMainSourcePath "z-path",
+    .invalidExternalSourcePath "bad-name" "A:path",
+    .invalidExternalSourcePath "bad-name" "z:path",
+    .duplicateMainSourcePath duplicatePath,
+    .duplicateExternalSourcePath libName duplicatePath
+  ]
+  let actual := Solcore.Workspace.validationErrors workspaceAllErrorsFixture
+  assertTrue (actual == expected)
+    s!"workspace validation errors differ from canonical sorted set: {reprStr actual}"
+  match Solcore.Workspace.validate workspaceAllErrorsFixture with
+  | .error errors =>
+      assertTrue (errors == expected)
+        "workspace rejection must return the complete canonical error list"
+  | .ok _ =>
+      throw (IO.userError "workspace containing every structural error was accepted")
+  let missingPath ← expectCanonicalWorkspacePath "Missing.solc"
+  let missingFixture : Solcore.Workspace.RawWorkspace := {
+    entry := "Missing.solc"
+    mainSources := [{ path := "Other.solc", content := "other" }]
+    externalLibraries := []
+  }
+  assertTrue
+    (Solcore.Workspace.validationErrors missingFixture == [.missingEntry missingPath])
+    "a valid absent entry must produce exactly missingEntry"
+  let invalidEntryFixture : Solcore.Workspace.RawWorkspace := {
+    entry := "bad.entry"
+    mainSources := []
+    externalLibraries := []
+  }
+  assertTrue
+    (Solcore.Workspace.validationErrors invalidEntryFixture ==
+      [.invalidEntryPath "bad.entry"])
+    "an invalid entry path must suppress missingEntry"
+  let invalidExternalFixture : Solcore.Workspace.RawWorkspace := {
+    entry := "Main.solc"
+    mainSources := [{ path := "Main.solc", content := "main" }]
+    externalLibraries := [{
+      name := "bad-name"
+      sources := [{ path := "bad:path", content := "external" }]
+    }]
+  }
+  assertTrue
+    (Solcore.Workspace.validationErrors invalidExternalFixture == [
+      .invalidExternalLibraryName "bad-name",
+      .invalidExternalSourcePath "bad-name" "bad:path"
+    ])
+    "invalid external paths must be reported under invalid library names"
+  let sharedPath ← expectCanonicalWorkspacePath "Shared.solc"
+  let repeatedDeclarations : Solcore.Workspace.RawWorkspace := {
+    entry := "Main.solc"
+    mainSources := [{ path := "Main.solc", content := "main" }]
+    externalLibraries := [
+      {
+        name := "Lib"
+        sources := [{ path := "Shared.solc", content := "first" }]
+      },
+      {
+        name := "Lib"
+        sources := [{ path := "Shared.solc", content := "second" }]
+      }
+    ]
+  }
+  assertTrue
+    (Solcore.Workspace.validationErrors repeatedDeclarations == [
+      .duplicateExternalLibraryName "Lib",
+      .duplicateExternalSourcePath libName sharedPath
+    ])
+    "external duplicate paths must be detected across repeated declarations"
+
+def assertWorkspaceValidationEqual
+    (left right : Solcore.Workspace.RawWorkspace)
+    (message : String) : IO Unit :=
+  match Solcore.Workspace.validate left, Solcore.Workspace.validate right with
+  | .error leftErrors, .error rightErrors =>
+      assertTrue (leftErrors == rightErrors) message
+  | .ok leftWorkspace, .ok rightWorkspace =>
+      assertTrue
+        (leftWorkspace.entry == rightWorkspace.entry &&
+          leftWorkspace.declaredExternalLibraries ==
+            rightWorkspace.declaredExternalLibraries &&
+          leftWorkspace.files == rightWorkspace.files)
+        message
+  | _, _ => throw (IO.userError message)
+
+def testWorkspaceValidationEquivalence : IO Unit := do
+  assertWorkspaceValidationEqual
+    canonicalWorkspaceFixture permutedCanonicalWorkspaceFixture
+    "raw main, library, and source permutations must validate identically"
+  let redistributedLeft : Solcore.Workspace.RawWorkspace := {
+    entry := "Main.solc"
+    mainSources := [{ path := "Main.solc", content := "main" }]
+    externalLibraries := [
+      {
+        name := "Lib"
+        sources := [
+          { path := "A.solc", content := "a" },
+          { path := "B.solc", content := "b" }
+        ]
+      },
+      { name := "Lib", sources := [] }
+    ]
+  }
+  let redistributedRight : Solcore.Workspace.RawWorkspace := {
+    entry := "Main.solc"
+    mainSources := [{ path := "Main.solc", content := "main" }]
+    externalLibraries := [
+      { name := "Lib", sources := [{ path := "B.solc", content := "b" }] },
+      { name := "Lib", sources := [{ path := "A.solc", content := "a" }] }
+    ]
+  }
+  assertTrue (redistributedLeft != redistributedRight)
+    "redistribution fixture must contain different raw declaration grouping"
+  assertWorkspaceValidationEqual redistributedLeft redistributedRight
+    "redistributing sources across duplicate same-name declarations must preserve validation"
+
 def run : IO Unit := do
   testProfile
   testFeatureMatrix
@@ -3605,10 +3998,14 @@ def run : IO Unit := do
   testSurfaceFrontendLexicalErrors
   testSurfaceValidityBoundaries
   testSchemaJson
+  testWorkspacePathIdentity
+  testWorkspaceCanonicalValidation
+  testWorkspaceValidationErrors
+  testWorkspaceValidationEquivalence
 
 end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c-workspace tests passed"
   return 0
