@@ -29,44 +29,55 @@ def lexBound (sourceBytes : Nat) : Nat :=
 
 namespace Lexer
 
-private def sourceSpan (file : WorkspaceFile)
+/-- Construct the source-owned span used by executor output and diagnostics. -/
+def sourceSpan (file : WorkspaceFile)
     (startByte endByte : Nat) : SourceSpan := {
   source := file.id
   startByte
   endByte
 }
 
-private def byteSize (characters : List Char) : Nat :=
+/-- The UTF-8 byte size of an executor character slice. -/
+def byteSize (characters : List Char) : Nat :=
   (String.ofList characters).utf8ByteSize
 
-private def isAsciiLower (character : Char) : Bool :=
+/-- Decide whether a character is a lowercase ASCII letter. -/
+def isAsciiLower (character : Char) : Bool :=
   'a' <= character && character <= 'z'
 
-private def isAsciiUpper (character : Char) : Bool :=
+/-- Decide whether a character is an uppercase ASCII letter. -/
+def isAsciiUpper (character : Char) : Bool :=
   'A' <= character && character <= 'Z'
 
-private def isAsciiLetter (character : Char) : Bool :=
+/-- Decide whether a character is an ASCII letter. -/
+def isAsciiLetter (character : Char) : Bool :=
   isAsciiLower character || isAsciiUpper character
 
-private def isAsciiDigit (character : Char) : Bool :=
+/-- Decide whether a character is an ASCII decimal digit. -/
+def isAsciiDigit (character : Char) : Bool :=
   '0' <= character && character <= '9'
 
-private def isAsciiHexDigit (character : Char) : Bool :=
+/-- Decide whether a character is an ASCII hexadecimal digit. -/
+def isAsciiHexDigit (character : Char) : Bool :=
   isAsciiDigit character ||
     ('a' <= character && character <= 'f') ||
     ('A' <= character && character <= 'F')
 
-private def isIdentifierContinue (character : Char) : Bool :=
+/-- Decide the closed ASCII identifier-continuation class. -/
+def isIdentifierContinue (character : Char) : Bool :=
   isAsciiLetter character || isAsciiDigit character || character == '_'
 
-private def isPragmaContinuation (character : Char) : Bool :=
+/-- Decide the identifier-or-hyphen pragma continuation class. -/
+def isPragmaContinuation (character : Char) : Bool :=
   isIdentifierContinue character || character == '-'
 
-private def isWhitespace (character : Char) : Bool :=
+/-- Decide the exact Multi Surface whitespace repertoire. -/
+def isWhitespace (character : Char) : Bool :=
   character == ' ' || character == '\t' || character == '\n' ||
     character == '\r' || character.toNat == 12
 
-private def takeWhile (predicate : Char -> Bool) : List Char -> List Char
+/-- Take the longest leading character slice accepted by `predicate`. -/
+def takeWhile (predicate : Char -> Bool) : List Char -> List Char
   | [] => []
   | character :: rest =>
       if predicate character then
@@ -93,18 +104,21 @@ private theorem drop_length_lt_of_pos
     List.length_pos_iff.mpr nonempty
   omega
 
-private def startsWith : List Char -> List Char -> Bool
+/-- Decide whether the first character list prefixes the second. -/
+def startsWith : List Char -> List Char -> Bool
   | [], _ => true
   | _, [] => false
   | expected :: expectedRest, actual :: actualRest =>
       expected == actual && startsWith expectedRest actualRest
 
-private def hasPragmaBoundary (remaining : List Char) : Bool :=
+/-- Decide the exact boundary following a complete pragma spelling. -/
+def hasPragmaBoundary (remaining : List Char) : Bool :=
   match remaining with
   | [] => true
   | character :: _ => !isPragmaContinuation character
 
-private def pragmaMatch? (characters : List Char) : Option PragmaKind :=
+/-- Recognize the unique complete pragma-name candidate at a cursor. -/
+def pragmaMatch? (characters : List Char) : Option PragmaKind :=
   let matchesKind (kind : PragmaKind) : Bool :=
     let spelling := kind.spelling.toList
     startsWith spelling characters &&
@@ -133,10 +147,12 @@ def classifyIdentifier (text : String) : TokenKind :=
       | none => .identifier text :=
   rfl
 
-private def pendingAfter (kind : TokenKind) : Bool :=
+/-- Compute whether a retained token arms the assembly scanner. -/
+def pendingAfter (kind : TokenKind) : Bool :=
   kind == .hardKeyword .assemblyKw
 
-private def multiSymbol? (first second : Char) : Option Symbol :=
+/-- Recognize a two-character symbol spelling. -/
+def multiSymbol? (first second : Char) : Option Symbol :=
   match first, second with
   | ':', '=' => some .colonEqual
   | '-', '>' => some .arrow
@@ -155,7 +171,8 @@ private def multiSymbol? (first second : Char) : Option Symbol :=
   | '%', '=' => some .percentEqual
   | _, _ => none
 
-private def singleSymbol? : Char -> Option Symbol
+/-- Recognize a one-character symbol spelling. -/
+def singleSymbol? : Char -> Option Symbol
   | '+' => some .plus
   | '-' => some .minus
   | '*' => some .star
@@ -183,12 +200,14 @@ private def singleSymbol? : Char -> Option Symbol
   | '_' => some .underscore
   | _ => none
 
-private structure LineScanResult where
+/-- The exact cursor, consumption, and units of a line-comment scan. -/
+structure LineScanResult where
   endByte : Nat
   consumedCharacters : Nat
   units : Nat
 
-private def scanLineComment : Nat -> List Char -> LineScanResult
+/-- Scan a line-comment body through the byte before LF or end of input. -/
+def scanLineComment : Nat -> List Char -> LineScanResult
   | cursor, [] => {
       endByte := cursor
       consumedCharacters := 0
@@ -207,14 +226,16 @@ private def scanLineComment : Nat -> List Char -> LineScanResult
         units := tail.units + 1
       }
 
-private inductive BlockScanResult where
+/-- The complete outcome of an ordinary nested block-comment scan. -/
+inductive BlockScanResult where
   | closed
       (endByte : Nat)
       (consumedCharacters : Nat)
       (units : Nat)
   | unterminated (units : Nat)
 
-private def scanBlockComment : Nat -> Nat -> List Char -> BlockScanResult
+/-- Scan an ordinary nested block comment from a positive delimiter depth. -/
+def scanBlockComment : Nat -> Nat -> List Char -> BlockScanResult
   | _, _, [] => .unterminated 0
   | cursor, depth, '/' :: '*' :: rest =>
       match scanBlockComment (cursor + 2) (depth + 1) rest with
@@ -234,7 +255,8 @@ private def scanBlockComment : Nat -> Nat -> List Char -> BlockScanResult
           .closed endByte (consumed + 1) (units + 1)
       | .unterminated units => .unterminated (units + 1)
 
-private inductive StringScanResult where
+/-- The complete outcome of a strict ordinary-string scan. -/
+inductive StringScanResult where
   | closed
       (endByte : Nat)
       (consumedCharacters : Nat)
@@ -245,7 +267,8 @@ private inductive StringScanResult where
       (units : Nat)
   | unterminated (units : Nat)
 
-private def scanString (file : WorkspaceFile) :
+/-- Scan and decode an ordinary string after its opening quote. -/
+def scanString (file : WorkspaceFile) :
     Nat -> List Char -> List Char -> StringScanResult
   | _, [], _ => .unterminated 0
   | cursor, '"' :: _, decodedRev =>
@@ -286,7 +309,8 @@ private def scanString (file : WorkspaceFile) :
           .invalidEscape diagnostic (units + 1)
       | .unterminated units => .unterminated (units + 1)
 
-private inductive AssemblyMode where
+/-- The internal state of the opaque assembly scanner. -/
+inductive AssemblyMode where
   | normal (braceDepth : Nat)
   | lineComment (braceDepth : Nat)
   | blockComment
@@ -295,7 +319,8 @@ private inductive AssemblyMode where
       (outermostOpen : Nat)
   | string (braceDepth : Nat) (openQuote : Nat)
 
-private inductive AssemblyScanResult where
+/-- The complete outcome of one opaque assembly-block scan. -/
+inductive AssemblyScanResult where
   | closed
       (closeByte : Nat)
       (endByte : Nat)
@@ -305,7 +330,8 @@ private inductive AssemblyScanResult where
       (diagnostic : LexicalDiagnostic)
       (units : Nat)
 
-private def scanAssembly (file : WorkspaceFile) (openBrace : Nat) :
+/-- Scan an opaque assembly block from the state after its opening brace. -/
+def scanAssembly (file : WorkspaceFile) (openBrace : Nat) :
     AssemblyMode -> Nat -> List Char -> AssemblyScanResult
   | .string _ openQuote, _, [] =>
       .failed
@@ -427,11 +453,13 @@ private def scanAssembly (file : WorkspaceFile) (openBrace : Nat) :
           .closed closeByte endByte (consumed + 1) (units + 1)
       | .failed diagnostic units => .failed diagnostic (units + 1)
 
-private structure CountedResult where
+/-- An internal lexer result paired with its semantic transition count. -/
+structure CountedResult where
   result : Except LexicalDiagnostic LexedModule
   units : Nat
 
-private def successfulResult (file : WorkspaceFile)
+/-- Construct a successful counted result in source order. -/
+def successfulResult (file : WorkspaceFile)
     (tokensRev : List Token) (commentsRev : List Comment) : CountedResult := {
   result := .ok {
     source := file.id
@@ -441,30 +469,38 @@ private def successfulResult (file : WorkspaceFile)
   units := 0
 }
 
-private def failedResult (diagnostic : LexicalDiagnostic)
+/-- Construct a failed counted result with its already accumulated units. -/
+def failedResult (diagnostic : LexicalDiagnostic)
     (units : Nat) : CountedResult := {
   result := .error diagnostic
   units
 }
 
-private def addUnits (amount : Nat) (result : CountedResult) : CountedResult := {
+/-- Prepend a transition charge to a counted lexer result. -/
+def addUnits (amount : Nat) (result : CountedResult) : CountedResult := {
   result := result.result
   units := amount + result.units
 }
 
-private def tokenAt (file : WorkspaceFile) (startByte endByte : Nat)
+/-- Construct a source-owned token at exact byte cursors. -/
+def tokenAt (file : WorkspaceFile) (startByte endByte : Nat)
     (kind : TokenKind) : Token := {
   span := sourceSpan file startByte endByte
   payload := kind
 }
 
-private def commentAt (file : WorkspaceFile) (startByte endByte : Nat)
+/-- Construct a retained source-owned comment at exact byte cursors. -/
+def commentAt (file : WorkspaceFile) (startByte endByte : Nat)
     (kind : CommentKind) : Comment := {
   span := sourceSpan file startByte endByte
   payload := kind
 }
 
-private def lexLoop (file : WorkspaceFile) :
+/--
+The proof-facing recursive executor from one byte cursor and character suffix.
+Its sufficient-fuel proof rules out an exhausted internal state.
+-/
+def lexLoop (file : WorkspaceFile) :
     (fuel cursor : Nat) -> (characters : List Char) -> Bool ->
       List Token -> List Comment -> characters.length < fuel -> CountedResult
   | 0, _, characters, _, _, _, sufficient =>
