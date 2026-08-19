@@ -6,6 +6,8 @@ import Solcore.Oracle.V3.Handler
 import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
 import Solcore.Standard.CanonicalData
+import Solcore.Surface.Multi.Grammar
+import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
 
 set_option autoImplicit false
@@ -4408,6 +4410,365 @@ def testCanonicalRawData : IO Unit := do
     assertTrue (raw.contentUtf8.size == raw.expectedByteCount)
       s!"canonical content size differs from its metadata for {reprStr expected.id}"
 
+def strictlyIncreasingNats : List Nat → Bool
+  | [] | [_] => true
+  | first :: second :: rest =>
+      first < second && strictlyIncreasingNats (second :: rest)
+
+def expectedMultiGrammarRuleIds :
+    List Solcore.Surface.Multi.Grammar.GrammarRuleId := [
+  .module, .topItem, .moduleRef, .importDecl, .importEntry,
+  .hidingClause, .exportDecl, .localExportEntry, .remoteExportEntry,
+  .exportItem, .constructorSelection, .pragmaDecl, .genericPrefix,
+  .forallClause, .forallBinder, .optionalComma, .predicateList,
+  .predicate, .functionSignature, .functionDecl, .classMethod, .dataDecl,
+  .dataConstructor, .typeAliasDecl, .classDecl, .instanceDecl,
+  .instanceMethod, .contractDecl, .contractMember, .fieldDecl,
+  .fallbackDecl, .contractConstructorDecl, .parameter, .body, .type,
+  .typeAtom, .qualifiedName, .statement, .letStatement, .letBinding,
+  .returnStatement, .blockStatement, .breakStatement, .continueStatement,
+  .assemblyStatement, .ifStatement, .forStatement, .forInitItem,
+  .forPostItem, .matchStatement, .matchArm, .armStatement,
+  .assignmentStatement, .assignmentOperator, .expressionStatement,
+  .terminalExpression, .pattern, .expression, .annotation, .conditional,
+  .logicalOr, .logicalAnd, .equality, .relational, .bitOr, .bitXor,
+  .bitAnd, .additive, .multiplicative, .prefix, .postfix, .postfixPart,
+  .atom, .lambda, .literal
+]
+
+open Solcore.Surface.Multi.Grammar in
+def expectedMultiGrammarSites : List GrammarSite :=
+  expectedMultiGrammarRuleIds.flatMap fun rule =>
+    (m2cV1.rhs rule).sitePaths.filterMap fun path =>
+      GrammarSite.ofKey? { rule, path }
+
+open Solcore.Surface.Multi.Grammar in
+def expectedMultiSitesOfKind
+    (kind : EbnfNodeKind) : List (GrammarSiteOfKind kind) :=
+  expectedMultiGrammarSites.filterMap (GrammarSiteOfKind.ofSite? kind)
+
+open Solcore.Surface.Multi.Grammar in
+def expectedMultiListSiteOfGrammarSite? (site : GrammarSite) : Option ListSite :=
+  match GrammarSiteOfKind.ofSite? .list0 site with
+  | some list0Site => some (.list0 list0Site)
+  | none =>
+      match GrammarSiteOfKind.ofSite? .list1 site with
+      | some list1Site => some (.list1 list1Site)
+      | none => none
+
+open Solcore.Surface.Multi.Grammar in
+def expectedMultiListSites : List ListSite :=
+  expectedMultiGrammarSites.filterMap expectedMultiListSiteOfGrammarSite?
+
+open Solcore.Surface.Multi.Grammar in
+def expectedMultiProductionIds : List ProductionId :=
+  expectedMultiGrammarRuleIds.map .root ++
+  (expectedMultiSitesOfKind .atom).map .atom ++
+  (expectedMultiSitesOfKind .sequence).map .seq ++
+  (expectedMultiSitesOfKind .group).map .group ++
+  ((expectedMultiSitesOfKind .choice).flatMap fun site =>
+    (List.finRange (ChoiceSite.branchCount site)).map fun branch =>
+      .choice site branch) ++
+  ((expectedMultiSitesOfKind .optional).flatMap fun site =>
+    [.opt site .none, .opt site .some]) ++
+  ((expectedMultiSitesOfKind .star).flatMap fun site =>
+    [.star site .nil, .star site .cons]) ++
+  ((expectedMultiSitesOfKind .plus).flatMap fun site =>
+    [.plus site .one, .plus site .cons]) ++
+  ((expectedMultiSitesOfKind .list0).flatMap fun site =>
+    [.list0 site .nil, .list0 site .cons]) ++
+  (expectedMultiSitesOfKind .list1).map .list1 ++
+  (expectedMultiListSites.flatMap fun site =>
+    [.tail site .nil, .tail site .cons])
+
+open Solcore.Surface.Multi.Grammar in
+def testMultiGrammarTables : IO Unit := do
+  assertTrue
+    (allGrammarRuleIds.length == 75 &&
+      allGrammarSites.length == 737 &&
+      allProductionIds.length == 1040 &&
+      allActionIds.length == 1040 &&
+      productionCount == 1040 && D == 2378 && F == 1861)
+    "the derived Multi grammar cardinalities must remain exact"
+  assertTrue
+    (allGrammarRuleIds == expectedMultiGrammarRuleIds &&
+      allGrammarSites.map Subtype.val ==
+        expectedMultiGrammarSites.map Subtype.val)
+    "grammar rules and sites must follow the independent displayed order"
+  assertTrue
+    (allProductionIds == expectedMultiProductionIds &&
+      allActionIds == expectedMultiProductionIds.map .actionFor)
+    "production and action tables must follow independent constructor segments"
+  assertTrue
+    (allProductionIds.map ProductionId.index ==
+      List.range allProductionIds.length)
+    "production indices must enumerate the expanded grammar exactly"
+  assertTrue
+    (allActionIds.map ActionId.index == List.range allActionIds.length)
+    "action indices must enumerate the expanded grammar exactly"
+  assertTrue
+    (strictlyIncreasingNats
+      (allListSites.map fun site => site.owner.index))
+    "list-tail productions must follow their owning grammar-site order"
+  assertTrue
+    (repetitionsNonnullable && guardCoverageValid &&
+      allPriorityGuardIds.length == 9 &&
+      (allPriorityGuardIds.foldl
+        (fun total guard => total + (guardCells guard).length) 0) == 18)
+    "the nullable-repetition and contextual-guard tables must stay closed"
+  assertTrue
+    (Polarity.positive.accepts GuardDecision.positive &&
+      !Polarity.positive.accepts GuardDecision.negative &&
+      Polarity.positive.accepts GuardDecision.neutral &&
+      !Polarity.negative.accepts GuardDecision.positive &&
+      Polarity.negative.accepts GuardDecision.negative &&
+      Polarity.negative.accepts GuardDecision.neutral)
+    "the three-valued contextual-guard allowance table changed"
+
+def makeMultiLexerFile
+    (content : String) : IO Solcore.Workspace.WorkspaceFile := do
+  let path ← expectCanonicalWorkspacePath "Lexer.solc"
+  return {
+    id := { library := .main, path }
+    content
+  }
+
+def multiLexerSpan
+    (file : Solcore.Workspace.WorkspaceFile)
+    (startByte endByte : Nat) : Solcore.Surface.Multi.SourceSpan := {
+  source := file.id
+  startByte
+  endByte
+}
+
+def assertMultiLexicalFailure
+    (content : String)
+    (expected : Solcore.Workspace.WorkspaceFile →
+      Solcore.Surface.Multi.LexicalDiagnostic)
+    (message : String) : IO Unit := do
+  let file ← makeMultiLexerFile content
+  let execution := Solcore.Surface.Multi.lexModuleWithUnits file
+  match execution.result with
+  | .error actual => assertTrue (actual == expected file) message
+  | .ok _ => throw (IO.userError message)
+  assertTrue
+    (execution.actualUnits <=
+      Solcore.Surface.Multi.lexBound file.content.utf8ByteSize)
+    s!"{message}: the failing execution exceeded the lexer bound"
+
+def testMultiLexerDiagnostics : IO Unit := do
+  assertMultiLexicalFailure "ok λ"
+    (fun file => .invalidCharacter (multiLexerSpan file 3 5) 'λ')
+    "the Multi lexer must report the first invalid Unicode character"
+  assertMultiLexicalFailure "/*abc"
+    (fun file => .unterminatedBlockComment (multiLexerSpan file 0 5))
+    "the Multi lexer must commit to an unterminated block-comment opener"
+  assertMultiLexicalFailure "\"abc"
+    (fun file => .unterminatedString (multiLexerSpan file 0 4))
+    "the Multi lexer must report an unterminated ordinary string"
+  assertMultiLexicalFailure "\"a\\q\""
+    (fun file => .invalidStringEscape (multiLexerSpan file 2 4) (some 'q'))
+    "the Multi lexer must report the first unsupported string escape"
+  assertMultiLexicalFailure "assembly { \"abc"
+    (fun file => .unterminatedAssemblyString (multiLexerSpan file 11 15))
+    "the Multi lexer must distinguish an unterminated assembly string"
+  assertMultiLexicalFailure "assembly {/*abc"
+    (fun file => .unterminatedAssemblyComment (multiLexerSpan file 10 15))
+    "the Multi lexer must distinguish an unterminated assembly comment"
+  assertMultiLexicalFailure "assembly { let x"
+    (fun file => .unterminatedAssemblyBlock (multiLexerSpan file 9 16))
+    "the Multi lexer must distinguish an unterminated assembly block"
+  let file ← makeMultiLexerFile ""
+  let empty := multiLexerSpan file 0 0
+  let diagnosticCodes := [
+    Solcore.Surface.Multi.LexicalDiagnostic.invalidCharacter empty 'x',
+    .unterminatedBlockComment empty,
+    .unterminatedString empty,
+    .invalidStringEscape empty none,
+    .unterminatedAssemblyString empty,
+    .unterminatedAssemblyComment empty,
+    .unterminatedAssemblyBlock empty
+  ] |>.map Solcore.Surface.Multi.LexicalDiagnostic.code
+  assertTrue
+    (diagnosticCodes == [
+      "MSL0001", "MSL0002", "MSL0003", "MSL0004",
+      "MSL0005", "MSL0006", "MSL0007"
+    ])
+    "the closed Multi lexical diagnostic codes changed"
+
+def assertSingleMultiToken
+    (content : String)
+    (expected : Solcore.Surface.Multi.TokenKind)
+    (message : String) : IO Unit := do
+  let file ← makeMultiLexerFile content
+  match Solcore.Surface.Multi.lexModule file with
+  | .error diagnostic =>
+      throw (IO.userError s!"{message}: {reprStr diagnostic}")
+  | .ok lexed =>
+      assertTrue
+        (lexed.tokens.map (fun token => token.payload) == [expected] &&
+          lexed.comments.isEmpty)
+        message
+
+def testMultiLexerClosedTokenMaps : IO Unit := do
+  for keyword in allMultiHardKeywords do
+    assertSingleMultiToken keyword.spelling (.hardKeyword keyword)
+      s!"the Multi lexer changed hard-keyword recognition for {reprStr keyword}"
+  for kind in allMultiPragmaKinds do
+    assertSingleMultiToken kind.spelling (.pragmaName kind)
+      s!"the Multi lexer changed pragma recognition for {reprStr kind}"
+  for symbol in allMultiSymbols do
+    assertSingleMultiToken symbol.spelling (.symbol symbol)
+      s!"the Multi lexer changed symbol recognition for {reprStr symbol}"
+
+def testMultiLexerMaximalMunch : IO Unit := do
+  let file ← makeMultiLexerFile
+    "if ifx then comptime 0x1f 0xg 123abc := : \"a\\nb\" //c\r\n/*a/*b*/c*/"
+  let execution := Solcore.Surface.Multi.lexModuleWithUnits file
+  match execution.result with
+  | .error diagnostic =>
+      throw (IO.userError
+        s!"the Multi maximal-munch fixture failed: {reprStr diagnostic}")
+  | .ok lexed =>
+      let expectedKinds : List Solcore.Surface.Multi.TokenKind := [
+        .hardKeyword .ifKw,
+        .identifier "ifx",
+        .identifier "then",
+        .identifier "comptime",
+        .hexadecimalLiteral "0x1f" "1f",
+        .decimalLiteral "0" "0",
+        .identifier "xg",
+        .decimalLiteral "123" "123",
+        .identifier "abc",
+        .symbol .colonEqual,
+        .symbol .colon,
+        .stringLiteral "\"a\\nb\"" "a\nb"
+      ]
+      assertTrue (lexed.tokens.map (fun token => token.payload) == expectedKinds)
+        "the Multi lexer changed maximal-munch or contextual-keyword behavior"
+      assertTrue
+        (lexed.comments.map (fun comment => comment.payload) == [.line, .block])
+        "the Multi lexer must retain ordered line and nested block comments"
+      assertTrue (lexed.tokens.all (fun token => token.span.isValidFor file))
+        "every Multi token span must be valid for its exact source"
+      assertTrue (lexed.comments.all (fun comment => comment.span.isValidFor file))
+        "every retained Multi comment span must be valid for its exact source"
+  assertTrue
+    (execution.actualUnits <= Solcore.Surface.Multi.lexBound file.content.utf8ByteSize)
+    "the Multi maximal-munch fixture exceeded the lexer bound"
+
+def testMultiLexerUtf8Spans : IO Unit := do
+  let file ← makeMultiLexerFile "\"λ🙂\" //€\r\nnext"
+  match Solcore.Surface.Multi.lexModule file with
+  | .error diagnostic =>
+      throw (IO.userError
+        s!"the Multi UTF-8 span fixture failed: {reprStr diagnostic}")
+  | .ok lexed =>
+      match lexed.tokens, lexed.comments with
+      | [stringToken, nextToken], [comment] =>
+          assertTrue
+            (stringToken.payload == .stringLiteral "\"λ🙂\"" "λ🙂" &&
+              stringToken.span == multiLexerSpan file 0 8)
+            "a successful Unicode string must retain exact UTF-8 byte endpoints"
+          assertTrue
+            (comment.payload == .line &&
+              comment.span == multiLexerSpan file 9 15)
+            "a Unicode CRLF line comment must retain CR and stop before LF"
+          assertTrue
+            (nextToken.payload == .identifier "next" &&
+              nextToken.span == multiLexerSpan file 16 20)
+            "lexing after a Unicode comment must resume at the exact byte boundary"
+      | _, _ =>
+          throw (IO.userError
+            s!"the UTF-8 span fixture produced unexpected output: {reprStr lexed}")
+
+def testMultiLexerAssemblySlice : IO Unit := do
+  let file ← makeMultiLexerFile
+    "assembly /*lead*/ { { \"}\" /* } */ // }\n } } next"
+  match Solcore.Surface.Multi.lexModule file with
+  | .error diagnostic =>
+      throw (IO.userError
+        s!"the Multi assembly fixture failed: {reprStr diagnostic}")
+  | .ok lexed =>
+      match lexed.tokens with
+      | [assemblyKeyword, assemblyBlock, nextIdentifier] =>
+          assertTrue
+            (assemblyKeyword.payload == .hardKeyword .assemblyKw &&
+              assemblyKeyword.span == multiLexerSpan file 0 8)
+            "the assembly introducer token changed"
+          match assemblyBlock.payload with
+          | .assemblyBlock slice =>
+              assertTrue
+                (assemblyBlock.span == multiLexerSpan file 18 43 &&
+                  slice.span == multiLexerSpan file 18 43 &&
+                  slice.payload.openBrace == multiLexerSpan file 18 19 &&
+                  slice.payload.contents == multiLexerSpan file 19 42 &&
+                  slice.payload.closeBrace == multiLexerSpan file 42 43)
+                "the opaque assembly slice lost its exact delimiter ranges"
+          | _ =>
+              throw (IO.userError
+                "the source after an assembly introducer was not opaque")
+          assertTrue
+            (nextIdentifier.payload == .identifier "next" &&
+              nextIdentifier.span == multiLexerSpan file 44 48)
+            "lexing did not resume immediately after the opaque assembly slice"
+      | _ =>
+          throw (IO.userError
+            s!"the assembly fixture produced unexpected tokens: {reprStr lexed.tokens}")
+      assertTrue
+        (lexed.comments == [{
+          span := multiLexerSpan file 9 17
+          payload := .block
+        }])
+        "only comments outside an opaque assembly block may be retained"
+
+structure CanonicalLexExpectation where
+  id : Solcore.Standard.CanonicalFileId
+  tokens : Nat
+  comments : Nat
+  units : Nat
+
+def canonicalLexExpectations : Vector CanonicalLexExpectation 6 := #v[
+  ⟨.abiGeneric, 849, 23, 5050⟩,
+  ⟨.generic, 51, 5, 438⟩,
+  ⟨.storageGeneric, 1416, 77, 9886⟩,
+  ⟨.dispatch, 1799, 65, 11124⟩,
+  ⟨.opcodes, 1881, 1, 10295⟩,
+  ⟨.std, 13472, 297, 72191⟩
+]
+
+def testCanonicalRawLexing : IO Unit := do
+  for (raw, expected) in
+      Solcore.Standard.canonicalRawFiles.toArray.zip
+        canonicalLexExpectations.toArray do
+    let logicalPath := String.fromUTF8! raw.logicalPathUtf8
+    let content := String.fromUTF8! raw.contentUtf8
+    let path ← expectCanonicalWorkspacePath logicalPath
+    let file : Solcore.Workspace.WorkspaceFile := {
+      id := { library := .standard, path }
+      content
+    }
+    let execution := Solcore.Surface.Multi.lexModuleWithUnits file
+    match execution.result with
+    | .error diagnostic =>
+        throw (IO.userError
+          s!"canonical source {reprStr raw.id} failed lexing: {reprStr diagnostic}")
+    | .ok lexed =>
+        assertTrue
+          (raw.id == expected.id &&
+            lexed.source == file.id &&
+            lexed.tokens.length == expected.tokens &&
+            lexed.comments.length == expected.comments &&
+            execution.actualUnits == expected.units)
+          s!"canonical lexer fingerprint changed for {reprStr raw.id}"
+        assertTrue (lexed.tokens.all (fun token => token.span.isValidFor file))
+          s!"canonical token span escaped its source in {reprStr raw.id}"
+        assertTrue (lexed.comments.all (fun comment => comment.span.isValidFor file))
+          s!"canonical comment span escaped its source in {reprStr raw.id}"
+    assertTrue
+      (execution.actualUnits <= Solcore.Surface.Multi.lexBound raw.contentUtf8.size)
+      s!"canonical source {reprStr raw.id} exceeded the lexer bound"
+
 def run : IO Unit := do
   testProfile
   testFeatureMatrix
@@ -4450,10 +4811,17 @@ def run : IO Unit := do
   testMultiSourceFoundation
   testMultiTokenFoundation
   testCanonicalRawData
+  testMultiGrammarTables
+  testMultiLexerDiagnostics
+  testMultiLexerClosedTokenMaps
+  testMultiLexerMaximalMunch
+  testMultiLexerUtf8Spans
+  testMultiLexerAssemblySlice
+  testCanonicalRawLexing
 
 end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c-workspace/M2c-multi-foundation tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c-workspace/M2c-multi-lexer tests passed"
   return 0
