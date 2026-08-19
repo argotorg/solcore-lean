@@ -5,6 +5,8 @@ import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
 import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
+import Solcore.Standard.CanonicalData
+import Solcore.Surface.Multi.Token
 
 set_option autoImplicit false
 
@@ -4025,6 +4027,387 @@ def testWorkspaceValidationEquivalence : IO Unit := do
   assertWorkspaceValidationEqual redistributedLeft redistributedRight
     "redistributing sources across duplicate same-name declarations must preserve validation"
 
+def assertUtf8Boundaries
+    (name content : String)
+    (expectedByteSize : Nat)
+    (boundaryOffsets nonBoundaryOffsets : List Nat) : IO Unit := do
+  assertTrue (content.utf8ByteSize == expectedByteSize)
+    s!"{name} has an unexpected UTF-8 byte size"
+  for offset in boundaryOffsets do
+    assertTrue
+      (Solcore.Surface.Multi.isUtf8Boundary content offset)
+      s!"{name} byte offset {offset} must be a UTF-8 boundary"
+  for offset in nonBoundaryOffsets do
+    assertTrue
+      (!Solcore.Surface.Multi.isUtf8Boundary content offset)
+      s!"{name} byte offset {offset} must not be a UTF-8 boundary"
+
+def testMultiSourceFoundation : IO Unit := do
+  assertUtf8Boundaries "empty string" "" 0 [0] [1]
+  assertUtf8Boundaries "ASCII scalar" "A" 1 [0, 1] [2]
+  assertUtf8Boundaries "two-byte scalar" "λ" 2 [0, 2] [1, 3]
+  assertUtf8Boundaries "three-byte scalar" "€" 3 [0, 3] [1, 2, 4]
+  assertUtf8Boundaries "four-byte scalar" "🙂" 4 [0, 4] [1, 2, 3, 5]
+  let mixed := "Aλ€🙂Z"
+  assertUtf8Boundaries "mixed scalar string" mixed 11
+    [0, 1, 3, 6, 10, 11]
+    [2, 4, 5, 7, 8, 9, 12]
+  let path ← expectCanonicalWorkspacePath "Span.solc"
+  let mainId : Solcore.Workspace.SourceId := {
+    library := .main
+    path
+  }
+  let standardId : Solcore.Workspace.SourceId := {
+    library := .standard
+    path
+  }
+  let mainFile : Solcore.Workspace.WorkspaceFile := {
+    id := mainId
+    content := mixed
+  }
+  let standardFile : Solcore.Workspace.WorkspaceFile := {
+    id := standardId
+    content := mixed
+  }
+  let whole : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 0
+    endByte := 11
+  }
+  let middle : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 1
+    endByte := 10
+  }
+  let emptyAtBoundary : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 6
+    endByte := 6
+  }
+  assertTrue (whole.isValidFor mainFile)
+    "the complete source span must be valid for its owning workspace file"
+  assertTrue (middle.isValidFor mainFile)
+    "a bounded span between interior scalar boundaries must be valid"
+  assertTrue (emptyAtBoundary.isValidFor mainFile)
+    "an empty span at an interior scalar boundary must be valid"
+  assertTrue (whole.length == 11 && middle.length == 9)
+    "source span length must use half-open byte offsets"
+  let standardWhole : Solcore.Surface.Multi.SourceSpan := {
+    source := standardId
+    startByte := 0
+    endByte := 11
+  }
+  assertTrue
+    (!whole.isValidFor standardFile && !standardWhole.isValidFor mainFile)
+    "equal paths and contents in distinct libraries must retain span ownership"
+  assertTrue (standardWhole.isValidFor standardFile)
+    "a standard-library span must validate against its exact structured owner"
+  let reversed : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 10
+    endByte := 6
+  }
+  let pastEnd : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 10
+    endByte := 12
+  }
+  let startInsideScalar : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 2
+    endByte := 3
+  }
+  let endInsideScalar : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 3
+    endByte := 5
+  }
+  assertTrue (!reversed.isValidFor mainFile)
+    "a source span with reversed endpoints must be rejected"
+  assertTrue (!pastEnd.isValidFor mainFile)
+    "a source span past the content byte bound must be rejected"
+  assertTrue (!startInsideScalar.isValidFor mainFile)
+    "a source span starting inside a UTF-8 scalar must be rejected"
+  assertTrue (!endInsideScalar.isValidFor mainFile)
+    "a source span ending inside a UTF-8 scalar must be rejected"
+  let prefixSpan : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 0
+    endByte := 3
+  }
+  let suffixSpan : Solcore.Surface.Multi.SourceSpan := {
+    source := mainId
+    startByte := 6
+    endByte := 11
+  }
+  assertTrue (whole.contains middle && whole.contains emptyAtBoundary)
+    "a whole span must contain ordered subspans with the same owner"
+  assertTrue (!middle.contains whole && !whole.contains standardWhole)
+    "span containment must preserve range order and exact ownership"
+  assertTrue
+    (Solcore.Surface.Multi.SourceSpan.cover prefixSpan suffixSpan == whole)
+    "source span cover must use the first start and last end"
+
+def allMultiHardKeywords : List Solcore.Surface.Multi.HardKeyword := [
+  .contractKw, .importKw, .exportKw, .hidingKw, .asKw, .letKw,
+  .dataKw, .forallKw, .classKw, .instanceKw, .ifKw, .elseKw,
+  .forKw, .switchKw, .caseKw, .defaultKw, .leaveKw, .continueKw,
+  .breakKw, .assemblyKw, .matchKw, .functionKw, .fallbackKw,
+  .payableKw, .publicKw, .constructorKw, .returnKw, .lamKw,
+  .typeKw, .pragmaKw
+]
+
+def expectedMultiHardKeywordSpelling :
+    Solcore.Surface.Multi.HardKeyword → String
+  | .contractKw => "contract"
+  | .importKw => "import"
+  | .exportKw => "export"
+  | .hidingKw => "hiding"
+  | .asKw => "as"
+  | .letKw => "let"
+  | .dataKw => "data"
+  | .forallKw => "forall"
+  | .classKw => "class"
+  | .instanceKw => "instance"
+  | .ifKw => "if"
+  | .elseKw => "else"
+  | .forKw => "for"
+  | .switchKw => "switch"
+  | .caseKw => "case"
+  | .defaultKw => "default"
+  | .leaveKw => "leave"
+  | .continueKw => "continue"
+  | .breakKw => "break"
+  | .assemblyKw => "assembly"
+  | .matchKw => "match"
+  | .functionKw => "function"
+  | .fallbackKw => "fallback"
+  | .payableKw => "payable"
+  | .publicKw => "public"
+  | .constructorKw => "constructor"
+  | .returnKw => "return"
+  | .lamKw => "lam"
+  | .typeKw => "type"
+  | .pragmaKw => "pragma"
+
+def allMultiContextualKeywords :
+    List Solcore.Surface.Multi.ContextualKeyword :=
+  [.thenKw, .comptimeKw]
+
+def expectedMultiContextualKeywordSpelling :
+    Solcore.Surface.Multi.ContextualKeyword → String
+  | .thenKw => "then"
+  | .comptimeKw => "comptime"
+
+def allMultiPragmaKinds : List Solcore.Surface.Multi.PragmaKind := [
+  .noCoverageCondition,
+  .noPattersonCondition,
+  .noBoundedVariableCondition,
+  .noGenericInstanceFor
+]
+
+def expectedMultiPragmaKindSpelling :
+    Solcore.Surface.Multi.PragmaKind → String
+  | .noCoverageCondition => "no-coverage-condition"
+  | .noPattersonCondition => "no-patterson-condition"
+  | .noBoundedVariableCondition => "no-bounded-variable-condition"
+  | .noGenericInstanceFor => "no-generic-instance-for"
+
+def allMultiSymbols : List Solcore.Surface.Multi.Symbol := [
+  .colonEqual, .arrow, .fatArrow, .equalEqual, .notEqual,
+  .greaterEqual, .lessEqual, .logicalAnd, .logicalOr, .plusEqual,
+  .minusEqual, .caretEqual, .ampEqual, .pipeEqual, .percentEqual,
+  .plus, .minus, .star, .slash, .percent, .bang, .less, .greater,
+  .equal, .pipe, .amp, .caret, .at, .question, .dot, .colon,
+  .semicolon, .comma, .leftParen, .rightParen, .leftBrace,
+  .rightBrace, .leftBracket, .rightBracket, .underscore
+]
+
+def expectedMultiSymbolSpelling : Solcore.Surface.Multi.Symbol → String
+  | .colonEqual => ":="
+  | .arrow => "->"
+  | .fatArrow => "=>"
+  | .equalEqual => "=="
+  | .notEqual => "!="
+  | .greaterEqual => ">="
+  | .lessEqual => "<="
+  | .logicalAnd => "&&"
+  | .logicalOr => "||"
+  | .plusEqual => "+="
+  | .minusEqual => "-="
+  | .caretEqual => "^="
+  | .ampEqual => "&="
+  | .pipeEqual => "|="
+  | .percentEqual => "%="
+  | .plus => "+"
+  | .minus => "-"
+  | .star => "*"
+  | .slash => "/"
+  | .percent => "%"
+  | .bang => "!"
+  | .less => "<"
+  | .greater => ">"
+  | .equal => "="
+  | .pipe => "|"
+  | .amp => "&"
+  | .caret => "^"
+  | .at => "@"
+  | .question => "?"
+  | .dot => "."
+  | .colon => ":"
+  | .semicolon => ";"
+  | .comma => ","
+  | .leftParen => "("
+  | .rightParen => ")"
+  | .leftBrace => "{"
+  | .rightBrace => "}"
+  | .leftBracket => "["
+  | .rightBracket => "]"
+  | .underscore => "_"
+
+def testMultiTokenFoundation : IO Unit := do
+  assertTrue (allMultiHardKeywords.length == 30)
+    "the Multi hard-keyword test table must contain thirty constructors"
+  for keyword in allMultiHardKeywords do
+    let expected := expectedMultiHardKeywordSpelling keyword
+    assertTrue (keyword.spelling == expected)
+      s!"hard-keyword spelling changed for {reprStr keyword}"
+    assertTrue
+      (Solcore.Surface.Multi.HardKeyword.ofString? expected == some keyword)
+      s!"hard-keyword recognition changed for {reprStr expected}"
+    assertTrue (Solcore.Surface.Multi.Identifier.parse expected).isNone
+      s!"hard keyword was accepted as an identifier: {reprStr expected}"
+  assertTrue (allMultiContextualKeywords.length == 2)
+    "the Multi contextual-keyword test table must contain two constructors"
+  for keyword in allMultiContextualKeywords do
+    let expected := expectedMultiContextualKeywordSpelling keyword
+    assertTrue (keyword.spelling == expected)
+      s!"contextual-keyword spelling changed for {reprStr keyword}"
+    assertTrue
+      (Solcore.Surface.Multi.HardKeyword.ofString? expected).isNone
+      s!"contextual keyword was recognized as hard: {reprStr expected}"
+    assertTrue
+      ((Solcore.Surface.Multi.Identifier.parse expected).map
+          Solcore.Surface.Multi.Identifier.render == some expected)
+      s!"contextual keyword must remain available as an identifier: {reprStr expected}"
+  let acceptedIdentifiers := ["alpha", "A0_b", "then", "comptime"]
+  for text in acceptedIdentifiers do
+    assertTrue
+      ((Solcore.Surface.Multi.Identifier.parse text).map
+          Solcore.Surface.Multi.Identifier.render == some text)
+      s!"valid Multi identifier was rejected: {reprStr text}"
+  let rejectedIdentifiers := [
+    "", "1alpha", "_alpha", "alpha-beta", "alpha.beta", "alpha/beta",
+    "λ"
+  ]
+  for text in rejectedIdentifiers do
+    assertTrue (Solcore.Surface.Multi.Identifier.parse text).isNone
+      s!"invalid Multi identifier was accepted: {reprStr text}"
+  assertTrue (allMultiPragmaKinds.length == 4)
+    "the Multi pragma test table must contain four constructors"
+  for kind in allMultiPragmaKinds do
+    let expected := expectedMultiPragmaKindSpelling kind
+    assertTrue (kind.spelling == expected)
+      s!"pragma spelling changed for {reprStr kind}"
+    assertTrue
+      (Solcore.Surface.Multi.PragmaKind.ofString? expected == some kind)
+      s!"pragma recognition changed for {reprStr expected}"
+  assertTrue
+    (Solcore.Surface.Multi.PragmaKind.ofString? "no-coverage-condition-extra").isNone
+    "pragma recognition must require a complete spelling"
+  assertTrue (allMultiSymbols.length == 40)
+    "the Multi symbol test table must contain forty constructors"
+  for symbol in allMultiSymbols do
+    assertTrue (symbol.spelling == expectedMultiSymbolSpelling symbol)
+      s!"symbol spelling changed for {reprStr symbol}"
+
+structure CanonicalMetadataExpectation where
+  id : Solcore.Standard.CanonicalFileId
+  logicalPath : String
+  byteCount : Nat
+  sha256Bytes : Vector UInt8 32
+
+def canonicalMetadataExpectations : Vector CanonicalMetadataExpectation 6 :=
+  #v[
+    {
+      id := .abiGeneric
+      logicalPath := "ABIGeneric.solc"
+      byteCount := 5540
+      sha256Bytes :=
+        #v[0xb1, 0x4f, 0x31, 0xab, 0xd3, 0x74, 0xd6, 0x5e,
+          0x19, 0x4c, 0x77, 0x06, 0x18, 0x30, 0x86, 0x08,
+          0x25, 0x58, 0xab, 0x2a, 0x60, 0xd2, 0x30, 0xec,
+          0x5b, 0x9e, 0x6f, 0x1b, 0x9c, 0x9b, 0x9a, 0xe2]
+    },
+    {
+      id := .generic
+      logicalPath := "Generic.solc"
+      byteCount := 445
+      sha256Bytes :=
+        #v[0x91, 0x3a, 0x02, 0xe3, 0x28, 0x29, 0xe0, 0x23,
+          0x0e, 0x31, 0xdb, 0x65, 0x12, 0x15, 0x1c, 0x36,
+          0xe0, 0x19, 0xf5, 0x63, 0x0e, 0x3d, 0xbd, 0x0b,
+          0xe9, 0xd0, 0x33, 0xa9, 0x01, 0x91, 0x94, 0xd7]
+    },
+    {
+      id := .storageGeneric
+      logicalPath := "StorageGeneric.solc"
+      byteCount := 10546
+      sha256Bytes :=
+        #v[0x8d, 0x68, 0x60, 0x14, 0x47, 0xf4, 0x0a, 0x6e,
+          0x66, 0x2d, 0xe8, 0xb6, 0xcf, 0xf0, 0x60, 0x31,
+          0x99, 0x86, 0x28, 0x33, 0x9c, 0xa2, 0x3e, 0xc9,
+          0x17, 0xa9, 0x70, 0x15, 0x7c, 0x30, 0x1a, 0x6a]
+    },
+    {
+      id := .dispatch
+      logicalPath := "dispatch.solc"
+      byteCount := 11249
+      sha256Bytes :=
+        #v[0xb7, 0x23, 0xec, 0x9a, 0x0a, 0x76, 0xa6, 0xab,
+          0xf0, 0x91, 0xd4, 0x9a, 0x12, 0x46, 0x7c, 0x6a,
+          0x46, 0x28, 0xb6, 0x34, 0xc4, 0x8d, 0x8c, 0x34,
+          0xe8, 0x2e, 0x2c, 0x45, 0xd6, 0xe9, 0x39, 0xf5]
+    },
+    {
+      id := .opcodes
+      logicalPath := "opcodes.solc"
+      byteCount := 10377
+      sha256Bytes :=
+        #v[0xa6, 0xa0, 0x8b, 0xee, 0xd1, 0x6c, 0xcd, 0xf7,
+          0x22, 0xf6, 0x5c, 0x60, 0xaf, 0x83, 0x5d, 0xcf,
+          0xd0, 0xea, 0xec, 0x61, 0xf3, 0x4f, 0x04, 0x10,
+          0x82, 0xbb, 0xc0, 0xfc, 0xa1, 0xe6, 0x9b, 0xab]
+    },
+    {
+      id := .std
+      logicalPath := "std.solc"
+      byteCount := 72958
+      sha256Bytes :=
+        #v[0xe8, 0xec, 0x75, 0x52, 0x32, 0x34, 0x7b, 0xbf,
+          0x4a, 0x13, 0x0d, 0xcc, 0x05, 0xc7, 0xc5, 0xa3,
+          0x23, 0x0c, 0x4d, 0x0c, 0xb0, 0x22, 0x34, 0x45,
+          0xa2, 0xd8, 0x22, 0x60, 0xd4, 0x47, 0x4f, 0xec]
+    }
+  ]
+
+def testCanonicalRawData : IO Unit := do
+  let rawFiles := Solcore.Standard.canonicalRawFiles.toArray
+  let expectations := canonicalMetadataExpectations.toArray
+  assertTrue (rawFiles.size == 6 && expectations.size == 6)
+    "canonical raw data and metadata must each contain exactly six files"
+  for (raw, expected) in rawFiles.zip expectations do
+    assertTrue (raw.id == expected.id)
+      s!"canonical file order changed at {reprStr expected.id}"
+    assertTrue (raw.logicalPathUtf8 == expected.logicalPath.toUTF8)
+      s!"canonical logical path bytes changed for {reprStr expected.id}"
+    assertTrue (raw.expectedByteCount == expected.byteCount)
+      s!"canonical byte-count metadata changed for {reprStr expected.id}"
+    assertTrue (raw.expectedSha256Bytes == expected.sha256Bytes)
+      s!"canonical SHA-256 metadata changed for {reprStr expected.id}"
+    assertTrue (raw.contentUtf8.size == raw.expectedByteCount)
+      s!"canonical content size differs from its metadata for {reprStr expected.id}"
+
 def run : IO Unit := do
   testProfile
   testFeatureMatrix
@@ -4064,10 +4447,13 @@ def run : IO Unit := do
   testWorkspaceEqualContentIdentity
   testWorkspaceValidationErrors
   testWorkspaceValidationEquivalence
+  testMultiSourceFoundation
+  testMultiTokenFoundation
+  testCanonicalRawData
 
 end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c-workspace tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c-workspace/M2c-multi-foundation tests passed"
   return 0
