@@ -1153,8 +1153,8 @@ The parser recognizes a statement `if` only for the complete prefix
 expression below. This finite chart guard does not construct or discard nodes.
 Within a match, a `|` followed by a complete `list1(pattern) =>` at a statement
 boundary begins the next arm; otherwise it is the bitwise-or operator. The
-declarative judgment, `Chart.G`, and the fast executor use the same guard
-predicate, and its uniqueness is proved.
+declarative judgment, `Chart.G`, and the fast executor use the same anchored
+three-way guard decision, and its functionality is proved.
 
 Pattern grammar is:
 
@@ -1393,8 +1393,8 @@ capitalization action, implicit return, synthetic empty body, or tuple-to-pair
 action.
 
 Some successful prefixes overlap before their delimiters are known. The
-following closed guard table resolves them. A guard fact is computed from the
-same expanded productions by span recognition; it does not invoke
+following closed guard algebra resolves them. A guard decision is computed
+from the same expanded productions by span recognition; it does not invoke
 `parseTokens`, resolution, or semantic typing. Lower numeric priority wins,
 and an explicitly disabled alternative cannot enter the chart.
 
@@ -1406,19 +1406,214 @@ PriorityGuardId =
   | G09_genericContext
 
 ParseOverrideId = G10_repeatedNonAssociative
+
+Boundary(tokens : List Token) = Fin (tokens.length + 2)
+
+Multi.Grammar.GuardDecision = positive | negative | neutral
+
+Multi.Grammar.Polarity = positive | negative
+
+Multi.Grammar.Polarity.accepts :
+  Polarity -> GuardDecision -> Bool
+  | positive, positive => true
+  | positive, negative => false
+  | positive, neutral  => true
+  | negative, positive => false
+  | negative, negative => true
+  | negative, neutral  => true
+
+Multi.Grammar.GuardDecision.allows :
+  GuardDecision -> Polarity -> Bool
+  | decision, polarity => Polarity.accepts polarity decision
+
+GuardContext(tokens : List Token) =
+  | plain
+  | bracedBody       (bodyStart : Boundary tokens)
+  | armBody          (armBodyStart : Boundary tokens)
+  | postfixInvocation (postfixStart : Boundary tokens)
+
+ProductionInstanceKey(tokens : List Token) = {
+  production : ProductionId,
+  origin     : Boundary tokens,
+  context    : GuardContext tokens
+}
+
+GuardInstanceKey(tokens : List Token) = {
+  guard        : PriorityGuardId,
+  contextStart : Boundary tokens,
+  siteCursor   : Boundary tokens,
+  ordered      : contextStart.val <= siteCursor.val
+}
 ```
 
-| `GuardId` | Enabled alternative and exact priority condition |
+`Boundary` ranges over all chart boundaries, including the boundary after the
+logical `EOF`. A `bracedBody` start is the boundary immediately after that
+body's `{`; an `armBody` start is the boundary immediately after that arm's
+`=>`; and a `postfixInvocation` start is the origin of the enclosing source
+rule `postfix`, before its `atom`. These are source-token boundaries, not byte
+cursors. `plain` is used outside all three locally relevant contexts.
+
+`GuardDecision` is owned by `Solcore.Surface.Multi.Grammar`, beside
+`PriorityGuardId`, `Polarity`, and `guardOf`; judgment and executor modules
+import that one type. `GuardDecision.neutral` is not a third priority side. It
+means that the two polarities do not overlap at this cursor and therefore both
+remain enabled. `GuardDecision.allows decision polarity` is definitionally
+`Polarity.accepts polarity decision`, as shown above. The previous
+`Polarity -> Bool -> Bool` signature is replaced; it is not a compatible
+overload or a second API, and a guard decision is never represented by a
+globally cached Boolean.
+
+The context attached to a predicted production is fixed by the following
+total transition. `waiting.raw.current` becomes the origin of the resulting
+`ProductionInstanceKey` in every case. The two sequence positions below are
+the positions before child `1` of
+`body ::= "{" statement* "}"` and before child `3` of
+`matchArm ::= "|" list1(pattern) "=>" armStatement*` respectively.
+
+```text
+descendContext(waiting : ContextualItemKey,
+               predicted : ProductionId) : GuardContext tokens =
+  | predicted = P.root[postfix] =>
+      postfixInvocation waiting.raw.current
+  | waiting.raw is P.seq[body.root] at dot 1 and
+      predicted.lhs = Aux(body.root.1) =>
+      bracedBody waiting.raw.current
+  | waiting.raw is P.seq[matchArm.root] at dot 3 and
+      predicted.lhs = Aux(matchArm.root.3) =>
+      armBody waiting.raw.current
+  | _ => waiting.context
+```
+
+The second and third cases apply only on initial entry from the displayed
+sequence production. Prediction of `P.star[body.root.1,*]` or
+`P.star[matchArm.root.3,*]` from its own cons production inherits the existing
+context and therefore does not move the region start. A nested `postfix`,
+braced body, or match arm temporarily replaces the outer context; completion
+restores the waiting item's context. Consequently one context value, rather
+than an unbounded ancestry stack, is sufficient.
+
+For a cell `cell = (guard, polarity)` in
+`guardOf productionInstance.production`, the closed relation
+
+```text
+GuardAnchor : ProductionInstanceKey tokens ->
+  (PriorityGuardId × Polarity) -> GuardInstanceKey tokens -> Prop
+```
+
+holds exactly when the cell belongs to `guardOf`, the instance guard is
+`guard`, its `siteCursor` is `productionInstance.origin`, and the remaining
+anchor equation in this table holds:
+
+| Guard | Required production context | `contextStart` / `siteCursor` |
+| --- | --- | --- |
+| `G01_statementIf` | any | statement start / the same statement start |
+| `G02_matchArmBoundary` | `armBody armBodyStart` | that `armBodyStart` / the current `armStatement*` iteration |
+| `G03_parameterComptime` | any | parameter start / the same parameter start |
+| `G04_letComptime` | any | cursor immediately after the let-binding colon / that same cursor |
+| `G05_typeComptime` | any | type start / the same type start |
+| `G06_patternComptime` | any | pattern start / the same pattern start |
+| `G07_leadingDotArguments` | `postfixInvocation postfixStart` | that canonical enclosing postfix invocation origin / the guarded argument-or-call site (the current token is `(` only for positive evidence) |
+| `G08_terminalExpression` | `bracedBody bodyStart` or `armBody armBodyStart` | that nearest enclosing region start / expression-statement start |
+| `G09_genericContext` | any | context-option start after `forallClause` / that same cursor |
+
+“Any” means that the surrounding context is retained in the
+`ProductionInstanceKey`; it does not mean that it may be erased when items are
+deduplicated. For `G07`, both the leading-dot atom option and every competing
+call `postfixPart` use the origin of the same enclosing `postfix`. An
+implementation-selected atom origin, postfix-part origin, or immediately
+preceding dot is not a legal anchor.
+
+`GuardAnchor.functional` is required:
+
+```text
+GuardAnchor.functional :
+  GuardAnchor productionInstance cell left ->
+  GuardAnchor productionInstance cell right ->
+  left = right
+```
+
+This theorem follows from the displayed equations and the canonical context
+transition; it must not be obtained by choosing the first of several anchors.
+
+Guard evidence uses one auxiliary, wholly unguarded recognition relation.
+`UnguardedRecognizes(rule, start, finish)` is generated by the least raw
+predict/scan/complete closure of `expanded` with every `guardOf` entry ignored.
+`GreatestUnguardedEnd` additionally states that no larger finish satisfying
+the same named delimiter restriction is recognized. `ArmHeaderAt(regionStart,
+cursor)` means that the token at `cursor` is `|`, and that from its successor
+the greatest unguarded nonempty `list1(pattern)` ends immediately before a
+`=>` at the same match-delimiter depth. `ExactSlice(start, finish,
+[dot, identifier])` means that the half-open retained-token slice is exactly
+those two terminal classes. These relations inspect retained tokens and the
+lexer-proved delimiter structure only; strings, comments, and opaque assembly
+slices never contribute delimiters.
+
+`NearestStatementRegion(regionStart, regionEnd)` is also unguarded. If the
+token immediately before `regionStart` is `{`, `regionEnd` is the matching `}`.
+If it is `=>`, delimiter scanning first selects the unique innermost unmatched
+`{` in the delimiter frame containing that `=>`; `regionEnd` is the least
+later cursor at the same depth that is either an
+`ArmHeaderAt(regionStart, regionEnd)` cursor or that `{` token's matching `}`.
+Nested bodies and nested matches are skipped by delimiter matching. A valid
+`GuardAnchor` ensures that the preceding `{` or `=>` is the token that created
+the retained context, but `NearestStatementRegion` itself uses only tokens and
+the unguarded delimiter relation. Implementations must prove:
+
+```text
+nearest_statement_region_functional :
+  NearestStatementRegion regionStart left ->
+  NearestStatementRegion regionStart right ->
+  left = right
+```
+
+The relation does not consult `G02`; it uses the common unguarded
+`ArmHeaderAt` predicate directly. This is necessary to keep `G08` from being
+circular through a guarded parse answer.
+
+The final evidence relation is:
+
+```text
+GuardEvidence : WorkspaceFile -> List Token ->
+  GuardInstanceKey tokens -> GuardDecision -> Prop
+```
+
+It first requires that every token is owned by the supplied file. It then
+holds exactly for the one row below. For the eight guards other than `G02`,
+“otherwise negative” includes a missing token or incomplete named recognition.
+For `G02`, a missing retained token, including the logical-EOF position, is
+“not `|`” and therefore `neutral`.
+
+| Guard | Exact `positive`, `negative`, and `neutral` evidence |
 | --- | --- |
-| `G01_statementIf` | At a statement boundary beginning with `if`, enable `ifStatement` and disable the expression-statement branch exactly when an `expression` can end at the matching `)` and the next token is `{`; otherwise disable `ifStatement`. |
-| `G02_matchArmBoundary` | In a match-arm body at a statement boundary, stop the body before `\|` exactly when a nonempty pattern list followed by `=>` is span-recognizable there; otherwise the `\|` remains available to expression parsing. |
-| `G03_parameterComptime` | At the beginning of a parameter, `comptime` is the located parameter modifier; the competing interpretation as the parameter name is disabled, even if the required following identifier is absent. |
-| `G04_letComptime` | Immediately after the colon of a let binding, a token spelled `comptime` is the located let marker; the competing type-level contextual interpretation is disabled. |
-| `G05_typeComptime` | At a type start, `comptime` is the located type-prefix marker; the competing one-component named type is disabled, even if the required following type is absent. |
-| `G06_patternComptime` | At a pattern start, `comptime` is the pattern marker exactly when an expression can end at the next comma, `)`, or `=>` pattern boundary; otherwise it is reinterpreted as an ordinary identifier component. |
-| `G07_leadingDotArguments` | Parentheses immediately following a leading-dot name are consumed by `dotConstructor.arguments`; the same parentheses are disabled as the first postfix call part. |
-| `G08_terminalExpression` | The unterminated expression-statement alternative is enabled only when its greatest complete end cursor is immediately before the enclosing body `}`, the next match arm recognized by `G02_matchArmBoundary`, or the enclosing match `}`. |
-| `G09_genericContext` | After a `forallClause`, take the context option exactly when a nonempty `predicateList` is followed by `=>`; otherwise take the absent option without consuming predicates. |
+| `G01_statementIf` | `positive` exactly when `siteCursor` starts `if (` and an unguarded complete `expression` ends at the delimiter-matching `)`, immediately followed by `{`; otherwise `negative`. |
+| `G02_matchArmBoundary` | `positive` exactly when `ArmHeaderAt(contextStart, siteCursor)`; `negative` exactly when the retained token at `siteCursor` is `|` but that predicate is false; `neutral` exactly when the retained token is absent or is not `|`. |
+| `G03_parameterComptime` | `positive` exactly when the identifier at `siteCursor` has contextual spelling `comptime`, even if no following identifier exists; otherwise `negative`. |
+| `G04_letComptime` | `positive` exactly when the identifier immediately after the colon, at `siteCursor`, has contextual spelling `comptime`; otherwise `negative`. |
+| `G05_typeComptime` | `positive` exactly when the identifier at `siteCursor` has contextual spelling `comptime`, even if no following type exists; otherwise `negative`. |
+| `G06_patternComptime` | `positive` exactly when `siteCursor` spells contextual `comptime` and, from its successor, the greatest unguarded complete `expression` ends at the next same-pattern-depth `,`, `)`, or `=>`; otherwise `negative`. |
+| `G07_leadingDotArguments` | `positive` exactly when `ExactSlice(contextStart, siteCursor, [dot, identifier])` and the token at `siteCursor` is `(`; otherwise `negative`. |
+| `G08_terminalExpression` | First obtain the unique `NearestStatementRegion(contextStart, regionEnd)`. Among unguarded complete `expression` ends from `siteCursor` that do not pass `regionEnd`, `positive` holds exactly when the greatest end equals `regionEnd`; otherwise `negative`. |
+| `G09_genericContext` | `positive` exactly when, from `siteCursor` after `forallClause`, the greatest unguarded complete nonempty `predicateList` ends immediately before `=>`; otherwise `negative`. |
+
+Only `G02` can yield `neutral`. Thus a recognized next-arm header enables the
+positive `star.nil` cell and disables the negative `star.cons` cell; a
+non-header `|` does the reverse; and an ordinary non-`|` statement boundary
+enables both. The last case is essential: forcing a Boolean complement there
+would either prevent an arm body from ending at `}`/EOF or prevent it from
+continuing with an ordinary statement.
+
+For `G07`, the exact slice makes `.T(` positive. It makes `f(`, `f.T(`,
+the second call in `.T(x)(y)`, and `.T.x(` negative. In particular, the dot
+nearest the `(` in `f.T(` cannot be substituted for the enclosing-postfix
+origin.
+
+`GuardEvidence.functional` and totality on every `GuardInstanceKey` of a
+well-owned `LexedModule` are required; only anchored keys can later be consumed
+by a production instance.
+Evidence is the least fixed point of only the unguarded finite relations named
+above. It may not mention `GuardAnchor`, contextual chart reachability,
+`Chart.G`, `parseTokens`, another `GuardEvidence`, resolution, or semantic
+typing.
 
 `guardOf : ProductionId -> List (PriorityGuardId × Polarity)` is total and is
 nonempty exactly on these expanded choices: `G01_statementIf` guards the
@@ -1432,18 +1627,99 @@ the leading-dot argument option and the competing first call `postfixPart`;
 `G08_terminalExpression` guards the `terminalExpression`
 expression-statement alternative; and `G09_genericContext` guards the
 generic-prefix context option. `Polarity` selects the enabled or disabled side
-stated in the table. Every other production has `guardOf = []`.
+through `GuardDecision.allows`. Every other production has `guardOf = []`.
 
-For `G01_statementIf`, “matching `)`” means the delimiter reached after a
-complete grouped condition from that `(`; braces inside strings, comments, and
-assembly tokens are never candidates. For `G02_matchArmBoundary`,
-`G06_patternComptime`, `G08_terminalExpression`, and `G09_genericContext`, the
-greatest complete end cursor is selected before applying the condition. These
-facts are the least fixed point of the unguarded predict/scan/complete relation
-restricted to the named subgrammar and delimiter boundary. The universe is
-finite, so the guard computation is executable and cannot appeal recursively
-to a parse answer. The table is exhaustive; no parser-combinator commit order
-is part of m2c-v1.
+The exact cells, using the `GrammarSite` rule plus child-index path, are:
+
+| Guard | Positive production cells | Negative production cells |
+| --- | --- | --- |
+| `G01` | `P.choice[statement, [], 3]` | `P.choice[statement, [], 10]` |
+| `G02` | `P.star[matchArm, [3], nil]` | `P.star[matchArm, [3], cons]` |
+| `G03` | `P.opt[parameter, [0], some]` | `P.opt[parameter, [0], none]` |
+| `G04` | `P.opt[letBinding, [2,0,1], some]` | `P.opt[letBinding, [2,0,1], none]` |
+| `G05` | `P.choice[type, [], 0]` | `P.choice[type, [], 1]` |
+| `G06` | `P.choice[pattern, [], 3]` | `P.choice[pattern, [], 4]` |
+| `G07` | `P.opt[atom, [2,2], some]` | `P.opt[atom, [2,2], none]`; `P.choice[postfixPart, [], 0]` |
+| `G08` | `P.choice[expressionStatement, [], 1]` | none |
+| `G09` | `P.opt[genericPrefix, [1], some]` | `P.opt[genericPrefix, [1], none]` |
+
+This table has `H = 18` cells. It is the same executable `guardOf` table used
+for coverage validation; the short `G01` through `G09` labels in this display
+stand for the correspondingly numbered `PriorityGuardId` constructors.
+
+The finite witness retained by the guarded chart is not a Boolean on a raw
+item. Its key is:
+
+```text
+GuardWitnessKey(tokens : List Token) = {
+  productionInstance : ProductionInstanceKey tokens,
+  guardInstance      : GuardInstanceKey tokens,
+  polarity           : Polarity,
+  guarded             :
+    (guardInstance.guard, polarity) in
+      guardOf productionInstance.production,
+  anchored            :
+    GuardAnchor productionInstance
+      (guardInstance.guard, polarity) guardInstance
+}
+```
+
+A witness value for this key additionally contains the unique `decision`, a
+`GuardEvidence file tokens guardInstance decision` derivation, and a proof
+that `decision.allows polarity = true`. A `ProductionInstanceKey` is enabled
+exactly when such a witness exists for every cell in its `guardOf` list.
+Unguarded production instances are enabled vacuously. Witness keys are
+inserted and looked up by their complete production/context/guard identity;
+erasing either context boundary before the lookup is nonconforming.
+
+The public guard schedule is a strict three-phase algorithm. Its internal
+state algebra is:
+
+```text
+GuardMemoState = undecided | final GuardDecision
+
+AllGuardsFinal(memo : GuardInstanceKey tokens -> GuardMemoState) : Prop =
+  forall key, exists decision, memo key = final decision
+
+ContextualReach :
+  AllGuardsFinal memo -> ContextualItemKey -> Prop
+```
+
+The `AllGuardsFinal` derivation is an explicit parameter of the Phase C reach
+relation and of every contextual packed-edge constructor. It cannot be
+recovered from an existential lookup for one key.
+
+1. **Phase A — universal unguarded saturation.** Initialize the raw dot-zero
+   production at every boundary for every expanded nonterminal and compute one
+   least raw predict/scan/complete fixed point with `guardOf` ignored. This
+   single universal span chart defines every `UnguardedRecognizes`, greatest
+   end, delimiter, and `ArmHeaderAt` lookup used by guard evidence. It is fully
+   saturated before Phase B begins and is never recomputed for a guard ID,
+   guard instance, production instance, or context.
+2. **Phase B — decision finalization.** Allocate one `undecided` cell for every
+   finite `GuardInstanceKey`, in its displayed lexicographic order. Reading
+   only Phase A's saturated tables and retained tokens, replace each cell
+   exactly once by the unique `final decision` specified by
+   `GuardEvidence`. Finish the entire table, including every anchored key,
+   before Phase C begins. This phase creates no `ProductionInstanceKey`,
+   `GuardWitnessKey`, contextual item, contextual edge, AST value, or parse
+   diagnostic.
+3. **Phase C — guarded contextual saturation and reduction.** Start the one
+   contextual module chart in `plain`. Prediction forms a production instance,
+   obtains its unique anchor, reads only a `final` Phase B cell, applies
+   `Polarity.accepts`, and creates the corresponding guard witness only when
+   the polarity is accepted. Compute the contextual fixed point once, then
+   compute its contextual diagnostic frontier or reduce its unique root.
+
+Phase order is part of `Chart.G`, not an implementation optimization. No
+Phase C reachability fact may exist while any Phase B cell is `undecided`.
+`undecided` is an internal scheduler state, never `negative`, `neutral`, a
+source diagnostic, or evidence for either polarity. A missing or provisional
+decision cannot enable a production and cannot enter `ContextualReach`.
+Likewise, Phase C may only look up Phase A/B results; it may not start another
+unguarded subchart or revise a finalized decision.
+
+The table is exhaustive; no parser-combinator commit order is part of m2c-v1.
 
 The normative reference parser is `Multi.Chart.G`. For an input containing
 `n` retained tokens, let `terminalStream` append one logical `EOF`, let
@@ -1463,45 +1739,91 @@ PackedEdgeKey =
       (waiting finished after : DottedItem)
       (sharedCursor : Fin (T + 1))
 
+ContextualItemKey = {
+  raw     : DottedItem,
+  context : GuardContext tokens
+}
+
+ContextualPackedEdgeKey =
+  | scanned
+      (before after : ContextualItemKey)
+      (terminalCursor : Fin T)
+  | completed
+      (waiting finished after : ContextualItemKey)
+      (sharedCursor : Boundary tokens)
+
 Predict(item) =
-  if item.next is nonterminal X, add every guarded-on X production
-  with dot zero and origin = current = item.current
+  if item.raw.next is nonterminal X, form each production instance for X
+  with origin = item.raw.current and context = descendContext(item, production),
+  and add its dot-zero contextual item exactly when that complete production
+  instance is enabled
 
 Scan(item) =
-  if item.next is terminal k and terminalStream[item.current] matches k,
-  add the same item with its dot advanced and current advanced by one
+  if item.raw.next is terminal k and
+     terminalStream[item.raw.current] matches k,
+  add the same contextual item with its raw dot and current advanced by one
 
 Complete(waiting, finished) =
-  if waiting.next is finished.lhs and
-     waiting.current = finished.origin and finished is complete,
-  add waiting with its dot advanced and current = finished.current
+  if waiting.raw.next is finished.raw.lhs and
+     waiting.raw.current = finished.raw.origin and finished.raw is complete and
+     finished.context =
+       descendContext(waiting, finished.raw.production),
+  add waiting with its raw dot advanced and
+    current = finished.raw.current and context = waiting.context
 ```
 
-`G` starts with `P.root[module]` at origin/current zero and computes the least
-set closed under `Predict`, `Scan`, and `Complete`, retaining packed action
-edges by stable `ActionId`. A packed-edge key exists only when its displayed
-items satisfy the corresponding `Scan` or `Complete` equation, so it is a
-finite subtype rather than an open trace object. The executable uses an
-ordered finite worklist:
-each item key is dequeued once, each compatible prediction, scan, and completion
-key is attempted once, and duplicate insertion is ignored. It accepts exactly
-when the completed module-root item spans boundary zero through `T`. Thus EOF
-is consumed and successful prefix parses do not exist.
+Here `Fin (T + 1)` is definitionally `Boundary tokens`; the raw spelling is
+retained to keep the original `DottedItem` and `PackedEdgeKey` algebra stable.
 
-On acceptance, the packed root is reduced by the action table. The guard table,
-non-null repetition check, precedence construction, and delimiter rules imply:
+The raw `DottedItem` and `PackedEdgeKey` algebras above are unchanged and remain
+the grammar-audit projections. They are not sufficient semantic deduplication
+keys. The contextual scanned constructor requires equal before/after contexts.
+The contextual completed constructor requires exactly the `Complete` context
+equations above. Its raw projection is the displayed raw `PackedEdgeKey`, but
+two contextual edges with the same raw projection remain distinct.
+
+After Phase A is saturated and Phase B proves `AllGuardsFinal`, Phase C of `G`
+starts with `P.root[module]` at origin/current zero in context `plain`. It
+computes the least set closed under contextual `Predict`, `Scan`, and
+`Complete`, retaining `ContextualPackedEdgeKey` action edges by stable
+`ActionId` and retaining the separate `GuardWitnessKey` set. A contextual edge
+exists only when its displayed items satisfy the corresponding equation, so
+it is a finite subtype rather than an open trace object. The Phase C executable
+uses an ordered finite worklist: each contextual item and contextual edge is
+dequeued once; each production instance and guard-witness key is activated or
+inserted once; each compatible prediction, scan, and completion key is
+attempted once; and duplicate insertion is ignored.
+
+Prediction is the only operation that creates a child context. Scan preserves
+it. Complete may consume only a finished item carrying the context produced by
+that exact waiting item and then restores the waiting context. In particular,
+the implementation must not define a raw predicate such as
+`ViableReach item := exists context, ContextualReach { raw := item, context }`
+and then use two independent witnesses from it in prediction, completion,
+reduction, or diagnostics. A raw item reached once under `.postfixInvocation`
+for `.T(` and once under another postfix origin is two keys, as are their
+completed edges. Raw projection may be used only after a complete coherent
+contextual derivation has been selected.
+
+`G` accepts exactly when the completed module-root contextual item in context
+`plain` spans boundary zero through `T`. Thus EOF is consumed and successful
+prefix parses do not exist.
+
+On acceptance, the contextual packed root is reduced by the action table. The
+guard table, non-null repetition check, precedence construction, and delimiter
+rules imply:
 
 ```text
 uniqueRootReduction :
-  completedRoot G tokens root1 ->
-  completedRoot G tokens root2 ->
+  completedContextualRoot G tokens plain root1 ->
+  completedContextualRoot G tokens plain root2 ->
   root1 = root2
 ```
 
-The statement quantifies over all packed derivations, not only the first
-worklist path. `G` therefore never selects an AST by map iteration order. Its
-result is the unique `ParsedModuleV1`, or the closed parse diagnostic specified
-below.
+The statement quantifies over all contextual packed derivations, not only the
+first worklist path. `G` therefore never selects an AST by map iteration order.
+Its result is the unique `ParsedModuleV1`, or the closed parse diagnostic
+specified below.
 
 ### Structural acceptance
 
@@ -1636,29 +1958,35 @@ through `MSL0007`, `MSP0001` through `MSP0002`, and `MSS0001` through
 Lexing is fail-fast at the least byte cursor at which no lexical rule can
 continue. A parse diagnostic instead comes from the complete finite chart, so
 an earlier dead alternative cannot hide a later, more informative failure.
-Let `Reach` be `G`'s guarded predict/scan/complete closure and define:
+Let `ContextualReach` be `G`'s contextual guarded
+predict/scan/complete closure and define:
 
 ```text
 greatestReachableCursor =
-  max { item.current | item is in Reach }
+  max { item.raw.current | item is in ContextualReach }
 
 frontier =
-  predict/complete closure of all Reach items whose current equals
-  greatestReachableCursor
+  contextual predict/complete closure of all ContextualReach items whose
+  raw.current equals greatestReachableCursor
 
 ExpectedAtFrontier =
   union { expectedClass(terminal) |
-          item is in frontier and item.next = terminal and
-          the item's production remains enabled by every priority guard }
+          item is in frontier and item.raw.next = terminal and
+          the exact production instance that introduced item has all of its
+          GuardWitnessKey values in the contextual derivation }
 ```
 
 `greatestReachableCursor` exists because the start item is reachable. On parse
 failure it is no later than the logical EOF cursor, and `ExpectedAtFrontier` is
 nonempty; both facts are required theorems of the expanded grammar. The union
-is set union over every reachable item, not the expectation of a preferred
-derivation. It is sorted first by `Expected` constructor order and then by the
-displayed order of any `HardKeyword`, `ContextualKeyword`, `PragmaKind`, or
-`Symbol` payload, and is deduplicated.
+is set union over every reachable contextual item, not the expectation of a
+preferred derivation. Context is retained through the complete frontier
+closure and erased only from the final `Expected` value. Two raw items may
+therefore contribute through different coherent contexts, but a prediction or
+completion premise from one context can never justify a terminal expectation
+from the other. The result is sorted first by `Expected` constructor order and
+then by the displayed order of any `HardKeyword`, `ContextualKeyword`,
+`PragmaKind`, or `Symbol` payload, and is deduplicated.
 
 Quoted hard and contextual words, pragma names, and symbols map to their
 corresponding singleton `Expected` constructors; grammar terminals
@@ -1671,12 +1999,15 @@ proved-equal fast executor.
 If the greatest cursor denotes a retained token, `unexpected` uses that token's
 exact span and `Found.token`; at the logical EOF cursor it uses the empty span
 at `file.content.utf8ByteSize` and `Found.endOfFile`. There is one override. If
-the frontier contains a completed first relational or equality operation, the
-found token is another operator from that same level, and no explicit group
-boundary intervenes, `G10_repeatedNonAssociative` replaces `unexpected`. It
+one coherent contextual packed derivation in the frontier contains a completed
+first relational or equality operation, the found token is another operator
+from that same level in that same derivation, and no explicit group boundary
+intervenes, `G10_repeatedNonAssociative` replaces `unexpected`. A completed
+operation from one contextual edge may not be paired with the found operator
+premise from another edge having only the same raw projection. The override
 uses the exact span of that second operator and retains that operator as
-payload. The override applies across different operators at the same level,
-such as `<` followed by `>=`; grouping starts a new level. At such a cursor,
+payload. It applies across different operators at the same level, such as `<`
+followed by `>=`; grouping starts a new level. At such a cursor,
 `repeatedNonAssociative` is the only applicable parse diagnostic and the union
 `ExpectedAtFrontier` is not emitted.
 
@@ -1748,9 +2079,15 @@ Multi.StructuralDiagnostic.Applies : ParsedModuleV1 ->
 lexemes, retained trivia, UTF-8 cursor movement, nested comments, string
 decoding, and the assembly scanner without mentioning the lexer function.
 `Parses` is a declarative, full-token grammar judgment generated from the
-stable production and action tables. Its derivations record production IDs,
-guard premises, action IDs, and associativity, but do not contain an equation
-to `Chart.G` or `parseTokens`. `StructurallyAccepts` is the conjunction of the
+stable production and action tables. Its derivations record
+`ProductionInstanceKey`, contextual item and packed-edge identities, exact
+`GuardWitnessKey`/`GuardAnchor`/`GuardEvidence` premises, action IDs, and
+associativity. Its prediction and completion rules use the same
+`descendContext` equations, so no derivation rule existentially erases context
+before combining premises. It does not contain an equation to `Chart.G` or
+`parseTokens`. `ParseDiagnostic.Applies` independently derives the same
+contextual greatest cursor, sorted/deduplicated expected union, exact `Found`,
+and coherent `G10` override. `StructurallyAccepts` is the conjunction of the
 sixteen rules above and does not invoke the validator.
 
 The raw executors import syntax and diagnostics but do not import their sibling
@@ -1837,6 +2174,14 @@ T = LexedModule.tokens.length + 1              -- includes logical EOF
 Q = T + 1                                      -- chart boundaries
 P = Multi.Grammar.expanded.productionCount
 D = sum (p.rhs.length + 1 for p in Multi.Grammar.expanded.productions)
+K_guard = card PriorityGuardId
+  = Multi.Grammar.allPriorityGuardIds.length
+  = 9
+H = sum ((guardOf p).length for p in
+         Multi.Grammar.expanded.productions)
+  = 18                                         -- derived guard-table cells
+C(T) = card (GuardContext tokens)
+  = 1 + 3 * Q
 FastMemoKeyKind =
   | rule GrammarRuleId | site GrammarSite
   | guard PriorityGuardId | action ActionId
@@ -1845,12 +2190,20 @@ F = card FastMemoKeyKind
     + card PriorityGuardId + card ActionId
 N = Multi.astNodeMeasure parsedModule
 
+L(T) = (1 + C(T)) * D * Q * Q
+R(T) = (1 + C(T)) * D * P * Q * Q
+U(T) = (1 + C(T)) * D * D * Q * Q * Q
+
 lexBound(B) =
   16 * (B + 1)
 
 chartGBound(T) =
-  1 + (2 * D * P + 4 * D) * Q * Q
-    + 4 * D * D * Q * Q * Q
+  4 + 8 * K_guard * Q * Q
+    + P * C(T) * Q
+    + 4 * H * C(T) * Q
+    + 14 * L(T)
+    + 2 * R(T)
+    + 8 * U(T)
 
 parseBound(T) =
   1 + 32 * F * Q
@@ -1861,27 +2214,246 @@ structureBound(N) =
 ```
 
 A lexer unit is one cursor-state transition or one delimiter-stack transition.
-One `G` unit is one ordered-worklist dequeue, candidate prediction, candidate
-scan, candidate completion pair, packed-edge insertion, action application, or
-frontier-diagnostic candidate. The exact cubic polynomial covers the unguarded
-guard-fact chart and guarded parse chart: their dequeues, predictions, and scans
-use at most `(2 * D * P + 4 * D) * Q^2` units; completion pairs, packed edges,
-reduction, and diagnostic collection use at most `4 * D^2 * Q^3` units; the
-leading one covers initialization. These are bounds on the specified semantic
-counter, not asymptotic placeholders.
+The `Chart.G` counter uses the closed source tag and three key universes:
+
+```text
+ChartSourceTag(tokens) =
+  | rawEvidence
+  | contextual (context : GuardContext tokens)
+
+card ChartSourceTag = 1 + C(T)
+
+LinearKey =
+  ChartSourceTag × DottedRhs × Boundary × Boundary
+
+PredictionKey =
+  ChartSourceTag × DottedRhs × ProductionId × Boundary × Boundary
+
+CubicKey =
+  ChartSourceTag × DottedRhs × DottedRhs ×
+    Boundary × Boundary × Boundary
+
+card LinearKey     = L(T)
+card PredictionKey = R(T)
+card CubicKey      = U(T)
+
+EvidenceIndexKind =
+  | terminalWindow | exactSlice | greatestEnd | delimiterOrRegion
+```
+
+`rawEvidence` identifies Phase A; `contextual context` identifies Phase C.
+It is a tagged sum, not erasure of a context. `DottedRhs` has cardinality `D`.
+The boundary coordinates are the origin/current or
+waiting/shared/finished-current coordinates appropriate to the unit family.
+For `U01`, the displayed-order pair
+`(EvidenceIndexKind, PriorityGuardId ⊕ GrammarRuleId)` injects into two fixed
+`DottedRhs` coordinates. The executable tables prove
+`card EvidenceIndexKind * (K_guard + card GrammarRuleId) <= D * D`; this is the
+tag that keeps the four index families disjoint inside one `U(T)` copy.
+
+Phase B has exactly these eight scheduler slots for each
+`GuardInstanceKey`, in order:
+
+```text
+GuardFinalizeSlot =
+  | initializeUndecided
+  | siteTerminalLookup
+  | adjacentTerminalWindowLookup
+  | exactSliceLookup
+  | unguardedSpanLookup
+  | greatestEndLookup
+  | delimiterOrRegionLookup
+  | writeFinalDecision
+
+ChartPhaseSlot =
+  | initializePhaseA | sealAEnterB | sealBEnterC | selectFinalOutcome
+```
+
+Every key executes all eight slots once; a lookup irrelevant to that guard ID
+is a no-op. Only `initializeUndecided` and `writeFinalDecision` mutate the
+cell. The middle six read Phase A's finalized indexes. This gives the term
+`8 * K_guard * Q^2`; the `ordered` proof only reduces the actual key count.
+No Phase B slot constructs a guard witness.
+
+Phase C attempts each `ProductionInstanceKey` once, giving
+`P * C(T) * Q`. Each possible guard-table cell of such an instance has four
+distinct once-only slots:
+
+```text
+GuardWitnessSlot =
+  | constructAnchor
+  | lookupFinalDecision
+  | comparePolarity
+  | insertWitness
+```
+
+Their tagged injection gives `4 * H * C(T) * Q`. `insertWitness` is a no-op
+when no anchor exists or when the finalized decision does not accept that
+polarity; after a failed `constructAnchor`, the intervening lookup/comparison
+slots are also no-ops. No rejected witness key is inserted, and an undecided
+cell is impossible in Phase C.
+
+All remaining unit families and their disjoint injection tags are fixed by
+this table. A combined “raw/contextual” row uses `ChartSourceTag.rawEvidence`
+for its Phase A units and `ChartSourceTag.contextual context` for its Phase C
+units. Thus those units are individually distinguishable even when their raw
+item or edge projections coincide.
+
+Both saturation phases have separate ordered item and edge queues. A newly
+inserted item or edge is enqueued once and later dequeued once. Phase A edge
+dequeue registers only unguarded recognition/index evidence; Phase C edge
+dequeue may schedule its stable action. This fixes the dequeue families even
+for an implementation that could otherwise fuse them with insertion.
+
+| Injection tag | Phase and exact unit family | Injective payload | Bound copy |
+| --- | --- | --- | --- |
+| `L01_itemDequeue` | A raw item dequeue; C contextual item dequeue | complete item key | `L(T)` |
+| `L02_scannedEdgeDequeue` | A raw scanned-edge dequeue; C contextual scanned-edge dequeue | scanned-edge key; `after` is reconstructed | `L(T)` |
+| `L03_itemInsert` | A universal/root seed or a newly predicted item insertion | inserted item key | `L(T)` |
+| `L04_scanAttempt` | A raw/contextual scan attempt | item plus its current terminal cursor | `L(T)` |
+| `L05_scannedItemInsert` | A successful raw/contextual scanned-item insertion | inserted item key | `L(T)` |
+| `L06_scannedEdgeInsert` | A successful raw/contextual scanned-edge insertion | scanned-edge key | `L(T)` |
+| `L07_completedItemInsert` | A successful raw/contextual completed-item insertion | inserted item key | `L(T)` |
+| `L08_frontierDequeue` | C frontier-item dequeue | contextual item key | `L(T)` |
+| `L09_frontierInsert` | C frontier-item insertion | contextual item key | `L(T)` |
+| `L10_expectedCandidate` | C `Expected` terminal candidate and ordered-set insertion | contextual item key | `L(T)` |
+| `L11_foundCandidate` | C's single retained-token/EOF `Found` and final-diagnostic construction candidate | cursor padded by fixed root dotted key | `L(T)` |
+| `L12_scannedAction` | C terminal-atom action scheduled by a scanned edge | contextual scanned-edge key | `L(T)` |
+| `L13_epsilonAction` | C epsilon-production action with no child edge | contextual completed-item key | `L(T)` |
+| `L14_frontierScannedTraversal` | C frontier scanned-edge traversal | contextual scanned-edge key | `L(T)` |
+| `R01_predictionAttempt` | A raw prediction attempt; C contextual prediction attempt | waiting item schema, predicted production, origin/current | `R(T)` |
+| `R02_frontierPrediction` | C frontier prediction attempt | frontier item schema, predicted production, origin/current | `R(T)` |
+| `U01_evidenceIndex` | A terminal-window, exact-slice, unguarded greatest-end, or delimiter/region-index candidate after raw saturation | guard/subgrammar tag and three boundaries, padded by fixed dotted keys | `U(T)` |
+| `U02_completedEdgeDequeue` | A raw completed-edge dequeue; C contextual completed-edge dequeue | completed-edge key | `U(T)` |
+| `U03_completionAttempt` | A raw/contextual compatible completion-pair attempt | waiting/finished schemas and three boundaries | `U(T)` |
+| `U04_completedEdgeInsert` | A successful raw/contextual completed-edge insertion | completed-edge key | `U(T)` |
+| `U05_completedAction` | C non-epsilon `ActionId` application scheduled by a contextual completed edge, including accepted-root reduction; A has no semantic action units | coherent contextual completed edge | `U(T)` |
+| `U06_frontierCompletion` | C frontier completion-pair attempt | contextual waiting/finished keys and three boundaries | `U(T)` |
+| `U07_frontierCompletedTraversal` | C frontier completed-edge traversal | coherent contextual completed edge | `U(T)` |
+| `U08_G10Candidate` | C repeated-nonassociative override candidate | coherent contextual packed edge; found cursor is its frontier-current coordinate | `U(T)` |
+
+The `L01` through `L14`, `R01` through `R02`, and `U01` through `U08`
+constructor tags are part of the counter definition. No event can be charged
+to two families, and two different families cannot collide after injection.
+`L10` atomically inserts its candidate into the canonical ordered expected set,
+and `L11` atomically constructs the one final `Found`/diagnostic value; these
+two displayed fusions are normative and have no separately counted second
+event. No other table row fuses two listed families.
+A duplicate item/edge attempt is charged to its prediction, scan, or completion
+attempt family; an insertion unit occurs only for a newly inserted key. Every
+item or edge is dequeued at most once. `K_guard <= card GrammarRuleId <= P <= D`,
+`1 <= Q`, and the fixed root dotted key justify the padding injections used for
+the smaller frontier and evidence-index families; these inequalities are
+executable consequences of `expanded` and its guard table.
+
+The cardinality injections used by `chartGBound` are fixed:
+
+```text
+card Boundary                         = Q
+card GuardContext                     = C(T) = 1 + 3 * Q
+card ProductionInstanceKey            = P * C(T) * Q
+card GuardInstanceKey                 =
+  K_guard * Q * (Q + 1) / 2           <= K_guard * Q * Q
+card GuardWitnessKey                  <= H * C(T) * Q
+card ContextualItemKey                = C(T) * D * Q * Q
+card ContextualPackedEdgeKey.scanned  <= C(T) * D * Q * Q
+card ContextualPackedEdgeKey.completed
+  <= C(T) * D * D * Q * Q * Q
+```
+
+The `GuardWitnessKey` injection sends a witness to its guard-table cell,
+production context, and origin. `GuardAnchor.functional` reconstructs its
+`GuardInstanceKey`, so no additional factor is hidden. The contextual
+completion injection sends an edge to its waiting context, two raw dotted
+schemas, waiting origin, shared cursor, and finished cursor;
+`descendContext` reconstructs the finished context, so there is no `C(T)^2`
+factor.
+
+The four `ChartPhaseSlot` values contribute the leading `4`; each occurs
+exactly once, and neither sealing transition can occur until the preceding
+phase's finite enumeration is exhausted. Phase A consumes exactly the
+`rawEvidence` portion of the applicable tagged `L`, `R`, and `U` copies and
+finishes `U01` before Phase B. Phase B consumes only the eight
+guard-finalization slots. Phase C consumes the contextual portions, the
+production/witness terms, and all frontier/G10 tags. This is the complete
+family list for `Chart.G`; there is no uncharged generic “worklist step.”
+
+Because `C(T) = 1 + 3 * Q`, `chartGBound` is quartic. The prior cubic bound is
+not sound for instance-specific ancestry: multiplying only the raw item count
+would permit a positive-context item to discharge a negative-context edge.
+`P`, `D`, the raw `DottedItem` and `PackedEdgeKey`, and their enumeration are
+unchanged. These are bounds on the specified semantic counter, not asymptotic
+placeholders.
 
 `F` is exactly the displayed sum of the four finite enumerations; it is not a
-tunable numeral. The optimized
-`parseTokens` fills memo cells in lexicographic `(fast key kind, start boundary,
-end boundary)` order, uses precedence climbing for expressions, and visits
-each successful reduction edge once. Each kind/boundary pair has 32 fixed
-initialization/finalization work slots and each memo cell has 256 fixed
-recognition/guard/action slots; an inapplicable slot is a no-op and a slot is
-never revisited. A non-no-op slot is one memo lookup or insertion, token
-comparison, guard comparison, or AST action. This schedule is the executor's
-termination argument and gives the displayed exact quadratic bound. Acceptance
-requires both its own bound and extensional equality with `Chart.G` for success
-ASTs and complete diagnostics:
+tunable numeral and is unchanged by the contextual chart repair. The optimized
+`parseTokens` uses the same mandatory phase barrier:
+
+1. Fast Phase A fills and fully saturates all context-free rule/site span and
+   unguarded greatest-end/delimiter indexes. Candidate values retain their
+   unresolved finite `guardOf` cells. No guarded candidate is combined and no
+   guarded action is applied.
+2. Fast Phase B initializes every ordered `.guard` memo coordinate that
+   corresponds to a `GuardInstanceKey` to `undecided`, then reads only the
+   completed Phase A indexes and replaces every such cell exactly once by its
+   final `GuardDecision`. Unordered start/end coordinates are fixed no-op slots
+   and are never queried. This phase does not generate a witness or combine a
+   candidate. Re-running recognition for one guard cell is forbidden.
+3. Only after `FastAllGuardsFinal` holds does Fast Phase C use precedence
+   climbing, combine candidates, and visit each successful reduction edge
+   once. Each combine reads the exact final guard cell and uses one coherent
+   `GuardWitnessKey` observation.
+
+Within each phase, memo cells are visited in lexicographic `(fast key kind,
+start boundary, end boundary)` order. No `undecided`, absent, or provisional
+cell is interpreted as `negative` or `neutral`, and none can authorize a
+candidate combine. A guard memo cell is indexed by exactly
+`(PriorityGuardId, contextStart, siteCursor)`, so every `GuardInstanceKey`
+injects into the already counted `.guard` family. Rule and site memo cells
+never cache a result whose guard premises were existentially discharged. A
+guarded activation must look up its exact final guard cell before using such a
+candidate, and the lookup and action combine must use one guard-witness
+observation, not independently projected raw premises.
+
+The fast executor uses a proved observation quotient; it does not add
+`GuardContext` as a third boundary coordinate. For `G01`, `G03` through `G06`,
+and `G09`, evidence is independent of the retained outer context. For `G02`,
+`G07`, and `G08`, `GuardAnchor` reconstructs the only context constructor and
+start relevant to the decision from `(guard, contextStart, siteCursor)`;
+`nearest_statement_region_functional` handles the `G08` region end. Therefore
+two production instances collapsed into one fast guard cell allow exactly the
+same polarity. `ActionId` reduction inspects the source span and semantic child
+values but not the erased outer `GuardContext`, so an allowed cell also has the
+same reduction. This congruence is a required theorem, not an implementation
+assumption.
+
+More precisely, a fast guarded-use slot is the tuple
+
+```text
+(guardInstance.guard,
+ guardInstance.contextStart,
+ guardInstance.siteCursor,
+ index of the guarded production cell,
+ witness phase)
+```
+
+where the finite guarded-use phases are final-decision lookup, polarity
+comparison, and action combine. The first three fields select a `.guard` memo
+key, the guarded production-cell index is drawn from the `H = 18` table cells,
+and those three phases use `3 * H = 54` slot indices. The eight
+`GuardFinalizeSlot` values occupy eight disjoint earlier indices, so all guard
+work uses `8 + 3 * H = 62 < 256` fixed slots and injects into the 256 slots of
+that memo cell. Context-free rule/site/action candidates use their existing
+slots. Thus the fast schedule has no hidden `C(T)` factor and no uncounted join
+over postfix origin, postfix-part origin, and result end.
+
+Each kind/boundary pair has 32 fixed initialization/finalization work slots and
+each memo cell has 256 fixed recognition/guard/action slots; an inapplicable
+slot is a no-op and a slot is never revisited. A non-no-op slot is one memo
+lookup or insertion, token comparison, guard comparison, or AST action. This
+schedule is the executor's termination argument and gives the displayed exact
+quadratic bound. Acceptance requires both its own bound and extensional
+equality with `Chart.G` for success ASTs and complete diagnostics:
 
 ```text
 parseTokens_eq_chartG :
@@ -1928,8 +2500,25 @@ assembly_slice_ignores_comment_braces
 ebnf_expansion_finite
 ebnf_expansion_nonnullable_repetitions
 production_action_id_bijective
-chart_predict_scan_complete_closed
-chart_guard_facts_functional
+polarity_accepts_guardDecision_table
+guardDecision_allows_eq_accepts
+guard_context_cardinality
+guard_instance_cardinality
+guard_witness_cardinality
+contextual_item_edge_cardinality
+guard_anchor_functional
+guard_evidence_functional
+guard_evidence_total
+nearest_statement_region_functional
+unguarded_chart_saturated_once
+guard_decisions_final_total
+chart_phase_order
+contextualReach_requires_allGuardsFinal
+contextual_predict_scan_complete_closed
+contextual_projection_no_anchor_mixing
+chart_guard_witnesses_exact
+chart_unit_family_injective
+chart_unit_family_complete
 chart_greatest_cursor_exists
 chart_expected_nonempty_on_failure
 chart_expected_is_frontier_union
@@ -1947,6 +2536,10 @@ parser_complete
 Parses.functional
 parse_diagnostic_sound
 parse_diagnostic_complete
+fast_guard_observation_congruent
+fast_guard_slot_injective
+fast_phase_order
+fast_guard_final_before_combine
 parseTokens_eq_chartG
 parseBound_sufficient
 
@@ -2363,6 +2956,16 @@ proves their equality. `CanonicalData.lean` imports no Surface or resolver
 module. The public internal umbrella is added only after all correspondence,
 certificate, fixture, and kernel audits pass.
 
+`Grammar.lean` exclusively owns `GuardDecision` and the replacement
+`Polarity.accepts : Polarity -> GuardDecision -> Bool`, with
+`GuardDecision.allows` only as the definitionally equal argument-order alias.
+An implementation that still exposes `Polarity -> Bool -> Bool` is not
+conforming to this Accepted ADR. Updating that shared algebra and its
+exhaustive table checks is a prerequisite gate: `ParserJudgment.lean`,
+`Chart.lean`, and `Parser.lean` may not be implemented, accepted, or imported
+as a conforming slice against the old signature. This implementation gate does
+not change the ADR's `Accepted` status.
+
 Implementation proceeds in this order:
 
 1. neutral canonical raw bytes, strict UTF-8 decoding, source spans, located
@@ -2370,8 +2973,10 @@ Implementation proceeds in this order:
 2. the independent lexical judgment and assembly-slice relation;
 3. the pure maximal-munch lexer and its correspondence proofs;
 4. the complete AST, checked EBNF expansion, stable production/action tables,
-   and independent parser judgment;
-5. finite-chart `G`, then the separate fast full-token parser, their bounds,
+   shared `GuardDecision` algebra, replacement `Polarity.accepts`, and their
+   exhaustive table checks;
+5. the independent parser judgment only after step 4, then finite-chart `G`
+   and the separate fast full-token parser, their phase barriers, bounds,
    correspondence, and exact result-equality proof;
 6. independent structural acceptance and the structural validator;
 7. location, token-correspondence, diagnostic, and resource theorems;
@@ -2470,8 +3075,40 @@ Lexical or parse failure produces a closed diagnostic and no AST.
   non-associative repetition, optional construct, empty permitted list, and
   forbidden trailing comma.
 - Check mechanical EBNF expansion, stable production/action IDs, all nine
-  priority guards, greatest-cursor frontier unions, the repeated-nonassociative
-  override, and unique reduction across every packed derivation.
+  priority guards, greatest-cursor contextual frontier unions, the
+  repeated-nonassociative override, and unique reduction across every
+  contextual packed derivation.
+- For `G01`, test both `if (x) {}` statement priority and keyword-conditional
+  expression priority. For `G03` through `G06` and `G09`, test both decision
+  sides, including incomplete `comptime` prefixes that still take the marker
+  side where the table requires it.
+- For `G02`, separately test a recognized `| patterns =>` next-arm header, a
+  non-header `|` used by bitwise-or parsing, and neutral ordinary-statement and
+  arm-close cursors. Include empty, one-statement, and multiple-statement arm
+  bodies and a nested match.
+- For `G07`, test `.T(`, `f(`, `f.T(`, both call sites in `.T(x)(y)`, and
+  `.T.x(`. A direct finite-chart fixture must give one raw dotted item two
+  distinct postfix contexts and prove that neither its guard witness nor its
+  completed edge can cross between them.
+- For `G08`, test a final expression before a braced-body close, before a next
+  arm, and before a match close; test a non-final unterminated expression; and
+  include nested braced bodies and nested matches so the nearest-region theorem
+  is observable.
+- Check `GuardAnchor.functional`, `GuardEvidence.functional`, the
+  positive/negative/neutral allowance table, contextual scan preservation,
+  prediction descent, completion restoration, and the fast observation
+  quotient on executable finite keys.
+- Check the exhaustive `Polarity.accepts` table and definitional
+  `GuardDecision.allows` alias from `Grammar.lean`; reject the obsolete
+  `Polarity -> Bool -> Bool` signature at the module boundary.
+- Instrument `Chart.G` to prove that Phase A saturates once, every Phase B cell
+  advances from `undecided` to one final decision before any Phase C fact,
+  Phase B emits no witness, and Phase C never recomputes raw recognition.
+  Exercise every `L01`–`L14`, `R01`–`R02`, and `U01`–`U08` tag and check that
+  the tagged injection is exhaustive and collision-free.
+- Instrument the fast executor to prove that every guard memo is final before
+  the first guarded candidate combine, and that absent/undecided cells never
+  act as negative or neutral decisions.
 - Test all structural diagnostic constructors, their exact primary spans,
   canonical ordering, and duplicate removal.
 - Check the compatibility ledger fixtures and prove both canonical-standard
