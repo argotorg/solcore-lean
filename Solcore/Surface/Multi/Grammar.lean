@@ -1661,7 +1661,14 @@ def allParseOverrideIds : List ParseOverrideId := [
   .G10_repeatedNonAssociative
 ]
 
-/-- Select whether a production requires a guard fact or its complement. -/
+/-- The closed outcome of one priority-guard decision. -/
+inductive GuardDecision where
+  | positive
+  | negative
+  | neutral
+  deriving Repr, BEq, DecidableEq
+
+/-- Select which side of a priority-guard decision a production requires. -/
 inductive Polarity where
   | positive
   | negative
@@ -1669,12 +1676,41 @@ inductive Polarity where
 
 namespace Polarity
 
-/-- Test a computed guard fact against the production's required side. -/
-def accepts : Polarity → Bool → Bool
-  | .positive, fact => fact
-  | .negative, fact => !fact
+/-- Test a closed guard decision against the production's required side. -/
+def accepts : Polarity → GuardDecision → Bool
+  | .positive, .positive => true
+  | .positive, .negative => false
+  | .positive, .neutral => true
+  | .negative, .positive => false
+  | .negative, .negative => true
+  | .negative, .neutral => true
 
 end Polarity
+
+namespace GuardDecision
+
+/-- `Polarity.accepts` with its arguments in decision-first order. -/
+def allows (decision : GuardDecision) (polarity : Polarity) : Bool :=
+  Polarity.accepts polarity decision
+
+end GuardDecision
+
+/-- The exhaustive priority-polarity allowance table. -/
+theorem polarity_accepts_guardDecision_table
+    (polarity : Polarity) (decision : GuardDecision) :
+    Polarity.accepts polarity decision =
+      match polarity, decision with
+      | .positive, .positive => true
+      | .positive, .negative => false
+      | .positive, .neutral => true
+      | .negative, .positive => false
+      | .negative, .negative => true
+      | .negative, .neutral => true := rfl
+
+/-- The decision-first allowance test is definitionally the polarity test. -/
+theorem guardDecision_allows_eq_accepts
+    (decision : GuardDecision) (polarity : Polarity) :
+    decision.allows polarity = Polarity.accepts polarity decision := rfl
 
 namespace GrammarSite
 
