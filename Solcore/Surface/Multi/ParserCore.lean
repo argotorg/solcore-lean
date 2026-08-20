@@ -760,6 +760,171 @@ theorem measure_cons_tail_lt
   simp only [EbnfValueIndex.measure, List.map_cons, List.sum_cons]
   omega
 
+/-- The well-founded semantic carrier shared by expressions and expression lists. -/
+def EbnfFamily
+    (file : WorkspaceFile)
+    (tokens : List Token) :
+    (index : EbnfValueIndex) → Type
+  | .expression (.atom (.terminal terminal)) =>
+      MatchedTerminal file tokens terminal
+  | .expression (.atom (.nonterminal rule)) =>
+      RuleValue rule
+  | .expression (.sequence children) =>
+      EbnfFamily file tokens (.expressions children)
+  | .expression (.group child) =>
+      EbnfFamily file tokens (.expression child)
+  | .expression (.choice branches) =>
+      (branch : Fin branches.length) ×
+        EbnfFamily file tokens (.expression (branches.get branch))
+  | .expression (.optional child) =>
+      Option (EbnfFamily file tokens (.expression child))
+  | .expression (.star child) =>
+      List (EbnfFamily file tokens (.expression child))
+  | .expression (.plus child) =>
+      NonemptyList (EbnfFamily file tokens (.expression child))
+  | .expression (.list0 element) =>
+      List (EbnfFamily file tokens (.expression element))
+  | .expression (.list1 element) =>
+      NonemptyList (EbnfFamily file tokens (.expression element))
+  | .expressions [] => Unit
+  | .expressions (child :: rest) =>
+      EbnfFamily file tokens (.expression child) ×
+        EbnfFamily file tokens (.expressions rest)
+termination_by index => index.measure
+decreasing_by
+  · exact measure_sequence_lt children
+  · exact measure_unary_child_lt .group child
+  · exact measure_choice_get_lt branches branch
+  · exact measure_unary_child_lt .optional child
+  · exact measure_unary_child_lt .star child
+  · exact measure_unary_child_lt .plus child
+  · exact measure_unary_child_lt .list0 element
+  · exact measure_unary_child_lt .list1 element
+  · exact measure_cons_head_lt child rest
+  · exact measure_cons_tail_lt child rest
+
+/-- The semantic carrier of one EBNF expression. -/
+abbrev EbnfValue
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (expression : EbnfExpr) : Type :=
+  EbnfFamily file tokens (.expression expression)
+
+/-- The heterogeneous semantic carrier of an expression sequence. -/
+abbrev EbnfValues
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (expressions : List EbnfExpr) : Type :=
+  EbnfFamily file tokens (.expressions expressions)
+
+/-- A terminal atom carries its exact checked terminal match. -/
+@[simp] theorem ebnfValue_atom_terminal_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (terminal : TerminalSymbol) :
+    EbnfValue file tokens (.atom (.terminal terminal)) =
+      MatchedTerminal file tokens terminal := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A nonterminal atom carries the exact semantic value of its source rule. -/
+@[simp] theorem ebnfValue_atom_nonterminal_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (rule : GrammarRuleId) :
+    EbnfValue file tokens (.atom (.nonterminal rule)) =
+      RuleValue rule := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A sequence expression carries its heterogeneous child sequence. -/
+@[simp] theorem ebnfValue_sequence_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (children : List EbnfExpr) :
+    EbnfValue file tokens (.sequence children) =
+      EbnfValues file tokens children := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A group carries exactly its child value. -/
+@[simp] theorem ebnfValue_group_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    EbnfValue file tokens (.group child) =
+      EbnfValue file tokens child := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A choice carries its finite branch tag and that branch's exact value. -/
+@[simp] theorem ebnfValue_choice_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (branches : List EbnfExpr) :
+    EbnfValue file tokens (.choice branches) =
+      ((branch : Fin branches.length) ×
+        EbnfValue file tokens (branches.get branch)) := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- An optional expression carries an optional child value. -/
+@[simp] theorem ebnfValue_optional_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    EbnfValue file tokens (.optional child) =
+      Option (EbnfValue file tokens child) := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A star expression carries its ordered child values. -/
+@[simp] theorem ebnfValue_star_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    EbnfValue file tokens (.star child) =
+      List (EbnfValue file tokens child) := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A plus expression carries a nonempty ordered child sequence. -/
+@[simp] theorem ebnfValue_plus_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    EbnfValue file tokens (.plus child) =
+      NonemptyList (EbnfValue file tokens child) := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A possibly empty comma list carries its ordered element values. -/
+@[simp] theorem ebnfValue_list0_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (element : EbnfExpr) :
+    EbnfValue file tokens (.list0 element) =
+      List (EbnfValue file tokens element) := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A nonempty comma list carries its nonempty ordered element values. -/
+@[simp] theorem ebnfValue_list1_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (element : EbnfExpr) :
+    EbnfValue file tokens (.list1 element) =
+      NonemptyList (EbnfValue file tokens element) := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- The empty expression sequence carries `Unit`. -/
+@[simp] theorem ebnfValues_nil_eq
+    {file : WorkspaceFile}
+    {tokens : List Token} :
+    EbnfValues file tokens [] = Unit := by
+  exact EbnfFamily.eq_def file tokens _
+
+/-- A nonempty expression sequence carries its head and tail values. -/
+@[simp] theorem ebnfValues_cons_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr)
+    (rest : List EbnfExpr) :
+    EbnfValues file tokens (child :: rest) =
+      (EbnfValue file tokens child × EbnfValues file tokens rest) := by
+  exact EbnfFamily.eq_def file tokens _
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
