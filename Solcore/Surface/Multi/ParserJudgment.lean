@@ -1101,6 +1101,14 @@ def ActionReductionReady
 
 namespace RuleReduction
 
+/-- One matched terminal aligned with its spelling and parsed semantic value. -/
+structure SpelledTerminalData
+    (file : WorkspaceFile) (tokens : List Token)
+    (terminal : TerminalSymbol) (parsedType : Type) where
+  matched : MatchedTerminal file tokens terminal
+  spelling : String
+  parsed : parsedType
+
 /-- Pair an explicit payload with the exact span of one matched terminal. -/
 def terminalLoc
     {alpha : Type}
