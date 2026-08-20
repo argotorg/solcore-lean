@@ -6445,4 +6445,47 @@ def RepeatedNonAssociativeAt
       ¬ ExplicitGroupBoundary level candidate ∧
       FoundNonAssociativeOperatorAt file tokens cursor level operator
 
+namespace ParseDiagnostic
+
+/-- Exact declarative applicability of one closed parser diagnostic. -/
+inductive Applies : WorkspaceFile → List Token → ParseDiagnostic → Prop where
+  | unexpected
+      (file : WorkspaceFile)
+      (tokens : List Token)
+      (memo : GuardMemo tokens)
+      (correct : PhaseBCorrect file tokens memo)
+      (final : AllGuardsFinal memo)
+      (cursor : Boundary tokens)
+      (span : SourceSpan)
+      (found : Found)
+      (expected : NonemptyList Expected)
+      (noRoot : ¬ ∃ module, SourceBackedRoot file tokens module)
+      (greatest : GreatestReachableCursor
+        file tokens memo correct final cursor)
+      (canonical : CanonicalExpected
+        file tokens memo correct final cursor expected)
+      (foundAt : FoundAt file tokens cursor span found)
+      (notRepeated : ∀ level operator,
+        ¬ RepeatedNonAssociativeAt file tokens memo correct final
+          cursor level operator) :
+      Applies file tokens (.unexpected span found expected)
+  | repeatedNonAssociative
+      (file : WorkspaceFile)
+      (tokens : List Token)
+      (memo : GuardMemo tokens)
+      (correct : PhaseBCorrect file tokens memo)
+      (final : AllGuardsFinal memo)
+      (cursor : Boundary tokens)
+      (level : NonAssociativeLevel)
+      (operator : Located InfixOperator)
+      (noRoot : ¬ ∃ module, SourceBackedRoot file tokens module)
+      (greatest : GreatestReachableCursor
+        file tokens memo correct final cursor)
+      (repeated : RepeatedNonAssociativeAt
+        file tokens memo correct final cursor level operator) :
+      Applies file tokens
+        (.repeatedNonAssociative operator.span level operator)
+
+end ParseDiagnostic
+
 end Solcore.Surface.Multi
