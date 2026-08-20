@@ -311,4 +311,258 @@ private theorem protectedDelimiterRun_functional
   exact delimiterRun_functional leftRun.toDelimiterRun
     rightRun.toDelimiterRun
 
+/-- Recover the symbol represented by one stack closer. -/
+private def DelimiterCloser.symbol : DelimiterCloser → Symbol
+  | .rightParen => .rightParen
+  | .rightBracket => .rightBracket
+  | .rightBrace => .rightBrace
+
+/-- Observe one retained symbol directly from the raw token stream. -/
+private def rawSymbolAtBoundary
+    (tokens : List Token) (cursor : Boundary tokens)
+    (symbol : Symbol) : Prop :=
+  ∃ terminalCursor : TerminalCursor tokens,
+  ∃ token : Token,
+    terminalCursor.beforeBoundary = cursor ∧
+      tokens[terminalCursor.val]? = some token ∧
+      token.payload = .symbol symbol
+
+/-- Observe a retained symbol together with its exact successor boundary. -/
+private def rawImmediatelyAfterSymbol
+    (tokens : List Token) (symbol : Symbol)
+    (symbolCursor after : Boundary tokens) : Prop :=
+  ∃ terminalCursor : TerminalCursor tokens,
+  ∃ token : Token,
+    terminalCursor.beforeBoundary = symbolCursor ∧
+      terminalCursor.afterBoundary = after ∧
+      tokens[terminalCursor.val]? = some token ∧
+      token.payload = .symbol symbol
+
+/-- A matched pair whose protected interior never consumes its own closer. -/
+def MatchingDelimiter
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens)
+    (opening closing : Symbol) : Prop :=
+  match opening with
+  | .leftParen =>
+    closing = .rightParen ∧
+    ∃ interiorStart : Boundary tokens,
+      (∃ terminalCursor : TerminalCursor tokens,
+       ∃ token : Token,
+        terminalCursor.beforeBoundary = openCursor ∧
+          terminalCursor.afterBoundary = interiorStart ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol opening) ∧
+      (∃ terminalCursor : TerminalCursor tokens,
+       ∃ token : Token,
+        terminalCursor.beforeBoundary = closeCursor ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol closing) ∧
+      ProtectedDelimiterRun tokens
+        { head := .rightParen, tail := [] }
+        interiorStart closeCursor
+        { head := .rightParen, tail := [] }
+  | .leftBracket =>
+    closing = .rightBracket ∧
+    ∃ interiorStart : Boundary tokens,
+      (∃ terminalCursor : TerminalCursor tokens,
+       ∃ token : Token,
+        terminalCursor.beforeBoundary = openCursor ∧
+          terminalCursor.afterBoundary = interiorStart ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol opening) ∧
+      (∃ terminalCursor : TerminalCursor tokens,
+       ∃ token : Token,
+        terminalCursor.beforeBoundary = closeCursor ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol closing) ∧
+      ProtectedDelimiterRun tokens
+        { head := .rightBracket, tail := [] }
+        interiorStart closeCursor
+        { head := .rightBracket, tail := [] }
+  | .leftBrace =>
+    closing = .rightBrace ∧
+    ∃ interiorStart : Boundary tokens,
+      (∃ terminalCursor : TerminalCursor tokens,
+       ∃ token : Token,
+        terminalCursor.beforeBoundary = openCursor ∧
+          terminalCursor.afterBoundary = interiorStart ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol opening) ∧
+      (∃ terminalCursor : TerminalCursor tokens,
+       ∃ token : Token,
+        terminalCursor.beforeBoundary = closeCursor ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol closing) ∧
+      ProtectedDelimiterRun tokens
+        { head := .rightBrace, tail := [] }
+        interiorStart closeCursor
+        { head := .rightBrace, tail := [] }
+  | _ => False
+
+/-- An exact empty-stack run between two boundaries. -/
+def SameDelimiterDepth
+    (tokens : List Token) (start finish : Boundary tokens) : Prop :=
+  DelimiterRun tokens [] start finish []
+
+/-- The first allowed symbol reached again at the starting delimiter depth. -/
+def NextSameDepthDelimiter
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Prop :=
+  SameDelimiterDepth tokens start cursor ∧
+    (∃ symbol : Symbol,
+      (symbol = allowed.head ∨ symbol ∈ allowed.tail) ∧
+      ∃ terminalCursor : TerminalCursor tokens,
+      ∃ token : Token,
+        terminalCursor.beforeBoundary = cursor ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol symbol) ∧
+    ∀ earlier : Boundary tokens,
+      start.val ≤ earlier.val →
+      earlier.val < cursor.val →
+      SameDelimiterDepth tokens start earlier →
+      ¬ ∃ symbol : Symbol,
+        (symbol = allowed.head ∨ symbol ∈ allowed.tail) ∧
+        ∃ terminalCursor : TerminalCursor tokens,
+        ∃ token : Token,
+          terminalCursor.beforeBoundary = earlier ∧
+            tokens[terminalCursor.val]? = some token ∧
+            token.payload = .symbol symbol
+
+/-- A retained symbol token at one exact grammar boundary. -/
+def SymbolAtBoundary
+    (file : WorkspaceFile) (tokens : List Token)
+    (cursor : Boundary tokens) (symbol : Symbol) : Prop :=
+  ∃ terminalCursor : TerminalCursor tokens,
+  ∃ token : Token,
+    terminalCursor.beforeBoundary = cursor ∧
+      TerminalAt file tokens terminalCursor (.retained token) token.span ∧
+      token.payload = .symbol symbol
+
+/-- A retained symbol token together with its exact successor boundary. -/
+def ImmediatelyAfterSymbol
+    (file : WorkspaceFile) (tokens : List Token) (symbol : Symbol)
+    (symbolCursor after : Boundary tokens) : Prop :=
+  ∃ terminalCursor : TerminalCursor tokens,
+  ∃ token : Token,
+    terminalCursor.beforeBoundary = symbolCursor ∧
+      terminalCursor.afterBoundary = after ∧
+      TerminalAt file tokens terminalCursor (.retained token) token.span ∧
+      token.payload = .symbol symbol
+
+/-- A raw symbol observation has a unique successor boundary. -/
+private theorem rawImmediatelyAfterSymbol_functional
+    {tokens : List Token} {symbol : Symbol}
+    {symbolCursor left right : Boundary tokens}
+    (leftAfter :
+      rawImmediatelyAfterSymbol tokens symbol symbolCursor left)
+    (rightAfter :
+      rawImmediatelyAfterSymbol tokens symbol symbolCursor right) :
+    left = right := by
+  rcases leftAfter with
+    ⟨leftCursor, leftToken, leftBefore, leftBoundary, leftLookup, leftPayload⟩
+  rcases rightAfter with
+    ⟨rightCursor, rightToken, rightBefore, rightBoundary, rightLookup,
+      rightPayload⟩
+  have cursorEq : leftCursor = rightCursor := by
+    apply Fin.ext
+    exact congrArg (fun value : Boundary tokens => value.val)
+      (leftBefore.trans rightBefore.symm)
+  exact leftBoundary.symm.trans
+    ((congrArg TerminalCursor.afterBoundary cursorEq).trans rightBoundary)
+
+/-- Two protected runs cannot encounter their bottom closer at different ends. -/
+private theorem protectedDelimiterRun_close_functional
+    {tokens : List Token} {closer : DelimiterCloser}
+    {before : NonemptyList DelimiterCloser}
+    {start left right : Boundary tokens}
+    {leftFinal rightFinal : NonemptyList DelimiterCloser}
+    (leftRun : ProtectedDelimiterRun tokens before start left leftFinal)
+    (leftFinalEq : leftFinal = { head := closer, tail := [] })
+    (leftClose : rawSymbolAtBoundary tokens left closer.symbol)
+    (rightRun : ProtectedDelimiterRun tokens before start right rightFinal)
+    (rightFinalEq : rightFinal = { head := closer, tail := [] })
+    (rightClose : rawSymbolAtBoundary tokens right closer.symbol) :
+    left = right := by
+  induction leftRun generalizing closer right rightFinal with
+  | nil stack cursor =>
+      subst stack
+      cases rightRun with
+      | nil => rfl
+      | cons before after finish stepCursor stepStart endCursor token atStart
+          lookup step rest =>
+          rcases leftClose with
+            ⟨closeCursor, closeToken, closeBefore, closeLookup, closePayload⟩
+          have cursorEq : stepCursor = closeCursor := by
+            apply Fin.ext
+            exact congrArg (fun value : Boundary tokens => value.val)
+              (atStart.trans closeBefore.symm)
+          subst closeCursor
+          have tokenEq : token = closeToken :=
+            Option.some.inj (lookup.symm.trans closeLookup)
+          subst closeToken
+          rw [closePayload] at step
+          cases closer <;>
+            simp [DelimiterStep, DelimiterCloser.symbol] at step
+  | cons before after finish cursor stepStart endCursor token atStart lookup
+      step rest induction =>
+      cases rightRun with
+      | nil =>
+          rcases rightClose with
+            ⟨closeCursor, closeToken, closeBefore, closeLookup, closePayload⟩
+          have cursorEq : cursor = closeCursor := by
+            apply Fin.ext
+            exact congrArg (fun value : Boundary tokens => value.val)
+              (atStart.trans closeBefore.symm)
+          subst closeCursor
+          have tokenEq : token = closeToken :=
+            Option.some.inj (lookup.symm.trans closeLookup)
+          subst closeToken
+          rw [rightFinalEq, closePayload] at step
+          cases closer <;>
+            simp [DelimiterStep, DelimiterCloser.symbol] at step
+      | cons _ rightAfter rightFinish rightCursor _ _ rightToken rightAtStart
+          rightLookup rightStep rightRest =>
+          have cursorEq : cursor = rightCursor := by
+            apply Fin.ext
+            exact congrArg (fun value : Boundary tokens => value.val)
+              (atStart.trans rightAtStart.symm)
+          subst rightCursor
+          have tokenEq : token = rightToken :=
+            Option.some.inj (lookup.symm.trans rightLookup)
+          subst rightToken
+          have afterListEq : after.toList = rightAfter.toList :=
+            delimiterStep_functional step rightStep
+          have afterEq : after = rightAfter :=
+            NonemptyList.toList_injective afterListEq
+          subst rightAfter
+          exact induction leftFinalEq leftClose rightRest rightFinalEq
+            rightClose
+
+/-- A fixed opening delimiter has exactly one matching closing boundary. -/
+theorem matchingDelimiter_functional
+    {tokens : List Token}
+    {openCursor left right : Boundary tokens}
+    {opening closing : Symbol}
+    (leftMatch :
+      MatchingDelimiter tokens openCursor left opening closing)
+    (rightMatch :
+      MatchingDelimiter tokens openCursor right opening closing) :
+    left = right := by
+  cases opening <;> simp only [MatchingDelimiter] at leftMatch rightMatch
+  all_goals
+    rcases leftMatch with
+      ⟨leftClosing, leftStart, leftOpen, leftClose, leftRun⟩
+    rcases rightMatch with
+      ⟨rightClosing, rightStart, rightOpen, rightClose, rightRun⟩
+    change rawImmediatelyAfterSymbol tokens _ openCursor leftStart at leftOpen
+    change rawImmediatelyAfterSymbol tokens _ openCursor rightStart at rightOpen
+    change rawSymbolAtBoundary tokens left closing at leftClose
+    change rawSymbolAtBoundary tokens right closing at rightClose
+    have startEq : leftStart = rightStart :=
+      rawImmediatelyAfterSymbol_functional leftOpen rightOpen
+    subst rightStart
+    rw [leftClosing] at leftClose rightClose
+    exact protectedDelimiterRun_close_functional
+      leftRun rfl leftClose rightRun rfl rightClose
+
 end Solcore.Surface.Multi
