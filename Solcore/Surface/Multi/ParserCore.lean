@@ -140,6 +140,25 @@ def BoundaryByte
     else
       byte = file.content.utf8ByteSize
 
+namespace BoundaryByte
+
+/-- One chart boundary selects only one physical source byte. -/
+theorem functional
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {boundary : Boundary tokens}
+    {left right : Nat}
+    (leftAt : BoundaryByte file tokens boundary left)
+    (rightAt : BoundaryByte file tokens boundary right) :
+    left = right := by
+  by_cases inRange : boundary.val < tokens.length
+  · simp [BoundaryByte, inRange] at leftAt rightAt
+    exact leftAt.2.trans rightAt.2.symm
+  · simp [BoundaryByte, inRange] at leftAt rightAt
+    exact leftAt.2.trans rightAt.2.symm
+
+end BoundaryByte
+
 /-- The exact source span covered by an ordered half-open chart interval. -/
 def ConsumedSpan
     (file : WorkspaceFile)
@@ -171,6 +190,30 @@ def ConsumedSpan
             startByte := byte
             endByte := byte
           }
+
+namespace ConsumedSpan
+
+/-- One ordered chart interval has only one exact consumed source span. -/
+theorem functional
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {left right : SourceSpan}
+    (leftConsumed : ConsumedSpan file tokens origin finish left)
+    (rightConsumed : ConsumedSpan file tokens origin finish right) :
+    left = right := by
+  by_cases occupied : origin.val < Nat.min finish.val tokens.length
+  · simp [ConsumedSpan, occupied] at leftConsumed rightConsumed
+    exact leftConsumed.2.2.trans rightConsumed.2.2.symm
+  · simp [ConsumedSpan, occupied] at leftConsumed rightConsumed
+    rcases leftConsumed.2.2 with ⟨leftByte, leftAt, leftSpan⟩
+    rcases rightConsumed.2.2 with ⟨rightByte, rightAt, rightSpan⟩
+    have byteEq : leftByte = rightByte :=
+      BoundaryByte.functional leftAt rightAt
+    subst rightByte
+    exact leftSpan.trans rightSpan.symm
+
+end ConsumedSpan
 
 /-- A checked source span for one completed chart interval. -/
 structure ConsumedSpanWitness
@@ -206,6 +249,89 @@ def SourceLocates
     (located : Located α) : Prop :=
   ∃ witness : ConsumedSpanWitness file tokens origin finish,
     located = sourceLoc witness payload
+
+namespace SourceLocates
+
+/-- A payload and completed interval determine only one located value. -/
+theorem functional
+    {α : Type}
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {payload : α}
+    {left right : Located α}
+    (leftLocates : SourceLocates file tokens origin finish payload left)
+    (rightLocates : SourceLocates file tokens origin finish payload right) :
+    left = right := by
+  rcases leftLocates with ⟨leftWitness, leftEq⟩
+  rcases rightLocates with ⟨rightWitness, rightEq⟩
+  have spanEq : leftWitness.span = rightWitness.span :=
+    ConsumedSpan.functional leftWitness.consumed rightWitness.consumed
+  calc
+    left = sourceLoc leftWitness payload := leftEq
+    _ = sourceLoc rightWitness payload := by
+      simpa [sourceLoc] using
+        congrArg
+          (fun span => ({ span := span, payload := payload } : Located α))
+          spanEq
+    _ = right := rightEq.symm
+
+end SourceLocates
+
+namespace ConsumedSpanWitness
+
+/-- Construct the exact consumed span for every owned, ordered chart interval. -/
+def compute
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val) :
+    ConsumedSpanWitness file tokens origin finish :=
+  if occupied : origin.val < Nat.min finish.val tokens.length then
+    have firstInRange : origin.val < tokens.length :=
+      (Nat.lt_min.mp occupied).2
+    have capPositive : 0 < Nat.min finish.val tokens.length :=
+      Nat.lt_of_le_of_lt (Nat.zero_le origin.val) occupied
+    have lastInRange : Nat.min finish.val tokens.length - 1 < tokens.length :=
+      Nat.lt_of_lt_of_le
+        (Nat.sub_lt capPositive Nat.zero_lt_one)
+        (Nat.min_le_right _ _)
+    let span : SourceSpan := {
+      source := file.id
+      startByte := (tokens[origin.val]'firstInRange).span.startByte
+      endByte :=
+        (tokens[Nat.min finish.val tokens.length - 1]'lastInRange).span.endByte
+    }
+    {
+      span := span
+      consumed := by
+        simp [ConsumedSpan, occupied, span, owned, ordered]
+    }
+  else
+    let byte : Nat :=
+      if inRange : origin.val < tokens.length then
+        tokens[origin.val].span.startByte
+      else
+        file.content.utf8ByteSize
+    have atBoundary : BoundaryByte file tokens origin byte := by
+      unfold BoundaryByte byte
+      refine ⟨owned, ?_⟩
+      split <;> rfl
+    let span : SourceSpan := {
+      source := file.id
+      startByte := byte
+      endByte := byte
+    }
+    {
+      span := span
+      consumed := by
+        refine ⟨owned, ordered, ?_⟩
+        simp only [occupied, ↓reduceDIte]
+        exact ⟨byte, atBoundary, rfl⟩
+    }
+
+end ConsumedSpanWitness
 
 namespace Expected
 
