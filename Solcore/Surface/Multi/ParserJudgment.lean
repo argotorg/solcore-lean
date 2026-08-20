@@ -565,4 +565,200 @@ theorem matchingDelimiter_functional
     exact protectedDelimiterRun_close_functional
       leftRun rfl leftClose rightRun rfl rightClose
 
+/-- A same-frame match-arm header whose pattern reaches its next fat arrow. -/
+def ArmHeaderAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (regionStart cursor : Boundary tokens) : Prop :=
+  regionStart.val ≤ cursor.val ∧
+    SameDelimiterDepth tokens regionStart cursor ∧
+    SymbolAtBoundary file tokens cursor .pipe ∧
+    ∃ patternStart arrowCursor : Boundary tokens,
+      ImmediatelyAfterSymbol file tokens .pipe cursor patternStart ∧
+        NextSameDepthDelimiter tokens patternStart arrowCursor
+          { head := .fatArrow, tail := [] } ∧
+        GreatestUnguardedEnd file tokens
+          (.aux Grammar.matchArmPatternListSite.site)
+          patternStart arrowCursor arrowCursor
+
+/-- A brace pair strictly containing one cursor. -/
+def ContainingBraceFrame
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Prop :=
+  openCursor.val < cursor.val ∧
+    cursor.val < closeCursor.val ∧
+    MatchingDelimiter tokens openCursor closeCursor .leftBrace .rightBrace
+
+/-- The containing brace frame with the greatest opening cursor. -/
+def InnermostContainingBraceFrame
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Prop :=
+  ContainingBraceFrame tokens cursor openCursor closeCursor ∧
+    ∀ otherOpen otherClose : Boundary tokens,
+      ContainingBraceFrame tokens cursor otherOpen otherClose →
+      otherOpen.val ≤ openCursor.val
+
+/-- The first same-frame next-arm header or the containing close brace. -/
+def NextArmOrClose
+    (file : WorkspaceFile) (tokens : List Token)
+    (regionStart closeCursor regionEnd : Boundary tokens) : Prop :=
+  regionStart.val ≤ regionEnd.val ∧
+    regionEnd.val ≤ closeCursor.val ∧
+    SameDelimiterDepth tokens regionStart regionEnd ∧
+    (regionEnd = closeCursor ∨
+      ArmHeaderAt file tokens regionStart regionEnd) ∧
+    ∀ earlier : Boundary tokens,
+      regionStart.val ≤ earlier.val →
+      earlier.val < regionEnd.val →
+      SameDelimiterDepth tokens regionStart earlier →
+      ¬ (earlier = closeCursor ∨
+        ArmHeaderAt file tokens regionStart earlier)
+
+/-- The exact nearest braced-body or match-arm statement region. -/
+def NearestStatementRegion
+    (file : WorkspaceFile) (tokens : List Token)
+    (regionStart regionEnd : Boundary tokens) : Prop :=
+  (∃ openCursor : Boundary tokens,
+    ImmediatelyAfterSymbol file tokens .leftBrace openCursor regionStart ∧
+      MatchingDelimiter tokens openCursor regionEnd .leftBrace .rightBrace) ∨
+  (∃ arrowCursor openCursor closeCursor : Boundary tokens,
+    ImmediatelyAfterSymbol file tokens .fatArrow arrowCursor regionStart ∧
+      InnermostContainingBraceFrame tokens arrowCursor openCursor closeCursor ∧
+      NextArmOrClose file tokens regionStart closeCursor regionEnd)
+
+/-- Every match-arm header is at the delimiter depth of its region start. -/
+theorem armHeaderAt_same_frame
+    {file : WorkspaceFile} {tokens : List Token}
+    {regionStart cursor : Boundary tokens}
+    (header : ArmHeaderAt file tokens regionStart cursor) :
+    SameDelimiterDepth tokens regionStart cursor :=
+  header.2.1
+
+/-- Recover the retained token lookup from one terminal observation. -/
+private theorem terminalAt_retained_lookup
+    {file : WorkspaceFile} {tokens : List Token}
+    {cursor : TerminalCursor tokens} {token : Token} {span : SourceSpan}
+    (terminalAt : TerminalAt file tokens cursor (.retained token) span) :
+    tokens[cursor.val]? = some token := by
+  cases terminalAt
+  assumption
+
+/-- A shared successor fixes both the observed symbol and its boundary. -/
+private theorem immediatelyAfterSymbol_cursor_symbol_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {leftSymbol rightSymbol : Symbol}
+    {leftCursor rightCursor after : Boundary tokens}
+    (leftAfter : ImmediatelyAfterSymbol file tokens leftSymbol
+      leftCursor after)
+    (rightAfter : ImmediatelyAfterSymbol file tokens rightSymbol
+      rightCursor after) :
+    leftCursor = rightCursor ∧ leftSymbol = rightSymbol := by
+  rcases leftAfter with
+    ⟨leftTerminal, leftToken, leftBefore, leftAfter, leftAt, leftPayload⟩
+  rcases rightAfter with
+    ⟨rightTerminal, rightToken, rightBefore, rightAfter, rightAt,
+      rightPayload⟩
+  have terminalEq : leftTerminal = rightTerminal := by
+    apply Fin.ext
+    have leftValue : leftTerminal.afterBoundary.val = leftTerminal.val + 1 := rfl
+    have rightValue : rightTerminal.afterBoundary.val = rightTerminal.val + 1 := rfl
+    have afterEq : leftTerminal.afterBoundary = rightTerminal.afterBoundary :=
+      leftAfter.trans rightAfter.symm
+    have afterValueEq := congrArg
+      (fun value : Boundary tokens => value.val) afterEq
+    omega
+  have cursorEq : leftCursor = rightCursor := by
+    exact leftBefore.symm.trans
+      ((congrArg TerminalCursor.beforeBoundary terminalEq).trans rightBefore)
+  subst rightTerminal
+  have tokenEq : leftToken = rightToken := by
+    exact Option.some.inj
+      ((terminalAt_retained_lookup leftAt).symm.trans
+        (terminalAt_retained_lookup rightAt))
+  have symbolEq : leftSymbol = rightSymbol := by
+    have payloadEq : TokenKind.symbol leftSymbol =
+        TokenKind.symbol rightSymbol := by
+      exact leftPayload.symm.trans
+        ((congrArg Located.payload tokenEq).trans rightPayload)
+    exact TokenKind.symbol.inj payloadEq
+  exact ⟨cursorEq, symbolEq⟩
+
+/-- The innermost frame around a fixed cursor is unique. -/
+private theorem innermostContainingBraceFrame_functional
+    {tokens : List Token} {cursor : Boundary tokens}
+    {leftOpen leftClose rightOpen rightClose : Boundary tokens}
+    (leftFrame : InnermostContainingBraceFrame tokens cursor
+      leftOpen leftClose)
+    (rightFrame : InnermostContainingBraceFrame tokens cursor
+      rightOpen rightClose) :
+    leftOpen = rightOpen ∧ leftClose = rightClose := by
+  have openEq : leftOpen = rightOpen := by
+    apply Fin.ext
+    exact Nat.le_antisymm
+      (rightFrame.2 leftOpen leftClose leftFrame.1)
+      (leftFrame.2 rightOpen rightClose rightFrame.1)
+  subst rightOpen
+  have closeEq : leftClose = rightClose :=
+    matchingDelimiter_functional leftFrame.1.2.2 rightFrame.1.2.2
+  exact ⟨rfl, closeEq⟩
+
+/-- A fixed frame has at most one least next arm-or-close endpoint. -/
+private theorem nextArmOrClose_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {regionStart closeCursor left right : Boundary tokens}
+    (leftNext : NextArmOrClose file tokens regionStart closeCursor left)
+    (rightNext : NextArmOrClose file tokens regionStart closeCursor right) :
+    left = right := by
+  apply Fin.ext
+  apply Nat.le_antisymm
+  · exact Nat.le_of_not_gt fun rightLtLeft =>
+      leftNext.2.2.2.2 right rightNext.1 rightLtLeft
+        rightNext.2.2.1 rightNext.2.2.2.1
+  · exact Nat.le_of_not_gt fun leftLtRight =>
+      rightNext.2.2.2.2 left leftNext.1 leftLtRight
+        leftNext.2.2.1 leftNext.2.2.2.1
+
+/-- A region start determines at most one nearest statement-region end. -/
+theorem nearest_statement_region_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {regionStart left right : Boundary tokens}
+    (leftRegion : NearestStatementRegion file tokens regionStart left)
+    (rightRegion : NearestStatementRegion file tokens regionStart right) :
+    left = right := by
+  rcases leftRegion with leftBlock | leftArm
+  · rcases leftBlock with ⟨leftOpen, leftAfter, leftMatch⟩
+    rcases rightRegion with rightBlock | rightArm
+    · rcases rightBlock with ⟨rightOpen, rightAfter, rightMatch⟩
+      have openEq :=
+        (immediatelyAfterSymbol_cursor_symbol_functional
+          leftAfter rightAfter).1
+      subst rightOpen
+      exact matchingDelimiter_functional leftMatch rightMatch
+    · rcases rightArm with
+        ⟨rightArrow, rightOpen, rightClose, rightAfter, rightFrame,
+          rightNext⟩
+      have impossible :=
+        (immediatelyAfterSymbol_cursor_symbol_functional
+          leftAfter rightAfter).2
+      cases impossible
+  · rcases leftArm with
+      ⟨leftArrow, leftOpen, leftClose, leftAfter, leftFrame, leftNext⟩
+    rcases rightRegion with rightBlock | rightArm
+    · rcases rightBlock with ⟨rightOpen, rightAfter, rightMatch⟩
+      have impossible :=
+        (immediatelyAfterSymbol_cursor_symbol_functional
+          leftAfter rightAfter).2
+      cases impossible
+    · rcases rightArm with
+        ⟨rightArrow, rightOpen, rightClose, rightAfter, rightFrame,
+          rightNext⟩
+      have arrowEq :=
+        (immediatelyAfterSymbol_cursor_symbol_functional
+          leftAfter rightAfter).1
+      subst rightArrow
+      rcases innermostContainingBraceFrame_functional leftFrame rightFrame with
+        ⟨openEq, closeEq⟩
+      subst rightOpen
+      subst rightClose
+      exact nextArmOrClose_functional leftNext rightNext
+
 end Solcore.Surface.Multi
