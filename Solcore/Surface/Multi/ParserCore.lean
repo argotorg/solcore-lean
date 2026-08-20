@@ -641,6 +641,148 @@ instance {file : WorkspaceFile} {tokens : List Token}
     BEq (MatchedTerminal file tokens terminal) :=
   ⟨fun left right => decide (left = right)⟩
 
+/-- Exact spelling and parsed value projected from one identifier terminal. -/
+def IdentifierProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .identifier))
+    (spelling : String) (parsed : Identifier) : Prop :=
+  ∃ token : Token,
+    terminal.value = .retained token ∧
+      token.payload = .identifier spelling ∧
+      Identifier.parse spelling = some parsed
+
+/-- Expose the raw equations of an identifier projection. -/
+theorem matchedTerminal_identifier_projection_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .identifier))
+    (spelling : String) (parsed : Identifier) :
+    IdentifierProjects terminal spelling parsed ↔
+      ∃ token : Token,
+        terminal.value = .retained token ∧
+          token.payload = .identifier spelling ∧
+          Identifier.parse spelling = some parsed :=
+  Iff.rfl
+
+/-- Exact spelling and parsed value projected from one path terminal. -/
+def PathSegmentProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent))
+    (spelling : String) (parsed : PathSegment) : Prop :=
+  ∃ token : Token,
+    terminal.value = .retained token ∧
+      (token.payload = .identifier spelling ∨
+        ∃ keyword : HardKeyword,
+          token.payload = .hardKeyword keyword ∧
+            spelling = keyword.spelling) ∧
+      PathSegment.parse spelling = some parsed
+
+/-- Expose both retained-token shapes of a path projection. -/
+theorem matchedTerminal_path_projection_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent))
+    (spelling : String) (parsed : PathSegment) :
+    PathSegmentProjects terminal spelling parsed ↔
+      ∃ token : Token,
+        terminal.value = .retained token ∧
+          (token.payload = .identifier spelling ∨
+            ∃ keyword : HardKeyword,
+              token.payload = .hardKeyword keyword ∧
+                spelling = keyword.spelling) ∧
+          PathSegment.parse spelling = some parsed :=
+  Iff.rfl
+
+/-- Exact spelling and external-library value projected from one path terminal. -/
+def ExternalLibraryProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent))
+    (spelling : String) (parsed : ExternalLibraryName) : Prop :=
+  ∃ token : Token,
+    terminal.value = .retained token ∧
+      (token.payload = .identifier spelling ∨
+        ∃ keyword : HardKeyword,
+          token.payload = .hardKeyword keyword ∧
+            spelling = keyword.spelling) ∧
+      ExternalLibraryName.parse spelling = some parsed
+
+/-- Expose both retained-token shapes of an external-library projection. -/
+theorem matchedTerminal_external_projection_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent))
+    (spelling : String) (parsed : ExternalLibraryName) :
+    ExternalLibraryProjects terminal spelling parsed ↔
+      ∃ token : Token,
+        terminal.value = .retained token ∧
+          (token.payload = .identifier spelling ∨
+            ∃ keyword : HardKeyword,
+              token.payload = .hardKeyword keyword ∧
+                spelling = keyword.spelling) ∧
+          ExternalLibraryName.parse spelling = some parsed :=
+  Iff.rfl
+
+/-- Exact spelling-preserving payload projected from one literal terminal. -/
+def LiteralProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal)
+    (literalPayload : LiteralPayload) : Prop :=
+  ∃ token : Token,
+    matched.value = .retained token ∧
+      ((terminal = .category .decimalLiteral ∧
+          ∃ spelling digits : String,
+            token.payload = .decimalLiteral spelling digits ∧
+              literalPayload = .decimal spelling digits) ∨
+        (terminal = .category .hexadecimalLiteral ∧
+          ∃ spelling digits : String,
+            token.payload = .hexadecimalLiteral spelling digits ∧
+              literalPayload = .hexadecimal spelling digits) ∨
+        (terminal = .category .stringLiteral ∧
+          ∃ spelling decoded : String,
+            token.payload = .stringLiteral spelling decoded ∧
+              literalPayload = .string spelling decoded))
+
+/-- Expose the three exact terminal/payload branches of a literal projection. -/
+theorem matchedTerminal_literal_projection_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal)
+    (literalPayload : LiteralPayload) :
+    LiteralProjects matched literalPayload ↔
+      ∃ token : Token,
+        matched.value = .retained token ∧
+          ((terminal = .category .decimalLiteral ∧
+              ∃ spelling digits : String,
+                token.payload = .decimalLiteral spelling digits ∧
+                  literalPayload = .decimal spelling digits) ∨
+            (terminal = .category .hexadecimalLiteral ∧
+              ∃ spelling digits : String,
+                token.payload = .hexadecimalLiteral spelling digits ∧
+                  literalPayload = .hexadecimal spelling digits) ∨
+            (terminal = .category .stringLiteral ∧
+              ∃ spelling decoded : String,
+                token.payload = .stringLiteral spelling decoded ∧
+                  literalPayload = .string spelling decoded)) :=
+  Iff.rfl
+
+/-- Exact opaque assembly slice projected from one assembly terminal. -/
+def AssemblySliceProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .assemblyBlock))
+    (slice : AssemblySlice) : Prop :=
+  ∃ token : Token,
+    terminal.value = .retained token ∧
+      token.payload = .assemblyBlock slice
+
+/-- Expose the retained token and payload equation of an assembly projection. -/
+theorem matchedTerminal_assembly_projection_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .assemblyBlock))
+    (slice : AssemblySlice) :
+    AssemblySliceProjects terminal slice ↔
+      ∃ token : Token,
+        terminal.value = .retained token ∧
+          token.payload = .assemblyBlock slice :=
+  Iff.rfl
+
 /-- The structural size of one finite EBNF expression. -/
 def ebnfSize : EbnfExpr → Nat
   | .atom _ => 1
