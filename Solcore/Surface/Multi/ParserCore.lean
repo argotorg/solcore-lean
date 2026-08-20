@@ -641,6 +641,125 @@ instance {file : WorkspaceFile} {tokens : List Token}
     BEq (MatchedTerminal file tokens terminal) :=
   ⟨fun left right => decide (left = right)⟩
 
+/-- The structural size of one finite EBNF expression. -/
+def ebnfSize : EbnfExpr → Nat
+  | .atom _ => 1
+  | .sequence children => 1 + (children.map ebnfSize).sum
+  | .group child => 1 + ebnfSize child
+  | .choice branches => 1 + (branches.map ebnfSize).sum
+  | .optional child => 1 + ebnfSize child
+  | .star child => 1 + ebnfSize child
+  | .plus child => 1 + ebnfSize child
+  | .list0 element => 1 + ebnfSize element
+  | .list1 element => 1 + ebnfSize element
+
+/-- The six unary constructors of the EBNF expression algebra. -/
+inductive UnaryEbnfKind where
+  | group
+  | optional
+  | star
+  | plus
+  | list0
+  | list1
+
+namespace UnaryEbnfKind
+
+/-- Apply one unary EBNF constructor to its child expression. -/
+def apply : UnaryEbnfKind → EbnfExpr → EbnfExpr
+  | .group, child => .group child
+  | .optional, child => .optional child
+  | .star, child => .star child
+  | .plus, child => .plus child
+  | .list0, child => .list0 child
+  | .list1, child => .list1 child
+
+end UnaryEbnfKind
+
+/-- An index selecting one EBNF expression or a sequence of expressions. -/
+inductive EbnfValueIndex where
+  | expression (expression : EbnfExpr)
+  | expressions (expressions : List EbnfExpr)
+
+namespace EbnfValueIndex
+
+/-- The well-founded measure of an EBNF semantic-value index. -/
+def measure : EbnfValueIndex → Nat
+  | .expression value => 2 * ebnfSize value
+  | .expressions values => 2 * (values.map ebnfSize).sum + 1
+
+end EbnfValueIndex
+
+/-- Every finite EBNF expression has positive structural size. -/
+theorem ebnfSize_positive (expression : EbnfExpr) :
+    0 < ebnfSize expression := by
+  cases expression <;> simp only [ebnfSize] <;> omega
+
+/-- A member's size is bounded by the sum of all mapped member sizes. -/
+private theorem ebnfSize_le_mapped_sum
+    {expression : EbnfExpr} :
+    ∀ {expressions : List EbnfExpr},
+      expression ∈ expressions →
+        ebnfSize expression ≤ (expressions.map ebnfSize).sum
+  | [], member => by
+      simp at member
+  | head :: tail, member => by
+      rcases List.mem_cons.mp member with equal | inTail
+      · subst head
+        simp only [List.map_cons, List.sum_cons]
+        exact Nat.le_add_right _ _
+      · simp only [List.map_cons, List.sum_cons]
+        exact Nat.le_trans
+          (ebnfSize_le_mapped_sum inTail)
+          (Nat.le_add_left _ _)
+
+/-- A sequence's expression-list index is strictly smaller. -/
+theorem measure_sequence_lt (children : List EbnfExpr) :
+    EbnfValueIndex.measure (.expressions children) <
+      EbnfValueIndex.measure (.expression (.sequence children)) := by
+  simp only [EbnfValueIndex.measure, ebnfSize]
+  omega
+
+/-- A selected choice branch is strictly smaller than its choice. -/
+theorem measure_choice_get_lt
+    (branches : List EbnfExpr)
+    (branch : Fin branches.length) :
+    EbnfValueIndex.measure (.expression (branches.get branch)) <
+      EbnfValueIndex.measure (.expression (.choice branches)) := by
+  have bound : ebnfSize (branches.get branch) ≤
+      (branches.map ebnfSize).sum :=
+    ebnfSize_le_mapped_sum (List.get_mem branches branch)
+  simp only [EbnfValueIndex.measure, ebnfSize]
+  omega
+
+/-- A unary constructor's child index is strictly smaller. -/
+theorem measure_unary_child_lt
+    (kind : UnaryEbnfKind)
+    (child : EbnfExpr) :
+    EbnfValueIndex.measure (.expression child) <
+      EbnfValueIndex.measure (.expression (kind.apply child)) := by
+  cases kind <;>
+    simp only [UnaryEbnfKind.apply, EbnfValueIndex.measure, ebnfSize] <;>
+    omega
+
+/-- The head expression index is strictly smaller than the whole list. -/
+theorem measure_cons_head_lt
+    (child : EbnfExpr)
+    (rest : List EbnfExpr) :
+    EbnfValueIndex.measure (.expression child) <
+      EbnfValueIndex.measure (.expressions (child :: rest)) := by
+  simp only [EbnfValueIndex.measure, List.map_cons, List.sum_cons]
+  omega
+
+/-- The tail expression-list index is strictly smaller than the whole list. -/
+theorem measure_cons_tail_lt
+    (child : EbnfExpr)
+    (rest : List EbnfExpr) :
+    EbnfValueIndex.measure (.expressions rest) <
+      EbnfValueIndex.measure (.expressions (child :: rest)) := by
+  have positive := ebnfSize_positive child
+  simp only [EbnfValueIndex.measure, List.map_cons, List.sum_cons]
+  omega
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
