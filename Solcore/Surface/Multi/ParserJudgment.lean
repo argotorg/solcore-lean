@@ -1203,6 +1203,151 @@ def armBody
         statements := first :: rest
       }
 
+/-- The exact retained terminal/kind pairs that construct syntax markers. -/
+inductive MarkerProjects
+    (file : WorkspaceFile) (tokens : List Token) :
+    {terminal : TerminalSymbol} →
+      MatchedTerminal file tokens terminal → SyntaxMarker → Prop where
+  | libraryRoot
+      (terminal : MatchedTerminal file tokens (.category .pathComponent))
+      (parsed : PathSegment)
+      (projects : PathSegmentProjects terminal "lib" parsed) :
+      MarkerProjects file tokens terminal .libraryRoot
+  | standardRoot
+      (terminal : MatchedTerminal file tokens (.category .pathComponent))
+      (parsed : PathSegment)
+      (projects : PathSegmentProjects terminal "std" parsed) :
+      MarkerProjects file tokens terminal .standardRoot
+  | externalSigil
+      (terminal : MatchedTerminal file tokens (.symbol .at)) :
+      MarkerProjects file tokens terminal .externalSigil
+  | wildcardStar
+      (terminal : MatchedTerminal file tokens (.symbol .star)) :
+      MarkerProjects file tokens terminal .wildcard
+  | wildcardUnderscore
+      (terminal : MatchedTerminal file tokens (.symbol .underscore)) :
+      MarkerProjects file tokens terminal .wildcard
+  | fallbackName
+      (terminal : MatchedTerminal file tokens (.hardKeyword .fallbackKw)) :
+      MarkerProjects file tokens terminal .fallbackName
+  | contractConstructorName
+      (terminal : MatchedTerminal file tokens
+        (.hardKeyword .constructorKw)) :
+      MarkerProjects file tokens terminal .contractConstructorName
+  | publicModifier
+      (terminal : MatchedTerminal file tokens (.hardKeyword .publicKw)) :
+      MarkerProjects file tokens terminal .publicModifier
+  | payableModifier
+      (terminal : MatchedTerminal file tokens (.hardKeyword .payableKw)) :
+      MarkerProjects file tokens terminal .payableModifier
+  | comptimeModifier
+      (terminal : MatchedTerminal file tokens
+        (.contextualKeyword .comptimeKw)) :
+      MarkerProjects file tokens terminal .comptimeModifier
+  | defaultModifier
+      (terminal : MatchedTerminal file tokens (.hardKeyword .defaultKw)) :
+      MarkerProjects file tokens terminal .defaultModifier
+
+/-- Locate one explicitly indexed syntax marker at its exact terminal span. -/
+def marker
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {kind : SyntaxMarker}
+    (matched : MatchedTerminal file tokens terminal)
+    (_projects : MarkerProjects file tokens matched kind) : Marker :=
+  terminalLoc matched kind
+
+/-- Locate the sole prefix operator at its exact bang-token span. -/
+def prefixOperator
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.symbol .bang)) :
+    Located PrefixOperator :=
+  terminalLoc terminal .logicalNot
+
+/-- The exact retained terminal/operator pairs for all infix operators. -/
+inductive InfixOperatorProjects
+    (file : WorkspaceFile) (tokens : List Token) :
+    {terminal : TerminalSymbol} →
+      MatchedTerminal file tokens terminal → InfixOperator → Prop where
+  | multiply (terminal : MatchedTerminal file tokens (.symbol .star)) :
+      InfixOperatorProjects file tokens terminal .multiply
+  | divide (terminal : MatchedTerminal file tokens (.symbol .slash)) :
+      InfixOperatorProjects file tokens terminal .divide
+  | modulo (terminal : MatchedTerminal file tokens (.symbol .percent)) :
+      InfixOperatorProjects file tokens terminal .modulo
+  | add (terminal : MatchedTerminal file tokens (.symbol .plus)) :
+      InfixOperatorProjects file tokens terminal .add
+  | subtract (terminal : MatchedTerminal file tokens (.symbol .minus)) :
+      InfixOperatorProjects file tokens terminal .subtract
+  | bitAnd (terminal : MatchedTerminal file tokens (.symbol .amp)) :
+      InfixOperatorProjects file tokens terminal .bitAnd
+  | bitXor (terminal : MatchedTerminal file tokens (.symbol .caret)) :
+      InfixOperatorProjects file tokens terminal .bitXor
+  | bitOr (terminal : MatchedTerminal file tokens (.symbol .pipe)) :
+      InfixOperatorProjects file tokens terminal .bitOr
+  | less (terminal : MatchedTerminal file tokens (.symbol .less)) :
+      InfixOperatorProjects file tokens terminal .less
+  | greater (terminal : MatchedTerminal file tokens (.symbol .greater)) :
+      InfixOperatorProjects file tokens terminal .greater
+  | lessEqual
+      (terminal : MatchedTerminal file tokens (.symbol .lessEqual)) :
+      InfixOperatorProjects file tokens terminal .lessEqual
+  | greaterEqual
+      (terminal : MatchedTerminal file tokens (.symbol .greaterEqual)) :
+      InfixOperatorProjects file tokens terminal .greaterEqual
+  | equal (terminal : MatchedTerminal file tokens (.symbol .equalEqual)) :
+      InfixOperatorProjects file tokens terminal .equal
+  | notEqual (terminal : MatchedTerminal file tokens (.symbol .notEqual)) :
+      InfixOperatorProjects file tokens terminal .notEqual
+  | logicalAnd
+      (terminal : MatchedTerminal file tokens (.symbol .logicalAnd)) :
+      InfixOperatorProjects file tokens terminal .logicalAnd
+  | logicalOr
+      (terminal : MatchedTerminal file tokens (.symbol .logicalOr)) :
+      InfixOperatorProjects file tokens terminal .logicalOr
+
+/-- Locate one explicitly indexed infix operator at its exact terminal span. -/
+def infixOperator
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {operator : InfixOperator}
+    (matched : MatchedTerminal file tokens terminal)
+    (_projects : InfixOperatorProjects file tokens matched operator) :
+    Located InfixOperator :=
+  terminalLoc matched operator
+
+/-- The exact retained terminal/operator pairs for assignment operators. -/
+inductive AssignmentOperatorProjects
+    (file : WorkspaceFile) (tokens : List Token) :
+    {terminal : TerminalSymbol} →
+      MatchedTerminal file tokens terminal → AssignmentOperator → Prop where
+  | equal (terminal : MatchedTerminal file tokens (.symbol .equal)) :
+      AssignmentOperatorProjects file tokens terminal .equal
+  | addEqual (terminal : MatchedTerminal file tokens (.symbol .plusEqual)) :
+      AssignmentOperatorProjects file tokens terminal .addEqual
+  | subtractEqual
+      (terminal : MatchedTerminal file tokens (.symbol .minusEqual)) :
+      AssignmentOperatorProjects file tokens terminal .subtractEqual
+  | bitXorEqual
+      (terminal : MatchedTerminal file tokens (.symbol .caretEqual)) :
+      AssignmentOperatorProjects file tokens terminal .bitXorEqual
+  | bitAndEqual
+      (terminal : MatchedTerminal file tokens (.symbol .ampEqual)) :
+      AssignmentOperatorProjects file tokens terminal .bitAndEqual
+  | bitOrEqual
+      (terminal : MatchedTerminal file tokens (.symbol .pipeEqual)) :
+      AssignmentOperatorProjects file tokens terminal .bitOrEqual
+  | moduloEqual
+      (terminal : MatchedTerminal file tokens (.symbol .percentEqual)) :
+      AssignmentOperatorProjects file tokens terminal .moduloEqual
+
+/-- Locate one explicitly indexed assignment operator at its terminal span. -/
+def assignmentOperator
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {operator : AssignmentOperator}
+    (matched : MatchedTerminal file tokens terminal)
+    (_projects : AssignmentOperatorProjects file tokens matched operator) :
+    Located AssignmentOperator :=
+  terminalLoc matched operator
+
 end RuleReduction
 
 end Solcore.Surface.Multi
