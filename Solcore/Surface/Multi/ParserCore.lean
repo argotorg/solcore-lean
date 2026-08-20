@@ -45,6 +45,82 @@ def afterLogicalEOF (tokens : List Token) : Boundary tokens := {
 
 end Boundary
 
+/-- The nearest parser region relevant to guarded productions. -/
+inductive GuardContext (tokens : List Token) where
+  | plain
+  | bracedBody (bodyStart : Boundary tokens)
+  | armBody (armBodyStart : Boundary tokens)
+  | postfixInvocation (postfixStart : Boundary tokens)
+  deriving Repr, BEq, DecidableEq
+
+/-- One production predicted at an origin in its exact guard context. -/
+structure ProductionInstanceKey (tokens : List Token) where
+  production : ProductionId
+  origin : Boundary tokens
+  context : GuardContext tokens
+  deriving Repr, BEq, DecidableEq
+
+/-- One priority-guard query at an ordered pair of chart boundaries. -/
+structure GuardInstanceKey (tokens : List Token) where
+  guard : PriorityGuardId
+  contextStart : Boundary tokens
+  siteCursor : Boundary tokens
+  ordered : contextStart.val ≤ siteCursor.val
+  deriving Repr, BEq, DecidableEq
+
+/-- One expanded production at a dot position and chart interval. -/
+structure DottedItem (tokens : List Token) where
+  production : ProductionId
+  dot : Fin (production.rhs.length + 1)
+  origin : Boundary tokens
+  current : Boundary tokens
+  deriving Repr, BEq, DecidableEq
+
+/-- A proof-free unguarded scan or completion edge key. -/
+inductive PackedEdgeKey (tokens : List Token) where
+  | scanned
+      (before after : DottedItem tokens)
+      (terminalCursor : TerminalCursor tokens)
+  | completed
+      (waiting finished after : DottedItem tokens)
+      (sharedCursor : Boundary tokens)
+  deriving Repr, BEq, DecidableEq
+
+/-- One dotted item paired with its exact guard context. -/
+structure ContextualItemKey (tokens : List Token) where
+  raw : DottedItem tokens
+  context : GuardContext tokens
+  deriving Repr, BEq, DecidableEq
+
+/-- A proof-free contextual scan or completion edge key. -/
+inductive ContextualPackedEdgeKey (tokens : List Token) where
+  | scanned
+      (before after : ContextualItemKey tokens)
+      (terminalCursor : TerminalCursor tokens)
+  | completed
+      (waiting finished after : ContextualItemKey tokens)
+      (sharedCursor : Boundary tokens)
+  deriving Repr, BEq, DecidableEq
+
+/-- The definitionally complete contextual item for one root production. -/
+def CanonicalCompleteRootItem
+    (tokens : List Token)
+    (rule : GrammarRuleId)
+    (origin finish : Boundary tokens)
+    (context : GuardContext tokens) :
+    ContextualItemKey tokens := {
+  raw := {
+    production := ProductionId.root rule
+    dot := {
+      val := (ProductionId.root rule).rhs.length
+      isLt := Nat.lt_succ_self _
+    }
+    origin := origin
+    current := finish
+  }
+  context := context
+}
+
 /-- The parser's terminal stream consists of retained tokens and logical EOF. -/
 inductive TerminalStreamValue where
   | retained (token : Token)
