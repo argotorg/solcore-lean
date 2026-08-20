@@ -943,4 +943,142 @@ def PhaseBCorrect
   ∀ key decision,
     memo key = .final decision ↔ GuardEvidence file tokens key decision
 
+/-- One accepted decision for one checked guarded-production cell. -/
+def GuardWitness
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (_correct : PhaseBCorrect file tokens memo)
+    (_allFinal : AllGuardsFinal memo)
+    (key : GuardWitnessKey tokens) : Prop :=
+  ∃ decision : GuardDecision,
+    memo key.guardInstance = .final decision ∧
+      GuardEvidence file tokens key.guardInstance decision ∧
+      decision.allows key.polarity = true
+
+/-- Every guard cell of one production instance accepts its exact polarity. -/
+def EnabledProductionInstance
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (allFinal : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens) : Prop :=
+  ∀ guard polarity,
+    (guard, polarity) ∈ guardOf productionInstance.production →
+      ∃ witnessKey : GuardWitnessKey tokens,
+        witnessKey.productionInstance = productionInstance ∧
+          witnessKey.guardInstance.guard = guard ∧
+          witnessKey.polarity = polarity ∧
+          GuardWitness file tokens memo correct allFinal witnessKey
+
+/-- The least Phase-C reachability relation after all guards are finalized. -/
+inductive ContextualReach
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    ContextualItemKey tokens → Prop where
+  | root :
+      ContextualReach file tokens memo correct final {
+        raw := {
+          production := .root .module
+          dot := ⟨0, Nat.zero_lt_succ _⟩
+          origin := Boundary.start tokens
+          current := Boundary.start tokens
+        }
+        context := .plain
+      }
+  | predict
+      (waiting : ContextualItemKey tokens)
+      (predicted : ProductionId)
+      (reached : ContextualReach file tokens memo correct final waiting)
+      (next : NextSymbol waiting.raw
+        (GrammarSymbol.nonterminal predicted.lhs))
+      (enabled : EnabledProductionInstance file tokens memo correct final {
+        production := predicted
+        origin := waiting.raw.current
+        context := descendContext waiting predicted
+      }) :
+      ContextualReach file tokens memo correct final {
+        raw := {
+          production := predicted
+          dot := ⟨0, Nat.zero_lt_succ _⟩
+          origin := waiting.raw.current
+          current := waiting.raw.current
+        }
+        context := descendContext waiting predicted
+      }
+  | scan
+      (before after : ContextualItemKey tokens)
+      (cursor : TerminalCursor tokens)
+      (reached : ContextualReach file tokens memo correct final before)
+      (structural : ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.scanned before after cursor)) :
+      ContextualReach file tokens memo correct final after
+  | complete
+      (waiting finished after : ContextualItemKey tokens)
+      (shared : Boundary tokens)
+      (waitingReached :
+        ContextualReach file tokens memo correct final waiting)
+      (finishedReached :
+        ContextualReach file tokens memo correct final finished)
+      (structural : ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.completed waiting finished after shared)) :
+      ContextualReach file tokens memo correct final after
+
+/-- Structural validity plus reachability of every endpoint of one edge. -/
+def ContextualEdgeReach
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (key : ContextualPackedEdgeKey tokens) : Prop :=
+  ContextualPackedEdgeKey.StructurallyValid file tokens key ∧
+    match key with
+    | .scanned before after _ =>
+        ContextualReach file tokens memo correct final before ∧
+          ContextualReach file tokens memo correct final after
+    | .completed waiting finished after _ =>
+        ContextualReach file tokens memo correct final waiting ∧
+          ContextualReach file tokens memo correct final finished ∧
+          ContextualReach file tokens memo correct final after
+
+/-- Every reached contextual item spans an ordered boundary interval. -/
+theorem contextualReach_ordered
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    item.raw.origin.val ≤ item.raw.current.val := by
+  induction reached with
+  | root => exact Nat.le_refl _
+  | predict => exact Nat.le_refl _
+  | scan before after cursor reached structural ordered =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      rw [originEq, currentEq]
+      calc
+        before.raw.origin.val ≤ before.raw.current.val := ordered
+        _ = cursor.val := by rw [← atCurrent]; rfl
+        _ ≤ cursor.val + 1 := Nat.le_succ _
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingOrdered finishedOrdered =>
+      rcases structural.1 with
+        ⟨symbol, next, complete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      rw [originEq, currentEq]
+      calc
+        waiting.raw.origin.val ≤ waiting.raw.current.val := waitingOrdered
+        _ = shared.val := congrArg Fin.val waitingAtShared
+        _ = finished.raw.origin.val :=
+          (congrArg Fin.val finishedAtShared).symm
+        _ ≤ finished.raw.current.val := finishedOrdered
+
 end Solcore.Surface.Multi
