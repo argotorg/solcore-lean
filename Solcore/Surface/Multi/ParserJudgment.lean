@@ -96,6 +96,92 @@ def ExactSlice
           TerminalAt file tokens cursor (.retained token) token.span ∧
           TerminalMatches (classes.get index) (.retained token)
 
+/-- Every relation closed under the four unguarded rules contains its reach. -/
+theorem unguardedReach_least
+    {file : WorkspaceFile} {tokens : List Token}
+    (relation : DottedItem tokens → Prop)
+    (seed : ∀ (production : ProductionId) (cursor : Boundary tokens),
+      relation {
+        production := production
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := cursor
+        current := cursor
+      })
+    (predict : ∀ (waiting : DottedItem tokens)
+        (predicted : ProductionId),
+      relation waiting →
+      NextSymbol waiting (.nonterminal predicted.lhs) →
+      relation {
+        production := predicted
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := waiting.current
+        current := waiting.current
+      })
+    (scan : ∀ (before after : DottedItem tokens)
+        (cursor : TerminalCursor tokens)
+        (terminal : TerminalSymbol)
+        (value : TerminalStreamValue)
+        (span : SourceSpan),
+      relation before →
+      NextSymbol before (.terminal terminal) →
+      cursor.beforeBoundary = before.current →
+      TerminalAt file tokens cursor value span →
+      TerminalMatches terminal value →
+      AdvanceItem before cursor.afterBoundary after →
+      relation after)
+    (complete : ∀ (waiting finished after : DottedItem tokens),
+      relation waiting →
+      relation finished →
+      NextSymbol waiting (.nonterminal finished.production.lhs) →
+      CompleteItem finished →
+      waiting.current = finished.origin →
+      AdvanceItem waiting finished.current after →
+      relation after)
+    {item : DottedItem tokens}
+    (reached : UnguardedReach file tokens item) :
+    relation item := by
+  induction reached with
+  | seed production cursor => exact seed production cursor
+  | predict waiting predicted _ next waitingInduction =>
+      exact predict waiting predicted waitingInduction next
+  | scan before after cursor terminal value span _ next atCurrent terminalAt
+      terminalMatches advance beforeInduction =>
+      exact scan before after cursor terminal value span beforeInduction next
+        atCurrent terminalAt terminalMatches advance
+  | complete waiting finished after _ _ next finishedComplete sameCursor advance
+      waitingInduction finishedInduction =>
+      exact complete waiting finished after waitingInduction finishedInduction
+        next finishedComplete sameCursor advance
+
+/-- Unguarded recognition is exactly one reached complete matching item. -/
+theorem unguardedRecognizes_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    {symbol : NonterminalSymbol}
+    {start finish : Boundary tokens} :
+    UnguardedRecognizes file tokens symbol start finish ↔
+      ∃ item : DottedItem tokens,
+        UnguardedReach file tokens item ∧
+          CompleteItem item ∧
+          item.production.lhs = symbol ∧
+          item.origin = start ∧
+          item.current = finish := by
+  rfl
+
+/-- An exact slice is precisely its retained, class-matched cursor sequence. -/
+theorem exactSlice_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    {start finish : Boundary tokens}
+    {classes : List TerminalSymbol} :
+    ExactSlice file tokens start finish classes ↔
+      finish.val = start.val + classes.length ∧
+        ∀ index : Fin classes.length,
+          ∃ cursor : TerminalCursor tokens,
+          ∃ token : Token,
+            cursor.beforeBoundary.val = start.val + index.val ∧
+              TerminalAt file tokens cursor (.retained token) token.span ∧
+              TerminalMatches (classes.get index) (.retained token) := by
+  rfl
+
 /-- The greatest recognized finish below one upper bound is functional. -/
 theorem greatestUnguardedEnd_functional
     {file : WorkspaceFile}
