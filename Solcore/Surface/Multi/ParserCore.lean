@@ -61,6 +61,63 @@ inductive GuardContext (tokens : List Token) where
   | postfixInvocation (postfixStart : Boundary tokens)
   deriving Repr, BEq, DecidableEq
 
+/-- Exact finite cardinality certificate for contextual ancestry. -/
+theorem guard_context_cardinality (tokens : List Token) :
+    ∃ encode : GuardContext tokens → Fin (1 + 3 * (tokens.length + 2)),
+      Function.Injective encode ∧ Function.Surjective encode := by
+  let q := tokens.length + 2
+  let encode : GuardContext tokens → Fin (1 + 3 * q)
+    | .plain => ⟨0, by omega⟩
+    | .bracedBody boundary => ⟨1 + boundary.val, by
+        have := boundary.isLt
+        omega⟩
+    | .armBody boundary => ⟨1 + q + boundary.val, by
+        have := boundary.isLt
+        omega⟩
+    | .postfixInvocation boundary => ⟨1 + 2 * q + boundary.val, by
+        have := boundary.isLt
+        omega⟩
+  refine ⟨encode, ?_, ?_⟩
+  · intro left right same
+    cases left <;> cases right <;>
+      simp only [encode, Fin.mk.injEq] at same ⊢ <;>
+      try omega
+    all_goals
+      congr
+      apply Fin.ext
+      omega
+  · intro value
+    by_cases plain : value.val = 0
+    · refine ⟨.plain, ?_⟩
+      apply Fin.ext
+      simp [encode, plain]
+    · have positive : 0 < value.val := Nat.pos_of_ne_zero plain
+      by_cases braced : value.val - 1 < q
+      · let boundary : Boundary tokens := ⟨value.val - 1, by
+          simpa [q] using braced⟩
+        refine ⟨.bracedBody boundary, ?_⟩
+        apply Fin.ext
+        simp only [encode, boundary]
+        omega
+      · by_cases arm : value.val - 1 < 2 * q
+        · have armLower : q ≤ value.val - 1 := Nat.le_of_not_gt braced
+          let boundary : Boundary tokens := ⟨value.val - 1 - q, by
+            simpa [q] using (show value.val - 1 - q < q by omega)⟩
+          refine ⟨.armBody boundary, ?_⟩
+          apply Fin.ext
+          simp only [encode, boundary]
+          omega
+        · have postfixLower : 2 * q ≤ value.val - 1 :=
+            Nat.le_of_not_gt arm
+          have valueUpper : value.val < 1 + 3 * q := value.isLt
+          let boundary : Boundary tokens := ⟨value.val - 1 - 2 * q, by
+            simpa [q] using
+              (show value.val - 1 - 2 * q < q by omega)⟩
+          refine ⟨.postfixInvocation boundary, ?_⟩
+          apply Fin.ext
+          simp only [encode, boundary]
+          omega
+
 /-- One production predicted at an origin in its exact guard context. -/
 structure ProductionInstanceKey (tokens : List Token) where
   production : ProductionId
