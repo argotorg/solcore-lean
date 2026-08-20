@@ -121,6 +121,28 @@ def CanonicalCompleteRootItem
   context := context
 }
 
+/-- Select the exact guard context inherited by one predicted production. -/
+def descendContext {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (predicted : ProductionId) : GuardContext tokens :=
+  match predicted with
+  | .root .postfix =>
+      .postfixInvocation waiting.raw.current
+  | _ =>
+      match waiting.raw.production, predicted.lhs with
+      | .seq waitingSite, .aux predictedSite =>
+          if waitingSite.site.isAt .body [] &&
+              waiting.raw.dot.val == 1 &&
+              predictedSite.isAt .body [1] then
+            .bracedBody waiting.raw.current
+          else if waitingSite.site.isAt .matchArm [] &&
+              waiting.raw.dot.val == 3 &&
+              predictedSite.isAt .matchArm [3] then
+            .armBody waiting.raw.current
+          else
+            waiting.context
+      | _, _ => waiting.context
+
 /-- The symbol selected by the dot of one incomplete item. -/
 def NextSymbol {tokens : List Token}
     (item : DottedItem tokens) (symbol : GrammarSymbol) : Prop :=
@@ -419,6 +441,38 @@ theorem packedEdge_completed_valid_iff
 /-- The proof-irrelevant subtype of structurally valid unguarded edges. -/
 abbrev PackedEdge (file : WorkspaceFile) (tokens : List Token) : Type :=
   { key : PackedEdgeKey tokens // PackedEdgeKey.Valid file tokens key }
+
+namespace ContextualPackedEdgeKey
+
+/-- Erase contexts from a contextual edge while preserving its raw edge key. -/
+def rawProjection {tokens : List Token} :
+    ContextualPackedEdgeKey tokens → PackedEdgeKey tokens
+  | .scanned before after cursor =>
+      PackedEdgeKey.scanned before.raw after.raw cursor
+  | .completed waiting finished after shared =>
+      PackedEdgeKey.completed waiting.raw finished.raw after.raw shared
+
+/-- Raw edge validity together with the exact contextual transition. -/
+def StructurallyValid
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (key : ContextualPackedEdgeKey tokens) : Prop :=
+  PackedEdgeKey.Valid file tokens key.rawProjection ∧
+    match key with
+    | .scanned before after _ =>
+        before.context = after.context
+    | .completed waiting finished after _ =>
+        finished.context =
+            descendContext waiting finished.raw.production ∧
+          after.context = waiting.context
+
+end ContextualPackedEdgeKey
+
+/-- The proof-irrelevant subtype of structurally valid contextual edges. -/
+abbrev StructurallyValidContextualPackedEdge
+    (file : WorkspaceFile) (tokens : List Token) : Type :=
+  { key : ContextualPackedEdgeKey tokens //
+    ContextualPackedEdgeKey.StructurallyValid file tokens key }
 
 /-- The physical byte selected by one chart boundary. -/
 def BoundaryByte
