@@ -1987,6 +1987,73 @@ def rhs : ProductionId → List GrammarSymbol
 
 end ProductionId
 
+/-- Every outer production shape reduces to its complete public RHS bridge,
+including every finite option and repetition branch. -/
+theorem production_rhs_public_bridges_exact
+    (production : ProductionId) :
+    match production with
+    | .root rule =>
+        ProductionId.rhs (.root rule) =
+          [.nonterminal (.aux (GrammarSite.root rule))]
+    | .atom site =>
+        ProductionId.rhs (.atom site) = [site.symbol]
+    | .seq site =>
+        ProductionId.rhs (.seq site) =
+          site.children.map fun child => .nonterminal (.aux child)
+    | .group site =>
+        ProductionId.rhs (.group site) =
+          [.nonterminal (.aux site.child)]
+    | .choice site branch =>
+        ProductionId.rhs (.choice site branch) =
+          [.nonterminal (.aux (site.branch branch))]
+    | .opt site branch =>
+        match branch with
+        | .none => ProductionId.rhs (.opt site .none) = []
+        | .some => ProductionId.rhs (.opt site .some) =
+            [.nonterminal (.aux site.child)]
+    | .star site branch =>
+        match branch with
+        | .nil => ProductionId.rhs (.star site .nil) = []
+        | .cons => ProductionId.rhs (.star site .cons) =
+            [.nonterminal (.aux site.child),
+              .nonterminal (.aux site.site)]
+    | .plus site branch =>
+        match branch with
+        | .one => ProductionId.rhs (.plus site .one) =
+            [.nonterminal (.aux site.child)]
+        | .cons => ProductionId.rhs (.plus site .cons) =
+            [.nonterminal (.aux site.child),
+              .nonterminal (.aux site.site)]
+    | .list0 site branch =>
+        match branch with
+        | .nil => ProductionId.rhs (.list0 site .nil) = []
+        | .cons => ProductionId.rhs (.list0 site .cons) =
+            [.nonterminal (.aux site.element),
+              .nonterminal (.tail (.list0 site))]
+    | .list1 site =>
+        ProductionId.rhs (.list1 site) =
+          [.nonterminal (.aux site.element),
+            .nonterminal (.tail (.list1 site))]
+    | .tail site branch =>
+        match branch with
+        | .nil => ProductionId.rhs (.tail site .nil) = []
+        | .cons => ProductionId.rhs (.tail site .cons) =
+            [.terminal (.symbol .comma),
+              .nonterminal (.aux site.element),
+              .nonterminal (.tail site)] := by
+  cases production with
+  | root rule => rfl
+  | atom site => rfl
+  | seq site => rfl
+  | group site => rfl
+  | choice site branch => rfl
+  | opt site branch => cases branch <;> rfl
+  | star site branch => cases branch <;> rfl
+  | plus site branch => cases branch <;> rfl
+  | list0 site branch => cases branch <;> rfl
+  | list1 site => rfl
+  | tail site branch => cases branch <;> rfl
+
 /-- Stable production IDs in the exact constructor and site order. -/
 def allProductionIds : List ProductionId :=
   allGrammarRuleIds.map .root ++
@@ -2120,6 +2187,13 @@ theorem repetitionsNonnullable_eq_true :
     repetitionsNonnullable = true := by
   simp [repetitionsNonnullable, repetitionsNonnullableExpr_m2cV1]
 
+/-- The nullable closure is exact and every repeated element passes the
+closed nonnullable-repetition check used by expansion. -/
+theorem ebnf_expansion_nonnullable_repetitions :
+    nullableGrammarRules = [.optionalComma] ∧
+      repetitionsNonnullable = true :=
+  ⟨nullableGrammarRules_eq, repetitionsNonnullable_eq_true⟩
+
 /-- The checked m2c-v1 expansion. -/
 def expanded : ExpandedGrammar :=
   checkedExpansion.get (by
@@ -2128,6 +2202,26 @@ def expanded : ExpandedGrammar :=
 /-- The exact production count derived from `expanded`. -/
 def productionCount : Nat :=
   expanded.productionCount
+
+/-- The checked expansion succeeds and is exactly the finite stable-production
+enumeration from which its public production count is derived. -/
+theorem ebnf_expansion_finite :
+    checkedExpansion = some expanded ∧
+      expanded.productions =
+        allProductionIds.map ExpandedProduction.ofId ∧
+      productionCount = allProductionIds.length := by
+  have accepted : checkedExpansion = some expanded := by
+    have isSome : checkedExpansion.isSome = true := by
+      simp [checkedExpansion, repetitionsNonnullable_eq_true]
+    apply Option.eq_some_iff_get_eq.mpr
+    exact ⟨isSome, by unfold expanded; rfl⟩
+  have rows : expanded.productions =
+      allProductionIds.map ExpandedProduction.ofId := by
+    unfold expanded
+    simp [checkedExpansion, repetitionsNonnullable_eq_true]
+    rfl
+  exact ⟨accepted, rows, by
+    simp [productionCount, ExpandedGrammar.productionCount, rows]⟩
 
 /-- A stable production together with one legal dotted RHS cursor. -/
 structure DottedRhs where
@@ -2454,6 +2548,16 @@ theorem actionFor_injective : Function.Injective ActionId.actionFor := by
   intro left right equality
   cases equality
   rfl
+
+/-- Stable actions and stable productions form a bijection through the public
+constructor and inverse projection. -/
+theorem production_action_id_bijective :
+    Function.Injective ActionId.actionFor ∧
+      Function.Surjective ActionId.actionFor := by
+  constructor
+  · exact actionFor_injective
+  · intro action
+    exact ⟨action.production, ActionId.actionFor_production action⟩
 
 theorem allActionIds_exact :
     allActionIds = allProductionIds.map ActionId.actionFor :=
