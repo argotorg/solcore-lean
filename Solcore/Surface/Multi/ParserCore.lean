@@ -1623,6 +1623,43 @@ end GrammarSymbolValues
 
 namespace EbnfValues
 
+/-- Construct the unique semantic value of an empty expression sequence. -/
+def nil
+    {file : WorkspaceFile} {tokens : List Token} :
+    EbnfValues file tokens [] :=
+  Eq.mp (ebnfValues_nil_eq (file := file) (tokens := tokens)).symm ()
+
+/-- Prepend one semantic value to an expression-sequence value. -/
+def cons
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (rest : List EbnfExpr)
+    (head : EbnfValue file tokens child)
+    (tail : EbnfValues file tokens rest) :
+    EbnfValues file tokens (child :: rest) :=
+  Eq.mp (ebnfValues_cons_eq child rest).symm (head, tail)
+
+/-- Viewing the empty sequence constructor yields its unit payload. -/
+@[simp] theorem nil_view
+    {file : WorkspaceFile} {tokens : List Token} :
+    Eq.mp (ebnfValues_nil_eq (file := file) (tokens := tokens))
+      (nil (file := file) (tokens := tokens)) = () := by
+  unfold nil
+  change cast _ (cast _ ()) = ()
+  rw [cast_cast]
+
+/-- Viewing a cons sequence constructor yields its head and tail. -/
+@[simp] theorem cons_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (rest : List EbnfExpr)
+    (head : EbnfValue file tokens child)
+    (tail : EbnfValues file tokens rest) :
+    Eq.mp (ebnfValues_cons_eq child rest)
+      (cons child rest head tail) = (head, tail) := by
+  unfold cons
+  change cast _ (cast _ (head, tail)) = (head, tail)
+  rw [cast_cast]
+  apply cast_eq
+
 /-- Convert auxiliary nonterminal values to their expression-indexed tuple. -/
 def ofAuxiliaries
     {file : WorkspaceFile}
