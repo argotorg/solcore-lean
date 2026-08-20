@@ -6141,4 +6141,92 @@ inductive ActionReduces
       ActionReduces file tokens (.actionFor (.tail site branch))
         origin finish input (ListSite.pack site branch input)
 
+mutual
+
+  /-- Values coherent with one reached contextual item's consumed prefix. -/
+  inductive CoherentPrefix
+      (file : WorkspaceFile) (tokens : List Token)
+      (memo : GuardMemo tokens)
+      (correct : PhaseBCorrect file tokens memo)
+      (final : AllGuardsFinal memo) :
+      (item : ContextualItemKey tokens) →
+        PrefixValues file tokens item → Prop where
+    | zero
+        (item : ContextualItemKey tokens)
+        (reached : ContextualReach file tokens memo correct final item)
+        (zero : item.raw.dot.val = 0) :
+        CoherentPrefix file tokens memo correct final item
+          (PrefixValues.zeroValue item zero)
+    | scan
+        (before after : ContextualItemKey tokens)
+        (cursor : TerminalCursor tokens)
+        (priorValues : PrefixValues file tokens before)
+        (witness : ScannedEdgeWitness
+          file tokens before.raw after.raw cursor)
+        (edge : ContextualEdgeReach file tokens memo correct final
+          (.scanned before after cursor))
+        (prior : CoherentPrefix file tokens memo correct final
+          before priorValues) :
+        CoherentPrefix file tokens memo correct final after
+          (PrefixValues.scanValue before after witness.terminal
+            witness.next witness.matched witness.advance priorValues)
+    | complete
+        (waiting finished after : ContextualItemKey tokens)
+        (shared : Boundary tokens)
+        (priorValues : PrefixValues file tokens waiting)
+        (childValue : NonterminalValue file tokens
+          finished.raw.production.lhs)
+        (witness : CompletedEdgeWitness
+          tokens waiting.raw finished.raw after.raw shared)
+        (edge : ContextualEdgeReach file tokens memo correct final
+          (.completed waiting finished after shared))
+        (prior : CoherentPrefix file tokens memo correct final
+          waiting priorValues)
+        (child : CoherentReduction file tokens memo correct final
+          finished childValue) :
+        CoherentPrefix file tokens memo correct final after
+          (PrefixValues.completeValue waiting finished after
+            witness.next witness.advance priorValues childValue)
+
+  /-- Completed nonterminal values coherent with one reached contextual item. -/
+  inductive CoherentReduction
+      (file : WorkspaceFile) (tokens : List Token)
+      (memo : GuardMemo tokens)
+      (correct : PhaseBCorrect file tokens memo)
+      (final : AllGuardsFinal memo) :
+      (item : ContextualItemKey tokens) →
+        NonterminalValue file tokens item.raw.production.lhs → Prop where
+    | reduce
+        (item : ContextualItemKey tokens)
+        (priorValues : PrefixValues file tokens item)
+        (output : NonterminalValue file tokens item.raw.production.lhs)
+        (reached : ContextualReach file tokens memo correct final item)
+        (complete : CompleteItem item.raw)
+        (coherentPrefix : CoherentPrefix file tokens memo correct final
+          item priorValues)
+        (action : ActionReduces file tokens
+          (.actionFor item.raw.production)
+          item.raw.origin item.raw.current
+          (PrefixValues.fullValue item complete priorValues) output) :
+        CoherentReduction file tokens memo correct final item output
+
+end
+
+/-- A coherent completed canonical root item for one source rule. -/
+def CanonicalCompleteRootReduction
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (rule : GrammarRuleId)
+    (origin finish : Boundary tokens)
+    (context : GuardContext tokens)
+    (value : RuleValue rule) : Prop :=
+  ContextualReach file tokens memo correct final
+      (CanonicalCompleteRootItem tokens rule origin finish context) ∧
+    CompleteItem
+      (CanonicalCompleteRootItem tokens rule origin finish context).raw ∧
+    CoherentReduction file tokens memo correct final
+      (CanonicalCompleteRootItem tokens rule origin finish context) value
+
 end Solcore.Surface.Multi
