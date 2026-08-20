@@ -1422,6 +1422,91 @@ namespace ChoiceSite
 def branchCount (site : ChoiceSite) : Nat :=
   site.site.expression.choiceBranchCount
 
+/-- The displayed choice branches in exact source order. -/
+def branchExpressions (site : ChoiceSite) :
+    Vector EbnfExpr site.branchCount :=
+  ⟨site.site.expression.children.toArray, by
+    have hasKind := site.hasKind
+    cases expression : site.site.expression <;>
+      simp [ChoiceSite.branchCount, EbnfExpr.choiceBranchCount,
+        EbnfExpr.kind, EbnfExpr.children, expression] at hasKind ⊢⟩
+
+/-- A choice site has the expected outer shape and displayed branches. -/
+theorem expression_eq_choice (site : ChoiceSite) :
+    site.site.expression =
+      EbnfExpr.choice site.branchExpressions.toList := by
+  have hasKind := site.hasKind
+  cases expression : site.site.expression <;>
+    simp [EbnfExpr.kind, expression] at hasKind
+  simp [branchExpressions, EbnfExpr.children, expression, Vector.toList]
+
+private def branchChildIndex
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+    Fin site.site.expression.children.length :=
+  ⟨branch.val, by
+    have hasKind := site.hasKind
+    cases expression : site.site.expression <;>
+      simp [EbnfExpr.kind, expression] at hasKind
+    simpa [ChoiceSite.branchCount, EbnfExpr.choiceBranchCount,
+      EbnfExpr.children, expression] using branch.isLt⟩
+
+private theorem branchExpression_eq
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+    site.site.expression.children[(branchChildIndex site branch).val] =
+      site.branchExpressions.get branch := by
+  simp [branchChildIndex, branchExpressions, Vector.get]
+
+private theorem branch_selected_eq_some
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+    site.site.expression.children[branch.val]? =
+      some (site.branchExpressions.get branch) := by
+  have inBounds : branch.val < site.site.expression.children.length :=
+    (branchChildIndex site branch).isLt
+  rw [List.getElem?_eq_getElem inBounds]
+  exact congrArg some (branchExpression_eq site branch)
+
+/-- Select one displayed choice branch as a checked grammar site. -/
+def branch (site : ChoiceSite)
+    (branch : Fin site.branchCount) : GrammarSite :=
+  GrammarSite.childAt site.site branch.val
+    (site.branchExpressions.get branch)
+    (branch_selected_eq_some site branch)
+
+/-- A selected branch site has exactly the indexed branch expression. -/
+theorem branch_expression
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+    (site.branch branch).expression =
+      site.branchExpressions.get branch :=
+  GrammarSite.childAt_expression site.site branch.val
+    (site.branchExpressions.get branch)
+    (branch_selected_eq_some site branch)
+
+/-- All checked branch sites in displayed choice order. -/
+def branches (site : ChoiceSite) :
+    Vector GrammarSite site.branchCount :=
+  Vector.ofFn site.branch
+
+/-- Convert a branch index to the branch-expression list index. -/
+def branchListIndex (site : ChoiceSite)
+    (branch : Fin site.branchCount) :
+    Fin site.branchExpressions.toList.length :=
+  ⟨branch.val, by simp⟩
+
+/-- Branch-list index conversion preserves the numeric index. -/
+theorem branchListIndex_val
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+    (site.branchListIndex branch).val = branch.val :=
+  rfl
+
+/-- Branch list lookup agrees with vector lookup at the converted index. -/
+theorem branch_get_toList
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+    site.branchExpressions.toList.get (site.branchListIndex branch) =
+      site.branchExpressions.get branch := by
+  change site.branchExpressions.toList[branch.val] =
+    site.branchExpressions.get branch
+  exact Vector.getElem_toList (site.branchListIndex branch).isLt
+
 end ChoiceSite
 
 /-- The disjoint union of comma-list sites that own tail auxiliaries. -/
@@ -1683,19 +1768,6 @@ def owner : ListSite → GrammarSite
 
 end ListSite
 
-private def directChildSites (site : GrammarSite) : List GrammarSite :=
-  (List.range site.expression.children.length).filterMap site.child?
-
-private def childAuxiliary
-    (site : GrammarSite) (index : Nat) : List GrammarSymbol :=
-  match site.child? index with
-  | some child => [.nonterminal (.aux child)]
-  | none => []
-
-private def atomSymbol : EbnfAtom → GrammarSymbol
-  | .terminal terminal => .terminal terminal
-  | .nonterminal rule => .nonterminal (.rule rule)
-
 namespace ProductionId
 
 /-- The exact expanded left-hand side. -/
@@ -1717,40 +1789,132 @@ def rhs : ProductionId → List GrammarSymbol
   | .root rule =>
       [.nonterminal (.aux (GrammarSite.root rule))]
   | .atom site =>
-      [atomSymbol site.atom]
+      [site.symbol]
   | .seq site =>
-      (directChildSites site.site).map fun child =>
-        .nonterminal (.aux child)
+      site.children.map fun child => .nonterminal (.aux child)
   | .group site =>
-      childAuxiliary site.site 0
+      [.nonterminal (.aux site.child)]
   | .choice site branch =>
-      childAuxiliary site.site branch.val
+      [.nonterminal (.aux (site.branch branch))]
   | .opt _ .none =>
       []
   | .opt site .some =>
-      childAuxiliary site.site 0
+      [.nonterminal (.aux site.child)]
   | .star _ .nil =>
       []
   | .star site .cons =>
-      childAuxiliary site.site 0 ++ [.nonterminal (.aux site.site)]
+      [.nonterminal (.aux site.child), .nonterminal (.aux site.site)]
   | .plus site .one =>
-      childAuxiliary site.site 0
+      [.nonterminal (.aux site.child)]
   | .plus site .cons =>
-      childAuxiliary site.site 0 ++ [.nonterminal (.aux site.site)]
+      [.nonterminal (.aux site.child), .nonterminal (.aux site.site)]
   | .list0 _ .nil =>
       []
   | .list0 site .cons =>
-      childAuxiliary site.site 0 ++
-        [.nonterminal (.tail (.list0 site))]
+      [.nonterminal (.aux site.element),
+        .nonterminal (.tail (.list0 site))]
   | .list1 site =>
-      childAuxiliary site.site 0 ++
-        [.nonterminal (.tail (.list1 site))]
+      [.nonterminal (.aux site.element),
+        .nonterminal (.tail (.list1 site))]
   | .tail _ .nil =>
       []
   | .tail site .cons =>
-      [.terminal (.symbol .comma)] ++
-        childAuxiliary site.owner 0 ++
-        [.nonterminal (.tail site)]
+      [.terminal (.symbol .comma),
+        .nonterminal (.aux site.element),
+        .nonterminal (.tail site)]
+
+/-- The root-production RHS layout. -/
+@[simp] theorem rhs_root (rule : GrammarRuleId) :
+    rhs (.root rule) =
+      [.nonterminal (.aux (GrammarSite.root rule))] :=
+  rfl
+
+/-- The atom-production RHS layout. -/
+@[simp] theorem rhs_atom (site : AtomSite) :
+    rhs (.atom site) = [site.symbol] :=
+  rfl
+
+/-- The sequence-production RHS layout. -/
+@[simp] theorem rhs_seq (site : SequenceSite) :
+    rhs (.seq site) =
+      site.children.map fun child => .nonterminal (.aux child) :=
+  rfl
+
+/-- The grouping-production RHS layout. -/
+@[simp] theorem rhs_group (site : GroupSite) :
+    rhs (.group site) = [.nonterminal (.aux site.child)] :=
+  rfl
+
+/-- The choice-production RHS layout. -/
+@[simp] theorem rhs_choice
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+    rhs (.choice site branch) =
+      [.nonterminal (.aux (site.branch branch))] :=
+  rfl
+
+/-- The empty optional-production RHS layout. -/
+@[simp] theorem rhs_opt_none (site : OptionalSite) :
+    rhs (.opt site .none) = [] :=
+  rfl
+
+/-- The present optional-production RHS layout. -/
+@[simp] theorem rhs_opt_some (site : OptionalSite) :
+    rhs (.opt site .some) = [.nonterminal (.aux site.child)] :=
+  rfl
+
+/-- The empty star-production RHS layout. -/
+@[simp] theorem rhs_star_nil (site : StarSite) :
+    rhs (.star site .nil) = [] :=
+  rfl
+
+/-- The extending star-production RHS layout. -/
+@[simp] theorem rhs_star_cons (site : StarSite) :
+    rhs (.star site .cons) =
+      [.nonterminal (.aux site.child), .nonterminal (.aux site.site)] :=
+  rfl
+
+/-- The singleton plus-production RHS layout. -/
+@[simp] theorem rhs_plus_one (site : PlusSite) :
+    rhs (.plus site .one) = [.nonterminal (.aux site.child)] :=
+  rfl
+
+/-- The extending plus-production RHS layout. -/
+@[simp] theorem rhs_plus_cons (site : PlusSite) :
+    rhs (.plus site .cons) =
+      [.nonterminal (.aux site.child), .nonterminal (.aux site.site)] :=
+  rfl
+
+/-- The empty zero-or-more list-production RHS layout. -/
+@[simp] theorem rhs_list0_nil (site : List0Site) :
+    rhs (.list0 site .nil) = [] :=
+  rfl
+
+/-- The extending zero-or-more list-production RHS layout. -/
+@[simp] theorem rhs_list0_cons (site : List0Site) :
+    rhs (.list0 site .cons) =
+      [.nonterminal (.aux site.element),
+        .nonterminal (.tail (.list0 site))] :=
+  rfl
+
+/-- The one-or-more list-production RHS layout. -/
+@[simp] theorem rhs_list1 (site : List1Site) :
+    rhs (.list1 site) =
+      [.nonterminal (.aux site.element),
+        .nonterminal (.tail (.list1 site))] :=
+  rfl
+
+/-- The empty comma-tail-production RHS layout. -/
+@[simp] theorem rhs_tail_nil (site : ListSite) :
+    rhs (.tail site .nil) = [] :=
+  rfl
+
+/-- The extending comma-tail-production RHS layout. -/
+@[simp] theorem rhs_tail_cons (site : ListSite) :
+    rhs (.tail site .cons) =
+      [.terminal (.symbol .comma),
+        .nonterminal (.aux site.element),
+        .nonterminal (.tail site)] :=
+  rfl
 
 end ProductionId
 
