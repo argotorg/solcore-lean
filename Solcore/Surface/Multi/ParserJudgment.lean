@@ -6333,4 +6333,116 @@ inductive FoundAt
         endByte := file.content.utf8ByteSize
       } .endOfFile
 
+namespace NonAssociativeLevel
+
+/-- The source rule that establishes one nonassociative precedence level. -/
+def rule : NonAssociativeLevel → GrammarRuleId
+  | .relational => .relational
+  | .equality => .equality
+
+end NonAssociativeLevel
+
+/-- A coherent completed level root retained at the diagnostic frontier. -/
+structure NonAssociativeFrontierValue
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel) where
+  origin : Boundary tokens
+  context : GuardContext tokens
+  value : RuleValue level.rule
+  frontier : FrontierReach file tokens memo correct final cursor
+    (CanonicalCompleteRootItem tokens level.rule origin cursor context)
+  root : CanonicalCompleteRootReduction
+    file tokens memo correct final level.rule origin cursor context value
+
+/-- A source-level group resets a completed nonassociative operation. -/
+def ExplicitGroupBoundary
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens} :
+    (level : NonAssociativeLevel) →
+      NonAssociativeFrontierValue
+        file tokens memo correct final cursor level → Prop
+  | .relational, candidate => ∃ inner, candidate.value.payload = .group inner
+  | .equality, candidate => ∃ inner, candidate.value.payload = .group inner
+
+/-- The first completed operation at one nonassociative precedence level. -/
+def CompletedNonAssociative
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens} :
+    (level : NonAssociativeLevel) →
+      (candidate : NonAssociativeFrontierValue
+        file tokens memo correct final cursor level) →
+      Located InfixOperator → Prop
+  | .relational, candidate, first =>
+      ∃ left right,
+        candidate.value.payload = .infix first left right ∧
+        first.payload ∈ [.less, .greater, .lessEqual, .greaterEqual]
+  | .equality, candidate, first =>
+      ∃ left right,
+        candidate.value.payload = .infix first left right ∧
+        first.payload ∈ [.equal, .notEqual]
+
+/-- One exact nonassociative operator beginning at the frontier cursor. -/
+inductive FoundNonAssociativeOperatorAt
+    (file : WorkspaceFile) (tokens : List Token) :
+    Boundary tokens → NonAssociativeLevel → Located InfixOperator → Prop where
+  | less
+      {cursor : Boundary tokens}
+      (terminal : MatchedTerminal file tokens (.symbol .less))
+      (atCursor : terminal.cursor.beforeBoundary = cursor) :
+      FoundNonAssociativeOperatorAt file tokens cursor .relational
+        (RuleReduction.terminalLoc terminal .less)
+  | greater
+      {cursor : Boundary tokens}
+      (terminal : MatchedTerminal file tokens (.symbol .greater))
+      (atCursor : terminal.cursor.beforeBoundary = cursor) :
+      FoundNonAssociativeOperatorAt file tokens cursor .relational
+        (RuleReduction.terminalLoc terminal .greater)
+  | lessEqual
+      {cursor : Boundary tokens}
+      (terminal : MatchedTerminal file tokens (.symbol .lessEqual))
+      (atCursor : terminal.cursor.beforeBoundary = cursor) :
+      FoundNonAssociativeOperatorAt file tokens cursor .relational
+        (RuleReduction.terminalLoc terminal .lessEqual)
+  | greaterEqual
+      {cursor : Boundary tokens}
+      (terminal : MatchedTerminal file tokens (.symbol .greaterEqual))
+      (atCursor : terminal.cursor.beforeBoundary = cursor) :
+      FoundNonAssociativeOperatorAt file tokens cursor .relational
+        (RuleReduction.terminalLoc terminal .greaterEqual)
+  | equal
+      {cursor : Boundary tokens}
+      (terminal : MatchedTerminal file tokens (.symbol .equalEqual))
+      (atCursor : terminal.cursor.beforeBoundary = cursor) :
+      FoundNonAssociativeOperatorAt file tokens cursor .equality
+        (RuleReduction.terminalLoc terminal .equal)
+  | notEqual
+      {cursor : Boundary tokens}
+      (terminal : MatchedTerminal file tokens (.symbol .notEqual))
+      (atCursor : terminal.cursor.beforeBoundary = cursor) :
+      FoundNonAssociativeOperatorAt file tokens cursor .equality
+        (RuleReduction.terminalLoc terminal .notEqual)
+
+/-- A second same-level operator following an ungrouped completed operation. -/
+def RepeatedNonAssociativeAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel)
+    (operator : Located InfixOperator) : Prop :=
+  ∃ candidate : NonAssociativeFrontierValue
+      file tokens memo correct final cursor level,
+    ∃ first : Located InfixOperator,
+      CompletedNonAssociative level candidate first ∧
+      ¬ ExplicitGroupBoundary level candidate ∧
+      FoundNonAssociativeOperatorAt file tokens cursor level operator
+
 end Solcore.Surface.Multi
