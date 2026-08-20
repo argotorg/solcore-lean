@@ -783,6 +783,300 @@ theorem matchedTerminal_assembly_projection_exact
           token.payload = .assemblyBlock slice :=
   Iff.rfl
 
+private theorem projectedPathSpelling_functional
+    {token : Token} {left right : String}
+    (leftShape : token.payload = .identifier left ∨
+      ∃ keyword : HardKeyword,
+        token.payload = .hardKeyword keyword ∧
+          left = keyword.spelling)
+    (rightShape : token.payload = .identifier right ∨
+      ∃ keyword : HardKeyword,
+        token.payload = .hardKeyword keyword ∧
+          right = keyword.spelling) :
+    left = right := by
+  rcases leftShape with leftShape | ⟨leftKeyword, leftShape, leftSpelling⟩
+  · rcases rightShape with rightShape |
+        ⟨rightKeyword, rightShape, rightSpelling⟩
+    · exact TokenKind.identifier.inj (leftShape.symm.trans rightShape)
+    · simp_all
+  · rcases rightShape with rightShape |
+        ⟨rightKeyword, rightShape, rightSpelling⟩
+    · simp_all
+    · have keywordEq : leftKeyword = rightKeyword :=
+        TokenKind.hardKeyword.inj (leftShape.symm.trans rightShape)
+      rw [leftSpelling, rightSpelling, keywordEq]
+
+/-- Every matched identifier has exactly one spelling-and-value projection. -/
+theorem matchedTerminal_identifier_projection_exists_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .identifier)) :
+    ∃ projection : String × Identifier,
+      IdentifierProjects terminal projection.1 projection.2 ∧
+        ∀ other : String × Identifier,
+          IdentifierProjects terminal other.1 other.2 →
+            other = projection := by
+  rcases terminal with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with ⟨spelling, parsed, payloadEq, parseEq⟩
+      refine ⟨(spelling, parsed),
+        (matchedTerminal_identifier_projection_exact _ spelling parsed).mpr
+          ⟨token, rfl, payloadEq, parseEq⟩, ?_⟩
+      rintro ⟨otherSpelling, otherParsed⟩ otherProjects
+      rcases (matchedTerminal_identifier_projection_exact
+        _ otherSpelling otherParsed).mp otherProjects with
+        ⟨otherToken, valueEq, otherPayload, otherParse⟩
+      have tokenEq : token = otherToken := by
+        simpa only [TerminalStreamValue.retained.injEq] using valueEq
+      subst otherToken
+      have spellingEq : spelling = otherSpelling :=
+        TokenKind.identifier.inj (payloadEq.symm.trans otherPayload)
+      subst otherSpelling
+      have parsedEq : otherParsed = parsed :=
+        Option.some.inj (otherParse.symm.trans parseEq)
+      subst otherParsed
+      rfl
+
+/-- Every matched path component has exactly one spelling-and-value projection. -/
+theorem matchedTerminal_path_projection_exists_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent)) :
+    ∃ projection : String × PathSegment,
+      PathSegmentProjects terminal projection.1 projection.2 ∧
+        ∀ other : String × PathSegment,
+          PathSegmentProjects terminal other.1 other.2 →
+            other = projection := by
+  rcases terminal with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with
+        ⟨spelling, parsed, payloadEq, parseEq⟩ |
+        ⟨keyword, parsed, payloadEq, parseEq⟩
+      · refine ⟨(spelling, parsed),
+          (matchedTerminal_path_projection_exact _ spelling parsed).mpr
+            ⟨token, rfl, Or.inl payloadEq, parseEq⟩, ?_⟩
+        rintro ⟨otherSpelling, otherParsed⟩ otherProjects
+        rcases (matchedTerminal_path_projection_exact
+          _ otherSpelling otherParsed).mp otherProjects with
+          ⟨otherToken, valueEq, otherShape, otherParse⟩
+        have tokenEq : token = otherToken := by
+          simpa only [TerminalStreamValue.retained.injEq] using valueEq
+        subst otherToken
+        have spellingEq : spelling = otherSpelling :=
+          projectedPathSpelling_functional (Or.inl payloadEq) otherShape
+        subst otherSpelling
+        have parsedEq : otherParsed = parsed :=
+          Option.some.inj (otherParse.symm.trans parseEq)
+        subst otherParsed
+        rfl
+      · refine ⟨(keyword.spelling, parsed),
+          (matchedTerminal_path_projection_exact
+            _ keyword.spelling parsed).mpr
+            ⟨token, rfl, Or.inr ⟨keyword, payloadEq, rfl⟩, parseEq⟩, ?_⟩
+        rintro ⟨otherSpelling, otherParsed⟩ otherProjects
+        rcases (matchedTerminal_path_projection_exact
+          _ otherSpelling otherParsed).mp otherProjects with
+          ⟨otherToken, valueEq, otherShape, otherParse⟩
+        have tokenEq : token = otherToken := by
+          simpa only [TerminalStreamValue.retained.injEq] using valueEq
+        subst otherToken
+        have spellingEq : keyword.spelling = otherSpelling :=
+          projectedPathSpelling_functional
+            (Or.inr ⟨keyword, payloadEq, rfl⟩) otherShape
+        subst otherSpelling
+        have parsedEq : otherParsed = parsed :=
+          Option.some.inj (otherParse.symm.trans parseEq)
+        subst otherParsed
+        rfl
+
+/-- Every matched external-library component has one spelling-and-value projection. -/
+theorem matchedTerminal_external_projection_exists_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent)) :
+    ∃ projection : String × ExternalLibraryName,
+      ExternalLibraryProjects terminal projection.1 projection.2 ∧
+        ∀ other : String × ExternalLibraryName,
+          ExternalLibraryProjects terminal other.1 other.2 →
+            other = projection := by
+  rcases terminal with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with
+        ⟨spelling, segment, payloadEq, parseEq⟩ |
+        ⟨keyword, segment, payloadEq, parseEq⟩
+      · have externalParse :
+            ExternalLibraryName.parse spelling = some ⟨segment⟩ := by
+          simp [ExternalLibraryName.parse, parseEq]
+        refine ⟨(spelling, ⟨segment⟩),
+          (matchedTerminal_external_projection_exact
+            _ spelling ⟨segment⟩).mpr
+            ⟨token, rfl, Or.inl payloadEq, externalParse⟩, ?_⟩
+        rintro ⟨otherSpelling, otherParsed⟩ otherProjects
+        rcases (matchedTerminal_external_projection_exact
+          _ otherSpelling otherParsed).mp otherProjects with
+          ⟨otherToken, valueEq, otherShape, otherParse⟩
+        have tokenEq : token = otherToken := by
+          simpa only [TerminalStreamValue.retained.injEq] using valueEq
+        subst otherToken
+        have spellingEq : spelling = otherSpelling :=
+          projectedPathSpelling_functional (Or.inl payloadEq) otherShape
+        subst otherSpelling
+        have parsedEq : otherParsed = ⟨segment⟩ :=
+          Option.some.inj (otherParse.symm.trans externalParse)
+        subst otherParsed
+        rfl
+      · have externalParse :
+            ExternalLibraryName.parse keyword.spelling = some ⟨segment⟩ := by
+          simp [ExternalLibraryName.parse, parseEq]
+        refine ⟨(keyword.spelling, ⟨segment⟩),
+          (matchedTerminal_external_projection_exact
+            _ keyword.spelling ⟨segment⟩).mpr
+            ⟨token, rfl, Or.inr ⟨keyword, payloadEq, rfl⟩, externalParse⟩,
+          ?_⟩
+        rintro ⟨otherSpelling, otherParsed⟩ otherProjects
+        rcases (matchedTerminal_external_projection_exact
+          _ otherSpelling otherParsed).mp otherProjects with
+          ⟨otherToken, valueEq, otherShape, otherParse⟩
+        have tokenEq : token = otherToken := by
+          simpa only [TerminalStreamValue.retained.injEq] using valueEq
+        subst otherToken
+        have spellingEq : keyword.spelling = otherSpelling :=
+          projectedPathSpelling_functional
+            (Or.inr ⟨keyword, payloadEq, rfl⟩) otherShape
+        subst otherSpelling
+        have parsedEq : otherParsed = ⟨segment⟩ :=
+          Option.some.inj (otherParse.symm.trans externalParse)
+        subst otherParsed
+        rfl
+
+/-- Every matched literal in the closed literal category has one exact payload. -/
+theorem matchedTerminal_literal_projection_exists_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal)
+    (literalTerminal :
+      terminal = .category .decimalLiteral ∨
+        terminal = .category .hexadecimalLiteral ∨
+        terminal = .category .stringLiteral) :
+    ∃ literalPayload : LiteralPayload,
+      LiteralProjects matched literalPayload ∧
+        ∀ other : LiteralPayload,
+          LiteralProjects matched other → other = literalPayload := by
+  rcases literalTerminal with terminalEq | terminalEq | terminalEq
+  · subst terminal
+    rcases matched with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+    cases value with
+    | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | retained token =>
+        rcases matchedEvidence with ⟨spelling, digits, payloadEq⟩
+        refine ⟨.decimal spelling digits,
+          (matchedTerminal_literal_projection_exact
+            _ (.decimal spelling digits)).mpr
+            ⟨token, rfl, Or.inl ⟨rfl, spelling, digits, payloadEq, rfl⟩⟩,
+          ?_⟩
+        intro other otherProjects
+        rcases (matchedTerminal_literal_projection_exact _ other).mp
+          otherProjects with ⟨otherToken, valueEq, branch⟩
+        have tokenEq : token = otherToken := by
+          simpa only [TerminalStreamValue.retained.injEq] using valueEq
+        subst otherToken
+        rcases branch with branch | branch | branch
+        · rcases branch with ⟨_, otherSpelling, otherDigits,
+              otherPayload, otherLiteral⟩
+          rcases TokenKind.decimalLiteral.inj
+              (payloadEq.symm.trans otherPayload) with
+            ⟨spellingEq, digitsEq⟩
+          subst otherSpelling
+          subst otherDigits
+          exact otherLiteral
+        · simp at branch
+        · simp at branch
+  · subst terminal
+    rcases matched with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+    cases value with
+    | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | retained token =>
+        rcases matchedEvidence with ⟨spelling, digits, payloadEq⟩
+        refine ⟨.hexadecimal spelling digits,
+          (matchedTerminal_literal_projection_exact
+            _ (.hexadecimal spelling digits)).mpr
+            ⟨token, rfl, Or.inr (Or.inl
+              ⟨rfl, spelling, digits, payloadEq, rfl⟩)⟩,
+          ?_⟩
+        intro other otherProjects
+        rcases (matchedTerminal_literal_projection_exact _ other).mp
+          otherProjects with ⟨otherToken, valueEq, branch⟩
+        have tokenEq : token = otherToken := by
+          simpa only [TerminalStreamValue.retained.injEq] using valueEq
+        subst otherToken
+        rcases branch with branch | branch | branch
+        · simp at branch
+        · rcases branch with ⟨_, otherSpelling, otherDigits,
+              otherPayload, otherLiteral⟩
+          rcases TokenKind.hexadecimalLiteral.inj
+              (payloadEq.symm.trans otherPayload) with
+            ⟨spellingEq, digitsEq⟩
+          subst otherSpelling
+          subst otherDigits
+          exact otherLiteral
+        · simp at branch
+  · subst terminal
+    rcases matched with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+    cases value with
+    | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | retained token =>
+        rcases matchedEvidence with ⟨spelling, decoded, payloadEq⟩
+        refine ⟨.string spelling decoded,
+          (matchedTerminal_literal_projection_exact
+            _ (.string spelling decoded)).mpr
+            ⟨token, rfl, Or.inr (Or.inr
+              ⟨rfl, spelling, decoded, payloadEq, rfl⟩)⟩,
+          ?_⟩
+        intro other otherProjects
+        rcases (matchedTerminal_literal_projection_exact _ other).mp
+          otherProjects with ⟨otherToken, valueEq, branch⟩
+        have tokenEq : token = otherToken := by
+          simpa only [TerminalStreamValue.retained.injEq] using valueEq
+        subst otherToken
+        rcases branch with branch | branch | branch
+        · simp at branch
+        · simp at branch
+        · rcases branch with ⟨_, otherSpelling, otherDecoded,
+              otherPayload, otherLiteral⟩
+          rcases TokenKind.stringLiteral.inj
+              (payloadEq.symm.trans otherPayload) with
+            ⟨spellingEq, decodedEq⟩
+          subst otherSpelling
+          subst otherDecoded
+          exact otherLiteral
+
+/-- Every matched assembly block has exactly one retained assembly slice. -/
+theorem matchedTerminal_assembly_projection_exists_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .assemblyBlock)) :
+    ∃ slice : AssemblySlice,
+      AssemblySliceProjects terminal slice ∧
+        ∀ other : AssemblySlice,
+          AssemblySliceProjects terminal other → other = slice := by
+  rcases terminal with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with ⟨slice, payloadEq⟩
+      refine ⟨slice,
+        (matchedTerminal_assembly_projection_exact _ slice).mpr
+          ⟨token, rfl, payloadEq⟩, ?_⟩
+      intro other otherProjects
+      rcases (matchedTerminal_assembly_projection_exact _ other).mp
+        otherProjects with ⟨otherToken, valueEq, otherPayload⟩
+      have tokenEq : token = otherToken := by
+        simpa only [TerminalStreamValue.retained.injEq] using valueEq
+      subst otherToken
+      exact TokenKind.assemblyBlock.inj (otherPayload.symm.trans payloadEq)
+
 /-- The structural size of one finite EBNF expression. -/
 def ebnfSize : EbnfExpr → Nat
   | .atom _ => 1
