@@ -6047,4 +6047,98 @@ inductive RuleReduction
             EbnfValue.terminalAtom (.category .stringLiteral) terminal⟩)
         (RuleReduction.terminalLoc terminal payload)
 
+/-- Exact semantic reduction for one generated production action. -/
+inductive ActionReduces
+    (file : WorkspaceFile) (tokens : List Token) :
+    (action : ActionId) →
+      (origin finish : Boundary tokens) →
+      GrammarSymbolValues file tokens action.production.rhs →
+      NonterminalValue file tokens action.production.lhs → Prop where
+  | root
+      (rule : GrammarRuleId)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.root rule).rhs)
+      (output : RuleValue rule)
+      (reduces : RuleReduction file tokens rule origin finish
+        (RootAction.unpack rule input) output) :
+      ActionReduces file tokens (.actionFor (.root rule))
+        origin finish input output
+  | atom
+      (site : AtomSite)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.atom site).rhs) :
+      ActionReduces file tokens (.actionFor (.atom site))
+        origin finish input (AtomSite.pack site input)
+  | seq
+      (site : SequenceSite)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.seq site).rhs) :
+      ActionReduces file tokens (.actionFor (.seq site))
+        origin finish input (SequenceSite.pack site input)
+  | group
+      (site : GroupSite)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.group site).rhs) :
+      ActionReduces file tokens (.actionFor (.group site))
+        origin finish input (GroupSite.pack site input)
+  | choice
+      (site : ChoiceSite)
+      (branch : Fin site.branchCount)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.choice site branch).rhs) :
+      ActionReduces file tokens (.actionFor (.choice site branch))
+        origin finish input (ChoiceSite.pack site branch input)
+  | opt
+      (site : OptionalSite)
+      (branch : OptionalBranch)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.opt site branch).rhs) :
+      ActionReduces file tokens (.actionFor (.opt site branch))
+        origin finish input (OptionalSite.pack site branch input)
+  | star
+      (site : StarSite)
+      (branch : NilConsBranch)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.star site branch).rhs) :
+      ActionReduces file tokens (.actionFor (.star site branch))
+        origin finish input (StarSite.pack site branch input)
+  | plus
+      (site : PlusSite)
+      (branch : OneConsBranch)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.plus site branch).rhs) :
+      ActionReduces file tokens (.actionFor (.plus site branch))
+        origin finish input (PlusSite.pack site branch input)
+  | list0
+      (site : List0Site)
+      (branch : NilConsBranch)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.list0 site branch).rhs) :
+      ActionReduces file tokens (.actionFor (.list0 site branch))
+        origin finish input (List0Site.pack site branch input)
+  | list1
+      (site : List1Site)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.list1 site).rhs) :
+      ActionReduces file tokens (.actionFor (.list1 site))
+        origin finish input (List1Site.pack site input)
+  | tail
+      (site : ListSite)
+      (branch : NilConsBranch)
+      (origin finish : Boundary tokens)
+      (input : GrammarSymbolValues file tokens
+        (ProductionId.tail site branch).rhs) :
+      ActionReduces file tokens (.actionFor (.tail site branch))
+        origin finish input (ListSite.pack site branch input)
+
 end Solcore.Surface.Multi
