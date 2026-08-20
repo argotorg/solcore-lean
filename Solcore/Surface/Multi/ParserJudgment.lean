@@ -6264,6 +6264,26 @@ inductive RuleReduction
             EbnfValue.terminalAtom (.category .stringLiteral) terminal⟩)
         (RuleReduction.terminalLoc terminal payload)
 
+/-- A module-rule reduction can only produce the full-file, source-owned
+module payload from its exact item list. -/
+theorem ruleReduction_source_backed
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .module)}
+    {output : RuleValue .module}
+    (reduces : RuleReduction file tokens .module
+      origin finish input output) :
+    ∃ items : List TopItem,
+      origin = Boundary.start tokens ∧
+      finish = Boundary.afterLogicalEOF tokens ∧
+      output = RuleReduction.moduleLoc file {
+        source := file.id
+        items := items
+      } := by
+  cases reduces with
+  | module origin finish items eof originEq finishEq eofValue =>
+      exact ⟨items, originEq, finishEq, rfl⟩
+
 /-- Exact semantic reduction for one generated production action. -/
 inductive ActionReduces
     (file : WorkspaceFile) (tokens : List Token) :
@@ -6358,6 +6378,94 @@ inductive ActionReduces
       ActionReduces file tokens (.actionFor (.tail site branch))
         origin finish input (ListSite.pack site branch input)
 
+/-- The action reduction relation has exactly the eleven production shapes. -/
+theorem actionReduces_eleven_shapes_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    {production : ProductionId}
+    {origin finish : Boundary tokens}
+    {input : GrammarSymbolValues file tokens production.rhs}
+    {output : NonterminalValue file tokens production.lhs} :
+    ActionReduces file tokens (.actionFor production)
+        origin finish input output ↔
+      match production with
+      | .root rule =>
+          RuleReduction file tokens rule origin finish
+            (RootAction.unpack rule input) output
+      | .atom site => output = AtomSite.pack site input
+      | .seq site => output = SequenceSite.pack site input
+      | .group site => output = GroupSite.pack site input
+      | .choice site branch =>
+          output = ChoiceSite.pack site branch input
+      | .opt site branch =>
+          output = OptionalSite.pack site branch input
+      | .star site branch =>
+          output = StarSite.pack site branch input
+      | .plus site branch =>
+          output = PlusSite.pack site branch input
+      | .list0 site branch =>
+          output = List0Site.pack site branch input
+      | .list1 site => output = List1Site.pack site input
+      | .tail site branch =>
+          output = ListSite.pack site branch input := by
+  constructor
+  · intro reduces
+    cases reduces with
+    | root rule origin finish input output reduces => exact reduces
+    | atom => rfl
+    | seq => rfl
+    | group => rfl
+    | choice => rfl
+    | opt => rfl
+    | star => rfl
+    | plus => rfl
+    | list0 => rfl
+    | list1 => rfl
+    | tail => rfl
+  · cases production with
+    | root rule =>
+        intro reduces
+        exact .root rule origin finish input output reduces
+    | atom site =>
+        intro outputEq
+        subst output
+        exact .atom site origin finish input
+    | seq site =>
+        intro outputEq
+        subst output
+        exact .seq site origin finish input
+    | group site =>
+        intro outputEq
+        subst output
+        exact .group site origin finish input
+    | choice site branch =>
+        intro outputEq
+        subst output
+        exact .choice site branch origin finish input
+    | opt site branch =>
+        intro outputEq
+        subst output
+        exact .opt site branch origin finish input
+    | star site branch =>
+        intro outputEq
+        subst output
+        exact .star site branch origin finish input
+    | plus site branch =>
+        intro outputEq
+        subst output
+        exact .plus site branch origin finish input
+    | list0 site branch =>
+        intro outputEq
+        subst output
+        exact .list0 site branch origin finish input
+    | list1 site =>
+        intro outputEq
+        subst output
+        exact .list1 site origin finish input
+    | tail site branch =>
+        intro outputEq
+        subst output
+        exact .tail site branch origin finish input
+
 mutual
 
   /-- Values coherent with one reached contextual item's consumed prefix. -/
@@ -6429,6 +6537,41 @@ mutual
 
 end
 
+/-- A coherent prefix is attached to the exact contextual item reached by its
+derivation; a raw projection from another context cannot be spliced in. -/
+theorem coherentPrefix_no_context_splice
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    {values : PrefixValues file tokens item}
+    (coherent : CoherentPrefix
+      file tokens memo correct final item values) :
+    ContextualReach file tokens memo correct final item ∧
+      (item.raw.dot.val = 0 ∨
+        (∃ before : ContextualItemKey tokens,
+          ∃ cursor : TerminalCursor tokens,
+            ContextualEdgeReach file tokens memo correct final
+              (.scanned before item cursor) ∧
+            before.context = item.context) ∨
+        ∃ waiting finished : ContextualItemKey tokens,
+          ∃ shared : Boundary tokens,
+            ContextualEdgeReach file tokens memo correct final
+              (.completed waiting finished item shared) ∧
+            item.context = waiting.context ∧
+            finished.context =
+              descendContext waiting finished.raw.production) := by
+  cases coherent with
+  | zero item reached zero => exact ⟨reached, Or.inl zero⟩
+  | scan before after cursor priorValues witness edge prior =>
+      exact ⟨edge.2.2, Or.inr (Or.inl
+        ⟨before, cursor, edge, edge.1.2⟩)⟩
+  | complete waiting finished after shared priorValues childValue witness
+      edge prior child =>
+      exact ⟨edge.2.2.2, Or.inr (Or.inr
+        ⟨waiting, finished, shared, edge, edge.1.2.2, edge.1.2.1⟩)⟩
+
 /-- A coherent completed canonical root item for one source rule. -/
 def CanonicalCompleteRootReduction
     (file : WorkspaceFile) (tokens : List Token)
@@ -6460,6 +6603,21 @@ def SourceBackedRoot
           (Boundary.afterLogicalEOF tokens)
           GuardContext.plain
           module
+
+/-- Expose the exact canonical complete module root carried by success. -/
+theorem sourceBackedRoot_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    {module : ParsedModuleV1} :
+    SourceBackedRoot file tokens module ↔
+      ∃ memo : GuardMemo tokens,
+        ∃ correct : PhaseBCorrect file tokens memo,
+          ∃ final : AllGuardsFinal memo,
+            CanonicalCompleteRootReduction
+              file tokens memo correct final .module
+              (Boundary.start tokens)
+              (Boundary.afterLogicalEOF tokens)
+              .plain module :=
+  Iff.rfl
 
 /-- Public successful parsing admits only a source-backed complete module root. -/
 inductive Parses : WorkspaceFile → List Token → ParsedModuleV1 → Prop where
@@ -6764,6 +6922,26 @@ def CompletedNonAssociative
         candidate.value.payload = .infix first left right ∧
         first.payload ∈ [.equal, .notEqual]
 
+/-- An explicitly grouped level value cannot simultaneously expose an
+ungrouped completed nonassociative operation at that same level root. -/
+theorem explicit_group_resets_nonassociative_level
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    {level : NonAssociativeLevel}
+    (candidate : NonAssociativeFrontierValue
+      file tokens memo correct final cursor level)
+    (grouped : ExplicitGroupBoundary level candidate) :
+    ∀ first : Located InfixOperator,
+      ¬ CompletedNonAssociative level candidate first := by
+  intro first completed
+  cases level <;>
+    rcases grouped with ⟨inner, grouped⟩ <;>
+    rcases completed with ⟨left, right, completed, firstAllowed⟩ <;>
+    cases grouped.symm.trans completed
+
 /-- One exact nonassociative operator beginning at the frontier cursor. -/
 inductive FoundNonAssociativeOperatorAt
     (file : WorkspaceFile) (tokens : List Token) :
@@ -6877,6 +7055,36 @@ def RepeatedNonAssociativeAt
       CompletedNonAssociative level candidate first ∧
       ¬ ExplicitGroupBoundary level candidate ∧
       FoundNonAssociativeOperatorAt file tokens cursor level operator
+
+/-- Every repeated-nonassociative witness retains the same coherent,
+greatest-frontier level root inspected by its completed and grouping tests. -/
+theorem repeatedNonAssociative_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    {level : NonAssociativeLevel}
+    {operator : Located InfixOperator}
+    (repeated : RepeatedNonAssociativeAt
+      file tokens memo correct final cursor level operator) :
+    ∃ candidate : NonAssociativeFrontierValue
+        file tokens memo correct final cursor level,
+      ∃ first : Located InfixOperator,
+        FrontierReach file tokens memo correct final cursor
+          (CanonicalCompleteRootItem tokens level.rule
+            candidate.origin cursor candidate.context) ∧
+        CanonicalCompleteRootReduction
+          file tokens memo correct final level.rule
+          candidate.origin cursor candidate.context candidate.value ∧
+        CompletedNonAssociative level candidate first ∧
+        ¬ ExplicitGroupBoundary level candidate ∧
+        FoundNonAssociativeOperatorAt
+          file tokens cursor level operator := by
+  rcases repeated with
+    ⟨candidate, first, completed, ungrouped, found⟩
+  exact ⟨candidate, first, candidate.frontier, candidate.root,
+    completed, ungrouped, found⟩
 
 namespace ParseDiagnostic
 
