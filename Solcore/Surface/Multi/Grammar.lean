@@ -1534,6 +1534,75 @@ theorem element_list1 (site : List1Site) :
 
 end ListSite
 
+/-- The exact key of the match-arm pattern-list site. -/
+private def matchArmPatternListSiteKey : GrammarSiteKey := {
+  rule := .matchArm
+  path := [1]
+}
+
+/-- The exact match-arm key resolves to a checked grammar site. -/
+private theorem matchArmPatternGrammarSite_isSome :
+    (GrammarSite.ofKey? matchArmPatternListSiteKey).isSome = true := by
+  unfold matchArmPatternListSiteKey GrammarSite.ofKey?
+    GrammarSiteKey.valid m2cV1
+  simp [m2cV1Rhs, EbnfExpr.nodeAt?, EbnfExpr.children,
+    sequence, symbol, list1, nonterminal]
+
+/-- The checked grammar site selected by the exact match-arm key. -/
+private def matchArmPatternGrammarSite : GrammarSite :=
+  (GrammarSite.ofKey? matchArmPatternListSiteKey).get
+    matchArmPatternGrammarSite_isSome
+
+/-- The first checked lookup returns the exact selected grammar site. -/
+private theorem matchArmPatternGrammarSite_some :
+    GrammarSite.ofKey? matchArmPatternListSiteKey =
+      some matchArmPatternGrammarSite := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨matchArmPatternGrammarSite_isSome, rfl⟩
+
+/-- The selected match-arm grammar site has the checked list-one kind. -/
+private theorem matchArmPatternListSite_isSome :
+    (GrammarSiteOfKind.ofSite? .list1
+      matchArmPatternGrammarSite).isSome = true := by
+  unfold matchArmPatternGrammarSite matchArmPatternListSiteKey
+    GrammarSiteOfKind.ofSite? GrammarSite.ofKey?
+    GrammarSiteKey.valid GrammarSite.expression m2cV1
+  simp [m2cV1Rhs, EbnfExpr.nodeAt?, EbnfExpr.children,
+    EbnfExpr.kind, sequence, symbol, list1, nonterminal]
+
+/-- The fixed comma-list site containing a match arm's displayed patterns. -/
+def matchArmPatternListSite : List1Site :=
+  (GrammarSiteOfKind.ofSite? .list1
+    matchArmPatternGrammarSite).get matchArmPatternListSite_isSome
+
+/-- The second checked lookup returns the exact refined list-one site. -/
+private theorem matchArmPatternListSite_some :
+    GrammarSiteOfKind.ofSite? .list1 matchArmPatternGrammarSite =
+      some matchArmPatternListSite := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨matchArmPatternListSite_isSome, rfl⟩
+
+/-- The fixed match-arm pattern-list site has its displayed grammar key. -/
+theorem matchArmPatternListSite_key :
+    matchArmPatternListSite.site.val =
+      { rule := GrammarRuleId.matchArm, path := [1] } := by
+  unfold matchArmPatternListSite matchArmPatternGrammarSite
+    matchArmPatternListSiteKey GrammarSiteOfKind.ofSite?
+    GrammarSite.ofKey? GrammarSiteKey.valid GrammarSite.expression m2cV1
+  simp [m2cV1Rhs, EbnfExpr.nodeAt?, EbnfExpr.children,
+    EbnfExpr.kind, sequence, symbol, list1, nonterminal]
+
+/-- The fixed match-arm site is exactly the nonempty pattern list. -/
+theorem matchArmPatternListSite_expression :
+    matchArmPatternListSite.site.expression =
+      EbnfExpr.list1
+        (EbnfExpr.atom (EbnfAtom.nonterminal GrammarRuleId.pattern)) := by
+  unfold matchArmPatternListSite matchArmPatternGrammarSite
+    matchArmPatternListSiteKey GrammarSiteOfKind.ofSite?
+    GrammarSite.ofKey? GrammarSiteKey.valid GrammarSite.expression m2cV1
+  simp [m2cV1Rhs, EbnfExpr.nodeAt?, EbnfExpr.children,
+    EbnfExpr.kind, sequence, symbol, list1, nonterminal]
+
 private def listSiteOfGrammarSite? (site : GrammarSite) : Option ListSite :=
   match GrammarSiteOfKind.ofSite? .list0 site with
   | some list0Site => some (.list0 list0Site)
