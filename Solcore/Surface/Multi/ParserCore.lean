@@ -925,6 +925,125 @@ abbrev EbnfValues
       (EbnfValue file tokens child × EbnfValues file tokens rest) := by
   exact EbnfFamily.eq_def file tokens _
 
+/-- The semantic value carried by one nonterminal symbol. -/
+def NonterminalValue
+    (file : WorkspaceFile)
+    (tokens : List Token) : NonterminalSymbol → Type
+  | .rule rule => RuleValue rule
+  | .aux site => EbnfValue file tokens site.expression
+  | .tail site =>
+      List (EbnfValue file tokens site.element.expression)
+
+/-- The semantic value carried by one grammar symbol. -/
+def GrammarSymbolValue
+    (file : WorkspaceFile)
+    (tokens : List Token) : GrammarSymbol → Type
+  | .terminal terminal => MatchedTerminal file tokens terminal
+  | .nonterminal nonterminal =>
+      NonterminalValue file tokens nonterminal
+
+/-- A type-indexed tuple of semantic grammar-symbol values. -/
+def GrammarSymbolValues
+    (file : WorkspaceFile)
+    (tokens : List Token) : List GrammarSymbol → Type
+  | [] => Unit
+  | symbol :: rest =>
+      GrammarSymbolValue file tokens symbol ×
+        GrammarSymbolValues file tokens rest
+
+namespace GrammarSymbolValues
+
+/-- Append two type-indexed grammar-symbol value tuples. -/
+def append
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {left right : List GrammarSymbol}
+    (leftValues : GrammarSymbolValues file tokens left)
+    (rightValues : GrammarSymbolValues file tokens right) :
+    GrammarSymbolValues file tokens (left ++ right) :=
+  match left with
+  | [] => rightValues
+  | _symbol :: _rest =>
+      (leftValues.1, append leftValues.2 rightValues)
+
+/-- Transport a grammar-symbol value tuple along an index equality. -/
+def transport
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {left right : List GrammarSymbol}
+    (equality : left = right) :
+    GrammarSymbolValues file tokens left →
+      GrammarSymbolValues file tokens right :=
+  Eq.mp (congrArg (GrammarSymbolValues file tokens) equality)
+
+end GrammarSymbolValues
+
+/-- Semantic values for the already consumed prefix of one item. -/
+abbrev PrefixValues
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (item : ContextualItemKey tokens) : Type :=
+  GrammarSymbolValues file tokens
+    (item.raw.production.rhs.take item.raw.dot.val)
+
+namespace PrefixValues
+
+/-- Construct the unique semantic value of a zero-length prefix. -/
+def zeroValue
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (item : ContextualItemKey tokens)
+    (zero : item.raw.dot.val = 0) :
+    PrefixValues file tokens item :=
+  GrammarSymbolValues.transport
+    (prefix_zero_layout item.raw zero) ()
+
+/-- Append one matched terminal while scanning an item. -/
+def scanValue
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (before after : ContextualItemKey tokens)
+    (terminal : TerminalSymbol)
+    (next : NextSymbol before.raw (.terminal terminal))
+    (matched : MatchedTerminal file tokens terminal)
+    (advance : AdvanceItem before.raw
+      matched.cursor.afterBoundary after.raw)
+    (prior : PrefixValues file tokens before) :
+    PrefixValues file tokens after :=
+  GrammarSymbolValues.transport
+    (prefix_scan_layout before.raw after.raw terminal
+      matched.cursor.afterBoundary next advance)
+    (GrammarSymbolValues.append prior (matched, ()))
+
+/-- Append one completed nonterminal while advancing a waiting item. -/
+def completeValue
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens)
+    (next : NextSymbol waiting.raw
+      (.nonterminal finished.raw.production.lhs))
+    (advance : AdvanceItem waiting.raw finished.raw.current after.raw)
+    (prior : PrefixValues file tokens waiting)
+    (value : NonterminalValue file tokens
+      finished.raw.production.lhs) :
+    PrefixValues file tokens after :=
+  GrammarSymbolValues.transport
+    (prefix_complete_layout waiting.raw finished.raw after.raw next advance)
+    (GrammarSymbolValues.append prior (value, ()))
+
+/-- Reindex a complete prefix as the full production right-hand side. -/
+def fullValue
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (item : ContextualItemKey tokens)
+    (complete : CompleteItem item.raw)
+    (prior : PrefixValues file tokens item) :
+    GrammarSymbolValues file tokens item.raw.production.rhs :=
+  GrammarSymbolValues.transport
+    (prefix_full_layout item.raw complete) prior
+
+end PrefixValues
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
