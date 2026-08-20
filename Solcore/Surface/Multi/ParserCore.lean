@@ -589,6 +589,33 @@ inductive TerminalAt
         endByte := file.content.utf8ByteSize
       }
 
+namespace TerminalAt
+
+/-- One terminal cursor determines both its terminal-stream value and span. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {cursor : TerminalCursor tokens}
+    {leftValue rightValue : TerminalStreamValue}
+    {leftSpan rightSpan : SourceSpan}
+    (leftAt : TerminalAt file tokens cursor leftValue leftSpan)
+    (rightAt : TerminalAt file tokens cursor rightValue rightSpan) :
+    leftValue = rightValue ∧ leftSpan = rightSpan := by
+  cases leftAt with
+  | retained leftToken leftInRange leftLookup leftValid =>
+      cases rightAt with
+      | retained rightToken rightInRange rightLookup rightValid =>
+          have tokenEq : leftToken = rightToken :=
+            Option.some.inj (leftLookup.symm.trans rightLookup)
+          subst rightToken
+          exact ⟨rfl, rfl⟩
+      | endOfFile atEnd => omega
+  | endOfFile leftAtEnd =>
+      cases rightAt with
+      | retained rightToken rightInRange rightLookup rightValid => omega
+      | endOfFile rightAtEnd => exact ⟨rfl, rfl⟩
+
+end TerminalAt
+
 /-- Exact agreement between one grammar terminal and one terminal-stream value. -/
 def TerminalMatches : TerminalSymbol → TerminalStreamValue → Prop
   | .hardKeyword keyword, .retained token =>
@@ -2340,6 +2367,42 @@ instance {file : WorkspaceFile} {tokens : List Token}
     BEq (ScannedEdgeWitness file tokens before after cursor) :=
   ⟨fun left right => decide (left = right)⟩
 
+namespace ScannedEdgeWitness
+
+/-- One fixed scanned edge key has a unique checked witness value. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : DottedItem tokens}
+    {cursor : TerminalCursor tokens}
+    (left right : ScannedEdgeWitness file tokens before after cursor) :
+    left = right := by
+  cases left with
+  | mk leftTerminal leftMatched leftSameCursor leftNext leftAtCurrent
+      leftAdvance =>
+      cases right with
+      | mk rightTerminal rightMatched rightSameCursor rightNext rightAtCurrent
+          rightAdvance =>
+          have terminalEq : leftTerminal = rightTerminal := by
+            have lookupEq := leftNext.2.symm.trans rightNext.2
+            exact GrammarSymbol.terminal.inj (Option.some.inj lookupEq)
+          subst rightTerminal
+          have cursorEq : leftMatched.cursor = rightMatched.cursor :=
+            leftSameCursor.trans rightSameCursor.symm
+          cases leftMatched with
+          | mk leftCursor leftValue leftSpan leftTerminalAt leftMatches =>
+              cases rightMatched with
+              | mk rightCursor rightValue rightSpan rightTerminalAt
+                  rightMatches =>
+                  simp only at cursorEq
+                  subst rightCursor
+                  rcases TerminalAt.functional leftTerminalAt rightTerminalAt with
+                    ⟨valueEq, spanEq⟩
+                  subst rightValue
+                  subst rightSpan
+                  rfl
+
+end ScannedEdgeWitness
+
 /-- Checked Type witness for one valid completed edge. -/
 structure CompletedEdgeWitness
     (tokens : List Token)
@@ -2357,6 +2420,21 @@ instance {tokens : List Token}
     {waiting finished after : DottedItem tokens} {shared : Boundary tokens} :
     BEq (CompletedEdgeWitness tokens waiting finished after shared) :=
   ⟨fun left right => decide (left = right)⟩
+
+namespace CompletedEdgeWitness
+
+/-- One fixed completed edge key has a unique checked witness value. -/
+theorem functional
+    {tokens : List Token}
+    {waiting finished after : DottedItem tokens}
+    {shared : Boundary tokens}
+    (left right : CompletedEdgeWitness tokens waiting finished after shared) :
+    left = right := by
+  cases left
+  cases right
+  rfl
+
+end CompletedEdgeWitness
 
 /-- A scanned edge is valid exactly when its checked Type witness is inhabited. -/
 theorem packedEdge_scanned_valid_iff
