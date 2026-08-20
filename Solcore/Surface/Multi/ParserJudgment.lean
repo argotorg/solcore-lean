@@ -6354,6 +6354,29 @@ def GreatestReachableCursor
     ContextualReach file tokens memo correct final item →
       item.raw.current.val ≤ cursor.val
 
+namespace GreatestReachableCursor
+
+/-- A saturated contextual relation has at most one greatest reached cursor. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {leftCursor rightCursor : Boundary tokens}
+    (leftGreatest : GreatestReachableCursor
+      file tokens memo correct final leftCursor)
+    (rightGreatest : GreatestReachableCursor
+      file tokens memo correct final rightCursor) :
+    leftCursor = rightCursor := by
+  rcases leftGreatest.1 with ⟨leftItem, leftReach, leftCurrent⟩
+  rcases rightGreatest.1 with ⟨rightItem, rightReach, rightCurrent⟩
+  apply Fin.ext
+  apply Nat.le_antisymm
+  · simpa [leftCurrent] using rightGreatest.2 leftItem leftReach
+  · simpa [rightCurrent] using leftGreatest.2 rightItem rightReach
+
+end GreatestReachableCursor
+
 /-- One reached contextual item at the greatest cursor. -/
 def FrontierReach
     (file : WorkspaceFile) (tokens : List Token)
@@ -6397,6 +6420,80 @@ def CanonicalExpected
     (values.head :: values.tail).Pairwise
       (fun left right => Expected.compare left right = .lt)
 
+/-- A sorted, deduplicated canonical expected list is unique. -/
+theorem canonicalExpected_sorted_nodup_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    {leftValues rightValues : NonemptyList Expected}
+    (leftCanonical : CanonicalExpected
+      file tokens memo correct final cursor leftValues)
+    (rightCanonical : CanonicalExpected
+      file tokens memo correct final cursor rightValues) :
+    leftValues = rightValues := by
+  rcases leftCanonical with
+    ⟨leftMembership, leftNodup, leftSorted⟩
+  rcases rightCanonical with
+    ⟨rightMembership, rightNodup, rightSorted⟩
+  have compareAsymm (first second : Expected)
+      (firstSecond : Expected.compare first second = .lt)
+      (secondFirst : Expected.compare second first = .lt) : False := by
+    unfold Expected.compare at firstSecond secondFirst
+    cases primary : compare first.ctorIdx second.ctorIdx with
+    | lt =>
+        have reverse : compare second.ctorIdx first.ctorIdx = .gt :=
+          Std.OrientedCmp.gt_of_lt primary
+        simp [reverse] at secondFirst
+    | eq =>
+        have reverse : compare second.ctorIdx first.ctorIdx = .eq :=
+          Std.OrientedCmp.eq_symm primary
+        simp [primary] at firstSecond
+        simp [reverse] at secondFirst
+        have payloadReverse := Std.OrientedCmp.gt_of_lt firstSecond
+        simp [payloadReverse] at secondFirst
+    | gt =>
+        simp [primary] at firstSecond
+  have membershipIff (expected : Expected) :
+      expected ∈ (leftValues.head :: leftValues.tail) ↔
+        expected ∈ (rightValues.head :: rightValues.tail) :=
+    (leftMembership expected).trans (rightMembership expected).symm
+  letI : BEq Expected := ⟨fun first second => decide (first = second)⟩
+  letI : ReflBEq Expected := ⟨by intro value; simp⟩
+  letI : LawfulBEq Expected := ⟨by
+      intro first second equality
+      simpa using of_decide_eq_true equality⟩
+  have permutation :
+      (leftValues.head :: leftValues.tail).Perm
+        (rightValues.head :: rightValues.tail) := by
+    apply List.perm_iff_count.mpr
+    intro expected
+    rw [leftNodup.count, rightNodup.count]
+    by_cases leftMember :
+        expected ∈ (leftValues.head :: leftValues.tail)
+    · have rightMember :
+          expected ∈ (rightValues.head :: rightValues.tail) :=
+        (membershipIff expected).mp leftMember
+      simp [leftMember, rightMember]
+    · have rightNotMember :
+          expected ∉ (rightValues.head :: rightValues.tail) := by
+        exact fun rightMember =>
+          leftMember ((membershipIff expected).mpr rightMember)
+      simp [leftMember, rightNotMember]
+  have listEq :
+      leftValues.head :: leftValues.tail =
+        rightValues.head :: rightValues.tail :=
+    permutation.eq_of_pairwise
+      (fun first second _ _ firstSecond secondFirst =>
+        False.elim (compareAsymm first second firstSecond secondFirst))
+      leftSorted rightSorted
+  cases leftValues
+  cases rightValues
+  simp only at listEq
+  cases listEq
+  rfl
+
 /-- The retained token or logical EOF observed at one parser boundary. -/
 inductive FoundAt
     (file : WorkspaceFile) (tokens : List Token) :
@@ -6418,6 +6515,67 @@ inductive FoundAt
         startByte := file.content.utf8ByteSize
         endByte := file.content.utf8ByteSize
       } .endOfFile
+
+namespace FoundAt
+
+/-- One parser boundary determines at most one found span and token class. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {cursor : Boundary tokens}
+    {leftSpan rightSpan : SourceSpan}
+    {leftFound rightFound : Found}
+    (leftAt : FoundAt file tokens cursor leftSpan leftFound)
+    (rightAt : FoundAt file tokens cursor rightSpan rightFound) :
+    leftSpan = rightSpan ∧ leftFound = rightFound := by
+  cases leftAt with
+  | retained leftCursor _ leftToken leftBoundary leftTerminalAt =>
+      cases rightAt with
+      | retained rightCursor _ rightToken rightBoundary rightTerminalAt =>
+          have cursorEq : leftCursor = rightCursor := by
+            apply Fin.ext
+            exact congrArg
+              (fun boundary : Boundary tokens => boundary.val)
+              (leftBoundary.trans rightBoundary.symm)
+          subst rightCursor
+          rcases TerminalAt.functional leftTerminalAt rightTerminalAt with
+            ⟨valueEq, spanEq⟩
+          have tokenEq : leftToken = rightToken :=
+            TerminalStreamValue.retained.inj valueEq
+          subst rightToken
+          exact ⟨rfl, rfl⟩
+      | endOfFile rightCursor _ rightBoundary rightAtEnd =>
+          have cursorEq : leftCursor = rightCursor := by
+            apply Fin.ext
+            exact congrArg
+              (fun boundary : Boundary tokens => boundary.val)
+              (leftBoundary.trans rightBoundary.symm)
+          subst rightCursor
+          have impossible :
+              TerminalStreamValue.retained leftToken =
+                TerminalStreamValue.endOfFile :=
+            (TerminalAt.functional leftTerminalAt
+              (TerminalAt.endOfFile leftCursor rightAtEnd)).1
+          contradiction
+  | endOfFile leftCursor _ leftBoundary leftAtEnd =>
+      cases rightAt with
+      | retained rightCursor _ rightToken rightBoundary rightTerminalAt =>
+          have cursorEq : leftCursor = rightCursor := by
+            apply Fin.ext
+            exact congrArg
+              (fun boundary : Boundary tokens => boundary.val)
+              (leftBoundary.trans rightBoundary.symm)
+          subst rightCursor
+          have impossible :
+              TerminalStreamValue.endOfFile =
+                TerminalStreamValue.retained rightToken :=
+            (TerminalAt.functional
+              (TerminalAt.endOfFile leftCursor leftAtEnd)
+              rightTerminalAt).1
+          contradiction
+      | endOfFile rightCursor _ rightBoundary rightAtEnd =>
+          exact ⟨rfl, rfl⟩
+
+end FoundAt
 
 namespace NonAssociativeLevel
 
@@ -6515,6 +6673,64 @@ inductive FoundNonAssociativeOperatorAt
       (atCursor : terminal.cursor.beforeBoundary = cursor) :
       FoundNonAssociativeOperatorAt file tokens cursor .equality
         (RuleReduction.terminalLoc terminal .notEqual)
+
+namespace FoundNonAssociativeOperatorAt
+
+/-- One frontier determines at most one nonassociative level and operator. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {cursor : Boundary tokens}
+    {leftLevel rightLevel : NonAssociativeLevel}
+    {leftOperator rightOperator : Located InfixOperator}
+    (leftFound : FoundNonAssociativeOperatorAt
+      file tokens cursor leftLevel leftOperator)
+    (rightFound : FoundNonAssociativeOperatorAt
+      file tokens cursor rightLevel rightOperator) :
+    leftLevel = rightLevel ∧ leftOperator = rightOperator := by
+  have symbolSpan
+      {leftSymbol rightSymbol : Symbol}
+      (leftTerminal : MatchedTerminal file tokens (.symbol leftSymbol))
+      (leftAtCursor : leftTerminal.cursor.beforeBoundary = cursor)
+      (rightTerminal : MatchedTerminal file tokens (.symbol rightSymbol))
+      (rightAtCursor : rightTerminal.cursor.beforeBoundary = cursor) :
+      leftSymbol = rightSymbol ∧ leftTerminal.span = rightTerminal.span := by
+    have cursorEq : leftTerminal.cursor = rightTerminal.cursor := by
+      apply Fin.ext
+      exact congrArg
+        (fun boundary : Boundary tokens => boundary.val)
+        (leftAtCursor.trans rightAtCursor.symm)
+    cases leftTerminal with
+    | mk leftCursor leftValue leftSpan leftAt leftMatches =>
+        cases rightTerminal with
+        | mk rightCursor rightValue rightSpan rightAt rightMatches =>
+            simp only at cursorEq
+            subst rightCursor
+            rcases TerminalAt.functional leftAt rightAt with
+              ⟨valueEq, spanEq⟩
+            subst rightValue
+            cases leftValue with
+            | retained token =>
+                simp only [TerminalMatches] at leftMatches rightMatches
+                have payloadEq := leftMatches.symm.trans rightMatches
+                have symbolEq : leftSymbol = rightSymbol :=
+                  TokenKind.symbol.inj payloadEq
+                exact ⟨symbolEq, spanEq⟩
+            | endOfFile =>
+                simp [TerminalMatches] at leftMatches
+  cases leftFound <;> cases rightFound <;>
+    rename_i leftTerminal leftAtCursor rightTerminal rightAtCursor <;>
+    rcases symbolSpan leftTerminal leftAtCursor rightTerminal rightAtCursor with
+      ⟨symbolEq, spanEq⟩ <;>
+    cases symbolEq <;>
+    constructor <;>
+    first
+    | rfl
+    | simpa only [RuleReduction.terminalLoc] using
+        congrArg
+          (fun span => ({ span := span, payload := _ } : Located InfixOperator))
+          spanEq
+
+end FoundNonAssociativeOperatorAt
 
 /-- A second same-level operator following an ungrouped completed operation. -/
 def RepeatedNonAssociativeAt
