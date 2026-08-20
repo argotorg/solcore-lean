@@ -1430,6 +1430,25 @@ inductive ListSite where
   | list1 (site : List1Site)
   deriving Repr, DecidableEq
 
+namespace ListSite
+
+/-- The repeated element site owned by a comma-list site. -/
+def element : ListSite → GrammarSite
+  | .list0 site => site.element
+  | .list1 site => site.element
+
+/-- The element projection reduces directly for a zero-or-more list site. -/
+theorem element_list0 (site : List0Site) :
+    (ListSite.list0 site).element = site.element :=
+  rfl
+
+/-- The element projection reduces directly for a one-or-more list site. -/
+theorem element_list1 (site : List1Site) :
+    (ListSite.list1 site).element = site.element :=
+  rfl
+
+end ListSite
+
 private def listSiteOfGrammarSite? (site : GrammarSite) : Option ListSite :=
   match GrammarSiteOfKind.ofSite? .list0 site with
   | some list0Site => some (.list0 list0Site)
@@ -1600,6 +1619,16 @@ inductive GrammarSymbol where
 instance : BEq GrammarSymbol :=
   ⟨fun left right => decide (left = right)⟩
 
+namespace EbnfAtom
+
+/-- Translate one source EBNF atom to its expanded grammar symbol. -/
+def grammarSymbol (atom : EbnfAtom) : GrammarSymbol :=
+  match atom with
+  | .terminal value => GrammarSymbol.terminal value
+  | .nonterminal rule => GrammarSymbol.nonterminal (.rule rule)
+
+end EbnfAtom
+
 namespace EbnfExpr
 
 private def atom? : EbnfExpr → Option EbnfAtom
@@ -1619,6 +1648,29 @@ private theorem atom?_isSome (site : AtomSite) :
 /-- The exact atom selected by an atom site. -/
 def atom (site : AtomSite) : EbnfAtom :=
   site.site.expression.atom?.get site.atom?_isSome
+
+/-- The expanded grammar symbol selected by an atom site. -/
+def symbol (site : AtomSite) : GrammarSymbol :=
+  site.atom.grammarSymbol
+
+/-- An atom site has the expected outer shape and selected atom. -/
+theorem expression_eq_atom (site : AtomSite) :
+    site.site.expression = EbnfExpr.atom site.atom := by
+  have kind := site.hasKind
+  cases expression : site.site.expression <;>
+    simp [EbnfExpr.kind, expression] at kind
+  congr 1
+  unfold AtomSite.atom
+  change _ =
+    (match site.site.expression with
+      | .atom value => some value
+      | _ => none).get _
+  simp [expression]
+
+/-- Atom-site symbol selection agrees with atom translation. -/
+theorem symbol_eq (site : AtomSite) :
+    site.symbol = site.atom.grammarSymbol :=
+  rfl
 
 end AtomSite
 
