@@ -1081,4 +1081,128 @@ theorem contextualReach_ordered
           (congrArg Fin.val finishedAtShared).symm
         _ ≤ finished.raw.current.val := finishedOrdered
 
+/-- Preconditions shared by all reductions of one source grammar rule. -/
+def RuleReductionReady
+    (file : WorkspaceFile) (tokens : List Token)
+    (rule : GrammarRuleId) (origin finish : Boundary tokens) : Prop :=
+  TokensOwnedBy file tokens ∧
+    origin.val ≤ finish.val ∧
+    (rule = .module →
+      origin = Boundary.start tokens ∧
+        finish = Boundary.afterLogicalEOF tokens)
+
+/-- Root actions inherit source-rule readiness; all auxiliary actions are ready. -/
+def ActionReductionReady
+    (file : WorkspaceFile) (tokens : List Token)
+    (action : ActionId) (origin finish : Boundary tokens) : Prop :=
+  match action.production with
+  | .root rule => RuleReductionReady file tokens rule origin finish
+  | _ => True
+
+namespace RuleReduction
+
+/-- Pair an explicit payload with the exact span of one matched terminal. -/
+def terminalLoc
+    {alpha : Type}
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal)
+    (payload : alpha) : Located alpha := {
+  span := matched.span
+  payload := payload
+}
+
+/-- Locate a payload between the first start and last end byte. -/
+def between {alpha : Type}
+    (file : WorkspaceFile)
+    (firstSpan lastSpan : SourceSpan)
+    (payload : alpha) : Located alpha := {
+  span := {
+    source := file.id
+    startByte := firstSpan.startByte
+    endByte := lastSpan.endByte
+  }
+  payload := payload
+}
+
+/-- Locate the complete module payload over the whole source file. -/
+def moduleLoc
+    (file : WorkspaceFile)
+    (payload : ParsedModuleV1Payload) : ParsedModuleV1 := {
+  span := {
+    source := file.id
+    startByte := 0
+    endByte := file.content.utf8ByteSize
+  }
+  payload := payload
+}
+
+/-- Locate a body payload at one empty UTF-8 byte boundary. -/
+def emptyAt
+    (file : WorkspaceFile)
+    (byte : Nat)
+    (payload : BodyPayload) : Body := {
+  span := { source := file.id, startByte := byte, endByte := byte }
+  payload := payload
+}
+
+/-- Convert a first/rest nonempty list to ordinary source order. -/
+def firstRest {alpha : Type} (values : NonemptyList alpha) : List alpha :=
+  values.head :: values.tail
+
+/-- Discard matched argument delimiters while preserving presence. -/
+def arguments
+    {file : WorkspaceFile} {tokens : List Token}
+    {alpha : Type} :
+    Option
+      (MatchedTerminal file tokens (.symbol .leftParen) ×
+        (alpha ×
+          (MatchedTerminal file tokens (.symbol .rightParen) × Unit))) →
+      Option alpha
+  | none => none
+  | some (_, values, _, ()) => some values
+
+/-- Fold source-ordered postfix pieces over their receiver. -/
+def foldPostfix
+    (file : WorkspaceFile) : Expression → List PostfixPartValue → Expression
+  | receiver, [] => receiver
+  | receiver, part :: rest =>
+      let next := match part with
+        | .call _ arguments closeParen =>
+            between file receiver.span closeParen (.call receiver arguments)
+        | .select _ field =>
+            between file receiver.span field.span (.select receiver field)
+        | .index _ index closeBracket =>
+            between file receiver.span closeBracket (.index receiver index)
+      foldPostfix file next rest
+
+/-- Fold source-ordered infix operations left-associatively. -/
+def foldInfixLeft
+    (file : WorkspaceFile) :
+    Expression → List (Located InfixOperator × Expression) → Expression
+  | left, [] => left
+  | left, (operator, right) :: rest =>
+      foldInfixLeft file
+        (between file left.span right.span (.infix operator left right))
+        rest
+
+/-- Construct the exact empty or nonempty body of one match arm. -/
+def armBody
+    {file : WorkspaceFile} {tokens : List Token}
+    (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow)) :
+    List Statement → Body
+  | [] =>
+      emptyAt file fatArrow.span.endByte {
+        origin := .matchArm fatArrow.span
+        statements := []
+      }
+  | first :: rest =>
+      let last := rest.getLastD first
+      between file first.span last.span {
+        origin := .matchArm fatArrow.span
+        statements := first :: rest
+      }
+
+end RuleReduction
+
 end Solcore.Surface.Multi
