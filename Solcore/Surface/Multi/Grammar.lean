@@ -1059,6 +1059,84 @@ def child? (site : GrammarSite) (index : Nat) : Option GrammarSite :=
     path := site.val.path ++ [index]
   }
 
+/-- The root site selects exactly the source rule right-hand side. -/
+theorem root_expression (rule : GrammarRuleId) :
+    (root rule).expression = m2cV1.rhs rule := by
+  simp [root, expression, EbnfExpr.nodeAt?]
+
+end GrammarSite
+
+namespace EbnfExpr
+
+private theorem nodeAt?_append
+    (root : EbnfExpr) (path suffix : List Nat) :
+    root.nodeAt? (path ++ suffix) =
+      (root.nodeAt? path).bind fun selected => selected.nodeAt? suffix := by
+  induction path generalizing root with
+  | nil => simp [nodeAt?]
+  | cons index path induction =>
+      simp only [List.cons_append, nodeAt?]
+      cases selected : root.children[index]? with
+      | none => rfl
+      | some child => exact induction child
+
+end EbnfExpr
+
+namespace GrammarSite
+
+private theorem selected_eq_some (site : GrammarSite) :
+    (m2cV1.rhs site.val.rule).nodeAt? site.val.path =
+      some site.expression := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨site.property, rfl⟩
+
+private theorem child_selected_eq_some
+    (site : GrammarSite) (index : Nat) (child : EbnfExpr)
+    (selected : site.expression.children[index]? = some child) :
+    (m2cV1.rhs site.val.rule).nodeAt? (site.val.path ++ [index]) =
+      some child := by
+  rw [EbnfExpr.nodeAt?_append, selected_eq_some]
+  simp [EbnfExpr.nodeAt?, selected]
+
+private def childAt
+    (site : GrammarSite) (index : Nat) (child : EbnfExpr)
+    (selected : site.expression.children[index]? = some child) :
+    GrammarSite :=
+  ⟨{ rule := site.val.rule, path := site.val.path ++ [index] }, by
+    simp [GrammarSiteKey.valid,
+      child_selected_eq_some site index child selected]⟩
+
+private theorem childAt_expression
+    (site : GrammarSite) (index : Nat) (child : EbnfExpr)
+    (selected : site.expression.children[index]? = some child) :
+    (childAt site index child selected).expression = child := by
+  unfold GrammarSite.expression childAt
+  rcases Option.eq_some_iff_get_eq.mp
+      (child_selected_eq_some site index child selected) with
+    ⟨isSome, result⟩
+  exact result
+
+private def directChildren (site : GrammarSite) : List GrammarSite :=
+  List.ofFn fun index : Fin site.expression.children.length =>
+    childAt site index.val site.expression.children[index.val]
+      (List.getElem?_eq_getElem index.isLt)
+
+private theorem directChildren_expression (site : GrammarSite) :
+    (directChildren site).map GrammarSite.expression =
+      site.expression.children := by
+  rw [directChildren, List.map_ofFn]
+  have expressions :
+      GrammarSite.expression ∘
+          (fun index : Fin site.expression.children.length =>
+            childAt site index.val site.expression.children[index.val]
+              (List.getElem?_eq_getElem index.isLt)) =
+        (fun index : Fin site.expression.children.length =>
+          site.expression.children[index.val]) := by
+    funext index
+    exact childAt_expression site index.val site.expression.children[index.val]
+      (List.getElem?_eq_getElem index.isLt)
+  rw [expressions, List.ofFn_getElem]
+
 end GrammarSite
 
 private def grammarSiteKeysForRule
@@ -1145,6 +1223,184 @@ abbrev StarSite := GrammarSiteOfKind .star
 abbrev PlusSite := GrammarSiteOfKind .plus
 abbrev List0Site := GrammarSiteOfKind .list0
 abbrev List1Site := GrammarSiteOfKind .list1
+
+namespace SequenceSite
+
+/-- The direct sequence children in displayed order. -/
+def children (site : SequenceSite) : List GrammarSite :=
+  GrammarSite.directChildren site.site
+
+/-- Sequence child sites select exactly the displayed child expressions. -/
+theorem children_expression (site : SequenceSite) :
+    (site.children.map GrammarSite.expression) =
+      site.site.expression.children :=
+  GrammarSite.directChildren_expression site.site
+
+/-- A sequence site has the expected outer shape and ordered children. -/
+theorem expression_eq_sequence (site : SequenceSite) :
+    site.site.expression =
+      EbnfExpr.sequence (site.children.map GrammarSite.expression) := by
+  rw [children_expression]
+  have hasKind := site.hasKind
+  cases expression : site.site.expression <;>
+    simp [EbnfExpr.kind, EbnfExpr.children, expression] at hasKind ⊢
+
+end SequenceSite
+
+private inductive UnarySiteKind where
+  | group
+  | optional
+  | star
+  | plus
+  | list0
+  | list1
+
+namespace UnarySiteKind
+
+private def nodeKind : UnarySiteKind → EbnfNodeKind
+  | .group => .group
+  | .optional => .optional
+  | .star => .star
+  | .plus => .plus
+  | .list0 => .list0
+  | .list1 => .list1
+
+private def apply : UnarySiteKind → EbnfExpr → EbnfExpr
+  | .group => .group
+  | .optional => .optional
+  | .star => .star
+  | .plus => .plus
+  | .list0 => .list0
+  | .list1 => .list1
+
+end UnarySiteKind
+
+private theorem unaryChild_isSome
+    (kind : UnarySiteKind)
+    (site : GrammarSiteOfKind kind.nodeKind) :
+    site.site.expression.children[0]?.isSome = true := by
+  have hasKind := site.hasKind
+  cases kind <;>
+    cases expression : site.site.expression <;>
+      simp [UnarySiteKind.nodeKind, EbnfExpr.kind,
+        EbnfExpr.children, expression] at hasKind ⊢
+
+private def unaryChildExpression
+    (kind : UnarySiteKind)
+    (site : GrammarSiteOfKind kind.nodeKind) : EbnfExpr :=
+  site.site.expression.children[0]?.get (unaryChild_isSome kind site)
+
+private theorem unaryChildExpression_selected
+    (kind : UnarySiteKind)
+    (site : GrammarSiteOfKind kind.nodeKind) :
+    site.site.expression.children[0]? =
+      some (unaryChildExpression kind site) := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨unaryChild_isSome kind site, rfl⟩
+
+private def unaryChild
+    (kind : UnarySiteKind)
+    (site : GrammarSiteOfKind kind.nodeKind) : GrammarSite :=
+  GrammarSite.childAt site.site 0 (unaryChildExpression kind site)
+    (unaryChildExpression_selected kind site)
+
+private theorem unaryChild_expression
+    (kind : UnarySiteKind)
+    (site : GrammarSiteOfKind kind.nodeKind) :
+    (unaryChild kind site).expression = unaryChildExpression kind site :=
+  GrammarSite.childAt_expression site.site 0 (unaryChildExpression kind site)
+    (unaryChildExpression_selected kind site)
+
+private theorem unaryExpression_eq
+    (kind : UnarySiteKind)
+    (site : GrammarSiteOfKind kind.nodeKind) :
+    site.site.expression = kind.apply (unaryChild kind site).expression := by
+  have hasKind := site.hasKind
+  have childExpression := unaryChild_expression kind site
+  cases kind <;>
+    cases expression : site.site.expression <;>
+      simp [UnarySiteKind.nodeKind, EbnfExpr.kind, expression] at hasKind
+  all_goals
+    simp [unaryChildExpression, EbnfExpr.children, expression] at childExpression
+    simp [UnarySiteKind.apply, childExpression]
+
+namespace GroupSite
+
+/-- The unique direct child of a grouping site. -/
+def child (site : GroupSite) : GrammarSite :=
+  unaryChild .group site
+
+/-- A grouping site has the expected outer shape and child. -/
+theorem expression_eq_group (site : GroupSite) :
+    site.site.expression = EbnfExpr.group site.child.expression :=
+  unaryExpression_eq .group site
+
+end GroupSite
+
+namespace OptionalSite
+
+/-- The unique direct child of an optional site. -/
+def child (site : OptionalSite) : GrammarSite :=
+  unaryChild .optional site
+
+/-- An optional site has the expected outer shape and child. -/
+theorem expression_eq_optional (site : OptionalSite) :
+    site.site.expression = EbnfExpr.optional site.child.expression :=
+  unaryExpression_eq .optional site
+
+end OptionalSite
+
+namespace StarSite
+
+/-- The unique repeated child of a star site. -/
+def child (site : StarSite) : GrammarSite :=
+  unaryChild .star site
+
+/-- A star site has the expected outer shape and child. -/
+theorem expression_eq_star (site : StarSite) :
+    site.site.expression = EbnfExpr.star site.child.expression :=
+  unaryExpression_eq .star site
+
+end StarSite
+
+namespace PlusSite
+
+/-- The unique repeated child of a plus site. -/
+def child (site : PlusSite) : GrammarSite :=
+  unaryChild .plus site
+
+/-- A plus site has the expected outer shape and child. -/
+theorem expression_eq_plus (site : PlusSite) :
+    site.site.expression = EbnfExpr.plus site.child.expression :=
+  unaryExpression_eq .plus site
+
+end PlusSite
+
+namespace List0Site
+
+/-- The repeated element site of a zero-or-more comma list. -/
+def element (site : List0Site) : GrammarSite :=
+  unaryChild .list0 site
+
+/-- A zero-or-more list site has the expected outer shape and element. -/
+theorem expression_eq_list0 (site : List0Site) :
+    site.site.expression = EbnfExpr.list0 site.element.expression :=
+  unaryExpression_eq .list0 site
+
+end List0Site
+
+namespace List1Site
+
+/-- The repeated element site of a one-or-more comma list. -/
+def element (site : List1Site) : GrammarSite :=
+  unaryChild .list1 site
+
+/-- A one-or-more list site has the expected outer shape and element. -/
+theorem expression_eq_list1 (site : List1Site) :
+    site.site.expression = EbnfExpr.list1 site.element.expression :=
+  unaryExpression_eq .list1 site
+
+end List1Site
 
 private def sitesOfKind
     (kind : EbnfNodeKind) : List (GrammarSiteOfKind kind) :=
