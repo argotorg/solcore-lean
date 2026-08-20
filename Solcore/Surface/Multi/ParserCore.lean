@@ -291,6 +291,69 @@ theorem decide_eq_some_iff
 
 end GuardAnchor
 
+/-- The unfinished or sealed state of one priority-guard computation. -/
+inductive GuardMemoState where
+  | undecided
+  | final (decision : GuardDecision)
+  deriving Repr, BEq, DecidableEq
+
+/-- A table of priority-guard states indexed by their structural anchors. -/
+abbrev GuardMemo (tokens : List Token) : Type :=
+  GuardInstanceKey tokens → GuardMemoState
+
+/-- Every structural guard query has reached a sealed decision. -/
+def AllGuardsFinal
+    {tokens : List Token}
+    (memo : GuardMemo tokens) : Prop :=
+  ∀ key : GuardInstanceKey tokens,
+    ∃ decision : GuardDecision, memo key = .final decision
+
+namespace GuardWitnessKey
+
+/-- The proof-free production cell and structural anchor retained by a chart. -/
+structure Raw (tokens : List Token) where
+  productionInstance : ProductionInstanceKey tokens
+  guardInstance : GuardInstanceKey tokens
+  polarity : Polarity
+  deriving Repr, BEq, DecidableEq
+
+/-- A retained guard key names an exact guarded production-table cell. -/
+def Valid
+    {tokens : List Token}
+    (raw : Raw tokens) : Prop :=
+  (raw.guardInstance.guard, raw.polarity) ∈
+      guardOf raw.productionInstance.production ∧
+    GuardAnchor raw.productionInstance
+      (raw.guardInstance.guard, raw.polarity) raw.guardInstance
+
+end GuardWitnessKey
+
+/-- The proof-irrelevant subtype of structurally valid retained guard keys. -/
+abbrev GuardWitnessKey (tokens : List Token) : Type :=
+  { raw : GuardWitnessKey.Raw tokens // GuardWitnessKey.Valid raw }
+
+namespace GuardWitnessKey
+
+/-- Project the guarded production instance through the checked subtype. -/
+def productionInstance
+    {tokens : List Token}
+    (key : GuardWitnessKey tokens) : ProductionInstanceKey tokens :=
+  key.val.productionInstance
+
+/-- Project the structural guard instance through the checked subtype. -/
+def guardInstance
+    {tokens : List Token}
+    (key : GuardWitnessKey tokens) : GuardInstanceKey tokens :=
+  key.val.guardInstance
+
+/-- Project the guarded production polarity through the checked subtype. -/
+def polarity
+    {tokens : List Token}
+    (key : GuardWitnessKey tokens) : Polarity :=
+  key.val.polarity
+
+end GuardWitnessKey
+
 /-- The symbol selected by the dot of one incomplete item. -/
 def NextSymbol {tokens : List Token}
     (item : DottedItem tokens) (symbol : GrammarSymbol) : Prop :=
