@@ -1044,6 +1044,203 @@ def fullValue
 
 end PrefixValues
 
+namespace EbnfValue
+
+/-- Transport one EBNF value along a checked expression equality. -/
+def transport
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {left right : EbnfExpr}
+    (equality : left = right) :
+    EbnfValue file tokens left → EbnfValue file tokens right :=
+  Eq.mp (congrArg (EbnfValue file tokens) equality)
+
+/-- View a site-indexed value at a checked displayed expression shape. -/
+def atShape
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {site : GrammarSite}
+    {expression : EbnfExpr}
+    (shape : site.expression = expression) :
+    EbnfValue file tokens site.expression →
+      EbnfValue file tokens expression :=
+  transport shape
+
+/-- Return a displayed expression value to its checked site index. -/
+def ofShape
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {site : GrammarSite}
+    {expression : EbnfExpr}
+    (shape : site.expression = expression) :
+    EbnfValue file tokens expression →
+      EbnfValue file tokens site.expression :=
+  transport shape.symm
+
+/-- Construct the checked EBNF value of one terminal atom. -/
+def terminalAtom
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (terminal : TerminalSymbol) :
+    MatchedTerminal file tokens terminal →
+      EbnfValue file tokens (EbnfExpr.atom (.terminal terminal)) :=
+  Eq.mp (ebnfValue_atom_terminal_eq terminal).symm
+
+/-- Construct the checked EBNF value of one grammar-rule atom. -/
+def ruleAtom
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (rule : GrammarRuleId) :
+    RuleValue rule →
+      EbnfValue file tokens (EbnfExpr.atom (.nonterminal rule)) :=
+  Eq.mp (ebnfValue_atom_nonterminal_eq rule).symm
+
+/-- Construct the checked EBNF value of one sequence. -/
+def sequence
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (children : List EbnfExpr) :
+    EbnfValues file tokens children →
+      EbnfValue file tokens (EbnfExpr.sequence children) :=
+  Eq.mp (ebnfValue_sequence_eq children).symm
+
+/-- Construct the checked EBNF value of one group. -/
+def group
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    EbnfValue file tokens child →
+      EbnfValue file tokens (EbnfExpr.group child) :=
+  Eq.mp (ebnfValue_group_eq child).symm
+
+/-- Construct the checked EBNF value of one tagged choice branch. -/
+def choice
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (branches : List EbnfExpr) :
+    ((branch : Fin branches.length) ×
+      EbnfValue file tokens (branches.get branch)) →
+      EbnfValue file tokens (EbnfExpr.choice branches) :=
+  Eq.mp (ebnfValue_choice_eq branches).symm
+
+/-- Construct the checked EBNF value of one optional expression. -/
+def optional
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    Option (EbnfValue file tokens child) →
+      EbnfValue file tokens (EbnfExpr.optional child) :=
+  Eq.mp (ebnfValue_optional_eq child).symm
+
+/-- Construct the checked EBNF value of one star expression. -/
+def star
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    List (EbnfValue file tokens child) →
+      EbnfValue file tokens (EbnfExpr.star child) :=
+  Eq.mp (ebnfValue_star_eq child).symm
+
+/-- Construct the checked EBNF value of one plus expression. -/
+def plus
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (child : EbnfExpr) :
+    NonemptyList (EbnfValue file tokens child) →
+      EbnfValue file tokens (EbnfExpr.plus child) :=
+  Eq.mp (ebnfValue_plus_eq child).symm
+
+/-- Construct the checked EBNF value of one possibly empty comma list. -/
+def list0
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (element : EbnfExpr) :
+    List (EbnfValue file tokens element) →
+      EbnfValue file tokens (EbnfExpr.list0 element) :=
+  Eq.mp (ebnfValue_list0_eq element).symm
+
+/-- Construct the checked EBNF value of one nonempty comma list. -/
+def list1
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (element : EbnfExpr) :
+    NonemptyList (EbnfValue file tokens element) →
+      EbnfValue file tokens (EbnfExpr.list1 element) :=
+  Eq.mp (ebnfValue_list1_eq element).symm
+
+end EbnfValue
+
+namespace GrammarSymbolValues
+
+/-- View production values at one checked canonical right-hand side. -/
+def view
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {production : ProductionId}
+    {canonicalRhs : List GrammarSymbol}
+    (layout : production.rhs = canonicalRhs) :
+    GrammarSymbolValues file tokens production.rhs →
+      GrammarSymbolValues file tokens canonicalRhs :=
+  GrammarSymbolValues.transport layout
+
+end GrammarSymbolValues
+
+namespace EbnfValues
+
+/-- Convert auxiliary nonterminal values to their expression-indexed tuple. -/
+def ofAuxiliaries
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (sites : List GrammarSite) :
+    GrammarSymbolValues file tokens
+      (sites.map (fun site =>
+        GrammarSymbol.nonterminal (.aux site))) →
+      EbnfValues file tokens
+        (sites.map GrammarSite.expression) :=
+  match sites with
+  | [] =>
+      fun _values =>
+        Eq.mp
+          (ebnfValues_nil_eq (file := file) (tokens := tokens)).symm ()
+  | site :: rest =>
+      fun values =>
+        Eq.mp
+          (ebnfValues_cons_eq (file := file) (tokens := tokens)
+            site.expression (rest.map GrammarSite.expression)).symm
+          (values.1, ofAuxiliaries rest values.2)
+
+/-- Viewing the empty auxiliary conversion yields the unique empty tuple. -/
+@[simp] theorem ofAuxiliaries_nil_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (values : GrammarSymbolValues file tokens []) :
+    Eq.mp (ebnfValues_nil_eq (file := file) (tokens := tokens))
+      (ofAuxiliaries (file := file) (tokens := tokens) [] values) = () := by
+  change cast _ (cast _ ()) = ()
+  rw [cast_cast]
+
+/-- Viewing a cons conversion preserves its head and recursive tail. -/
+@[simp] theorem ofAuxiliaries_cons_eq
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (site : GrammarSite)
+    (rest : List GrammarSite)
+    (head : EbnfValue file tokens site.expression)
+    (tail : GrammarSymbolValues file tokens
+      (rest.map (fun child =>
+        GrammarSymbol.nonterminal (.aux child)))) :
+    Eq.mp
+        (ebnfValues_cons_eq (file := file) (tokens := tokens)
+          site.expression (rest.map GrammarSite.expression))
+        (ofAuxiliaries (file := file) (tokens := tokens) (site :: rest)
+          (head, tail)) =
+      (head, ofAuxiliaries rest tail) := by
+  change cast _ (cast _ (head, ofAuxiliaries rest tail)) = _
+  rw [cast_cast]
+  apply cast_eq
+
+end EbnfValues
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
