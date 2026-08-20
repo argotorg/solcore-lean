@@ -121,6 +121,87 @@ def CanonicalCompleteRootItem
   context := context
 }
 
+/-- The symbol selected by the dot of one incomplete item. -/
+def NextSymbol {tokens : List Token}
+    (item : DottedItem tokens) (symbol : GrammarSymbol) : Prop :=
+  item.dot.val < item.production.rhs.length ∧
+    item.production.rhs[item.dot.val]? = some symbol
+
+/-- An item whose dot is exactly at the end of its production. -/
+def CompleteItem {tokens : List Token} (item : DottedItem tokens) : Prop :=
+  item.dot.val = item.production.rhs.length
+
+/-- The exact structural update that advances one item's dot and cursor. -/
+def AdvanceItem {tokens : List Token}
+    (before : DottedItem tokens) (next : Boundary tokens)
+    (after : DottedItem tokens) : Prop :=
+  after.production = before.production ∧
+    after.dot.val = before.dot.val + 1 ∧
+    after.origin = before.origin ∧
+    after.current = next
+
+/-- A dot at zero selects the empty right-hand-side prefix. -/
+theorem prefix_zero_layout
+    {tokens : List Token}
+    (item : DottedItem tokens)
+    (zero : item.dot.val = 0) :
+    [] = item.production.rhs.take item.dot.val := by
+  rw [zero, List.take_zero]
+
+/-- Scanning the next terminal appends exactly that terminal to the prefix. -/
+theorem prefix_scan_layout
+    {tokens : List Token}
+    (before after : DottedItem tokens)
+    (terminal : TerminalSymbol)
+    (nextBoundary : Boundary tokens)
+    (next : NextSymbol before (GrammarSymbol.terminal terminal))
+    (advance : AdvanceItem before nextBoundary after) :
+    before.production.rhs.take before.dot.val ++
+        [GrammarSymbol.terminal terminal] =
+      after.production.rhs.take after.dot.val := by
+  rcases next with ⟨_inRange, lookup⟩
+  rcases advance with ⟨production, dot, _origin, _current⟩
+  have rhs : after.production.rhs = before.production.rhs :=
+    congrArg ProductionId.rhs production
+  rw [dot, rhs, List.take_add_one, lookup]
+  rfl
+
+/-- Completing the next nonterminal appends exactly that symbol to the prefix. -/
+theorem prefix_complete_layout
+    {tokens : List Token}
+    (waiting finished after : DottedItem tokens)
+    (next : NextSymbol waiting
+      (GrammarSymbol.nonterminal finished.production.lhs))
+    (advance : AdvanceItem waiting finished.current after) :
+    waiting.production.rhs.take waiting.dot.val ++
+        [GrammarSymbol.nonterminal finished.production.lhs] =
+      after.production.rhs.take after.dot.val := by
+  rcases next with ⟨_inRange, lookup⟩
+  rcases advance with ⟨production, dot, _origin, _current⟩
+  have rhs : after.production.rhs = waiting.production.rhs :=
+    congrArg ProductionId.rhs production
+  rw [dot, rhs, List.take_add_one, lookup]
+  rfl
+
+/-- A complete item's right-hand-side prefix is the full right-hand side. -/
+theorem prefix_full_layout
+    {tokens : List Token}
+    (item : DottedItem tokens)
+    (complete : CompleteItem item) :
+    item.production.rhs.take item.dot.val = item.production.rhs := by
+  unfold CompleteItem at complete
+  rw [complete, List.take_length]
+
+/-- The canonical root item is definitionally complete. -/
+theorem canonicalCompleteRootItem_complete
+    {tokens : List Token}
+    (rule : GrammarRuleId)
+    (origin finish : Boundary tokens)
+    (context : GuardContext tokens) :
+    CompleteItem
+      (CanonicalCompleteRootItem tokens rule origin finish context).raw := by
+  rfl
+
 /-- The parser's terminal stream consists of retained tokens and logical EOF. -/
 inductive TerminalStreamValue where
   | retained (token : Token)
