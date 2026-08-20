@@ -285,6 +285,141 @@ instance {file : WorkspaceFile} {tokens : List Token}
     BEq (MatchedTerminal file tokens terminal) :=
   ⟨fun left right => decide (left = right)⟩
 
+namespace PackedEdgeKey
+
+/-- Exact structural validity for an unguarded scanned or completed edge. -/
+def Valid
+    (file : WorkspaceFile)
+    (tokens : List Token) :
+    PackedEdgeKey tokens → Prop
+  | .scanned before after terminalCursor =>
+      ∃ terminal value span,
+        NextSymbol before (GrammarSymbol.terminal terminal) ∧
+          terminalCursor.beforeBoundary = before.current ∧
+          TerminalAt file tokens terminalCursor value span ∧
+          TerminalMatches terminal value ∧
+          AdvanceItem before terminalCursor.afterBoundary after
+  | .completed waiting finished after sharedCursor =>
+      ∃ symbol,
+        NextSymbol waiting (GrammarSymbol.nonterminal symbol) ∧
+          CompleteItem finished ∧
+          finished.production.lhs = symbol ∧
+          waiting.current = sharedCursor ∧
+          finished.origin = sharedCursor ∧
+          AdvanceItem waiting finished.current after
+
+end PackedEdgeKey
+
+/-- Checked Type witness for one valid scanned edge. -/
+structure ScannedEdgeWitness
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (before after : DottedItem tokens)
+    (cursor : TerminalCursor tokens) : Type where
+  terminal : TerminalSymbol
+  matched : MatchedTerminal file tokens terminal
+  sameCursor : matched.cursor = cursor
+  next : NextSymbol before (GrammarSymbol.terminal terminal)
+  atCurrent : cursor.beforeBoundary = before.current
+  advance : AdvanceItem before matched.cursor.afterBoundary after
+  deriving Repr, DecidableEq
+
+instance {file : WorkspaceFile} {tokens : List Token}
+    {before after : DottedItem tokens} {cursor : TerminalCursor tokens} :
+    BEq (ScannedEdgeWitness file tokens before after cursor) :=
+  ⟨fun left right => decide (left = right)⟩
+
+/-- Checked Type witness for one valid completed edge. -/
+structure CompletedEdgeWitness
+    (tokens : List Token)
+    (waiting finished after : DottedItem tokens)
+    (shared : Boundary tokens) : Type where
+  next : NextSymbol waiting
+    (GrammarSymbol.nonterminal finished.production.lhs)
+  complete : CompleteItem finished
+  waitingAtShared : waiting.current = shared
+  finishedAtShared : finished.origin = shared
+  advance : AdvanceItem waiting finished.current after
+  deriving Repr, DecidableEq
+
+instance {tokens : List Token}
+    {waiting finished after : DottedItem tokens} {shared : Boundary tokens} :
+    BEq (CompletedEdgeWitness tokens waiting finished after shared) :=
+  ⟨fun left right => decide (left = right)⟩
+
+/-- A scanned edge is valid exactly when its checked Type witness is inhabited. -/
+theorem packedEdge_scanned_valid_iff
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {before after : DottedItem tokens}
+    {cursor : TerminalCursor tokens} :
+    PackedEdgeKey.Valid file tokens (.scanned before after cursor) ↔
+      Nonempty (ScannedEdgeWitness file tokens before after cursor) := by
+  constructor
+  · rintro ⟨terminal, value, span, next, atCurrent,
+      terminalAt, terminalMatches, advance⟩
+    exact ⟨{
+      terminal := terminal
+      matched := {
+        cursor := cursor
+        value := value
+        span := span
+        «at» := terminalAt
+        «matches» := terminalMatches
+      }
+      sameCursor := rfl
+      next := next
+      atCurrent := atCurrent
+      advance := advance
+    }⟩
+  · rintro ⟨witness⟩
+    rcases witness with
+      ⟨terminal, matched, sameCursor, next, atCurrent, matchedAdvance⟩
+    have terminalAt : TerminalAt file tokens cursor
+        matched.value matched.span := by
+      rw [← sameCursor]
+      exact matched.at
+    have afterBoundaryEq : matched.cursor.afterBoundary =
+        cursor.afterBoundary :=
+      congrArg TerminalCursor.afterBoundary sameCursor
+    have advance : AdvanceItem before cursor.afterBoundary after := by
+      rw [← afterBoundaryEq]
+      exact matchedAdvance
+    exact ⟨terminal, matched.value, matched.span, next, atCurrent,
+      terminalAt, matched.matches, advance⟩
+
+/-- A completed edge is valid exactly when its checked Type witness is inhabited. -/
+theorem packedEdge_completed_valid_iff
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {waiting finished after : DottedItem tokens}
+    {shared : Boundary tokens} :
+    PackedEdgeKey.Valid file tokens
+        (.completed waiting finished after shared) ↔
+      Nonempty
+        (CompletedEdgeWitness tokens waiting finished after shared) := by
+  constructor
+  · rintro ⟨symbol, next, complete, lhs, waitingAtShared,
+      finishedAtShared, advance⟩
+    have exactNext : NextSymbol waiting
+        (GrammarSymbol.nonterminal finished.production.lhs) := by
+      rw [lhs]
+      exact next
+    exact ⟨{
+      next := exactNext
+      complete := complete
+      waitingAtShared := waitingAtShared
+      finishedAtShared := finishedAtShared
+      advance := advance
+    }⟩
+  · rintro ⟨witness⟩
+    exact ⟨finished.production.lhs, witness.next, witness.complete, rfl,
+      witness.waitingAtShared, witness.finishedAtShared, witness.advance⟩
+
+/-- The proof-irrelevant subtype of structurally valid unguarded edges. -/
+abbrev PackedEdge (file : WorkspaceFile) (tokens : List Token) : Type :=
+  { key : PackedEdgeKey tokens // PackedEdgeKey.Valid file tokens key }
+
 /-- The physical byte selected by one chart boundary. -/
 def BoundaryByte
     (file : WorkspaceFile)
