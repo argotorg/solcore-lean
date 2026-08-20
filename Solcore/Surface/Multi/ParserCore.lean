@@ -1391,6 +1391,155 @@ def packAtAtom
 
 end AtomSite
 
+namespace SequenceSite
+
+/-- Pack one expanded sequence into its auxiliary EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.SequenceSite) :
+    GrammarSymbolValues file tokens (ProductionId.seq site).rhs →
+      NonterminalValue file tokens (ProductionId.seq site).lhs :=
+  fun values =>
+    EbnfValue.ofShape site.expression_eq_sequence
+      (EbnfValue.sequence (site.children.map GrammarSite.expression)
+        (EbnfValues.ofAuxiliaries site.children
+          (GrammarSymbolValues.view (ProductionId.rhs_seq site) values)))
+
+/-- Sequence packing preserves every child value in displayed order. -/
+@[simp] theorem pack_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.SequenceSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.seq site).rhs) :
+    EbnfValue.atShape site.expression_eq_sequence (pack site values) =
+      EbnfValue.sequence (site.children.map GrammarSite.expression)
+        (EbnfValues.ofAuxiliaries site.children
+          (GrammarSymbolValues.view (ProductionId.rhs_seq site) values)) := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end SequenceSite
+
+namespace GroupSite
+
+/-- Pack one expanded group into its auxiliary EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.GroupSite) :
+    GrammarSymbolValues file tokens (ProductionId.group site).rhs →
+      NonterminalValue file tokens (ProductionId.group site).lhs :=
+  fun values =>
+    EbnfValue.ofShape site.expression_eq_group
+      (EbnfValue.group site.child.expression
+        (GrammarSymbolValues.view (ProductionId.rhs_group site) values).1)
+
+/-- Group packing preserves its unique checked child value. -/
+@[simp] theorem pack_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.GroupSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.group site).rhs) :
+    EbnfValue.atShape site.expression_eq_group (pack site values) =
+      EbnfValue.group site.child.expression
+        (GrammarSymbolValues.view
+          (ProductionId.rhs_group site) values).1 := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end GroupSite
+
+namespace ChoiceSite
+
+/-- Pack one expanded choice branch into its tagged auxiliary EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.ChoiceSite)
+    (branch : Fin site.branchCount) :
+    GrammarSymbolValues file tokens
+      (ProductionId.choice site branch).rhs →
+      NonterminalValue file tokens
+        (ProductionId.choice site branch).lhs :=
+  fun values =>
+    let childValue :=
+      EbnfValue.transport
+        ((site.branch_expression branch).trans
+          (site.branch_get_toList branch).symm)
+        (GrammarSymbolValues.view
+          (ProductionId.rhs_choice site branch) values).1
+    EbnfValue.ofShape site.expression_eq_choice
+      (EbnfValue.choice site.branchExpressions.toList
+        ⟨site.branchListIndex branch, childValue⟩)
+
+/-- Choice packing preserves the exact displayed branch tag and child. -/
+@[simp] theorem pack_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.ChoiceSite)
+    (branch : Fin site.branchCount)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.choice site branch).rhs) :
+    EbnfValue.atShape site.expression_eq_choice
+        (pack site branch values) =
+      EbnfValue.choice site.branchExpressions.toList
+        ⟨site.branchListIndex branch,
+          EbnfValue.transport
+            ((site.branch_expression branch).trans
+              (site.branch_get_toList branch).symm)
+            (GrammarSymbolValues.view
+              (ProductionId.rhs_choice site branch) values).1⟩ := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end ChoiceSite
+
+namespace OptionalSite
+
+/-- Pack either expanded optional production into its auxiliary EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.OptionalSite) (branch : OptionalBranch) :
+    GrammarSymbolValues file tokens
+      (ProductionId.opt site branch).rhs →
+      NonterminalValue file tokens (ProductionId.opt site branch).lhs :=
+  match branch with
+  | .none => fun values =>
+      match GrammarSymbolValues.view
+          (ProductionId.rhs_opt_none site) values with
+      | () =>
+          EbnfValue.ofShape site.expression_eq_optional
+            (EbnfValue.optional site.child.expression none)
+  | .some => fun values =>
+      EbnfValue.ofShape site.expression_eq_optional
+        (EbnfValue.optional site.child.expression
+          (some (GrammarSymbolValues.view
+            (ProductionId.rhs_opt_some site) values).1))
+
+/-- Empty optional packing yields the checked absent value. -/
+@[simp] theorem pack_none_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.OptionalSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.opt site .none).rhs) :
+    EbnfValue.atShape site.expression_eq_optional
+        (pack site .none values) =
+      EbnfValue.optional site.child.expression none := by
+  unfold pack
+  generalize viewedEq : GrammarSymbolValues.view
+    (ProductionId.rhs_opt_none site) values = viewed
+  cases viewed
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+/-- Present optional packing preserves its unique checked child value. -/
+@[simp] theorem pack_some_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.OptionalSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.opt site .some).rhs) :
+    EbnfValue.atShape site.expression_eq_optional
+        (pack site .some values) =
+      EbnfValue.optional site.child.expression
+        (some (GrammarSymbolValues.view
+          (ProductionId.rhs_opt_some site) values).1) := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end OptionalSite
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
