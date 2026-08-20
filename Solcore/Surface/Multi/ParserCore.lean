@@ -133,6 +133,298 @@ structure GuardInstanceKey (tokens : List Token) where
   ordered : contextStart.val ≤ siteCursor.val
   deriving Repr, BEq, DecidableEq
 
+private def triangle (n : Nat) : Nat := (List.range' 1 n 1).sum
+
+private theorem triangle_succ (n : Nat) :
+    triangle (n + 1) = triangle n + (n + 1) := by
+  simp [triangle, List.range'_concat, Nat.add_comm, Nat.add_left_comm]
+
+private theorem triangle_mono {a b : Nat} (atMost : a ≤ b) :
+    triangle a ≤ triangle b := by
+  obtain ⟨offset, rfl⟩ := Nat.le.dest atMost
+  clear atMost
+  induction offset with
+  | zero => simp
+  | succ offset induction =>
+      rw [show a + (offset + 1) = (a + offset) + 1 by omega]
+      rw [triangle_succ]
+      exact Nat.le_trans induction (Nat.le_add_right _ _)
+
+private theorem twice_triangle (n : Nat) :
+    2 * triangle n = n * (n + 1) := by
+  induction n with
+  | zero => rfl
+  | succ n induction =>
+      rw [show n + 1 + 1 = (n + 1) + 1 by omega]
+      rw [triangle_succ, Nat.mul_add, induction]
+      simp [Nat.mul_add, Nat.add_mul, Nat.add_assoc, Nat.add_comm,
+        Nat.add_left_comm]
+      omega
+
+private structure OrderedFinPair (q : Nat) where
+  first : Fin q
+  second : Fin q
+  ordered : first.val ≤ second.val
+
+private def OrderedFinPair.rank {q : Nat} (pair : OrderedFinPair q) : Nat :=
+  triangle pair.second.val + pair.first.val
+
+private theorem OrderedFinPair.rank_lt {q : Nat} (pair : OrderedFinPair q) :
+    pair.rank < triangle q := by
+  have firstBound : pair.first.val < pair.second.val + 1 := by
+    exact Nat.lt_succ_of_le pair.ordered
+  have rowBound :
+      pair.rank < triangle (pair.second.val + 1) := by
+    rw [triangle_succ]
+    exact Nat.add_lt_add_left firstBound _
+  exact Nat.lt_of_lt_of_le rowBound
+    (triangle_mono (Nat.succ_le_of_lt pair.second.isLt))
+
+private theorem OrderedFinPair.rank_injective {q : Nat} :
+    Function.Injective (@OrderedFinPair.rank q) := by
+  intro left right equality
+  have sameSecond : left.second.val = right.second.val := by
+    rcases Nat.lt_trichotomy left.second.val right.second.val with
+      less | same | greater
+    · have firstRowBound :
+          left.rank < triangle (left.second.val + 1) := by
+        rw [triangle_succ]
+        simp only [OrderedFinPair.rank]
+        exact Nat.add_lt_add_left (Nat.lt_succ_of_le left.ordered) _
+      have rowsOrdered :
+          triangle (left.second.val + 1) ≤ triangle right.second.val :=
+        triangle_mono (by omega)
+      have rightRowStart : triangle right.second.val ≤ right.rank := by
+        simp [OrderedFinPair.rank]
+      have rankLess : left.rank < right.rank :=
+        Nat.lt_of_lt_of_le
+          (Nat.lt_of_lt_of_le firstRowBound rowsOrdered) rightRowStart
+      exact False.elim ((Nat.ne_of_lt rankLess) equality)
+    · exact same
+    · have rightRowBound :
+          right.rank < triangle (right.second.val + 1) := by
+        rw [triangle_succ]
+        simp only [OrderedFinPair.rank]
+        exact Nat.add_lt_add_left (Nat.lt_succ_of_le right.ordered) _
+      have rowsOrdered :
+          triangle (right.second.val + 1) ≤ triangle left.second.val :=
+        triangle_mono (by omega)
+      have leftRowStart : triangle left.second.val ≤ left.rank := by
+        simp [OrderedFinPair.rank]
+      have rankLess : right.rank < left.rank :=
+        Nat.lt_of_lt_of_le
+          (Nat.lt_of_lt_of_le rightRowBound rowsOrdered) leftRowStart
+      exact False.elim ((Nat.ne_of_lt rankLess) equality.symm)
+  have sameFirst : left.first.val = right.first.val := by
+    simp only [OrderedFinPair.rank] at equality
+    rw [sameSecond] at equality
+    exact Nat.add_left_cancel equality
+  have sameFirstFin : left.first = right.first := Fin.ext sameFirst
+  have sameSecondFin : left.second = right.second := Fin.ext sameSecond
+  cases left
+  cases right
+  cases sameFirstFin
+  cases sameSecondFin
+  rfl
+
+private theorem OrderedFinPair.rank_surjective (q : Nat) :
+    ∀ value : Fin (triangle q), ∃ pair : OrderedFinPair q, pair.rank = value.val := by
+  induction q with
+  | zero =>
+      intro value
+      exact Fin.elim0 (Fin.cast (by rfl) value)
+  | succ q induction =>
+      intro value
+      by_cases earlier : value.val < triangle q
+      · obtain ⟨pair, rankEq⟩ := induction ⟨value.val, earlier⟩
+        let lifted : OrderedFinPair (q + 1) := {
+          first := Fin.castLE (Nat.le_succ q) pair.first
+          second := Fin.castLE (Nat.le_succ q) pair.second
+          ordered := pair.ordered
+        }
+        exact ⟨lifted, by simpa [lifted, OrderedFinPair.rank] using rankEq⟩
+      · have valueBound : value.val < triangle q + (q + 1) := by
+          simpa [triangle_succ] using value.isLt
+        let first : Fin (q + 1) := ⟨value.val - triangle q, by omega⟩
+        let second : Fin (q + 1) := ⟨q, by omega⟩
+        let pair : OrderedFinPair (q + 1) := {
+          first := first
+          second := second
+          ordered := by
+            simp only [first, second]
+            omega
+        }
+        refine ⟨pair, ?_⟩
+        simp only [pair, OrderedFinPair.rank, first, second]
+        omega
+
+private def guardRank : PriorityGuardId → Nat
+  | .G01_statementIf => 0 | .G02_matchArmBoundary => 1
+  | .G03_parameterComptime => 2 | .G04_letComptime => 3
+  | .G05_typeComptime => 4 | .G06_patternComptime => 5
+  | .G07_leadingDotArguments => 6 | .G08_terminalExpression => 7
+  | .G09_genericContext => 8
+
+private theorem guardRank_lt (guard : PriorityGuardId) :
+    guardRank guard < allPriorityGuardIds.length := by
+  cases guard <;> decide
+
+private theorem guardRank_injective :
+    Function.Injective guardRank := by
+  intro left right equality
+  cases left <;> cases right <;>
+    simp only [guardRank] at equality ⊢ <;> omega
+
+private theorem guardRank_surjective :
+    ∀ value : Fin allPriorityGuardIds.length,
+      ∃ guard : PriorityGuardId, guardRank guard = value.val := by
+  intro value
+  have bound : value.val < 9 := by
+    change value.val < allPriorityGuardIds.length
+    exact value.isLt
+  have alternatives :
+      value.val = 0 ∨ value.val = 1 ∨ value.val = 2 ∨
+      value.val = 3 ∨ value.val = 4 ∨ value.val = 5 ∨
+      value.val = 6 ∨ value.val = 7 ∨ value.val = 8 := by
+    omega
+  rcases alternatives with h | h | h | h | h | h | h | h | h
+  · exact ⟨.G01_statementIf, by simp [guardRank, h]⟩
+  · exact ⟨.G02_matchArmBoundary, by simp [guardRank, h]⟩
+  · exact ⟨.G03_parameterComptime, by simp [guardRank, h]⟩
+  · exact ⟨.G04_letComptime, by simp [guardRank, h]⟩
+  · exact ⟨.G05_typeComptime, by simp [guardRank, h]⟩
+  · exact ⟨.G06_patternComptime, by simp [guardRank, h]⟩
+  · exact ⟨.G07_leadingDotArguments, by simp [guardRank, h]⟩
+  · exact ⟨.G08_terminalExpression, by simp [guardRank, h]⟩
+  · exact ⟨.G09_genericContext, by simp [guardRank, h]⟩
+
+private theorem blockRank_injective {width : Nat}
+    {leftBlock rightBlock leftOffset rightOffset : Nat}
+    (leftOffsetBound : leftOffset < width)
+    (rightOffsetBound : rightOffset < width)
+    (equality :
+      leftBlock * width + leftOffset =
+        rightBlock * width + rightOffset) :
+    leftBlock = rightBlock ∧ leftOffset = rightOffset := by
+  have widthPositive : 0 < width := Nat.zero_lt_of_lt leftOffsetBound
+  have quotient (block offset : Nat) (offsetBound : offset < width) :
+      (block * width + offset) / width = block := by
+    rw [Nat.add_comm, Nat.mul_comm block width,
+      Nat.add_mul_div_left _ _ widthPositive, Nat.div_eq_of_lt offsetBound]
+    exact Nat.zero_add block
+  have sameBlock : leftBlock = rightBlock := by
+    rw [← quotient leftBlock leftOffset leftOffsetBound,
+      equality, quotient rightBlock rightOffset rightOffsetBound]
+  constructor
+  · exact sameBlock
+  · rw [sameBlock] at equality
+    exact Nat.add_left_cancel equality
+
+/-- Exact finite cardinality of priority-guard queries over ordered chart
+boundary pairs. -/
+theorem guard_instance_cardinality (tokens : List Token) :
+    ∃ encode : GuardInstanceKey tokens →
+        Fin (allPriorityGuardIds.length * (tokens.length + 2) *
+          (tokens.length + 2 + 1) / 2),
+      Function.Injective encode ∧ Function.Surjective encode := by
+  let q := tokens.length + 2
+  let width := triangle q
+  have widthPositive : 0 < width := by
+    change 0 < triangle q
+    rw [show q = (tokens.length + 1) + 1 by simp [q]]
+    rw [triangle_succ]
+    omega
+  have cardinalityEq :
+      allPriorityGuardIds.length * width =
+        allPriorityGuardIds.length * q * (q + 1) / 2 := by
+    have numeratorEq :
+        2 * (allPriorityGuardIds.length * width) =
+          allPriorityGuardIds.length * q * (q + 1) := by
+      rw [show 2 * (allPriorityGuardIds.length * width) =
+        allPriorityGuardIds.length * (2 * width) by
+          simp [Nat.mul_left_comm]]
+      rw [show 2 * width = q * (q + 1) by
+        simpa [width] using twice_triangle q]
+      simp [Nat.mul_assoc]
+    calc
+      allPriorityGuardIds.length * width =
+          2 * (allPriorityGuardIds.length * width) / 2 := by
+        exact (Nat.mul_div_cancel_left _ (by omega)).symm
+      _ = allPriorityGuardIds.length * q * (q + 1) / 2 :=
+        congrArg (fun value => value / 2) numeratorEq
+  let pairOf (key : GuardInstanceKey tokens) : OrderedFinPair q := {
+    first := key.contextStart
+    second := key.siteCursor
+    ordered := key.ordered
+  }
+  let rawEncode (key : GuardInstanceKey tokens) : Nat :=
+    guardRank key.guard * width + (pairOf key).rank
+  let encode (key : GuardInstanceKey tokens) :
+      Fin (allPriorityGuardIds.length * (tokens.length + 2) *
+        (tokens.length + 2 + 1) / 2) := ⟨rawEncode key, by
+    have guardBound := guardRank_lt key.guard
+    have pairBound := OrderedFinPair.rank_lt (pairOf key)
+    have rowBound :
+        rawEncode key < (guardRank key.guard + 1) * width := by
+      change guardRank key.guard * width + (pairOf key).rank <
+        (guardRank key.guard + 1) * width
+      rw [Nat.add_mul]
+      simpa only [Nat.one_mul, width] using
+        Nat.add_lt_add_left pairBound (guardRank key.guard * width)
+    have rowsBound :
+        (guardRank key.guard + 1) * width ≤
+          allPriorityGuardIds.length * width :=
+      Nat.mul_le_mul_right width (Nat.succ_le_of_lt guardBound)
+    have rawBound := Nat.lt_of_lt_of_le rowBound rowsBound
+    have normalizedEq :
+        allPriorityGuardIds.length * width =
+          allPriorityGuardIds.length * (tokens.length + 2) *
+            (tokens.length + 2 + 1) / 2 := by
+      simpa [q] using cardinalityEq
+    exact normalizedEq ▸ rawBound
+  ⟩
+  refine ⟨encode, ?_, ?_⟩
+  · intro left right equality
+    have rawEquality : rawEncode left = rawEncode right := by
+      exact congrArg Fin.val equality
+    have blocksEqual := blockRank_injective
+      (OrderedFinPair.rank_lt (pairOf left))
+      (OrderedFinPair.rank_lt (pairOf right)) rawEquality
+    have guardEqual : left.guard = right.guard :=
+      guardRank_injective blocksEqual.1
+    have pairsEqual : pairOf left = pairOf right :=
+      OrderedFinPair.rank_injective blocksEqual.2
+    have contextEqual : left.contextStart = right.contextStart :=
+      congrArg OrderedFinPair.first pairsEqual
+    have siteEqual : left.siteCursor = right.siteCursor :=
+      congrArg OrderedFinPair.second pairsEqual
+    cases left
+    cases right
+    simp only [GuardInstanceKey.mk.injEq]
+    exact ⟨guardEqual, contextEqual, siteEqual⟩
+  · intro value
+    let rawValue : Fin (allPriorityGuardIds.length * width) :=
+      Fin.cast cardinalityEq.symm (Fin.cast (by simp [q]) value)
+    let guardIndex : Fin allPriorityGuardIds.length :=
+      ⟨rawValue.val / width, (Nat.div_lt_iff_lt_mul widthPositive).mpr
+        rawValue.isLt⟩
+    let pairIndex : Fin width :=
+      ⟨rawValue.val % width, Nat.mod_lt _ widthPositive⟩
+    obtain ⟨guard, guardEq⟩ := guardRank_surjective guardIndex
+    obtain ⟨pair, pairEq⟩ := OrderedFinPair.rank_surjective q pairIndex
+    let key : GuardInstanceKey tokens := {
+      guard := guard
+      contextStart := pair.first
+      siteCursor := pair.second
+      ordered := pair.ordered
+    }
+    refine ⟨key, ?_⟩
+    apply Fin.ext
+    simp only [encode, rawEncode, pairOf, key]
+    rw [guardEq, pairEq]
+    simpa [guardIndex, pairIndex, rawValue, Nat.add_comm, Nat.mul_comm] using
+      Nat.mod_add_div rawValue.val width
+
 /-- One expanded production at a dot position and chart interval. -/
 structure DottedItem (tokens : List Token) where
   production : ProductionId
