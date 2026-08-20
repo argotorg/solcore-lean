@@ -1308,6 +1308,160 @@ ProductionId =
 ActionId = actionFor (production : ProductionId)
 ```
 
+Dependent action carriers must not unfold a private grammar helper or perform
+one unchecked cast per expanded production. `Grammar.lean` therefore owns this
+public bridge API in addition to `ProductionId.rhs`:
+
+```text
+EbnfAtom.grammarSymbol     : EbnfAtom -> GrammarSymbol
+  | terminal terminal => GrammarSymbol.terminal terminal
+  | nonterminal rule   => GrammarSymbol.nonterminal (.rule rule)
+AtomSite.symbol            : AtomSite -> GrammarSymbol
+SequenceSite.children      : SequenceSite -> List GrammarSite
+GroupSite.child            : GroupSite -> GrammarSite
+ChoiceSite.branchExpressions :
+  (site : ChoiceSite) -> Vector EbnfExpr site.branchCount
+ChoiceSite.branch          : (site : ChoiceSite) ->
+                             Fin site.branchCount -> GrammarSite
+ChoiceSite.branches        :
+  (site : ChoiceSite) -> Vector GrammarSite site.branchCount :=
+    Vector.ofFn site.branch
+ChoiceSite.branchListIndex : (site : ChoiceSite) ->
+  Fin site.branchCount -> Fin site.branchExpressions.toList.length
+OptionalSite.child         : OptionalSite -> GrammarSite
+StarSite.child             : StarSite -> GrammarSite
+PlusSite.child             : PlusSite -> GrammarSite
+List0Site.element          : List0Site -> GrammarSite
+List1Site.element          : List1Site -> GrammarSite
+
+SequenceSite.children_expression (site : SequenceSite) :
+  (site.children.map GrammarSite.expression) =
+    site.site.expression.children
+
+GrammarSite.root_expression (rule : GrammarRuleId) :
+  (GrammarSite.root rule).expression = m2cV1.rhs rule
+AtomSite.expression_eq_atom (site : AtomSite) :
+  site.site.expression = EbnfExpr.atom site.atom
+AtomSite.symbol_eq (site : AtomSite) :
+  site.symbol = site.atom.grammarSymbol
+SequenceSite.expression_eq_sequence (site : SequenceSite) :
+  site.site.expression =
+    EbnfExpr.sequence (site.children.map GrammarSite.expression)
+GroupSite.expression_eq_group (site : GroupSite) :
+  site.site.expression = EbnfExpr.group site.child.expression
+ChoiceSite.expression_eq_choice (site : ChoiceSite) :
+  site.site.expression =
+    EbnfExpr.choice site.branchExpressions.toList
+ChoiceSite.branch_expression
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+  (site.branch branch).expression = site.branchExpressions.get branch
+ChoiceSite.branchListIndex_val
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+  (site.branchListIndex branch).val = branch.val
+ChoiceSite.branch_get_toList
+    (site : ChoiceSite) (branch : Fin site.branchCount) :
+  site.branchExpressions.toList.get (site.branchListIndex branch) =
+    site.branchExpressions.get branch
+OptionalSite.expression_eq_optional (site : OptionalSite) :
+  site.site.expression = EbnfExpr.optional site.child.expression
+StarSite.expression_eq_star (site : StarSite) :
+  site.site.expression = EbnfExpr.star site.child.expression
+PlusSite.expression_eq_plus (site : PlusSite) :
+  site.site.expression = EbnfExpr.plus site.child.expression
+List0Site.expression_eq_list0 (site : List0Site) :
+  site.site.expression = EbnfExpr.list0 site.element.expression
+List1Site.expression_eq_list1 (site : List1Site) :
+  site.site.expression = EbnfExpr.list1 site.element.expression
+
+ListSite.element : ListSite -> GrammarSite
+  | .list0 site => site.element
+  | .list1 site => site.element
+
+ListSite.element_list0 (site : List0Site) :
+  (ListSite.list0 site).element = site.element := rfl
+ListSite.element_list1 (site : List1Site) :
+  (ListSite.list1 site).element = site.element := rfl
+
+matchArmPatternListSite : List1Site
+matchArmPatternListSite_key :
+  matchArmPatternListSite.site.val =
+    { rule := GrammarRuleId.matchArm, path := [1] }
+matchArmPatternListSite_expression :
+  matchArmPatternListSite.site.expression =
+    EbnfExpr.list1
+      (EbnfExpr.atom (EbnfAtom.nonterminal GrammarRuleId.pattern))
+```
+
+Every selector is total because its site subtype certifies the corresponding
+node shape. `ChoiceSite.branchExpressions` and `ChoiceSite.branch` are defined
+by dependent elimination on `site.hasKind`; the impossible eight outer
+constructors are discharged from that equality. Thus the same
+`Fin site.branchCount` indexes both vectors. The only conversion to the
+`Fin site.branchExpressions.toList.length` stored by a choice `EbnfValue` is
+the checked `branchListIndex`; its value and lookup equations are public, so
+no implementation manufactures or assumes a `Fin` equality.
+`ListSite.element` is the displayed case split,
+not an attempted projection such as `owner.expression.child[0]` (there is no
+such total singular projection on `EbnfExpr`). The two computation theorems
+make the tail-element index reduce without a cast.
+`matchArmPatternListSite` is constructed by `GrammarSite.ofKey?` at the one
+displayed key and then refined by `GrammarSiteOfKind.ofSite? .list1`; the two
+`some` equations and the displayed key/expression equations are proved in
+`Grammar.lean`. It is not selected by searching for a `list1(pattern)` shape:
+that shape also occurs at two pattern-argument sites. The module also exports one
+`[simp]` RHS-layout theorem for each of the eleven production constructors:
+
+```text
+ProductionId.rhs_root (R : GrammarRuleId) :
+  rhs(root R)       = [nonterminal (aux (GrammarSite.root R))]
+ProductionId.rhs_atom (s : AtomSite) :
+  rhs(atom s)       = [s.symbol]
+ProductionId.rhs_seq (s : SequenceSite) :
+  rhs(seq s)        = s.children.map (nonterminal . aux)
+ProductionId.rhs_group (s : GroupSite) :
+  rhs(group s)      = [nonterminal (aux s.child)]
+ProductionId.rhs_choice
+    (s : ChoiceSite) (i : Fin s.branchCount) :
+  rhs(choice s i)   = [nonterminal (aux (s.branch i))]
+ProductionId.rhs_opt_none (s : OptionalSite) : rhs(opt s none) = []
+ProductionId.rhs_opt_some (s : OptionalSite) :
+  rhs(opt s some)   = [nonterminal (aux s.child)]
+ProductionId.rhs_star_nil (s : StarSite) : rhs(star s nil) = []
+ProductionId.rhs_star_cons (s : StarSite) :
+  rhs(star s cons)  = [nonterminal (aux s.child),
+                       nonterminal (aux s.site)]
+ProductionId.rhs_plus_one (s : PlusSite) :
+  rhs(plus s one)   = [nonterminal (aux s.child)]
+ProductionId.rhs_plus_cons (s : PlusSite) :
+  rhs(plus s cons)  = [nonterminal (aux s.child),
+                       nonterminal (aux s.site)]
+ProductionId.rhs_list0_nil (s : List0Site) : rhs(list0 s nil) = []
+ProductionId.rhs_list0_cons (s : List0Site) :
+  rhs(list0 s cons) = [nonterminal (aux s.element),
+                       nonterminal (tail (.list0 s))]
+ProductionId.rhs_list1 (s : List1Site) :
+  rhs(list1 s)      = [nonterminal (aux s.element),
+                       nonterminal (tail (.list1 s))]
+ProductionId.rhs_tail_nil (s : ListSite) : rhs(tail s nil) = []
+ProductionId.rhs_tail_cons (s : ListSite) :
+  rhs(tail s cons)  = [terminal (symbol comma),
+                       nonterminal (aux s.element),
+                       nonterminal (tail s)]
+```
+
+The “eleven” count is by outer `ProductionId` constructor; branch equations
+are the displayed exhaustive subcases. `ParserCore` implements exactly eleven
+typed HList transport functions using these public outer-constructor equality
+theorems, branch/element equalities, and `SequenceSite.children_expression`.
+The bridges are the total eliminators of each site subtype's `hasKind` proof;
+`ParserCore` does not repeat dependent elimination on `EbnfExpr.kind`.
+Their equality arguments are checked
+proofs and erase at runtime; unchecked representation conversion, conversion
+from an assumed equation,
+reflection into private definitions, and 1,040 hand-written conversions are
+forbidden. Adding this API changes neither `ProductionId`, `ActionId`, their
+ordering, nor `P`, `D`, or `F`.
+
 Each `...Site` is the finite subtype of `GrammarSite` having that exact EBNF
 node kind; `ListSite` is the disjoint finite union of `List0Site` and
 `List1Site`. The table's `P.*` and `A.*` spellings are the pretty names of these
@@ -1409,6 +1563,25 @@ ParseOverrideId = G10_repeatedNonAssociative
 
 Boundary(tokens : List Token) = Fin (tokens.length + 2)
 
+TerminalCursor(tokens : List Token) = Fin (tokens.length + 1)
+
+TerminalCursor.beforeBoundary {tokens : List Token} :
+  TerminalCursor tokens -> Boundary tokens
+  | cursor => Fin.castLE (Nat.le_succ _) cursor
+
+TerminalCursor.afterBoundary {tokens : List Token} :
+  TerminalCursor tokens -> Boundary tokens
+  | cursor =>
+      { val := cursor.val + 1,
+        isLt := Nat.succ_lt_succ cursor.isLt }
+
+Boundary.start(tokens : List Token) : Boundary tokens =
+  { val := 0, isLt := Nat.zero_lt_succ _ }
+
+Boundary.afterLogicalEOF(tokens : List Token) : Boundary tokens =
+  { val := tokens.length + 1,
+    isLt := Nat.lt_succ_self (tokens.length + 1) }
+
 Multi.Grammar.GuardDecision = positive | negative | neutral
 
 Multi.Grammar.Polarity = positive | negative
@@ -1444,6 +1617,51 @@ GuardInstanceKey(tokens : List Token) = {
   siteCursor   : Boundary tokens,
   ordered      : contextStart.val <= siteCursor.val
 }
+
+DottedItem(tokens : List Token) = {
+  production : ProductionId,
+  dot        : Fin (production.rhs.length + 1),
+  origin     : Boundary tokens,
+  current    : Boundary tokens
+}
+
+PackedEdgeKey(tokens : List Token) =
+  | scanned
+      (before after : DottedItem tokens)
+      (terminalCursor : TerminalCursor tokens)
+  | completed
+      (waiting finished after : DottedItem tokens)
+      (sharedCursor : Boundary tokens)
+
+ContextualItemKey(tokens : List Token) = {
+  raw     : DottedItem tokens,
+  context : GuardContext tokens
+}
+
+ContextualPackedEdgeKey(tokens : List Token) =
+  | scanned
+      (before after : ContextualItemKey tokens)
+      (terminalCursor : TerminalCursor tokens)
+  | completed
+      (waiting finished after : ContextualItemKey tokens)
+      (sharedCursor : Boundary tokens)
+
+CanonicalCompleteRootItem(tokens : List Token,
+                          rule : GrammarRuleId,
+                          origin finish : Boundary tokens,
+                          context : GuardContext tokens) :
+    ContextualItemKey tokens = {
+  raw := {
+    production := ProductionId.root rule,
+    dot := {
+      val := (ProductionId.root rule).rhs.length,
+      isLt := Nat.lt_succ_self _
+    },
+    origin := origin,
+    current := finish
+  },
+  context := context
+}
 ```
 
 `Boundary` ranges over all chart boundaries, including the boundary after the
@@ -1452,6 +1670,27 @@ body's `{`; an `armBody` start is the boundary immediately after that arm's
 `=>`; and a `postfixInvocation` start is the origin of the enclosing source
 rule `postfix`, before its `atom`. These are source-token boundaries, not byte
 cursors. `plain` is used outside all three locally relevant contexts.
+
+These token-indexed data types, `descendContext`, the terminal-stream lookup
+below, and the proof-free validity predicates on packed edges are owned by
+`Solcore.Surface.Multi.ParserCore`. `ParserCore` imports `Grammar` and is
+imported independently by `ParserJudgment`, `Chart`, and `Parser`; none of
+those three imports either sibling. This shared ownership is required:
+duplicating a `GuardContext`, boundary, or packed-edge type in the judgment and
+executor would make context identity an unproved conversion instead of the
+same key. `Grammar` continues to own only the grammar table and its finite IDs,
+including `GuardDecision`, `Polarity`, and `guardOf`.
+
+`TerminalCursor` selects one member of `tokens` followed by the one logical
+`EOF`; it never denotes the boundary after `EOF`. `DottedItem` keeps its four
+displayed fields rather than storing an implementation-selected opaque chart
+node. `CanonicalCompleteRootItem` is the only rule-indexed root refinement:
+its production is definitionally `.root rule`, its dot is definitionally the
+complete dot, its left-hand side reduces definitionally to `.rule rule`, and
+its semantic output index therefore reduces to `RuleValue rule`. It contains
+no equality field or cast. All structures and sums in this block have `Repr`, `BEq`, and
+`DecidableEq`; proof fields introduced by the valid-edge subtypes below are
+proof-irrelevant.
 
 `GuardDecision` is owned by `Solcore.Surface.Multi.Grammar`, beside
 `PriorityGuardId`, `Polarity`, and `guardOf`; judgment and executor modules
@@ -1471,8 +1710,9 @@ the positions before child `1` of
 `matchArm ::= "|" list1(pattern) "=>" armStatement*` respectively.
 
 ```text
-descendContext(waiting : ContextualItemKey,
-               predicted : ProductionId) : GuardContext tokens =
+descendContext {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (predicted : ProductionId) : GuardContext tokens =
   | predicted = P.root[postfix] =>
       postfixInvocation waiting.raw.current
   | waiting.raw is P.seq[body.root] at dot 1 and
@@ -1496,7 +1736,7 @@ For a cell `cell = (guard, polarity)` in
 `guardOf productionInstance.production`, the closed relation
 
 ```text
-GuardAnchor : ProductionInstanceKey tokens ->
+GuardAnchor {tokens : List Token} : ProductionInstanceKey tokens ->
   (PriorityGuardId × Polarity) -> GuardInstanceKey tokens -> Prop
 ```
 
@@ -1526,43 +1766,394 @@ preceding dot is not a legal anchor.
 `GuardAnchor.functional` is required:
 
 ```text
-GuardAnchor.functional :
+GuardAnchor.functional
+    {tokens : List Token}
+    {productionInstance : ProductionInstanceKey tokens}
+    {cell : PriorityGuardId × Polarity}
+    {left right : GuardInstanceKey tokens} :
   GuardAnchor productionInstance cell left ->
   GuardAnchor productionInstance cell right ->
   left = right
+
+GuardAnchor.decide :
+  {tokens : List Token} ->
+  (productionInstance : ProductionInstanceKey tokens) ->
+  (cell : PriorityGuardId × Polarity) ->
+  Option (GuardInstanceKey tokens)
+
+GuardAnchor.decide_eq_some_iff
+    {tokens : List Token}
+    {productionInstance : ProductionInstanceKey tokens}
+    {cell : PriorityGuardId × Polarity}
+    {guardInstance : GuardInstanceKey tokens} :
+  GuardAnchor.decide productionInstance cell = some guardInstance iff
+    GuardAnchor productionInstance cell guardInstance
 ```
 
 This theorem follows from the displayed equations and the canonical context
 transition; it must not be obtained by choosing the first of several anchors.
+`ParserCore` owns the table relation, the total executable `decide`, and this
+characterization. They inspect only Grammar-owned guard cells and Core-owned
+keys/contexts; they do not inspect unguarded recognition or `GuardEvidence`.
+Consequently both executors may construct the same structural anchor without
+importing `ParserJudgment`.
 
-Guard evidence uses one auxiliary, wholly unguarded recognition relation.
-`UnguardedRecognizes(rule, start, finish)` is generated by the least raw
-predict/scan/complete closure of `expanded` with every `guardOf` entry ignored.
-`GreatestUnguardedEnd` additionally states that no larger finish satisfying
-the same named delimiter restriction is recognized. `ArmHeaderAt(regionStart,
-cursor)` means that the token at `cursor` is `|`, and that from its successor
-the greatest unguarded nonempty `list1(pattern)` ends immediately before a
-`=>` at the same match-delimiter depth. `ExactSlice(start, finish,
-[dot, identifier])` means that the half-open retained-token slice is exactly
-those two terminal classes. These relations inspect retained tokens and the
-lexer-proved delimiter structure only; strings, comments, and opaque assembly
-slices never contribute delimiters.
+Guard evidence uses one auxiliary, wholly unguarded recognition relation. The
+terminal stream and terminal match are first fixed completely:
 
-`NearestStatementRegion(regionStart, regionEnd)` is also unguarded. If the
-token immediately before `regionStart` is `{`, `regionEnd` is the matching `}`.
-If it is `=>`, delimiter scanning first selects the unique innermost unmatched
-`{` in the delimiter frame containing that `=>`; `regionEnd` is the least
-later cursor at the same depth that is either an
-`ArmHeaderAt(regionStart, regionEnd)` cursor or that `{` token's matching `}`.
-Nested bodies and nested matches are skipped by delimiter matching. A valid
-`GuardAnchor` ensures that the preceding `{` or `=>` is the token that created
-the retained context, but `NearestStatementRegion` itself uses only tokens and
-the unguarded delimiter relation. Implementations must prove:
+```text
+TerminalStreamValue = retained Token | endOfFile
+
+TokensOwnedBy (file : WorkspaceFile) (tokens : List Token) : Prop =
+  forall token, token in tokens -> token.span.ValidFor file
+
+TerminalAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (cursor : TerminalCursor tokens)
+    (value : TerminalStreamValue) (span : SourceSpan) : Prop =
+  | cursor.val < tokens.length,
+    tokens[cursor.val]? = some token,
+    value = retained token,
+    span = token.span,
+    token.span.ValidFor file
+  | cursor.val = tokens.length,
+    value = endOfFile,
+    span = { source := file.id,
+             startByte := file.content.utf8ByteSize,
+             endByte := file.content.utf8ByteSize }
+
+TerminalMatches : TerminalSymbol -> TerminalStreamValue -> Prop
+  | hardKeyword keyword, retained token =>
+      token.payload = hardKeyword keyword
+  | contextualKeyword keyword, retained token =>
+      token.payload = identifier keyword.spelling
+  | pragmaName kind, retained token => token.payload = pragmaName kind
+  | symbol symbol, retained token => token.payload = symbol symbol
+  | category identifier, retained token =>
+      exists text parsed,
+        token.payload = identifier text and
+        Identifier.parse text = some parsed
+  | category pathComponent, retained token =>
+      (exists text parsed,
+         token.payload = identifier text and
+         PathSegment.parse text = some parsed) or
+      (exists keyword parsed,
+         token.payload = hardKeyword keyword and
+         PathSegment.parse keyword.spelling = some parsed)
+  | category decimalLiteral, retained token =>
+      exists spelling digits,
+        token.payload = decimalLiteral spelling digits
+  | category hexadecimalLiteral, retained token =>
+      exists spelling digits,
+        token.payload = hexadecimalLiteral spelling digits
+  | category stringLiteral, retained token =>
+      exists spelling decoded,
+        token.payload = stringLiteral spelling decoded
+  | category assemblyBlock, retained token =>
+      exists slice, token.payload = assemblyBlock slice
+  | endOfFile, endOfFile => True
+  | _, _ => False
+
+MatchedTerminal
+    (file : WorkspaceFile) (tokens : List Token)
+    (terminal : TerminalSymbol) = {
+  cursor  : TerminalCursor tokens,
+  value   : TerminalStreamValue,
+  span    : SourceSpan,
+  at      : TerminalAt file tokens cursor value span,
+  matches : TerminalMatches terminal value
+}
+
+BoundaryByte : WorkspaceFile -> (tokens : List Token) ->
+  Boundary tokens -> Nat -> Prop
+
+ConsumedSpan : WorkspaceFile -> (tokens : List Token) ->
+  Boundary tokens -> Boundary tokens -> SourceSpan -> Prop
+
+ConsumedSpanWitness
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens) = {
+  span     : SourceSpan,
+  consumed : ConsumedSpan file tokens origin finish span
+}
+
+sourceLoc
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens} {alpha : Type}
+    (witness : ConsumedSpanWitness file tokens origin finish)
+    (payload : alpha) : Located alpha =
+  { span := witness.span, payload := payload }
+
+SourceLocates
+    {alpha : Type}
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens) (payload : alpha)
+    (located : Located alpha) : Prop =
+  exists witness : ConsumedSpanWitness file tokens origin finish,
+    located = sourceLoc witness payload
+
+ConsumedSpanWitness.compute
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val <= finish.val) :
+  ConsumedSpanWitness file tokens origin finish
+```
+
+Thus contextual words are identifier tokens with the exact contextual
+spelling; they are never a second lexer token kind. The identifier category
+cannot match a hard-keyword token. A path component may match either an
+identifier token or the exact spelling retained by a hard-keyword token, but
+only when that spelling constructs a `PathSegment`. The three literal token
+kinds are the complete `literal` category. The logical `EOF` has the unique
+empty source span at the file's UTF-8 byte size; it is not a synthetic `Token`.
+
+`BoundaryByte file tokens boundary byte` first requires
+`TokensOwnedBy file tokens`; it is functional and otherwise holds exactly as
+follows. If `boundary.val < tokens.length`, `byte` is the indexed token's
+`span.startByte`. At either of the final two chart
+boundaries (`boundary.val >= tokens.length`), `byte` is
+`file.content.utf8ByteSize`. Thus trivia belongs to no token value. Leading
+trivia before the first consumed token and trailing trivia after the last
+consumed token are excluded from an ordinary nonempty syntax span; trivia
+between two consumed tokens necessarily lies inside their minimal contiguous
+byte interval. The logical-EOF and post-EOF boundaries share the physical end
+byte while remaining distinct grammar boundaries.
+
+`ConsumedSpan file tokens start finish span` first requires
+`TokensOwnedBy file tokens` and `start.val <= finish.val`. If the half-open cursor interval
+`[start.val, finish.val)` contains retained tokens, let `first` and `last` be
+its least and greatest retained-token cursors; it holds exactly for
+`{ source := file.id, startByte := first.span.startByte,
+endByte := last.span.endByte }`. Logical `EOF` is not retained and does not
+extend that range. If the interval contains no retained token, it holds exactly
+for the empty span at the functional `BoundaryByte file tokens start`.
+`ConsumedSpan` is therefore functional. The module root deliberately overrides
+it with `[0, file.content.utf8ByteSize)`, and an empty match-arm body deliberately
+uses the empty span at its retained `fatArrow.span.endByte`; these are the only
+two root-action span overrides. Every other located value constructed by a
+root action takes the `ConsumedSpan` of that source production's exact origin
+and finish, while a pass-through action preserves the child's already fixed
+span.
+
+`ConsumedSpanWitness` is an explicit checked Type input to a locating root
+constructor. `sourceLoc` projects its span and constructs the `Located` value;
+it never searches for or selects a span from a proposition. Every
+`RuleReduction` constructor below that uses `sourceLoc` takes such a witness as
+an explicit argument. `SourceLocates` is the proposition exposed to proofs.
+`ConsumedSpan.functional` gives `SourceLocates.functional`, but functionality
+is used only to compare two already-constructed outputs and never to obtain
+one. The witness, relation, and constructor are owned by `ParserCore` beside
+`BoundaryByte` and `ConsumedSpan`.
+`ConsumedSpanWitness.compute` is the total constructive implementation: it
+decides whether the finite interval contains a retained token and computes the
+first/last or empty-boundary case directly. Completed coherent items provide
+`ordered`; the public parse premise provides `owned`. Its proof field is then
+established from those inputs. Thus ordinary locating actions have an
+executable witness whenever their completed interval is ordered; the module
+and empty-arm overrides do not call this constructor.
+
+The unguarded chart and its named projections have these complete signatures:
+
+```text
+UnguardedReach :
+  WorkspaceFile -> (tokens : List Token) -> DottedItem tokens -> Prop
+
+UnguardedRecognizes :
+  WorkspaceFile -> (tokens : List Token) -> NonterminalSymbol ->
+  Boundary tokens -> Boundary tokens -> Prop
+
+GreatestUnguardedEnd :
+  WorkspaceFile -> (tokens : List Token) -> NonterminalSymbol ->
+  (start upperBound finish : Boundary tokens) -> Prop
+
+ExactSlice :
+  WorkspaceFile -> (tokens : List Token) ->
+  (start finish : Boundary tokens) -> List TerminalSymbol -> Prop
+
+ArmHeaderAt :
+  WorkspaceFile -> (tokens : List Token) ->
+  (regionStart cursor : Boundary tokens) -> Prop
+
+NearestStatementRegion :
+  WorkspaceFile -> (tokens : List Token) ->
+  (regionStart regionEnd : Boundary tokens) -> Prop
+```
+
+`UnguardedReach file tokens` is the least relation generated by these four
+rules, with every `guardOf` entry ignored:
+
+1. `seed` inserts every production at dot zero, with equal origin/current, at
+   every `Boundary tokens`;
+2. `predict` inserts every dot-zero production whose `lhs` is the
+   nonterminal after a reached item's dot, at that item's current boundary;
+3. `scan` advances dot and current by one exactly when the current boundary is
+   a `TerminalCursor`, `TerminalAt` supplies its retained token or logical
+   `EOF`, and `TerminalMatches` holds for the terminal after the dot; and
+4. `complete` advances a reached waiting item exactly when its next symbol is
+   the `lhs` of a reached complete item and the waiting current equals the
+   finished origin, retaining the waiting origin and using the finished
+   current.
+
+`UnguardedRecognizes file tokens symbol start finish` holds exactly when a
+complete reached item has `production.lhs = symbol`, `origin = start`, and
+`current = finish`. It takes `NonterminalSymbol`, not only `GrammarRuleId`, so
+the mechanically generated `Aux` for `list1(pattern)` can be named without a
+second recognition relation. `GreatestUnguardedEnd file tokens symbol start
+upperBound finish` is `UnguardedRecognizes ... start finish`,
+`finish.val <= upperBound.val`, and the assertion that every other recognized
+end at or below that same upper bound has value at most `finish.val`. The upper
+bound is part of the key; there is no open predicate argument or unnamed
+delimiter restriction.
+
+`ExactSlice file tokens start finish classes` holds exactly when
+`finish.val = start.val + classes.length`, every cursor in that half-open range
+is the `beforeBoundary` of a `TerminalCursor` for which `TerminalAt file tokens`
+returns a retained token and `TerminalMatches` holds for the corresponding
+class, and there is no
+logical `EOF` member. In particular, the G07 query uses exactly
+`[symbol dot, category identifier]`.
+
+Delimiter evidence is closed over these types:
+
+```text
+DelimiterCloser = rightParen | rightBracket | rightBrace
+
+DelimiterStack = List DelimiterCloser
+
+DelimiterStep :
+  DelimiterStack -> TokenKind -> DelimiterStack -> Prop
+
+DelimiterRun :
+  (tokens : List Token) -> DelimiterStack -> Boundary tokens ->
+  Boundary tokens -> DelimiterStack -> Prop
+
+ProtectedDelimiterRun :
+  (tokens : List Token) -> NonemptyList DelimiterCloser -> Boundary tokens ->
+  Boundary tokens -> NonemptyList DelimiterCloser -> Prop
+
+MatchingDelimiter :
+  (tokens : List Token) -> (open close : Boundary tokens) ->
+  (opening closing : Symbol) -> Prop
+
+SameDelimiterDepth :
+  (tokens : List Token) -> Boundary tokens -> Boundary tokens -> Prop
+
+NextSameDepthDelimiter :
+  (tokens : List Token) -> Boundary tokens -> Boundary tokens ->
+  NonemptyList Symbol -> Prop
+
+SymbolAtBoundary :
+  WorkspaceFile -> (tokens : List Token) ->
+  Boundary tokens -> Symbol -> Prop
+
+ImmediatelyAfterSymbol :
+  WorkspaceFile -> (tokens : List Token) -> Symbol ->
+  (symbolCursor after : Boundary tokens) -> Prop
+
+ContainingBraceFrame :
+  (tokens : List Token) -> (cursor open close : Boundary tokens) -> Prop
+
+InnermostContainingBraceFrame :
+  (tokens : List Token) -> (cursor open close : Boundary tokens) -> Prop
+
+NextArmOrClose :
+  WorkspaceFile -> (tokens : List Token) ->
+  (regionStart close regionEnd : Boundary tokens) -> Prop
+```
+
+The only opening/closing pairs are `(`/`)`, `[`/`]`, and `{`/`}`.
+`DelimiterStep` pushes the corresponding closer for an opening-symbol token,
+pops only an equal closer, leaves the stack unchanged for every other token,
+and has no rule for a mismatched or unmatched closer. `DelimiterRun` is the
+least exact one-token-at-a-time composition of those steps. A token whose kind
+is string, literal, comment-free assembly block, identifier, keyword, pragma,
+or non-delimiter symbol is one unchanged-stack step. Comments are absent from
+`tokens`; strings and opaque assembly tokens are never opened and inspected.
+
+`ProtectedDelimiterRun` is the same composition with a nonempty stack before
+and after every step, so it cannot consume the closer belonging to its bottom
+stack entry. `MatchingDelimiter tokens open close opening closing` requires
+the stated pair at `open`/`close` and a protected run from the successor of
+`open` through the half-open interior to `close`, beginning and ending with
+the singleton expected closer. `SameDelimiterDepth tokens start finish` is a
+run from the empty stack to the empty stack. `NextSameDepthDelimiter tokens
+start cursor allowed` requires `SameDelimiterDepth start cursor`, an allowed
+symbol token at `cursor`, and no smaller cursor after `start` satisfying both
+conditions. These clauses make every delimiter query deterministic without a
+guard or parser answer.
+
+`SymbolAtBoundary file tokens cursor symbol` holds exactly when there is a
+`TerminalCursor` whose `beforeBoundary` is `cursor`, `TerminalAt` returns a
+retained token there, and that token has payload `.symbol symbol`.
+`ImmediatelyAfterSymbol file tokens symbol symbolCursor after` adds
+`after = terminalCursor.afterBoundary` for that same cursor. It is false at
+logical `EOF` and at the post-EOF boundary.
+
+The remaining region relations are the following least closed relations; the
+displayed quantifiers are part of their definitions, not implementation
+guidance:
+
+```text
+ArmHeaderAt file tokens regionStart cursor iff
+  regionStart.val <= cursor.val and
+  SameDelimiterDepth tokens regionStart cursor and
+  SymbolAtBoundary file tokens cursor pipe and
+  exists patternStart arrowCursor,
+    ImmediatelyAfterSymbol file tokens pipe cursor patternStart and
+    NextSameDepthDelimiter
+      tokens patternStart arrowCursor [fatArrow] and
+    GreatestUnguardedEnd file tokens
+      (NonterminalSymbol.aux matchArmPatternListSite.site)
+      patternStart arrowCursor arrowCursor
+
+ContainingBraceFrame tokens cursor open close iff
+  open.val < cursor.val and cursor.val < close.val and
+  MatchingDelimiter tokens open close openBrace closeBrace
+
+InnermostContainingBraceFrame tokens cursor open close iff
+  ContainingBraceFrame tokens cursor open close and
+  forall otherOpen otherClose,
+    ContainingBraceFrame tokens cursor otherOpen otherClose ->
+      otherOpen.val <= open.val
+
+NextArmOrClose file tokens regionStart close regionEnd iff
+  regionStart.val <= regionEnd.val and regionEnd.val <= close.val and
+  SameDelimiterDepth tokens regionStart regionEnd and
+  (regionEnd = close or
+    ArmHeaderAt file tokens regionStart regionEnd) and
+  forall earlier,
+    regionStart.val <= earlier.val -> earlier.val < regionEnd.val ->
+    SameDelimiterDepth tokens regionStart earlier ->
+    not (earlier = close or
+      ArmHeaderAt file tokens regionStart earlier)
+
+NearestStatementRegion file tokens regionStart regionEnd iff
+  (exists open,
+    ImmediatelyAfterSymbol file tokens openBrace open regionStart and
+    MatchingDelimiter tokens open regionEnd openBrace closeBrace) or
+  (exists arrow open close,
+    ImmediatelyAfterSymbol file tokens fatArrow arrow regionStart and
+    InnermostContainingBraceFrame tokens arrow open close and
+    NextArmOrClose file tokens regionStart close regionEnd)
+```
+
+The `SameDelimiterDepth tokens regionStart cursor` premise in `ArmHeaderAt` is
+essential: a pipe belonging to an inner match cannot satisfy an outer arm-body
+query. The recognized nonterminal is the fixed Grammar-owned site whose exact
+key is `[rule = matchArm, path = [1]]`; it cannot accidentally select either
+of the other two `list1(pattern)` shapes. The innermost condition chooses the greatest containing opening-brace
+cursor; `MatchingDelimiter` then fixes its close. The final universal clause
+chooses the least same-depth next-arm header or that close. Nested bodies and
+matches are therefore skipped. A valid `GuardAnchor` ensures that the
+preceding `{` or `=>` created the retained context, but
+`NearestStatementRegion` itself mentions only `file`, `tokens`, delimiter
+relations, and `ArmHeaderAt`. Implementations must prove:
 
 ```text
 nearest_statement_region_functional :
-  NearestStatementRegion regionStart left ->
-  NearestStatementRegion regionStart right ->
+  NearestStatementRegion file tokens regionStart left ->
+  NearestStatementRegion file tokens regionStart right ->
   left = right
 ```
 
@@ -1573,12 +2164,12 @@ circular through a guarded parse answer.
 The final evidence relation is:
 
 ```text
-GuardEvidence : WorkspaceFile -> List Token ->
+GuardEvidence : (file : WorkspaceFile) -> (tokens : List Token) ->
   GuardInstanceKey tokens -> GuardDecision -> Prop
 ```
 
-It first requires that every token is owned by the supplied file. It then
-holds exactly for the one row below. For the eight guards other than `G02`,
+It first requires `TokensOwnedBy file tokens`. It then holds exactly for the
+one row below. For the eight guards other than `G02`,
 “otherwise negative” includes a missing token or incomplete named recognition.
 For `G02`, a missing retained token, including the logical-EOF position, is
 “not `|`” and therefore `neutral`.
@@ -1592,7 +2183,7 @@ For `G02`, a missing retained token, including the logical-EOF position, is
 | `G05_typeComptime` | `positive` exactly when the identifier at `siteCursor` has contextual spelling `comptime`, even if no following type exists; otherwise `negative`. |
 | `G06_patternComptime` | `positive` exactly when `siteCursor` spells contextual `comptime` and, from its successor, the greatest unguarded complete `expression` ends at the next same-pattern-depth `,`, `)`, or `=>`; otherwise `negative`. |
 | `G07_leadingDotArguments` | `positive` exactly when `ExactSlice(contextStart, siteCursor, [dot, identifier])` and the token at `siteCursor` is `(`; otherwise `negative`. |
-| `G08_terminalExpression` | First obtain the unique `NearestStatementRegion(contextStart, regionEnd)`. Among unguarded complete `expression` ends from `siteCursor` that do not pass `regionEnd`, `positive` holds exactly when the greatest end equals `regionEnd`; otherwise `negative`. |
+| `G08_terminalExpression` | `positive` holds exactly when there exists `regionEnd` with `NearestStatementRegion(contextStart, regionEnd)` and the greatest unguarded complete `expression` end from `siteCursor` not past `regionEnd` equals `regionEnd`; otherwise `negative`. `NearestStatementRegion.functional` makes this existential endpoint single-valued inside the proposition; no endpoint is selected into Type. |
 | `G09_genericContext` | `positive` exactly when, from `siteCursor` after `forallClause`, the greatest unguarded complete nonempty `predicateList` ends immediately before `=>`; otherwise `negative`. |
 
 Only `G02` can yield `neutral`. Thus a recognized next-arm header enables the
@@ -1647,47 +2238,127 @@ This table has `H = 18` cells. It is the same executable `guardOf` table used
 for coverage validation; the short `G01` through `G09` labels in this display
 stand for the correspondingly numbered `PriorityGuardId` constructors.
 
-The finite witness retained by the guarded chart is not a Boolean on a raw
-item. Its key is:
-
-```text
-GuardWitnessKey(tokens : List Token) = {
-  productionInstance : ProductionInstanceKey tokens,
-  guardInstance      : GuardInstanceKey tokens,
-  polarity           : Polarity,
-  guarded             :
-    (guardInstance.guard, polarity) in
-      guardOf productionInstance.production,
-  anchored            :
-    GuardAnchor productionInstance
-      (guardInstance.guard, polarity) guardInstance
-}
-```
-
-A witness value for this key additionally contains the unique `decision`, a
-`GuardEvidence file tokens guardInstance decision` derivation, and a proof
-that `decision.allows polarity = true`. A `ProductionInstanceKey` is enabled
-exactly when such a witness exists for every cell in its `guardOf` list.
-Unguarded production instances are enabled vacuously. Witness keys are
-inserted and looked up by their complete production/context/guard identity;
-erasing either context boundary before the lookup is nonconforming.
-
-The public guard schedule is a strict three-phase algorithm. Its internal
-state algebra is:
+The Phase-B state and its two independent correctness properties are defined
+before any witness that refers to them:
 
 ```text
 GuardMemoState = undecided | final GuardDecision
 
-AllGuardsFinal(memo : GuardInstanceKey tokens -> GuardMemoState) : Prop =
-  forall key, exists decision, memo key = final decision
+GuardMemo(tokens : List Token) =
+  GuardInstanceKey tokens -> GuardMemoState
 
-ContextualReach :
-  AllGuardsFinal memo -> ContextualItemKey -> Prop
+PhaseBCorrect
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens) : Prop =
+  forall key decision,
+    memo key = GuardMemoState.final decision iff
+      GuardEvidence file tokens key decision
+
+AllGuardsFinal {tokens : List Token} (memo : GuardMemo tokens) : Prop =
+  forall key, exists decision,
+    memo key = GuardMemoState.final decision
 ```
 
-The `AllGuardsFinal` derivation is an explicit parameter of the Phase C reach
-relation and of every contextual packed-edge constructor. It cannot be
-recovered from an existential lookup for one key.
+`ParserCore` owns `GuardMemoState`, `GuardMemo`, and the structural
+`AllGuardsFinal` barrier. `ParserJudgment` owns `GuardEvidence` and
+`PhaseBCorrect`, because only that relation connects a table to declarative
+unguarded recognition. An executor may expose its Core memo and prove
+`AllGuardsFinal`; the theorem that the executor's sealed table also satisfies
+`PhaseBCorrect` belongs to `Properties.lean`, the only layer that imports both
+the executor and `ParserJudgment`.
+
+The finite witness retained by the guarded chart is not a Boolean on a raw
+item. Its key is:
+
+```text
+GuardWitnessKey.Raw(tokens : List Token) = {
+  productionInstance : ProductionInstanceKey tokens,
+  guardInstance      : GuardInstanceKey tokens,
+  polarity           : Polarity
+}
+
+GuardWitnessKey.Valid {tokens : List Token}
+    (raw : GuardWitnessKey.Raw tokens) : Prop =
+  (raw.guardInstance.guard, raw.polarity) in
+    guardOf raw.productionInstance.production and
+    GuardAnchor raw.productionInstance
+      (raw.guardInstance.guard, raw.polarity) raw.guardInstance
+
+GuardWitnessKey (tokens : List Token) =
+  { raw : GuardWitnessKey.Raw tokens // GuardWitnessKey.Valid raw }
+```
+
+`GuardWitnessKey.productionInstance`, `.guardInstance`, and `.polarity` are
+the transparent projections through `.val`. `ParserCore` owns the raw key,
+validity predicate, checked subtype, and its `Repr`, `BEq`, and
+`DecidableEq`; the proof field is proof-irrelevant. `Chart.G` and
+`parseTokens` store only this Core-owned checked key. They do not store a
+`GuardEvidence` or judgment-owned `GuardWitness` value.
+
+A witness value and production enablement have these complete signatures:
+
+```text
+GuardWitness
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (allFinal : AllGuardsFinal memo)
+    (key : GuardWitnessKey tokens) : Prop =
+  exists decision : GuardDecision,
+    memo key.guardInstance = GuardMemoState.final decision and
+    GuardEvidence file tokens key.guardInstance decision and
+    decision.allows key.polarity = true
+
+EnabledProductionInstance
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (allFinal : AllGuardsFinal memo)
+    (instance : ProductionInstanceKey tokens) : Prop =
+  forall guard polarity,
+    (guard, polarity) in guardOf instance.production ->
+    exists witnessKey : GuardWitnessKey tokens,
+      witnessKey.productionInstance = instance and
+      witnessKey.guardInstance.guard = guard and
+      witnessKey.polarity = polarity and
+      GuardWitness file tokens memo correct allFinal witnessKey
+```
+
+Here `correct` and `allFinal` are explicit parameters; the key's proof
+field is the exact membership-and-anchor validity premise just displayed. A
+`ProductionInstanceKey` is enabled
+exactly when such a witness exists for every cell in its `guardOf` list.
+Unguarded production instances are enabled vacuously. Witness keys are
+inserted and looked up by their complete production/context/guard identity;
+erasing either context boundary before the lookup is nonconforming.
+`GuardWitness` is deliberately a proposition, not a Type-valued record used as
+a proposition. Its existential decision remains inside `Prop`; neither
+`EnabledProductionInstance` nor contextual reach eliminates it to construct a
+semantic value. The executable constructs its stored `GuardWitnessKey` and
+final decision directly from the sealed Phase-B table, and correspondence
+proves the displayed proposition afterward.
+
+The public guard schedule is a strict three-phase algorithm. Its Phase-C reach
+signature is:
+
+```text
+ContextualReach
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+  ContextualItemKey tokens -> Prop
+```
+
+`PhaseBCorrect` states that every finalized cell has exactly its declarative
+evidence and that every declaratively evidenced decision is the stored one.
+`AllGuardsFinal` states only the scheduling barrier. These propositions are
+deliberately separate: a table filled with `final neutral` satisfies the
+second and generally violates the first. Both derivations are explicit
+parameters of the Phase C reach relation and of every contextual packed-edge
+constructor. Neither may be recovered from an existential lookup for one key,
+and Phase C may not replace `PhaseBCorrect` by functionality or totality of
+`GuardEvidence` alone.
 
 1. **Phase A — universal unguarded saturation.** Initialize the raw dot-zero
    production at every boundary for every expanded nonterminal and compute one
@@ -1699,20 +2370,32 @@ recovered from an existential lookup for one key.
 2. **Phase B — decision finalization.** Allocate one `undecided` cell for every
    finite `GuardInstanceKey`, in its displayed lexicographic order. Reading
    only Phase A's saturated tables and retained tokens, replace each cell
-   exactly once by the unique `final decision` specified by
-   `GuardEvidence`. Finish the entire table, including every anchored key,
-   before Phase C begins. This phase creates no `ProductionInstanceKey`,
+   exactly once by its unique final decision. Extensionally that decision is
+   the one specified by `GuardEvidence`; executors compute it from their
+   Phase-A indexes without importing that judgment, and `Properties.lean`
+   proves the equivalence. The completed table must separately satisfy
+   `PhaseBCorrect` and `AllGuardsFinal` at the declarative interface. Finish
+   the entire table, including
+   every anchored key, before Phase C begins. This phase creates no `ProductionInstanceKey`,
    `GuardWitnessKey`, contextual item, contextual edge, AST value, or parse
    diagnostic.
-3. **Phase C — guarded contextual saturation and reduction.** Start the one
-   contextual module chart in `plain`. Prediction forms a production instance,
+3. **Phase C — guarded contextual saturation and reduction.** In the
+   declarative relation, given explicit proofs of both `PhaseBCorrect` and
+   `AllGuardsFinal`, start the one contextual
+   module chart in `plain`. Prediction forms a production instance,
    obtains its unique anchor, reads only a `final` Phase B cell, applies
    `Polarity.accepts`, and creates the corresponding guard witness only when
    the polarity is accepted. Compute the contextual fixed point once, then
    compute its contextual diagnostic frontier or reduce its unique root.
 
 Phase order is part of `Chart.G`, not an implementation optimization. No
-Phase C reachability fact may exist while any Phase B cell is `undecided`.
+declarative Phase C reachability, edge-validity, reduction, frontier, or
+diagnostic fact may exist without both Phase B proofs. Executable Chart/Fast
+Phase C is blocked by its Core-owned sealed-final state; it never imports or
+constructs `PhaseBCorrect`. `Properties.lean` proves that the sealed executor
+memo satisfies `PhaseBCorrect` and maps that run into the declarative Phase C
+relation. Neither form of Phase C may begin while any Phase B cell is
+`undecided`.
 `undecided` is an internal scheduler state, never `negative`, `neutral`, a
 source diagnostic, or evidence for either polarity. A missing or provisional
 decision cannot enable a production and cannot enter `ContextualReach`.
@@ -1723,34 +2406,159 @@ The table is exhaustive; no parser-combinator commit order is part of m2c-v1.
 
 The normative reference parser is `Multi.Chart.G`. For an input containing
 `n` retained tokens, let `terminalStream` append one logical `EOF`, let
-`T = n + 1`, and number its `T + 1` boundaries from zero through `T`.
+`T = n + 1`, and number its `T + 1` boundaries from zero through `T`. The
+chart uses the `ParserCore` carriers already defined above; it does not
+redeclare private executor variants of them.
 
 ```text
-DottedItem = {
-  production : ProductionId,
-  dot        : Fin (production.rhs.length + 1),
-  origin     : Fin (T + 1),
-  current    : Fin (T + 1)
+NextSymbol {tokens : List Token}
+    (item : DottedItem tokens) (symbol : GrammarSymbol) : Prop =
+  item.dot.val < item.production.rhs.length and
+  item.production.rhs[item.dot.val]? = some symbol
+
+CompleteItem {tokens : List Token} (item : DottedItem tokens) : Prop =
+  item.dot.val = item.production.rhs.length
+
+AdvanceItem {tokens : List Token}
+    (before : DottedItem tokens) (next : Boundary tokens)
+    (after : DottedItem tokens) : Prop =
+  after.production = before.production and
+  after.dot.val = before.dot.val + 1 and
+  after.origin = before.origin and
+  after.current = next
+
+prefix_zero_layout
+    {tokens : List Token}
+    (item : DottedItem tokens)
+    (zero : item.dot.val = 0) :
+  [] = item.production.rhs.take item.dot.val
+
+prefix_scan_layout
+    {tokens : List Token}
+    (before after : DottedItem tokens)
+    (terminal : TerminalSymbol)
+    (nextBoundary : Boundary tokens)
+    (next : NextSymbol before (GrammarSymbol.terminal terminal))
+    (advance : AdvanceItem before nextBoundary after) :
+  before.production.rhs.take before.dot.val ++
+      [GrammarSymbol.terminal terminal] =
+    after.production.rhs.take after.dot.val
+
+prefix_complete_layout
+    {tokens : List Token}
+    (waiting finished after : DottedItem tokens)
+    (next : NextSymbol waiting
+      (GrammarSymbol.nonterminal finished.production.lhs))
+    (advance : AdvanceItem waiting finished.current after) :
+  waiting.production.rhs.take waiting.dot.val ++
+      [GrammarSymbol.nonterminal finished.production.lhs] =
+    after.production.rhs.take after.dot.val
+
+prefix_full_layout
+    {tokens : List Token}
+    (item : DottedItem tokens)
+    (complete : CompleteItem item) :
+  item.production.rhs.take item.dot.val = item.production.rhs
+
+canonicalCompleteRootItem_complete
+    {tokens : List Token} (rule : GrammarRuleId)
+    (origin finish : Boundary tokens) (context : GuardContext tokens) :
+  CompleteItem
+    (CanonicalCompleteRootItem
+      tokens rule origin finish context).raw
+
+PackedEdgeKey.Valid
+    (file : WorkspaceFile) (tokens : List Token)
+    (key : PackedEdgeKey tokens) : Prop =
+  | scanned before after terminalCursor =>
+      exists terminal value span,
+        NextSymbol before (terminal terminal) and
+        terminalCursor.beforeBoundary = before.current and
+        TerminalAt file tokens terminalCursor value span and
+        TerminalMatches terminal value and
+        AdvanceItem before terminalCursor.afterBoundary after
+  | completed waiting finished after sharedCursor =>
+      exists symbol,
+        NextSymbol waiting (nonterminal symbol) and
+        CompleteItem finished and
+        finished.production.lhs = symbol and
+        waiting.current = sharedCursor and
+        finished.origin = sharedCursor and
+        AdvanceItem waiting finished.current after
+
+ScannedEdgeWitness
+    (file : WorkspaceFile) (tokens : List Token)
+    (before after : DottedItem tokens)
+    (cursor : TerminalCursor tokens) = {
+  terminal : TerminalSymbol,
+  matched  : MatchedTerminal file tokens terminal,
+  sameCursor : matched.cursor = cursor,
+  next     : NextSymbol before (GrammarSymbol.terminal terminal),
+  atCurrent : cursor.beforeBoundary = before.current,
+  advance  : AdvanceItem before matched.cursor.afterBoundary after
 }
 
-PackedEdgeKey =
-  | scanned  (before after : DottedItem) (terminalCursor : Fin T)
-  | completed
-      (waiting finished after : DottedItem)
-      (sharedCursor : Fin (T + 1))
-
-ContextualItemKey = {
-  raw     : DottedItem,
-  context : GuardContext tokens
+CompletedEdgeWitness
+    (tokens : List Token)
+    (waiting finished after : DottedItem tokens)
+    (shared : Boundary tokens) = {
+  next : NextSymbol waiting
+    (GrammarSymbol.nonterminal finished.production.lhs),
+  complete : CompleteItem finished,
+  waitingAtShared : waiting.current = shared,
+  finishedAtShared : finished.origin = shared,
+  advance : AdvanceItem waiting finished.current after
 }
 
-ContextualPackedEdgeKey =
-  | scanned
-      (before after : ContextualItemKey)
-      (terminalCursor : Fin T)
-  | completed
-      (waiting finished after : ContextualItemKey)
-      (sharedCursor : Boundary tokens)
+packedEdge_scanned_valid_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : DottedItem tokens} {cursor : TerminalCursor tokens} :
+  PackedEdgeKey.Valid file tokens (.scanned before after cursor) iff
+    Nonempty (ScannedEdgeWitness file tokens before after cursor)
+
+packedEdge_completed_valid_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {waiting finished after : DottedItem tokens}
+    {shared : Boundary tokens} :
+  PackedEdgeKey.Valid file tokens
+    (.completed waiting finished after shared) iff
+      Nonempty
+        (CompletedEdgeWitness tokens waiting finished after shared)
+
+PackedEdge (file : WorkspaceFile) (tokens : List Token) =
+  { key : PackedEdgeKey tokens // PackedEdgeKey.Valid file tokens key }
+
+ContextualPackedEdgeKey.rawProjection :
+  {tokens : List Token} ->
+  ContextualPackedEdgeKey tokens -> PackedEdgeKey tokens
+  | scanned before after cursor =>
+      PackedEdgeKey.scanned before.raw after.raw cursor
+  | completed waiting finished after shared =>
+      PackedEdgeKey.completed waiting.raw finished.raw after.raw shared
+
+ContextualPackedEdgeKey.StructurallyValid
+    (file : WorkspaceFile) (tokens : List Token)
+    (key : ContextualPackedEdgeKey tokens) : Prop =
+  PackedEdgeKey.Valid file tokens key.rawProjection and
+  match key with
+  | scanned before after _ =>
+      before.context = after.context
+  | completed waiting finished after _ =>
+      finished.context =
+        descendContext waiting finished.raw.production and
+      after.context = waiting.context
+
+StructurallyValidContextualPackedEdge
+    (file : WorkspaceFile) (tokens : List Token) =
+  { key : ContextualPackedEdgeKey tokens //
+      ContextualPackedEdgeKey.StructurallyValid file tokens key }
+
+ContextualEdgeReach
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+  ContextualPackedEdgeKey tokens -> Prop
 
 Predict(item) =
   if item.raw.next is nonterminal X, form each production instance for X
@@ -1772,8 +2580,20 @@ Complete(waiting, finished) =
     current = finished.raw.current and context = waiting.context
 ```
 
-Here `Fin (T + 1)` is definitionally `Boundary tokens`; the raw spelling is
-retained to keep the original `DottedItem` and `PackedEdgeKey` algebra stable.
+`TerminalCursor.afterBoundary` is the unique successor boundary, including
+when the scanned terminal is logical `EOF`. The terminal cursor is therefore the exact
+pre-scan boundary and scanning `EOF` reaches the final boundary. These
+relations are proof-free predicates owned by `ParserCore`; the two structural
+subtype aliases retain their proofs only as erased validity certificates.
+`ContextualEdgeReach` is instead owned by `ParserJudgment`, so `ParserCore`
+never imports a judgment relation.
+
+The four `prefix_*_layout` results and
+`canonicalCompleteRootItem_complete` are public checked theorems in
+`ParserCore`. They are proved only from `List.take_zero`, `List.take_succ`,
+`List.take_eq_self`, `NextSymbol`, and `AdvanceItem`, with equality
+substitution for production/dot fields. They are not axioms stored in an edge,
+and their proofs contain no `Classical.choice` or unchecked cast.
 
 The raw `DottedItem` and `PackedEdgeKey` algebras above are unchanged and remain
 the grammar-audit projections. They are not sufficient semantic deduplication
@@ -1782,13 +2602,19 @@ The contextual completed constructor requires exactly the `Complete` context
 equations above. Its raw projection is the displayed raw `PackedEdgeKey`, but
 two contextual edges with the same raw projection remain distinct.
 
-After Phase A is saturated and Phase B proves `AllGuardsFinal`, Phase C of `G`
-starts with `P.root[module]` at origin/current zero in context `plain`. It
+After Phase A is saturated and Phase B proves both `PhaseBCorrect` and
+`AllGuardsFinal`, Phase C of `G`
+starts with `P.root[GrammarRuleId.module]` at origin/current zero in context
+`plain`. It
 computes the least set closed under contextual `Predict`, `Scan`, and
 `Complete`, retaining `ContextualPackedEdgeKey` action edges by stable
-`ActionId` and retaining the separate `GuardWitnessKey` set. A contextual edge
-exists only when its displayed items satisfy the corresponding equation, so
-it is a finite subtype rather than an open trace object. The Phase C executable
+`ActionId` and retaining the separate `GuardWitnessKey` set. A scanned
+`ContextualEdgeReach` constructor requires reached `before`, structural
+validity, and then derives reached `after`; a completed constructor requires
+reached `waiting` and `finished`, structural validity, and then derives reached
+`after`. Thus every retained edge is structurally valid and all endpoint items
+belong to the same least Phase C closure; an unreached `after` cannot be
+admitted by constructing a structural subtype. The Phase C executable
 uses an ordered finite worklist: each contextual item and contextual edge is
 dequeued once; each production instance and guard-witness key is activated or
 inserted once; each compatible prediction, scan, and completion key is
@@ -1804,6 +2630,1185 @@ reduction, or diagnostics. A raw item reached once under `.postfixInvocation`
 for `.T(` and once under another postfix origin is two keys, as are their
 completed edges. Raw projection may be used only after a complete coherent
 contextual derivation has been selected.
+
+The semantic carrier is indexed by the finite grammar rather than erased to
+`Any`, `Dynamic`, or an executor callback. `ParserCore` owns the following
+carrier types. `OptionalCommaValue` and `PostfixPartValue` are the only
+non-AST root values:
+
+```text
+OptionalCommaValue = absent | present SourceSpan
+
+PostfixPartValue =
+  | call   (openParen : SourceSpan) (arguments : List Expression)
+           (closeParen : SourceSpan)
+  | select (dot : SourceSpan) (field : IdentifierOccurrence)
+  | index  (openBracket : SourceSpan) (index : Expression)
+           (closeBracket : SourceSpan)
+
+RuleValue : GrammarRuleId -> Type
+  | module                  => ParsedModuleV1
+  | topItem                 => TopItem
+  | moduleRef               => ModuleReference
+  | importDecl              => ImportDecl
+  | importEntry             => ImportSelectorEntry
+  | hidingClause            => HidingClause
+  | exportDecl              => ExportDecl
+  | localExportEntry        => ExportEntry
+  | remoteExportEntry       => RemoteExportEntry
+  | exportItem              => ExportItem
+  | constructorSelection    => ConstructorSelection
+  | pragmaDecl              => PragmaDecl
+  | genericPrefix           => GenericPrefix
+  | forallClause            => ForallClause
+  | forallBinder            => ForallBinder
+  | optionalComma           => OptionalCommaValue
+  | predicateList           => NonemptyList Predicate
+  | predicate               => Predicate
+  | functionSignature       => FunctionSignature
+  | functionDecl            => FunctionDecl
+  | classMethod             => ClassMethodDecl
+  | dataDecl                => DataDecl
+  | dataConstructor         => DataConstructor
+  | typeAliasDecl           => TypeAliasDecl
+  | classDecl               => ClassDecl
+  | instanceDecl            => InstanceDecl
+  | instanceMethod          => FunctionDecl
+  | contractDecl            => ContractDecl
+  | contractMember          => ContractMember
+  | fieldDecl               => FieldDecl
+  | fallbackDecl            => FallbackDecl
+  | contractConstructorDecl => ContractConstructorDecl
+  | parameter               => Parameter
+  | body                    => Body
+  | type                    => TypeExpr
+  | typeAtom                => TypeExpr
+  | qualifiedName           => QualifiedName
+  | statement               => Statement
+  | letStatement            => Statement
+  | letBinding              => LetBinding
+  | returnStatement         => Statement
+  | blockStatement          => Statement
+  | breakStatement          => Statement
+  | continueStatement       => Statement
+  | assemblyStatement       => Statement
+  | ifStatement             => Statement
+  | forStatement            => Statement
+  | forInitItem             => ForInitItem
+  | forPostItem             => ForPostItem
+  | matchStatement          => Statement
+  | matchArm                => MatchArm
+  | armStatement            => Statement
+  | assignmentStatement     => Statement
+  | assignmentOperator      => Located AssignmentOperator
+  | expressionStatement     => Statement
+  | terminalExpression      => Expression
+  | pattern                 => Pattern
+  | expression              => Expression
+  | annotation              => Expression
+  | conditional             => Expression
+  | logicalOr               => Expression
+  | logicalAnd              => Expression
+  | equality                => Expression
+  | relational              => Expression
+  | bitOr                   => Expression
+  | bitXor                  => Expression
+  | bitAnd                  => Expression
+  | additive                => Expression
+  | multiplicative          => Expression
+  | prefix                  => Expression
+  | postfix                 => Expression
+  | postfixPart             => PostfixPartValue
+  | atom                    => Expression
+  | lambda                  => Expression
+  | literal                 => Literal
+```
+
+This definition has exactly one equation for each of the 75 constructors of
+`GrammarRuleId`, in their displayed order. An exhaustiveness theorem compares
+its equation tags with `allGrammarRuleIds`; a wildcard equation is forbidden.
+
+The EBNF value family preserves the raw products, options, and lists displayed
+below. It is **not** a naive structural mutual definition: Lean 4.32 does not
+accept the recursive occurrence at `branches.get branch` as a structural
+subterm, and a nested indexed inductive is rejected when a `List` parameter
+contains the local expression index. `ParserCore` therefore uses this one
+explicit well-founded family:
+
+```text
+ebnfSize : EbnfExpr -> Nat
+  | atom _            => 1
+  | sequence children => 1 + (children.map ebnfSize).sum
+  | group child       => 1 + ebnfSize child
+  | choice branches   => 1 + (branches.map ebnfSize).sum
+  | optional child    => 1 + ebnfSize child
+  | star child        => 1 + ebnfSize child
+  | plus child        => 1 + ebnfSize child
+  | list0 element     => 1 + ebnfSize element
+  | list1 element     => 1 + ebnfSize element
+
+UnaryEbnfKind = group | optional | star | plus | list0 | list1
+
+UnaryEbnfKind.apply : UnaryEbnfKind -> EbnfExpr -> EbnfExpr
+  | group, child    => EbnfExpr.group child
+  | optional, child => EbnfExpr.optional child
+  | star, child     => EbnfExpr.star child
+  | plus, child     => EbnfExpr.plus child
+  | list0, child    => EbnfExpr.list0 child
+  | list1, child    => EbnfExpr.list1 child
+
+EbnfValueIndex =
+  | expression  EbnfExpr
+  | expressions (List EbnfExpr)
+
+EbnfValueIndex.measure : EbnfValueIndex -> Nat
+  | expression expression => 2 * ebnfSize expression
+  | expressions values    => 2 * (values.map ebnfSize).sum + 1
+
+EbnfFamily (file : WorkspaceFile) (tokens : List Token) :
+    (index : EbnfValueIndex) -> Type
+  | expression (atom (terminal terminal)) =>
+      MatchedTerminal file tokens terminal
+  | expression (atom (nonterminal rule)) => RuleValue rule
+  | expression (sequence children) =>
+      EbnfFamily file tokens (expressions children)
+  | expression (group child) =>
+      EbnfFamily file tokens (expression child)
+  | expression (choice branches) =>
+      (branch : Fin branches.length) ×
+        EbnfFamily file tokens (expression (branches.get branch))
+  | expression (optional child) =>
+      Option (EbnfFamily file tokens (expression child))
+  | expression (star child) =>
+      List (EbnfFamily file tokens (expression child))
+  | expression (plus child) =>
+      NonemptyList (EbnfFamily file tokens (expression child))
+  | expression (list0 element) =>
+      List (EbnfFamily file tokens (expression element))
+  | expression (list1 element) =>
+      NonemptyList (EbnfFamily file tokens (expression element))
+  | expressions [] => Unit
+  | expressions (child :: rest) =>
+      EbnfFamily file tokens (expression child) ×
+        EbnfFamily file tokens (expressions rest)
+termination_by index => EbnfValueIndex.measure index
+
+EbnfValue (file : WorkspaceFile) (tokens : List Token)
+          (expression : EbnfExpr) : Type =
+  EbnfFamily file tokens (EbnfValueIndex.expression expression)
+
+EbnfValues (file : WorkspaceFile) (tokens : List Token)
+           (expressions : List EbnfExpr) : Type =
+  EbnfFamily file tokens (EbnfValueIndex.expressions expressions)
+```
+
+The termination proof is part of this definition. `ParserCore` proves
+`ebnfSize_positive` and the following strict-decrease lemmas from it,
+`List.get_mem`, and the mapped-sum membership bound:
+
+```text
+measure_sequence_lt (children : List EbnfExpr) :
+  measure (.expressions children) < measure (.expression (.sequence children))
+measure_choice_get_lt (branches : List EbnfExpr)
+                      (branch : Fin branches.length) :
+  measure (.expression (branches.get branch)) <
+    measure (.expression (.choice branches))
+measure_unary_child_lt (kind : UnaryEbnfKind) (child : EbnfExpr) :
+  measure (.expression child) < measure (.expression (kind.apply child))
+measure_cons_head_lt (child : EbnfExpr) (rest : List EbnfExpr) :
+  measure (.expression child) < measure (.expressions (child :: rest))
+measure_cons_tail_lt (child : EbnfExpr) (rest : List EbnfExpr) :
+  measure (.expressions rest) < measure (.expressions (child :: rest))
+```
+
+Here `kind` in `measure_unary_child_lt` has the closed constructors
+`group | optional | star | plus | list0 | list1`; `kind.apply` is their total
+case split, not an arbitrary function. The `decreasing_by` block uses exactly
+these lemmas in the corresponding equations. No opaque recursion escape,
+unchecked code-generation escape, assumed theorem, or compiler acceptance of
+a hidden structural recursion is permitted.
+`ParserCore` also exports `[simp]` equation theorems for both atom cases,
+sequence, group, choice, optional, star, plus, list0, list1,
+`EbnfValues []`, and `EbnfValues (child :: rest)`. Those twelve theorems have
+exactly the right-hand-side types displayed above and are proved from the
+well-founded equation theorem. They are the only reductions used by the
+action constructors, so the choice index always retains its
+`Fin branches.length` proof.
+
+The remaining indexed value carriers are:
+
+```text
+
+NonterminalValue (file : WorkspaceFile) (tokens : List Token) :
+    NonterminalSymbol -> Type
+  | rule rule => RuleValue rule
+  | aux site  => EbnfValue file tokens site.expression
+  | tail site =>
+      List (EbnfValue file tokens site.element.expression)
+
+GrammarSymbolValue (file : WorkspaceFile) (tokens : List Token) :
+    GrammarSymbol -> Type
+  | terminal terminal       => MatchedTerminal file tokens terminal
+  | nonterminal nonterminal => NonterminalValue file tokens nonterminal
+
+GrammarSymbolValues (file : WorkspaceFile) (tokens : List Token) :
+    List GrammarSymbol -> Type
+  | []             => Unit
+  | symbol :: rest =>
+      GrammarSymbolValue file tokens symbol ×
+        GrammarSymbolValues file tokens rest
+
+GrammarSymbolValues.append
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : List GrammarSymbol} :
+  GrammarSymbolValues file tokens left ->
+  GrammarSymbolValues file tokens right ->
+  GrammarSymbolValues file tokens (left ++ right)
+
+GrammarSymbolValues.transport
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : List GrammarSymbol}
+    (equality : left = right) :
+  GrammarSymbolValues file tokens left ->
+  GrammarSymbolValues file tokens right :=
+  Eq.mp
+    (congrArg (GrammarSymbolValues file tokens) equality)
+
+PrefixValues
+    (file : WorkspaceFile) (tokens : List Token)
+    (item : ContextualItemKey tokens) =
+  GrammarSymbolValues file tokens
+    (item.raw.production.rhs.take item.raw.dot.val)
+
+PrefixValues.zeroValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (item : ContextualItemKey tokens)
+    (zero : item.raw.dot.val = 0) :
+  PrefixValues file tokens item :=
+  GrammarSymbolValues.transport
+    (prefix_zero_layout item.raw zero) ()
+
+PrefixValues.scanValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : ContextualItemKey tokens)
+    (terminal : TerminalSymbol)
+    (next : NextSymbol before.raw (GrammarSymbol.terminal terminal))
+    (matched : MatchedTerminal file tokens terminal)
+    (advance : AdvanceItem before.raw
+      matched.cursor.afterBoundary after.raw)
+    (prior : PrefixValues file tokens before) :
+  PrefixValues file tokens after :=
+  GrammarSymbolValues.transport
+    (prefix_scan_layout before.raw after.raw terminal
+      matched.cursor.afterBoundary next advance)
+    (GrammarSymbolValues.append prior (matched, ()))
+
+PrefixValues.completeValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens)
+    (next : NextSymbol waiting.raw
+      (GrammarSymbol.nonterminal finished.raw.production.lhs))
+    (advance : AdvanceItem waiting.raw finished.raw.current after.raw)
+    (prior : PrefixValues file tokens waiting)
+    (value : NonterminalValue file tokens
+      finished.raw.production.lhs) :
+  PrefixValues file tokens after :=
+  GrammarSymbolValues.transport
+    (prefix_complete_layout waiting.raw finished.raw after.raw next advance)
+    (GrammarSymbolValues.append prior (value, ()))
+
+PrefixValues.fullValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (item : ContextualItemKey tokens)
+    (complete : CompleteItem item.raw)
+    (prior : PrefixValues file tokens item) :
+  GrammarSymbolValues file tokens item.raw.production.rhs :=
+  GrammarSymbolValues.transport
+    (prefix_full_layout item.raw complete) prior
+```
+
+`site.element` is the public total element projection certified by the
+`ListSite` subtype; its proof is part of the index, not a fallible lookup.
+Terminal values always retain `MatchedTerminal`, including logical `EOF`; the
+EOF value has exactly the empty file-end span defined above.
+
+`GrammarSymbolValues.transport` is exactly `Eq.mp` on a checked list-index
+equality. The four `PrefixValues` helpers invoke it only with the named
+theorem-derived layouts above. `zeroValue` transports the unique empty HList;
+`scanValue` appends the exact matched terminal; `completeValue` appends the
+finished nonterminal value; and `fullValue` transports a complete prefix to
+the full production RHS. None relies on proof irrelevance, an assumed
+equation, choice from a proposition, or an unchecked representation cast.
+
+The same checked-transport discipline closes every expanded action.
+`ParserCore` owns these total operations; every index that is not an ordinary
+argument is still bound explicitly so the signatures remain valid under
+`set_option autoImplicit false`:
+
+```text
+EbnfValue.transport
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : EbnfExpr} (equality : left = right) :
+  EbnfValue file tokens left -> EbnfValue file tokens right :=
+  Eq.mp (congrArg (EbnfValue file tokens) equality)
+
+EbnfValue.atShape
+    {file : WorkspaceFile} {tokens : List Token}
+    {site : GrammarSite} {expression : EbnfExpr}
+    (shape : site.expression = expression) :
+  EbnfValue file tokens site.expression ->
+  EbnfValue file tokens expression :=
+  EbnfValue.transport shape
+
+EbnfValue.ofShape
+    {file : WorkspaceFile} {tokens : List Token}
+    {site : GrammarSite} {expression : EbnfExpr}
+    (shape : site.expression = expression) :
+  EbnfValue file tokens expression ->
+  EbnfValue file tokens site.expression :=
+  EbnfValue.transport shape.symm
+
+EbnfValue.terminalAtom
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) :
+  MatchedTerminal file tokens terminal ->
+  EbnfValue file tokens (EbnfExpr.atom (.terminal terminal))
+
+EbnfValue.ruleAtom
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId) :
+  RuleValue rule ->
+  EbnfValue file tokens (EbnfExpr.atom (.nonterminal rule))
+
+EbnfValue.sequence
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr) :
+  EbnfValues file tokens children ->
+  EbnfValue file tokens (EbnfExpr.sequence children)
+
+EbnfValue.group
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+  EbnfValue file tokens child ->
+  EbnfValue file tokens (EbnfExpr.group child)
+
+EbnfValue.choice
+    {file : WorkspaceFile} {tokens : List Token}
+    (branches : List EbnfExpr) :
+  ((branch : Fin branches.length) ×
+    EbnfValue file tokens (branches.get branch)) ->
+  EbnfValue file tokens (EbnfExpr.choice branches)
+
+EbnfValue.optional
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+  Option (EbnfValue file tokens child) ->
+  EbnfValue file tokens (EbnfExpr.optional child)
+
+EbnfValue.star
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+  List (EbnfValue file tokens child) ->
+  EbnfValue file tokens (EbnfExpr.star child)
+
+EbnfValue.plus
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+  NonemptyList (EbnfValue file tokens child) ->
+  EbnfValue file tokens (EbnfExpr.plus child)
+
+EbnfValue.list0
+    {file : WorkspaceFile} {tokens : List Token}
+    (element : EbnfExpr) :
+  List (EbnfValue file tokens element) ->
+  EbnfValue file tokens (EbnfExpr.list0 element)
+
+EbnfValue.list1
+    {file : WorkspaceFile} {tokens : List Token}
+    (element : EbnfExpr) :
+  NonemptyList (EbnfValue file tokens element) ->
+  EbnfValue file tokens (EbnfExpr.list1 element)
+
+GrammarSymbolValues.view
+    {file : WorkspaceFile} {tokens : List Token}
+    {production : ProductionId}
+    {canonicalRhs : List GrammarSymbol}
+    (layout : production.rhs = canonicalRhs) :
+  GrammarSymbolValues file tokens production.rhs ->
+  GrammarSymbolValues file tokens canonicalRhs :=
+  GrammarSymbolValues.transport layout
+
+EbnfValues.ofAuxiliaries
+    {file : WorkspaceFile} {tokens : List Token}
+    (sites : List GrammarSite) :
+  GrammarSymbolValues file tokens
+    (sites.map (fun site =>
+      GrammarSymbol.nonterminal (.aux site))) ->
+  EbnfValues file tokens
+    (sites.map GrammarSite.expression)
+
+RootAction.unpack
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId) :
+  GrammarSymbolValues file tokens (ProductionId.root rule).rhs ->
+  EbnfValue file tokens (m2cV1.rhs rule)
+
+AtomSite.pack
+    {file : WorkspaceFile} {tokens : List Token} (site : AtomSite) :
+  GrammarSymbolValues file tokens (ProductionId.atom site).rhs ->
+  NonterminalValue file tokens (ProductionId.atom site).lhs
+
+SequenceSite.pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : SequenceSite) :
+  GrammarSymbolValues file tokens (ProductionId.seq site).rhs ->
+  NonterminalValue file tokens (ProductionId.seq site).lhs
+
+GroupSite.pack
+    {file : WorkspaceFile} {tokens : List Token} (site : GroupSite) :
+  GrammarSymbolValues file tokens (ProductionId.group site).rhs ->
+  NonterminalValue file tokens (ProductionId.group site).lhs
+
+ChoiceSite.pack
+                {file : WorkspaceFile} {tokens : List Token}
+                (site : ChoiceSite)
+                (branch : Fin site.branchCount) :
+  GrammarSymbolValues file tokens
+    (ProductionId.choice site branch).rhs ->
+  NonterminalValue file tokens
+    (ProductionId.choice site branch).lhs
+
+OptionalSite.pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : OptionalSite) (branch : OptionalBranch) :
+  GrammarSymbolValues file tokens
+    (ProductionId.opt site branch).rhs ->
+  NonterminalValue file tokens
+    (ProductionId.opt site branch).lhs
+
+StarSite.pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : StarSite) (branch : NilConsBranch) :
+  GrammarSymbolValues file tokens
+    (ProductionId.star site branch).rhs ->
+  NonterminalValue file tokens
+    (ProductionId.star site branch).lhs
+
+PlusSite.pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : PlusSite) (branch : OneConsBranch) :
+  GrammarSymbolValues file tokens
+    (ProductionId.plus site branch).rhs ->
+  NonterminalValue file tokens
+    (ProductionId.plus site branch).lhs
+
+List0Site.pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : List0Site) (branch : NilConsBranch) :
+  GrammarSymbolValues file tokens
+    (ProductionId.list0 site branch).rhs ->
+  NonterminalValue file tokens
+    (ProductionId.list0 site branch).lhs
+
+List1Site.pack
+    {file : WorkspaceFile} {tokens : List Token} (site : List1Site) :
+  GrammarSymbolValues file tokens (ProductionId.list1 site).rhs ->
+  NonterminalValue file tokens (ProductionId.list1 site).lhs
+
+ListSite.pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : ListSite) (branch : NilConsBranch) :
+  GrammarSymbolValues file tokens
+    (ProductionId.tail site branch).rhs ->
+  NonterminalValue file tokens
+    (ProductionId.tail site branch).lhs
+```
+
+`EbnfValues.ofAuxiliaries` is structural recursion on `sites`. Its empty and
+cons equations use the checked `EbnfValues` family equations; the cons equation
+preserves the head and recursively converts the tail. It is the only bridge
+from the sequence action's HList indexed by
+`sites.map (nonterminal . aux)` to the EBNF HList indexed by
+`sites.map GrammarSite.expression`.
+
+For each packer, first apply `GrammarSymbolValues.view` with the corresponding
+named theorem `ProductionId.rhs_root`, `rhs_atom`, `rhs_seq`, `rhs_group`,
+`rhs_choice`, `rhs_opt_none`, `rhs_opt_some`, `rhs_star_nil`,
+`rhs_star_cons`, `rhs_plus_one`, `rhs_plus_cons`, `rhs_list0_nil`,
+`rhs_list0_cons`, `rhs_list1`, `rhs_tail_nil`, or `rhs_tail_cons`. These
+theorems are oriented from the actual production RHS to the canonical RHS, so
+the input transport is never reversed implicitly. Output at an auxiliary site
+uses `EbnfValue.ofShape` with the site's public outer-expression equation.
+The required checked result equations are exactly:
+
+| Required theorem | Canonical result (`RootAction` directly; auxiliary output after its `EbnfValue.atShape`) |
+| --- | --- |
+| `RootAction.unpack_eq R` | View `rhs_root`; take its one child at `GrammarSite.root R`; transport it forward with `GrammarSite.root_expression : root.expression = m2cV1.rhs R`. |
+| `AtomSite.pack_terminal_eq s` | View `rhs_atom`; use `AtomSite.symbol_eq`; the one `MatchedTerminal` becomes the terminal-atom family value; then transport backward with `AtomSite.expression_eq_atom`. |
+| `AtomSite.pack_rule_eq s` | View `rhs_atom`; use `AtomSite.symbol_eq`; the one `RuleValue R` becomes the nonterminal-atom family value; then transport backward with `AtomSite.expression_eq_atom`. |
+| `SequenceSite.pack_eq s` | View `rhs_seq`; apply `EbnfValues.ofAuxiliaries s.children`; apply the checked sequence-family constructor; then transport backward with `SequenceSite.expression_eq_sequence`. |
+| `GroupSite.pack_eq s` | View `rhs_group`; take the one value at `s.child`; apply the checked group-family constructor; then transport backward with `GroupSite.expression_eq_group`. |
+| `ChoiceSite.pack_eq s i` | View `rhs_choice`; take the child at `(s.branch i).expression`; transport it forward by `(s.branch_expression i).trans((s.branch_get_toList i).symm)` to `s.branchExpressions.toList.get (s.branchListIndex i)`; tag it with exactly `s.branchListIndex i`; apply the checked choice-family constructor; then transport backward with `ChoiceSite.expression_eq_choice`. |
+| `OptionalSite.pack_none_eq s` | View `rhs_opt_none`; construct the checked optional-family `none`; transport backward with `OptionalSite.expression_eq_optional`. |
+| `OptionalSite.pack_some_eq s` | View `rhs_opt_some`; take the one value at `s.child`; construct `some child`; transport backward with `OptionalSite.expression_eq_optional`. |
+| `StarSite.pack_nil_eq s` | View `rhs_star_nil`; construct the checked star-family `[]`; transport backward with `StarSite.expression_eq_star`. |
+| `StarSite.pack_cons_eq s` | View `rhs_star_cons`; take `head` at `s.child`, view the recursively reduced auxiliary at `s.site` forward with `StarSite.expression_eq_star`, construct `head :: tail`, then transport backward with that same site equation. |
+| `PlusSite.pack_one_eq s` | View `rhs_plus_one`; construct `NEL(child, [])`; transport backward with `PlusSite.expression_eq_plus`. |
+| `PlusSite.pack_cons_eq s` | View `rhs_plus_cons`; view the recursive auxiliary forward with `PlusSite.expression_eq_plus`, prepend the new child to its nonempty value, then transport backward with that equation. |
+| `List0Site.pack_nil_eq s` | View `rhs_list0_nil`; construct `[]`; transport backward with `List0Site.expression_eq_list0`. |
+| `List0Site.pack_cons_eq s` | View `rhs_list0_cons`; take the child and exact `Tail(ListSite.list0 s)` list, use `ListSite.element_list0`, construct `head :: tail`, then transport backward with `List0Site.expression_eq_list0`. |
+| `List1Site.pack_eq s` | View `rhs_list1`; take the child and exact `Tail(ListSite.list1 s)` list, use `ListSite.element_list1`, construct `NEL(head, tail)`, then transport backward with `List1Site.expression_eq_list1`. |
+| `ListSite.pack_nil_eq s` | View `rhs_tail_nil`; return `[]` at `s.element.expression`. |
+| `ListSite.pack_cons_eq s` | View `rhs_tail_cons`; retain the exact matched comma premise, take the child at `s.element` and the recursive `Tail(s)` list, and return `head :: tail`. |
+
+Every sentence in the result column is a required `[simp]` equation theorem
+for the named total function, not implementation commentary. In particular,
+the choice result stores `s.branchListIndex i`, whose target is
+`Fin s.branchExpressions.toList.length`; it never stores `i` at that different
+index. The two public equations for `branchListIndex` prove that the tag and
+selected child are exactly the original displayed branch. These functions and
+equations were checked in Lean 4.32.1 with a well-founded EBNF carrier,
+including the recursive sequence conversion and the dependent choice
+`Vector`/`List` index transport.
+
+`ParserJudgment` owns the two independent reduction relations:
+
+```text
+RuleReduction :
+  (file : WorkspaceFile) -> (tokens : List Token) ->
+  (rule : GrammarRuleId) -> (origin finish : Boundary tokens) ->
+  EbnfValue file tokens (m2cV1.rhs rule) -> RuleValue rule -> Prop
+
+ActionReduces :
+  (file : WorkspaceFile) -> (tokens : List Token) ->
+  (action : ActionId) -> (origin finish : Boundary tokens) ->
+  GrammarSymbolValues file tokens action.production.rhs ->
+  NonterminalValue file tokens action.production.lhs -> Prop
+
+RuleReductionReady
+    (file : WorkspaceFile) (tokens : List Token)
+    (rule : GrammarRuleId) (origin finish : Boundary tokens) : Prop =
+  TokensOwnedBy file tokens and
+  origin.val <= finish.val and
+  (rule = GrammarRuleId.module ->
+    origin = Boundary.start tokens and
+    finish = Boundary.afterLogicalEOF tokens)
+
+ActionReductionReady
+    (file : WorkspaceFile) (tokens : List Token)
+    (action : ActionId) (origin finish : Boundary tokens) : Prop =
+  match action.production with
+  | ProductionId.root rule =>
+      RuleReductionReady file tokens rule origin finish
+  | _ => True
+```
+
+Neither relation takes `GuardContext`; this makes reduction independent of an
+outer context by construction. `ActionReduces` is the least relation with
+exactly these eleven constructor families, one for each `ProductionId` shape:
+
+```text
+section ActionReducesConstructors
+
+variable {file : WorkspaceFile} {tokens : List Token}
+
+ActionReduces.root
+    (rule : GrammarRuleId)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens (ProductionId.root rule).rhs)
+    (output : RuleValue rule)
+    (reduces : RuleReduction file tokens rule origin finish
+      (RootAction.unpack rule input) output) :
+  ActionReduces file tokens (.actionFor (.root rule))
+    origin finish input output
+
+ActionReduces.atom
+    (site : AtomSite) (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens (ProductionId.atom site).rhs) :
+  ActionReduces file tokens (.actionFor (.atom site)) origin finish
+    input (AtomSite.pack site input)
+
+ActionReduces.seq
+    (site : SequenceSite) (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens (ProductionId.seq site).rhs) :
+  ActionReduces file tokens (.actionFor (.seq site)) origin finish
+    input (SequenceSite.pack site input)
+
+ActionReduces.group
+    (site : GroupSite) (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens (ProductionId.group site).rhs) :
+  ActionReduces file tokens (.actionFor (.group site)) origin finish
+    input (GroupSite.pack site input)
+
+ActionReduces.choice
+    (site : ChoiceSite) (branch : Fin site.branchCount)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens
+      (ProductionId.choice site branch).rhs) :
+  ActionReduces file tokens (.actionFor (.choice site branch)) origin finish
+    input (ChoiceSite.pack site branch input)
+
+ActionReduces.opt
+    (site : OptionalSite) (branch : OptionalBranch)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens
+      (ProductionId.opt site branch).rhs) :
+  ActionReduces file tokens (.actionFor (.opt site branch)) origin finish
+    input (OptionalSite.pack site branch input)
+
+ActionReduces.star
+    (site : StarSite) (branch : NilConsBranch)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens
+      (ProductionId.star site branch).rhs) :
+  ActionReduces file tokens (.actionFor (.star site branch)) origin finish
+    input (StarSite.pack site branch input)
+
+ActionReduces.plus
+    (site : PlusSite) (branch : OneConsBranch)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens
+      (ProductionId.plus site branch).rhs) :
+  ActionReduces file tokens (.actionFor (.plus site branch)) origin finish
+    input (PlusSite.pack site branch input)
+
+ActionReduces.list0
+    (site : List0Site) (branch : NilConsBranch)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens
+      (ProductionId.list0 site branch).rhs) :
+  ActionReduces file tokens (.actionFor (.list0 site branch)) origin finish
+    input (List0Site.pack site branch input)
+
+ActionReduces.list1
+    (site : List1Site) (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens
+      (ProductionId.list1 site).rhs) :
+  ActionReduces file tokens (.actionFor (.list1 site)) origin finish
+    input (List1Site.pack site input)
+
+ActionReduces.tail
+    (site : ListSite) (branch : NilConsBranch)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens
+      (ProductionId.tail site branch).rhs) :
+  ActionReduces file tokens (.actionFor (.tail site branch)) origin finish
+    input (ListSite.pack site branch input)
+
+end ActionReducesConstructors
+```
+
+In every constructor above, the dependent type of `input` is exactly the RHS
+of the production displayed inside its `ActionId`, and the dependent type of
+the result is exactly that production's LHS carrier. Thus no separate action,
+production, origin, finish, input, or output equality premise is hidden in the
+constructor.
+
+| Action shape | Exact output equation |
+| --- | --- |
+| `A.root[R]` | Its singleton auxiliary input is passed to `RuleReduction file tokens R origin finish`; that relation's result is the rule value. |
+| `A.atom[s]` | A terminal `MatchedTerminal` becomes the terminal-atom `EbnfValue`; a source-rule value becomes the nonterminal-atom `EbnfValue`. |
+| `A.seq[s]` | The ordered child-auxiliary HList becomes the identically ordered `EbnfValues`; no permutation or flattening occurs. |
+| `A.group[s]` | The unique child value is returned unchanged. This is an EBNF group, not a source parenthesis. |
+| `A.choice[s,i]` | The unique child is tagged with exactly branch `i`. |
+| `A.opt[s,none/some]` | Epsilon maps to `none`; the unique child maps to `some child`. |
+| `A.star[s,nil/cons]` | Epsilon maps to `[]`; `(head, recursively reduced tail)` maps to `head :: tail`. |
+| `A.plus[s,one/cons]` | One child maps to `{head := child, tail := []}`; `(head, recursive nonempty tail)` prepends `head`. |
+| `A.list0[s,nil/cons]` | Epsilon maps to `[]`; `(head, Tail(s))` maps to `head :: tail`. |
+| `A.list1[s]` | `(head, Tail(s))` maps to `{head := head, tail := tail}`. |
+| `A.tail[s,nil/cons]` | Epsilon maps to `[]`; `MatchedTerminal comma, head, Tail(s)` maps to `head :: tail`; the comma is discarded only after its exact match and span have been retained in the premise. |
+
+There is no cast from an unindexed list, and no constructor may invoke
+`RuleReduction` except `ActionReduces.root`. The caller supplies the completed
+item's actual `origin` and `finish` directly to the selected constructor.
+
+The following notation fixes the complete `RuleReduction` equation family.
+It is normative Lean-level pseudocode, not an informal list of examples.
+`#i(value)` is the indexed value of displayed choice branch `i`; parentheses
+are `EbnfValues` in source order; `none`/`some`, `[]`/`(::)`, and
+`NEL(head, tail)` are the values of optional, star/list0, and plus/list1.
+Every quoted terminal metavariable is a `MatchedTerminal` at that exact grammar
+class. These total projections are used below:
+
+```text
+IdentifierProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .identifier))
+    (spelling : String) (parsed : Identifier) : Prop
+
+PathSegmentProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent))
+    (spelling : String) (parsed : PathSegment) : Prop
+
+ExternalLibraryProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .pathComponent))
+    (spelling : String) (parsed : ExternalLibraryName) : Prop
+
+LiteralProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal)
+    (literalPayload : LiteralPayload) : Prop
+
+AssemblySliceProjects
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : MatchedTerminal file tokens (.category .assemblyBlock))
+    (slice : AssemblySlice) : Prop
+
+sp(terminal)                    = terminal.span
+id(terminal, parsedIdentifier)  =
+  { span := terminal.span, payload := parsedIdentifier }
+path(terminal, parsedPath)      =
+  { span := terminal.span, payload := parsedPath }
+external(terminal, parsedName)  =
+  { span := terminal.span, payload := parsedName }
+unit(terminal) = { span := terminal.span, payload := () }
+marker(kind, terminal) = { span := terminal.span, payload := kind }
+  only for one of the exact terminal/kind equations below
+pragma(terminal) =
+  { span := terminal.span, payload := terminalPragmaKind }
+literal(terminal, literalPayload) =
+  { span := terminal.span, payload := literalPayload }
+
+between(firstSpan, lastSpan, payload) =
+  { span := { source := file.id,
+              startByte := firstSpan.startByte,
+              endByte := lastSpan.endByte },
+    payload := payload }
+
+moduleLoc(payload) =
+  { span := { source := file.id, startByte := 0,
+              endByte := file.content.utf8ByteSize },
+    payload := payload }
+
+emptyAt(byte, payload) =
+  { span := { source := file.id, startByte := byte, endByte := byte },
+    payload := payload }
+
+mapNEL(f, NEL(head, tail)) = NEL(f(head), List.map f tail)
+
+option(default, f, none) = default
+option(default, f, some value) = f(value)
+```
+
+Each of the first three projection relations requires an exact retained-token
+spelling equation and respectively
+`Identifier.parse spelling = some parsed`,
+`PathSegment.parse spelling = some parsed`, or
+`ExternalLibraryName.parse spelling = some parsed`.
+`PathSegmentProjects` admits the two token shapes already listed by
+`TerminalMatches.pathComponent`; the other projection relations permit only
+their one exact terminal payload shape. `LiteralProjects` relates a decimal,
+hexadecimal, or string matched terminal to the corresponding `Literal` value,
+including both original spelling and decoded payload. `AssemblySliceProjects`
+relates an assembly-block matched terminal to its exact retained
+`AssemblySlice`. All five are propositions. A `RuleReduction` constructor
+binds the parsed value or slice as an ordinary explicit Type argument and takes
+the corresponding projection proposition as a premise; it never extracts that
+value from `MatchedTerminal.matches` into Type.
+For each identifier, path, external-library, and assembly matched terminal,
+`ParserCore` proves existence and uniqueness of the corresponding projection
+inside `Prop`. For `LiteralProjects` it proves the same theorem under the
+closed premise that the terminal is decimal, hexadecimal, or string. These
+existence theorems are exactly what `ruleReduction_total` eliminates while its
+goal remains a proposition; the executable obtains the same data by direct
+case analysis on the retained token value.
+
+For compactness in the 75-row tables, `sourceLoc(payload)` is binder notation:
+that individual constructor binds a fresh explicit
+`witness : ConsumedSpanWitness file tokens origin finish` and the displayed
+term is `sourceLoc witness payload`. Likewise `id(terminal)`,
+`path(terminal)`, `external(terminal)`, `literal(terminal)`, and
+`assemblyToken.slice` each bind the explicit result value and the exact
+projection premise just specified. The generated Lean constructor signatures
+contain those arguments; these table forms are not functions that choose a
+witness from a proposition. Parse-result functionality is used only after two
+constructor results exist.
+
+`pragma` copies the exact `PragmaKind`. The marker projection is a dependent
+refined helper whose domain is exactly these terminal/kind pairs:
+`lib -> libraryRoot`, `std -> standardRoot`, `@ -> externalSigil`,
+`* -> wildcard`, `_ -> wildcard`, `fallback -> fallbackName`,
+`constructor -> contractConstructorName`, `public -> publicModifier`,
+`payable -> payableModifier`, contextual `comptime -> comptimeModifier`, and
+`default -> defaultModifier`. It has no constructor for a different kind
+paired with one of those terminals and no catch-all case. `unit` is used
+for proxy and leading-dot markers, whose AST field is `Located Unit`.
+
+`args(none)=none` and `args(some(open, values, close))=some values`; no written
+empty argument form is converted to absence. `firstRest(NEL(h,t)) = h :: t`.
+The two deterministic folds are:
+
+```text
+foldPostfix(receiver, []) = receiver
+foldPostfix(receiver, part :: rest) =
+  foldPostfix(
+    match part with
+    | call _ arguments close =>
+        between receiver.span close (.call receiver arguments)
+    | select _ field =>
+        between receiver.span field.span (.select receiver field)
+    | index _ index close =>
+        between receiver.span close (.index receiver index),
+    rest)
+
+foldInfixLeft(left, []) = left
+foldInfixLeft(left, (operator, right) :: rest) =
+  foldInfixLeft(
+    between left.span right.span (.infix operator left right), rest)
+```
+
+Every operator helper constructs a `Located` operator with the operator
+terminal's exact span. `!` maps to `PrefixOperator.logicalNot`; `* / % + - & ^
+| < > <= >= == != && ||` map in that order to the identically named 16
+`InfixOperator` constructors; and `= += -= ^= &= |= %=` map in that order to
+the seven displayed `AssignmentOperator` constructors. No text lookup or
+default operator case exists.
+
+Here are the first 37 root equations, in `GrammarRuleId` order. A semicolon in
+the right column separates equations for different displayed branch tags; it
+is not source punctuation.
+
+| Rule | Exact `EbnfValue` branch/tag to `RuleValue` equation |
+| --- | --- |
+| `module` | `(items, eof) -> moduleLoc { source := file.id, items := items }`, with `origin = Boundary.start tokens`, `finish = Boundary.afterLogicalEOF tokens`, and `eof.value = endOfFile`. |
+| `topItem` | `#0 import -> sourceLoc (.importDecl import)`; `#1 export -> sourceLoc (.exportDecl export)`; `#2 pragma -> sourceLoc (.pragmaDecl pragma)`; `#3 data -> sourceLoc (.dataDecl data)`; `#4 alias -> sourceLoc (.typeAliasDecl alias)`; `#5 class -> sourceLoc (.classDecl class)`; `#6 instance -> sourceLoc (.instanceDecl instance)`; `#7 contract -> sourceLoc (.contractDecl contract)`; `#8 function -> sourceLoc (.functionDecl function)`. |
+| `moduleRef` | `#0(at, library, dot, next, rest) -> sourceLoc (.external (marker externalSigil at) (external library) (NEL(path next, map (fun (dot, component) => path component) rest)))`; for `#1(first, rest)`, let `tail = map (fun (dot, component) => path component) rest`: if `first` spells `std`, produce `sourceLoc (.standard (marker standardRoot first) tail)`; if `first` spells `lib` and `tail = next :: remaining`, produce `sourceLoc (.libraryRoot (marker libraryRoot first) (NEL(next, remaining)))`; otherwise, including `first = lib` and `tail = []`, produce `sourceLoc (.relative (NEL(path first, tail)))`. Dots are discarded only after their matched premises. |
+| `importDecl` | `#0(import, ref, semi) -> sourceLoc { moduleRef := ref, mode := .module none }`; `#1(import, ref, as, name, semi) -> sourceLoc { moduleRef := ref, mode := .module (some (id name)) }`; `#2(import, ref, dot, open, entries, close, hiding, semi) -> sourceLoc { moduleRef := ref, mode := .items (between (sp open) (sp close) {entries := entries}) hiding }`. |
+| `importEntry` | `#0 star -> sourceLoc (.wildcard (marker wildcard star))`; `#1(name, none) -> sourceLoc (.named (id name) none)`; `#1(name, some(as, alias)) -> sourceLoc (.named (id name) (some (id alias)))`. |
+| `hidingClause` | `(hiding, open, names, close) -> sourceLoc { names := map id names }`. |
+| `exportDecl` | `#0(export, open, entries, close, semi) -> sourceLoc (.local (between (sp open) (sp close) { entries := entries }))`; `#1(export, ref, semi) -> sourceLoc (.module ref none)`; `#2(export, ref, as, name, semi) -> sourceLoc (.module ref (some (id name)))`; `#3(export, ref, dot, star, semi) -> sourceLoc (.from ref (between (sp dot) (sp star) (.dotWildcard (marker wildcard star))))`; `#4(export, ref, dot, open, entries, close, semi) -> sourceLoc (.from ref (between (sp open) (sp close) (.braced entries)))`. |
+| `localExportEntry` | `#0 star -> sourceLoc (.wildcard (marker wildcard star))`; `#1 item -> sourceLoc (.item item)`; `#2(ref, dot, star) -> sourceLoc (.allFrom ref (marker wildcard star))`. |
+| `remoteExportEntry` | `#0 star -> sourceLoc (.wildcard (marker wildcard star))`; `#1 item -> sourceLoc (.item item)`. |
+| `exportItem` | `(name, selection) -> sourceLoc { name := id name, constructors := selection }`. |
+| `constructorSelection` | `#0(open, star, close) -> sourceLoc (.all (marker wildcard star))`; `#1(open, names, close) -> sourceLoc (.named (mapNEL id names))`. |
+| `pragmaDecl` | For each branch `i=0..3`, `(pragmaKw, kind_i, targets, semi) -> sourceLoc { kind := pragma(kind_i), targets := option [] (fun values => firstRest (mapNEL id values)) targets }`, where the branch order is exactly `no-coverage-condition`, `no-patterson-condition`, `no-bounded-variable-condition`, `no-generic-instance-for`. |
+| `genericPrefix` | `(forall, none) -> sourceLoc { forallClause := forall, context := none }`; `(forall, some(predicates, arrow)) -> sourceLoc { forallClause := forall, context := some predicates }`. |
+| `forallClause` | `(forallKw, first, rest, dot) -> sourceLoc { binders := NEL(first, map (fun (_, binder) => binder) rest) }`; each ignored first component is a fully reduced `OptionalCommaValue`. |
+| `forallBinder` | `#0 name -> sourceLoc (.bare (id name))`; `#1(name, colon, class, none) -> sourceLoc (.bounded (id name) class none)`; `#1(name, colon, class, some(open, arguments, close)) -> sourceLoc (.bounded (id name) class (some arguments))`. |
+| `optionalComma` | `none -> absent`; `some comma -> present (sp comma)`. |
+| `predicateList` | `predicates -> predicates`. |
+| `predicate` | `(main, colon, class, none) -> sourceLoc { main := main, className := class, parameters := none }`; `(main, colon, class, some(open, arguments, close)) -> sourceLoc { main := main, className := class, parameters := some arguments }`. |
+| `functionSignature` | `(generic, public, payable, functionKw, name, open, parameters, close, return) -> sourceLoc { genericPrefix := generic, public := map (marker publicModifier) public, payable := map (marker payableModifier) payable, name := id name, parameters := parameters, returnType := map (fun (arrow, type) => type) return }`. |
+| `functionDecl` | `(signature, body) -> sourceLoc { signature := signature, body := body }`. |
+| `classMethod` | `(signature, semi) -> sourceLoc { signature := signature, terminator := sp semi }`. |
+| `dataDecl` | `(dataKw, name, parameters, constructors, semi) -> sourceLoc { name := id name, parameters := map (fun (open, names, close) => mapNEL id names) parameters, constructors := map (fun (equal, first, rest) => NEL(first, map (fun (pipe, constructor) => constructor) rest)) constructors }`. |
+| `dataConstructor` | `(name, none) -> sourceLoc { name := id name, fields := none }`; `(name, some(open, fields, close)) -> sourceLoc { name := id name, fields := some fields }`. |
+| `typeAliasDecl` | `(typeKw, name, parameters, equal, body, semi) -> sourceLoc { name := id name, parameters := map (fun (open, names, close) => mapNEL id names) parameters, body := body }`. |
+| `classDecl` | `(generic, classKw, main, colon, name, parameters, open, methods, close) -> sourceLoc { genericPrefix := generic, main := main, className := id name, parameters := map (fun (open, values, close) => values) parameters, methods := methods }`. |
+| `instanceDecl` | `(generic, default, instanceKw, main, colon, class, parameters, open, methods, close) -> sourceLoc { genericPrefix := generic, default := map (marker defaultModifier) default, main := main, className := class, parameters := map (fun (open, values, close) => values) parameters, methods := methods }`. |
+| `instanceMethod` | `function -> function` (pass-through, preserving the existing `FunctionDecl` span). |
+| `contractDecl` | `(contractKw, name, parameters, open, members, close) -> sourceLoc { name := id name, parameters := map (fun (open, names, close) => mapNEL id names) parameters, members := members }`. |
+| `contractMember` | `#0 data -> sourceLoc (.dataDecl data)`; `#1 alias -> sourceLoc (.typeAlias alias)`; `#2 field -> sourceLoc (.field field)`; `#3 function -> sourceLoc (.function function)`; `#4 fallback -> sourceLoc (.fallback fallback)`; `#5 constructor -> sourceLoc (.constructor constructor)`. |
+| `fieldDecl` | `(name, colon, type, initializer, semi) -> sourceLoc { name := id name, type := type, initializer := map (fun (equal, expression) => expression) initializer }`. |
+| `fallbackDecl` | `(generic, public, payable, fallback, open, parameters, close, return, body) -> sourceLoc { genericPrefix := generic, public := map (marker publicModifier) public, payable := map (marker payableModifier) payable, marker := marker fallbackName fallback, parameters := parameters, returnType := map (fun (arrow, type) => type) return, body := body }`. |
+| `contractConstructorDecl` | `(public, payable, constructor, open, parameters, close, body) -> sourceLoc { public := map (marker publicModifier) public, payable := map (marker payableModifier) payable, marker := marker contractConstructorName constructor, parameters := parameters, body := body }`. |
+| `parameter` | `(comptime, name, type) -> sourceLoc { comptime := map (marker comptimeModifier) comptime, name := id name, type := map (fun (colon, value) => value) type }`. |
+| `body` | `(open, statements, close) -> sourceLoc { origin := .braced (sp open) (sp close), statements := statements }`. |
+| `type` | `#0(comptime, inner) -> sourceLoc (.comptime (marker comptimeModifier comptime) inner)`; `#1(atom, none) -> atom`; `#1(atom, some(arrow, result)) -> sourceLoc (.function atom result)`. |
+| `typeAtom` | `#0(at, inner) -> sourceLoc (.proxy (unit at) inner)`; `#1(name, none) -> sourceLoc (.named name none)`; `#1(name, some(open, arguments, close)) -> sourceLoc (.named name (some arguments))`; `#2(open, close) -> sourceLoc (.tuple [])`; `#3(open, inner, close) -> sourceLoc (.group inner)`; `#4(open, first, comma, second, rest, close) -> sourceLoc (.tuple (first :: second :: map (fun (comma, value) => value) rest))`. |
+| `qualifiedName` | `(first, rest) -> sourceLoc { components := NEL(id first, map (fun (dot, name) => id name) rest) }`. |
+
+The remaining 38 equations continue that same table and order:
+
+| Rule | Exact `EbnfValue` branch/tag to `RuleValue` equation |
+| --- | --- |
+| `statement` | For branches `#0` through `#10`, return the child unchanged, in the exact order `let`, `return`, `match`, `if`, `for`, `assembly`, `block`, `break`, `continue`, `assignment`, `expression`. |
+| `letStatement` | `(binding, semi) -> sourceLoc (.letBinding binding)`. |
+| `letBinding` | `(letKw, name, none, initializer) -> sourceLoc { comptime := none, name := id name, type := none, initializer := map (fun (equal, value) => value) initializer }`; `(letKw, name, some(colon, none, value), initializer) -> sourceLoc { comptime := none, name := id name, type := some value, initializer := map (fun (equal, expression) => expression) initializer }`; `(letKw, name, some(colon, some comptime, value), initializer) -> sourceLoc { comptime := some (marker comptimeModifier comptime), name := id name, type := some value, initializer := map (fun (equal, expression) => expression) initializer }`. |
+| `returnStatement` | `(returnKw, value, semi) -> sourceLoc (.return value (sp semi))`. |
+| `blockStatement` | `body -> sourceLoc (.block body)`. |
+| `breakStatement` | `(breakKw, semi) -> sourceLoc (.break (sp semi))`. |
+| `continueStatement` | `(continueKw, semi) -> sourceLoc (.continue (sp semi))`. |
+| `assemblyStatement` | `(assemblyKw, assemblyToken) -> sourceLoc (.assembly assemblyToken.slice)`, where `assemblyToken.slice` is the exact `AssemblySlice` in the token payload. |
+| `ifStatement` | `(ifKw, open, condition, close, thenBody, none) -> sourceLoc (.ifThenElse condition thenBody none)`; `(ifKw, open, condition, close, thenBody, some(elseKw, elseBody)) -> sourceLoc (.ifThenElse condition thenBody (some elseBody))`. |
+| `forStatement` | `(forKw, open, initializers, semi1, condition, semi2, post, close, body) -> sourceLoc (.forLoop initializers condition post body)`. |
+| `forInitItem` | `#0 binding -> sourceLoc (.letBinding binding)`; `#1(left, operator, right) -> sourceLoc (.assignment operator left right)`; `#2 expression -> sourceLoc (.expression expression)`. |
+| `forPostItem` | `#0(left, operator, right) -> sourceLoc (.assignment operator left right)`; `#1 expression -> sourceLoc (.expression expression)`. |
+| `matchStatement` | `(matchKw, scrutinees, open, arms, close, terminator) -> sourceLoc (.match scrutinees arms (map sp terminator))`. |
+| `matchArm` | `(pipe, patterns, fatArrow, statements) -> sourceLoc { patterns := patterns, body := armBody(fatArrow, statements) }`, where `armBody(fatArrow, []) = emptyAt(fatArrow.span.endByte, { origin := .matchArm (sp fatArrow), statements := [] })`, and for a nonempty list it is `between(firstStatement.span, lastStatement.span, { origin := .matchArm (sp fatArrow), statements := statements })`. |
+| `armStatement` | `statement -> statement` (pass-through). |
+| `assignmentStatement` | `(left, operator, right, semi) -> sourceLoc (.assignment operator left right)`. |
+| `assignmentOperator` | Branches `#0..#6` map `=`, `+=`, `-=`, `^=`, `&=`, `|=`, `%=` respectively to values `{ span := sp token, payload := .equal }`, `{ span := sp token, payload := .addEqual }`, `{ span := sp token, payload := .subtractEqual }`, `{ span := sp token, payload := .bitXorEqual }`, `{ span := sp token, payload := .bitAndEqual }`, `{ span := sp token, payload := .bitOrEqual }`, and `{ span := sp token, payload := .moduloEqual }`. |
+| `expressionStatement` | `#0(expression, semi) -> sourceLoc (.expression expression (some (sp semi)))`; `#1 terminalExpression -> sourceLoc (.expression terminalExpression none)`. |
+| `terminalExpression` | `expression -> expression` (pass-through). |
+| `pattern` | `#0 underscore -> sourceLoc (.wildcard (marker wildcard underscore))`; `#1 literal -> sourceLoc (.literal literal)`; `#2(dot, name, none) -> sourceLoc (.dotConstructor (unit dot) (id name) none)`; `#2(dot, name, some(open, arguments, close)) -> sourceLoc (.dotConstructor (unit dot) (id name) (some arguments))`; `#3(comptime, expression) -> sourceLoc (.comptime (marker comptimeModifier comptime) expression)`; `#4(name, none) -> sourceLoc (.named name none)`; `#4(name, some(open, arguments, close)) -> sourceLoc (.named name (some arguments))`; `#5(open, close) -> sourceLoc (.tuple [])`; `#6(open, inner, close) -> sourceLoc (.group inner)`; `#7(open, first, comma, second, rest, close) -> sourceLoc (.tuple (first :: second :: map (fun (comma, value) => value) rest))`. |
+| `expression` | `annotation -> annotation` (pass-through). |
+| `annotation` | `(expression, none) -> expression`; `(expression, some(colon, type)) -> sourceLoc (.annotation expression type)`. |
+| `conditional` | `#0(ifKw, condition, thenKw, thenBranch, elseKw, elseBranch) -> sourceLoc (.keywordConditional condition thenBranch elseBranch)`; `#1(condition, none) -> condition`; `#1(condition, some(question, thenBranch, colon, elseBranch)) -> sourceLoc (.ternaryConditional condition thenBranch elseBranch)`. |
+| `logicalOr` | `(left, rest) -> foldInfixLeft(left, map (fun (op, right) => (infix(op), right)) rest)`, with only `||`. |
+| `logicalAnd` | The same left fold, with only `&&`. |
+| `equality` | `(left, none) -> left`; `(left, some(opChoice, right)) -> sourceLoc (.infix (infix(opChoice)) left right)`, where `opChoice` is exactly branch `==` or `!=`. |
+| `relational` | `(left, none) -> left`; `(left, some(opChoice, right)) -> sourceLoc (.infix (infix(opChoice)) left right)`, where `opChoice` is exactly branch `<`, `>`, `<=`, or `>=`. |
+| `bitOr` | The exact left fold over `(pipe, right)` pairs. |
+| `bitXor` | The exact left fold over `(caret, right)` pairs. |
+| `bitAnd` | The exact left fold over `(amp, right)` pairs. |
+| `additive` | The exact left fold over `(#0 plus | #1 minus, right)` pairs. |
+| `multiplicative` | The exact left fold over `(#0 star | #1 slash | #2 percent, right)` pairs. |
+| `prefix` | `#0(bang, operand) -> sourceLoc (.prefix { span := sp bang, payload := .logicalNot } operand)`; `#1 postfix -> postfix`. Recursion of the first branch makes written prefixes right-associated. |
+| `postfix` | `(atom, parts) -> foldPostfix(atom, parts)` in source order. |
+| `postfixPart` | `#0(open, arguments, close) -> .call (sp open) arguments (sp close)`; `#1(dot, field) -> .select (sp dot) (id field)`; `#2(open, index, close) -> .index (sp open) index (sp close)`. |
+| `atom` | `#0 literal -> sourceLoc (.literal literal)`; `#1 name -> sourceLoc (.name (id name))`; `#2(dot, name, none) -> sourceLoc (.dotConstructor (unit dot) (id name) none)`; `#2(dot, name, some(open, arguments, close)) -> sourceLoc (.dotConstructor (unit dot) (id name) (some arguments))`; `#3(at, type) -> sourceLoc (.proxy (unit at) type)`; `#4 lambda -> lambda`; `#5(open, close) -> sourceLoc (.tuple [])`; `#6(open, inner, close) -> sourceLoc (.group inner)`; `#7(open, first, comma, second, rest, close) -> sourceLoc (.tuple (first :: second :: map (fun (comma, value) => value) rest))`. |
+| `lambda` | `(lamKw, open, parameters, close, return, body) -> sourceLoc (.lambda parameters (map (fun (arrow, type) => type) return) body)`. |
+| `literal` | `#0 decimal -> literal(decimal)`; `#1 hexadecimal -> literal(hexadecimal)`; `#2 string -> literal(string)`. |
+
+These two tables contain 75 and only 75 rule rows. Within each row every
+choice tag and every option presence case is covered. Every constructor that
+adds a real located syntax wrapper uses `sourceLoc`, `between`, the exact token
+span, the module override, or the empty-arm override shown above; pass-through
+rows add no wrapper. They are the constructors of the inductive
+`RuleReduction` relation. Consequently no catch-all, proof-irrelevant output
+field, `Classical.choice`, reparse, or unchecked output equality is permitted,
+and `RuleReduction.functional` follows by case analysis on the rule, branch
+tag, these equations, `ConsumedSpan.functional`, and parse-result uniqueness.
+
+The corresponding constructive existence theorems are required, not left
+implicit in parser completeness:
+
+```text
+ruleReduction_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens rule origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs rule)) :
+  exists output : RuleValue rule,
+    RuleReduction file tokens rule origin finish input output
+
+actionReduces_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {action : ActionId} {origin finish : Boundary tokens}
+    (ready : ActionReductionReady file tokens action origin finish)
+    (input : GrammarSymbolValues file tokens action.production.rhs) :
+  exists output : NonterminalValue file tokens action.production.lhs,
+    ActionReduces file tokens action origin finish input output
+```
+
+The proofs recurse over the 75 rule rows and case-split over the eleven action
+shapes. For an ordinary located rule, `ready` supplies
+`ConsumedSpanWitness.compute`; terminal projection existence follows inside
+the proposition from the corresponding `MatchedTerminal.matches` equation.
+The module case uses its stated root boundaries and full-file override.
+`actionReduces_total` invokes `ruleReduction_total` only in its root case and
+uses the total packer directly in every other case. Together with
+`contextualReach_ordered`, these are the action-construction lemmas used by
+`chartG_complete`.
+
+Phase C reachability and packed reduction are closed independently of either
+executor. Define the production instance of a dot-zero contextual item by its
+production, raw origin, and context. `EnabledProductionInstance` requires one
+complete `GuardWitnessKey` value for every cell of that instance's `guardOf`
+list, all using the same `memo`, `PhaseBCorrect`, and `AllGuardsFinal` proofs;
+the empty list is enabled by `Unit`. Then `ContextualReach` is the least
+relation generated by exactly these rules:
+
+1. the dot-zero `P.root[GrammarRuleId.module]` item at origin/current zero and context
+   `plain` is reached;
+2. prediction from a reached waiting item adds the dot-zero child production
+   in `descendContext waiting childProduction` exactly when its
+   `ProductionInstanceKey` is enabled;
+3. a structurally valid scanned edge whose `before` is reached adds its
+   `after`; and
+4. a structurally valid completed edge whose `waiting` and `finished` are
+   reached adds its `after`.
+
+There are no other constructors. `ContextualEdgeReach` is exactly structural
+validity plus reachability of all endpoints:
+
+```text
+ContextualEdgeReach ... key iff
+  ContextualPackedEdgeKey.StructurallyValid file tokens key and
+  match key with
+  | scanned before after _ =>
+      ContextualReach ... before and ContextualReach ... after
+  | completed waiting finished after _ =>
+      ContextualReach ... waiting and ContextualReach ... finished and
+      ContextualReach ... after
+```
+
+Induction over those four reach constructors proves the public ordering
+theorem:
+
+```text
+contextualReach_ordered
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens} :
+  ContextualReach file tokens memo correct final item ->
+  item.raw.origin.val <= item.raw.current.val
+```
+
+Prediction begins at equal boundaries, scan moves only the current boundary
+forward, and completion uses a finished item that began at the waiting
+cursor. This theorem supplies the `ordered` argument to
+`ConsumedSpanWitness.compute` for every coherent completed action.
+
+This is the only contextual edge premise accepted by reduction. The semantic
+derivation keeps one edge identity at every step:
+
+```text
+mutual
+  CoherentPrefix
+      (file : WorkspaceFile) (tokens : List Token)
+      (memo : GuardMemo tokens)
+      (correct : PhaseBCorrect file tokens memo)
+      (final : AllGuardsFinal memo) :
+    (item : ContextualItemKey tokens) ->
+    PrefixValues file tokens item -> Prop
+
+  CoherentReduction
+      (file : WorkspaceFile) (tokens : List Token)
+      (memo : GuardMemo tokens)
+      (correct : PhaseBCorrect file tokens memo)
+      (final : AllGuardsFinal memo) :
+    (item : ContextualItemKey tokens) ->
+    NonterminalValue file tokens item.raw.production.lhs -> Prop
+end
+```
+
+The mutual relation has exactly these four constructors; the displayed helper
+result is the constructor's dependent output, not an informal append:
+
+```text
+section CoherentConstructors
+
+variable {file : WorkspaceFile} {tokens : List Token}
+variable {memo : GuardMemo tokens}
+variable {correct : PhaseBCorrect file tokens memo}
+variable {final : AllGuardsFinal memo}
+
+CoherentPrefix.zero
+    (item : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final item)
+    (zero : item.raw.dot.val = 0) :
+  CoherentPrefix file tokens memo correct final item
+    (PrefixValues.zeroValue item zero)
+
+CoherentPrefix.scan
+    (before after : ContextualItemKey tokens)
+    (cursor : TerminalCursor tokens)
+    (priorValues : PrefixValues file tokens before)
+    (witness : ScannedEdgeWitness
+      file tokens before.raw after.raw cursor)
+    (edge : ContextualEdgeReach file tokens memo correct final
+      (.scanned before after cursor))
+    (prior : CoherentPrefix file tokens memo correct final
+      before priorValues) :
+  CoherentPrefix file tokens memo correct final after
+    (PrefixValues.scanValue before after witness.terminal
+      witness.next witness.matched witness.advance priorValues)
+
+CoherentPrefix.complete
+    (waiting finished after : ContextualItemKey tokens)
+    (shared : Boundary tokens)
+    (priorValues : PrefixValues file tokens waiting)
+    (childValue : NonterminalValue file tokens
+      finished.raw.production.lhs)
+    (witness : CompletedEdgeWitness
+      tokens waiting.raw finished.raw after.raw shared)
+    (edge : ContextualEdgeReach file tokens memo correct final
+      (.completed waiting finished after shared))
+    (prior : CoherentPrefix file tokens memo correct final
+      waiting priorValues)
+    (child : CoherentReduction file tokens memo correct final
+      finished childValue) :
+  CoherentPrefix file tokens memo correct final after
+    (PrefixValues.completeValue waiting finished after
+      witness.next witness.advance priorValues childValue)
+
+CoherentReduction.reduce
+    (item : ContextualItemKey tokens)
+    (priorValues : PrefixValues file tokens item)
+    (output : NonterminalValue file tokens item.raw.production.lhs)
+    (reached : ContextualReach file tokens memo correct final item)
+    (complete : CompleteItem item.raw)
+    (prefix : CoherentPrefix file tokens memo correct final
+      item priorValues)
+    (action : ActionReduces file tokens
+      (.actionFor item.raw.production)
+      item.raw.origin item.raw.current
+      (PrefixValues.fullValue item complete priorValues) output) :
+  CoherentReduction file tokens memo correct final item output
+
+end CoherentConstructors
+```
+
+The scan and completion constructors take the evidence carrier belonging to
+the same contextual edge key; `packedEdge_*_valid_iff` proves that carrier's
+raw equations, while `ContextualEdgeReach` supplies the contextual endpoints.
+No Prop-valued existential is eliminated to manufacture semantic data. The
+zero, scan, completion, and full-RHS index changes are precisely the four
+checked `Eq.mp` helpers. In particular, `CompleteItem` is not claimed to make
+`rhs.take dot` definitionally equal to `rhs`. Epsilon reductions use
+`zeroValue` followed by `fullValue` and the appropriate nil action. There is no
+constructor for splicing a prefix, completion value, or raw projection from
+another context.
+
+The one reusable rule-indexed complete-root relation is:
+
+```text
+CanonicalCompleteRootReduction
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (rule : GrammarRuleId)
+    (origin finish : Boundary tokens)
+    (context : GuardContext tokens)
+    (value : RuleValue rule) : Prop =
+  ContextualReach file tokens memo correct final
+    (CanonicalCompleteRootItem
+      tokens rule origin finish context) and
+  CompleteItem
+    (CanonicalCompleteRootItem
+      tokens rule origin finish context).raw and
+  CoherentReduction file tokens memo correct final
+    (CanonicalCompleteRootItem
+      tokens rule origin finish context) value
+```
+
+The middle premise is discharged by
+`canonicalCompleteRootItem_complete`, but remains explicit in the public
+relation. The last premise is well typed by reduction alone: the canonical
+item's production and left-hand side reduce definitionally to `.root rule` and
+`.rule rule`, so its output carrier reduces definitionally to `RuleValue rule`.
+There is no equality proof to eliminate and no cast of an already-reduced
+value.
+
+The successful root carrier and public parse judgment are:
+
+```text
+SourceBackedRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (module : ParsedModuleV1) : Prop =
+  exists memo,
+  exists correct : PhaseBCorrect file tokens memo,
+  exists allFinal : AllGuardsFinal memo,
+    CanonicalCompleteRootReduction
+      file tokens memo correct allFinal
+      GrammarRuleId.module
+      (Boundary.start tokens)
+      (Boundary.afterLogicalEOF tokens)
+      GuardContext.plain
+      module
+
+Multi.Parses : WorkspaceFile -> List Token -> ParsedModuleV1 -> Prop
+  | sourceBackedRoot
+      (file : WorkspaceFile) (tokens : List Token)
+      (module : ParsedModuleV1) :
+      TokensOwnedBy file tokens ->
+      SourceBackedRoot file tokens module ->
+      Parses file tokens module
+```
+
+The canonical item's fields definitionally force `.root[module]`, origin zero,
+post-EOF finish, and `plain`; the `.root[module]` `RuleReduction` equation
+additionally forces its source ID, complete item list, and full-file module span, so
+`SourceBackedRoot` cannot inject an arbitrary `ParsedModuleV1`. `Parses` has no
+recovery/synthetic constructor and no premise equating an executor result.
 
 `G` accepts exactly when the completed module-root contextual item in context
 `plain` spans boundary zero through `T`. Thus EOF is consumed and successful
@@ -1956,60 +3961,242 @@ through `MSL0007`, `MSP0001` through `MSP0002`, and `MSS0001` through
 `MSS0020`.
 
 Lexing is fail-fast at the least byte cursor at which no lexical rule can
-continue. A parse diagnostic instead comes from the complete finite chart, so
-an earlier dead alternative cannot hide a later, more informative failure.
-Let `ContextualReach` be `G`'s contextual guarded
-predict/scan/complete closure and define:
+continue. A parse diagnostic instead comes from the complete finite Phase C
+relation, so an earlier dead alternative cannot hide a later failure. The
+diagnostic carrier is closed over the same `memo`, `PhaseBCorrect`, and
+`AllGuardsFinal` proofs:
 
 ```text
-greatestReachableCursor =
-  max { item.raw.current | item is in ContextualReach }
+GreatestReachableCursor
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) : Prop =
+  (exists item,
+    ContextualReach file tokens memo correct final item and
+    item.raw.current = cursor) and
+  (forall item,
+    ContextualReach file tokens memo correct final item ->
+    item.raw.current.val <= cursor.val)
 
-frontier =
-  contextual predict/complete closure of all ContextualReach items whose
-  raw.current equals greatestReachableCursor
+FrontierReach
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (item : ContextualItemKey tokens) : Prop =
+  GreatestReachableCursor file tokens memo correct final cursor and
+  ContextualReach file tokens memo correct final item and
+  item.raw.current = cursor
 
-ExpectedAtFrontier =
-  union { expectedClass(terminal) |
-          item is in frontier and item.raw.next = terminal and
-          the exact production instance that introduced item has all of its
-          GuardWitnessKey values in the contextual derivation }
+ExpectedMember
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (expected : Expected) : Prop =
+  exists item terminal,
+    FrontierReach file tokens memo correct final cursor item and
+    NextSymbol item.raw (terminal terminal) and
+    EnabledProductionInstance file tokens memo correct final
+      { production := item.raw.production,
+        origin := item.raw.origin,
+        context := item.context } and
+    expected = terminal.expected
+
+CanonicalExpected
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (values : NonemptyList Expected) : Prop =
+  (forall expected,
+    expected in (values.head :: values.tail) iff
+      ExpectedMember file tokens memo correct final cursor expected) and
+  (values.head :: values.tail).Nodup and
+  (values.head :: values.tail).Pairwise
+    (fun left right => Expected.compare left right = lt)
+
+FoundAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (cursor : Boundary tokens)
+    (span : SourceSpan) (found : Found) : Prop
 ```
 
-`greatestReachableCursor` exists because the start item is reachable. On parse
-failure it is no later than the logical EOF cursor, and `ExpectedAtFrontier` is
-nonempty; both facts are required theorems of the expanded grammar. The union
-is set union over every reachable contextual item, not the expectation of a
-preferred derivation. Context is retained through the complete frontier
-closure and erased only from the final `Expected` value. Two raw items may
-therefore contribute through different coherent contexts, but a prediction or
-completion premise from one context can never justify a terminal expectation
-from the other. The result is sorted first by `Expected` constructor order and
-then by the displayed order of any `HardKeyword`, `ContextualKeyword`,
-`PragmaKind`, or `Symbol` payload, and is deduplicated.
+The Phase C relation is already fully saturated under predict and complete, so
+`FrontierReach` is exactly the reached items at the greatest cursor; starting
+a second frontier closure is forbidden. The equivalent closure
+characterization is a required theorem. Greatest reach exists because the
+root seed is reached. On failure its cursor is a `TerminalCursor` no later than
+logical `EOF`, and `CanonicalExpected` exists and is unique.
 
-Quoted hard and contextual words, pragma names, and symbols map to their
-corresponding singleton `Expected` constructors; grammar terminals
-`identifier`, `pathComponent`, `literal`, and `assemblyBlock` map to the four
-category constructors; `EOF` maps to `endOfFile`. No nonterminal label,
-disabled branch, recovery alternative, or presentation-only name is added.
-This list is used identically by `ParseDiagnostic.Applies`, `Chart.G`, and the
-proved-equal fast executor.
+`Expected.compare` is owned by `ParserCore`. It first uses this constructor
+order: `hardKeyword`, `contextualKeyword`, `pragmaName`, `symbol`, `identifier`,
+`pathComponent`, `literal`, `assemblyBlock`, `endOfFile`; within the first four
+constructors it uses the displayed finite index of `HardKeyword`,
+`ContextualKeyword`, `PragmaKind`, or `Symbol`. The strict pairwise condition,
+membership iff, and nonempty type therefore specify one sorted, deduplicated
+list. `TerminalSymbol.expected` gives quoted terminals their singleton values,
+maps decimal/hex/string to `literal`, and maps logical `EOF` to `endOfFile`.
+No nonterminal, disabled production, recovery label, or presentation name can
+enter `ExpectedMember`. A witness is paired with the exact contextual item;
+two equal raw projections cannot exchange witnesses.
 
-If the greatest cursor denotes a retained token, `unexpected` uses that token's
-exact span and `Found.token`; at the logical EOF cursor it uses the empty span
-at `file.content.utf8ByteSize` and `Found.endOfFile`. There is one override. If
-one coherent contextual packed derivation in the frontier contains a completed
-first relational or equality operation, the found token is another operator
-from that same level in that same derivation, and no explicit group boundary
-intervenes, `G10_repeatedNonAssociative` replaces `unexpected`. A completed
-operation from one contextual edge may not be paired with the found operator
-premise from another edge having only the same raw projection. The override
-uses the exact span of that second operator and retains that operator as
-payload. It applies across different operators at the same level, such as `<`
-followed by `>=`; grouping starts a new level. At such a cursor,
-`repeatedNonAssociative` is the only applicable parse diagnostic and the union
-`ExpectedAtFrontier` is not emitted.
+`FoundAt` has exactly two constructors. `retained` requires a
+`TerminalCursor` whose `beforeBoundary = cursor` and a `TerminalAt` retained
+token; it returns that token's exact span and `.token token.payload`.
+`endOfFile` requires the unique cursor with `cursor.val = tokens.length` and
+returns the empty file-end span and `.endOfFile`. It has no constructor at the
+post-EOF boundary.
+
+G10 is indexed by the precedence rule that established the first operation.
+Using only the outer `expression` root is insufficient: at the second `<` in
+`a == b < c < d`, the completed relational value is the right operand of an
+equality value and the outer payload is not the relevant first relational
+operation. The carrier therefore retains the coherent **level root** and the
+same frontier cursor at which the second operator was found:
+
+```text
+NonAssociativeLevel.rule : NonAssociativeLevel -> GrammarRuleId
+  | relational => GrammarRuleId.relational
+  | equality   => GrammarRuleId.equality
+
+NonAssociativeFrontierValue
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel) = {
+  origin    : Boundary tokens,
+  context   : GuardContext tokens,
+  value     : RuleValue level.rule,
+  frontier  : FrontierReach file tokens memo correct final cursor
+    (CanonicalCompleteRootItem tokens level.rule
+      origin cursor context),
+  root      : CanonicalCompleteRootReduction
+    file tokens memo correct final level.rule
+      origin cursor context value
+}
+
+ExplicitGroupBoundary
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens} :
+  (level : NonAssociativeLevel) ->
+  NonAssociativeFrontierValue
+    file tokens memo correct final cursor level -> Prop
+  | relational, candidate =>
+      exists inner, candidate.value.payload = .group inner
+  | equality, candidate =>
+      exists inner, candidate.value.payload = .group inner
+
+CompletedNonAssociative
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens} :
+  (level : NonAssociativeLevel) ->
+  (candidate : NonAssociativeFrontierValue
+    file tokens memo correct final cursor level) ->
+  (first : Located InfixOperator) -> Prop
+  | relational, candidate, first =>
+      exists left right,
+        candidate.value.payload = .infix first left right and
+        first.payload in [less, greater, lessEqual, greaterEqual]
+  | equality, candidate, first =>
+      exists left right,
+        candidate.value.payload = .infix first left right and
+        first.payload in [equal, notEqual]
+
+FoundNonAssociativeOperatorAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel)
+    (operator : Located InfixOperator) : Prop
+
+RepeatedNonAssociativeAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel)
+    (operator : Located InfixOperator) : Prop =
+  exists candidate : NonAssociativeFrontierValue
+      file tokens memo correct final cursor level,
+  exists first,
+    CompletedNonAssociative level candidate first and
+    not ExplicitGroupBoundary level candidate and
+    FoundNonAssociativeOperatorAt file tokens cursor level operator
+```
+
+`FoundNonAssociativeOperatorAt` has exactly six constructors. At the same
+`TerminalCursor.beforeBoundary = cursor`, `<`, `>`, `<=`, `>=` produce the
+corresponding exact-span `Located InfixOperator` at level `relational`, and
+`==`, `!=` do so at level `equality`. It is false for every other token and at
+EOF. `RuleValue GrammarRuleId.relational` and
+`RuleValue GrammarRuleId.equality` each reduce definitionally to `Expression`
+in their respective indexed cases; no equality field changes either output
+type. Because
+`CompletedNonAssociative` and `ExplicitGroupBoundary` inspect the same
+rule-indexed `NonAssociativeFrontierValue`, a completed edge from another context cannot
+be substituted. A source-parenthesized expression reduces to outer payload
+`.group`, so it cannot satisfy `CompletedNonAssociative`; EBNF metalanguage
+`P.group` creates no `ExplicitGroupBoundary`. Thus `(a < b) < c` starts a new
+level, while `a < b >= c` selects G10 at `>=`. The level root also selects G10
+for the second `<` in `a == b < c < d`, `a && b < c < d`, and a conditional
+branch containing `b < c < d`; an unrelated outer expression root cannot hide
+that completed relational root.
+
+Finally the diagnostic judgment has exactly these two constructors:
+
+```text
+Multi.ParseDiagnostic.Applies :
+  WorkspaceFile -> List Token -> ParseDiagnostic -> Prop
+
+| unexpected
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (span : SourceSpan)
+    (found : Found) (expected : NonemptyList Expected)
+    (noRoot : not (exists module,
+      SourceBackedRoot file tokens module))
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (canonical : CanonicalExpected
+      file tokens memo correct final cursor expected)
+    (foundAt : FoundAt file tokens cursor span found)
+    (notRepeated : forall level operator,
+      not (RepeatedNonAssociativeAt file tokens memo correct final
+        cursor level operator)) :
+    Applies file tokens (.unexpected span found expected)
+
+| repeatedNonAssociative
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel)
+    (operator : Located InfixOperator)
+    (noRoot : not (exists module,
+      SourceBackedRoot file tokens module))
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (repeated : RepeatedNonAssociativeAt file tokens memo correct final
+      cursor level operator) :
+    Applies file tokens
+      (.repeatedNonAssociative operator.span level operator)
+```
+
+The G10 constructor has no `Expected` premise or payload. The negative G10
+premise on `unexpected`, functionality of the six-token mapping, and uniqueness
+of the canonical frontier make the constructors exclusive and diagnostic
+functional. Both relations are declarative; neither mentions `Chart.G`,
+`parseTokens`, a worklist result, or executor failure.
 
 Structural validation reports every applicable structural diagnostic. It
 sorts and deduplicates by diagnostic code, source identity, primary start and
@@ -2090,8 +4277,8 @@ contextual greatest cursor, sorted/deduplicated expected union, exact `Found`,
 and coherent `G10` override. `StructurallyAccepts` is the conjunction of the
 sixteen rules above and does not invoke the validator.
 
-The raw executors import syntax and diagnostics but do not import their sibling
-judgments:
+The lexer imports syntax/diagnostics, while both parser executors import the
+shared `ParserCore`; no executor imports its sibling judgment:
 
 ```text
 LexedModule = {
@@ -2350,14 +4537,16 @@ The cardinality injections used by `chartGBound` are fixed:
 
 ```text
 card Boundary                         = Q
+card TerminalCursor                   = T = Q - 1
 card GuardContext                     = C(T) = 1 + 3 * Q
 card ProductionInstanceKey            = P * C(T) * Q
 card GuardInstanceKey                 =
   K_guard * Q * (Q + 1) / 2           <= K_guard * Q * Q
 card GuardWitnessKey                  <= H * C(T) * Q
 card ContextualItemKey                = C(T) * D * Q * Q
-card ContextualPackedEdgeKey.scanned  <= C(T) * D * Q * Q
-card ContextualPackedEdgeKey.completed
+card StructurallyValidContextualPackedEdge.scanned
+  <= C(T) * D * Q * Q
+card StructurallyValidContextualPackedEdge.completed
   <= C(T) * D * D * Q * Q * Q
 ```
 
@@ -2368,6 +4557,26 @@ completion injection sends an edge to its waiting context, two raw dotted
 schemas, waiting origin, shared cursor, and finished cursor;
 `descendContext` reconstructs the finished context, so there is no `C(T)^2`
 factor.
+
+`PackedEdge` and `StructurallyValidContextualPackedEdge` are proof-irrelevant
+subtypes. The displayed edge bounds count only keys satisfying their exact
+structural equations; the unrestricted raw sum type is never enumerated,
+stored, dequeued, or used as the domain of a worklist. Erasing the subtype
+proof after validation preserves the same valid-key cardinality. `MatchedTerminal`, `EbnfValue`, `RuleValue`,
+`GrammarSymbolValues`, `GuardEvidence`, `ScannedEdgeWitness`,
+`CompletedEdgeWitness`, `CoherentPrefix`, `CoherentReduction`,
+`CanonicalCompleteRootReduction`, `NonAssociativeFrontierValue`, and the validity/correctness
+proofs are values or certificates attached to an existing item, edge, action,
+guard, frontier, or G10 unit; they are not memo, worklist, or deduplication
+identities. `ActionReduces.functional`, `RuleReduction.functional`, and
+`CoherentReduction.functional` ensure that an existing coherent key has at
+most one such attached semantic output. Their construction is charged respectively to the existing scan
+actions `L12`, epsilon actions `L13`, completed actions `U05`, Phase-B lookup
+slots, frontier units, and `U08_G10Candidate`. Therefore they introduce no new
+cardinality factor and the displayed bound is unchanged. An implementation
+that materializes a semantic value, proof term, coherent derivation, or AST
+alternative as an additional worklist/memo key is nonconforming to this bound
+and must specify a replacement bound before adoption.
 
 The four `ChartPhaseSlot` values contribute the leading `4`; each occurs
 exactly once, and neither sealing transition can occur until the preceding
@@ -2399,10 +4608,16 @@ tunable numeral and is unchanged by the contextual chart repair. The optimized
    final `GuardDecision`. Unordered start/end coordinates are fixed no-op slots
    and are never queried. This phase does not generate a witness or combine a
    candidate. Re-running recognition for one guard cell is forbidden.
-3. Only after `FastAllGuardsFinal` holds does Fast Phase C use precedence
-   climbing, combine candidates, and visit each successful reduction edge
-   once. Each combine reads the exact final guard cell and uses one coherent
-   `GuardWitnessKey` observation.
+   Its sealed table carries the Core-owned `FastAllGuardsFinal` barrier.
+   `Properties.lean` proves `FastPhaseBCorrect`, the observation-quotient
+   counterpart of `PhaseBCorrect`; it is not a proposition imported by the
+   executor. An all-neutral table satisfies only the finality barrier.
+3. Only after `FastAllGuardsFinal` holds does executable Fast Phase C use
+   precedence climbing, combine candidates, and visit each successful
+   reduction edge once. Each combine reads the exact final guard cell and uses
+   one coherent Core `GuardWitnessKey` observation. The corresponding
+   declarative Phase C derivation is constructed in `Properties.lean` only
+   after `FastPhaseBCorrect` has also been proved.
 
 Within each phase, memo cells are visited in lexicographic `(fast key kind,
 start boundary, end boundary)` order. No `undecided`, absent, or provisional
@@ -2500,8 +4715,33 @@ assembly_slice_ignores_comment_braces
 ebnf_expansion_finite
 ebnf_expansion_nonnullable_repetitions
 production_action_id_bijective
+production_rhs_public_bridges_exact
+production_rhs_typed_hlist_transport
+actionPackers_typed_exact
+ruleValue_allGrammarRuleIds_exhaustive
 polarity_accepts_guardDecision_table
 guardDecision_allows_eq_accepts
+terminalCursor_boundary_coercions_exact
+tokensOwnedBy_exact
+terminalAt_functional
+terminalMatches_exact
+matchedTerminal_eof_empty_span
+boundaryByte_functional
+consumedSpan_functional
+consumedSpan_boundary_trivia_exact
+consumedSpanWitness_compute
+consumedSpanWitness_sourceLocates
+sourceLocates_functional
+matchedTerminal_identifier_projection_exact
+matchedTerminal_identifier_projection_exists_unique
+matchedTerminal_path_projection_exact
+matchedTerminal_path_projection_exists_unique
+matchedTerminal_external_projection_exact
+matchedTerminal_external_projection_exists_unique
+matchedTerminal_literal_projection_exact
+matchedTerminal_literal_projection_exists_unique
+matchedTerminal_assembly_projection_exact
+matchedTerminal_assembly_projection_exists_unique
 guard_context_cardinality
 guard_instance_cardinality
 guard_witness_cardinality
@@ -2509,19 +4749,45 @@ contextual_item_edge_cardinality
 guard_anchor_functional
 guard_evidence_functional
 guard_evidence_total
+unguardedReach_least
+unguardedRecognizes_exact
+greatestUnguardedEnd_functional
+exactSlice_exact
+delimiterRun_functional
+matchingDelimiter_functional
+armHeaderAt_same_frame
 nearest_statement_region_functional
 unguarded_chart_saturated_once
+phaseBCorrect_iff_guardEvidence
 guard_decisions_final_total
 chart_phase_order
+contextualReach_requires_phaseBCorrect
 contextualReach_requires_allGuardsFinal
 contextual_predict_scan_complete_closed
+contextualReach_ordered
+contextualPackedEdge_structural_equations
+contextualEdgeReach_endpoints_reached
 contextual_projection_no_anchor_mixing
 chart_guard_witnesses_exact
+actionReduces_eleven_shapes_exact
+actionReduces_total
+ActionReduces.functional
+ruleReduction_seventyFive_exhaustive
+ruleReduction_total
+ruleReduction_functional
+ruleReduction_source_backed
+coherentPrefix_no_context_splice
+coherentReduction_functional
+sourceBackedRoot_exact
 chart_unit_family_injective
 chart_unit_family_complete
 chart_greatest_cursor_exists
 chart_expected_nonempty_on_failure
 chart_expected_is_frontier_union
+canonicalExpected_sorted_nodup_unique
+foundAt_functional
+explicit_group_resets_nonassociative_level
+repeatedNonAssociative_coherent
 chart_repeated_nonassoc_overrides
 chart_unique_root_reduction
 chartG_sound
@@ -2536,8 +4802,11 @@ parser_complete
 Parses.functional
 parse_diagnostic_sound
 parse_diagnostic_complete
+ParseDiagnostic.Applies.functional
+parse_diagnostic_constructors_exclusive
 fast_guard_observation_congruent
 fast_guard_slot_injective
+fast_phaseB_correct
 fast_phase_order
 fast_guard_final_before_combine
 parseTokens_eq_chartG
@@ -2932,6 +5201,7 @@ Solcore/Surface/Multi/Syntax.lean
 Solcore/Surface/Multi/Diagnostic.lean
 Solcore/Surface/Multi/Measure.lean
 Solcore/Surface/Multi/Grammar.lean
+Solcore/Surface/Multi/ParserCore.lean
 
 Solcore/Surface/Multi/LexicalJudgment.lean
 Solcore/Surface/Multi/Lexer.lean
@@ -2946,13 +5216,32 @@ Solcore/Surface/Multi/StandardFixtures.lean
 Solcore/Surface/Multi.lean
 ```
 
+`ParserCore.lean` imports `Grammar.lean` and owns `Boundary`, `TerminalCursor`,
+their coercions, terminal lookup/matching, `GuardContext`, production/guard
+instances, the structural `GuardAnchor` relation/decider,
+`GuardMemoState`/`GuardMemo`/`AllGuardsFinal`, the checked
+`GuardWitnessKey` subtype, raw/contextual item and edge keys,
+structural-validity subtypes, the indexed EBNF/nonterminal/RHS value carriers,
+all eleven typed action packers and their equations, `descendContext`,
+`TokensOwnedBy`, `BoundaryByte`, `ConsumedSpan`, `ConsumedSpanWitness` and its
+total `compute`, `sourceLoc`, `SourceLocates`, and `Expected.compare`. In particular, `GuardAnchor` and
+`GuardWitnessKey` have no shadow definition in a judgment or executor. It
+imports no judgment or executor.
+
 `LexicalJudgment.lean` does not import `Lexer.lean`.
-`ParserJudgment.lean` does not import `Chart.lean` or `Parser.lean`.
+`ParserJudgment.lean`, `Chart.lean`, and `Parser.lean` each import the same
+`ParserCore.lean`. `ParserJudgment.lean` owns `UnguardedReach`, delimiter and
+guard evidence, `PhaseBCorrect`, judgment-level `GuardWitness` and production
+enablement, contextual reach/edge reach, reduction,
+`Parses`, and `ParseDiagnostic.Applies`; it does not import `Chart.lean` or
+`Parser.lean`.
 `StructureJudgment.lean` does not import `Structure.lean`.
 `Lexer.lean`, `Chart.lean`, `Parser.lean`, and `Structure.lean` do not import
 their sibling judgments. `Parser.lean` does not import `Chart.lean`; only
 `Properties.lean` connects either executor to the declarative judgment and
-proves their equality. `CanonicalData.lean` imports no Surface or resolver
+proves that each sealed executor memo satisfies `PhaseBCorrect`, relates each
+stored Core `GuardWitnessKey` to the judgment-level `GuardWitness`, and proves
+their result equality. `CanonicalData.lean` imports no Surface or resolver
 module. The public internal umbrella is added only after all correspondence,
 certificate, fixture, and kernel audits pass.
 
@@ -2961,10 +5250,11 @@ certificate, fixture, and kernel audits pass.
 `GuardDecision.allows` only as the definitionally equal argument-order alias.
 An implementation that still exposes `Polarity -> Bool -> Bool` is not
 conforming to this Accepted ADR. Updating that shared algebra and its
-exhaustive table checks is a prerequisite gate: `ParserJudgment.lean`,
-`Chart.lean`, and `Parser.lean` may not be implemented, accepted, or imported
-as a conforming slice against the old signature. This implementation gate does
-not change the ADR's `Accepted` status.
+exhaustive table checks is a prerequisite gate. In addition, the present
+ParserCore/value/reduction/diagnostic revision must pass an independent
+closedness audit before `ParserJudgment.lean`, `Chart.lean`, or `Parser.lean`
+may be implemented, accepted, or imported as a conforming slice. This
+implementation stop does not change the ADR's `Accepted` status.
 
 Implementation proceeds in this order:
 
@@ -2974,15 +5264,19 @@ Implementation proceeds in this order:
 3. the pure maximal-munch lexer and its correspondence proofs;
 4. the complete AST, checked EBNF expansion, stable production/action tables,
    shared `GuardDecision` algebra, replacement `Polarity.accepts`, and their
-   exhaustive table checks;
-5. the independent parser judgment only after step 4, then finite-chart `G`
+   exhaustive table checks, including every public dependent RHS bridge;
+5. the shared `ParserCore` carriers, their structural validity equations,
+   well-founded value family, eleven typed action packers, constructive
+   location witnesses, exact 75-rule value mapping, and cardinality checks;
+6. the independent parser judgment only after step 5 and the independent ADR
+   closedness audit, then finite-chart `G`
    and the separate fast full-token parser, their phase barriers, bounds,
    correspondence, and exact result-equality proof;
-6. independent structural acceptance and the structural validator;
-7. location, token-correspondence, diagnostic, and resource theorems;
-8. checked compatibility, strict UTF-8, byte-round-trip, and six-file standard
+7. independent structural acceptance and the structural validator;
+8. location, token-correspondence, diagnostic, and resource theorems;
+9. checked compatibility, strict UTF-8, byte-round-trip, and six-file standard
    certificates; and
-9. the internal `Solcore.Surface.Multi` umbrella.
+10. the internal `Solcore.Surface.Multi` umbrella.
 
 No resolver module may be implemented against an intermediate parser slice.
 No later slice may bypass `CertifiedParsedModule` by importing compiler HIR,
@@ -3078,6 +5372,19 @@ Lexical or parse failure produces a closed diagnostic and no AST.
   priority guards, greatest-cursor contextual frontier unions, the
   repeated-nonassociative override, and unique reduction across every
   contextual packed derivation.
+- Check the public Grammar RHS bridge for every production and all eleven
+  typed action shapes; check that `RuleValue` covers the 75 displayed rule IDs
+  exactly and that every branch of every `RuleReduction` row reduces to the
+  stated constructor and span. Include absent/present option pairs, left/right
+  fold directions, every `PostfixPartValue`, pass-through wrapper counts, the
+  module full-file span, empty-arm fat-arrow-end span, and logical-EOF empty
+  span.
+- Test `TerminalMatches` independently: a contextual word is only the exact
+  identifier spelling; identifier rejects every hard-keyword token; path
+  component accepts valid identifier and hard-keyword spellings; decimal,
+  hexadecimal, and string are exactly the literal categories; and only the
+  logical EOF value matches EOF. Test `BoundaryByte` and `ConsumedSpan` across
+  leading/inter-token/trailing trivia and UTF-8 token endpoints.
 - For `G01`, test both `if (x) {}` statement priority and keyword-conditional
   expression priority. For `G03` through `G06` and `G09`, test both decision
   sides, including incomplete `comptime` prefixes that still take the marker
@@ -3098,6 +5405,11 @@ Lexical or parse failure produces a closed diagnostic and no AST.
   positive/negative/neutral allowance table, contextual scan preservation,
   prediction descent, completion restoration, and the fast observation
   quotient on executable finite keys.
+- Give `AllGuardsFinal` a deliberately all-neutral table and prove that it
+  fails `PhaseBCorrect` on a non-neutral evidence fixture; then check that no
+  contextual reach, edge, reduction, frontier, or diagnostic constructor can
+  be formed from that table. Check structural edge validity separately from
+  endpoint reach and reject an otherwise valid edge with an unreached `after`.
 - Check the exhaustive `Polarity.accepts` table and definitional
   `GuardDecision.allows` alias from `Grammar.lean`; reject the obsolete
   `Polarity -> Bool -> Bool` signature at the module boundary.
@@ -3109,6 +5421,12 @@ Lexical or parse failure produces a closed diagnostic and no AST.
 - Instrument the fast executor to prove that every guard memo is final before
   the first guarded candidate combine, and that absent/undecided cells never
   act as negative or neutral decisions.
+- For G10, test mixed operators at each level, `(a < b) < c`,
+  `a < b >= c`, `(a == b) != c`, `a == b < c < d`, `a && b < c < d`, a
+  conditional branch containing `b < c < d`, and two contextual derivations
+  with the same raw edge. Only the same coherent level-indexed
+  `NonAssociativeFrontierValue` may supply the first operation, and an explicit
+  source `.group` must reset the level.
 - Test all structural diagnostic constructors, their exact primary spans,
   canonical ordering, and duplicate removal.
 - Check the compatibility ledger fixtures and prove both canonical-standard
