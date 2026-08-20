@@ -6254,4 +6254,83 @@ inductive Parses : WorkspaceFile → List Token → ParsedModuleV1 → Prop wher
       (sourceBacked : SourceBackedRoot file tokens module) :
       Parses file tokens module
 
+/-- The greatest cursor reached by the fully saturated contextual relation. -/
+def GreatestReachableCursor
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) : Prop :=
+  (∃ item : ContextualItemKey tokens,
+    ContextualReach file tokens memo correct final item ∧
+      item.raw.current = cursor) ∧
+  ∀ item : ContextualItemKey tokens,
+    ContextualReach file tokens memo correct final item →
+      item.raw.current.val ≤ cursor.val
+
+/-- One reached contextual item at the greatest cursor. -/
+def FrontierReach
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (item : ContextualItemKey tokens) : Prop :=
+  GreatestReachableCursor file tokens memo correct final cursor ∧
+    ContextualReach file tokens memo correct final item ∧
+    item.raw.current = cursor
+
+/-- One enabled terminal expected by a contextual frontier item. -/
+def ExpectedMember
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (expected : Expected) : Prop :=
+  ∃ item : ContextualItemKey tokens,
+    ∃ terminal : TerminalSymbol,
+      FrontierReach file tokens memo correct final cursor item ∧
+      NextSymbol item.raw (.terminal terminal) ∧
+      EnabledProductionInstance file tokens memo correct final {
+        production := item.raw.production
+        origin := item.raw.origin
+        context := item.context
+      } ∧
+      expected = terminal.expected
+
+/-- The unique intended sorted and deduplicated expected frontier list. -/
+def CanonicalExpected
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (values : NonemptyList Expected) : Prop :=
+  (∀ expected, expected ∈ (values.head :: values.tail) ↔
+      ExpectedMember file tokens memo correct final cursor expected) ∧
+    (values.head :: values.tail).Nodup ∧
+    (values.head :: values.tail).Pairwise
+      (fun left right => Expected.compare left right = .lt)
+
+/-- The retained token or logical EOF observed at one parser boundary. -/
+inductive FoundAt
+    (file : WorkspaceFile) (tokens : List Token) :
+    Boundary tokens → SourceSpan → Found → Prop where
+  | retained
+      (cursor : TerminalCursor tokens)
+      (boundary : Boundary tokens)
+      (token : Token)
+      (atBoundary : cursor.beforeBoundary = boundary)
+      (terminalAt : TerminalAt file tokens cursor (.retained token) token.span) :
+      FoundAt file tokens boundary token.span (.token token.payload)
+  | endOfFile
+      (cursor : TerminalCursor tokens)
+      (boundary : Boundary tokens)
+      (atBoundary : cursor.beforeBoundary = boundary)
+      (atEnd : cursor.val = tokens.length) :
+      FoundAt file tokens boundary {
+        source := file.id
+        startByte := file.content.utf8ByteSize
+        endByte := file.content.utf8ByteSize
+      } .endOfFile
+
 end Solcore.Surface.Multi
