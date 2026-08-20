@@ -1358,4 +1358,4693 @@ def assignmentOperator
 
 end RuleReduction
 
+
+local syntax "rrEvs![" term,* "]" : term
+
+local macro "rrEvs![" values:term,* "]" : term => do
+  let mut result ← `(EbnfValues.nil)
+  for value in values.getElems.reverse do
+    result ← `(EbnfValues.cons _ _ $value $result)
+  return result
+
+local syntax "rrRoot![" term "]" : term
+local macro_rules
+  | `(rrRoot![$value:term]) => `(EbnfValue.transport (by rfl) $value)
+
+local syntax "rrTerm![" term "," term "]" : term
+local macro_rules
+  | `(rrTerm![$terminal:term, $matched:term]) =>
+      `(EbnfValue.terminalAtom $terminal $matched)
+
+local syntax "rrRule![" term "," term "]" : term
+local macro_rules
+  | `(rrRule![$rule:term, $value:term]) =>
+      `(EbnfValue.ruleAtom $rule $value)
+
+local syntax "rrSeq![" term "|" term,* "]" : term
+local macro "rrSeq![" children:term "|" values:term,* "]" : term => do
+  `(EbnfValue.sequence $children rrEvs![$values,*])
+
+local syntax "rrChoice![" term "|" term "," term "]" : term
+local macro_rules
+  | `(rrChoice![$branches:term | $branch:term, $value:term]) =>
+      `(EbnfValue.choice $branches ⟨$branch, $value⟩)
+
+local syntax "rrGroup![" term "," term "]" : term
+local macro_rules
+  | `(rrGroup![$child:term, $value:term]) =>
+      `(EbnfValue.group $child $value)
+
+local syntax "rrOpt![" term "," term "]" : term
+local macro_rules
+  | `(rrOpt![$child:term, $value:term]) =>
+      `(EbnfValue.optional $child $value)
+
+local syntax "rrStar![" term "," term "]" : term
+local macro_rules
+  | `(rrStar![$child:term, $value:term]) =>
+      `(EbnfValue.star $child $value)
+
+local syntax "rrList0![" term "," term "]" : term
+local macro_rules
+  | `(rrList0![$child:term, $value:term]) =>
+      `(EbnfValue.list0 $child $value)
+
+local syntax "rrList1![" term "," term "]" : term
+local macro_rules
+  | `(rrList1![$child:term, $value:term]) =>
+      `(EbnfValue.list1 $child $value)
+
+local syntax "rrTopItemInput![" term "," term "]" : term
+local macro_rules
+  | `(rrTopItemInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .atom (.nonterminal .importDecl),
+        .atom (.nonterminal .exportDecl),
+        .atom (.nonterminal .pragmaDecl),
+        .atom (.nonterminal .dataDecl),
+        .atom (.nonterminal .typeAliasDecl),
+        .atom (.nonterminal .classDecl),
+        .atom (.nonterminal .instanceDecl),
+        .atom (.nonterminal .contractDecl),
+        .atom (.nonterminal .functionDecl)
+      ] | $branch, $value]])
+
+local syntax "rrModuleRefInput![" term "," term "]" : term
+local macro_rules
+  | `(rrModuleRefInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .sequence [
+          .atom (.terminal (.symbol .at)),
+          .atom (.terminal (.category .pathComponent)),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.category .pathComponent)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]))
+        ],
+        .sequence [
+          .atom (.terminal (.category .pathComponent)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]))
+        ]
+      ] | $branch, $value]])
+
+local syntax "rrExportDeclInput![" term "," term "]" : term
+local macro_rules
+  | `(rrExportDeclInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .sequence [
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.terminal (.symbol .leftBrace)),
+          .list0 (.atom (.nonterminal .localExportEntry)),
+          .atom (.terminal (.symbol .rightBrace)),
+          .atom (.terminal (.symbol .semicolon))
+        ],
+        .sequence [
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .semicolon))
+        ],
+        .sequence [
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.hardKeyword .asKw)),
+          .atom (.terminal (.category .identifier)),
+          .atom (.terminal (.symbol .semicolon))
+        ],
+        .sequence [
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.symbol .star)),
+          .atom (.terminal (.symbol .semicolon))
+        ],
+        .sequence [
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.symbol .leftBrace)),
+          .list0 (.atom (.nonterminal .remoteExportEntry)),
+          .atom (.terminal (.symbol .rightBrace)),
+          .atom (.terminal (.symbol .semicolon))
+        ]
+      ] | $branch, $value]])
+
+local syntax "rrLocalExportEntryInput![" term "," term "]" : term
+local macro_rules
+  | `(rrLocalExportEntryInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .atom (.terminal (.symbol .star)),
+        .atom (.nonterminal .exportItem),
+        .sequence [
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.symbol .star))
+        ]
+      ] | $branch, $value]])
+
+local syntax "rrRemoteExportEntryInput![" term "," term "]" : term
+local macro_rules
+  | `(rrRemoteExportEntryInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .atom (.terminal (.symbol .star)),
+        .atom (.nonterminal .exportItem)
+      ] | $branch, $value]])
+
+local syntax "rrPragmaDeclInput![" term "," term "]" : term
+local macro_rules
+  | `(rrPragmaDeclInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .sequence [
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noCoverageCondition)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ],
+        .sequence [
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noPattersonCondition)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ],
+        .sequence [
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noBoundedVariableCondition)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ],
+        .sequence [
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noGenericInstanceFor)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ]
+      ] | $branch, $value]])
+
+local syntax "rrContractMemberInput![" term "," term "]" : term
+local macro_rules
+  | `(rrContractMemberInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .atom (.nonterminal .dataDecl),
+        .atom (.nonterminal .typeAliasDecl),
+        .atom (.nonterminal .fieldDecl),
+        .atom (.nonterminal .functionDecl),
+        .atom (.nonterminal .fallbackDecl),
+        .atom (.nonterminal .contractConstructorDecl)
+      ] | $branch, $value]])
+
+local syntax "rrTypeInput![" term "," term "]" : term
+local macro_rules
+  | `(rrTypeInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .sequence [
+          .atom (.terminal (.contextualKeyword .comptimeKw)),
+          .atom (.nonterminal .type)
+        ],
+        .sequence [
+          .atom (.nonterminal .typeAtom),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ])
+        ]
+      ] | $branch, $value]])
+
+local syntax "rrTypeAtomInput![" term "," term "]" : term
+local macro_rules
+  | `(rrTypeAtomInput![$branch:term, $value:term]) =>
+      `(rrRoot![rrChoice![[
+        .sequence [
+          .atom (.terminal (.symbol .at)),
+          .atom (.nonterminal .typeAtom)
+        ],
+        .sequence [
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ],
+        .sequence [
+          .atom (.terminal (.symbol .leftParen)),
+          .atom (.terminal (.symbol .rightParen))
+        ],
+        .sequence [
+          .atom (.terminal (.symbol .leftParen)),
+          .atom (.nonterminal .type),
+          .atom (.terminal (.symbol .rightParen))
+        ],
+        .sequence [
+          .atom (.terminal (.symbol .leftParen)),
+          .atom (.nonterminal .type),
+          .atom (.terminal (.symbol .comma)),
+          .atom (.nonterminal .type),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .comma)),
+            .atom (.nonterminal .type)
+          ])),
+          .atom (.terminal (.symbol .rightParen))
+        ]
+      ] | $branch, $value]])
+
+local syntax "rrNil" : term
+local macro_rules
+  | `(rrNil) => `(EbnfValues.nil)
+
+local syntax "rrCons" : term
+local macro_rules
+  | `(rrCons) => `(EbnfValues.cons _ _)
+
+local syntax "rrTerminalExpr![" term "]" : term
+local macro_rules
+  | `(rrTerminalExpr![$terminal:term]) =>
+      `(.atom (.terminal $terminal))
+
+local syntax "rrRuleExpr![" term "]" : term
+local macro_rules
+  | `(rrRuleExpr![$rule:term]) =>
+      `(.atom (.nonterminal $rule))
+
+local syntax "rrExprSeq![" term,* "]" : term
+local macro_rules
+  | `(rrExprSeq![$children:term,*]) => `(.sequence [$children,*])
+
+local syntax "rrExprChoice![" term,* "]" : term
+local macro_rules
+  | `(rrExprChoice![$branches:term,*]) => `(.choice [$branches,*])
+
+local syntax "rrExprGroup![" term "]" : term
+local macro_rules
+  | `(rrExprGroup![$child:term]) => `(.group $child)
+
+local syntax "rrExprOpt![" term "]" : term
+local macro_rules
+  | `(rrExprOpt![$child:term]) => `(.optional $child)
+
+local syntax "rrExprStar![" term "]" : term
+local macro_rules
+  | `(rrExprStar![$child:term]) => `(.star $child)
+
+local syntax "rrExprPlus![" term "]" : term
+local macro_rules
+  | `(rrExprPlus![$child:term]) => `(.plus $child)
+
+local syntax "rrExprList0![" term "]" : term
+local macro_rules
+  | `(rrExprList0![$child:term]) => `(.list0 $child)
+
+local syntax "rrExprList1![" term "]" : term
+local macro_rules
+  | `(rrExprList1![$child:term]) => `(.list1 $child)
+
+local syntax "rrPublicRhs![" term "]" : term
+local macro_rules
+  | `(rrPublicRhs![.statement]) => `(rrExprChoice![
+      rrRuleExpr![.letStatement],
+      rrRuleExpr![.returnStatement],
+      rrRuleExpr![.matchStatement],
+      rrRuleExpr![.ifStatement],
+      rrRuleExpr![.forStatement],
+      rrRuleExpr![.assemblyStatement],
+      rrRuleExpr![.blockStatement],
+      rrRuleExpr![.breakStatement],
+      rrRuleExpr![.continueStatement],
+      rrRuleExpr![.assignmentStatement],
+      rrRuleExpr![.expressionStatement]
+    ])
+  | `(rrPublicRhs![.letStatement]) => `(rrExprSeq![
+      rrRuleExpr![.letBinding],
+      rrTerminalExpr![.symbol .semicolon]
+    ])
+  | `(rrPublicRhs![.letBinding]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .letKw],
+      rrTerminalExpr![.category .identifier],
+      rrExprOpt![rrExprSeq![
+        rrTerminalExpr![.symbol .colon],
+        rrExprOpt![rrTerminalExpr![.contextualKeyword .comptimeKw]],
+        rrRuleExpr![.type]
+      ]],
+      rrExprOpt![rrExprSeq![
+        rrTerminalExpr![.symbol .equal],
+        rrRuleExpr![.expression]
+      ]]
+    ])
+  | `(rrPublicRhs![.returnStatement]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .returnKw],
+      rrExprOpt![rrRuleExpr![.expression]],
+      rrTerminalExpr![.symbol .semicolon]
+    ])
+  | `(rrPublicRhs![.blockStatement]) => `(rrRuleExpr![.body])
+  | `(rrPublicRhs![.breakStatement]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .breakKw],
+      rrTerminalExpr![.symbol .semicolon]
+    ])
+  | `(rrPublicRhs![.continueStatement]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .continueKw],
+      rrTerminalExpr![.symbol .semicolon]
+    ])
+  | `(rrPublicRhs![.assemblyStatement]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .assemblyKw],
+      rrTerminalExpr![.category .assemblyBlock]
+    ])
+  | `(rrPublicRhs![.ifStatement]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .ifKw],
+      rrTerminalExpr![.symbol .leftParen],
+      rrRuleExpr![.expression],
+      rrTerminalExpr![.symbol .rightParen],
+      rrRuleExpr![.body],
+      rrExprOpt![rrExprSeq![
+        rrTerminalExpr![.hardKeyword .elseKw],
+        rrRuleExpr![.body]
+      ]]
+    ])
+  | `(rrPublicRhs![.forStatement]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .forKw],
+      rrTerminalExpr![.symbol .leftParen],
+      rrExprList0![rrRuleExpr![.forInitItem]],
+      rrTerminalExpr![.symbol .semicolon],
+      rrRuleExpr![.expression],
+      rrTerminalExpr![.symbol .semicolon],
+      rrExprList0![rrRuleExpr![.forPostItem]],
+      rrTerminalExpr![.symbol .rightParen],
+      rrRuleExpr![.body]
+    ])
+  | `(rrPublicRhs![.forInitItem]) => `(rrExprChoice![
+      rrRuleExpr![.letBinding],
+      rrExprSeq![
+        rrRuleExpr![.expression],
+        rrRuleExpr![.assignmentOperator],
+        rrRuleExpr![.expression]
+      ],
+      rrRuleExpr![.expression]
+    ])
+  | `(rrPublicRhs![.forPostItem]) => `(rrExprChoice![
+      rrExprSeq![
+        rrRuleExpr![.expression],
+        rrRuleExpr![.assignmentOperator],
+        rrRuleExpr![.expression]
+      ],
+      rrRuleExpr![.expression]
+    ])
+  | `(rrPublicRhs![.matchStatement]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .matchKw],
+      rrExprList1![rrRuleExpr![.expression]],
+      rrTerminalExpr![.symbol .leftBrace],
+      rrExprPlus![rrRuleExpr![.matchArm]],
+      rrTerminalExpr![.symbol .rightBrace],
+      rrExprOpt![rrTerminalExpr![.symbol .semicolon]]
+    ])
+  | `(rrPublicRhs![.matchArm]) => `(rrExprSeq![
+      rrTerminalExpr![.symbol .pipe],
+      rrExprList1![rrRuleExpr![.pattern]],
+      rrTerminalExpr![.symbol .fatArrow],
+      rrExprStar![rrRuleExpr![.armStatement]]
+    ])
+  | `(rrPublicRhs![.armStatement]) => `(rrRuleExpr![.statement])
+  | `(rrPublicRhs![.assignmentStatement]) => `(rrExprSeq![
+      rrRuleExpr![.expression],
+      rrRuleExpr![.assignmentOperator],
+      rrRuleExpr![.expression],
+      rrTerminalExpr![.symbol .semicolon]
+    ])
+  | `(rrPublicRhs![.assignmentOperator]) => `(rrExprChoice![
+      rrTerminalExpr![.symbol .equal],
+      rrTerminalExpr![.symbol .plusEqual],
+      rrTerminalExpr![.symbol .minusEqual],
+      rrTerminalExpr![.symbol .caretEqual],
+      rrTerminalExpr![.symbol .ampEqual],
+      rrTerminalExpr![.symbol .pipeEqual],
+      rrTerminalExpr![.symbol .percentEqual]
+    ])
+  | `(rrPublicRhs![.expressionStatement]) => `(rrExprChoice![
+      rrExprSeq![
+        rrRuleExpr![.expression],
+        rrTerminalExpr![.symbol .semicolon]
+      ],
+      rrRuleExpr![.terminalExpression]
+    ])
+  | `(rrPublicRhs![.terminalExpression]) => `(rrRuleExpr![.expression])
+  | `(rrPublicRhs![.pattern]) => `(rrExprChoice![
+      rrTerminalExpr![.symbol .underscore],
+      rrRuleExpr![.literal],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .dot],
+        rrTerminalExpr![.category .identifier],
+        rrExprOpt![rrExprSeq![
+          rrTerminalExpr![.symbol .leftParen],
+          rrExprList1![rrRuleExpr![.pattern]],
+          rrTerminalExpr![.symbol .rightParen]
+        ]]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.contextualKeyword .comptimeKw],
+        rrRuleExpr![.expression]
+      ],
+      rrExprSeq![
+        rrRuleExpr![.qualifiedName],
+        rrExprOpt![rrExprSeq![
+          rrTerminalExpr![.symbol .leftParen],
+          rrExprList1![rrRuleExpr![.pattern]],
+          rrTerminalExpr![.symbol .rightParen]
+        ]]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftParen],
+        rrTerminalExpr![.symbol .rightParen]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftParen],
+        rrRuleExpr![.pattern],
+        rrTerminalExpr![.symbol .rightParen]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftParen],
+        rrRuleExpr![.pattern],
+        rrTerminalExpr![.symbol .comma],
+        rrRuleExpr![.pattern],
+        rrExprStar![rrExprGroup![rrExprSeq![
+          rrTerminalExpr![.symbol .comma],
+          rrRuleExpr![.pattern]
+        ]]],
+        rrTerminalExpr![.symbol .rightParen]
+      ]
+    ])
+  | `(rrPublicRhs![.expression]) => `(rrRuleExpr![.annotation])
+  | `(rrPublicRhs![.annotation]) => `(rrExprSeq![
+      rrRuleExpr![.conditional],
+      rrExprOpt![rrExprSeq![
+        rrTerminalExpr![.symbol .colon],
+        rrRuleExpr![.type]
+      ]]
+    ])
+  | `(rrPublicRhs![.conditional]) => `(rrExprChoice![
+      rrExprSeq![
+        rrTerminalExpr![.hardKeyword .ifKw],
+        rrRuleExpr![.conditional],
+        rrTerminalExpr![.contextualKeyword .thenKw],
+        rrRuleExpr![.conditional],
+        rrTerminalExpr![.hardKeyword .elseKw],
+        rrRuleExpr![.conditional]
+      ],
+      rrExprSeq![
+        rrRuleExpr![.logicalOr],
+        rrExprOpt![rrExprSeq![
+          rrTerminalExpr![.symbol .question],
+          rrRuleExpr![.conditional],
+          rrTerminalExpr![.symbol .colon],
+          rrRuleExpr![.conditional]
+        ]]
+      ]
+    ])
+  | `(rrPublicRhs![.logicalOr]) => `(rrExprSeq![
+      rrRuleExpr![.logicalAnd],
+      rrExprStar![rrExprGroup![rrExprSeq![
+        rrTerminalExpr![.symbol .logicalOr],
+        rrRuleExpr![.logicalAnd]
+      ]]]
+    ])
+  | `(rrPublicRhs![.logicalAnd]) => `(rrExprSeq![
+      rrRuleExpr![.equality],
+      rrExprStar![rrExprGroup![rrExprSeq![
+        rrTerminalExpr![.symbol .logicalAnd],
+        rrRuleExpr![.equality]
+      ]]]
+    ])
+  | `(rrPublicRhs![.equality]) => `(rrExprSeq![
+      rrRuleExpr![.relational],
+      rrExprOpt![rrExprSeq![
+        rrExprGroup![rrExprChoice![
+          rrTerminalExpr![.symbol .equalEqual],
+          rrTerminalExpr![.symbol .notEqual]
+        ]],
+        rrRuleExpr![.relational]
+      ]]
+    ])
+  | `(rrPublicRhs![.relational]) => `(rrExprSeq![
+      rrRuleExpr![.bitOr],
+      rrExprOpt![rrExprSeq![
+        rrExprGroup![rrExprChoice![
+          rrTerminalExpr![.symbol .less],
+          rrTerminalExpr![.symbol .greater],
+          rrTerminalExpr![.symbol .lessEqual],
+          rrTerminalExpr![.symbol .greaterEqual]
+        ]],
+        rrRuleExpr![.bitOr]
+      ]]
+    ])
+  | `(rrPublicRhs![.bitOr]) => `(rrExprSeq![
+      rrRuleExpr![.bitXor],
+      rrExprStar![rrExprGroup![rrExprSeq![
+        rrTerminalExpr![.symbol .pipe],
+        rrRuleExpr![.bitXor]
+      ]]]
+    ])
+  | `(rrPublicRhs![.bitXor]) => `(rrExprSeq![
+      rrRuleExpr![.bitAnd],
+      rrExprStar![rrExprGroup![rrExprSeq![
+        rrTerminalExpr![.symbol .caret],
+        rrRuleExpr![.bitAnd]
+      ]]]
+    ])
+  | `(rrPublicRhs![.bitAnd]) => `(rrExprSeq![
+      rrRuleExpr![.additive],
+      rrExprStar![rrExprGroup![rrExprSeq![
+        rrTerminalExpr![.symbol .amp],
+        rrRuleExpr![.additive]
+      ]]]
+    ])
+  | `(rrPublicRhs![.additive]) => `(rrExprSeq![
+      rrRuleExpr![.multiplicative],
+      rrExprStar![rrExprGroup![rrExprSeq![
+        rrExprGroup![rrExprChoice![
+          rrTerminalExpr![.symbol .plus],
+          rrTerminalExpr![.symbol .minus]
+        ]],
+        rrRuleExpr![.multiplicative]
+      ]]]
+    ])
+  | `(rrPublicRhs![.multiplicative]) => `(rrExprSeq![
+      rrRuleExpr![.prefix],
+      rrExprStar![rrExprGroup![rrExprSeq![
+        rrExprGroup![rrExprChoice![
+          rrTerminalExpr![.symbol .star],
+          rrTerminalExpr![.symbol .slash],
+          rrTerminalExpr![.symbol .percent]
+        ]],
+        rrRuleExpr![.prefix]
+      ]]]
+    ])
+  | `(rrPublicRhs![.prefix]) => `(rrExprChoice![
+      rrExprSeq![
+        rrTerminalExpr![.symbol .bang],
+        rrRuleExpr![.prefix]
+      ],
+      rrRuleExpr![.postfix]
+    ])
+  | `(rrPublicRhs![.postfix]) => `(rrExprSeq![
+      rrRuleExpr![.atom],
+      rrExprStar![rrRuleExpr![.postfixPart]]
+    ])
+  | `(rrPublicRhs![.postfixPart]) => `(rrExprChoice![
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftParen],
+        rrExprList0![rrRuleExpr![.expression]],
+        rrTerminalExpr![.symbol .rightParen]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .dot],
+        rrTerminalExpr![.category .identifier]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftBracket],
+        rrRuleExpr![.expression],
+        rrTerminalExpr![.symbol .rightBracket]
+      ]
+    ])
+  | `(rrPublicRhs![.atom]) => `(rrExprChoice![
+      rrRuleExpr![.literal],
+      rrTerminalExpr![.category .identifier],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .dot],
+        rrTerminalExpr![.category .identifier],
+        rrExprOpt![rrExprSeq![
+          rrTerminalExpr![.symbol .leftParen],
+          rrExprList0![rrRuleExpr![.expression]],
+          rrTerminalExpr![.symbol .rightParen]
+        ]]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .at],
+        rrRuleExpr![.typeAtom]
+      ],
+      rrRuleExpr![.lambda],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftParen],
+        rrTerminalExpr![.symbol .rightParen]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftParen],
+        rrRuleExpr![.expression],
+        rrTerminalExpr![.symbol .rightParen]
+      ],
+      rrExprSeq![
+        rrTerminalExpr![.symbol .leftParen],
+        rrRuleExpr![.expression],
+        rrTerminalExpr![.symbol .comma],
+        rrRuleExpr![.expression],
+        rrExprStar![rrExprGroup![rrExprSeq![
+          rrTerminalExpr![.symbol .comma],
+          rrRuleExpr![.expression]
+        ]]],
+        rrTerminalExpr![.symbol .rightParen]
+      ]
+    ])
+  | `(rrPublicRhs![.lambda]) => `(rrExprSeq![
+      rrTerminalExpr![.hardKeyword .lamKw],
+      rrTerminalExpr![.symbol .leftParen],
+      rrExprList0![rrRuleExpr![.parameter]],
+      rrTerminalExpr![.symbol .rightParen],
+      rrExprOpt![rrExprSeq![
+        rrTerminalExpr![.symbol .arrow],
+        rrRuleExpr![.type]
+      ]],
+      rrRuleExpr![.body]
+    ])
+  | `(rrPublicRhs![.literal]) => `(rrExprChoice![
+      rrTerminalExpr![.category .decimalLiteral],
+      rrTerminalExpr![.category .hexadecimalLiteral],
+      rrTerminalExpr![.category .stringLiteral]
+    ])
+
+local syntax "rrChoiceRoot![" term "]" term : term
+local macro_rules
+  | `(rrChoiceRoot![$rule:term] $payload:term) =>
+      `(EbnfValue.choice (EbnfExpr.children (rrPublicRhs![$rule])) $payload)
+
+local syntax "rrSequenceRoot![" term "]" term : term
+local macro_rules
+  | `(rrSequenceRoot![$rule:term] $values:term) =>
+      `(EbnfValue.sequence (EbnfExpr.children (rrPublicRhs![$rule])) $values)
+
+/-- Exact source-rule reduction for every grammar rule. -/
+inductive RuleReduction
+    (file : WorkspaceFile) (tokens : List Token) :
+    (rule : GrammarRuleId) →
+      (origin finish : Boundary tokens) →
+      EbnfValue file tokens (m2cV1.rhs rule) →
+      RuleValue rule → Prop where
+  | module
+      (origin finish : Boundary tokens)
+      (items : List TopItem)
+      (eof : MatchedTerminal file tokens .endOfFile)
+      (originEq : origin = Boundary.start tokens)
+      (finishEq : finish = Boundary.afterLogicalEOF tokens)
+      (eofValue : eof.value = .endOfFile) :
+      RuleReduction file tokens .module origin finish
+        rrRoot![rrSeq![[
+            .star (.atom (.nonterminal .topItem)),
+            .atom (.terminal .endOfFile)
+          ] |
+            rrStar![.atom (.nonterminal .topItem),
+              items.map (EbnfValue.ruleAtom .topItem)],
+            rrTerm![.endOfFile, eof]
+          ]]
+        (RuleReduction.moduleLoc file { source := file.id, items })
+  | topItemImport
+      (origin finish : Boundary tokens)
+      (declaration : ImportDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![0, rrRule![.importDecl, declaration]]
+        (sourceLoc witness (.importDecl declaration))
+  | topItemExport
+      (origin finish : Boundary tokens)
+      (declaration : ExportDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![1, rrRule![.exportDecl, declaration]]
+        (sourceLoc witness (.exportDecl declaration))
+  | topItemPragma
+      (origin finish : Boundary tokens)
+      (declaration : PragmaDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![2, rrRule![.pragmaDecl, declaration]]
+        (sourceLoc witness (.pragmaDecl declaration))
+  | topItemData
+      (origin finish : Boundary tokens)
+      (declaration : DataDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![3, rrRule![.dataDecl, declaration]]
+        (sourceLoc witness (.dataDecl declaration))
+  | topItemTypeAlias
+      (origin finish : Boundary tokens)
+      (declaration : TypeAliasDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![4, rrRule![.typeAliasDecl, declaration]]
+        (sourceLoc witness (.typeAliasDecl declaration))
+  | topItemClass
+      (origin finish : Boundary tokens)
+      (declaration : ClassDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![5, rrRule![.classDecl, declaration]]
+        (sourceLoc witness (.classDecl declaration))
+  | topItemInstance
+      (origin finish : Boundary tokens)
+      (declaration : InstanceDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![6, rrRule![.instanceDecl, declaration]]
+        (sourceLoc witness (.instanceDecl declaration))
+  | topItemContract
+      (origin finish : Boundary tokens)
+      (declaration : ContractDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![7, rrRule![.contractDecl, declaration]]
+        (sourceLoc witness (.contractDecl declaration))
+  | topItemFunction
+      (origin finish : Boundary tokens)
+      (declaration : FunctionDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .topItem origin finish
+        rrTopItemInput![8, rrRule![.functionDecl, declaration]]
+        (sourceLoc witness (.functionDecl declaration))
+  | moduleRefExternal
+      (origin finish : Boundary tokens)
+      (atToken : MatchedTerminal file tokens (.symbol .at))
+      (library : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) ExternalLibraryName)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (next : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .dot) ×
+          RuleReduction.SpelledTerminalData file tokens
+            (.category .pathComponent) PathSegment))
+      (atMarker : RuleReduction.MarkerProjects file tokens
+        atToken .externalSigil)
+      (libraryProjects : ExternalLibraryProjects library.matched
+        library.spelling library.parsed)
+      (nextProjects : PathSegmentProjects next.matched
+        next.spelling next.parsed)
+      (restProjects : ∀ entry, entry ∈ rest →
+        PathSegmentProjects entry.2.matched
+          entry.2.spelling entry.2.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .moduleRef origin finish
+        rrModuleRefInput![0, rrSeq![[
+          .atom (.terminal (.symbol .at)),
+          .atom (.terminal (.category .pathComponent)),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.category .pathComponent)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]))
+        ] |
+          rrTerm![.symbol .at, atToken],
+          rrTerm![.category .pathComponent, library.matched],
+          rrTerm![.symbol .dot, dot],
+          rrTerm![.category .pathComponent, next.matched],
+          rrStar![.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]), rest.map fun entry =>
+            rrGroup![.sequence [
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ], rrSeq![[
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ] |
+              rrTerm![.symbol .dot, entry.1],
+              rrTerm![.category .pathComponent, entry.2.matched]
+            ]]
+          ]
+        ]]
+        (sourceLoc witness (.external
+          (RuleReduction.marker atToken atMarker)
+          (RuleReduction.terminalLoc library.matched library.parsed)
+          { head := RuleReduction.terminalLoc next.matched next.parsed
+            tail := rest.map fun entry =>
+              RuleReduction.terminalLoc entry.2.matched entry.2.parsed }))
+  | moduleRefStandard
+      (origin finish : Boundary tokens)
+      (first : MatchedTerminal file tokens (.category .pathComponent))
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .dot) ×
+          RuleReduction.SpelledTerminalData file tokens
+            (.category .pathComponent) PathSegment))
+      (rootMarker : RuleReduction.MarkerProjects file tokens
+        first .standardRoot)
+      (restProjects : ∀ entry, entry ∈ rest →
+        PathSegmentProjects entry.2.matched
+          entry.2.spelling entry.2.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .moduleRef origin finish
+        rrModuleRefInput![1, rrSeq![[
+          .atom (.terminal (.category .pathComponent)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]))
+        ] |
+          rrTerm![.category .pathComponent, first],
+          rrStar![.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]), rest.map fun entry =>
+            rrGroup![.sequence [
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ], rrSeq![[
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ] |
+              rrTerm![.symbol .dot, entry.1],
+              rrTerm![.category .pathComponent, entry.2.matched]
+            ]]
+          ]
+        ]]
+        (sourceLoc witness (.standard
+          (RuleReduction.marker first rootMarker)
+          (rest.map fun entry =>
+            RuleReduction.terminalLoc entry.2.matched entry.2.parsed)))
+  | moduleRefLibraryRoot
+      (origin finish : Boundary tokens)
+      (first : MatchedTerminal file tokens (.category .pathComponent))
+      (nextDot : MatchedTerminal file tokens (.symbol .dot))
+      (next : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment)
+      (remaining : List
+        (MatchedTerminal file tokens (.symbol .dot) ×
+          RuleReduction.SpelledTerminalData file tokens
+            (.category .pathComponent) PathSegment))
+      (rootMarker : RuleReduction.MarkerProjects file tokens
+        first .libraryRoot)
+      (nextProjects : PathSegmentProjects next.matched
+        next.spelling next.parsed)
+      (remainingProjects : ∀ entry, entry ∈ remaining →
+        PathSegmentProjects entry.2.matched
+          entry.2.spelling entry.2.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .moduleRef origin finish
+        rrModuleRefInput![1, rrSeq![[
+          .atom (.terminal (.category .pathComponent)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]))
+        ] |
+          rrTerm![.category .pathComponent, first],
+          rrStar![.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]),
+            rrGroup![.sequence [
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ], rrSeq![[
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ] |
+              rrTerm![.symbol .dot, nextDot],
+              rrTerm![.category .pathComponent, next.matched]
+            ]] :: remaining.map fun entry =>
+              rrGroup![.sequence [
+                .atom (.terminal (.symbol .dot)),
+                .atom (.terminal (.category .pathComponent))
+              ], rrSeq![[
+                .atom (.terminal (.symbol .dot)),
+                .atom (.terminal (.category .pathComponent))
+              ] |
+                rrTerm![.symbol .dot, entry.1],
+                rrTerm![.category .pathComponent, entry.2.matched]
+              ]]
+          ]
+        ]]
+        (sourceLoc witness (.libraryRoot
+          (RuleReduction.marker first rootMarker)
+          { head := RuleReduction.terminalLoc next.matched next.parsed
+            tail := remaining.map fun entry =>
+              RuleReduction.terminalLoc entry.2.matched entry.2.parsed }))
+  | moduleRefRelativeLibraryEmpty
+      (origin finish : Boundary tokens)
+      (first : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment)
+      (firstProjects : PathSegmentProjects first.matched
+        first.spelling first.parsed)
+      (libraryMarker : RuleReduction.MarkerProjects file tokens
+        first.matched .libraryRoot)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .moduleRef origin finish
+        rrModuleRefInput![1, rrSeq![[
+          .atom (.terminal (.category .pathComponent)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]))
+        ] |
+          rrTerm![.category .pathComponent, first.matched],
+          rrStar![.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]), []]
+        ]]
+        (sourceLoc witness (.relative {
+          head := RuleReduction.terminalLoc first.matched first.parsed
+          tail := []
+        }))
+  | moduleRefRelativeOther
+      (origin finish : Boundary tokens)
+      (first : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .dot) ×
+          RuleReduction.SpelledTerminalData file tokens
+            (.category .pathComponent) PathSegment))
+      (firstProjects : PathSegmentProjects first.matched
+        first.spelling first.parsed)
+      (restProjects : ∀ entry, entry ∈ rest →
+        PathSegmentProjects entry.2.matched
+          entry.2.spelling entry.2.parsed)
+      (notStandard : first.spelling ≠ "std")
+      (notLibrary : first.spelling ≠ "lib")
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .moduleRef origin finish
+        rrModuleRefInput![1, rrSeq![[
+          .atom (.terminal (.category .pathComponent)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]))
+        ] |
+          rrTerm![.category .pathComponent, first.matched],
+          rrStar![.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .pathComponent))
+          ]), rest.map fun entry =>
+            rrGroup![.sequence [
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ], rrSeq![[
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .pathComponent))
+            ] |
+              rrTerm![.symbol .dot, entry.1],
+              rrTerm![.category .pathComponent, entry.2.matched]
+            ]]
+          ]
+        ]]
+        (sourceLoc witness (.relative {
+          head := RuleReduction.terminalLoc first.matched first.parsed
+          tail := rest.map fun entry =>
+            RuleReduction.terminalLoc entry.2.matched entry.2.parsed
+        }))
+  | importDeclModule
+      (origin finish : Boundary tokens)
+      (importKw : MatchedTerminal file tokens
+        (.hardKeyword .importKw))
+      (reference : ModuleReference)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .importDecl origin finish
+        rrRoot![rrChoice![[
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.symbol .semicolon))
+          ],
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier)),
+            .atom (.terminal (.symbol .semicolon))
+          ],
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.symbol .leftBrace)),
+            .list0 (.atom (.nonterminal .importEntry)),
+            .atom (.terminal (.symbol .rightBrace)),
+            .optional (.atom (.nonterminal .hidingClause)),
+            .atom (.terminal (.symbol .semicolon))
+          ]
+        ] | 0, rrSeq![[
+          .atom (.terminal (.hardKeyword .importKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .importKw, importKw],
+          rrRule![.moduleRef, reference],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]]
+        (sourceLoc witness {
+          moduleRef := reference
+          mode := .module none
+        })
+  | importDeclAliased
+      (origin finish : Boundary tokens)
+      (importKw : MatchedTerminal file tokens
+        (.hardKeyword .importKw))
+      (reference : ModuleReference)
+      (asKw : MatchedTerminal file tokens (.hardKeyword .asKw))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .importDecl origin finish
+        rrRoot![rrChoice![[
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.symbol .semicolon))
+          ],
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier)),
+            .atom (.terminal (.symbol .semicolon))
+          ],
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.symbol .leftBrace)),
+            .list0 (.atom (.nonterminal .importEntry)),
+            .atom (.terminal (.symbol .rightBrace)),
+            .optional (.atom (.nonterminal .hidingClause)),
+            .atom (.terminal (.symbol .semicolon))
+          ]
+        ] | 1, rrSeq![[
+          .atom (.terminal (.hardKeyword .importKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.hardKeyword .asKw)),
+          .atom (.terminal (.category .identifier)),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .importKw, importKw],
+          rrRule![.moduleRef, reference],
+          rrTerm![.hardKeyword .asKw, asKw],
+          rrTerm![.category .identifier, name.matched],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]]
+        (sourceLoc witness {
+          moduleRef := reference
+          mode := .module (some
+            (RuleReduction.terminalLoc name.matched name.parsed))
+        })
+  | importDeclItems
+      (origin finish : Boundary tokens)
+      (importKw : MatchedTerminal file tokens
+        (.hardKeyword .importKw))
+      (reference : ModuleReference)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (entries : List ImportSelectorEntry)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (hidingValue : Option HidingClause)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .importDecl origin finish
+        rrRoot![rrChoice![[
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.symbol .semicolon))
+          ],
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier)),
+            .atom (.terminal (.symbol .semicolon))
+          ],
+          .sequence [
+            .atom (.terminal (.hardKeyword .importKw)),
+            .atom (.nonterminal .moduleRef),
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.symbol .leftBrace)),
+            .list0 (.atom (.nonterminal .importEntry)),
+            .atom (.terminal (.symbol .rightBrace)),
+            .optional (.atom (.nonterminal .hidingClause)),
+            .atom (.terminal (.symbol .semicolon))
+          ]
+        ] | 2, rrSeq![[
+          .atom (.terminal (.hardKeyword .importKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.symbol .leftBrace)),
+          .list0 (.atom (.nonterminal .importEntry)),
+          .atom (.terminal (.symbol .rightBrace)),
+          .optional (.atom (.nonterminal .hidingClause)),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .importKw, importKw],
+          rrRule![.moduleRef, reference],
+          rrTerm![.symbol .dot, dot],
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrList0![.atom (.nonterminal .importEntry),
+            entries.map (EbnfValue.ruleAtom .importEntry)],
+          rrTerm![.symbol .rightBrace, closeBrace],
+          rrOpt![.atom (.nonterminal .hidingClause),
+            hidingValue.map (EbnfValue.ruleAtom .hidingClause)],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]]
+        (sourceLoc witness {
+          moduleRef := reference
+          mode := .items
+            (RuleReduction.between file openBrace.span closeBrace.span {
+              entries := entries
+            }) hidingValue
+        })
+  | importEntryWildcard
+      (origin finish : Boundary tokens)
+      (star : MatchedTerminal file tokens (.symbol .star))
+      (starMarker : RuleReduction.MarkerProjects file tokens
+        star .wildcard)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .importEntry origin finish
+        rrRoot![rrChoice![[
+          .atom (.terminal (.symbol .star)),
+          .sequence [
+            .atom (.terminal (.category .identifier)),
+            .optional (.sequence [
+              .atom (.terminal (.hardKeyword .asKw)),
+              .atom (.terminal (.category .identifier))
+            ])
+          ]
+        ] | 0, rrTerm![.symbol .star, star]]]
+        (sourceLoc witness (.wildcard
+          (RuleReduction.marker star starMarker)))
+  | importEntryNamed
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .importEntry origin finish
+        rrRoot![rrChoice![[
+          .atom (.terminal (.symbol .star)),
+          .sequence [
+            .atom (.terminal (.category .identifier)),
+            .optional (.sequence [
+              .atom (.terminal (.hardKeyword .asKw)),
+              .atom (.terminal (.category .identifier))
+            ])
+          ]
+        ] | 1, rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier))
+          ])
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier))
+          ], none]
+        ]]]
+        (sourceLoc witness (.named
+          (RuleReduction.terminalLoc name.matched name.parsed) none))
+  | importEntryAliased
+      (origin finish : Boundary tokens)
+      (name alias : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (asKw : MatchedTerminal file tokens (.hardKeyword .asKw))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (aliasProjects : IdentifierProjects alias.matched
+        alias.spelling alias.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .importEntry origin finish
+        rrRoot![rrChoice![[
+          .atom (.terminal (.symbol .star)),
+          .sequence [
+            .atom (.terminal (.category .identifier)),
+            .optional (.sequence [
+              .atom (.terminal (.hardKeyword .asKw)),
+              .atom (.terminal (.category .identifier))
+            ])
+          ]
+        ] | 1, rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier))
+          ])
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier))
+          ], some (rrSeq![[
+            .atom (.terminal (.hardKeyword .asKw)),
+            .atom (.terminal (.category .identifier))
+          ] |
+            rrTerm![.hardKeyword .asKw, asKw],
+            rrTerm![.category .identifier, alias.matched]
+          ])]
+        ]]]
+        (sourceLoc witness (.named
+          (RuleReduction.terminalLoc name.matched name.parsed)
+          (some (RuleReduction.terminalLoc alias.matched alias.parsed))))
+  | hidingClause
+      (origin finish : Boundary tokens)
+      (hidingKw : MatchedTerminal file tokens
+        (.hardKeyword .hidingKw))
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (names : List (RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier))
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (nameProjects : ∀ name, name ∈ names →
+        IdentifierProjects name.matched name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .hidingClause origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.hardKeyword .hidingKw)),
+          .atom (.terminal (.symbol .leftBrace)),
+          .list0 (.atom (.terminal (.category .identifier))),
+          .atom (.terminal (.symbol .rightBrace))
+        ] |
+          rrTerm![.hardKeyword .hidingKw, hidingKw],
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrList0![.atom (.terminal (.category .identifier)),
+            names.map fun name =>
+              rrTerm![.category .identifier, name.matched]],
+          rrTerm![.symbol .rightBrace, closeBrace]
+        ]]
+        (sourceLoc witness {
+          names := names.map fun name =>
+            RuleReduction.terminalLoc name.matched name.parsed
+        })
+  | exportDeclLocal
+      (origin finish : Boundary tokens)
+      (exportKw : MatchedTerminal file tokens
+        (.hardKeyword .exportKw))
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (entries : List ExportEntry)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .exportDecl origin finish
+        rrExportDeclInput![0, rrSeq![[
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.terminal (.symbol .leftBrace)),
+          .list0 (.atom (.nonterminal .localExportEntry)),
+          .atom (.terminal (.symbol .rightBrace)),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .exportKw, exportKw],
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrList0![.atom (.nonterminal .localExportEntry),
+            entries.map (EbnfValue.ruleAtom .localExportEntry)],
+          rrTerm![.symbol .rightBrace, closeBrace],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness (.local
+          (RuleReduction.between file openBrace.span closeBrace.span {
+            entries := entries
+          })))
+  | exportDeclModule
+      (origin finish : Boundary tokens)
+      (exportKw : MatchedTerminal file tokens
+        (.hardKeyword .exportKw))
+      (reference : ModuleReference)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .exportDecl origin finish
+        rrExportDeclInput![1, rrSeq![[
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .exportKw, exportKw],
+          rrRule![.moduleRef, reference],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness (.module reference none))
+  | exportDeclAliased
+      (origin finish : Boundary tokens)
+      (exportKw : MatchedTerminal file tokens
+        (.hardKeyword .exportKw))
+      (reference : ModuleReference)
+      (asKw : MatchedTerminal file tokens (.hardKeyword .asKw))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .exportDecl origin finish
+        rrExportDeclInput![2, rrSeq![[
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.hardKeyword .asKw)),
+          .atom (.terminal (.category .identifier)),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .exportKw, exportKw],
+          rrRule![.moduleRef, reference],
+          rrTerm![.hardKeyword .asKw, asKw],
+          rrTerm![.category .identifier, name.matched],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness (.module reference
+          (some (RuleReduction.terminalLoc name.matched name.parsed))))
+  | exportDeclWildcard
+      (origin finish : Boundary tokens)
+      (exportKw : MatchedTerminal file tokens
+        (.hardKeyword .exportKw))
+      (reference : ModuleReference)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (star : MatchedTerminal file tokens (.symbol .star))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (starMarker : RuleReduction.MarkerProjects file tokens
+        star .wildcard)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .exportDecl origin finish
+        rrExportDeclInput![3, rrSeq![[
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.symbol .star)),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .exportKw, exportKw],
+          rrRule![.moduleRef, reference],
+          rrTerm![.symbol .dot, dot],
+          rrTerm![.symbol .star, star],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness (.from reference
+          (RuleReduction.between file dot.span star.span
+            (.dotWildcard (RuleReduction.marker star starMarker)))))
+  | exportDeclBraced
+      (origin finish : Boundary tokens)
+      (exportKw : MatchedTerminal file tokens
+        (.hardKeyword .exportKw))
+      (reference : ModuleReference)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (entries : List RemoteExportEntry)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .exportDecl origin finish
+        rrExportDeclInput![4, rrSeq![[
+          .atom (.terminal (.hardKeyword .exportKw)),
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.symbol .leftBrace)),
+          .list0 (.atom (.nonterminal .remoteExportEntry)),
+          .atom (.terminal (.symbol .rightBrace)),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .exportKw, exportKw],
+          rrRule![.moduleRef, reference],
+          rrTerm![.symbol .dot, dot],
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrList0![.atom (.nonterminal .remoteExportEntry),
+            entries.map (EbnfValue.ruleAtom .remoteExportEntry)],
+          rrTerm![.symbol .rightBrace, closeBrace],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness (.from reference
+          (RuleReduction.between file openBrace.span closeBrace.span
+            (.braced entries))))
+  | localExportEntryWildcard
+      (origin finish : Boundary tokens)
+      (star : MatchedTerminal file tokens (.symbol .star))
+      (starMarker : RuleReduction.MarkerProjects file tokens
+        star .wildcard)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .localExportEntry origin finish
+        rrLocalExportEntryInput![0, rrTerm![.symbol .star, star]]
+        (sourceLoc witness (.wildcard
+          (RuleReduction.marker star starMarker)))
+  | localExportEntryItem
+      (origin finish : Boundary tokens)
+      (item : ExportItem)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .localExportEntry origin finish
+        rrLocalExportEntryInput![1, rrRule![.exportItem, item]]
+        (sourceLoc witness (.item item))
+  | localExportEntryAllFrom
+      (origin finish : Boundary tokens)
+      (reference : ModuleReference)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (star : MatchedTerminal file tokens (.symbol .star))
+      (starMarker : RuleReduction.MarkerProjects file tokens
+        star .wildcard)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .localExportEntry origin finish
+        rrLocalExportEntryInput![2, rrSeq![[
+          .atom (.nonterminal .moduleRef),
+          .atom (.terminal (.symbol .dot)),
+          .atom (.terminal (.symbol .star))
+        ] |
+          rrRule![.moduleRef, reference],
+          rrTerm![.symbol .dot, dot],
+          rrTerm![.symbol .star, star]
+        ]]
+        (sourceLoc witness (.allFrom reference
+          (RuleReduction.marker star starMarker)))
+  | remoteExportEntryWildcard
+      (origin finish : Boundary tokens)
+      (star : MatchedTerminal file tokens (.symbol .star))
+      (starMarker : RuleReduction.MarkerProjects file tokens
+        star .wildcard)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .remoteExportEntry origin finish
+        rrRemoteExportEntryInput![0, rrTerm![.symbol .star, star]]
+        (sourceLoc witness (.wildcard
+          (RuleReduction.marker star starMarker)))
+  | remoteExportEntryItem
+      (origin finish : Boundary tokens)
+      (item : ExportItem)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .remoteExportEntry origin finish
+        rrRemoteExportEntryInput![1, rrRule![.exportItem, item]]
+        (sourceLoc witness (.item item))
+  | exportItem
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (selection : Option ConstructorSelection)
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .exportItem origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .optional (.atom (.nonterminal .constructorSelection))
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.atom (.nonterminal .constructorSelection),
+            selection.map (EbnfValue.ruleAtom .constructorSelection)]
+        ]]
+        (sourceLoc witness {
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          constructors := selection
+        })
+  | constructorSelectionAll
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (star : MatchedTerminal file tokens (.symbol .star))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (starMarker : RuleReduction.MarkerProjects file tokens
+        star .wildcard)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .constructorSelection origin finish
+        rrRoot![rrChoice![[
+          .sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .atom (.terminal (.symbol .star)),
+            .atom (.terminal (.symbol .rightParen))
+          ],
+          .sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ]
+        ] | 0, rrSeq![[
+          .atom (.terminal (.symbol .leftParen)),
+          .atom (.terminal (.symbol .star)),
+          .atom (.terminal (.symbol .rightParen))
+        ] |
+          rrTerm![.symbol .leftParen, openParen],
+          rrTerm![.symbol .star, star],
+          rrTerm![.symbol .rightParen, closeParen]
+        ]]]
+        (sourceLoc witness (.all
+          (RuleReduction.marker star starMarker)))
+  | constructorSelectionNamed
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (names : NonemptyList (RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (headProjects : IdentifierProjects names.head.matched
+        names.head.spelling names.head.parsed)
+      (tailProjects : ∀ name, name ∈ names.tail →
+        IdentifierProjects name.matched name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .constructorSelection origin finish
+        rrRoot![rrChoice![[
+          .sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .atom (.terminal (.symbol .star)),
+            .atom (.terminal (.symbol .rightParen))
+          ],
+          .sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ]
+        ] | 1, rrSeq![[
+          .atom (.terminal (.symbol .leftParen)),
+          .list1 (.atom (.terminal (.category .identifier))),
+          .atom (.terminal (.symbol .rightParen))
+        ] |
+          rrTerm![.symbol .leftParen, openParen],
+          rrList1![.atom (.terminal (.category .identifier)), {
+            head := rrTerm![.category .identifier, names.head.matched]
+            tail := names.tail.map fun name =>
+              rrTerm![.category .identifier, name.matched]
+          }],
+          rrTerm![.symbol .rightParen, closeParen]
+        ]]]
+        (sourceLoc witness (.named
+          (names.map fun name =>
+            RuleReduction.terminalLoc name.matched name.parsed)))
+  | pragmaDeclNoCoverageCondition
+      (origin finish : Boundary tokens)
+      (pragmaKw : MatchedTerminal file tokens
+        (.hardKeyword .pragmaKw))
+      (kindToken : MatchedTerminal file tokens
+        (.pragmaName .noCoverageCondition))
+      (targets : Option (NonemptyList
+        (RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (targetProjects : ∀ values, targets = some values →
+        IdentifierProjects values.head.matched
+          values.head.spelling values.head.parsed ∧
+        ∀ name, name ∈ values.tail →
+          IdentifierProjects name.matched name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pragmaDecl origin finish
+        rrPragmaDeclInput![0, rrSeq![[
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noCoverageCondition)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .pragmaKw, pragmaKw],
+          rrTerm![.pragmaName .noCoverageCondition, kindToken],
+          rrOpt![.list1 (.atom (.terminal (.category .identifier))),
+            targets.map fun values =>
+              rrList1![.atom (.terminal (.category .identifier)), {
+                head := rrTerm![.category .identifier, values.head.matched]
+                tail := values.tail.map fun name =>
+                  rrTerm![.category .identifier, name.matched]
+              }]],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          kind := RuleReduction.terminalLoc kindToken
+            .noCoverageCondition
+          targets := targets.elim [] fun values =>
+            RuleReduction.firstRest (values.map fun name =>
+              RuleReduction.terminalLoc name.matched name.parsed)
+        })
+  | pragmaDeclNoPattersonCondition
+      (origin finish : Boundary tokens)
+      (pragmaKw : MatchedTerminal file tokens
+        (.hardKeyword .pragmaKw))
+      (kindToken : MatchedTerminal file tokens
+        (.pragmaName .noPattersonCondition))
+      (targets : Option (NonemptyList
+        (RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (targetProjects : ∀ values, targets = some values →
+        IdentifierProjects values.head.matched
+          values.head.spelling values.head.parsed ∧
+        ∀ name, name ∈ values.tail →
+          IdentifierProjects name.matched name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pragmaDecl origin finish
+        rrPragmaDeclInput![1, rrSeq![[
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noPattersonCondition)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .pragmaKw, pragmaKw],
+          rrTerm![.pragmaName .noPattersonCondition, kindToken],
+          rrOpt![.list1 (.atom (.terminal (.category .identifier))),
+            targets.map fun values =>
+              rrList1![.atom (.terminal (.category .identifier)), {
+                head := rrTerm![.category .identifier, values.head.matched]
+                tail := values.tail.map fun name =>
+                  rrTerm![.category .identifier, name.matched]
+              }]],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          kind := RuleReduction.terminalLoc kindToken
+            .noPattersonCondition
+          targets := targets.elim [] fun values =>
+            RuleReduction.firstRest (values.map fun name =>
+              RuleReduction.terminalLoc name.matched name.parsed)
+        })
+  | pragmaDeclNoBoundedVariableCondition
+      (origin finish : Boundary tokens)
+      (pragmaKw : MatchedTerminal file tokens
+        (.hardKeyword .pragmaKw))
+      (kindToken : MatchedTerminal file tokens
+        (.pragmaName .noBoundedVariableCondition))
+      (targets : Option (NonemptyList
+        (RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (targetProjects : ∀ values, targets = some values →
+        IdentifierProjects values.head.matched
+          values.head.spelling values.head.parsed ∧
+        ∀ name, name ∈ values.tail →
+          IdentifierProjects name.matched name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pragmaDecl origin finish
+        rrPragmaDeclInput![2, rrSeq![[
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noBoundedVariableCondition)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .pragmaKw, pragmaKw],
+          rrTerm![.pragmaName .noBoundedVariableCondition, kindToken],
+          rrOpt![.list1 (.atom (.terminal (.category .identifier))),
+            targets.map fun values =>
+              rrList1![.atom (.terminal (.category .identifier)), {
+                head := rrTerm![.category .identifier, values.head.matched]
+                tail := values.tail.map fun name =>
+                  rrTerm![.category .identifier, name.matched]
+              }]],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          kind := RuleReduction.terminalLoc kindToken
+            .noBoundedVariableCondition
+          targets := targets.elim [] fun values =>
+            RuleReduction.firstRest (values.map fun name =>
+              RuleReduction.terminalLoc name.matched name.parsed)
+        })
+  | pragmaDeclNoGenericInstanceFor
+      (origin finish : Boundary tokens)
+      (pragmaKw : MatchedTerminal file tokens
+        (.hardKeyword .pragmaKw))
+      (kindToken : MatchedTerminal file tokens
+        (.pragmaName .noGenericInstanceFor))
+      (targets : Option (NonemptyList
+        (RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (targetProjects : ∀ values, targets = some values →
+        IdentifierProjects values.head.matched
+          values.head.spelling values.head.parsed ∧
+        ∀ name, name ∈ values.tail →
+          IdentifierProjects name.matched name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pragmaDecl origin finish
+        rrPragmaDeclInput![3, rrSeq![[
+          .atom (.terminal (.hardKeyword .pragmaKw)),
+          .atom (.terminal (.pragmaName .noGenericInstanceFor)),
+          .optional (.list1 (.atom (.terminal (.category .identifier)))),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .pragmaKw, pragmaKw],
+          rrTerm![.pragmaName .noGenericInstanceFor, kindToken],
+          rrOpt![.list1 (.atom (.terminal (.category .identifier))),
+            targets.map fun values =>
+              rrList1![.atom (.terminal (.category .identifier)), {
+                head := rrTerm![.category .identifier, values.head.matched]
+                tail := values.tail.map fun name =>
+                  rrTerm![.category .identifier, name.matched]
+              }]],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          kind := RuleReduction.terminalLoc kindToken
+            .noGenericInstanceFor
+          targets := targets.elim [] fun values =>
+            RuleReduction.firstRest (values.map fun name =>
+              RuleReduction.terminalLoc name.matched name.parsed)
+        })
+  | genericPrefixBare
+      (origin finish : Boundary tokens)
+      (forallClause : ForallClause)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .genericPrefix origin finish
+        rrRoot![rrSeq![[
+          .atom (.nonterminal .forallClause),
+          .optional (.sequence [
+            .atom (.nonterminal .predicateList),
+            .atom (.terminal (.symbol .fatArrow))
+          ])
+        ] |
+          rrRule![.forallClause, forallClause],
+          rrOpt![.sequence [
+            .atom (.nonterminal .predicateList),
+            .atom (.terminal (.symbol .fatArrow))
+          ], none]
+        ]]
+        (sourceLoc witness {
+          forallClause := forallClause
+          context := none
+        })
+  | genericPrefixContext
+      (origin finish : Boundary tokens)
+      (forallClause : ForallClause)
+      (predicates : NonemptyList Predicate)
+      (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .genericPrefix origin finish
+        rrRoot![rrSeq![[
+          .atom (.nonterminal .forallClause),
+          .optional (.sequence [
+            .atom (.nonterminal .predicateList),
+            .atom (.terminal (.symbol .fatArrow))
+          ])
+        ] |
+          rrRule![.forallClause, forallClause],
+          rrOpt![.sequence [
+            .atom (.nonterminal .predicateList),
+            .atom (.terminal (.symbol .fatArrow))
+          ], some (rrSeq![[
+            .atom (.nonterminal .predicateList),
+            .atom (.terminal (.symbol .fatArrow))
+          ] |
+            rrRule![.predicateList, predicates],
+            rrTerm![.symbol .fatArrow, fatArrow]
+          ])]
+        ]]
+        (sourceLoc witness {
+          forallClause := forallClause
+          context := some predicates
+        })
+  | forallClause
+      (origin finish : Boundary tokens)
+      (forallKw : MatchedTerminal file tokens
+        (.hardKeyword .forallKw))
+      (first : ForallBinder)
+      (rest : List (OptionalCommaValue × ForallBinder))
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forallClause origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.hardKeyword .forallKw)),
+          .atom (.nonterminal .forallBinder),
+          .star (.group (.sequence [
+            .atom (.nonterminal .optionalComma),
+            .atom (.nonterminal .forallBinder)
+          ])),
+          .atom (.terminal (.symbol .dot))
+        ] |
+          rrTerm![.hardKeyword .forallKw, forallKw],
+          rrRule![.forallBinder, first],
+          rrStar![.group (.sequence [
+            .atom (.nonterminal .optionalComma),
+            .atom (.nonterminal .forallBinder)
+          ]), rest.map fun entry =>
+            rrGroup![.sequence [
+              .atom (.nonterminal .optionalComma),
+              .atom (.nonterminal .forallBinder)
+            ], rrSeq![[
+              .atom (.nonterminal .optionalComma),
+              .atom (.nonterminal .forallBinder)
+            ] |
+              rrRule![.optionalComma, entry.1],
+              rrRule![.forallBinder, entry.2]
+            ]]
+          ],
+          rrTerm![.symbol .dot, dot]
+        ]]
+        (sourceLoc witness {
+          binders := {
+            head := first
+            tail := rest.map Prod.snd
+          }
+        })
+  | forallBinderBare
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forallBinder origin finish
+        rrRoot![rrChoice![[
+          .atom (.terminal (.category .identifier)),
+          .sequence [
+            .atom (.terminal (.category .identifier)),
+            .atom (.terminal (.symbol .colon)),
+            .atom (.nonterminal .qualifiedName),
+            .optional (.sequence [
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.nonterminal .type)),
+              .atom (.terminal (.symbol .rightParen))
+            ])
+          ]
+        ] | 0, rrTerm![.category .identifier, name.matched]]]
+        (sourceLoc witness (.bare
+          (RuleReduction.terminalLoc name.matched name.parsed)))
+  | forallBinderBoundedWithoutArguments
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (className : QualifiedName)
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forallBinder origin finish
+        rrRoot![rrChoice![[
+          .atom (.terminal (.category .identifier)),
+          .sequence [
+            .atom (.terminal (.category .identifier)),
+            .atom (.terminal (.symbol .colon)),
+            .atom (.nonterminal .qualifiedName),
+            .optional (.sequence [
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.nonterminal .type)),
+              .atom (.terminal (.symbol .rightParen))
+            ])
+          ]
+        ] | 1, rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .atom (.terminal (.symbol .colon)),
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrTerm![.symbol .colon, colon],
+          rrRule![.qualifiedName, className],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], none]
+        ]]]
+        (sourceLoc witness (.bounded
+          (RuleReduction.terminalLoc name.matched name.parsed)
+          className none))
+  | forallBinderBoundedWithArguments
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (className : QualifiedName)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (arguments : NonemptyList TypeExpr)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forallBinder origin finish
+        rrRoot![rrChoice![[
+          .atom (.terminal (.category .identifier)),
+          .sequence [
+            .atom (.terminal (.category .identifier)),
+            .atom (.terminal (.symbol .colon)),
+            .atom (.nonterminal .qualifiedName),
+            .optional (.sequence [
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.nonterminal .type)),
+              .atom (.terminal (.symbol .rightParen))
+            ])
+          ]
+        ] | 1, rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .atom (.terminal (.symbol .colon)),
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrTerm![.symbol .colon, colon],
+          rrRule![.qualifiedName, className],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], some (rrSeq![[
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ] |
+            rrTerm![.symbol .leftParen, openParen],
+            rrList1![.atom (.nonterminal .type),
+              arguments.map (EbnfValue.ruleAtom .type)],
+            rrTerm![.symbol .rightParen, closeParen]
+          ])]
+        ]]]
+        (sourceLoc witness (.bounded
+          (RuleReduction.terminalLoc name.matched name.parsed)
+          className (RuleReduction.arguments
+            (some (openParen, arguments, closeParen, ())))))
+  | optionalCommaAbsent
+      (origin finish : Boundary tokens) :
+      RuleReduction file tokens .optionalComma origin finish
+        rrRoot![rrOpt![.atom (.terminal (.symbol .comma)), none]]
+        .absent
+  | optionalCommaPresent
+      (origin finish : Boundary tokens)
+      (comma : MatchedTerminal file tokens (.symbol .comma)) :
+      RuleReduction file tokens .optionalComma origin finish
+        rrRoot![rrOpt![.atom (.terminal (.symbol .comma)),
+          some (rrTerm![.symbol .comma, comma])]]
+        (.present comma.span)
+  | predicateList
+      (origin finish : Boundary tokens)
+      (predicates : NonemptyList Predicate) :
+      RuleReduction file tokens .predicateList origin finish
+        rrRoot![rrList1![.atom (.nonterminal .predicate),
+          predicates.map (EbnfValue.ruleAtom .predicate)]]
+        predicates
+  | predicateWithoutArguments
+      (origin finish : Boundary tokens)
+      (main : TypeExpr)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (className : QualifiedName)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .predicate origin finish
+        rrRoot![rrSeq![[
+          .atom (.nonterminal .typeAtom),
+          .atom (.terminal (.symbol .colon)),
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrRule![.typeAtom, main],
+          rrTerm![.symbol .colon, colon],
+          rrRule![.qualifiedName, className],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], none]
+        ]]
+        (sourceLoc witness {
+          main := main
+          className := className
+          parameters := none
+        })
+  | predicateWithArguments
+      (origin finish : Boundary tokens)
+      (main : TypeExpr)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (className : QualifiedName)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (parameters : NonemptyList TypeExpr)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .predicate origin finish
+        rrRoot![rrSeq![[
+          .atom (.nonterminal .typeAtom),
+          .atom (.terminal (.symbol .colon)),
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrRule![.typeAtom, main],
+          rrTerm![.symbol .colon, colon],
+          rrRule![.qualifiedName, className],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], some (rrSeq![[
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ] |
+            rrTerm![.symbol .leftParen, openParen],
+            rrList1![.atom (.nonterminal .type),
+              parameters.map (EbnfValue.ruleAtom .type)],
+            rrTerm![.symbol .rightParen, closeParen]
+          ])]
+        ]]
+        (sourceLoc witness {
+          main := main
+          className := className
+          parameters := RuleReduction.arguments
+            (some (openParen, parameters, closeParen, ()))
+        })
+  | functionSignature
+      (origin finish : Boundary tokens)
+      (genericPrefix : Option GenericPrefix)
+      (publicToken : Option (MatchedTerminal file tokens
+        (.hardKeyword .publicKw)))
+      (payableToken : Option (MatchedTerminal file tokens
+        (.hardKeyword .payableKw)))
+      (functionKw : MatchedTerminal file tokens
+        (.hardKeyword .functionKw))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (parameters : List Parameter)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (returnValue : Option
+        (MatchedTerminal file tokens (.symbol .arrow) ×
+          (TypeExpr × Unit)))
+      (publicProjects : ∀ terminal, publicToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .publicModifier)
+      (payableProjects : ∀ terminal, payableToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .payableModifier)
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .functionSignature origin finish
+        rrRoot![rrSeq![[
+          .optional (.atom (.nonterminal .genericPrefix)),
+          .optional (.atom (.terminal (.hardKeyword .publicKw))),
+          .optional (.atom (.terminal (.hardKeyword .payableKw))),
+          .atom (.terminal (.hardKeyword .functionKw)),
+          .atom (.terminal (.category .identifier)),
+          .atom (.terminal (.symbol .leftParen)),
+          .list0 (.atom (.nonterminal .parameter)),
+          .atom (.terminal (.symbol .rightParen)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ])
+        ] |
+          rrOpt![.atom (.nonterminal .genericPrefix),
+            genericPrefix.map (EbnfValue.ruleAtom .genericPrefix)],
+          rrOpt![.atom (.terminal (.hardKeyword .publicKw)),
+            publicToken.map fun terminal =>
+              rrTerm![.hardKeyword .publicKw, terminal]],
+          rrOpt![.atom (.terminal (.hardKeyword .payableKw)),
+            payableToken.map fun terminal =>
+              rrTerm![.hardKeyword .payableKw, terminal]],
+          rrTerm![.hardKeyword .functionKw, functionKw],
+          rrTerm![.category .identifier, name.matched],
+          rrTerm![.symbol .leftParen, openParen],
+          rrList0![.atom (.nonterminal .parameter),
+            parameters.map (EbnfValue.ruleAtom .parameter)],
+          rrTerm![.symbol .rightParen, closeParen],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ], returnValue.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .arrow)),
+              .atom (.nonterminal .type)
+            ] |
+              rrTerm![.symbol .arrow, value.1],
+              rrRule![.type, value.2.1]
+            ]]
+        ]]
+        (sourceLoc witness {
+          genericPrefix := genericPrefix
+          «public» := match publicToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (publicProjects terminal rfl))
+          payable := match payableToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (payableProjects terminal rfl))
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          parameters := parameters
+          returnType := returnValue.map fun value => value.2.1
+        })
+  | functionDecl
+      (origin finish : Boundary tokens)
+      (signature : FunctionSignature)
+      (body : Body)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .functionDecl origin finish
+        rrRoot![rrSeq![[
+          .atom (.nonterminal .functionSignature),
+          .atom (.nonterminal .body)
+        ] |
+          rrRule![.functionSignature, signature],
+          rrRule![.body, body]
+        ]]
+        (sourceLoc witness {
+          signature := signature
+          body := body
+        })
+  | classMethod
+      (origin finish : Boundary tokens)
+      (signature : FunctionSignature)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .classMethod origin finish
+        rrRoot![rrSeq![[
+          .atom (.nonterminal .functionSignature),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrRule![.functionSignature, signature],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          signature := signature
+          terminator := semicolon.span
+        })
+  | dataDecl
+      (origin finish : Boundary tokens)
+      (dataKw : MatchedTerminal file tokens (.hardKeyword .dataKw))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (parameters : Option
+        (MatchedTerminal file tokens (.symbol .leftParen) ×
+          (NonemptyList (RuleReduction.SpelledTerminalData file tokens
+            (.category .identifier) Identifier) ×
+            (MatchedTerminal file tokens (.symbol .rightParen) × Unit))))
+      (constructors : Option
+        (MatchedTerminal file tokens (.symbol .equal) ×
+          (DataConstructor ×
+            (List
+              (MatchedTerminal file tokens (.symbol .pipe) ×
+                DataConstructor) × Unit))))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (parameterProjects : ∀ value, parameters = some value →
+        IdentifierProjects value.2.1.head.matched
+          value.2.1.head.spelling value.2.1.head.parsed ∧
+        ∀ parameter, parameter ∈ value.2.1.tail →
+          IdentifierProjects parameter.matched
+            parameter.spelling parameter.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .dataDecl origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.hardKeyword .dataKw)),
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ]),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .equal)),
+            .atom (.nonterminal .dataConstructor),
+            .star (.group (.sequence [
+              .atom (.terminal (.symbol .pipe)),
+              .atom (.nonterminal .dataConstructor)
+            ]))
+          ]),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .dataKw, dataKw],
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ], parameters.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.terminal (.category .identifier))),
+              .atom (.terminal (.symbol .rightParen))
+            ] |
+              rrTerm![.symbol .leftParen, value.1],
+              rrList1![.atom (.terminal (.category .identifier)), {
+                head := rrTerm![.category .identifier,
+                  value.2.1.head.matched]
+                tail := value.2.1.tail.map fun parameter =>
+                  rrTerm![.category .identifier, parameter.matched]
+              }],
+              rrTerm![.symbol .rightParen, value.2.2.1]
+            ]],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .equal)),
+            .atom (.nonterminal .dataConstructor),
+            .star (.group (.sequence [
+              .atom (.terminal (.symbol .pipe)),
+              .atom (.nonterminal .dataConstructor)
+            ]))
+          ], constructors.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .equal)),
+              .atom (.nonterminal .dataConstructor),
+              .star (.group (.sequence [
+                .atom (.terminal (.symbol .pipe)),
+                .atom (.nonterminal .dataConstructor)
+              ]))
+            ] |
+              rrTerm![.symbol .equal, value.1],
+              rrRule![.dataConstructor, value.2.1],
+              rrStar![.group (.sequence [
+                .atom (.terminal (.symbol .pipe)),
+                .atom (.nonterminal .dataConstructor)
+              ]), value.2.2.1.map fun entry =>
+                rrGroup![.sequence [
+                  .atom (.terminal (.symbol .pipe)),
+                  .atom (.nonterminal .dataConstructor)
+                ], rrSeq![[
+                  .atom (.terminal (.symbol .pipe)),
+                  .atom (.nonterminal .dataConstructor)
+                ] |
+                  rrTerm![.symbol .pipe, entry.1],
+                  rrRule![.dataConstructor, entry.2]
+                ]]
+              ]
+            ]],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          parameters := parameters.map fun value =>
+            value.2.1.map fun parameter =>
+              RuleReduction.terminalLoc
+                parameter.matched parameter.parsed
+          constructors := constructors.map fun value => {
+            head := value.2.1
+            tail := value.2.2.1.map Prod.snd
+          }
+        })
+  | dataConstructorWithoutArguments
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .dataConstructor origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], none]
+        ]]
+        (sourceLoc witness {
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          fields := none
+        })
+  | dataConstructorWithArguments
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (fields : NonemptyList TypeExpr)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .dataConstructor origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], some (rrSeq![[
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ] |
+            rrTerm![.symbol .leftParen, openParen],
+            rrList1![.atom (.nonterminal .type),
+              fields.map (EbnfValue.ruleAtom .type)],
+            rrTerm![.symbol .rightParen, closeParen]
+          ])]
+        ]]
+        (sourceLoc witness {
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          fields := RuleReduction.arguments
+            (some (openParen, fields, closeParen, ()))
+        })
+  | typeAliasDecl
+      (origin finish : Boundary tokens)
+      (typeKw : MatchedTerminal file tokens (.hardKeyword .typeKw))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (parameters : Option
+        (MatchedTerminal file tokens (.symbol .leftParen) ×
+          (NonemptyList (RuleReduction.SpelledTerminalData file tokens
+            (.category .identifier) Identifier) ×
+            (MatchedTerminal file tokens (.symbol .rightParen) × Unit))))
+      (equal : MatchedTerminal file tokens (.symbol .equal))
+      (body : TypeExpr)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (parameterProjects : ∀ value, parameters = some value →
+        IdentifierProjects value.2.1.head.matched
+          value.2.1.head.spelling value.2.1.head.parsed ∧
+        ∀ parameter, parameter ∈ value.2.1.tail →
+          IdentifierProjects parameter.matched
+            parameter.spelling parameter.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .typeAliasDecl origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.hardKeyword .typeKw)),
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ]),
+          .atom (.terminal (.symbol .equal)),
+          .atom (.nonterminal .type),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.hardKeyword .typeKw, typeKw],
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ], parameters.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.terminal (.category .identifier))),
+              .atom (.terminal (.symbol .rightParen))
+            ] |
+              rrTerm![.symbol .leftParen, value.1],
+              rrList1![.atom (.terminal (.category .identifier)), {
+                head := rrTerm![.category .identifier,
+                  value.2.1.head.matched]
+                tail := value.2.1.tail.map fun parameter =>
+                  rrTerm![.category .identifier, parameter.matched]
+              }],
+              rrTerm![.symbol .rightParen, value.2.2.1]
+            ]],
+          rrTerm![.symbol .equal, equal],
+          rrRule![.type, body],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          parameters := parameters.map fun value =>
+            value.2.1.map fun parameter =>
+              RuleReduction.terminalLoc
+                parameter.matched parameter.parsed
+          body := body
+        })
+  | classDecl
+      (origin finish : Boundary tokens)
+      (genericPrefix : Option GenericPrefix)
+      (classKw : MatchedTerminal file tokens (.hardKeyword .classKw))
+      (main : TypeExpr)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (parameters : Option
+        (MatchedTerminal file tokens (.symbol .leftParen) ×
+          (NonemptyList TypeExpr ×
+            (MatchedTerminal file tokens (.symbol .rightParen) × Unit))))
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (methods : List ClassMethodDecl)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .classDecl origin finish
+        rrRoot![rrSeq![[
+          .optional (.atom (.nonterminal .genericPrefix)),
+          .atom (.terminal (.hardKeyword .classKw)),
+          .atom (.nonterminal .typeAtom),
+          .atom (.terminal (.symbol .colon)),
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ]),
+          .atom (.terminal (.symbol .leftBrace)),
+          .star (.atom (.nonterminal .classMethod)),
+          .atom (.terminal (.symbol .rightBrace))
+        ] |
+          rrOpt![.atom (.nonterminal .genericPrefix),
+            genericPrefix.map (EbnfValue.ruleAtom .genericPrefix)],
+          rrTerm![.hardKeyword .classKw, classKw],
+          rrRule![.typeAtom, main],
+          rrTerm![.symbol .colon, colon],
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], parameters.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.nonterminal .type)),
+              .atom (.terminal (.symbol .rightParen))
+            ] |
+              rrTerm![.symbol .leftParen, value.1],
+              rrList1![.atom (.nonterminal .type),
+                value.2.1.map (EbnfValue.ruleAtom .type)],
+              rrTerm![.symbol .rightParen, value.2.2.1]
+            ]],
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrStar![.atom (.nonterminal .classMethod),
+            methods.map (EbnfValue.ruleAtom .classMethod)],
+          rrTerm![.symbol .rightBrace, closeBrace]
+        ]]
+        (sourceLoc witness {
+          genericPrefix := genericPrefix
+          main := main
+          className := RuleReduction.terminalLoc name.matched name.parsed
+          parameters := RuleReduction.arguments parameters
+          methods := methods
+        })
+  | instanceDecl
+      (origin finish : Boundary tokens)
+      (genericPrefix : Option GenericPrefix)
+      (defaultToken : Option (MatchedTerminal file tokens
+        (.hardKeyword .defaultKw)))
+      (instanceKw : MatchedTerminal file tokens
+        (.hardKeyword .instanceKw))
+      (main : TypeExpr)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (className : QualifiedName)
+      (parameters : Option
+        (MatchedTerminal file tokens (.symbol .leftParen) ×
+          (NonemptyList TypeExpr ×
+            (MatchedTerminal file tokens (.symbol .rightParen) × Unit))))
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (methods : List FunctionDecl)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (defaultProjects : ∀ terminal, defaultToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .defaultModifier)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .instanceDecl origin finish
+        rrRoot![rrSeq![[
+          .optional (.atom (.nonterminal .genericPrefix)),
+          .optional (.atom (.terminal (.hardKeyword .defaultKw))),
+          .atom (.terminal (.hardKeyword .instanceKw)),
+          .atom (.nonterminal .typeAtom),
+          .atom (.terminal (.symbol .colon)),
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ]),
+          .atom (.terminal (.symbol .leftBrace)),
+          .star (.atom (.nonterminal .instanceMethod)),
+          .atom (.terminal (.symbol .rightBrace))
+        ] |
+          rrOpt![.atom (.nonterminal .genericPrefix),
+            genericPrefix.map (EbnfValue.ruleAtom .genericPrefix)],
+          rrOpt![.atom (.terminal (.hardKeyword .defaultKw)),
+            defaultToken.map fun terminal =>
+              rrTerm![.hardKeyword .defaultKw, terminal]],
+          rrTerm![.hardKeyword .instanceKw, instanceKw],
+          rrRule![.typeAtom, main],
+          rrTerm![.symbol .colon, colon],
+          rrRule![.qualifiedName, className],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], parameters.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.nonterminal .type)),
+              .atom (.terminal (.symbol .rightParen))
+            ] |
+              rrTerm![.symbol .leftParen, value.1],
+              rrList1![.atom (.nonterminal .type),
+                value.2.1.map (EbnfValue.ruleAtom .type)],
+              rrTerm![.symbol .rightParen, value.2.2.1]
+            ]],
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrStar![.atom (.nonterminal .instanceMethod),
+            methods.map (EbnfValue.ruleAtom .instanceMethod)],
+          rrTerm![.symbol .rightBrace, closeBrace]
+        ]]
+        (sourceLoc witness {
+          genericPrefix := genericPrefix
+          default := match defaultToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (defaultProjects terminal rfl))
+          main := main
+          className := className
+          parameters := RuleReduction.arguments parameters
+          methods := methods
+        })
+  | instanceMethod
+      (origin finish : Boundary tokens)
+      (functionValue : FunctionDecl) :
+      RuleReduction file tokens .instanceMethod origin finish
+        rrRoot![rrRule![.functionDecl, functionValue]]
+        functionValue
+  | contractDecl
+      (origin finish : Boundary tokens)
+      (contractKw : MatchedTerminal file tokens
+        (.hardKeyword .contractKw))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (parameters : Option
+        (MatchedTerminal file tokens (.symbol .leftParen) ×
+          (NonemptyList (RuleReduction.SpelledTerminalData file tokens
+            (.category .identifier) Identifier) ×
+            (MatchedTerminal file tokens (.symbol .rightParen) × Unit))))
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (members : List ContractMember)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (parameterProjects : ∀ value, parameters = some value →
+        IdentifierProjects value.2.1.head.matched
+          value.2.1.head.spelling value.2.1.head.parsed ∧
+        ∀ parameter, parameter ∈ value.2.1.tail →
+          IdentifierProjects parameter.matched
+            parameter.spelling parameter.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractDecl origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.hardKeyword .contractKw)),
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ]),
+          .atom (.terminal (.symbol .leftBrace)),
+          .star (.atom (.nonterminal .contractMember)),
+          .atom (.terminal (.symbol .rightBrace))
+        ] |
+          rrTerm![.hardKeyword .contractKw, contractKw],
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.terminal (.category .identifier))),
+            .atom (.terminal (.symbol .rightParen))
+          ], parameters.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 (.atom (.terminal (.category .identifier))),
+              .atom (.terminal (.symbol .rightParen))
+            ] |
+              rrTerm![.symbol .leftParen, value.1],
+              rrList1![.atom (.terminal (.category .identifier)), {
+                head := rrTerm![.category .identifier,
+                  value.2.1.head.matched]
+                tail := value.2.1.tail.map fun parameter =>
+                  rrTerm![.category .identifier, parameter.matched]
+              }],
+              rrTerm![.symbol .rightParen, value.2.2.1]
+            ]],
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrStar![.atom (.nonterminal .contractMember),
+            members.map (EbnfValue.ruleAtom .contractMember)],
+          rrTerm![.symbol .rightBrace, closeBrace]
+        ]]
+        (sourceLoc witness {
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          parameters := parameters.map fun value =>
+            value.2.1.map fun parameter =>
+              RuleReduction.terminalLoc
+                parameter.matched parameter.parsed
+          members := members
+        })
+  | contractMemberData
+      (origin finish : Boundary tokens)
+      (declaration : DataDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractMember origin finish
+        rrContractMemberInput![0, rrRule![.dataDecl, declaration]]
+        (sourceLoc witness (.dataDecl declaration))
+  | contractMemberTypeAlias
+      (origin finish : Boundary tokens)
+      (declaration : TypeAliasDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractMember origin finish
+        rrContractMemberInput![1, rrRule![.typeAliasDecl, declaration]]
+        (sourceLoc witness (.typeAlias declaration))
+  | contractMemberField
+      (origin finish : Boundary tokens)
+      (declaration : FieldDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractMember origin finish
+        rrContractMemberInput![2, rrRule![.fieldDecl, declaration]]
+        (sourceLoc witness (.field declaration))
+  | contractMemberFunction
+      (origin finish : Boundary tokens)
+      (declaration : FunctionDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractMember origin finish
+        rrContractMemberInput![3, rrRule![.functionDecl, declaration]]
+        (sourceLoc witness (.function declaration))
+  | contractMemberFallback
+      (origin finish : Boundary tokens)
+      (declaration : FallbackDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractMember origin finish
+        rrContractMemberInput![4, rrRule![.fallbackDecl, declaration]]
+        (sourceLoc witness (.fallback declaration))
+  | contractMemberConstructor
+      (origin finish : Boundary tokens)
+      (declaration : ContractConstructorDecl)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractMember origin finish
+        rrContractMemberInput![5,
+          rrRule![.contractConstructorDecl, declaration]]
+        (sourceLoc witness (.constructor declaration))
+  | fieldDecl
+      (origin finish : Boundary tokens)
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (typeValue : TypeExpr)
+      (initializer : Option
+        (MatchedTerminal file tokens (.symbol .equal) ×
+          (Expression × Unit)))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .fieldDecl origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .atom (.terminal (.symbol .colon)),
+          .atom (.nonterminal .type),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .equal)),
+            .atom (.nonterminal .expression)
+          ]),
+          .atom (.terminal (.symbol .semicolon))
+        ] |
+          rrTerm![.category .identifier, name.matched],
+          rrTerm![.symbol .colon, colon],
+          rrRule![.type, typeValue],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .equal)),
+            .atom (.nonterminal .expression)
+          ], initializer.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .equal)),
+              .atom (.nonterminal .expression)
+            ] |
+              rrTerm![.symbol .equal, value.1],
+              rrRule![.expression, value.2.1]
+            ]],
+          rrTerm![.symbol .semicolon, semicolon]
+        ]]
+        (sourceLoc witness {
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          type := typeValue
+          initializer := initializer.map fun value => value.2.1
+        })
+  | fallbackDecl
+      (origin finish : Boundary tokens)
+      (genericPrefix : Option GenericPrefix)
+      (publicToken : Option (MatchedTerminal file tokens
+        (.hardKeyword .publicKw)))
+      (payableToken : Option (MatchedTerminal file tokens
+        (.hardKeyword .payableKw)))
+      (fallbackKw : MatchedTerminal file tokens
+        (.hardKeyword .fallbackKw))
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (parameters : List Parameter)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (returnValue : Option
+        (MatchedTerminal file tokens (.symbol .arrow) ×
+          (TypeExpr × Unit)))
+      (body : Body)
+      (publicProjects : ∀ terminal, publicToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .publicModifier)
+      (payableProjects : ∀ terminal, payableToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .payableModifier)
+      (fallbackProjects : RuleReduction.MarkerProjects file tokens
+        fallbackKw .fallbackName)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .fallbackDecl origin finish
+        rrRoot![rrSeq![[
+          .optional (.atom (.nonterminal .genericPrefix)),
+          .optional (.atom (.terminal (.hardKeyword .publicKw))),
+          .optional (.atom (.terminal (.hardKeyword .payableKw))),
+          .atom (.terminal (.hardKeyword .fallbackKw)),
+          .atom (.terminal (.symbol .leftParen)),
+          .list0 (.atom (.nonterminal .parameter)),
+          .atom (.terminal (.symbol .rightParen)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ]),
+          .atom (.nonterminal .body)
+        ] |
+          rrOpt![.atom (.nonterminal .genericPrefix),
+            genericPrefix.map (EbnfValue.ruleAtom .genericPrefix)],
+          rrOpt![.atom (.terminal (.hardKeyword .publicKw)),
+            publicToken.map fun terminal =>
+              rrTerm![.hardKeyword .publicKw, terminal]],
+          rrOpt![.atom (.terminal (.hardKeyword .payableKw)),
+            payableToken.map fun terminal =>
+              rrTerm![.hardKeyword .payableKw, terminal]],
+          rrTerm![.hardKeyword .fallbackKw, fallbackKw],
+          rrTerm![.symbol .leftParen, openParen],
+          rrList0![.atom (.nonterminal .parameter),
+            parameters.map (EbnfValue.ruleAtom .parameter)],
+          rrTerm![.symbol .rightParen, closeParen],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ], returnValue.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .arrow)),
+              .atom (.nonterminal .type)
+            ] |
+              rrTerm![.symbol .arrow, value.1],
+              rrRule![.type, value.2.1]
+            ]],
+          rrRule![.body, body]
+        ]]
+        (sourceLoc witness {
+          genericPrefix := genericPrefix
+          «public» := match publicToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (publicProjects terminal rfl))
+          payable := match payableToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (payableProjects terminal rfl))
+          marker := RuleReduction.marker fallbackKw fallbackProjects
+          parameters := parameters
+          returnType := returnValue.map fun value => value.2.1
+          body := body
+        })
+  | contractConstructorDecl
+      (origin finish : Boundary tokens)
+      (publicToken : Option (MatchedTerminal file tokens
+        (.hardKeyword .publicKw)))
+      (payableToken : Option (MatchedTerminal file tokens
+        (.hardKeyword .payableKw)))
+      (constructorKw : MatchedTerminal file tokens
+        (.hardKeyword .constructorKw))
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (parameters : List Parameter)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (body : Body)
+      (publicProjects : ∀ terminal, publicToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .publicModifier)
+      (payableProjects : ∀ terminal, payableToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .payableModifier)
+      (constructorProjects : RuleReduction.MarkerProjects file tokens
+        constructorKw .contractConstructorName)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .contractConstructorDecl origin finish
+        rrRoot![rrSeq![[
+          .optional (.atom (.terminal (.hardKeyword .publicKw))),
+          .optional (.atom (.terminal (.hardKeyword .payableKw))),
+          .atom (.terminal (.hardKeyword .constructorKw)),
+          .atom (.terminal (.symbol .leftParen)),
+          .list0 (.atom (.nonterminal .parameter)),
+          .atom (.terminal (.symbol .rightParen)),
+          .atom (.nonterminal .body)
+        ] |
+          rrOpt![.atom (.terminal (.hardKeyword .publicKw)),
+            publicToken.map fun terminal =>
+              rrTerm![.hardKeyword .publicKw, terminal]],
+          rrOpt![.atom (.terminal (.hardKeyword .payableKw)),
+            payableToken.map fun terminal =>
+              rrTerm![.hardKeyword .payableKw, terminal]],
+          rrTerm![.hardKeyword .constructorKw, constructorKw],
+          rrTerm![.symbol .leftParen, openParen],
+          rrList0![.atom (.nonterminal .parameter),
+            parameters.map (EbnfValue.ruleAtom .parameter)],
+          rrTerm![.symbol .rightParen, closeParen],
+          rrRule![.body, body]
+        ]]
+        (sourceLoc witness {
+          «public» := match publicToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (publicProjects terminal rfl))
+          payable := match payableToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (payableProjects terminal rfl))
+          marker := RuleReduction.marker constructorKw constructorProjects
+          parameters := parameters
+          body := body
+        })
+  | parameter
+      (origin finish : Boundary tokens)
+      (comptimeToken : Option (MatchedTerminal file tokens
+        (.contextualKeyword .comptimeKw)))
+      (name : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (typeValue : Option
+        (MatchedTerminal file tokens (.symbol .colon) ×
+          (TypeExpr × Unit)))
+      (comptimeProjects : ∀ terminal, comptimeToken = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal .comptimeModifier)
+      (nameProjects : IdentifierProjects name.matched
+        name.spelling name.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .parameter origin finish
+        rrRoot![rrSeq![[
+          .optional (.atom (.terminal
+            (.contextualKeyword .comptimeKw))),
+          .atom (.terminal (.category .identifier)),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .colon)),
+            .atom (.nonterminal .type)
+          ])
+        ] |
+          rrOpt![.atom (.terminal (.contextualKeyword .comptimeKw)),
+            comptimeToken.map fun terminal =>
+              rrTerm![.contextualKeyword .comptimeKw, terminal]],
+          rrTerm![.category .identifier, name.matched],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .colon)),
+            .atom (.nonterminal .type)
+          ], typeValue.map fun value =>
+            rrSeq![[
+              .atom (.terminal (.symbol .colon)),
+              .atom (.nonterminal .type)
+            ] |
+              rrTerm![.symbol .colon, value.1],
+              rrRule![.type, value.2.1]
+            ]]
+        ]]
+        (sourceLoc witness {
+          comptime := match comptimeToken with
+            | none => none
+            | some terminal => some (RuleReduction.marker terminal
+                (comptimeProjects terminal rfl))
+          name := RuleReduction.terminalLoc name.matched name.parsed
+          type := typeValue.map fun value => value.2.1
+        })
+  | body
+      (origin finish : Boundary tokens)
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (statements : List Statement)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .body origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.symbol .leftBrace)),
+          .star (.atom (.nonterminal .statement)),
+          .atom (.terminal (.symbol .rightBrace))
+        ] |
+          rrTerm![.symbol .leftBrace, openBrace],
+          rrStar![.atom (.nonterminal .statement),
+            statements.map (EbnfValue.ruleAtom .statement)],
+          rrTerm![.symbol .rightBrace, closeBrace]
+        ]]
+        (sourceLoc witness {
+          origin := .braced openBrace.span closeBrace.span
+          statements := statements
+        })
+  | typeComptime
+      (origin finish : Boundary tokens)
+      (comptimeToken : MatchedTerminal file tokens
+        (.contextualKeyword .comptimeKw))
+      (inner : TypeExpr)
+      (comptimeProjects : RuleReduction.MarkerProjects file tokens
+        comptimeToken .comptimeModifier)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .type origin finish
+        rrTypeInput![0, rrSeq![[
+          .atom (.terminal (.contextualKeyword .comptimeKw)),
+          .atom (.nonterminal .type)
+        ] |
+          rrTerm![.contextualKeyword .comptimeKw, comptimeToken],
+          rrRule![.type, inner]
+        ]]
+        (sourceLoc witness (.comptime
+          (RuleReduction.marker comptimeToken comptimeProjects) inner))
+  | typeAtomOnly
+      (origin finish : Boundary tokens)
+      (atom : TypeExpr) :
+      RuleReduction file tokens .type origin finish
+        rrTypeInput![1, rrSeq![[
+          .atom (.nonterminal .typeAtom),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ])
+        ] |
+          rrRule![.typeAtom, atom],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ], none]
+        ]]
+        atom
+  | typeFunction
+      (origin finish : Boundary tokens)
+      (domain : TypeExpr)
+      (arrow : MatchedTerminal file tokens (.symbol .arrow))
+      (codomain : TypeExpr)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .type origin finish
+        rrTypeInput![1, rrSeq![[
+          .atom (.nonterminal .typeAtom),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ])
+        ] |
+          rrRule![.typeAtom, domain],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ], some (rrSeq![[
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)
+          ] |
+            rrTerm![.symbol .arrow, arrow],
+            rrRule![.type, codomain]
+          ])]
+        ]]
+        (sourceLoc witness (.function domain codomain))
+  | typeAtomProxy
+      (origin finish : Boundary tokens)
+      (atToken : MatchedTerminal file tokens (.symbol .at))
+      (inner : TypeExpr)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .typeAtom origin finish
+        rrTypeAtomInput![0, rrSeq![[
+          .atom (.terminal (.symbol .at)),
+          .atom (.nonterminal .typeAtom)
+        ] |
+          rrTerm![.symbol .at, atToken],
+          rrRule![.typeAtom, inner]
+        ]]
+        (sourceLoc witness (.proxy
+          (RuleReduction.terminalLoc atToken ()) inner))
+  | typeAtomNamedWithoutArguments
+      (origin finish : Boundary tokens)
+      (name : QualifiedName)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .typeAtom origin finish
+        rrTypeAtomInput![1, rrSeq![[
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrRule![.qualifiedName, name],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], none]
+        ]]
+        (sourceLoc witness (.named name none))
+  | typeAtomNamedWithArguments
+      (origin finish : Boundary tokens)
+      (name : QualifiedName)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (arguments : NonemptyList TypeExpr)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .typeAtom origin finish
+        rrTypeAtomInput![1, rrSeq![[
+          .atom (.nonterminal .qualifiedName),
+          .optional (.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ])
+        ] |
+          rrRule![.qualifiedName, name],
+          rrOpt![.sequence [
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ], some (rrSeq![[
+            .atom (.terminal (.symbol .leftParen)),
+            .list1 (.atom (.nonterminal .type)),
+            .atom (.terminal (.symbol .rightParen))
+          ] |
+            rrTerm![.symbol .leftParen, openParen],
+            rrList1![.atom (.nonterminal .type),
+              arguments.map (EbnfValue.ruleAtom .type)],
+            rrTerm![.symbol .rightParen, closeParen]
+          ])]
+        ]]
+        (sourceLoc witness (.named name
+          (RuleReduction.arguments
+            (some (openParen, arguments, closeParen, ())))))
+  | typeAtomEmptyTuple
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .typeAtom origin finish
+        rrTypeAtomInput![2, rrSeq![[
+          .atom (.terminal (.symbol .leftParen)),
+          .atom (.terminal (.symbol .rightParen))
+        ] |
+          rrTerm![.symbol .leftParen, openParen],
+          rrTerm![.symbol .rightParen, closeParen]
+        ]]
+        (sourceLoc witness (.tuple []))
+  | typeAtomGroup
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (inner : TypeExpr)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .typeAtom origin finish
+        rrTypeAtomInput![3, rrSeq![[
+          .atom (.terminal (.symbol .leftParen)),
+          .atom (.nonterminal .type),
+          .atom (.terminal (.symbol .rightParen))
+        ] |
+          rrTerm![.symbol .leftParen, openParen],
+          rrRule![.type, inner],
+          rrTerm![.symbol .rightParen, closeParen]
+        ]]
+        (sourceLoc witness (.group inner))
+  | typeAtomTuple
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (first : TypeExpr)
+      (comma : MatchedTerminal file tokens (.symbol .comma))
+      (second : TypeExpr)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .comma) × TypeExpr))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .typeAtom origin finish
+        rrTypeAtomInput![4, rrSeq![[
+          .atom (.terminal (.symbol .leftParen)),
+          .atom (.nonterminal .type),
+          .atom (.terminal (.symbol .comma)),
+          .atom (.nonterminal .type),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .comma)),
+            .atom (.nonterminal .type)
+          ])),
+          .atom (.terminal (.symbol .rightParen))
+        ] |
+          rrTerm![.symbol .leftParen, openParen],
+          rrRule![.type, first],
+          rrTerm![.symbol .comma, comma],
+          rrRule![.type, second],
+          rrStar![.group (.sequence [
+            .atom (.terminal (.symbol .comma)),
+            .atom (.nonterminal .type)
+          ]), rest.map fun entry =>
+            rrGroup![.sequence [
+              .atom (.terminal (.symbol .comma)),
+              .atom (.nonterminal .type)
+            ], rrSeq![[
+              .atom (.terminal (.symbol .comma)),
+              .atom (.nonterminal .type)
+            ] |
+              rrTerm![.symbol .comma, entry.1],
+              rrRule![.type, entry.2]
+            ]]
+          ],
+          rrTerm![.symbol .rightParen, closeParen]
+        ]]
+        (sourceLoc witness
+          (.tuple (first :: second :: rest.map Prod.snd)))
+  | qualifiedName
+      (origin finish : Boundary tokens)
+      (first : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .dot) ×
+          RuleReduction.SpelledTerminalData file tokens
+            (.category .identifier) Identifier))
+      (firstProjects : IdentifierProjects first.matched
+        first.spelling first.parsed)
+      (restProjects : ∀ entry, entry ∈ rest →
+        IdentifierProjects entry.2.matched
+          entry.2.spelling entry.2.parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .qualifiedName origin finish
+        rrRoot![rrSeq![[
+          .atom (.terminal (.category .identifier)),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .identifier))
+          ]))
+        ] |
+          rrTerm![.category .identifier, first.matched],
+          rrStar![.group (.sequence [
+            .atom (.terminal (.symbol .dot)),
+            .atom (.terminal (.category .identifier))
+          ]), rest.map fun entry =>
+            rrGroup![.sequence [
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .identifier))
+            ], rrSeq![[
+              .atom (.terminal (.symbol .dot)),
+              .atom (.terminal (.category .identifier))
+            ] |
+              rrTerm![.symbol .dot, entry.1],
+              rrTerm![.category .identifier, entry.2.matched]
+            ]]
+          ]
+        ]]
+        (sourceLoc witness {
+          components := {
+            head := RuleReduction.terminalLoc
+              first.matched first.parsed
+            tail := rest.map fun entry =>
+              RuleReduction.terminalLoc
+                entry.2.matched entry.2.parsed
+          }
+        })
+  | statementLet
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨0, by decide⟩, EbnfValue.ruleAtom .letStatement value⟩)
+        value
+  | statementReturn
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨1, by decide⟩, EbnfValue.ruleAtom .returnStatement value⟩)
+        value
+  | statementMatch
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨2, by decide⟩, EbnfValue.ruleAtom .matchStatement value⟩)
+        value
+  | statementIf
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨3, by decide⟩, EbnfValue.ruleAtom .ifStatement value⟩)
+        value
+  | statementFor
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨4, by decide⟩, EbnfValue.ruleAtom .forStatement value⟩)
+        value
+  | statementAssembly
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨5, by decide⟩, EbnfValue.ruleAtom .assemblyStatement value⟩)
+        value
+  | statementBlock
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨6, by decide⟩, EbnfValue.ruleAtom .blockStatement value⟩)
+        value
+  | statementBreak
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨7, by decide⟩, EbnfValue.ruleAtom .breakStatement value⟩)
+        value
+  | statementContinue
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨8, by decide⟩, EbnfValue.ruleAtom .continueStatement value⟩)
+        value
+  | statementAssignment
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨9, by decide⟩, EbnfValue.ruleAtom .assignmentStatement value⟩)
+        value
+  | statementExpression
+      (origin finish : Boundary tokens)
+      (value : Statement) :
+      RuleReduction file tokens .statement origin finish
+        (rrChoiceRoot![.statement]
+          ⟨⟨10, by decide⟩, EbnfValue.ruleAtom .expressionStatement value⟩)
+        value
+  | letStatement
+      (origin finish : Boundary tokens)
+      (binding : LetBinding)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .letStatement origin finish
+        (rrSequenceRoot![.letStatement]
+          (rrCons (EbnfValue.ruleAtom .letBinding binding)
+            (rrCons (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)
+              rrNil)))
+        (sourceLoc witness (.letBinding binding))
+  | letBindingUntyped
+      (origin finish : Boundary tokens)
+      (letKeyword : MatchedTerminal file tokens (.hardKeyword .letKw))
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (nameProjects : IdentifierProjects name spelling parsed)
+      (initializer : Option
+        (MatchedTerminal file tokens (.symbol .equal) × Expression))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .letBinding origin finish
+        (rrSequenceRoot![.letBinding]
+          (rrCons (EbnfValue.terminalAtom (.hardKeyword .letKw) letKeyword)
+            (rrCons (EbnfValue.terminalAtom (.category .identifier) name)
+              (rrCons (EbnfValue.optional _ none)
+                (rrCons
+                  (EbnfValue.optional _
+                    (initializer.map fun value =>
+                      EbnfValue.sequence _
+                        (rrCons
+                          (EbnfValue.terminalAtom (.symbol .equal) value.1)
+                          (rrCons (EbnfValue.ruleAtom .expression value.2) rrNil))))
+                  rrNil)))))
+        (sourceLoc witness {
+          comptime := none
+          name := RuleReduction.terminalLoc name parsed
+          type := none
+          initializer := initializer.map Prod.snd
+        })
+  | letBindingTyped
+      (origin finish : Boundary tokens)
+      (letKeyword : MatchedTerminal file tokens (.hardKeyword .letKw))
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (nameProjects : IdentifierProjects name spelling parsed)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (typeValue : TypeExpr)
+      (initializer : Option
+        (MatchedTerminal file tokens (.symbol .equal) × Expression))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .letBinding origin finish
+        (rrSequenceRoot![.letBinding]
+          (rrCons (EbnfValue.terminalAtom (.hardKeyword .letKw) letKeyword)
+            (rrCons (EbnfValue.terminalAtom (.category .identifier) name)
+              (rrCons
+                (EbnfValue.optional _ (some
+                  (EbnfValue.sequence _
+                    (rrCons (EbnfValue.terminalAtom (.symbol .colon) colon)
+                      (rrCons (EbnfValue.optional _ none)
+                        (rrCons (EbnfValue.ruleAtom .type typeValue) rrNil))))))
+                (rrCons
+                  (EbnfValue.optional _
+                    (initializer.map fun value =>
+                      EbnfValue.sequence _
+                        (rrCons
+                          (EbnfValue.terminalAtom (.symbol .equal) value.1)
+                          (rrCons (EbnfValue.ruleAtom .expression value.2) rrNil))))
+                  rrNil)))))
+        (sourceLoc witness {
+          comptime := none
+          name := RuleReduction.terminalLoc name parsed
+          type := some typeValue
+          initializer := initializer.map Prod.snd
+        })
+  | letBindingComptime
+      (origin finish : Boundary tokens)
+      (letKeyword : MatchedTerminal file tokens (.hardKeyword .letKw))
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (nameProjects : IdentifierProjects name spelling parsed)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (comptime : MatchedTerminal file tokens
+        (.contextualKeyword .comptimeKw))
+      (typeValue : TypeExpr)
+      (initializer : Option
+        (MatchedTerminal file tokens (.symbol .equal) × Expression))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .letBinding origin finish
+        (rrSequenceRoot![.letBinding]
+          (rrCons (EbnfValue.terminalAtom (.hardKeyword .letKw) letKeyword)
+            (rrCons (EbnfValue.terminalAtom (.category .identifier) name)
+              (rrCons
+                (EbnfValue.optional _ (some
+                  (EbnfValue.sequence _
+                    (rrCons (EbnfValue.terminalAtom (.symbol .colon) colon)
+                      (rrCons
+                        (EbnfValue.optional _ (some
+                          (EbnfValue.terminalAtom
+                            (.contextualKeyword .comptimeKw) comptime)))
+                        (rrCons (EbnfValue.ruleAtom .type typeValue) rrNil))))))
+                (rrCons
+                  (EbnfValue.optional _
+                    (initializer.map fun value =>
+                      EbnfValue.sequence _
+                        (rrCons
+                          (EbnfValue.terminalAtom (.symbol .equal) value.1)
+                          (rrCons (EbnfValue.ruleAtom .expression value.2) rrNil))))
+                  rrNil)))))
+        (sourceLoc witness {
+          comptime := some
+            (RuleReduction.marker comptime (.comptimeModifier comptime))
+          name := RuleReduction.terminalLoc name parsed
+          type := some typeValue
+          initializer := initializer.map Prod.snd
+        })
+  | returnStatement
+      (origin finish : Boundary tokens)
+      (returnKeyword : MatchedTerminal file tokens (.hardKeyword .returnKw))
+      (value : Option Expression)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .returnStatement origin finish
+        (rrSequenceRoot![.returnStatement]
+          (rrCons
+            (EbnfValue.terminalAtom (.hardKeyword .returnKw) returnKeyword)
+            (rrCons
+              (EbnfValue.optional _ (value.map (EbnfValue.ruleAtom .expression)))
+              (rrCons (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)
+                rrNil))))
+        (sourceLoc witness (.return value semicolon.span))
+  | blockStatement
+      (origin finish : Boundary tokens)
+      (body : Body)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .blockStatement origin finish
+        (EbnfValue.ruleAtom .body body)
+        (sourceLoc witness (.block body))
+  | breakStatement
+      (origin finish : Boundary tokens)
+      (breakKeyword : MatchedTerminal file tokens (.hardKeyword .breakKw))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .breakStatement origin finish
+        (rrSequenceRoot![.breakStatement]
+          (rrCons (EbnfValue.terminalAtom (.hardKeyword .breakKw) breakKeyword)
+            (rrCons (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)
+              rrNil)))
+        (sourceLoc witness (.break semicolon.span))
+  | continueStatement
+      (origin finish : Boundary tokens)
+      (continueKeyword : MatchedTerminal file tokens
+        (.hardKeyword .continueKw))
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .continueStatement origin finish
+        (rrSequenceRoot![.continueStatement]
+          (rrCons
+            (EbnfValue.terminalAtom
+              (.hardKeyword .continueKw) continueKeyword)
+            (rrCons (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)
+              rrNil)))
+        (sourceLoc witness (.continue semicolon.span))
+  | assemblyStatement
+      (origin finish : Boundary tokens)
+      (assemblyKeyword : MatchedTerminal file tokens
+        (.hardKeyword .assemblyKw))
+      (assemblyToken : MatchedTerminal file tokens
+        (.category .assemblyBlock))
+      (slice : AssemblySlice)
+      (projects : AssemblySliceProjects assemblyToken slice)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .assemblyStatement origin finish
+        (rrSequenceRoot![.assemblyStatement]
+          (rrCons
+            (EbnfValue.terminalAtom
+              (.hardKeyword .assemblyKw) assemblyKeyword)
+            (rrCons
+              (EbnfValue.terminalAtom
+                (.category .assemblyBlock) assemblyToken)
+              rrNil)))
+        (sourceLoc witness (.assembly slice))
+  | ifStatementWithoutElse
+      (origin finish : Boundary tokens)
+      (ifKeyword : MatchedTerminal file tokens (.hardKeyword .ifKw))
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (condition : Expression)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (thenBody : Body)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .ifStatement origin finish
+        (rrSequenceRoot![.ifStatement]
+          (rrCons (EbnfValue.terminalAtom (.hardKeyword .ifKw) ifKeyword)
+            (rrCons
+              (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+              (rrCons (EbnfValue.ruleAtom .expression condition)
+                (rrCons
+                  (EbnfValue.terminalAtom (.symbol .rightParen) closeParen)
+                  (rrCons (EbnfValue.ruleAtom .body thenBody)
+                    (rrCons (EbnfValue.optional _ none) rrNil)))))))
+        (sourceLoc witness (.ifThenElse condition thenBody none))
+  | ifStatementWithElse
+      (origin finish : Boundary tokens)
+      (ifKeyword : MatchedTerminal file tokens (.hardKeyword .ifKw))
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (condition : Expression)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (thenBody : Body)
+      (elseKeyword : MatchedTerminal file tokens (.hardKeyword .elseKw))
+      (elseBody : Body)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .ifStatement origin finish
+        (rrSequenceRoot![.ifStatement]
+          (rrCons (EbnfValue.terminalAtom (.hardKeyword .ifKw) ifKeyword)
+            (rrCons
+              (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+              (rrCons (EbnfValue.ruleAtom .expression condition)
+                (rrCons
+                  (EbnfValue.terminalAtom (.symbol .rightParen) closeParen)
+                  (rrCons (EbnfValue.ruleAtom .body thenBody)
+                    (rrCons
+                      (EbnfValue.optional _ (some
+                        (EbnfValue.sequence _
+                          (rrCons
+                            (EbnfValue.terminalAtom
+                              (.hardKeyword .elseKw) elseKeyword)
+                            (rrCons (EbnfValue.ruleAtom .body elseBody) rrNil)))))
+                      rrNil)))))))
+        (sourceLoc witness
+          (.ifThenElse condition thenBody (some elseBody)))
+  | forStatement
+      (origin finish : Boundary tokens)
+      (forKeyword : MatchedTerminal file tokens (.hardKeyword .forKw))
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (initializers : List ForInitItem)
+      (firstSemicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (condition : Expression)
+      (secondSemicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (post : List ForPostItem)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (body : Body)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forStatement origin finish
+        (rrSequenceRoot![.forStatement]
+          (rrCons (EbnfValue.terminalAtom (.hardKeyword .forKw) forKeyword)
+            (rrCons (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+              (rrCons
+                (EbnfValue.list0 _
+                  (initializers.map (EbnfValue.ruleAtom .forInitItem)))
+                (rrCons
+                  (EbnfValue.terminalAtom
+                    (.symbol .semicolon) firstSemicolon)
+                  (rrCons (EbnfValue.ruleAtom .expression condition)
+                    (rrCons
+                      (EbnfValue.terminalAtom
+                        (.symbol .semicolon) secondSemicolon)
+                      (rrCons
+                        (EbnfValue.list0 _
+                          (post.map (EbnfValue.ruleAtom .forPostItem)))
+                        (rrCons
+                          (EbnfValue.terminalAtom
+                            (.symbol .rightParen) closeParen)
+                          (rrCons (EbnfValue.ruleAtom .body body) rrNil))))))))))
+        (sourceLoc witness (.forLoop initializers condition post body))
+  | forInitItemLet
+      (origin finish : Boundary tokens)
+      (binding : LetBinding)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forInitItem origin finish
+        (rrChoiceRoot![.forInitItem]
+          ⟨⟨0, by decide⟩, EbnfValue.ruleAtom .letBinding binding⟩)
+        (sourceLoc witness (.letBinding binding))
+  | forInitItemAssignment
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : Located AssignmentOperator)
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forInitItem origin finish
+        (rrChoiceRoot![.forInitItem]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.ruleAtom .expression left)
+                (rrCons
+                  (EbnfValue.ruleAtom .assignmentOperator operator)
+                  (rrCons (EbnfValue.ruleAtom .expression right) rrNil)))⟩)
+        (sourceLoc witness (.assignment operator left right))
+  | forInitItemExpression
+      (origin finish : Boundary tokens)
+      (expression : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forInitItem origin finish
+        (rrChoiceRoot![.forInitItem]
+          ⟨⟨2, by decide⟩, EbnfValue.ruleAtom .expression expression⟩)
+        (sourceLoc witness (.expression expression))
+  | forPostItemAssignment
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : Located AssignmentOperator)
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forPostItem origin finish
+        (rrChoiceRoot![.forPostItem]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.ruleAtom .expression left)
+                (rrCons
+                  (EbnfValue.ruleAtom .assignmentOperator operator)
+                  (rrCons (EbnfValue.ruleAtom .expression right) rrNil)))⟩)
+        (sourceLoc witness (.assignment operator left right))
+  | forPostItemExpression
+      (origin finish : Boundary tokens)
+      (expression : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .forPostItem origin finish
+        (rrChoiceRoot![.forPostItem]
+          ⟨⟨1, by decide⟩, EbnfValue.ruleAtom .expression expression⟩)
+        (sourceLoc witness (.expression expression))
+  | matchStatement
+      (origin finish : Boundary tokens)
+      (matchKeyword : MatchedTerminal file tokens (.hardKeyword .matchKw))
+      (scrutinees : NonemptyList Expression)
+      (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
+      (arms : NonemptyList MatchArm)
+      (closeBrace : MatchedTerminal file tokens (.symbol .rightBrace))
+      (terminator : Option
+        (MatchedTerminal file tokens (.symbol .semicolon)))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .matchStatement origin finish
+        (rrSequenceRoot![.matchStatement]
+          (rrCons
+            (EbnfValue.terminalAtom (.hardKeyword .matchKw) matchKeyword)
+            (rrCons
+              (EbnfValue.list1 _
+                (scrutinees.map (EbnfValue.ruleAtom .expression)))
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftBrace) openBrace)
+                (rrCons
+                  (EbnfValue.plus _
+                    (arms.map (EbnfValue.ruleAtom .matchArm)))
+                  (rrCons
+                    (EbnfValue.terminalAtom (.symbol .rightBrace) closeBrace)
+                    (rrCons
+                      (EbnfValue.optional _
+                        (terminator.map
+                          (EbnfValue.terminalAtom (.symbol .semicolon))))
+                      rrNil)))))))
+        (sourceLoc witness
+          (.match scrutinees arms (terminator.map MatchedTerminal.span)))
+  | matchArm
+      (origin finish : Boundary tokens)
+      (pipe : MatchedTerminal file tokens (.symbol .pipe))
+      (patterns : NonemptyList Pattern)
+      (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow))
+      (statements : List Statement)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .matchArm origin finish
+        (rrSequenceRoot![.matchArm]
+          (rrCons (EbnfValue.terminalAtom (.symbol .pipe) pipe)
+            (rrCons
+              (EbnfValue.list1 _
+                (patterns.map (EbnfValue.ruleAtom .pattern)))
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .fatArrow) fatArrow)
+                (rrCons
+                  (EbnfValue.star _
+                    (statements.map (EbnfValue.ruleAtom .armStatement)))
+                  rrNil)))))
+        (sourceLoc witness {
+          patterns := patterns
+          body := RuleReduction.armBody fatArrow statements
+        })
+  | armStatement
+      (origin finish : Boundary tokens)
+      (statement : Statement) :
+      RuleReduction file tokens .armStatement origin finish
+        (EbnfValue.ruleAtom .statement statement)
+        statement
+  | assignmentStatement
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : Located AssignmentOperator)
+      (right : Expression)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .assignmentStatement origin finish
+        (rrSequenceRoot![.assignmentStatement]
+          (rrCons (EbnfValue.ruleAtom .expression left)
+            (rrCons (EbnfValue.ruleAtom .assignmentOperator operator)
+              (rrCons (EbnfValue.ruleAtom .expression right)
+                (rrCons
+                  (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)
+                  rrNil)))))
+        (sourceLoc witness (.assignment operator left right))
+  | assignmentOperatorEqual
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.symbol .equal)) :
+      RuleReduction file tokens .assignmentOperator origin finish
+        (rrChoiceRoot![.assignmentOperator]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .equal) terminal⟩)
+        (RuleReduction.assignmentOperator terminal (.equal terminal))
+  | assignmentOperatorAddEqual
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.symbol .plusEqual)) :
+      RuleReduction file tokens .assignmentOperator origin finish
+        (rrChoiceRoot![.assignmentOperator]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .plusEqual) terminal⟩)
+        (RuleReduction.assignmentOperator terminal (.addEqual terminal))
+  | assignmentOperatorSubtractEqual
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.symbol .minusEqual)) :
+      RuleReduction file tokens .assignmentOperator origin finish
+        (rrChoiceRoot![.assignmentOperator]
+          ⟨⟨2, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .minusEqual) terminal⟩)
+        (RuleReduction.assignmentOperator terminal (.subtractEqual terminal))
+  | assignmentOperatorBitXorEqual
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.symbol .caretEqual)) :
+      RuleReduction file tokens .assignmentOperator origin finish
+        (rrChoiceRoot![.assignmentOperator]
+          ⟨⟨3, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .caretEqual) terminal⟩)
+        (RuleReduction.assignmentOperator terminal (.bitXorEqual terminal))
+  | assignmentOperatorBitAndEqual
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.symbol .ampEqual)) :
+      RuleReduction file tokens .assignmentOperator origin finish
+        (rrChoiceRoot![.assignmentOperator]
+          ⟨⟨4, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .ampEqual) terminal⟩)
+        (RuleReduction.assignmentOperator terminal (.bitAndEqual terminal))
+  | assignmentOperatorBitOrEqual
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.symbol .pipeEqual)) :
+      RuleReduction file tokens .assignmentOperator origin finish
+        (rrChoiceRoot![.assignmentOperator]
+          ⟨⟨5, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .pipeEqual) terminal⟩)
+        (RuleReduction.assignmentOperator terminal (.bitOrEqual terminal))
+  | assignmentOperatorModuloEqual
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.symbol .percentEqual)) :
+      RuleReduction file tokens .assignmentOperator origin finish
+        (rrChoiceRoot![.assignmentOperator]
+          ⟨⟨6, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .percentEqual) terminal⟩)
+        (RuleReduction.assignmentOperator terminal (.moduloEqual terminal))
+  | expressionStatementTerminated
+      (origin finish : Boundary tokens)
+      (expression : Expression)
+      (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .expressionStatement origin finish
+        (rrChoiceRoot![.expressionStatement]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.ruleAtom .expression expression)
+                (rrCons
+                  (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)
+                  rrNil))⟩)
+        (sourceLoc witness (.expression expression (some semicolon.span)))
+  | expressionStatementTerminal
+      (origin finish : Boundary tokens)
+      (expression : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .expressionStatement origin finish
+        (rrChoiceRoot![.expressionStatement]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.ruleAtom .terminalExpression expression⟩)
+        (sourceLoc witness (.expression expression none))
+  | terminalExpression
+      (origin finish : Boundary tokens)
+      (expression : Expression) :
+      RuleReduction file tokens .terminalExpression origin finish
+        (EbnfValue.ruleAtom .expression expression)
+        expression
+  | patternWildcard
+      (origin finish : Boundary tokens)
+      (underscore : MatchedTerminal file tokens (.symbol .underscore))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.terminalAtom (.symbol .underscore) underscore⟩)
+        (sourceLoc witness
+          (.wildcard
+            (RuleReduction.marker underscore (.wildcardUnderscore underscore))))
+  | patternLiteral
+      (origin finish : Boundary tokens)
+      (literal : Literal)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨1, by decide⟩, EbnfValue.ruleAtom .literal literal⟩)
+        (sourceLoc witness (.literal literal))
+  | patternDotConstructorWithoutArguments
+      (origin finish : Boundary tokens)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (projects : IdentifierProjects name spelling parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨2, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.symbol .dot) dot)
+                (rrCons (EbnfValue.terminalAtom (.category .identifier) name)
+                  (rrCons (EbnfValue.optional _ none) rrNil)))⟩)
+        (sourceLoc witness
+          (.dotConstructor
+            (RuleReduction.terminalLoc dot ())
+            (RuleReduction.terminalLoc name parsed)
+            none))
+  | patternDotConstructorWithArguments
+      (origin finish : Boundary tokens)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (projects : IdentifierProjects name spelling parsed)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (arguments : NonemptyList Pattern)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨2, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.symbol .dot) dot)
+                (rrCons (EbnfValue.terminalAtom (.category .identifier) name)
+                  (rrCons
+                    (EbnfValue.optional _ (some
+                      (EbnfValue.sequence _
+                        (rrCons
+                          (EbnfValue.terminalAtom
+                            (.symbol .leftParen) openParen)
+                          (rrCons
+                            (EbnfValue.list1 _
+                              (arguments.map
+                                (EbnfValue.ruleAtom .pattern)))
+                            (rrCons
+                              (EbnfValue.terminalAtom
+                                (.symbol .rightParen) closeParen)
+                              rrNil))))))
+                    rrNil)))⟩)
+        (sourceLoc witness
+          (.dotConstructor
+            (RuleReduction.terminalLoc dot ())
+            (RuleReduction.terminalLoc name parsed)
+            (some arguments)))
+  | patternComptime
+      (origin finish : Boundary tokens)
+      (comptime : MatchedTerminal file tokens
+        (.contextualKeyword .comptimeKw))
+      (expression : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨3, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom
+                  (.contextualKeyword .comptimeKw) comptime)
+                (rrCons (EbnfValue.ruleAtom .expression expression) rrNil))⟩)
+        (sourceLoc witness
+          (.comptime
+            (RuleReduction.marker comptime (.comptimeModifier comptime))
+            expression))
+  | patternNamedWithoutArguments
+      (origin finish : Boundary tokens)
+      (name : QualifiedName)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨4, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.ruleAtom .qualifiedName name)
+                (rrCons (EbnfValue.optional _ none) rrNil))⟩)
+        (sourceLoc witness (.named name none))
+  | patternNamedWithArguments
+      (origin finish : Boundary tokens)
+      (name : QualifiedName)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (arguments : NonemptyList Pattern)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨4, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.ruleAtom .qualifiedName name)
+                (rrCons
+                  (EbnfValue.optional _ (some
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.terminalAtom
+                          (.symbol .leftParen) openParen)
+                        (rrCons
+                          (EbnfValue.list1 _
+                            (arguments.map (EbnfValue.ruleAtom .pattern)))
+                          (rrCons
+                            (EbnfValue.terminalAtom
+                              (.symbol .rightParen) closeParen)
+                            rrNil))))))
+                  rrNil))⟩)
+        (sourceLoc witness (.named name (some arguments)))
+  | patternEmptyTuple
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨5, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+                (rrCons
+                  (EbnfValue.terminalAtom (.symbol .rightParen) closeParen)
+                  rrNil))⟩)
+        (sourceLoc witness (.tuple []))
+  | patternGroup
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (inner : Pattern)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨6, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+                (rrCons (EbnfValue.ruleAtom .pattern inner)
+                  (rrCons
+                    (EbnfValue.terminalAtom
+                      (.symbol .rightParen) closeParen)
+                    rrNil)))⟩)
+        (sourceLoc witness (.group inner))
+  | patternTuple
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (first : Pattern)
+      (comma : MatchedTerminal file tokens (.symbol .comma))
+      (second : Pattern)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .comma) × Pattern))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .pattern origin finish
+        (rrChoiceRoot![.pattern]
+          ⟨⟨7, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+                (rrCons (EbnfValue.ruleAtom .pattern first)
+                  (rrCons (EbnfValue.terminalAtom (.symbol .comma) comma)
+                    (rrCons (EbnfValue.ruleAtom .pattern second)
+                      (rrCons
+                        (EbnfValue.star _
+                          (rest.map fun value =>
+                            EbnfValue.group _
+                              (EbnfValue.sequence _
+                                (rrCons
+                                  (EbnfValue.terminalAtom
+                                    (.symbol .comma) value.1)
+                                  (rrCons
+                                    (EbnfValue.ruleAtom .pattern value.2)
+                                    rrNil)))))
+                        (rrCons
+                          (EbnfValue.terminalAtom
+                            (.symbol .rightParen) closeParen)
+                          rrNil))))))⟩)
+        (sourceLoc witness
+          (.tuple (first :: second :: rest.map Prod.snd)))
+  | expression
+      (origin finish : Boundary tokens)
+      (expression : Expression) :
+      RuleReduction file tokens .expression origin finish
+        (EbnfValue.ruleAtom .annotation expression)
+        expression
+  | annotationNone
+      (origin finish : Boundary tokens)
+      (expression : Expression) :
+      RuleReduction file tokens .annotation origin finish
+        (rrSequenceRoot![.annotation]
+          (rrCons (EbnfValue.ruleAtom .conditional expression)
+            (rrCons (EbnfValue.optional _ none) rrNil)))
+        expression
+  | annotationSome
+      (origin finish : Boundary tokens)
+      (expression : Expression)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (typeValue : TypeExpr)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .annotation origin finish
+        (rrSequenceRoot![.annotation]
+          (rrCons (EbnfValue.ruleAtom .conditional expression)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.sequence _
+                  (rrCons (EbnfValue.terminalAtom (.symbol .colon) colon)
+                    (rrCons (EbnfValue.ruleAtom .type typeValue) rrNil)))))
+              rrNil)))
+        (sourceLoc witness (.annotation expression typeValue))
+  | conditionalKeyword
+      (origin finish : Boundary tokens)
+      (ifKeyword : MatchedTerminal file tokens (.hardKeyword .ifKw))
+      (condition : Expression)
+      (thenKeyword : MatchedTerminal file tokens
+        (.contextualKeyword .thenKw))
+      (thenBranch : Expression)
+      (elseKeyword : MatchedTerminal file tokens (.hardKeyword .elseKw))
+      (elseBranch : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .conditional origin finish
+        (rrChoiceRoot![.conditional]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.hardKeyword .ifKw) ifKeyword)
+                (rrCons (EbnfValue.ruleAtom .conditional condition)
+                  (rrCons
+                    (EbnfValue.terminalAtom
+                      (.contextualKeyword .thenKw) thenKeyword)
+                    (rrCons (EbnfValue.ruleAtom .conditional thenBranch)
+                      (rrCons
+                        (EbnfValue.terminalAtom
+                          (.hardKeyword .elseKw) elseKeyword)
+                        (rrCons
+                          (EbnfValue.ruleAtom .conditional elseBranch)
+                          rrNil))))))⟩)
+        (sourceLoc witness
+          (.keywordConditional condition thenBranch elseBranch))
+  | conditionalLogical
+      (origin finish : Boundary tokens)
+      (condition : Expression) :
+      RuleReduction file tokens .conditional origin finish
+        (rrChoiceRoot![.conditional]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.ruleAtom .logicalOr condition)
+                (rrCons (EbnfValue.optional _ none) rrNil))⟩)
+        condition
+  | conditionalTernary
+      (origin finish : Boundary tokens)
+      (condition : Expression)
+      (question : MatchedTerminal file tokens (.symbol .question))
+      (thenBranch : Expression)
+      (colon : MatchedTerminal file tokens (.symbol .colon))
+      (elseBranch : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .conditional origin finish
+        (rrChoiceRoot![.conditional]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.ruleAtom .logicalOr condition)
+                (rrCons
+                  (EbnfValue.optional _ (some
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.terminalAtom
+                          (.symbol .question) question)
+                        (rrCons
+                          (EbnfValue.ruleAtom .conditional thenBranch)
+                          (rrCons
+                            (EbnfValue.terminalAtom (.symbol .colon) colon)
+                            (rrCons
+                              (EbnfValue.ruleAtom
+                                .conditional elseBranch)
+                              rrNil)))))))
+                  rrNil))⟩)
+        (sourceLoc witness
+          (.ternaryConditional condition thenBranch elseBranch))
+  | logicalOr
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .logicalOr) × Expression)) :
+      RuleReduction file tokens .logicalOr origin finish
+        (rrSequenceRoot![.logicalOr]
+          (rrCons (EbnfValue.ruleAtom .logicalAnd left)
+            (rrCons
+              (EbnfValue.star _
+                (rest.map fun value =>
+                  EbnfValue.group _
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.terminalAtom
+                          (.symbol .logicalOr) value.1)
+                        (rrCons
+                          (EbnfValue.ruleAtom .logicalAnd value.2)
+                          rrNil)))))
+              rrNil)))
+        (RuleReduction.foldInfixLeft file left
+          (rest.map fun value =>
+            (RuleReduction.infixOperator value.1 (.logicalOr value.1),
+              value.2)))
+  | logicalAnd
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .logicalAnd) × Expression)) :
+      RuleReduction file tokens .logicalAnd origin finish
+        (rrSequenceRoot![.logicalAnd]
+          (rrCons (EbnfValue.ruleAtom .equality left)
+            (rrCons
+              (EbnfValue.star _
+                (rest.map fun value =>
+                  EbnfValue.group _
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.terminalAtom
+                          (.symbol .logicalAnd) value.1)
+                        (rrCons (EbnfValue.ruleAtom .equality value.2) rrNil)))))
+              rrNil)))
+        (RuleReduction.foldInfixLeft file left
+          (rest.map fun value =>
+            (RuleReduction.infixOperator value.1 (.logicalAnd value.1),
+              value.2)))
+  | equalityNone
+      (origin finish : Boundary tokens)
+      (left : Expression) :
+      RuleReduction file tokens .equality origin finish
+        (rrSequenceRoot![.equality]
+          (rrCons (EbnfValue.ruleAtom .relational left)
+            (rrCons (EbnfValue.optional _ none) rrNil)))
+        left
+  | equalityEqual
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : MatchedTerminal file tokens (.symbol .equalEqual))
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .equality origin finish
+        (rrSequenceRoot![.equality]
+          (rrCons (EbnfValue.ruleAtom .relational left)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.sequence _
+                  (rrCons
+                    (EbnfValue.group _
+                      (EbnfValue.choice _
+                        ⟨⟨0, by decide⟩,
+                          EbnfValue.terminalAtom
+                            (.symbol .equalEqual) operator⟩))
+                    (rrCons (EbnfValue.ruleAtom .relational right) rrNil)))))
+              rrNil)))
+        (sourceLoc witness
+          (.infix
+            (RuleReduction.infixOperator operator (.equal operator))
+            left right))
+  | equalityNotEqual
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : MatchedTerminal file tokens (.symbol .notEqual))
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .equality origin finish
+        (rrSequenceRoot![.equality]
+          (rrCons (EbnfValue.ruleAtom .relational left)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.sequence _
+                  (rrCons
+                    (EbnfValue.group _
+                      (EbnfValue.choice _
+                        ⟨⟨1, by decide⟩,
+                          EbnfValue.terminalAtom
+                            (.symbol .notEqual) operator⟩))
+                    (rrCons (EbnfValue.ruleAtom .relational right) rrNil)))))
+              rrNil)))
+        (sourceLoc witness
+          (.infix
+            (RuleReduction.infixOperator operator (.notEqual operator))
+            left right))
+  | relationalNone
+      (origin finish : Boundary tokens)
+      (left : Expression) :
+      RuleReduction file tokens .relational origin finish
+        (rrSequenceRoot![.relational]
+          (rrCons (EbnfValue.ruleAtom .bitOr left)
+            (rrCons (EbnfValue.optional _ none) rrNil)))
+        left
+  | relationalLess
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : MatchedTerminal file tokens (.symbol .less))
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .relational origin finish
+        (rrSequenceRoot![.relational]
+          (rrCons (EbnfValue.ruleAtom .bitOr left)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.sequence _
+                  (rrCons
+                    (EbnfValue.group _
+                      (EbnfValue.choice _
+                        ⟨⟨0, by decide⟩,
+                          EbnfValue.terminalAtom (.symbol .less) operator⟩))
+                    (rrCons (EbnfValue.ruleAtom .bitOr right) rrNil)))))
+              rrNil)))
+        (sourceLoc witness
+          (.infix (RuleReduction.infixOperator operator (.less operator))
+            left right))
+  | relationalGreater
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : MatchedTerminal file tokens (.symbol .greater))
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .relational origin finish
+        (rrSequenceRoot![.relational]
+          (rrCons (EbnfValue.ruleAtom .bitOr left)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.sequence _
+                  (rrCons
+                    (EbnfValue.group _
+                      (EbnfValue.choice _
+                        ⟨⟨1, by decide⟩,
+                          EbnfValue.terminalAtom
+                            (.symbol .greater) operator⟩))
+                    (rrCons (EbnfValue.ruleAtom .bitOr right) rrNil)))))
+              rrNil)))
+        (sourceLoc witness
+          (.infix (RuleReduction.infixOperator operator (.greater operator))
+            left right))
+  | relationalLessEqual
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : MatchedTerminal file tokens (.symbol .lessEqual))
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .relational origin finish
+        (rrSequenceRoot![.relational]
+          (rrCons (EbnfValue.ruleAtom .bitOr left)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.sequence _
+                  (rrCons
+                    (EbnfValue.group _
+                      (EbnfValue.choice _
+                        ⟨⟨2, by decide⟩,
+                          EbnfValue.terminalAtom
+                            (.symbol .lessEqual) operator⟩))
+                    (rrCons (EbnfValue.ruleAtom .bitOr right) rrNil)))))
+              rrNil)))
+        (sourceLoc witness
+          (.infix
+            (RuleReduction.infixOperator operator (.lessEqual operator))
+            left right))
+  | relationalGreaterEqual
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (operator : MatchedTerminal file tokens (.symbol .greaterEqual))
+      (right : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .relational origin finish
+        (rrSequenceRoot![.relational]
+          (rrCons (EbnfValue.ruleAtom .bitOr left)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.sequence _
+                  (rrCons
+                    (EbnfValue.group _
+                      (EbnfValue.choice _
+                        ⟨⟨3, by decide⟩,
+                          EbnfValue.terminalAtom
+                            (.symbol .greaterEqual) operator⟩))
+                    (rrCons (EbnfValue.ruleAtom .bitOr right) rrNil)))))
+              rrNil)))
+        (sourceLoc witness
+          (.infix
+            (RuleReduction.infixOperator operator (.greaterEqual operator))
+            left right))
+  | bitOr
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .pipe) × Expression)) :
+      RuleReduction file tokens .bitOr origin finish
+        (rrSequenceRoot![.bitOr]
+          (rrCons (EbnfValue.ruleAtom .bitXor left)
+            (rrCons
+              (EbnfValue.star _
+                (rest.map fun value =>
+                  EbnfValue.group _
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.terminalAtom (.symbol .pipe) value.1)
+                        (rrCons (EbnfValue.ruleAtom .bitXor value.2) rrNil)))))
+              rrNil)))
+        (RuleReduction.foldInfixLeft file left
+          (rest.map fun value =>
+            (RuleReduction.infixOperator value.1 (.bitOr value.1), value.2)))
+  | bitXor
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .caret) × Expression)) :
+      RuleReduction file tokens .bitXor origin finish
+        (rrSequenceRoot![.bitXor]
+          (rrCons (EbnfValue.ruleAtom .bitAnd left)
+            (rrCons
+              (EbnfValue.star _
+                (rest.map fun value =>
+                  EbnfValue.group _
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.terminalAtom (.symbol .caret) value.1)
+                        (rrCons (EbnfValue.ruleAtom .bitAnd value.2) rrNil)))))
+              rrNil)))
+        (RuleReduction.foldInfixLeft file left
+          (rest.map fun value =>
+            (RuleReduction.infixOperator value.1 (.bitXor value.1), value.2)))
+  | bitAnd
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .amp) × Expression)) :
+      RuleReduction file tokens .bitAnd origin finish
+        (rrSequenceRoot![.bitAnd]
+          (rrCons (EbnfValue.ruleAtom .additive left)
+            (rrCons
+              (EbnfValue.star _
+                (rest.map fun value =>
+                  EbnfValue.group _
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.terminalAtom (.symbol .amp) value.1)
+                        (rrCons (EbnfValue.ruleAtom .additive value.2) rrNil)))))
+              rrNil)))
+        (RuleReduction.foldInfixLeft file left
+          (rest.map fun value =>
+            (RuleReduction.infixOperator value.1 (.bitAnd value.1), value.2)))
+  | additive
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (rest : List
+        (Sum
+          (MatchedTerminal file tokens (.symbol .plus))
+          (MatchedTerminal file tokens (.symbol .minus)) × Expression)) :
+      RuleReduction file tokens .additive origin finish
+        (rrSequenceRoot![.additive]
+          (rrCons (EbnfValue.ruleAtom .multiplicative left)
+            (rrCons
+              (EbnfValue.star _
+                (rest.map fun value =>
+                  EbnfValue.group _
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.group _
+                          (match value.1 with
+                          | .inl plus =>
+                              EbnfValue.choice _
+                                ⟨⟨0, by decide⟩,
+                                  EbnfValue.terminalAtom
+                                    (.symbol .plus) plus⟩
+                          | .inr minus =>
+                              EbnfValue.choice _
+                                ⟨⟨1, by decide⟩,
+                                  EbnfValue.terminalAtom
+                                    (.symbol .minus) minus⟩))
+                        (rrCons
+                          (EbnfValue.ruleAtom .multiplicative value.2)
+                          rrNil)))))
+              rrNil)))
+        (RuleReduction.foldInfixLeft file left
+          (rest.map fun value =>
+            (match value.1 with
+              | .inl plus =>
+                  RuleReduction.infixOperator plus (.add plus)
+              | .inr minus =>
+                  RuleReduction.infixOperator minus (.subtract minus),
+              value.2)))
+  | multiplicative
+      (origin finish : Boundary tokens)
+      (left : Expression)
+      (rest : List
+        (Sum
+          (MatchedTerminal file tokens (.symbol .star))
+          (Sum
+            (MatchedTerminal file tokens (.symbol .slash))
+            (MatchedTerminal file tokens (.symbol .percent))) × Expression)) :
+      RuleReduction file tokens .multiplicative origin finish
+        (rrSequenceRoot![.multiplicative]
+          (rrCons (EbnfValue.ruleAtom .prefix left)
+            (rrCons
+              (EbnfValue.star _
+                (rest.map fun value =>
+                  EbnfValue.group _
+                    (EbnfValue.sequence _
+                      (rrCons
+                        (EbnfValue.group _
+                          (match value.1 with
+                          | .inl star =>
+                              EbnfValue.choice _
+                                ⟨⟨0, by decide⟩,
+                                  EbnfValue.terminalAtom
+                                    (.symbol .star) star⟩
+                          | .inr (.inl slash) =>
+                              EbnfValue.choice _
+                                ⟨⟨1, by decide⟩,
+                                  EbnfValue.terminalAtom
+                                    (.symbol .slash) slash⟩
+                          | .inr (.inr percent) =>
+                              EbnfValue.choice _
+                                ⟨⟨2, by decide⟩,
+                                  EbnfValue.terminalAtom
+                                    (.symbol .percent) percent⟩))
+                        (rrCons (EbnfValue.ruleAtom .prefix value.2) rrNil)))))
+              rrNil)))
+        (RuleReduction.foldInfixLeft file left
+          (rest.map fun value =>
+            (match value.1 with
+              | .inl star =>
+                  RuleReduction.infixOperator star (.multiply star)
+              | .inr (.inl slash) =>
+                  RuleReduction.infixOperator slash (.divide slash)
+              | .inr (.inr percent) =>
+                  RuleReduction.infixOperator percent (.modulo percent),
+              value.2)))
+  | prefixLogicalNot
+      (origin finish : Boundary tokens)
+      (bang : MatchedTerminal file tokens (.symbol .bang))
+      (operand : Expression)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .prefix origin finish
+        (rrChoiceRoot![.prefix]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.symbol .bang) bang)
+                (rrCons (EbnfValue.ruleAtom .prefix operand) rrNil))⟩)
+        (sourceLoc witness
+          (.prefix (RuleReduction.prefixOperator bang) operand))
+  | prefixPostfix
+      (origin finish : Boundary tokens)
+      (expression : Expression) :
+      RuleReduction file tokens .prefix origin finish
+        (rrChoiceRoot![.prefix]
+          ⟨⟨1, by decide⟩, EbnfValue.ruleAtom .postfix expression⟩)
+        expression
+  | postfix
+      (origin finish : Boundary tokens)
+      (atom : Expression)
+      (parts : List PostfixPartValue) :
+      RuleReduction file tokens .postfix origin finish
+        (rrSequenceRoot![.postfix]
+          (rrCons (EbnfValue.ruleAtom .atom atom)
+            (rrCons
+              (EbnfValue.star _
+                (parts.map (EbnfValue.ruleAtom .postfixPart)))
+              rrNil)))
+        (RuleReduction.foldPostfix file atom parts)
+  | postfixPartCall
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (arguments : List Expression)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen)) :
+      RuleReduction file tokens .postfixPart origin finish
+        (rrChoiceRoot![.postfixPart]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+                (rrCons
+                  (EbnfValue.list0 _
+                    (arguments.map (EbnfValue.ruleAtom .expression)))
+                  (rrCons
+                    (EbnfValue.terminalAtom
+                      (.symbol .rightParen) closeParen)
+                    rrNil)))⟩)
+        (.call openParen.span arguments closeParen.span)
+  | postfixPartSelect
+      (origin finish : Boundary tokens)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (field : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (projects : IdentifierProjects field spelling parsed) :
+      RuleReduction file tokens .postfixPart origin finish
+        (rrChoiceRoot![.postfixPart]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.symbol .dot) dot)
+                (rrCons
+                  (EbnfValue.terminalAtom (.category .identifier) field)
+                  rrNil))⟩)
+        (.select dot.span (RuleReduction.terminalLoc field parsed))
+  | postfixPartIndex
+      (origin finish : Boundary tokens)
+      (openBracket : MatchedTerminal file tokens (.symbol .leftBracket))
+      (index : Expression)
+      (closeBracket : MatchedTerminal file tokens (.symbol .rightBracket)) :
+      RuleReduction file tokens .postfixPart origin finish
+        (rrChoiceRoot![.postfixPart]
+          ⟨⟨2, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom
+                  (.symbol .leftBracket) openBracket)
+                (rrCons (EbnfValue.ruleAtom .expression index)
+                  (rrCons
+                    (EbnfValue.terminalAtom
+                      (.symbol .rightBracket) closeBracket)
+                    rrNil)))⟩)
+        (.index openBracket.span index closeBracket.span)
+  | atomLiteral
+      (origin finish : Boundary tokens)
+      (literal : Literal)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨0, by decide⟩, EbnfValue.ruleAtom .literal literal⟩)
+        (sourceLoc witness (.literal literal))
+  | atomName
+      (origin finish : Boundary tokens)
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (projects : IdentifierProjects name spelling parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.terminalAtom (.category .identifier) name⟩)
+        (sourceLoc witness
+          (.name (RuleReduction.terminalLoc name parsed)))
+  | atomDotConstructorWithoutArguments
+      (origin finish : Boundary tokens)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (projects : IdentifierProjects name spelling parsed)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨2, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.symbol .dot) dot)
+                (rrCons (EbnfValue.terminalAtom (.category .identifier) name)
+                  (rrCons (EbnfValue.optional _ none) rrNil)))⟩)
+        (sourceLoc witness
+          (.dotConstructor
+            (RuleReduction.terminalLoc dot ())
+            (RuleReduction.terminalLoc name parsed)
+            none))
+  | atomDotConstructorWithArguments
+      (origin finish : Boundary tokens)
+      (dot : MatchedTerminal file tokens (.symbol .dot))
+      (name : MatchedTerminal file tokens (.category .identifier))
+      (spelling : String)
+      (parsed : Identifier)
+      (projects : IdentifierProjects name spelling parsed)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (arguments : List Expression)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨2, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.symbol .dot) dot)
+                (rrCons (EbnfValue.terminalAtom (.category .identifier) name)
+                  (rrCons
+                    (EbnfValue.optional _ (some
+                      (EbnfValue.sequence _
+                        (rrCons
+                          (EbnfValue.terminalAtom
+                            (.symbol .leftParen) openParen)
+                          (rrCons
+                            (EbnfValue.list0 _
+                              (arguments.map
+                                (EbnfValue.ruleAtom .expression)))
+                            (rrCons
+                              (EbnfValue.terminalAtom
+                                (.symbol .rightParen) closeParen)
+                              rrNil))))))
+                    rrNil)))⟩)
+        (sourceLoc witness
+          (.dotConstructor
+            (RuleReduction.terminalLoc dot ())
+            (RuleReduction.terminalLoc name parsed)
+            (some arguments)))
+  | atomProxy
+      (origin finish : Boundary tokens)
+      (atTerminal : MatchedTerminal file tokens (.symbol .at))
+      (typeValue : TypeExpr)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨3, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons (EbnfValue.terminalAtom (.symbol .at) atTerminal)
+                (rrCons (EbnfValue.ruleAtom .typeAtom typeValue) rrNil))⟩)
+        (sourceLoc witness
+          (.proxy (RuleReduction.terminalLoc atTerminal ()) typeValue))
+  | atomLambda
+      (origin finish : Boundary tokens)
+      (lambda : Expression) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨4, by decide⟩, EbnfValue.ruleAtom .lambda lambda⟩)
+        lambda
+  | atomEmptyTuple
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨5, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+                (rrCons
+                  (EbnfValue.terminalAtom (.symbol .rightParen) closeParen)
+                  rrNil))⟩)
+        (sourceLoc witness (.tuple []))
+  | atomGroup
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (inner : Expression)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨6, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+                (rrCons (EbnfValue.ruleAtom .expression inner)
+                  (rrCons
+                    (EbnfValue.terminalAtom
+                      (.symbol .rightParen) closeParen)
+                    rrNil)))⟩)
+        (sourceLoc witness (.group inner))
+  | atomTuple
+      (origin finish : Boundary tokens)
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (first : Expression)
+      (comma : MatchedTerminal file tokens (.symbol .comma))
+      (second : Expression)
+      (rest : List
+        (MatchedTerminal file tokens (.symbol .comma) × Expression))
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .atom origin finish
+        (rrChoiceRoot![.atom]
+          ⟨⟨7, by decide⟩,
+            EbnfValue.sequence _
+              (rrCons
+                (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+                (rrCons (EbnfValue.ruleAtom .expression first)
+                  (rrCons (EbnfValue.terminalAtom (.symbol .comma) comma)
+                    (rrCons (EbnfValue.ruleAtom .expression second)
+                      (rrCons
+                        (EbnfValue.star _
+                          (rest.map fun value =>
+                            EbnfValue.group _
+                              (EbnfValue.sequence _
+                                (rrCons
+                                  (EbnfValue.terminalAtom
+                                    (.symbol .comma) value.1)
+                                  (rrCons
+                                    (EbnfValue.ruleAtom
+                                      .expression value.2)
+                                    rrNil)))))
+                        (rrCons
+                          (EbnfValue.terminalAtom
+                            (.symbol .rightParen) closeParen)
+                          rrNil))))))⟩)
+        (sourceLoc witness
+          (.tuple (first :: second :: rest.map Prod.snd)))
+  | lambda
+      (origin finish : Boundary tokens)
+      (lambdaKeyword : MatchedTerminal file tokens (.hardKeyword .lamKw))
+      (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+      (parameters : List Parameter)
+      (closeParen : MatchedTerminal file tokens (.symbol .rightParen))
+      (returnType : Option
+        (MatchedTerminal file tokens (.symbol .arrow) × TypeExpr))
+      (body : Body)
+      (witness : ConsumedSpanWitness file tokens origin finish) :
+      RuleReduction file tokens .lambda origin finish
+        (rrSequenceRoot![.lambda]
+          (rrCons
+            (EbnfValue.terminalAtom (.hardKeyword .lamKw) lambdaKeyword)
+            (rrCons
+              (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+              (rrCons
+                (EbnfValue.list0 _
+                  (parameters.map (EbnfValue.ruleAtom .parameter)))
+                (rrCons
+                  (EbnfValue.terminalAtom
+                    (.symbol .rightParen) closeParen)
+                  (rrCons
+                    (EbnfValue.optional _
+                      (returnType.map fun value =>
+                        EbnfValue.sequence _
+                          (rrCons
+                            (EbnfValue.terminalAtom
+                              (.symbol .arrow) value.1)
+                            (rrCons (EbnfValue.ruleAtom .type value.2) rrNil))))
+                    (rrCons (EbnfValue.ruleAtom .body body) rrNil)))))))
+        (sourceLoc witness
+          (.lambda parameters (returnType.map Prod.snd) body))
+  | literalDecimal
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.category .decimalLiteral))
+      (payload : LiteralPayload)
+      (projects : LiteralProjects terminal payload) :
+      RuleReduction file tokens .literal origin finish
+        (rrChoiceRoot![.literal]
+          ⟨⟨0, by decide⟩,
+            EbnfValue.terminalAtom (.category .decimalLiteral) terminal⟩)
+        (RuleReduction.terminalLoc terminal payload)
+  | literalHexadecimal
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens
+        (.category .hexadecimalLiteral))
+      (payload : LiteralPayload)
+      (projects : LiteralProjects terminal payload) :
+      RuleReduction file tokens .literal origin finish
+        (rrChoiceRoot![.literal]
+          ⟨⟨1, by decide⟩,
+            EbnfValue.terminalAtom
+              (.category .hexadecimalLiteral) terminal⟩)
+        (RuleReduction.terminalLoc terminal payload)
+  | literalString
+      (origin finish : Boundary tokens)
+      (terminal : MatchedTerminal file tokens (.category .stringLiteral))
+      (payload : LiteralPayload)
+      (projects : LiteralProjects terminal payload) :
+      RuleReduction file tokens .literal origin finish
+        (rrChoiceRoot![.literal]
+          ⟨⟨2, by decide⟩,
+            EbnfValue.terminalAtom (.category .stringLiteral) terminal⟩)
+        (RuleReduction.terminalLoc terminal payload)
+
 end Solcore.Surface.Multi
