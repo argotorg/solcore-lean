@@ -761,4 +761,186 @@ theorem nearest_statement_region_functional
       subst rightClose
       exact nextArmOrClose_functional leftNext rightNext
 
+/-- The exact declarative guard-decision relation. -/
+def GuardEvidence
+    (file : WorkspaceFile) (tokens : List Token)
+    (key : GuardInstanceKey tokens) (decision : GuardDecision) : Prop :=
+  let terminalAtBoundary := fun
+      (terminal : TerminalSymbol) (boundary : Boundary tokens) =>
+    ∃ matched : MatchedTerminal file tokens terminal,
+      matched.cursor.beforeBoundary = boundary
+  let immediatelyAfterTerminal := fun
+      (terminal : TerminalSymbol)
+      (boundary after : Boundary tokens) =>
+    ∃ matched : MatchedTerminal file tokens terminal,
+      matched.cursor.beforeBoundary = boundary ∧
+        matched.cursor.afterBoundary = after
+  let statementIf :=
+    ∃ openCursor expressionStart closeCursor afterClose : Boundary tokens,
+      immediatelyAfterTerminal (.hardKeyword .ifKw)
+        key.siteCursor openCursor ∧
+      immediatelyAfterTerminal (.symbol .leftParen)
+        openCursor expressionStart ∧
+      MatchingDelimiter tokens openCursor closeCursor
+        .leftParen .rightParen ∧
+      UnguardedRecognizes file tokens (.rule .expression)
+        expressionStart closeCursor ∧
+      immediatelyAfterTerminal (.symbol .rightParen)
+        closeCursor afterClose ∧
+      terminalAtBoundary (.symbol .leftBrace) afterClose
+  let armHeader :=
+    ArmHeaderAt file tokens key.contextStart key.siteCursor
+  let pipeAtSite :=
+    SymbolAtBoundary file tokens key.siteCursor .pipe
+  let comptimeAtSite :=
+    terminalAtBoundary (.contextualKeyword .comptimeKw) key.siteCursor
+  let patternComptime :=
+    ∃ expressionStart limit : Boundary tokens,
+      immediatelyAfterTerminal (.contextualKeyword .comptimeKw)
+        key.siteCursor expressionStart ∧
+      NextSameDepthDelimiter tokens expressionStart limit {
+        head := .comma
+        tail := [.rightParen, .fatArrow]
+      } ∧
+      GreatestUnguardedEnd file tokens (.rule .expression)
+        expressionStart limit limit
+  let leadingDotArguments :=
+    ExactSlice file tokens key.contextStart key.siteCursor [
+      .symbol .dot,
+      .category .identifier
+    ] ∧
+    SymbolAtBoundary file tokens key.siteCursor .leftParen
+  let terminalExpression :=
+    ∃ regionEnd : Boundary tokens,
+      NearestStatementRegion file tokens key.contextStart regionEnd ∧
+      GreatestUnguardedEnd file tokens (.rule .expression)
+        key.siteCursor regionEnd regionEnd
+  let genericContext :=
+    ∃ arrowCursor : Boundary tokens,
+      SymbolAtBoundary file tokens arrowCursor .fatArrow ∧
+      GreatestUnguardedEnd file tokens (.rule .predicateList)
+        key.siteCursor arrowCursor arrowCursor
+  TokensOwnedBy file tokens ∧
+    match key.guard with
+    | .G01_statementIf =>
+      match decision with
+      | .positive => statementIf
+      | .negative => ¬ statementIf
+      | .neutral => False
+    | .G02_matchArmBoundary =>
+      match decision with
+      | .positive => armHeader
+      | .negative => pipeAtSite ∧ ¬ armHeader
+      | .neutral => ¬ pipeAtSite
+    | .G03_parameterComptime =>
+      match decision with
+      | .positive => comptimeAtSite
+      | .negative => ¬ comptimeAtSite
+      | .neutral => False
+    | .G04_letComptime =>
+      match decision with
+      | .positive => comptimeAtSite
+      | .negative => ¬ comptimeAtSite
+      | .neutral => False
+    | .G05_typeComptime =>
+      match decision with
+      | .positive => comptimeAtSite
+      | .negative => ¬ comptimeAtSite
+      | .neutral => False
+    | .G06_patternComptime =>
+      match decision with
+      | .positive => patternComptime
+      | .negative => ¬ patternComptime
+      | .neutral => False
+    | .G07_leadingDotArguments =>
+      match decision with
+      | .positive => leadingDotArguments
+      | .negative => ¬ leadingDotArguments
+      | .neutral => False
+    | .G08_terminalExpression =>
+      match decision with
+      | .positive => terminalExpression
+      | .negative => ¬ terminalExpression
+      | .neutral => False
+    | .G09_genericContext =>
+      match decision with
+      | .positive => genericContext
+      | .negative => ¬ genericContext
+      | .neutral => False
+
+private theorem binaryGuardDecision_functional
+    (positive : Prop)
+    {left right : GuardDecision}
+    (leftEvidence :
+      match left with
+      | .positive => positive
+      | .negative => ¬ positive
+      | .neutral => False)
+    (rightEvidence :
+      match right with
+      | .positive => positive
+      | .negative => ¬ positive
+      | .neutral => False) :
+    left = right := by
+  cases left <;> cases right <;> simp_all
+
+private theorem matchArmGuardDecision_functional
+    (header pipeAtSite : Prop)
+    (headerPipe : header → pipeAtSite)
+    {left right : GuardDecision}
+    (leftEvidence :
+      match left with
+      | .positive => header
+      | .negative => pipeAtSite ∧ ¬ header
+      | .neutral => ¬ pipeAtSite)
+    (rightEvidence :
+      match right with
+      | .positive => header
+      | .negative => pipeAtSite ∧ ¬ header
+      | .neutral => ¬ pipeAtSite) :
+    left = right := by
+  cases left <;> cases right <;> simp_all
+
+/-- One guard instance has at most one declarative decision. -/
+theorem GuardEvidence.functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {key : GuardInstanceKey tokens} {left right : GuardDecision}
+    (leftEvidence : GuardEvidence file tokens key left)
+    (rightEvidence : GuardEvidence file tokens key right) :
+    left = right := by
+  cases key with
+  | mk guard contextStart siteCursor ordered =>
+      unfold GuardEvidence at leftEvidence rightEvidence
+      rcases leftEvidence with ⟨leftOwned, leftEvidence⟩
+      rcases rightEvidence with ⟨rightOwned, rightEvidence⟩
+      cases guard <;> simp only at leftEvidence rightEvidence
+      case G01_statementIf =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+      case G02_matchArmBoundary =>
+        apply matchArmGuardDecision_functional _ _ _
+          leftEvidence rightEvidence
+        intro header
+        exact header.2.2.1
+      case G03_parameterComptime =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+      case G04_letComptime =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+      case G05_typeComptime =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+      case G06_patternComptime =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+      case G07_leadingDotArguments =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+      case G08_terminalExpression =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+      case G09_genericContext =>
+        exact binaryGuardDecision_functional _ leftEvidence rightEvidence
+
+/-- Exact agreement between one final Phase-B table and guard evidence. -/
+def PhaseBCorrect
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens) : Prop :=
+  ∀ key decision,
+    memo key = .final decision ↔ GuardEvidence file tokens key decision
+
 end Solcore.Surface.Multi
