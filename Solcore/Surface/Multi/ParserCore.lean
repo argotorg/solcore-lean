@@ -1540,6 +1540,289 @@ def pack
 
 end OptionalSite
 
+namespace StarSite
+
+/-- Pack either expanded star production into its auxiliary EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.StarSite) (branch : NilConsBranch) :
+    GrammarSymbolValues file tokens
+      (ProductionId.star site branch).rhs →
+      NonterminalValue file tokens (ProductionId.star site branch).lhs :=
+  match branch with
+  | .nil => fun values =>
+      match GrammarSymbolValues.view
+          (ProductionId.rhs_star_nil site) values with
+      | () =>
+          EbnfValue.ofShape site.expression_eq_star
+            (EbnfValue.star site.child.expression [])
+  | .cons => fun values =>
+      let viewed := GrammarSymbolValues.view
+        (ProductionId.rhs_star_cons site) values
+      let tailValue :=
+        EbnfValue.atShape site.expression_eq_star viewed.2.1
+      let tail :=
+        Eq.mp (ebnfValue_star_eq site.child.expression) tailValue
+      EbnfValue.ofShape site.expression_eq_star
+        (EbnfValue.star site.child.expression (viewed.1 :: tail))
+
+/-- Empty star packing yields the checked empty repetition. -/
+@[simp] theorem pack_nil_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.StarSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.star site .nil).rhs) :
+    EbnfValue.atShape site.expression_eq_star
+        (pack site .nil values) =
+      EbnfValue.star site.child.expression [] := by
+  unfold pack
+  generalize viewedEq : GrammarSymbolValues.view
+    (ProductionId.rhs_star_nil site) values = viewed
+  cases viewed
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+/-- Extending star packing prepends one child to the recursive repetition. -/
+@[simp] theorem pack_cons_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.StarSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.star site .cons).rhs) :
+    EbnfValue.atShape site.expression_eq_star
+        (pack site .cons values) =
+      EbnfValue.star site.child.expression
+        ((GrammarSymbolValues.view
+            (ProductionId.rhs_star_cons site) values).1 ::
+          Eq.mp (ebnfValue_star_eq site.child.expression)
+            (EbnfValue.atShape site.expression_eq_star
+              (GrammarSymbolValues.view
+                (ProductionId.rhs_star_cons site) values).2.1)) := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end StarSite
+
+namespace PlusSite
+
+/-- Pack either expanded plus production into its auxiliary EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.PlusSite) (branch : OneConsBranch) :
+    GrammarSymbolValues file tokens
+      (ProductionId.plus site branch).rhs →
+      NonterminalValue file tokens (ProductionId.plus site branch).lhs :=
+  match branch with
+  | .one => fun values =>
+      let viewed := GrammarSymbolValues.view
+        (ProductionId.rhs_plus_one site) values
+      EbnfValue.ofShape site.expression_eq_plus
+        (EbnfValue.plus site.child.expression {
+          head := viewed.1
+          tail := []
+        })
+  | .cons => fun values =>
+      let viewed := GrammarSymbolValues.view
+        (ProductionId.rhs_plus_cons site) values
+      let tailValue :=
+        EbnfValue.atShape site.expression_eq_plus viewed.2.1
+      let tail :=
+        Eq.mp (ebnfValue_plus_eq site.child.expression) tailValue
+      EbnfValue.ofShape site.expression_eq_plus
+        (EbnfValue.plus site.child.expression {
+          head := viewed.1
+          tail := tail.head :: tail.tail
+        })
+
+/-- Singleton plus packing yields one child and no remaining values. -/
+@[simp] theorem pack_one_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.PlusSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.plus site .one).rhs) :
+    EbnfValue.atShape site.expression_eq_plus
+        (pack site .one values) =
+      EbnfValue.plus site.child.expression {
+        head := (GrammarSymbolValues.view
+          (ProductionId.rhs_plus_one site) values).1
+        tail := []
+      } := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+/-- Extending plus packing prepends one child to the recursive nonempty value. -/
+@[simp] theorem pack_cons_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.PlusSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.plus site .cons).rhs) :
+    let viewed := GrammarSymbolValues.view
+      (ProductionId.rhs_plus_cons site) values
+    let tail := Eq.mp (ebnfValue_plus_eq site.child.expression)
+      (EbnfValue.atShape site.expression_eq_plus viewed.2.1)
+    EbnfValue.atShape site.expression_eq_plus
+        (pack site .cons values) =
+      EbnfValue.plus site.child.expression {
+        head := viewed.1
+        tail := tail.head :: tail.tail
+      } := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end PlusSite
+
+namespace List0Site
+
+/-- Pack either expanded zero-or-more list production into its EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.List0Site) (branch : NilConsBranch) :
+    GrammarSymbolValues file tokens
+      (ProductionId.list0 site branch).rhs →
+      NonterminalValue file tokens (ProductionId.list0 site branch).lhs :=
+  match branch with
+  | .nil => fun values =>
+      match GrammarSymbolValues.view
+          (ProductionId.rhs_list0_nil site) values with
+      | () =>
+          EbnfValue.ofShape site.expression_eq_list0
+            (EbnfValue.list0 site.element.expression [])
+  | .cons => fun values =>
+      let viewed := GrammarSymbolValues.view
+        (ProductionId.rhs_list0_cons site) values
+      let tail := Eq.mp
+        (congrArg
+          (fun element : GrammarSite =>
+            List (EbnfValue file tokens element.expression))
+          (Grammar.ListSite.element_list0 site))
+        viewed.2.1
+      EbnfValue.ofShape site.expression_eq_list0
+        (EbnfValue.list0 site.element.expression (viewed.1 :: tail))
+
+/-- Empty zero-or-more list packing yields the checked empty list. -/
+@[simp] theorem pack_nil_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.List0Site)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.list0 site .nil).rhs) :
+    EbnfValue.atShape site.expression_eq_list0
+        (pack site .nil values) =
+      EbnfValue.list0 site.element.expression [] := by
+  unfold pack
+  generalize viewedEq : GrammarSymbolValues.view
+    (ProductionId.rhs_list0_nil site) values = viewed
+  cases viewed
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+/-- Extending zero-or-more list packing prepends its exact element. -/
+@[simp] theorem pack_cons_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.List0Site)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.list0 site .cons).rhs) :
+    let viewed := GrammarSymbolValues.view
+      (ProductionId.rhs_list0_cons site) values
+    let tail := Eq.mp
+      (congrArg
+        (fun element : GrammarSite =>
+          List (EbnfValue file tokens element.expression))
+        (Grammar.ListSite.element_list0 site))
+      viewed.2.1
+    EbnfValue.atShape site.expression_eq_list0
+        (pack site .cons values) =
+      EbnfValue.list0 site.element.expression (viewed.1 :: tail) := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end List0Site
+
+namespace List1Site
+
+/-- Pack one expanded nonempty list production into its EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.List1Site) :
+    GrammarSymbolValues file tokens (ProductionId.list1 site).rhs →
+      NonterminalValue file tokens (ProductionId.list1 site).lhs :=
+  fun values =>
+    let viewed := GrammarSymbolValues.view
+      (ProductionId.rhs_list1 site) values
+    let tail := Eq.mp
+      (congrArg
+        (fun element : GrammarSite =>
+          List (EbnfValue file tokens element.expression))
+        (Grammar.ListSite.element_list1 site))
+      viewed.2.1
+    EbnfValue.ofShape site.expression_eq_list1
+      (EbnfValue.list1 site.element.expression {
+        head := viewed.1
+        tail := tail
+      })
+
+/-- Nonempty list packing preserves its head and exact comma-tail values. -/
+@[simp] theorem pack_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.List1Site)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.list1 site).rhs) :
+    let viewed := GrammarSymbolValues.view
+      (ProductionId.rhs_list1 site) values
+    let tail := Eq.mp
+      (congrArg
+        (fun element : GrammarSite =>
+          List (EbnfValue file tokens element.expression))
+        (Grammar.ListSite.element_list1 site))
+      viewed.2.1
+    EbnfValue.atShape site.expression_eq_list1 (pack site values) =
+      EbnfValue.list1 site.element.expression {
+        head := viewed.1
+        tail := tail
+      } := by
+  exact EbnfValue.atShape_ofShape_eq _ _
+
+end List1Site
+
+namespace ListSite
+
+/-- Pack either expanded comma-tail production into its exact element list. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.ListSite) (branch : NilConsBranch) :
+    GrammarSymbolValues file tokens
+      (ProductionId.tail site branch).rhs →
+      NonterminalValue file tokens (ProductionId.tail site branch).lhs :=
+  match branch with
+  | .nil => fun values =>
+      match GrammarSymbolValues.view
+          (ProductionId.rhs_tail_nil site) values with
+      | () => []
+  | .cons => fun values =>
+      let viewed := GrammarSymbolValues.view
+        (ProductionId.rhs_tail_cons site) values
+      viewed.2.1 :: viewed.2.2.1
+
+/-- Empty comma-tail packing consumes its empty RHS and returns no values. -/
+@[simp] theorem pack_nil_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.ListSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.tail site .nil).rhs) :
+    pack site .nil values = [] := by
+  unfold pack
+  generalize viewedEq : GrammarSymbolValues.view
+    (ProductionId.rhs_tail_nil site) values = viewed
+  cases viewed
+  rfl
+
+/-- Extending comma-tail packing consumes its comma and prepends its element. -/
+@[simp] theorem pack_cons_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.ListSite)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.tail site .cons).rhs) :
+    pack site .cons values =
+      (GrammarSymbolValues.view
+          (ProductionId.rhs_tail_cons site) values).2.1 ::
+        (GrammarSymbolValues.view
+          (ProductionId.rhs_tail_cons site) values).2.2.1 :=
+  rfl
+
+end ListSite
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
