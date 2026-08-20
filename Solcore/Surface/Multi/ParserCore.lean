@@ -29,6 +29,14 @@ def afterBoundary {tokens : List Token}
 
 end TerminalCursor
 
+/-- The two embeddings of a terminal cursor preserve its index and select
+the immediately following chart boundary, respectively. -/
+theorem terminalCursor_boundary_coercions_exact
+    {tokens : List Token} (cursor : TerminalCursor tokens) :
+    cursor.beforeBoundary.val = cursor.val ∧
+      cursor.afterBoundary.val = cursor.val + 1 := by
+  exact ⟨rfl, rfl⟩
+
 namespace Boundary
 
 /-- The first chart boundary. -/
@@ -568,6 +576,13 @@ inductive TerminalStreamValue where
 def TokensOwnedBy (file : WorkspaceFile) (tokens : List Token) : Prop :=
   ∀ token, token ∈ tokens → token.span.ValidFor file
 
+/-- Token-stream ownership is exactly pointwise validity of every member. -/
+theorem tokensOwnedBy_exact
+    (file : WorkspaceFile) (tokens : List Token) :
+    TokensOwnedBy file tokens ↔
+      ∀ token, token ∈ tokens → token.span.ValidFor file := by
+  rfl
+
 /-- Exact lookup in the retained-token stream extended by one logical EOF. -/
 inductive TerminalAt
     (file : WorkspaceFile)
@@ -651,6 +666,71 @@ def TerminalMatches : TerminalSymbol → TerminalStreamValue → Prop
   | .endOfFile, .endOfFile => True
   | _, _ => False
 
+/-- Enumerate every and only terminal/value pair accepted by the grammar. -/
+theorem terminalMatches_exact
+    (terminal : TerminalSymbol) (value : TerminalStreamValue) :
+    TerminalMatches terminal value ↔
+      (∃ keyword token,
+        terminal = .hardKeyword keyword ∧
+          value = .retained token ∧
+          token.payload = .hardKeyword keyword) ∨
+      (∃ keyword token,
+        terminal = .contextualKeyword keyword ∧
+          value = .retained token ∧
+          token.payload = .identifier keyword.spelling) ∨
+      (∃ kind token,
+        terminal = .pragmaName kind ∧
+          value = .retained token ∧
+          token.payload = .pragmaName kind) ∨
+      (∃ symbol token,
+        terminal = .symbol symbol ∧
+          value = .retained token ∧
+          token.payload = .symbol symbol) ∨
+      (∃ token text parsed,
+        terminal = .category .identifier ∧
+          value = .retained token ∧
+          token.payload = .identifier text ∧
+          Identifier.parse text = some parsed) ∨
+      (∃ token,
+        terminal = .category .pathComponent ∧
+          value = .retained token ∧
+          ((∃ text parsed,
+              token.payload = .identifier text ∧
+                PathSegment.parse text = some parsed) ∨
+            (∃ keyword parsed,
+              token.payload = .hardKeyword keyword ∧
+                PathSegment.parse keyword.spelling = some parsed))) ∨
+      (∃ token spelling digits,
+        terminal = .category .decimalLiteral ∧
+          value = .retained token ∧
+          token.payload = .decimalLiteral spelling digits) ∨
+      (∃ token spelling digits,
+        terminal = .category .hexadecimalLiteral ∧
+          value = .retained token ∧
+          token.payload = .hexadecimalLiteral spelling digits) ∨
+      (∃ token spelling decoded,
+        terminal = .category .stringLiteral ∧
+          value = .retained token ∧
+          token.payload = .stringLiteral spelling decoded) ∨
+      (∃ token slice,
+        terminal = .category .assemblyBlock ∧
+          value = .retained token ∧
+          token.payload = .assemblyBlock slice) ∨
+      (terminal = .endOfFile ∧ value = .endOfFile) := by
+  cases terminal with
+  | hardKeyword keyword =>
+      cases value <;> simp [TerminalMatches]
+  | contextualKeyword keyword =>
+      cases value <;> simp [TerminalMatches]
+  | pragmaName kind =>
+      cases value <;> simp [TerminalMatches]
+  | symbol symbol =>
+      cases value <;> simp [TerminalMatches]
+  | category category =>
+      cases category <;> cases value <;> simp [TerminalMatches]
+  | endOfFile =>
+      cases value <;> simp [TerminalMatches]
+
 /-- A terminal-stream value together with its exact lookup and match evidence. -/
 structure MatchedTerminal
     (file : WorkspaceFile)
@@ -667,6 +747,25 @@ instance {file : WorkspaceFile} {tokens : List Token}
     {terminal : TerminalSymbol} :
     BEq (MatchedTerminal file tokens terminal) :=
   ⟨fun left right => decide (left = right)⟩
+
+/-- A matched logical EOF is at the retained-token limit and has the unique
+empty span at the physical end of the file. -/
+theorem matchedTerminal_eof_empty_span
+    {file : WorkspaceFile} {tokens : List Token}
+    (matched : MatchedTerminal file tokens .endOfFile) :
+    matched.cursor.val = tokens.length ∧
+      matched.value = .endOfFile ∧
+      matched.span = {
+        source := file.id
+        startByte := file.content.utf8ByteSize
+        endByte := file.content.utf8ByteSize
+      } := by
+  rcases matched with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | retained token => simp [TerminalMatches] at matchedEvidence
+  | endOfFile =>
+      cases terminalAt with
+      | endOfFile atEnd => exact ⟨atEnd, rfl, rfl⟩
 
 /-- Exact spelling and parsed value projected from one identifier terminal. -/
 def IdentifierProjects
@@ -2643,6 +2742,88 @@ theorem functional
 
 end ConsumedSpan
 
+/-- Expose the two exact span branches: a nonempty retained-token interval
+uses its first/last token endpoints, while an empty retained interval uses
+the origin boundary byte and therefore excludes surrounding trivia. -/
+theorem consumedSpan_boundary_trivia_exact
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens) (span : SourceSpan) :
+    ConsumedSpan file tokens origin finish span ↔
+      TokensOwnedBy file tokens ∧
+        origin.val ≤ finish.val ∧
+        ((∃ occupied : origin.val < Nat.min finish.val tokens.length,
+            have firstInRange : origin.val < tokens.length :=
+              Nat.lt_of_lt_of_le occupied (Nat.min_le_right _ _)
+            have lastInRange :
+                Nat.min finish.val tokens.length - 1 < tokens.length := by
+              have positive : 0 < Nat.min finish.val tokens.length :=
+                Nat.zero_lt_of_lt occupied
+              exact Nat.lt_of_lt_of_le
+                (Nat.sub_lt positive Nat.zero_lt_one)
+                (Nat.min_le_right _ _)
+            span = {
+              source := file.id
+              startByte := (tokens[origin.val]'firstInRange).span.startByte
+              endByte :=
+                (tokens[Nat.min finish.val tokens.length - 1]'lastInRange).span.endByte
+            }) ∨
+          (¬ origin.val < Nat.min finish.val tokens.length ∧
+            let byte :=
+              if inRange : origin.val < tokens.length then
+                tokens[origin.val].span.startByte
+              else
+                file.content.utf8ByteSize
+            span = {
+              source := file.id
+              startByte := byte
+              endByte := byte
+            })) := by
+  by_cases occupied : origin.val < Nat.min finish.val tokens.length
+  · constructor
+    · intro consumed
+      simp only [ConsumedSpan, occupied, ↓reduceDIte] at consumed
+      exact ⟨consumed.1, consumed.2.1,
+        Or.inl ⟨occupied, consumed.2.2⟩⟩
+    · rintro ⟨owned, ordered, branch⟩
+      rcases branch with branch | branch
+      · rcases branch with ⟨_occupied, spanEq⟩
+        simp only [ConsumedSpan, occupied, ↓reduceDIte]
+        exact ⟨owned, ordered, spanEq⟩
+      · exact (branch.1 occupied).elim
+  · constructor
+    · intro consumed
+      simp only [ConsumedSpan, occupied, ↓reduceDIte] at consumed
+      rcases consumed with ⟨owned, ordered, byte, atBoundary, spanEq⟩
+      let exactByte : Nat :=
+        if inRange : origin.val < tokens.length then
+          tokens[origin.val].span.startByte
+        else
+          file.content.utf8ByteSize
+      have exactAt : BoundaryByte file tokens origin exactByte := by
+        unfold BoundaryByte exactByte
+        refine ⟨owned, ?_⟩
+        split <;> rfl
+      have byteEq : byte = exactByte :=
+        BoundaryByte.functional atBoundary exactAt
+      subst byte
+      exact ⟨owned, ordered, Or.inr ⟨occupied, by
+        simpa [exactByte] using spanEq⟩⟩
+    · rintro ⟨owned, ordered, branch⟩
+      rcases branch with branch | branch
+      · exact (occupied branch.1).elim
+      · let exactByte : Nat :=
+          if inRange : origin.val < tokens.length then
+            tokens[origin.val].span.startByte
+          else
+            file.content.utf8ByteSize
+        have exactAt : BoundaryByte file tokens origin exactByte := by
+          unfold BoundaryByte exactByte
+          refine ⟨owned, ?_⟩
+          split <;> rfl
+        simp only [ConsumedSpan, occupied, ↓reduceDIte]
+        exact ⟨owned, ordered, exactByte, exactAt, by
+          simpa [exactByte] using branch.2⟩
+
 /-- A checked source span for one completed chart interval. -/
 structure ConsumedSpanWitness
     (file : WorkspaceFile)
@@ -2677,6 +2858,16 @@ def SourceLocates
     (located : Located α) : Prop :=
   ∃ witness : ConsumedSpanWitness file tokens origin finish,
     located = sourceLoc witness payload
+
+/-- Every checked consumed-span witness directly locates any payload. -/
+theorem consumedSpanWitness_sourceLocates
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens} {alpha : Type}
+    (witness : ConsumedSpanWitness file tokens origin finish)
+    (payload : alpha) :
+    SourceLocates file tokens origin finish payload
+      (sourceLoc witness payload) := by
+  exact ⟨witness, rfl⟩
 
 namespace SourceLocates
 
