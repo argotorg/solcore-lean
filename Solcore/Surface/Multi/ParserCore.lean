@@ -140,6 +140,73 @@ def BoundaryByte
     else
       byte = file.content.utf8ByteSize
 
+/-- The exact source span covered by an ordered half-open chart interval. -/
+def ConsumedSpan
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (span : SourceSpan) : Prop :=
+  TokensOwnedBy file tokens ∧
+    origin.val ≤ finish.val ∧
+    if occupied : origin.val < Nat.min finish.val tokens.length then
+      have firstInRange : origin.val < tokens.length :=
+        Nat.lt_of_lt_of_le occupied (Nat.min_le_right _ _)
+      have lastInRange : Nat.min finish.val tokens.length - 1 < tokens.length := by
+        have positive : 0 < Nat.min finish.val tokens.length :=
+          Nat.zero_lt_of_lt occupied
+        exact Nat.lt_of_lt_of_le
+          (Nat.sub_lt positive Nat.zero_lt_one)
+          (Nat.min_le_right _ _)
+      span = {
+        source := file.id
+        startByte := (tokens[origin.val]'firstInRange).span.startByte
+        endByte :=
+          (tokens[Nat.min finish.val tokens.length - 1]'lastInRange).span.endByte
+      }
+    else
+      ∃ byte,
+        BoundaryByte file tokens origin byte ∧
+          span = {
+            source := file.id
+            startByte := byte
+            endByte := byte
+          }
+
+/-- A checked source span for one completed chart interval. -/
+structure ConsumedSpanWitness
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (origin finish : Boundary tokens) where
+  span : SourceSpan
+  consumed : ConsumedSpan file tokens origin finish span
+  deriving Repr, DecidableEq
+
+instance {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens} :
+    BEq (ConsumedSpanWitness file tokens origin finish) :=
+  ⟨fun left right => decide (left = right)⟩
+
+/-- Locate a payload with an already checked consumed-span witness. -/
+def sourceLoc
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {α : Type}
+    (witness : ConsumedSpanWitness file tokens origin finish)
+    (payload : α) : Located α :=
+  { span := witness.span, payload := payload }
+
+/-- A located payload uses the checked span of this completed interval. -/
+def SourceLocates
+    {α : Type}
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (payload : α)
+    (located : Located α) : Prop :=
+  ∃ witness : ConsumedSpanWitness file tokens origin finish,
+    located = sourceLoc witness payload
+
 namespace Expected
 
 /-- The stable finite-table index within a payload-bearing constructor. -/
