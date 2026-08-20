@@ -143,6 +143,154 @@ def descendContext {tokens : List Token}
             waiting.context
       | _, _ => waiting.context
 
+/-- Select the unique context start allowed by one closed priority guard. -/
+private def guardAnchorContextStart?
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (guard : PriorityGuardId) : Option (Boundary tokens) :=
+  match guard with
+  | .G01_statementIf => some productionInstance.origin
+  | .G02_matchArmBoundary =>
+      match productionInstance.context with
+      | .armBody armBodyStart => some armBodyStart
+      | _ => none
+  | .G03_parameterComptime => some productionInstance.origin
+  | .G04_letComptime => some productionInstance.origin
+  | .G05_typeComptime => some productionInstance.origin
+  | .G06_patternComptime => some productionInstance.origin
+  | .G07_leadingDotArguments =>
+      match productionInstance.context with
+      | .postfixInvocation postfixStart => some postfixStart
+      | _ => none
+  | .G08_terminalExpression =>
+      match productionInstance.context with
+      | .bracedBody bodyStart => some bodyStart
+      | .armBody armBodyStart => some armBodyStart
+      | _ => none
+  | .G09_genericContext => some productionInstance.origin
+
+/-- Constructive membership decision for the closed guard-cell lists. -/
+private def decidableGuardCellMem
+    (cell : PriorityGuardId × Polarity) :
+    (cells : List (PriorityGuardId × Polarity)) → Decidable (cell ∈ cells)
+  | [] => isFalse (by simp)
+  | candidate :: rest =>
+      if same : cell = candidate then
+        isTrue (List.mem_cons.mpr (Or.inl same))
+      else
+        match decidableGuardCellMem cell rest with
+        | isTrue member =>
+            isTrue (List.mem_cons_of_mem candidate member)
+        | isFalse absent =>
+            isFalse (by
+              intro member
+              rcases List.mem_cons.mp member with equal | inRest
+              · exact same equal
+              · exact absent inRest)
+
+/-- The exact structural anchor of one grammar-owned priority-guard cell. -/
+def GuardAnchor
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (cell : PriorityGuardId × Polarity)
+    (guardInstance : GuardInstanceKey tokens) : Prop :=
+  cell ∈ guardOf productionInstance.production ∧
+    guardInstance.guard = cell.1 ∧
+    guardInstance.siteCursor = productionInstance.origin ∧
+    guardAnchorContextStart? productionInstance cell.1 =
+      some guardInstance.contextStart
+
+namespace GuardAnchor
+
+/-- A production cell determines at most one structural guard anchor. -/
+theorem functional
+    {tokens : List Token}
+    {productionInstance : ProductionInstanceKey tokens}
+    {cell : PriorityGuardId × Polarity}
+    {left right : GuardInstanceKey tokens}
+    (leftAnchor : GuardAnchor productionInstance cell left)
+    (rightAnchor : GuardAnchor productionInstance cell right) :
+    left = right := by
+  rcases left with ⟨leftGuard, leftStart, leftSite, _leftOrdered⟩
+  rcases right with ⟨rightGuard, rightStart, rightSite, _rightOrdered⟩
+  rcases leftAnchor with
+    ⟨_leftMember, leftGuardEq, leftSiteEq, leftStartEq⟩
+  rcases rightAnchor with
+    ⟨_rightMember, rightGuardEq, rightSiteEq, rightStartEq⟩
+  have guardEq : leftGuard = rightGuard :=
+    leftGuardEq.trans rightGuardEq.symm
+  have startEq : leftStart = rightStart :=
+    Option.some.inj (leftStartEq.symm.trans rightStartEq)
+  have siteEq : leftSite = rightSite :=
+    leftSiteEq.trans rightSiteEq.symm
+  cases guardEq
+  cases startEq
+  cases siteEq
+  rfl
+
+/-- Compute the exact structural anchor of one grammar-owned guard cell. -/
+def decide
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (cell : PriorityGuardId × Polarity) :
+    Option (GuardInstanceKey tokens) :=
+  letI : Decidable (cell ∈ guardOf productionInstance.production) :=
+    decidableGuardCellMem cell (guardOf productionInstance.production)
+  if _member : cell ∈ guardOf productionInstance.production then
+    match guardAnchorContextStart? productionInstance cell.1 with
+    | none => none
+    | some contextStart =>
+        if ordered : contextStart.val ≤ productionInstance.origin.val then
+          some {
+            guard := cell.1
+            contextStart := contextStart
+            siteCursor := productionInstance.origin
+            ordered := ordered
+          }
+        else
+          none
+  else
+    none
+
+/-- The anchor computation succeeds exactly for the structural relation. -/
+theorem decide_eq_some_iff
+    {tokens : List Token}
+    {productionInstance : ProductionInstanceKey tokens}
+    {cell : PriorityGuardId × Polarity}
+    {guardInstance : GuardInstanceKey tokens} :
+    decide productionInstance cell = some guardInstance ↔
+      GuardAnchor productionInstance cell guardInstance := by
+  rcases guardInstance with
+    ⟨guard, contextStart, siteCursor, instanceOrdered⟩
+  unfold decide GuardAnchor
+  by_cases member : cell ∈ guardOf productionInstance.production
+  · cases startResult : guardAnchorContextStart? productionInstance cell.1 with
+    | none =>
+        simp [member]
+    | some start =>
+        by_cases ordered : start.val ≤ productionInstance.origin.val
+        · simp [member]
+          constructor
+          · rintro ⟨guardEq, startEq, _startOrdered, siteEq⟩
+            exact ⟨guardEq.symm, siteEq.symm, startEq⟩
+          · rintro ⟨guardEq, siteEq, startEq⟩
+            exact ⟨guardEq.symm, startEq, ordered, siteEq.symm⟩
+        · simp [member]
+          constructor
+          · rintro ⟨_guardEq, _startEq, startOrdered, _siteEq⟩
+            exact (ordered startOrdered).elim
+          · rintro ⟨_guardEq, siteEq, startEq⟩
+            apply (ordered ?_).elim
+            have startValEq : start.val = contextStart.val :=
+              congrArg Fin.val startEq
+            have siteValEq : siteCursor.val =
+                productionInstance.origin.val :=
+              congrArg Fin.val siteEq
+            omega
+  · simp [member]
+
+end GuardAnchor
+
 /-- The symbol selected by the dot of one incomplete item. -/
 def NextSymbol {tokens : List Token}
     (item : DottedItem tokens) (symbol : GrammarSymbol) : Prop :=
