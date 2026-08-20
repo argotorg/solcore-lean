@@ -1241,6 +1241,156 @@ def ofAuxiliaries
 
 end EbnfValues
 
+namespace EbnfValue
+
+/-- Viewing a value immediately after restoring its site index is identity. -/
+private theorem atShape_ofShape_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {site : GrammarSite} {expression : EbnfExpr}
+    (shape : site.expression = expression)
+    (value : EbnfValue file tokens expression) :
+    atShape shape (ofShape shape value) = value := by
+  unfold atShape ofShape transport
+  change cast _ (cast _ value) = value
+  rw [cast_cast]
+  apply cast_eq
+
+end EbnfValue
+
+namespace RootAction
+
+/-- Extract the checked source-rule EBNF value from a root production. -/
+def unpack
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId) :
+    GrammarSymbolValues file tokens (ProductionId.root rule).rhs →
+      EbnfValue file tokens (m2cV1.rhs rule) :=
+  fun values =>
+    EbnfValue.atShape (GrammarSite.root_expression rule)
+      (GrammarSymbolValues.view (ProductionId.rhs_root rule) values).1
+
+/-- Root unpacking views the canonical child and restores its source shape. -/
+@[simp] theorem unpack_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.root rule).rhs) :
+    unpack rule values =
+      EbnfValue.atShape (GrammarSite.root_expression rule)
+        (GrammarSymbolValues.view
+          (ProductionId.rhs_root rule) values).1 :=
+  rfl
+
+end RootAction
+
+namespace AtomSite
+
+/-- Construct the checked family value of one already translated atom. -/
+private def packAtom
+    {file : WorkspaceFile} {tokens : List Token} :
+    (atom : EbnfAtom) →
+      GrammarSymbolValue file tokens atom.grammarSymbol →
+      EbnfValue file tokens (.atom atom)
+  | .terminal terminal, value => EbnfValue.terminalAtom terminal value
+  | .nonterminal rule, value =>
+      EbnfValue.ruleAtom (file := file) (tokens := tokens) rule value
+
+/-- Atom packing commutes with transport along an atom equality. -/
+private theorem transport_packAtom
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : EbnfAtom}
+    (equality : left = right)
+    (value : GrammarSymbolValue file tokens left.grammarSymbol) :
+    EbnfValue.transport (congrArg EbnfExpr.atom equality)
+        (packAtom left value) =
+      packAtom right
+        (Eq.mp
+          (congrArg (GrammarSymbolValue file tokens)
+            (congrArg EbnfAtom.grammarSymbol equality))
+          value) := by
+  cases equality
+  rfl
+
+/-- Pack one expanded atom production into its auxiliary EBNF value. -/
+def pack
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.AtomSite) :
+    GrammarSymbolValues file tokens (ProductionId.atom site).rhs →
+      NonterminalValue file tokens (ProductionId.atom site).lhs :=
+  fun values =>
+    let atomValue :=
+      Eq.mp (congrArg (GrammarSymbolValue file tokens) site.symbol_eq)
+        (GrammarSymbolValues.view (ProductionId.rhs_atom site) values).1
+    EbnfValue.ofShape site.expression_eq_atom
+      (packAtom site.atom atomValue)
+
+/-- View one packed atom at an explicitly checked atom index. -/
+def packAtAtom
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.AtomSite) (atom : EbnfAtom)
+    (atomEq : site.atom = atom)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.atom site).rhs) :
+    EbnfValue file tokens (.atom atom) :=
+  EbnfValue.transport (congrArg EbnfExpr.atom atomEq)
+    (EbnfValue.atShape site.expression_eq_atom (pack site values))
+
+/-- Packing a terminal atom retains its exact checked terminal match. -/
+@[simp] theorem pack_terminal_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.AtomSite) (terminal : TerminalSymbol)
+    (atomEq : site.atom = .terminal terminal)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.atom site).rhs) :
+    packAtAtom site (.terminal terminal) atomEq values =
+      EbnfValue.terminalAtom terminal
+        (Eq.mp
+          (congrArg (GrammarSymbolValue file tokens)
+            (congrArg EbnfAtom.grammarSymbol atomEq))
+          (Eq.mp
+            (congrArg (GrammarSymbolValue file tokens) site.symbol_eq)
+            (GrammarSymbolValues.view
+              (ProductionId.rhs_atom site) values).1)) := by
+  let atomValue :=
+    Eq.mp (congrArg (GrammarSymbolValue file tokens) site.symbol_eq)
+      (GrammarSymbolValues.view (ProductionId.rhs_atom site) values).1
+  unfold packAtAtom pack
+  change EbnfValue.transport (congrArg EbnfExpr.atom atomEq)
+    (EbnfValue.atShape site.expression_eq_atom
+      (EbnfValue.ofShape site.expression_eq_atom
+        (packAtom site.atom atomValue))) = _
+  rw [EbnfValue.atShape_ofShape_eq, transport_packAtom atomEq]
+  rfl
+
+/-- Packing a rule atom retains its exact source-rule semantic value. -/
+@[simp] theorem pack_rule_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : Grammar.AtomSite) (rule : GrammarRuleId)
+    (atomEq : site.atom = .nonterminal rule)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.atom site).rhs) :
+    packAtAtom site (.nonterminal rule) atomEq values =
+      EbnfValue.ruleAtom (file := file) (tokens := tokens) rule
+        (Eq.mp
+          (congrArg (GrammarSymbolValue file tokens)
+            (congrArg EbnfAtom.grammarSymbol atomEq))
+          (Eq.mp
+            (congrArg (GrammarSymbolValue file tokens) site.symbol_eq)
+            (GrammarSymbolValues.view
+              (ProductionId.rhs_atom site) values).1)) := by
+  let atomValue :=
+    Eq.mp (congrArg (GrammarSymbolValue file tokens) site.symbol_eq)
+      (GrammarSymbolValues.view (ProductionId.rhs_atom site) values).1
+  unfold packAtAtom pack
+  change EbnfValue.transport (congrArg EbnfExpr.atom atomEq)
+    (EbnfValue.atShape site.expression_eq_atom
+      (EbnfValue.ofShape site.expression_eq_atom
+        (packAtom site.atom atomValue))) = _
+  rw [EbnfValue.atShape_ofShape_eq, transport_packAtom atomEq]
+  rfl
+
+end AtomSite
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
