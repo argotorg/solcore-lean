@@ -6229,4 +6229,29 @@ def CanonicalCompleteRootReduction
     CoherentReduction file tokens memo correct final
       (CanonicalCompleteRootItem tokens rule origin finish context) value
 
+/-- A canonical coherent module-root reduction over the complete token stream. -/
+def SourceBackedRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (module : ParsedModuleV1) : Prop :=
+  ∃ memo : GuardMemo tokens,
+    ∃ correct : PhaseBCorrect file tokens memo,
+      ∃ allFinal : AllGuardsFinal memo,
+        CanonicalCompleteRootReduction
+          file tokens memo correct allFinal
+          GrammarRuleId.module
+          (Boundary.start tokens)
+          (Boundary.afterLogicalEOF tokens)
+          GuardContext.plain
+          module
+
+/-- Public successful parsing admits only a source-backed complete module root. -/
+inductive Parses : WorkspaceFile → List Token → ParsedModuleV1 → Prop where
+  | sourceBackedRoot
+      (file : WorkspaceFile)
+      (tokens : List Token)
+      (module : ParsedModuleV1)
+      (owned : TokensOwnedBy file tokens)
+      (sourceBacked : SourceBackedRoot file tokens module) :
+      Parses file tokens module
+
 end Solcore.Surface.Multi
