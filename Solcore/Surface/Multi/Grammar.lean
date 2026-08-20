@@ -2075,6 +2075,180 @@ def allProductionIds : List ProductionId :=
   (allListSites.flatMap fun site =>
     [.tail site .nil, .tail site .cons])
 
+namespace EbnfExpr
+
+mutual
+
+private theorem nodeAt?_isSome_implies_mem_paths
+    (expression : EbnfExpr) (path : List Nat)
+    (valid : (expression.nodeAt? path).isSome = true) :
+    path ∈ paths expression := by
+  cases expression with
+  | atom atom =>
+      cases path with
+      | nil => simp [paths]
+      | cons index rest =>
+          simp [nodeAt?, children] at valid
+  | sequence children
+  | choice children =>
+      cases path with
+      | nil => simp [paths]
+      | cons index rest =>
+          unfold EbnfExpr.nodeAt? at valid
+          unfold EbnfExpr.children at valid
+          change (match children[index]? with
+            | some child => child.nodeAt? rest
+            | none => none).isSome = true at valid
+          cases selected : children[index]? with
+          | none => simp [selected] at valid
+          | some child =>
+              apply List.mem_cons_of_mem []
+              simpa only [Nat.zero_add] using
+                indexedChildPaths_complete children 0 index child rest
+                  selected (by simpa only [selected, Option.isSome_some]
+                    using valid)
+  | group child
+  | optional child
+  | star child
+  | plus child
+  | list0 child
+  | list1 child =>
+      cases path with
+      | nil => simp [paths]
+      | cons index rest =>
+          cases index with
+          | zero =>
+              apply List.mem_cons_of_mem []
+              simp only [List.mem_map]
+              exact ⟨rest,
+                nodeAt?_isSome_implies_mem_paths child rest
+                  (by simpa [nodeAt?, children] using valid), rfl⟩
+          | succ index =>
+              simp [nodeAt?, children] at valid
+
+private theorem indexedChildPaths_complete
+    (children : List EbnfExpr) (offset index : Nat)
+    (child : EbnfExpr) (path : List Nat)
+    (selected : children[index]? = some child)
+    (valid : (child.nodeAt? path).isSome = true) :
+    (offset + index) :: path ∈ indexedChildPaths offset children := by
+  induction children generalizing offset index child with
+  | nil => simp at selected
+  | cons head tail induction =>
+      cases index with
+      | zero =>
+          simp only [List.getElem?_cons_zero, Option.some.injEq] at selected
+          subst child
+          simp only [Nat.add_zero, indexedChildPaths, List.mem_append,
+            List.mem_map]
+          exact Or.inl ⟨path,
+            nodeAt?_isSome_implies_mem_paths head path valid, rfl⟩
+      | succ index =>
+          simp only [List.getElem?_cons_succ] at selected
+          simp only [indexedChildPaths, List.mem_append]
+          apply Or.inr
+          simpa [Nat.add_assoc, Nat.add_comm 1 index] using
+            induction (offset := offset + 1) (index := index)
+              (child := child) selected valid
+
+end
+
+private theorem nodeAt?_isSome_implies_mem_sitePaths
+    (expression : EbnfExpr) (path : List Nat)
+    (valid : (expression.nodeAt? path).isSome = true) :
+    path ∈ expression.sitePaths := by
+  exact nodeAt?_isSome_implies_mem_paths expression path valid
+
+end EbnfExpr
+
+private theorem allGrammarRuleIds_complete (rule : GrammarRuleId) :
+    rule ∈ allGrammarRuleIds := by
+  cases rule <;> simp [allGrammarRuleIds]
+
+private theorem grammarSiteKeysForRule_complete (site : GrammarSite) :
+    site.val ∈ grammarSiteKeysForRule site.val.rule := by
+  apply List.mem_map.mpr
+  refine ⟨site.val.path, ?_, ?_⟩
+  · exact EbnfExpr.nodeAt?_isSome_implies_mem_sitePaths
+      (m2cV1.rhs site.val.rule) site.val.path site.property
+  · cases site with
+    | mk key valid => cases key; rfl
+
+private theorem allGrammarSites_complete (site : GrammarSite) :
+    site ∈ allGrammarSites := by
+  apply List.mem_filterMap.mpr
+  refine ⟨site.val, ?_, ?_⟩
+  · apply List.mem_flatMap.mpr
+    exact ⟨site.val.rule, allGrammarRuleIds_complete site.val.rule,
+      grammarSiteKeysForRule_complete site⟩
+  · unfold GrammarSite.ofKey?
+    simp only [site.property, ↓reduceDIte]
+
+private theorem sitesOfKind_complete
+    {kind : EbnfNodeKind} (site : GrammarSiteOfKind kind) :
+    site ∈ sitesOfKind kind := by
+  apply List.mem_filterMap.mpr
+  refine ⟨site.site, allGrammarSites_complete site.site, ?_⟩
+  unfold GrammarSiteOfKind.ofSite?
+  simp only [site.hasKind, ↓reduceDIte]
+
+private theorem allListSites_complete (site : ListSite) :
+    site ∈ allListSites := by
+  apply List.mem_filterMap.mpr
+  cases site with
+  | list0 site =>
+      refine ⟨site.site, allGrammarSites_complete site.site, ?_⟩
+      simp [listSiteOfGrammarSite?, GrammarSiteOfKind.ofSite?, site.hasKind]
+  | list1 site =>
+      refine ⟨site.site, allGrammarSites_complete site.site, ?_⟩
+      simp [listSiteOfGrammarSite?, GrammarSiteOfKind.ofSite?, site.hasKind]
+
+/-- Every stable production identifier occurs in the displayed production
+enumeration. -/
+theorem allProductionIds_complete (production : ProductionId) :
+    production ∈ allProductionIds := by
+  cases production with
+  | root rule =>
+      simp [allProductionIds, allGrammarRuleIds_complete rule]
+  | atom site =>
+      simp [allProductionIds, allAtomSites, sitesOfKind_complete site]
+  | seq site =>
+      simp [allProductionIds, allSequenceSites, sitesOfKind_complete site]
+  | group site =>
+      simp [allProductionIds, allGroupSites, sitesOfKind_complete site]
+  | choice site branch =>
+      have member : ProductionId.choice site branch ∈
+          allChoiceSites.flatMap fun choiceSite =>
+            (List.finRange choiceSite.branchCount).map fun choiceBranch =>
+              .choice choiceSite choiceBranch := by
+        apply List.mem_flatMap.mpr
+        refine ⟨site, sitesOfKind_complete site, ?_⟩
+        apply List.mem_map.mpr
+        exact ⟨branch, List.mem_finRange branch, rfl⟩
+      simp only [allProductionIds, List.mem_append, member,
+        or_true, true_or]
+  | opt site branch =>
+      cases branch <;>
+        simp [allProductionIds, allOptionalSites,
+          sitesOfKind_complete site]
+  | star site branch =>
+      cases branch <;>
+        simp [allProductionIds, allStarSites, sitesOfKind_complete site]
+  | plus site branch =>
+      cases branch <;>
+        simp [allProductionIds, allPlusSites, sitesOfKind_complete site]
+  | list0 site branch =>
+      cases branch <;>
+        simp [allProductionIds, allList0Sites, sitesOfKind_complete site]
+  | list1 site =>
+      simp [allProductionIds, allList1Sites, sitesOfKind_complete site]
+  | tail site branch =>
+      cases branch <;> simp only [allProductionIds, List.mem_append]
+      all_goals
+        right
+        apply List.mem_flatMap.mpr
+        exact ⟨site, allListSites_complete site, by simp⟩
+
 /-- Stable action IDs inherited from production order. -/
 def allActionIds : List ActionId :=
   allProductionIds.map .actionFor
