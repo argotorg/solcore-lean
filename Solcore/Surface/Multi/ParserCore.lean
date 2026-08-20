@@ -354,6 +354,129 @@ def polarity
 
 end GuardWitnessKey
 
+/-- The absent or source-preserving comma between repeated forall binders. -/
+inductive OptionalCommaValue where
+  | absent
+  | present (comma : SourceSpan)
+
+/-- One source-preserving postfix operation before it is folded over a callee. -/
+inductive PostfixPartValue where
+  | call
+      (openParen : SourceSpan)
+      (arguments : List Expression)
+      (closeParen : SourceSpan)
+  | select
+      (dot : SourceSpan)
+      (field : IdentifierOccurrence)
+  | index
+      (openBracket : SourceSpan)
+      (index : Expression)
+      (closeBracket : SourceSpan)
+
+/-- The exact semantic result carrier of each of the seventy-five source rules. -/
+def RuleValue : GrammarRuleId → Type
+  | .module => ParsedModuleV1
+  | .topItem => TopItem
+  | .moduleRef => ModuleReference
+  | .importDecl => ImportDecl
+  | .importEntry => ImportSelectorEntry
+  | .hidingClause => HidingClause
+  | .exportDecl => ExportDecl
+  | .localExportEntry => ExportEntry
+  | .remoteExportEntry => RemoteExportEntry
+  | .exportItem => ExportItem
+  | .constructorSelection => ConstructorSelection
+  | .pragmaDecl => PragmaDecl
+  | .genericPrefix => GenericPrefix
+  | .forallClause => ForallClause
+  | .forallBinder => ForallBinder
+  | .optionalComma => OptionalCommaValue
+  | .predicateList => NonemptyList Predicate
+  | .predicate => Predicate
+  | .functionSignature => FunctionSignature
+  | .functionDecl => FunctionDecl
+  | .classMethod => ClassMethodDecl
+  | .dataDecl => DataDecl
+  | .dataConstructor => DataConstructor
+  | .typeAliasDecl => TypeAliasDecl
+  | .classDecl => ClassDecl
+  | .instanceDecl => InstanceDecl
+  | .instanceMethod => FunctionDecl
+  | .contractDecl => ContractDecl
+  | .contractMember => ContractMember
+  | .fieldDecl => FieldDecl
+  | .fallbackDecl => FallbackDecl
+  | .contractConstructorDecl => ContractConstructorDecl
+  | .parameter => Parameter
+  | .body => Body
+  | .type => TypeExpr
+  | .typeAtom => TypeExpr
+  | .qualifiedName => QualifiedName
+  | .statement => Statement
+  | .letStatement => Statement
+  | .letBinding => LetBinding
+  | .returnStatement => Statement
+  | .blockStatement => Statement
+  | .breakStatement => Statement
+  | .continueStatement => Statement
+  | .assemblyStatement => Statement
+  | .ifStatement => Statement
+  | .forStatement => Statement
+  | .forInitItem => ForInitItem
+  | .forPostItem => ForPostItem
+  | .matchStatement => Statement
+  | .matchArm => MatchArm
+  | .armStatement => Statement
+  | .assignmentStatement => Statement
+  | .assignmentOperator => Located AssignmentOperator
+  | .expressionStatement => Statement
+  | .terminalExpression => Expression
+  | .pattern => Pattern
+  | .expression => Expression
+  | .annotation => Expression
+  | .conditional => Expression
+  | .logicalOr => Expression
+  | .logicalAnd => Expression
+  | .equality => Expression
+  | .relational => Expression
+  | .bitOr => Expression
+  | .bitXor => Expression
+  | .bitAnd => Expression
+  | .additive => Expression
+  | .multiplicative => Expression
+  | .prefix => Expression
+  | .postfix => Expression
+  | .postfixPart => PostfixPartValue
+  | .atom => Expression
+  | .lambda => Expression
+  | .literal => Literal
+
+/-- The literal equation tags of `RuleValue`, in definition branch order. -/
+def ruleValueEquationTags : List GrammarRuleId := [
+  .module, .topItem, .moduleRef, .importDecl, .importEntry,
+  .hidingClause, .exportDecl, .localExportEntry, .remoteExportEntry,
+  .exportItem, .constructorSelection, .pragmaDecl, .genericPrefix,
+  .forallClause, .forallBinder, .optionalComma, .predicateList,
+  .predicate, .functionSignature, .functionDecl, .classMethod, .dataDecl,
+  .dataConstructor, .typeAliasDecl, .classDecl, .instanceDecl,
+  .instanceMethod, .contractDecl, .contractMember, .fieldDecl,
+  .fallbackDecl, .contractConstructorDecl, .parameter, .body, .type,
+  .typeAtom, .qualifiedName, .statement, .letStatement, .letBinding,
+  .returnStatement, .blockStatement, .breakStatement, .continueStatement,
+  .assemblyStatement, .ifStatement, .forStatement, .forInitItem,
+  .forPostItem, .matchStatement, .matchArm, .armStatement,
+  .assignmentStatement, .assignmentOperator, .expressionStatement,
+  .terminalExpression, .pattern, .expression, .annotation, .conditional,
+  .logicalOr, .logicalAnd, .equality, .relational, .bitOr, .bitXor,
+  .bitAnd, .additive, .multiplicative, .prefix, .postfix, .postfixPart,
+  .atom, .lambda, .literal
+]
+
+/-- The semantic carrier has one explicit equation for every source rule. -/
+theorem ruleValue_allGrammarRuleIds_exhaustive :
+    ruleValueEquationTags = allGrammarRuleIds := by
+  rfl
+
 /-- The symbol selected by the dot of one incomplete item. -/
 def NextSymbol {tokens : List Token}
     (item : DottedItem tokens) (symbol : GrammarSymbol) : Prop :=
