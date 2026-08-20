@@ -6790,4 +6790,137 @@ inductive Applies : WorkspaceFile → List Token → ParseDiagnostic → Prop wh
 
 end ParseDiagnostic
 
+private theorem finalPhaseBMemo_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {leftMemo rightMemo : GuardMemo tokens}
+    (leftCorrect : PhaseBCorrect file tokens leftMemo)
+    (leftFinal : AllGuardsFinal leftMemo)
+    (rightCorrect : PhaseBCorrect file tokens rightMemo)
+    (rightFinal : AllGuardsFinal rightMemo) :
+    leftMemo = rightMemo := by
+  funext key
+  rcases leftFinal key with ⟨leftDecision, leftState⟩
+  rcases rightFinal key with ⟨rightDecision, rightState⟩
+  have leftEvidence : GuardEvidence file tokens key leftDecision :=
+    (leftCorrect key leftDecision).mp leftState
+  have rightEvidence : GuardEvidence file tokens key rightDecision :=
+    (rightCorrect key rightDecision).mp rightState
+  have decisionEq : leftDecision = rightDecision :=
+    GuardEvidence.functional leftEvidence rightEvidence
+  subst rightDecision
+  exact leftState.trans rightState.symm
+
+namespace ParseDiagnostic.Applies
+
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : ParseDiagnostic}
+    (leftApplies : ParseDiagnostic.Applies file tokens left)
+    (rightApplies : ParseDiagnostic.Applies file tokens right) :
+    left = right := by
+  cases leftApplies with
+  | unexpected leftMemo leftCorrect leftFinal leftCursor leftSpan
+      leftFound leftExpected _ leftGreatest leftCanonical leftFoundAt
+      leftNotRepeated =>
+      cases rightApplies with
+      | unexpected rightMemo rightCorrect rightFinal rightCursor rightSpan
+          rightFound rightExpected _ rightGreatest rightCanonical rightFoundAt
+          rightNotRepeated =>
+          have memoEq : leftMemo = rightMemo :=
+            finalPhaseBMemo_functional
+              leftCorrect leftFinal rightCorrect rightFinal
+          subst rightMemo
+          have correctEq : leftCorrect = rightCorrect := Subsingleton.elim _ _
+          subst rightCorrect
+          have finalEq : leftFinal = rightFinal := Subsingleton.elim _ _
+          subst rightFinal
+          have cursorEq : leftCursor = rightCursor :=
+            GreatestReachableCursor.functional leftGreatest rightGreatest
+          subst rightCursor
+          have expectedEq : leftExpected = rightExpected :=
+            canonicalExpected_sorted_nodup_unique
+              leftCanonical rightCanonical
+          subst rightExpected
+          rcases FoundAt.functional leftFoundAt rightFoundAt with
+            ⟨spanEq, foundEq⟩
+          subst rightSpan
+          subst rightFound
+          rfl
+      | repeatedNonAssociative rightMemo rightCorrect rightFinal
+          rightCursor rightLevel rightOperator _ rightGreatest rightRepeated =>
+          have memoEq : leftMemo = rightMemo :=
+            finalPhaseBMemo_functional
+              leftCorrect leftFinal rightCorrect rightFinal
+          subst rightMemo
+          have correctEq : leftCorrect = rightCorrect := Subsingleton.elim _ _
+          subst rightCorrect
+          have finalEq : leftFinal = rightFinal := Subsingleton.elim _ _
+          subst rightFinal
+          have cursorEq : leftCursor = rightCursor :=
+            GreatestReachableCursor.functional leftGreatest rightGreatest
+          subst rightCursor
+          exact (leftNotRepeated rightLevel rightOperator rightRepeated).elim
+  | repeatedNonAssociative leftMemo leftCorrect leftFinal leftCursor
+      leftLevel leftOperator _ leftGreatest leftRepeated =>
+      cases rightApplies with
+      | unexpected rightMemo rightCorrect rightFinal rightCursor _ _ _ _
+          rightGreatest _ _ rightNotRepeated =>
+          have memoEq : leftMemo = rightMemo :=
+            finalPhaseBMemo_functional
+              leftCorrect leftFinal rightCorrect rightFinal
+          subst rightMemo
+          have correctEq : leftCorrect = rightCorrect := Subsingleton.elim _ _
+          subst rightCorrect
+          have finalEq : leftFinal = rightFinal := Subsingleton.elim _ _
+          subst rightFinal
+          have cursorEq : leftCursor = rightCursor :=
+            GreatestReachableCursor.functional leftGreatest rightGreatest
+          subst rightCursor
+          exact (rightNotRepeated leftLevel leftOperator leftRepeated).elim
+      | repeatedNonAssociative rightMemo rightCorrect rightFinal
+          rightCursor rightLevel rightOperator _ rightGreatest rightRepeated =>
+          have memoEq : leftMemo = rightMemo :=
+            finalPhaseBMemo_functional
+              leftCorrect leftFinal rightCorrect rightFinal
+          subst rightMemo
+          have correctEq : leftCorrect = rightCorrect := Subsingleton.elim _ _
+          subst rightCorrect
+          have finalEq : leftFinal = rightFinal := Subsingleton.elim _ _
+          subst rightFinal
+          have cursorEq : leftCursor = rightCursor :=
+            GreatestReachableCursor.functional leftGreatest rightGreatest
+          subst rightCursor
+          rcases leftRepeated with
+            ⟨leftCandidate, leftFirst, leftCompleted, leftUngrouped,
+              leftFoundOperator⟩
+          rcases rightRepeated with
+            ⟨rightCandidate, rightFirst, rightCompleted, rightUngrouped,
+              rightFoundOperator⟩
+          rcases FoundNonAssociativeOperatorAt.functional
+              leftFoundOperator rightFoundOperator with
+            ⟨levelEq, operatorEq⟩
+          subst rightLevel
+          subst rightOperator
+          rfl
+
+end ParseDiagnostic.Applies
+
+/-- Unexpected-token and repeated-nonassociative diagnostics are exclusive. -/
+theorem parse_diagnostic_constructors_exclusive
+    {file : WorkspaceFile} {tokens : List Token}
+    {unexpectedSpan repeatedSpan : SourceSpan}
+    {found : Found} {expected : NonemptyList Expected}
+    {level : NonAssociativeLevel}
+    {operator : Located InfixOperator}
+    (unexpected : ParseDiagnostic.Applies file tokens
+      (.unexpected unexpectedSpan found expected))
+    (repeated : ParseDiagnostic.Applies file tokens
+      (.repeatedNonAssociative repeatedSpan level operator)) :
+    False := by
+  have impossible :
+      ParseDiagnostic.unexpected unexpectedSpan found expected =
+        ParseDiagnostic.repeatedNonAssociative repeatedSpan level operator :=
+    ParseDiagnostic.Applies.functional unexpected repeated
+  contradiction
+
 end Solcore.Surface.Multi
