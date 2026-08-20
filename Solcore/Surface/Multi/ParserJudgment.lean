@@ -1112,6 +1112,92 @@ inductive ContextualReach
         (.completed waiting finished after shared)) :
       ContextualReach file tokens memo correct final after
 
+/-- Any contextual Phase-C reach derivation carries a correct Phase-B memo. -/
+theorem contextualReach_requires_phaseBCorrect
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached :
+      ∃ (correct : PhaseBCorrect file tokens memo)
+          (final : AllGuardsFinal memo),
+        ContextualReach file tokens memo correct final item) :
+    PhaseBCorrect file tokens memo := by
+  rcases reached with ⟨correct, _final, _reached⟩
+  exact correct
+
+/-- Any contextual Phase-C reach derivation carries a fully finalized memo. -/
+theorem contextualReach_requires_allGuardsFinal
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached :
+      ∃ (correct : PhaseBCorrect file tokens memo)
+          (final : AllGuardsFinal memo),
+        ContextualReach file tokens memo correct final item) :
+    AllGuardsFinal memo := by
+  rcases reached with ⟨_correct, final, _reached⟩
+  exact final
+
+/-- Contextual reach is the least relation containing the root and closed
+under exact guarded prediction, scanning, and completion. -/
+theorem contextual_predict_scan_complete_closed
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (relation : ContextualItemKey tokens → Prop)
+    (root : relation {
+      raw := {
+        production := .root .module
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := Boundary.start tokens
+        current := Boundary.start tokens
+      }
+      context := .plain
+    })
+    (predict : ∀ (waiting : ContextualItemKey tokens)
+        (predicted : ProductionId),
+      relation waiting →
+      NextSymbol waiting.raw (.nonterminal predicted.lhs) →
+      EnabledProductionInstance file tokens memo correct final {
+        production := predicted
+        origin := waiting.raw.current
+        context := descendContext waiting predicted
+      } →
+      relation {
+        raw := {
+          production := predicted
+          dot := ⟨0, Nat.zero_lt_succ _⟩
+          origin := waiting.raw.current
+          current := waiting.raw.current
+        }
+        context := descendContext waiting predicted
+      })
+    (scan : ∀ (before after : ContextualItemKey tokens)
+        (cursor : TerminalCursor tokens),
+      relation before →
+      ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.scanned before after cursor) →
+      relation after)
+    (complete : ∀ (waiting finished after : ContextualItemKey tokens)
+        (shared : Boundary tokens),
+      relation waiting →
+      relation finished →
+      ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.completed waiting finished after shared) →
+      relation after)
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    relation item := by
+  induction reached with
+  | root => exact root
+  | predict waiting predicted _ next enabled waitingInduction =>
+      exact predict waiting predicted waitingInduction next enabled
+  | scan before after cursor _ structural beforeInduction =>
+      exact scan before after cursor beforeInduction structural
+  | complete waiting finished after shared _ _ structural
+      waitingInduction finishedInduction =>
+      exact complete waiting finished after shared waitingInduction
+        finishedInduction structural
+
 /-- Structural validity plus reachability of every endpoint of one edge. -/
 def ContextualEdgeReach
     (file : WorkspaceFile) (tokens : List Token)
@@ -1128,6 +1214,51 @@ def ContextualEdgeReach
         ContextualReach file tokens memo correct final waiting ∧
           ContextualReach file tokens memo correct final finished ∧
           ContextualReach file tokens memo correct final after
+
+/-- A contextual edge is retained exactly when it is structural and all of
+its constructor-specific endpoints are reached. -/
+theorem contextualEdgeReach_endpoints_reached
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {key : ContextualPackedEdgeKey tokens} :
+    ContextualEdgeReach file tokens memo correct final key ↔
+      ContextualPackedEdgeKey.StructurallyValid file tokens key ∧
+        match key with
+        | .scanned before after _ =>
+            ContextualReach file tokens memo correct final before ∧
+              ContextualReach file tokens memo correct final after
+        | .completed waiting finished after _ =>
+            ContextualReach file tokens memo correct final waiting ∧
+              ContextualReach file tokens memo correct final finished ∧
+              ContextualReach file tokens memo correct final after := by
+  rfl
+
+/-- Raw projection of a reached edge never discards the contextual equations
+needed to keep scan and completion anchors coherent. -/
+theorem contextual_projection_no_anchor_mixing
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} :
+    (∀ (before after : ContextualItemKey tokens)
+        (cursor : TerminalCursor tokens),
+      ContextualEdgeReach file tokens memo correct final
+          (.scanned before after cursor) →
+        before.context = after.context) ∧
+      ∀ (waiting finished after : ContextualItemKey tokens)
+          (shared : Boundary tokens),
+        ContextualEdgeReach file tokens memo correct final
+            (.completed waiting finished after shared) →
+          finished.context =
+              descendContext waiting finished.raw.production ∧
+            after.context = waiting.context := by
+  constructor
+  · intro before after cursor edge
+    exact edge.1.2
+  · intro waiting finished after shared edge
+    exact edge.1.2
 
 /-- Every reached contextual item spans an ordered boundary interval. -/
 theorem contextualReach_ordered

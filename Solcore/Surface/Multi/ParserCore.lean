@@ -2535,6 +2535,21 @@ def StructurallyValid
 
 end ContextualPackedEdgeKey
 
+/-- Structural validity is exactly raw validity plus the contextual equations. -/
+theorem contextualPackedEdge_structural_equations
+    {file : WorkspaceFile} {tokens : List Token}
+    {key : ContextualPackedEdgeKey tokens} :
+    ContextualPackedEdgeKey.StructurallyValid file tokens key ↔
+      PackedEdgeKey.Valid file tokens key.rawProjection ∧
+        match key with
+        | .scanned before after _ =>
+            before.context = after.context
+        | .completed waiting finished after _ =>
+            finished.context =
+                descendContext waiting finished.raw.production ∧
+              after.context = waiting.context := by
+  rfl
+
 /-- The proof-irrelevant subtype of structurally valid contextual edges. -/
 abbrev StructurallyValidContextualPackedEdge
     (file : WorkspaceFile) (tokens : List Token) : Type :=
