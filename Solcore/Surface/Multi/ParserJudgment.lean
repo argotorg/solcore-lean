@@ -18124,7 +18124,103 @@ theorem functional
       | endOfFile rightCursor _ rightBoundary rightAtEnd =>
           exact ⟨rfl, rfl⟩
 
+/-- A declarative terminal observation never occupies the boundary after
+logical EOF. -/
+theorem boundary_le_logicalEOF
+    {file : WorkspaceFile} {tokens : List Token}
+    {boundary : Boundary tokens} {span : SourceSpan} {found : Found}
+    (applies : FoundAt file tokens boundary span found) :
+    boundary.val ≤ tokens.length := by
+  cases applies with
+  | retained cursor _ token atBoundary terminalAt =>
+      have valueEq := congrArg Fin.val atBoundary
+      change cursor.val = boundary.val at valueEq
+      cases terminalAt with
+      | retained _ inRange lookup valid => omega
+  | endOfFile cursor _ atBoundary atEnd =>
+      have valueEq := congrArg Fin.val atBoundary
+      change cursor.val = boundary.val at valueEq
+      omega
+
+/-- Construct the unique found token class and span at any boundary no later
+than logical EOF. -/
+def compute
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (boundary : Boundary tokens)
+    (atMost : boundary.val ≤ tokens.length) :
+    { result : SourceSpan × Found //
+      FoundAt file tokens boundary result.1 result.2 } :=
+  let cursor : TerminalCursor tokens := ⟨boundary.val, by omega⟩
+  have atBoundary : cursor.beforeBoundary = boundary := by
+    apply Fin.ext
+    rfl
+  if inRange : boundary.val < tokens.length then
+    let token := tokens[boundary.val]
+    ⟨(token.span, .token token.payload),
+      .retained cursor boundary token atBoundary
+        (.retained cursor token inRange
+          (List.getElem?_eq_getElem inRange)
+          (owned token (List.getElem_mem inRange)))⟩
+  else
+    have atEnd : cursor.val = tokens.length := by
+      dsimp only [cursor]
+      omega
+    ⟨({
+        source := file.id
+        startByte := file.content.utf8ByteSize
+        endByte := file.content.utf8ByteSize
+      }, .endOfFile),
+      .endOfFile cursor boundary atBoundary atEnd⟩
+
+/-- Every admissible boundary has a found token class and exact source span. -/
+theorem exists_of_le_logicalEOF
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (boundary : Boundary tokens)
+    (atMost : boundary.val ≤ tokens.length) :
+    ∃ span found, FoundAt file tokens boundary span found := by
+  let result := compute file tokens owned boundary atMost
+  exact ⟨result.val.1, result.val.2, result.property⟩
+
+/-- The computed observation agrees with every declarative observation at the
+same boundary. -/
+theorem compute_eq_of_applies
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (boundary : Boundary tokens)
+    (atMost : boundary.val ≤ tokens.length)
+    (span : SourceSpan) (found : Found)
+    (applies : FoundAt file tokens boundary span found) :
+    (compute file tokens owned boundary atMost).val = (span, found) := by
+  rcases functional (compute file tokens owned boundary atMost).property
+      applies with ⟨spanEq, foundEq⟩
+  exact Prod.ext spanEq foundEq
+
 end FoundAt
+
+/-- Exact terminal observation at a parser boundary is decidable. -/
+def foundAtDecision
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (boundary : Boundary tokens)
+    (span : SourceSpan) (found : Found) :
+    Decidable (FoundAt file tokens boundary span found) := by
+  if atMost : boundary.val ≤ tokens.length then
+    let computed := FoundAt.compute file tokens owned boundary atMost
+    if equality : computed.val = (span, found) then
+      apply isTrue
+      simpa only [equality] using computed.property
+    else
+      apply isFalse
+      intro applies
+      exact equality
+        (FoundAt.compute_eq_of_applies
+          file tokens owned boundary atMost span found applies)
+  else
+    apply isFalse
+    intro applies
+    exact atMost (FoundAt.boundary_le_logicalEOF applies)
 
 namespace NonAssociativeLevel
 
