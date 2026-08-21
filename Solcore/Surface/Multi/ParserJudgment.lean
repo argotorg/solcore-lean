@@ -2347,6 +2347,78 @@ def NearestStatementRegion
       InnermostContainingBraceFrame tokens arrowCursor openCursor closeCursor ∧
       NextArmOrClose file tokens regionStart closeCursor regionEnd)
 
+private def containingBraceFrameDecision
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Decidable
+      (ContainingBraceFrame tokens cursor openCursor closeCursor) := by
+  unfold ContainingBraceFrame
+  letI : Decidable
+      (MatchingDelimiter tokens openCursor closeCursor
+        .leftBrace .rightBrace) :=
+    matchingDelimiterDecision tokens openCursor closeCursor
+      .leftBrace .rightBrace
+  infer_instance
+
+private def innermostContainingBraceFrameDecision
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Decidable
+      (InnermostContainingBraceFrame tokens cursor openCursor closeCursor) := by
+  unfold InnermostContainingBraceFrame
+  letI (candidateOpen candidateClose : Boundary tokens) : Decidable
+      (ContainingBraceFrame tokens cursor candidateOpen candidateClose) :=
+    containingBraceFrameDecision tokens cursor candidateOpen candidateClose
+  letI boundaryForallDecidable
+      (predicate : Boundary tokens → Prop) [DecidablePred predicate] :
+      Decidable (∀ candidate, predicate candidate) :=
+    Nat.decidableForallFin predicate
+  infer_instance
+
+private def nextArmOrCloseDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart closeCursor regionEnd : Boundary tokens) :
+    Decidable
+      (NextArmOrClose file tokens regionStart closeCursor regionEnd) := by
+  unfold NextArmOrClose
+  letI (candidate : Boundary tokens) : Decidable
+      (SameDelimiterDepth tokens regionStart candidate) :=
+    sameDelimiterDepthDecision tokens regionStart candidate
+  letI (candidate : Boundary tokens) : Decidable
+      (ArmHeaderAt file tokens regionStart candidate) :=
+    armHeaderAtDecision owned regionStart candidate
+  letI boundaryForallDecidable
+      (predicate : Boundary tokens → Prop) [DecidablePred predicate] :
+      Decidable (∀ candidate, predicate candidate) :=
+    Nat.decidableForallFin predicate
+  infer_instance
+
+private def nearestStatementRegionDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart regionEnd : Boundary tokens) :
+    Decidable
+      (NearestStatementRegion file tokens regionStart regionEnd) := by
+  unfold NearestStatementRegion
+  letI (symbol : Symbol) (before after : Boundary tokens) : Decidable
+      (ImmediatelyAfterSymbol file tokens symbol before after) :=
+    immediatelyAfterSymbolDecision owned symbol before after
+  letI (openCursor closeCursor : Boundary tokens) : Decidable
+      (MatchingDelimiter tokens openCursor closeCursor
+        .leftBrace .rightBrace) :=
+    matchingDelimiterDecision tokens openCursor closeCursor
+      .leftBrace .rightBrace
+  letI (cursor openCursor closeCursor : Boundary tokens) : Decidable
+      (InnermostContainingBraceFrame tokens cursor openCursor closeCursor) :=
+    innermostContainingBraceFrameDecision tokens cursor openCursor closeCursor
+  letI (closeCursor : Boundary tokens) : Decidable
+      (NextArmOrClose file tokens regionStart closeCursor regionEnd) :=
+    nextArmOrCloseDecision owned regionStart closeCursor regionEnd
+  letI boundaryExistsDecidable
+      (predicate : Boundary tokens → Prop) [DecidablePred predicate] :
+      Decidable (∃ candidate, predicate candidate) :=
+    Nat.decidableExistsFin predicate
+  infer_instance
+
 /-- Every match-arm header is at the delimiter depth of its region start. -/
 theorem armHeaderAt_same_frame
     {file : WorkspaceFile} {tokens : List Token}
