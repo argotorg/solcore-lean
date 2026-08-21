@@ -4692,6 +4692,207 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private def phaseBEntryReservedAddress {tokens : List Token} :
+    UnitAddress tokens → Prop
+  | .phase .sealAEnterB => True
+  | .phase .sealBEnterC => True
+  | .guardFinalize _ _ => True
+  | _ => False
+
+private def PhaseBEntryFresh {tokens : List Token}
+    (counter : Counter tokens) : Prop :=
+  ∀ address, phaseBEntryReservedAddress address →
+    address ∉ counter.usedRev
+
+private theorem PhaseAReservedFresh.phaseBEntryFresh
+    {tokens : List Token} {counter : Counter tokens}
+    (invariant : PhaseAReservedFresh counter) :
+    PhaseBEntryFresh counter := by
+  intro address reserved
+  apply invariant address
+  cases address with
+  | phase slot =>
+      cases slot <;>
+        simp_all [phaseAReservedAddress, phaseBEntryReservedAddress]
+  | guardFinalize => simp [phaseAReservedAddress]
+  | production => simp_all [phaseBEntryReservedAddress]
+  | guardWitness => simp_all [phaseBEntryReservedAddress]
+  | linear => simp_all [phaseBEntryReservedAddress]
+  | prediction => simp_all [phaseBEntryReservedAddress]
+  | cubic kind key =>
+      cases kind <;>
+        simp_all [phaseBEntryReservedAddress]
+
+private theorem runMappedPrimitive?_phaseBEntryFresh
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (invariant : PhaseBEntryFresh current.counter)
+    (available : ¬ phaseBEntryReservedAddress address)
+    (result : CountedState tokens after)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    PhaseBEntryFresh result.counter := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  next fresh =>
+    cases selected
+    intro candidate reserved member
+    simp only [Counter.charge, List.mem_cons] at member
+    rcases member with equal | old
+    · exact available (equal ▸ reserved)
+    · exact invariant candidate reserved old
+  next collision => contradiction
+
+private theorem materializePhaseAIndexes?_total_owned
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens) :
+    ∀ addresses (current : CountedState tokens (PhaseAIndexed file tokens)),
+      addresses.Nodup →
+      (∀ address, address ∈ addresses →
+        UnitAddress.evidenceIndex address ∉ current.counter.usedRev) →
+      PhaseBEntryFresh current.counter →
+      ∃ result,
+        materializePhaseAIndexes? evaluate addresses current = some result ∧
+        PhaseBEntryFresh result.counter := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current unique pending invariant
+      exact ⟨current, rfl, invariant⟩
+  | cons address rest induction =>
+      intro current unique pending invariant
+      rw [List.nodup_cons] at unique
+      have fresh := pending address (by simp)
+      let transition := fun (state : PhaseAIndexed file tokens) => ({
+        state with entries := state.entries ++ [{
+          address := address
+          selected := evaluate state.phaseA address
+        }]
+      } : PhaseAIndexed file tokens)
+      let next : CountedState tokens (PhaseAIndexed file tokens) := {
+        payload := transition current.payload
+        counter := current.counter.charge
+          (UnitAddress.evidenceIndex address) fresh
+      }
+      have stepped : runMappedPrimitive? current
+          (UnitAddress.evidenceIndex address) transition = some next := by
+        simp [runMappedPrimitive?, fresh, next]
+      have nextInvariant := runMappedPrimitive?_phaseBEntryFresh
+        current (UnitAddress.evidenceIndex address) transition invariant
+        (by simp [phaseBEntryReservedAddress, UnitAddress.evidenceIndex])
+        next stepped
+      have restPending : ∀ candidate, candidate ∈ rest →
+          UnitAddress.evidenceIndex candidate ∉ next.counter.usedRev := by
+        intro candidate member used
+        rw [runMappedPrimitive?_usedRev current
+          (UnitAddress.evidenceIndex address) transition next stepped,
+          List.mem_cons] at used
+        rcases used with equal | old
+        · have same := UnitAddress.evidenceIndex_injective equal
+          exact unique.1 (same.symm ▸ member)
+        · exact pending candidate (by simp [member]) old
+      obtain ⟨result, continued, resultInvariant⟩ :=
+        induction next unique.2 restPending nextInvariant
+      exact ⟨result, by
+        rw [materializePhaseAIndexes?, stepped]
+        exact continued, resultInvariant⟩
+
+private theorem materializeAllPhaseAIndexes?_total_owned
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (invariant : PhaseAReservedFresh current.counter) :
+    ∃ result,
+      materializePhaseAIndexes? evaluate
+        (allEvidenceIndexAddresses tokens) (beginPhaseAIndexing current) =
+          some result ∧
+      PhaseBEntryFresh result.counter := by
+  apply materializePhaseAIndexes?_total_owned evaluate
+    (allEvidenceIndexAddresses tokens) (beginPhaseAIndexing current)
+    (allEvidenceIndexAddresses_nodup tokens)
+  · intro address member
+    exact invariant (UnitAddress.evidenceIndex address)
+      (by simp [phaseAReservedAddress, UnitAddress.evidenceIndex,
+        evidenceIndexUnitAddress])
+  · exact invariant.phaseBEntryFresh
+
+private def PhaseBIndexedReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens)) : Prop :=
+  current.payload.phaseA.itemQueue = [] ∧
+  current.payload.phaseA.edgeQueue = [] ∧
+  current.payload.phaseA.rawItems = rawSaturation tokens ∧
+  FullyMaterializedEvidenceEntries current.payload.entries ∧
+  PhaseBEntryFresh current.counter
+
+private theorem indexSaturatedPhaseACanonicalWith?_total_owned
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (itemsDone : current.payload.itemQueue = [])
+    (edgesDone : current.payload.edgeQueue = [])
+    (sameMembers : canonicalRawItems tokens current.payload.rawItems =
+      canonicalRawItems tokens (rawSaturation tokens))
+    (invariant : PhaseAReservedFresh current.counter) :
+    ∃ result,
+      indexSaturatedPhaseACanonicalWith? evaluate current = some result ∧
+      PhaseBIndexedReady result := by
+  obtain ⟨result, materialized, resultFresh⟩ :=
+    materializeAllPhaseAIndexes?_total_owned evaluate
+      (normalizePhaseARawItems current sameMembers) invariant
+  have indexed : indexSaturatedPhaseACanonicalWith? evaluate current =
+      some result := by
+    unfold indexSaturatedPhaseACanonicalWith?
+    rw [dif_pos sameMembers]
+    unfold indexSaturatedPhaseAWith?
+    rw [dif_pos (by simpa [normalizePhaseARawItems] using itemsDone)]
+    rw [dif_pos (by simpa [normalizePhaseARawItems] using edgesDone)]
+    rw [dif_pos (by rfl)]
+    exact materialized
+  have shape := materializePhaseAIndexes?_payload evaluate
+    (allEvidenceIndexAddresses tokens)
+    (beginPhaseAIndexing
+      (normalizePhaseARawItems current sameMembers)) result materialized
+  refine ⟨result, indexed, ?_, ?_, ?_, ?_, resultFresh⟩
+  · rw [shape.1]
+    simpa [beginPhaseAIndexing, normalizePhaseARawItems] using itemsDone
+  · rw [shape.1]
+    simpa [beginPhaseAIndexing, normalizePhaseARawItems] using edgesDone
+  · rw [shape.1]
+    rfl
+  · exact indexSaturatedPhaseACanonicalWith?_fullyMaterialized
+      evaluate current result indexed
+
+private theorem executePhaseA?_index_total_owned
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : CountedState tokens (PhaseAOpen file tokens))
+    (executed : executePhaseA? file tokens owned = some phaseA)
+    (sameMembers : canonicalRawItems tokens phaseA.payload.rawItems =
+      canonicalRawItems tokens (rawSaturation tokens)) :
+    ∃ indexed,
+      indexSaturatedPhaseACanonicalWith?
+        (phaseAObservationIndexEvaluator owned) phaseA = some indexed ∧
+      PhaseBIndexedReady indexed := by
+  have invariant := executePhaseA?_reservedFresh
+    file tokens owned phaseA executed
+  have execution := executed
+  unfold executePhaseA? at execution
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at execution
+  rcases execution with ⟨seeded, seededEq, runEq⟩
+  have queues := runPhaseAQueues?_queues_empty owned
+    (chartGBound (tokens.length + 1)) seeded phaseA runEq
+  exact indexSaturatedPhaseACanonicalWith?_total_owned
+    (phaseAObservationIndexEvaluator owned) phaseA queues.1 queues.2
+    sameMembers invariant
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
