@@ -3387,6 +3387,290 @@ theorem contextual_predict_scan_complete_closed
       exact complete waiting finished after shared waitingInduction
         finishedInduction structural
 
+private def ContextualRoot {tokens : List Token}
+    (item : ContextualItemKey tokens) : Prop :=
+  item.raw.production = .root .module ∧
+    item.raw.dot.val = 0 ∧
+    item.raw.origin = Boundary.start tokens ∧
+    item.raw.current = Boundary.start tokens ∧
+    item.context = .plain
+
+private def ContextualPredict
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting predicted : ContextualItemKey tokens) : Prop :=
+  NextSymbol waiting.raw
+      (.nonterminal predicted.raw.production.lhs) ∧
+    predicted.raw.dot.val = 0 ∧
+    predicted.raw.origin = waiting.raw.current ∧
+    predicted.raw.current = waiting.raw.current ∧
+    predicted.context =
+      descendContext waiting predicted.raw.production ∧
+    EnabledProductionInstance file tokens memo correct final {
+      production := predicted.raw.production
+      origin := waiting.raw.current
+      context := descendContext waiting predicted.raw.production
+    }
+
+private def ContextualScan
+    (file : WorkspaceFile) (tokens : List Token)
+    (before after : ContextualItemKey tokens) : Prop :=
+  Nonempty (RawScanWitness file tokens before.raw after.raw) ∧
+    before.context = after.context
+
+private def ContextualComplete {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens) : Prop :=
+  RawComplete waiting.raw finished.raw after.raw ∧
+    finished.context =
+      descendContext waiting finished.raw.production ∧
+    after.context = waiting.context
+
+private def contextualRootDecidable {tokens : List Token}
+    (item : ContextualItemKey tokens) :
+    Decidable (ContextualRoot item) := by
+  unfold ContextualRoot
+  infer_instance
+
+private def contextualPredictDecidable
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting predicted : ContextualItemKey tokens) :
+    Decidable
+      (ContextualPredict file tokens memo correct final waiting predicted) := by
+  unfold ContextualPredict
+  letI : Decidable
+      (NextSymbol waiting.raw
+        (.nonterminal predicted.raw.production.lhs)) :=
+    nextSymbolDecidable waiting.raw
+      (.nonterminal predicted.raw.production.lhs)
+  letI : Decidable
+      (EnabledProductionInstance file tokens memo correct final {
+        production := predicted.raw.production
+        origin := waiting.raw.current
+        context := descendContext waiting predicted.raw.production
+      }) :=
+    enabledProductionInstanceDecision correct final _
+  infer_instance
+
+private def contextualScanDecidable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : ContextualItemKey tokens) :
+    Decidable (ContextualScan file tokens before after) := by
+  unfold ContextualScan
+  letI : Decidable
+      (Nonempty (RawScanWitness file tokens before.raw after.raw)) :=
+    decidable_of_iff
+      (rawScanBool file tokens owned before.raw after.raw = true)
+      (rawScanBool_eq_true_iff owned before.raw after.raw)
+  infer_instance
+
+private def contextualCompleteDecidable {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens) :
+    Decidable (ContextualComplete waiting finished after) := by
+  unfold ContextualComplete
+  letI : Decidable
+      (RawComplete waiting.raw finished.raw after.raw) :=
+    rawCompleteDecidable waiting.raw finished.raw after.raw
+  infer_instance
+
+private def ContextualClosureRule
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) : Prop :=
+  item ∈ known ∨ ContextualRoot item ∨
+    (∃ waiting, waiting ∈ known ∧
+      ContextualPredict file tokens memo correct final waiting item) ∨
+    (∃ before, before ∈ known ∧
+      ContextualScan file tokens before item) ∨
+    ∃ waiting, waiting ∈ known ∧
+      ∃ finished, finished ∈ known ∧
+        ContextualComplete waiting finished item
+
+private def contextualMemberBool {tokens : List Token}
+    (known : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) : Bool :=
+  known.any fun candidate => decide (candidate = item)
+
+private theorem contextualMemberBool_eq_true_iff
+    {tokens : List Token}
+    (known : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) :
+    contextualMemberBool known item = true ↔ item ∈ known := by
+  rw [contextualMemberBool, List.any_eq_true]
+  simp only [decide_eq_true_iff]
+  constructor
+  · rintro ⟨candidate, member, rfl⟩
+    exact member
+  · intro member
+    exact ⟨item, member, rfl⟩
+
+private def contextualPredictBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens))
+    (predicted : ContextualItemKey tokens) : Bool :=
+  known.any fun waiting =>
+    @decide (ContextualPredict file tokens memo correct final
+      waiting predicted)
+      (contextualPredictDecidable correct final waiting predicted)
+
+private theorem contextualPredictBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens))
+    (predicted : ContextualItemKey tokens) :
+    contextualPredictBool file tokens memo correct final known predicted =
+        true ↔
+      ∃ waiting, waiting ∈ known ∧
+        ContextualPredict file tokens memo correct final
+          waiting predicted := by
+  rw [contextualPredictBool, List.any_eq_true]
+  simp only [decide_eq_true_iff]
+
+private def contextualScanBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (known : List (ContextualItemKey tokens))
+    (after : ContextualItemKey tokens) : Bool :=
+  known.any fun before =>
+    @decide (ContextualScan file tokens before after)
+      (contextualScanDecidable owned before after)
+
+private theorem contextualScanBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (known : List (ContextualItemKey tokens))
+    (after : ContextualItemKey tokens) :
+    contextualScanBool file tokens owned known after = true ↔
+      ∃ before, before ∈ known ∧
+        ContextualScan file tokens before after := by
+  rw [contextualScanBool, List.any_eq_true]
+  simp only [decide_eq_true_iff]
+
+private def contextualCompleteBool {tokens : List Token}
+    (known : List (ContextualItemKey tokens))
+    (after : ContextualItemKey tokens) : Bool :=
+  known.any fun waiting => known.any fun finished =>
+    @decide (ContextualComplete waiting finished after)
+      (contextualCompleteDecidable waiting finished after)
+
+private theorem contextualCompleteBool_eq_true_iff
+    {tokens : List Token}
+    (known : List (ContextualItemKey tokens))
+    (after : ContextualItemKey tokens) :
+    contextualCompleteBool known after = true ↔
+      ∃ waiting, waiting ∈ known ∧
+        ∃ finished, finished ∈ known ∧
+          ContextualComplete waiting finished after := by
+  simp only [contextualCompleteBool, List.any_eq_true,
+    decide_eq_true_iff]
+
+private def contextualClosureBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) : Bool :=
+  contextualMemberBool known item ||
+    (@decide (ContextualRoot item) (contextualRootDecidable item) ||
+      (contextualPredictBool file tokens memo correct final known item ||
+        (contextualScanBool file tokens owned known item ||
+          contextualCompleteBool known item)))
+
+private theorem contextualClosureBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) :
+    contextualClosureBool file tokens owned memo correct final known item =
+        true ↔
+      ContextualClosureRule file tokens memo correct final known item := by
+  simp only [contextualClosureBool, Bool.or_eq_true,
+    contextualMemberBool_eq_true_iff, decide_eq_true_iff,
+    contextualPredictBool_eq_true_iff,
+    contextualScanBool_eq_true_iff,
+    contextualCompleteBool_eq_true_iff, ContextualClosureRule]
+
+private def contextualSaturationStep
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens)) :
+    List (ContextualItemKey tokens) :=
+  (allContextualItems tokens).filter
+    (contextualClosureBool file tokens owned memo correct final known)
+
+private theorem contextualSaturationStep_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) :
+    item ∈ contextualSaturationStep file tokens owned memo correct final
+        known ↔
+      ContextualClosureRule file tokens memo correct final known item := by
+  rw [contextualSaturationStep, List.mem_filter,
+    contextualClosureBool_eq_true_iff owned correct final known item]
+  exact and_iff_right (allContextualItems_complete item)
+
+private theorem contextualClosureBool_inflationary
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (known : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) (member : item ∈ known) :
+    contextualClosureBool file tokens owned memo correct final known item =
+      true :=
+  (contextualClosureBool_eq_true_iff
+    owned correct final known item).mpr (Or.inl member)
+
+private def contextualSaturation
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    List (ContextualItemKey tokens) :=
+  closureIterate
+    (contextualSaturationStep file tokens owned memo correct final)
+    (allContextualItems tokens).length
+
+private theorem contextualSaturation_stable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    contextualSaturationStep file tokens owned memo correct final
+        (contextualSaturation file tokens owned memo correct final) =
+      contextualSaturation file tokens owned memo correct final := by
+  exact finiteFilteredClosure_stable (allContextualItems tokens)
+    (contextualClosureBool file tokens owned memo correct final)
+    (contextualClosureBool_inflationary owned correct final)
+
 /-- Structural validity plus reachability of every endpoint of one edge. -/
 def ContextualEdgeReach
     (file : WorkspaceFile) (tokens : List Token)
