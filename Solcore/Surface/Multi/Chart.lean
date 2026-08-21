@@ -2190,4 +2190,161 @@ private theorem runPhaseAQueues?_queues_empty
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def allEvidenceIndexKinds : List EvidenceIndexKind := [
+  .terminalWindow,
+  .exactSlice,
+  .greatestEnd,
+  .delimiterOrRegion
+]
+
+private def allEvidenceIndexSubjects :
+    List (PriorityGuardId ⊕ GrammarRuleId) :=
+  allPriorityGuardIds.map .inl ++ allGrammarRuleIds.map .inr
+
+private def allEvidenceIndexAddresses (tokens : List Token) :
+    List (EvidenceIndexAddress tokens) :=
+  allEvidenceIndexKinds.flatMap fun kind =>
+    allEvidenceIndexSubjects.flatMap fun subject =>
+      (List.finRange (tokens.length + 2)).flatMap fun contextStart =>
+        (List.finRange (tokens.length + 2)).flatMap fun siteCursor =>
+          (List.finRange (tokens.length + 2)).map fun resultEnd => {
+            kind := kind
+            subject := subject
+            contextStart := contextStart
+            siteCursor := siteCursor
+            resultEnd := resultEnd
+          }
+
+private theorem allEvidenceIndexAddresses_complete
+    {tokens : List Token} (address : EvidenceIndexAddress tokens) :
+    address ∈ allEvidenceIndexAddresses tokens := by
+  rcases address with
+    ⟨kind, subject, contextStart, siteCursor, resultEnd⟩
+  rw [allEvidenceIndexAddresses, List.mem_flatMap]
+  refine ⟨kind, ?_, ?_⟩
+  · cases kind <;> simp [allEvidenceIndexKinds]
+  · rw [List.mem_flatMap]
+    refine ⟨subject, ?_, ?_⟩
+    · cases subject with
+      | inl guard =>
+          rw [allEvidenceIndexSubjects, List.mem_append]
+          left
+          rw [List.mem_map]
+          exact ⟨guard, by cases guard <;> simp [allPriorityGuardIds], rfl⟩
+      | inr rule =>
+          rw [allEvidenceIndexSubjects, List.mem_append]
+          right
+          rw [List.mem_map]
+          exact ⟨rule, by cases rule <;> simp [allGrammarRuleIds], rfl⟩
+    · rw [List.mem_flatMap]
+      refine ⟨contextStart, List.mem_finRange _, ?_⟩
+      rw [List.mem_flatMap]
+      refine ⟨siteCursor, List.mem_finRange _, ?_⟩
+      rw [List.mem_map]
+      exact ⟨resultEnd, List.mem_finRange _, rfl⟩
+
+private structure PhaseAEvidenceEntry (tokens : List Token) where
+  address : EvidenceIndexAddress tokens
+  selected : Bool
+
+private structure PhaseAIndexed
+    (file : WorkspaceFile) (tokens : List Token) where
+  phaseA : PhaseAOpen file tokens
+  entries : List (PhaseAEvidenceEntry tokens)
+
+private abbrev PhaseAIndexEvaluator
+    (file : WorkspaceFile) (tokens : List Token) :=
+  PhaseAOpen file tokens → EvidenceIndexAddress tokens → Bool
+
+private def beginPhaseAIndexing
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    CountedState tokens (PhaseAIndexed file tokens) := {
+  payload := ⟨current.payload, []⟩
+  counter := current.counter
+}
+
+private def materializePhaseAIndexes?
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens) :
+    List (EvidenceIndexAddress tokens) →
+      CountedState tokens (PhaseAIndexed file tokens) →
+      Option (CountedState tokens (PhaseAIndexed file tokens))
+  | [], current => some current
+  | address :: rest, current => do
+      let next ← runMappedPrimitive? current
+        (UnitAddress.evidenceIndex address) fun state => {
+          state with entries := state.entries ++ [{
+            address := address
+            selected := evaluate state.phaseA address
+          }]
+        }
+      materializePhaseAIndexes? evaluate rest next
+
+private def indexSaturatedPhaseAWith?
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (CountedState tokens (PhaseAIndexed file tokens)) :=
+  if _itemsDone : current.payload.itemQueue = [] then
+    if _edgesDone : current.payload.edgeQueue = [] then
+      if _saturated : current.payload.rawItems = rawSaturation tokens then
+        materializePhaseAIndexes? evaluate
+          (allEvidenceIndexAddresses tokens)
+          (beginPhaseAIndexing current)
+      else
+        none
+    else
+      none
+  else
+    none
+
+private structure PhaseBIndexed
+    (file : WorkspaceFile) (tokens : List Token) where
+  phaseB : PhaseBOpen file tokens
+  indexes : List (PhaseAEvidenceEntry tokens)
+
+private def enterIndexedPhaseB?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) := do
+  let entered ← enterPhaseB? {
+    payload := current.payload.phaseA
+    counter := current.counter
+  }
+  pure {
+    payload := ⟨entered.payload, current.payload.entries⟩
+    counter := entered.counter
+  }
+
+private def finalizeNextIndexedGuardWithDecision?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (decision : GuardDecision) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) := do
+  let finalized ← finalizeNextGuardWithDecision? {
+    payload := current.payload.phaseB
+    counter := current.counter
+  } decision
+  pure {
+    payload := ⟨finalized.payload, current.payload.indexes⟩
+    counter := finalized.counter
+  }
+
+private def sealIndexedPhaseB?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) :=
+  sealPhaseB? {
+    payload := current.payload.phaseB
+    counter := current.counter
+  }
+
+end Chart
+
 end Solcore.Surface.Multi
