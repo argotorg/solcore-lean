@@ -1868,6 +1868,155 @@ def immediatelyAfterSymbolDecision
     (immediatelyAfterSymbolBool_eq_true_iff
       owned symbol symbolCursor after)
 
+private theorem symbolAtBoundaryBool_eq_true_iff_raw
+    (tokens : List Token) (cursor : Boundary tokens)
+    (symbol : Symbol) :
+    symbolAtBoundaryBool tokens cursor symbol = true ↔
+      rawSymbolAtBoundary tokens cursor symbol := by
+  constructor
+  · intro accepted
+    unfold symbolAtBoundaryBool at accepted
+    split at accepted
+    case isFalse => simp at accepted
+    case isTrue inRange =>
+      have payload := of_decide_eq_true accepted
+      let terminalCursor : TerminalCursor tokens :=
+        ⟨cursor.val, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+      refine ⟨terminalCursor, tokens[cursor.val], ?_, ?_, payload⟩
+      · apply Fin.ext
+        rfl
+      · exact List.getElem?_eq_getElem inRange
+  · rintro ⟨terminalCursor, token, atCursor, lookup, payload⟩
+    have cursorEq : terminalCursor.val = cursor.val :=
+      congrArg Fin.val atCursor
+    have inRange : cursor.val < tokens.length := by
+      by_cases candidate : cursor.val < tokens.length
+      · exact candidate
+      · have outOfRange : tokens.length ≤ terminalCursor.val := by
+          omega
+        rw [List.getElem?_eq_none outOfRange] at lookup
+        contradiction
+    have tokenEq : tokens[cursor.val] = token := by
+      have canonical := List.getElem?_eq_getElem inRange
+      rw [cursorEq] at lookup
+      exact Option.some.inj (canonical.symm.trans lookup)
+    unfold symbolAtBoundaryBool
+    rw [dif_pos inRange]
+    exact decide_eq_true (tokenEq ▸ payload)
+
+private def rawSymbolAtBoundaryDecision
+    (tokens : List Token) (cursor : Boundary tokens)
+    (symbol : Symbol) :
+    Decidable (rawSymbolAtBoundary tokens cursor symbol) :=
+  decidable_of_iff
+    (symbolAtBoundaryBool tokens cursor symbol = true)
+    (symbolAtBoundaryBool_eq_true_iff_raw tokens cursor symbol)
+
+private theorem immediatelyAfterSymbolBool_eq_true_iff_raw
+    (tokens : List Token) (symbol : Symbol)
+    (symbolCursor after : Boundary tokens) :
+    immediatelyAfterSymbolBool tokens symbol symbolCursor after = true ↔
+      rawImmediatelyAfterSymbol tokens symbol symbolCursor after := by
+  rw [immediatelyAfterSymbolBool, Bool.and_eq_true, decide_eq_true_iff,
+    symbolAtBoundaryBool_eq_true_iff_raw]
+  constructor
+  · rintro ⟨⟨terminalCursor, token, atCursor, lookup, payload⟩,
+      afterEq⟩
+    refine ⟨terminalCursor, token, atCursor, ?_, lookup, payload⟩
+    apply Fin.ext
+    have atCursorValue := congrArg Fin.val atCursor
+    change terminalCursor.val = symbolCursor.val at atCursorValue
+    change terminalCursor.val + 1 = after.val
+    omega
+  · rintro ⟨terminalCursor, token, atCursor, atAfter, lookup, payload⟩
+    refine ⟨⟨terminalCursor, token, atCursor, lookup, payload⟩, ?_⟩
+    have atCursorValue := congrArg Fin.val atCursor
+    have atAfterValue := congrArg Fin.val atAfter
+    change terminalCursor.val = symbolCursor.val at atCursorValue
+    change terminalCursor.val + 1 = after.val at atAfterValue
+    omega
+
+private def rawImmediatelyAfterSymbolDecision
+    (tokens : List Token) (symbol : Symbol)
+    (symbolCursor after : Boundary tokens) :
+    Decidable
+      (rawImmediatelyAfterSymbol tokens symbol symbolCursor after) :=
+  decidable_of_iff
+    (immediatelyAfterSymbolBool tokens symbol symbolCursor after = true)
+    (immediatelyAfterSymbolBool_eq_true_iff_raw
+      tokens symbol symbolCursor after)
+
+private def MatchingDelimiterDecisionShape
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens)
+    (opening closing : Symbol) : Prop :=
+  match opening with
+  | .leftParen =>
+      closing = .rightParen ∧
+      ∃ interiorStart : Boundary tokens,
+        rawImmediatelyAfterSymbol tokens opening openCursor interiorStart ∧
+        rawSymbolAtBoundary tokens closeCursor closing ∧
+        ProtectedDelimiterRun tokens
+          ⟨.rightParen, []⟩ interiorStart closeCursor
+          ⟨.rightParen, []⟩
+  | .leftBracket =>
+      closing = .rightBracket ∧
+      ∃ interiorStart : Boundary tokens,
+        rawImmediatelyAfterSymbol tokens opening openCursor interiorStart ∧
+        rawSymbolAtBoundary tokens closeCursor closing ∧
+        ProtectedDelimiterRun tokens
+          ⟨.rightBracket, []⟩ interiorStart closeCursor
+          ⟨.rightBracket, []⟩
+  | .leftBrace =>
+      closing = .rightBrace ∧
+      ∃ interiorStart : Boundary tokens,
+        rawImmediatelyAfterSymbol tokens opening openCursor interiorStart ∧
+        rawSymbolAtBoundary tokens closeCursor closing ∧
+        ProtectedDelimiterRun tokens
+          ⟨.rightBrace, []⟩ interiorStart closeCursor
+          ⟨.rightBrace, []⟩
+  | _ => False
+
+private theorem matchingDelimiterDecisionShape_iff
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens)
+    (opening closing : Symbol) :
+    MatchingDelimiterDecisionShape tokens openCursor closeCursor
+      opening closing ↔
+    MatchingDelimiter tokens openCursor closeCursor opening closing := by
+  cases opening <;> rfl
+
+/-- Delimiter matching is constructively decidable. -/
+def matchingDelimiterDecision
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens)
+    (opening closing : Symbol) :
+    Decidable
+      (MatchingDelimiter tokens openCursor closeCursor opening closing) := by
+  letI (cursor : Boundary tokens) (symbol : Symbol) :
+      Decidable (rawSymbolAtBoundary tokens cursor symbol) :=
+    rawSymbolAtBoundaryDecision tokens cursor symbol
+  letI (symbol : Symbol) (symbolCursor after : Boundary tokens) :
+      Decidable
+        (rawImmediatelyAfterSymbol tokens symbol symbolCursor after) :=
+    rawImmediatelyAfterSymbolDecision tokens symbol symbolCursor after
+  letI (before : NonemptyList DelimiterCloser)
+      (start finish : Boundary tokens)
+      (after : NonemptyList DelimiterCloser) :
+      Decidable
+        (ProtectedDelimiterRun tokens before start finish after) :=
+    protectedDelimiterRunDecision tokens before start finish after
+  let shapeDecision : Decidable
+      (MatchingDelimiterDecisionShape tokens openCursor closeCursor
+        opening closing) := by
+    unfold MatchingDelimiterDecisionShape
+    cases opening <;> infer_instance
+  letI : Decidable
+      (MatchingDelimiterDecisionShape tokens openCursor closeCursor
+        opening closing) := shapeDecision
+  exact decidable_of_iff
+    (MatchingDelimiterDecisionShape tokens openCursor closeCursor
+      opening closing)
+    (matchingDelimiterDecisionShape_iff
+      tokens openCursor closeCursor opening closing)
+
 /-- A raw symbol observation has a unique successor boundary. -/
 private theorem rawImmediatelyAfterSymbol_functional
     {tokens : List Token} {symbol : Symbol}
