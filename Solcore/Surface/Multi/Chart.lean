@@ -2698,4 +2698,123 @@ private def phaseANearestStatementRegionBool
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Guard-specific adjacent terminal observations.  The three coordinates are
+interpreted per guard but always retain an exact successor when one exists. -/
+private def phaseATerminalWindowGuardBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Bool :=
+  match guard with
+  | .G01_statementIf =>
+      (phaseAImmediatelyAfterTerminalBool owned (.hardKeyword .ifKw)
+          contextStart siteCursor &&
+        phaseAImmediatelyAfterTerminalBool owned (.symbol .leftParen)
+          siteCursor resultEnd) ||
+      (phaseAImmediatelyAfterTerminalBool owned (.symbol .rightParen)
+          contextStart siteCursor &&
+        phaseAImmediatelyAfterTerminalBool owned (.symbol .leftBrace)
+          siteCursor resultEnd)
+  | .G02_matchArmBoundary =>
+      phaseAImmediatelyAfterTerminalBool owned (.symbol .pipe)
+        siteCursor resultEnd
+  | .G03_parameterComptime | .G04_letComptime |
+      .G05_typeComptime | .G06_patternComptime =>
+      phaseAImmediatelyAfterTerminalBool owned
+        (.contextualKeyword .comptimeKw) siteCursor resultEnd
+  | .G07_leadingDotArguments =>
+      phaseAImmediatelyAfterTerminalBool owned (.symbol .leftParen)
+        siteCursor resultEnd
+  | .G08_terminalExpression => false
+  | .G09_genericContext =>
+      phaseATerminalAtBool owned (.symbol .fatArrow) resultEnd
+
+/-- The only guard whose decision needs a fixed retained-terminal slice. -/
+private def phaseAExactSliceGuardBool
+    (tokens : List Token) (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Bool :=
+  match guard with
+  | .G07_leadingDotArguments =>
+      decide (resultEnd = siteCursor) &&
+        phaseAExactSliceBool tokens contextStart siteCursor [
+          .symbol .dot,
+          .category .identifier
+        ]
+  | _ => false
+
+/-- Guard-specific delimiter and nearest-region observations. -/
+private def phaseADelimiterOrRegionGuardBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Bool :=
+  match guard with
+  | .G01_statementIf =>
+      decide (resultEnd = siteCursor) &&
+        phaseAMatchingDelimiterBool tokens contextStart siteCursor
+          .leftParen .rightParen
+  | .G02_matchArmBoundary =>
+      decide (resultEnd = siteCursor) &&
+        phaseAArmHeaderBool phaseA contextStart siteCursor
+  | .G06_patternComptime =>
+      decide (resultEnd = siteCursor) &&
+        phaseANextSameDepthDelimiterBool tokens contextStart siteCursor {
+          head := .comma,
+          tail := [.rightParen, .fatArrow]
+        }
+  | .G08_terminalExpression =>
+      phaseANearestStatementRegionBool phaseA contextStart resultEnd
+  | _ => false
+
+/-- Complete proof-free U01 evaluator for the current four index families.
+Rule subjects select greatest-end cells; guard subjects select only the
+terminal, exact-slice, delimiter, and region meanings relevant to that guard. -/
+private def phaseAObservationIndexEvaluator
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    PhaseAIndexEvaluator file tokens :=
+  fun phaseA address =>
+    match address.kind, address.subject with
+    | .terminalWindow, .inl guard =>
+        phaseATerminalWindowGuardBool owned guard
+          address.contextStart address.siteCursor address.resultEnd
+    | .exactSlice, .inl guard =>
+        phaseAExactSliceGuardBool tokens guard
+          address.contextStart address.siteCursor address.resultEnd
+    | .greatestEnd, .inr rule =>
+        rawGreatestEndBool phaseA (.rule rule)
+          address.contextStart address.siteCursor address.resultEnd
+    | .delimiterOrRegion, .inl guard =>
+        phaseADelimiterOrRegionGuardBool phaseA guard
+          address.contextStart address.siteCursor address.resultEnd
+    | _, _ => false
+
+/-- Compare evidence addresses without exposing the private carrier. -/
+private def phaseAEvidenceAddressEqBool
+    {tokens : List Token}
+    (left right : EvidenceIndexAddress tokens) : Bool :=
+  left.kind == right.kind && left.subject == right.subject &&
+    left.contextStart == right.contextStart &&
+    left.siteCursor == right.siteCursor &&
+    left.resultEnd == right.resultEnd
+
+/-- Read one fully materialized U01 cell while retaining absence explicitly. -/
+private def phaseAEvidenceEntryAt?
+    {tokens : List Token} :
+    List (PhaseAEvidenceEntry tokens) → EvidenceIndexAddress tokens →
+      Option Bool
+  | [], _ => none
+  | entry :: rest, address =>
+      if phaseAEvidenceAddressEqBool entry.address address then
+        some entry.selected
+      else
+        phaseAEvidenceEntryAt? rest address
+
+end Chart
+
 end Solcore.Surface.Multi
