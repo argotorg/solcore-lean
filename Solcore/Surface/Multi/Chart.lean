@@ -4057,4 +4057,248 @@ private theorem runPhaseCQueues?_queues_empty
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The executable completion ledger covers every retained completed edge. -/
+private def PhaseCBackpointerInvariant
+    (file : WorkspaceFile) (tokens : List Token)
+    (state : PhaseCWorklist file tokens) : Prop :=
+  CompletionBackpointerLedger.CoversPackedEdges file tokens
+    state.completionBackpointers state.phaseC.contextualEdges
+
+private theorem runMappedPrimitive?_payload
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    {result : CountedState tokens after}
+    (selected : runMappedPrimitive? current address transition = some result) :
+    result.payload = transition current.payload := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  · cases selected
+    rfl
+  · contradiction
+
+private theorem chargeAddresses?_payload
+    {tokens : List Token} {state : Type}
+    (addresses : List (UnitAddress tokens))
+    (current result : CountedState tokens state)
+    (selected : chargeAddresses? current addresses = some result) :
+    result.payload = current.payload := by
+  induction addresses generalizing current result with
+  | nil =>
+      simp only [chargeAddresses?] at selected
+      cases selected
+      rfl
+  | cons address rest induction =>
+      simp only [chargeAddresses?] at selected
+      cases stepped : runMappedPrimitive? current address id with
+      | none => simp [stepped] at selected
+      | some next =>
+          rw [stepped] at selected
+          exact (induction next result selected).trans
+            (runMappedPrimitive?_payload current address id stepped)
+
+private theorem processGuardCell?_contextualEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : processGuardCell? current productionInstance index =
+      some result) :
+    result.1.payload.contextualEdges = current.payload.contextualEdges := by
+  unfold processGuardCell? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨inspected, inspectedEq, inserted, insertedEq, resultEq⟩
+  cases resultEq
+  have inspectedPayload := chargeAddresses?_payload
+    (preInsertWitnessSlots.map fun slot =>
+      .guardWitness slot (guardCellAddress productionInstance index))
+    current inspected inspectedEq
+  have insertedPayload := runMappedPrimitive?_payload inspected
+    (.guardWitness .insertWitness
+      (guardCellAddress productionInstance index)) _ insertedEq
+  rw [insertedPayload, inspectedPayload]
+  split <;> rfl
+
+private theorem processGuardCells?_contextualEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ∀ (indices : List (Fin (guardOf productionInstance.production).length))
+      (current : CountedState tokens (PhaseCOpen file tokens))
+      (result : CountedState tokens (PhaseCOpen file tokens) × Bool),
+      processGuardCells? productionInstance indices current = some result →
+        result.1.payload.contextualEdges = current.payload.contextualEdges := by
+  intro indices
+  induction indices with
+  | nil =>
+      intro current result selected
+      simp only [processGuardCells?, Option.some.injEq] at selected
+      cases selected
+      rfl
+  | cons index rest induction =>
+      intro current result selected
+      simp only [processGuardCells?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with
+        ⟨processed, processedEq, finished, finishedEq, resultEq⟩
+      cases resultEq
+      exact (induction processed.1 finished finishedEq).trans
+        (processGuardCell?_contextualEdges current productionInstance index
+          processed processedEq)
+
+private theorem activateProduction?_contextualEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : activateProduction? current productionInstance = some result) :
+    result.1.payload.contextualEdges = current.payload.contextualEdges := by
+  unfold activateProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, processedEq⟩
+  exact (processGuardCells?_contextualEdges productionInstance _
+    attempted result processedEq).trans
+      (congrArg PhaseCOpen.contextualEdges
+        (runMappedPrimitive?_payload current
+          (.production productionInstance) id attemptedEq))
+
+private theorem beginPhaseCWorklist?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  have enteredPayload := runMappedPrimitive?_payload current
+    (.linear .L03_itemInsert (contextualLinearKey (contextualRoot tokens))) _
+    enteredEq
+  unfold PhaseCBackpointerInvariant
+  rw [enteredPayload]
+  exact CompletionBackpointerLedger.coversPackedEdges_nil file tokens
+
+private theorem activateWorklistProduction?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCBackpointerInvariant file tokens result.1.payload := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  unfold PhaseCBackpointerInvariant at invariant ⊢
+  rw [activateProduction?_contextualEdges
+    { payload := current.payload.phaseC, counter := current.counter }
+    productionInstance activated activatedEq]
+  exact invariant
+
+private theorem insertContextualItem?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold insertContextualItem? at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · rw [runMappedPrimitive?_payload current
+      (.linear source.unitKind (contextualLinearKey item)) _ selected]
+    exact invariant
+
+private theorem insertContextualScannedEdge?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · rw [runMappedPrimitive?_payload current
+      (.linear .L06_scannedEdgeInsert (contextualLinearKey edge.before)) _
+      selected]
+    exact CompletionBackpointerLedger.coversPackedEdges_cons_scanned edge
+      invariant
+
+private theorem insertContextualCompletedEdge?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with
+      ⟨pair, insertedEq, chargedEq⟩
+    rw [runMappedPrimitive?_payload current
+      (.cubic .U04_completedEdgeInsert
+        (contextualCompletionKey edge.waiting edge.finished)) _ chargedEq]
+    exact CompletionBackpointerLedger.insertCompleted?_coversPackedEdges edge
+      insertedEq invariant
+
+private theorem dequeueContextualItem?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCBackpointerInvariant file tokens result.2.payload := by
+  unfold dequeueContextualItem? at selected
+  cases queueEq : current.payload.phaseC.itemQueue with
+  | nil => simp [queueEq] at selected
+  | cons item rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      rw [runMappedPrimitive?_payload current
+        (.linear .L01_itemDequeue (contextualLinearKey item)) _ nextEq]
+      exact invariant
+
+private theorem dequeueContextualEdge?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCBackpointerInvariant file tokens result.2.payload := by
+  unfold dequeueContextualEdge? at selected
+  cases queueEq : current.payload.phaseC.edgeQueue with
+  | nil => simp [queueEq] at selected
+  | cons edge rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      rw [runMappedPrimitive?_payload current _ _ nextEq]
+      exact invariant
+
+end Chart
+
 end Solcore.Surface.Multi
