@@ -3566,4 +3566,34 @@ private theorem guardedKeyIndicator_sum_eq_filter_length
       · simp [isZero, induction]
       · simp [isOne, induction, Nat.add_comm]
 
+/-- The exact number of cells in the executable guard table. -/
+def H : Nat :=
+  (allProductionIds.map fun production => (guardOf production).length).sum
+
+/-- The guard-cell count is unchanged by checked EBNF expansion. -/
+theorem H_eq_expanded_guard_table_sum :
+    H = (expanded.productions.map fun production =>
+      (guardOf production.id).length).sum := by
+  unfold H
+  rw [ebnf_expansion_finite.2.1, List.map_map]
+  apply congrArg List.sum
+  apply List.map_congr_left
+  intro production _member
+  rfl
+
+/-- The executable grammar guard table has exactly eighteen cells. -/
+theorem H_eq_eighteen : H = 18 := by
+  calc
+    H = (allProductionIds.map guardedKeyIndicator).sum := by
+      unfold H
+      apply congrArg List.sum
+      apply List.map_congr_left
+      intro production _member
+      exact guardOf_length_eq_indicator production
+    _ = guardedProductionFilter.length := by
+      exact guardedKeyIndicator_sum_eq_filter_length allProductionIds
+    _ = guardedProductions.length :=
+      guardedProductionFilter_perm.length_eq
+    _ = 18 := rfl
+
 end Solcore.Surface.Multi.Grammar
