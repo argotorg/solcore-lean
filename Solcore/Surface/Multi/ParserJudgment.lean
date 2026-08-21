@@ -9192,6 +9192,202 @@ private theorem ruleReduction_atom_functional
     apply (sourceLoc_eq_iff _ _ _ _).2
     rw [sequenceEq.2.1, sequenceEq.2.2.2.1, restEq]
 
+private def terminalView
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol)
+    (input : EbnfValue file tokens (.atom (.terminal terminal))) :
+    MatchedTerminal file tokens terminal :=
+  Eq.mp (ebnfValue_atom_terminal_eq terminal) input
+
+private theorem terminal_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol)
+    (input : EbnfValue file tokens (.atom (.terminal terminal))) :
+    EbnfValue.terminalAtom terminal (terminalView terminal input) = input := by
+  simp [terminalView, EbnfValue.terminalAtom]
+
+private def ruleView
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.atom (.nonterminal rule))) :
+    RuleValue rule :=
+  Eq.mp (ebnfValue_atom_nonterminal_eq rule) input
+
+private theorem rule_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.atom (.nonterminal rule))) :
+    EbnfValue.ruleAtom rule (ruleView rule input) = input := by
+  simp [ruleView, EbnfValue.ruleAtom]
+
+private def sequenceView
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    EbnfValues file tokens children :=
+  Eq.mp (ebnfValue_sequence_eq children) input
+
+private theorem sequence_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    EbnfValue.sequence children (sequenceView children input) = input := by
+  simp [sequenceView, EbnfValue.sequence]
+
+private def choiceView
+    {file : WorkspaceFile} {tokens : List Token}
+    (branches : List EbnfExpr)
+    (input : EbnfValue file tokens (.choice branches)) :
+    (branch : Fin branches.length) ×
+      EbnfValue file tokens (branches.get branch) :=
+  Eq.mp (ebnfValue_choice_eq branches) input
+
+private theorem choice_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (branches : List EbnfExpr)
+    (input : EbnfValue file tokens (.choice branches)) :
+    EbnfValue.choice branches (choiceView branches input) = input := by
+  simp [choiceView, EbnfValue.choice]
+
+private def optionalView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.optional child)) :
+    Option (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_optional_eq child) input
+
+private theorem optional_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.optional child)) :
+    EbnfValue.optional child (optionalView child input) = input := by
+  simp [optionalView, EbnfValue.optional]
+
+private theorem ruleReduction_optionalComma_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .optionalComma origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .optionalComma)) :
+    ∃ output : RuleValue .optionalComma,
+      RuleReduction file tokens .optionalComma origin finish input output := by
+  change EbnfValue file tokens
+    (.optional (.atom (.terminal (.symbol .comma)))) at input
+  generalize viewEq : optionalView
+    (.atom (.terminal (.symbol .comma))) input = viewed
+  cases viewed with
+  | none =>
+      have inputEq :
+          EbnfValue.optional (.atom (.terminal (.symbol .comma))) none =
+            input := by
+        calc
+          _ = EbnfValue.optional _ (optionalView _ input) :=
+            congrArg (EbnfValue.optional _) viewEq.symm
+          _ = input := optional_of_view _ input
+      rw [← inputEq]
+      exact ⟨.absent, .optionalCommaAbsent origin finish⟩
+  | some rawComma =>
+      let comma := terminalView (.symbol .comma) rawComma
+      have rawCommaEq : EbnfValue.terminalAtom (.symbol .comma) comma =
+          rawComma := terminal_of_view _ rawComma
+      have inputEq :
+          EbnfValue.optional (.atom (.terminal (.symbol .comma)))
+              (some (EbnfValue.terminalAtom (.symbol .comma) comma)) = input := by
+        calc
+          _ = EbnfValue.optional _ (some rawComma) := by rw [rawCommaEq]
+          _ = EbnfValue.optional _ (optionalView _ input) :=
+            congrArg (EbnfValue.optional _) viewEq.symm
+          _ = input := optional_of_view _ input
+      rw [← inputEq]
+      exact ⟨.present comma.span, .optionalCommaPresent origin finish comma⟩
+
+private theorem ruleReduction_topItem_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .topItem origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .topItem)) :
+    ∃ output : RuleValue .topItem,
+      RuleReduction file tokens .topItem origin finish input output := by
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .importDecl), .atom (.nonterminal .exportDecl),
+    .atom (.nonterminal .pragmaDecl), .atom (.nonterminal .dataDecl),
+    .atom (.nonterminal .typeAliasDecl), .atom (.nonterminal .classDecl),
+    .atom (.nonterminal .instanceDecl), .atom (.nonterminal .contractDecl),
+    .atom (.nonterminal .functionDecl)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches (choiceView branches input) :=
+        congrArg (EbnfValue.choice branches) viewEq.symm
+      _ = input := choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 ∨ branch = 5 ∨ branch = 6 ∨
+      branch = 7 ∨ branch = 8 := by
+    have branchesLength : branches.length = 9 := by rfl
+    have bound : branch.val < 9 := by omega
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 ∨
+        branch.val = 5 ∨ branch.val = 6 ∨ branch.val = 7 ∨
+        branch.val = 8 := by
+      omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq |
+      valueEq | valueEq | valueEq | valueEq | valueEq
+    all_goals first
+      | exact Or.inl (Fin.ext valueEq)
+      | exact Or.inr (Or.inl (Fin.ext valueEq))
+      | exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+      | exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inl (Fin.ext valueEq))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Fin.ext valueEq))))))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  · let declaration := ruleView .importDecl raw
+    have rawEq := rule_of_view .importDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemImport origin finish declaration witness⟩
+  · let declaration := ruleView .exportDecl raw
+    have rawEq := rule_of_view .exportDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemExport origin finish declaration witness⟩
+  · let declaration := ruleView .pragmaDecl raw
+    have rawEq := rule_of_view .pragmaDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemPragma origin finish declaration witness⟩
+  · let declaration := ruleView .dataDecl raw
+    have rawEq := rule_of_view .dataDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemData origin finish declaration witness⟩
+  · let declaration := ruleView .typeAliasDecl raw
+    have rawEq := rule_of_view .typeAliasDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemTypeAlias origin finish declaration witness⟩
+  · let declaration := ruleView .classDecl raw
+    have rawEq := rule_of_view .classDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemClass origin finish declaration witness⟩
+  · let declaration := ruleView .instanceDecl raw
+    have rawEq := rule_of_view .instanceDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemInstance origin finish declaration witness⟩
+  · let declaration := ruleView .contractDecl raw
+    have rawEq := rule_of_view .contractDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemContract origin finish declaration witness⟩
+  · let declaration := ruleView .functionDecl raw
+    have rawEq := rule_of_view .functionDecl raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .topItemFunction origin finish declaration witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
