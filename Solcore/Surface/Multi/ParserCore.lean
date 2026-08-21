@@ -433,6 +433,193 @@ structure DottedItem (tokens : List Token) where
   current : Boundary tokens
   deriving Repr, BEq, DecidableEq
 
+private theorem dependentEnumeration_nodup
+    {α γ : Type} {β : α → Type}
+    (values : List α) (items : (value : α) → List (β value))
+    (make : (value : α) → β value → γ)
+    (valuesUnique : values.Nodup)
+    (itemsUnique : ∀ value, (items value).Nodup)
+    (makeInjective : ∀ {left right} {leftItem : β left}
+      {rightItem : β right},
+      make left leftItem = make right rightItem →
+        Sigma.mk left leftItem = Sigma.mk right rightItem) :
+    (values.flatMap fun value =>
+      (items value).map (make value)).Nodup := by
+  induction values with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.nodup_cons] at valuesUnique
+      simp only [List.flatMap_cons]
+      rw [List.nodup_append]
+      have mappedUnique :
+          ((items head).map (make head)).Nodup := by
+        rw [List.nodup_iff_pairwise_ne]
+        rw [List.pairwise_map]
+        exact (itemsUnique head).imp fun different equal =>
+          different (eq_of_heq
+            (Sigma.ext_iff.mp (makeInjective equal)).2)
+      refine ⟨mappedUnique, induction valuesUnique.2, ?_⟩
+      intro left leftMember right rightMember equal
+      rw [List.mem_map] at leftMember
+      rcases leftMember with ⟨leftItem, _, rfl⟩
+      rw [List.mem_flatMap] at rightMember
+      rcases rightMember with ⟨owner, ownerMember, rightMember⟩
+      rw [List.mem_map] at rightMember
+      rcases rightMember with ⟨rightItem, _, rfl⟩
+      have ownerEqual := congrArg Sigma.fst (makeInjective equal)
+      change head = owner at ownerEqual
+      exact valuesUnique.1 (ownerEqual.symm ▸ ownerMember)
+
+private theorem allDottedRhs_nodup_for_chart : allDottedRhs.Nodup := by
+  apply dependentEnumeration_nodup allProductionIds
+    (fun production =>
+      List.ofFn fun dot : Fin (production.rhs.length + 1) => dot)
+    (fun production dot => ({ production, dot } : DottedRhs))
+    allProductionIds_nodup
+  · intro production
+    rw [List.nodup_iff_pairwise_ne, List.pairwise_iff_getElem]
+    intro left right leftBound rightBound before equal
+    have sameFin :
+        (⟨left, by simpa using leftBound⟩ :
+            Fin (production.rhs.length + 1)) =
+          ⟨right, by simpa using rightBound⟩ := by
+      simpa only [List.getElem_ofFn] using equal
+    have sameValue : left = right := congrArg Fin.val sameFin
+    omega
+  · intro left right leftDot rightDot equal
+    cases equal
+    rfl
+
+private def allBoundaries (tokens : List Token) : List (Boundary tokens) :=
+  List.ofFn id
+
+private theorem allBoundaries_complete {tokens : List Token}
+    (boundary : Boundary tokens) : boundary ∈ allBoundaries tokens := by
+  rw [allBoundaries, List.mem_ofFn]
+  exact ⟨boundary, rfl⟩
+
+private theorem allBoundaries_nodup (tokens : List Token) :
+    (allBoundaries tokens).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_iff_getElem]
+  intro left right leftBound rightBound before equal
+  have sameFin :
+      (⟨left, by simpa [allBoundaries] using leftBound⟩ :
+          Boundary tokens) =
+        ⟨right, by simpa [allBoundaries] using rightBound⟩ := by
+    simpa only [allBoundaries, List.getElem_ofFn, id_eq] using equal
+  have sameValue : left = right := congrArg Fin.val sameFin
+  omega
+
+private theorem allBoundaries_length (tokens : List Token) :
+    (allBoundaries tokens).length = tokens.length + 2 := by
+  simp [allBoundaries]
+
+private theorem dependentEnumeration_length
+    {α γ : Type} {β : α → Type}
+    (values : List α) (items : (value : α) → List (β value))
+    (make : (value : α) → β value → γ)
+    (size : Nat) (itemLength : ∀ value, (items value).length = size) :
+    (values.flatMap fun value =>
+      (items value).map (make value)).length = values.length * size := by
+  induction values with
+  | nil => simp
+  | cons head tail induction =>
+      simp only [List.flatMap_cons, List.length_append, List.length_map,
+        List.length_cons]
+      rw [itemLength head, induction]
+      rw [Nat.succ_mul]
+      omega
+
+private structure DottedOrigin (tokens : List Token) where
+  dotted : DottedRhs
+  origin : Boundary tokens
+
+private def allDottedOrigins (tokens : List Token) :
+    List (DottedOrigin tokens) :=
+  allDottedRhs.flatMap fun dotted =>
+    (allBoundaries tokens).map fun origin => { dotted, origin }
+
+private theorem allDottedOrigins_complete {tokens : List Token}
+    (value : DottedOrigin tokens) : value ∈ allDottedOrigins tokens := by
+  rw [allDottedOrigins, List.mem_flatMap]
+  refine ⟨value.dotted, allDottedRhs_complete value.dotted, ?_⟩
+  rw [List.mem_map]
+  exact ⟨value.origin, allBoundaries_complete value.origin, by
+    cases value
+    rfl⟩
+
+private theorem allDottedOrigins_nodup (tokens : List Token) :
+    (allDottedOrigins tokens).Nodup := by
+  apply dependentEnumeration_nodup allDottedRhs
+    (fun _ => allBoundaries tokens)
+    (fun dotted origin => ({ dotted, origin } : DottedOrigin tokens))
+    allDottedRhs_nodup_for_chart
+    (fun _ => allBoundaries_nodup tokens)
+  intro left right leftOrigin rightOrigin equal
+  cases equal
+  rfl
+
+/-- Every dotted chart item in stable production, dot, and boundary order. -/
+def allDottedItems (tokens : List Token) : List (DottedItem tokens) :=
+  (allDottedOrigins tokens).flatMap fun value =>
+    (allBoundaries tokens).map fun current => {
+      production := value.dotted.production
+      dot := value.dotted.dot
+      origin := value.origin
+      current := current
+    }
+
+/-- Every dotted chart item occurs in the stable finite enumeration. -/
+theorem allDottedItems_complete {tokens : List Token}
+    (item : DottedItem tokens) : item ∈ allDottedItems tokens := by
+  let value : DottedOrigin tokens := {
+    dotted := { production := item.production, dot := item.dot }
+    origin := item.origin
+  }
+  rw [allDottedItems, List.mem_flatMap]
+  refine ⟨value, allDottedOrigins_complete value, ?_⟩
+  rw [List.mem_map]
+  refine ⟨item.current, allBoundaries_complete item.current, ?_⟩
+  cases item
+  rfl
+
+/-- The stable dotted-item enumeration contains no duplicate key. -/
+theorem allDottedItems_nodup (tokens : List Token) :
+    (allDottedItems tokens).Nodup := by
+  apply dependentEnumeration_nodup (allDottedOrigins tokens)
+    (fun _ => allBoundaries tokens)
+    (fun value current => ({
+      production := value.dotted.production
+      dot := value.dotted.dot
+      origin := value.origin
+      current := current
+    } : DottedItem tokens))
+    (allDottedOrigins_nodup tokens)
+    (fun _ => allBoundaries_nodup tokens)
+  intro left right leftCurrent rightCurrent equal
+  cases left with
+  | mk leftDotted leftOrigin =>
+      cases right with
+      | mk rightDotted rightOrigin =>
+          cases leftDotted
+          cases rightDotted
+          cases equal
+          rfl
+
+/-- The dotted-item enumeration has the displayed chart-item cardinality. -/
+theorem allDottedItems_length (tokens : List Token) :
+    (allDottedItems tokens).length =
+      D * (tokens.length + 2) * (tokens.length + 2) := by
+  rw [allDottedItems]
+  rw [dependentEnumeration_length (allDottedOrigins tokens)
+    (fun _ => allBoundaries tokens) _ (tokens.length + 2)
+    (fun _ => allBoundaries_length tokens)]
+  rw [allDottedOrigins]
+  rw [dependentEnumeration_length allDottedRhs
+    (fun _ => allBoundaries tokens) _ (tokens.length + 2)
+    (fun _ => allBoundaries_length tokens)]
+  rw [allDottedRhs_length]
+
 /-- A proof-free unguarded scan or completion edge key. -/
 inductive PackedEdgeKey (tokens : List Token) where
   | scanned
