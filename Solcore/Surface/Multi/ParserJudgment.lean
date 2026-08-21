@@ -10510,6 +10510,157 @@ private theorem ruleReduction_postfixPart_total
       ← terminal_of_view (.symbol .rightBracket) rawClose]
     exact ⟨_, .postfixPartIndex origin finish openBracket index closeBracket⟩
 
+private theorem listInputs_exists
+    {Raw Semantic : Type} (encode : Semantic → Raw)
+    (one : ∀ raw, ∃ value, encode value = raw)
+    (inputs : List Raw) : ∃ values : List Semantic, values.map encode = inputs := by
+  induction inputs with
+  | nil => exact ⟨[], rfl⟩
+  | cons head tail ih =>
+      rcases one head with ⟨value, valueEq⟩
+      rcases ih with ⟨values, valuesEq⟩
+      exact ⟨value :: values, by simp [valueEq, valuesEq]⟩
+
+private theorem fixedInfixTail_exists
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.group (.sequence [
+      .atom (.terminal terminal), .atom (.nonterminal rule)]))) :
+    ∃ value, fixedInfixTailInput terminal rule value = input := by
+  let children : List EbnfExpr := [
+    .atom (.terminal terminal), .atom (.nonterminal rule)]
+  let rawSequence := groupView (.sequence children) input
+  let viewed := sequencePairView
+    (.atom (.terminal terminal)) (.atom (.nonterminal rule)) rawSequence
+  let rawTerminal := viewed.firstValue
+  let rawRule := viewed.secondValue
+  let terminalValue := terminalView terminal rawTerminal
+  let ruleValue := ruleView rule rawRule
+  refine ⟨(terminalValue, ruleValue), ?_⟩
+  unfold fixedInfixTailInput
+  rw [terminal_of_view terminal rawTerminal, rule_of_view rule rawRule,
+    viewed.rebuild]
+  exact group_of_view (.sequence children) input
+
+private theorem ruleReduction_logicalOr_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .logicalOr origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .logicalOr)) :
+    ∃ output, RuleReduction file tokens .logicalOr origin finish input output := by
+  let tail : EbnfExpr := .group (.sequence [
+    .atom (.terminal (.symbol .logicalOr)), .atom (.nonterminal .logicalAnd)])
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .logicalAnd), .star tail]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawLeft rawStar
+  simp only [totalValuesBuild]
+  let left := ruleView .logicalAnd rawLeft
+  rcases listInputs_exists (fixedInfixTailInput (.symbol .logicalOr) .logicalAnd)
+      (fixedInfixTail_exists (.symbol .logicalOr) .logicalAnd)
+      (starView tail rawStar) with
+    ⟨rest, restEq⟩
+  rw [← rule_of_view .logicalAnd rawLeft, ← star_of_view tail rawStar,
+    ← restEq]
+  exact ⟨_, .logicalOr origin finish left rest⟩
+
+private theorem ruleReduction_logicalAnd_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .logicalAnd origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .logicalAnd)) :
+    ∃ output, RuleReduction file tokens .logicalAnd origin finish input output := by
+  let tail : EbnfExpr := .group (.sequence [
+    .atom (.terminal (.symbol .logicalAnd)), .atom (.nonterminal .equality)])
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .equality), .star tail]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawLeft rawStar
+  simp only [totalValuesBuild]
+  let left := ruleView .equality rawLeft
+  rcases listInputs_exists (fixedInfixTailInput (.symbol .logicalAnd) .equality)
+      (fixedInfixTail_exists (.symbol .logicalAnd) .equality)
+      (starView tail rawStar) with
+    ⟨rest, restEq⟩
+  rw [← rule_of_view .equality rawLeft, ← star_of_view tail rawStar,
+    ← restEq]
+  exact ⟨_, .logicalAnd origin finish left rest⟩
+
+private theorem ruleReduction_bitOr_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .bitOr origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .bitOr)) :
+    ∃ output, RuleReduction file tokens .bitOr origin finish input output := by
+  let tail : EbnfExpr := .group (.sequence [
+    .atom (.terminal (.symbol .pipe)), .atom (.nonterminal .bitXor)])
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .bitXor), .star tail]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawLeft rawStar
+  simp only [totalValuesBuild]
+  let left := ruleView .bitXor rawLeft
+  rcases listInputs_exists (fixedInfixTailInput (.symbol .pipe) .bitXor)
+      (fixedInfixTail_exists (.symbol .pipe) .bitXor)
+      (starView tail rawStar) with
+    ⟨rest, restEq⟩
+  rw [← rule_of_view .bitXor rawLeft, ← star_of_view tail rawStar, ← restEq]
+  exact ⟨_, .bitOr origin finish left rest⟩
+
+private theorem ruleReduction_bitXor_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .bitXor origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .bitXor)) :
+    ∃ output, RuleReduction file tokens .bitXor origin finish input output := by
+  let tail : EbnfExpr := .group (.sequence [
+    .atom (.terminal (.symbol .caret)), .atom (.nonterminal .bitAnd)])
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .bitAnd), .star tail]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawLeft rawStar
+  simp only [totalValuesBuild]
+  let left := ruleView .bitAnd rawLeft
+  rcases listInputs_exists (fixedInfixTailInput (.symbol .caret) .bitAnd)
+      (fixedInfixTail_exists (.symbol .caret) .bitAnd)
+      (starView tail rawStar) with
+    ⟨rest, restEq⟩
+  rw [← rule_of_view .bitAnd rawLeft, ← star_of_view tail rawStar, ← restEq]
+  exact ⟨_, .bitXor origin finish left rest⟩
+
+private theorem ruleReduction_bitAnd_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .bitAnd origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .bitAnd)) :
+    ∃ output, RuleReduction file tokens .bitAnd origin finish input output := by
+  let tail : EbnfExpr := .group (.sequence [
+    .atom (.terminal (.symbol .amp)), .atom (.nonterminal .additive)])
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .additive), .star tail]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawLeft rawStar
+  simp only [totalValuesBuild]
+  let left := ruleView .additive rawLeft
+  rcases listInputs_exists (fixedInfixTailInput (.symbol .amp) .additive)
+      (fixedInfixTail_exists (.symbol .amp) .additive)
+      (starView tail rawStar) with
+    ⟨rest, restEq⟩
+  rw [← rule_of_view .additive rawLeft, ← star_of_view tail rawStar, ← restEq]
+  exact ⟨_, .bitAnd origin finish left rest⟩
+
+private theorem ruleReduction_postfix_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .postfix origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .postfix)) :
+    ∃ output, RuleReduction file tokens .postfix origin finish input output := by
+  let partAtom : EbnfExpr := .atom (.nonterminal .postfixPart)
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .atom), .star partAtom]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawAtom rawStar
+  simp only [totalValuesBuild]
+  let atom := ruleView .atom rawAtom
+  let parts := (starView partAtom rawStar).map (ruleView .postfixPart)
+  rw [← rule_of_view .atom rawAtom, ← star_of_view partAtom rawStar,
+    ← ruleList_of_view .postfixPart (starView partAtom rawStar)]
+  exact ⟨_, .postfix origin finish atom parts⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
