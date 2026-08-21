@@ -13423,6 +13423,164 @@ private theorem ruleReduction_pattern_total
     exact ⟨_, .patternTuple origin finish openParen first comma second rest
       closeParen witness⟩
 
+private theorem ruleReduction_atom_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .atom origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .atom)) :
+    ∃ output : RuleValue .atom,
+      RuleReduction file tokens .atom origin finish input output := by
+  let literalAtom : EbnfExpr := .atom (.nonterminal .literal)
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let dotAtom : EbnfExpr := .atom (.terminal (.symbol .dot))
+  let atAtom : EbnfExpr := .atom (.terminal (.symbol .at))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let lambdaAtom : EbnfExpr := .atom (.nonterminal .lambda)
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let commaAtom : EbnfExpr := .atom (.terminal (.symbol .comma))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let argumentsSeq : EbnfExpr :=
+    .sequence [openAtom, .list0 expressionAtom, closeAtom]
+  let tupleTail : EbnfExpr := .group (.sequence [commaAtom, expressionAtom])
+  let branches : List EbnfExpr := [
+    literalAtom,
+    identifierAtom,
+    .sequence [dotAtom, identifierAtom, .optional argumentsSeq],
+    .sequence [atAtom, typeAtom],
+    lambdaAtom,
+    .sequence [openAtom, closeAtom],
+    .sequence [openAtom, expressionAtom, closeAtom],
+    .sequence [openAtom, expressionAtom, commaAtom, expressionAtom,
+      .star tupleTail, closeAtom]]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 8 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 ∨ branch = 5 ∨ branch = 6 ∨
+      branch = 7 := by
+    have bound : branch.val < 8 := by omega
+    have cases : branch.val = 0 ∨ branch.val = 1 ∨ branch.val = 2 ∨
+        branch.val = 3 ∨ branch.val = 4 ∨ branch.val = 5 ∨
+        branch.val = 6 ∨ branch.val = 7 := by omega
+    rcases cases with valueEq | valueEq | valueEq | valueEq |
+      valueEq | valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr
+        (Or.inl (Fin.ext valueEq)))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+        (Or.inl (Fin.ext valueEq))))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+        (Or.inl (Fin.ext valueEq)))))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+        (Or.inr (Fin.ext valueEq)))))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  · let literal := ruleView .literal raw
+    rw [← inputEq, ← rule_of_view .literal raw]
+    exact ⟨_, .atomLiteral origin finish literal witness⟩
+  · let name := terminalView (.category .identifier) raw
+    rcases matchedTerminal_identifier_projection_exists_unique name with
+      ⟨projection, projects, _unique⟩
+    rw [← inputEq, ← terminal_of_view (.category .identifier) raw]
+    exact ⟨_, .atomName origin finish name projection.1 projection.2
+      projects witness⟩
+  · let children : List EbnfExpr :=
+      [dotAtom, identifierAtom, .optional argumentsSeq]
+    generalize sequenceEq : sequenceFlatView children raw = values
+    rcases values with ⟨rawDot, rawName, rawOptional, ⟨⟩⟩
+    let dot := terminalView (.symbol .dot) rawDot
+    let name := terminalView (.category .identifier) rawName
+    rcases matchedTerminal_identifier_projection_exists_unique name with
+      ⟨projection, projects, _unique⟩
+    generalize optionalEq : optionalView argumentsSeq rawOptional = viewed
+    cases viewed with
+    | none =>
+        rw [← inputEq, ← sequence_of_flat_view children raw, sequenceEq,
+          ← terminal_of_view (.symbol .dot) rawDot,
+          ← terminal_of_view (.category .identifier) rawName,
+          ← optional_eq_of_view argumentsSeq rawOptional optionalEq]
+        exact ⟨_, .atomDotConstructorWithoutArguments origin finish dot name
+          projection.1 projection.2 projects witness⟩
+    | some rawArguments =>
+        generalize argumentsEq : sequenceFlatView
+          [openAtom, .list0 expressionAtom, closeAtom] rawArguments = values
+        rcases values with ⟨rawOpen, rawExpressions, rawClose, ⟨⟩⟩
+        let openParen := terminalView (.symbol .leftParen) rawOpen
+        let arguments := (list0View expressionAtom rawExpressions).map
+          (ruleView .expression)
+        let closeParen := terminalView (.symbol .rightParen) rawClose
+        rw [← inputEq, ← sequence_of_flat_view children raw, sequenceEq,
+          ← terminal_of_view (.symbol .dot) rawDot,
+          ← terminal_of_view (.category .identifier) rawName,
+          ← optional_eq_of_view argumentsSeq rawOptional optionalEq,
+          ← sequence_of_flat_view
+            [openAtom, .list0 expressionAtom, closeAtom] rawArguments,
+          argumentsEq, ← terminal_of_view (.symbol .leftParen) rawOpen,
+          ← ruleList0_of_view .expression rawExpressions,
+          ← terminal_of_view (.symbol .rightParen) rawClose]
+        exact ⟨_, .atomDotConstructorWithArguments origin finish dot name
+          projection.1 projection.2 projects openParen arguments closeParen
+          witness⟩
+  · let pair := sequencePairView atAtom typeAtom raw
+    let atTerminal := terminalView (.symbol .at) pair.firstValue
+    let typeValue := ruleView .typeAtom pair.secondValue
+    rw [← inputEq, ← pair.rebuild,
+      ← terminal_of_view (.symbol .at) pair.firstValue,
+      ← rule_of_view .typeAtom pair.secondValue]
+    exact ⟨_, .atomProxy origin finish atTerminal typeValue witness⟩
+  · let lambda := ruleView .lambda raw
+    rw [← inputEq, ← rule_of_view .lambda raw]
+    exact ⟨lambda, .atomLambda origin finish lambda⟩
+  · let pair := sequencePairView openAtom closeAtom raw
+    let openParen := terminalView (.symbol .leftParen) pair.firstValue
+    let closeParen := terminalView (.symbol .rightParen) pair.secondValue
+    rw [← inputEq, ← pair.rebuild,
+      ← terminal_of_view (.symbol .leftParen) pair.firstValue,
+      ← terminal_of_view (.symbol .rightParen) pair.secondValue]
+    exact ⟨_, .atomEmptyTuple origin finish openParen closeParen witness⟩
+  · generalize sequenceEq : sequenceFlatView
+      [openAtom, expressionAtom, closeAtom] raw = values
+    rcases values with ⟨rawOpen, rawInner, rawClose, ⟨⟩⟩
+    let openParen := terminalView (.symbol .leftParen) rawOpen
+    let inner := ruleView .expression rawInner
+    let closeParen := terminalView (.symbol .rightParen) rawClose
+    rw [← inputEq,
+      ← sequence_of_flat_view [openAtom, expressionAtom, closeAtom] raw,
+      sequenceEq, ← terminal_of_view (.symbol .leftParen) rawOpen,
+      ← rule_of_view .expression rawInner,
+      ← terminal_of_view (.symbol .rightParen) rawClose]
+    exact ⟨_, .atomGroup origin finish openParen inner closeParen witness⟩
+  · generalize sequenceEq : sequenceFlatView [openAtom, expressionAtom,
+      commaAtom, expressionAtom, .star tupleTail, closeAtom] raw = values
+    rcases values with
+      ⟨rawOpen, rawFirst, rawComma, rawSecond, rawRest, rawClose, ⟨⟩⟩
+    let openParen := terminalView (.symbol .leftParen) rawOpen
+    let first := ruleView .expression rawFirst
+    let comma := terminalView (.symbol .comma) rawComma
+    let second := ruleView .expression rawSecond
+    let closeParen := terminalView (.symbol .rightParen) rawClose
+    rcases listInputs_exists (fixedInfixTailInput (.symbol .comma) .expression)
+        (fixedInfixTail_exists (.symbol .comma) .expression)
+        (starView tupleTail rawRest) with ⟨rest, restEq⟩
+    rw [← inputEq, ← sequence_of_flat_view [openAtom, expressionAtom,
+      commaAtom, expressionAtom, .star tupleTail, closeAtom] raw, sequenceEq,
+      ← terminal_of_view (.symbol .leftParen) rawOpen,
+      ← rule_of_view .expression rawFirst,
+      ← terminal_of_view (.symbol .comma) rawComma,
+      ← rule_of_view .expression rawSecond,
+      ← star_of_view tupleTail rawRest, ← restEq,
+      ← terminal_of_view (.symbol .rightParen) rawClose]
+    exact ⟨_, .atomTuple origin finish openParen first comma second rest
+      closeParen witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
