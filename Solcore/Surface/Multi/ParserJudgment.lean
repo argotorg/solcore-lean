@@ -18861,6 +18861,54 @@ inductive Applies : WorkspaceFile → List Token → ParseDiagnostic → Prop wh
 
 end ParseDiagnostic
 
+/-- Minimal proof interface for the ordinary unexpected-token failure branch.
+The repeated-nonassociative branch has a separate positive witness and is not
+represented here. -/
+structure UnexpectedDiagnosticPremises
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) : Prop where
+  noRoot : ¬ ∃ module, SourceBackedRoot file tokens module
+  greatest : GreatestReachableCursor file tokens memo correct final cursor
+  terminalWait : TerminalFrontierWait
+    file tokens memo correct final cursor
+  atMostLogicalEOF : cursor.val ≤ tokens.length
+  notRepeated : ∀ level operator,
+    ¬ RepeatedNonAssociativeAt
+      file tokens memo correct final cursor level operator
+
+/-- Construct the unique ordinary parse diagnostic and its declarative
+certificate from the minimal unexpected-failure premises. -/
+def unexpectedDiagnosticOfPremises
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (premises : UnexpectedDiagnosticPremises
+      file tokens memo correct final cursor) :
+    { diagnostic : ParseDiagnostic //
+      ParseDiagnostic.Applies file tokens diagnostic } :=
+  let expectedResult :=
+    canonicalExpected? owned correct final cursor premises.greatest
+  have expectedSome : expectedResult ≠ none := by
+    dsimp only [expectedResult]
+    exact canonicalExpected?_ne_none_of_terminalFrontierWait
+      owned correct final cursor premises.greatest premises.terminalWait
+  match selected : expectedResult with
+  | none => False.elim (expectedSome rfl)
+  | some expected =>
+      let found := FoundAt.compute
+        file tokens owned cursor premises.atMostLogicalEOF
+      ⟨.unexpected found.val.1 found.val.2 expected.val,
+        .unexpected file tokens memo correct final cursor
+          found.val.1 found.val.2 expected.val
+          premises.noRoot premises.greatest expected.property
+          found.property premises.notRepeated⟩
+
 private theorem finalPhaseBMemo_functional
     {file : WorkspaceFile} {tokens : List Token}
     {leftMemo rightMemo : GuardMemo tokens}
