@@ -11717,6 +11717,262 @@ private theorem ruleReduction_constructorSelection_total
     exact ⟨_, .constructorSelectionNamed origin finish openParen names
       closeParen headProjects tailProjects witness⟩
 
+private theorem ruleReduction_importDecl_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .importDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .importDecl)) :
+    ∃ output : RuleValue .importDecl,
+      RuleReduction file tokens .importDecl origin finish input output := by
+  let moduleChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .importKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .semicolon))]
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .importKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.hardKeyword .asKw)),
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .semicolon))]
+  let entryAtom : EbnfExpr := .atom (.nonterminal .importEntry)
+  let hidingAtom : EbnfExpr := .atom (.nonterminal .hidingClause)
+  let itemsChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .importKw)),
+    .atom (.nonterminal .moduleRef), .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 entryAtom,
+    .atom (.terminal (.symbol .rightBrace)), .optional hidingAtom,
+    .atom (.terminal (.symbol .semicolon))]
+  let branches : List EbnfExpr := [.sequence moduleChildren,
+    .sequence aliasChildren, .sequence itemsChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 3 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl
+  · generalize sequenceEq : sequenceFlatView moduleChildren raw = values
+    rcases values with ⟨rawImport, rawReference, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view moduleChildren raw
+    rw [sequenceEq] at rawEq
+    let importKw := terminalView (.hardKeyword .importKw) rawImport
+    let reference := ruleView .moduleRef rawReference
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .importKw) rawImport,
+      ← rule_of_view .moduleRef rawReference,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .importDeclModule origin finish
+      importKw reference semicolon witness⟩
+  · generalize sequenceEq : sequenceFlatView aliasChildren raw = values
+    rcases values with
+      ⟨rawImport, rawReference, rawAs, rawName, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view aliasChildren raw
+    rw [sequenceEq] at rawEq
+    let importKw := terminalView (.hardKeyword .importKw) rawImport
+    let reference := ruleView .moduleRef rawReference
+    let asKw := terminalView (.hardKeyword .asKw) rawAs
+    let matched := terminalView (.category .identifier) rawName
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rcases matchedTerminal_identifier_projection_exists_unique matched with
+      ⟨projection, projects, _unique⟩
+    let name := identifierData matched projection
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .importKw) rawImport,
+      ← rule_of_view .moduleRef rawReference,
+      ← terminal_of_view (.hardKeyword .asKw) rawAs,
+      ← terminal_of_view (.category .identifier) rawName,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .importDeclAliased origin finish importKw reference asKw
+      name semicolon projects witness⟩
+  · generalize sequenceEq : sequenceFlatView itemsChildren raw = values
+    rcases values with ⟨rawImport, rawReference, rawDot, rawOpen,
+      rawEntries, rawClose, rawHiding, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view itemsChildren raw
+    rw [sequenceEq] at rawEq
+    let importKw := terminalView (.hardKeyword .importKw) rawImport
+    let reference := ruleView .moduleRef rawReference
+    let dot := terminalView (.symbol .dot) rawDot
+    let openBrace := terminalView (.symbol .leftBrace) rawOpen
+    let entries := (list0View entryAtom rawEntries).map
+      (ruleView .importEntry)
+    let closeBrace := terminalView (.symbol .rightBrace) rawClose
+    let hidingValue := (optionalView hidingAtom rawHiding).map
+      (ruleView .hidingClause)
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    have entriesEq := ruleList0_of_view .importEntry rawEntries
+    have hidingEq := optional_map_of_view hidingAtom
+      (ruleView .hidingClause) (EbnfValue.ruleAtom .hidingClause)
+      (rule_of_view .hidingClause) rawHiding
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .importKw) rawImport,
+      ← rule_of_view .moduleRef rawReference,
+      ← terminal_of_view (.symbol .dot) rawDot,
+      ← terminal_of_view (.symbol .leftBrace) rawOpen, ← entriesEq,
+      ← terminal_of_view (.symbol .rightBrace) rawClose, ← hidingEq,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .importDeclItems origin finish importKw reference dot
+      openBrace entries closeBrace hidingValue semicolon witness⟩
+
+private theorem ruleReduction_exportDecl_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .exportDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .exportDecl)) :
+    ∃ output : RuleValue .exportDecl,
+      RuleReduction file tokens .exportDecl origin finish input output := by
+  let localAtom : EbnfExpr := .atom (.nonterminal .localExportEntry)
+  let remoteAtom : EbnfExpr := .atom (.nonterminal .remoteExportEntry)
+  let localChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 localAtom,
+    .atom (.terminal (.symbol .rightBrace)),
+    .atom (.terminal (.symbol .semicolon))]
+  let moduleChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .semicolon))]
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.hardKeyword .asKw)),
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .semicolon))]
+  let wildcardChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef), .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .semicolon))]
+  let bracedChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef), .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 remoteAtom,
+    .atom (.terminal (.symbol .rightBrace)),
+    .atom (.terminal (.symbol .semicolon))]
+  let branches : List EbnfExpr := [.sequence localChildren,
+    .sequence moduleChildren, .sequence aliasChildren,
+    .sequence wildcardChildren, .sequence bracedChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 5 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+      branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext valueEq))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl
+  · generalize sequenceEq : sequenceFlatView localChildren raw = values
+    rcases values with ⟨rawExport, rawOpen, rawEntries,
+      rawClose, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view localChildren raw
+    rw [sequenceEq] at rawEq
+    let exportKw := terminalView (.hardKeyword .exportKw) rawExport
+    let openBrace := terminalView (.symbol .leftBrace) rawOpen
+    let entries := (list0View localAtom rawEntries).map
+      (ruleView .localExportEntry)
+    let closeBrace := terminalView (.symbol .rightBrace) rawClose
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    have entriesEq := ruleList0_of_view .localExportEntry rawEntries
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← terminal_of_view (.symbol .leftBrace) rawOpen, ← entriesEq,
+      ← terminal_of_view (.symbol .rightBrace) rawClose,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .exportDeclLocal origin finish exportKw openBrace entries
+      closeBrace semicolon witness⟩
+  · generalize sequenceEq : sequenceFlatView moduleChildren raw = values
+    rcases values with ⟨rawExport, rawReference, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view moduleChildren raw
+    rw [sequenceEq] at rawEq
+    let exportKw := terminalView (.hardKeyword .exportKw) rawExport
+    let reference := ruleView .moduleRef rawReference
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← rule_of_view .moduleRef rawReference,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .exportDeclModule origin finish
+      exportKw reference semicolon witness⟩
+  · generalize sequenceEq : sequenceFlatView aliasChildren raw = values
+    rcases values with
+      ⟨rawExport, rawReference, rawAs, rawName, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view aliasChildren raw
+    rw [sequenceEq] at rawEq
+    let exportKw := terminalView (.hardKeyword .exportKw) rawExport
+    let reference := ruleView .moduleRef rawReference
+    let asKw := terminalView (.hardKeyword .asKw) rawAs
+    let matched := terminalView (.category .identifier) rawName
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rcases matchedTerminal_identifier_projection_exists_unique matched with
+      ⟨projection, projects, _unique⟩
+    let name := identifierData matched projection
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← rule_of_view .moduleRef rawReference,
+      ← terminal_of_view (.hardKeyword .asKw) rawAs,
+      ← terminal_of_view (.category .identifier) rawName,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .exportDeclAliased origin finish exportKw reference asKw
+      name semicolon projects witness⟩
+  · generalize sequenceEq : sequenceFlatView wildcardChildren raw = values
+    rcases values with
+      ⟨rawExport, rawReference, rawDot, rawStar, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view wildcardChildren raw
+    rw [sequenceEq] at rawEq
+    let exportKw := terminalView (.hardKeyword .exportKw) rawExport
+    let reference := ruleView .moduleRef rawReference
+    let dot := terminalView (.symbol .dot) rawDot
+    let star := terminalView (.symbol .star) rawStar
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← rule_of_view .moduleRef rawReference,
+      ← terminal_of_view (.symbol .dot) rawDot,
+      ← terminal_of_view (.symbol .star) rawStar,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .exportDeclWildcard origin finish exportKw reference dot star
+      semicolon (.wildcardStar star) witness⟩
+  · generalize sequenceEq : sequenceFlatView bracedChildren raw = values
+    rcases values with ⟨rawExport, rawReference, rawDot, rawOpen,
+      rawEntries, rawClose, rawSemicolon, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view bracedChildren raw
+    rw [sequenceEq] at rawEq
+    let exportKw := terminalView (.hardKeyword .exportKw) rawExport
+    let reference := ruleView .moduleRef rawReference
+    let dot := terminalView (.symbol .dot) rawDot
+    let openBrace := terminalView (.symbol .leftBrace) rawOpen
+    let entries := (list0View remoteAtom rawEntries).map
+      (ruleView .remoteExportEntry)
+    let closeBrace := terminalView (.symbol .rightBrace) rawClose
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    have entriesEq := ruleList0_of_view .remoteExportEntry rawEntries
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← rule_of_view .moduleRef rawReference,
+      ← terminal_of_view (.symbol .dot) rawDot,
+      ← terminal_of_view (.symbol .leftBrace) rawOpen, ← entriesEq,
+      ← terminal_of_view (.symbol .rightBrace) rawClose,
+      ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .exportDeclBraced origin finish exportKw reference dot
+      openBrace entries closeBrace semicolon witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
