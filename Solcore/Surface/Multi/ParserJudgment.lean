@@ -2864,6 +2864,16 @@ private theorem guardEvidence_total_of_positiveDecision
               intro evidence
               exact noPositive ⟨owned, evidence⟩
 
+/-- Every guard instance on an owned stream has one declarative decision. -/
+theorem guard_evidence_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) :
+    ∃ decision : GuardDecision,
+      GuardEvidence file tokens key decision :=
+  guardEvidence_total_of_positiveDecision owned key
+    (guardEvidenceDecision owned key .positive)
+
 private theorem binaryGuardDecision_functional
     (positive : Prop)
     {left right : GuardDecision}
