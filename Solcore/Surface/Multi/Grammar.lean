@@ -3174,4 +3174,206 @@ theorem expanded_actions_exact :
   simp [expanded, checkedExpansion, repetitionsNonnullable_eq_true,
     expandedUnchecked, allActionIds, ExpandedProduction.ofId]
 
+private def statementChoice : ChoiceSite := {
+  site := ⟨{ rule := .statement, path := [] }, by
+    unfold GrammarSiteKey.valid m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+    rfl⟩
+  hasKind := by
+    unfold GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+      EbnfExpr.kind
+    rfl
+}
+
+private def typeChoice : ChoiceSite := {
+  site := ⟨{ rule := .type, path := [] }, by
+    unfold GrammarSiteKey.valid m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+    rfl⟩
+  hasKind := by
+    unfold GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+      EbnfExpr.kind
+    rfl
+}
+
+private def patternChoice : ChoiceSite := {
+  site := ⟨{ rule := .pattern, path := [] }, by
+    unfold GrammarSiteKey.valid m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+    rfl⟩
+  hasKind := by
+    unfold GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+      EbnfExpr.kind
+    rfl
+}
+
+private def postfixPartChoice : ChoiceSite := {
+  site := ⟨{ rule := .postfixPart, path := [] }, by
+    unfold GrammarSiteKey.valid m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+    rfl⟩
+  hasKind := by
+    unfold GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+      EbnfExpr.kind
+    rfl
+}
+
+private def expressionStatementChoice : ChoiceSite := {
+  site := ⟨{ rule := .expressionStatement, path := [] }, by
+    unfold GrammarSiteKey.valid m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+    rfl⟩
+  hasKind := by
+    unfold GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+      EbnfExpr.kind
+    rfl
+}
+
+set_option linter.unusedSimpArgs false in
+private def parameterOptional : OptionalSite := {
+  site := ⟨{ rule := .parameter, path := [0] }, by
+    simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, terminal, hardKeyword, contextualKeyword,
+      pragmaName, symbol, category, nonterminal, sequence, choice, group,
+      optional, star, plus, list0, list1, identifier, pathComponent]⟩
+  hasKind := by
+    simp [GrammarSite.expression, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, EbnfExpr.kind, terminal, hardKeyword,
+      contextualKeyword, pragmaName, symbol, category, nonterminal,
+      sequence, choice, group, optional, star, plus, list0, list1,
+      identifier, pathComponent]
+}
+
+set_option linter.unusedSimpArgs false in
+private def letBindingOptional : OptionalSite := {
+  site := ⟨{ rule := .letBinding, path := [2, 0, 1] }, by
+    simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, terminal, hardKeyword, contextualKeyword,
+      pragmaName, symbol, category, nonterminal, sequence, choice, group,
+      optional, star, plus, list0, list1, identifier, pathComponent]⟩
+  hasKind := by
+    simp [GrammarSite.expression, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, EbnfExpr.kind, terminal, hardKeyword,
+      contextualKeyword, pragmaName, symbol, category, nonterminal,
+      sequence, choice, group, optional, star, plus, list0, list1,
+      identifier, pathComponent]
+}
+
+set_option linter.unusedSimpArgs false in
+private def atomOptional : OptionalSite := {
+  site := ⟨{ rule := .atom, path := [2, 2] }, by
+    simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, terminal, hardKeyword, contextualKeyword,
+      pragmaName, symbol, category, nonterminal, sequence, choice, group,
+      optional, star, plus, list0, list1, identifier, pathComponent]⟩
+  hasKind := by
+    simp [GrammarSite.expression, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, EbnfExpr.kind, terminal, hardKeyword,
+      contextualKeyword, pragmaName, symbol, category, nonterminal,
+      sequence, choice, group, optional, star, plus, list0, list1,
+      identifier, pathComponent]
+}
+
+set_option linter.unusedSimpArgs false in
+private def genericPrefixOptional : OptionalSite := {
+  site := ⟨{ rule := .genericPrefix, path := [1] }, by
+    simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, terminal, hardKeyword, contextualKeyword,
+      pragmaName, symbol, category, nonterminal, sequence, choice, group,
+      optional, star, plus, list0, list1, identifier, pathComponent]⟩
+  hasKind := by
+    simp [GrammarSite.expression, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, EbnfExpr.kind, terminal, hardKeyword,
+      contextualKeyword, pragmaName, symbol, category, nonterminal,
+      sequence, choice, group, optional, star, plus, list0, list1,
+      identifier, pathComponent]
+}
+
+set_option linter.unusedSimpArgs false in
+private def matchArmStar : StarSite := {
+  site := ⟨{ rule := .matchArm, path := [3] }, by
+    simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, terminal, hardKeyword, contextualKeyword,
+      pragmaName, symbol, category, nonterminal, sequence, choice, group,
+      optional, star, plus, list0, list1, identifier, pathComponent]⟩
+  hasKind := by
+    simp [GrammarSite.expression, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, EbnfExpr.kind, terminal, hardKeyword,
+      contextualKeyword, pragmaName, symbol, category, nonterminal,
+      sequence, choice, group, optional, star, plus, list0, list1,
+      identifier, pathComponent]
+}
+
+private theorem statementChoice_branchCount :
+    statementChoice.branchCount = 11 := by
+  unfold statementChoice ChoiceSite.branchCount GrammarSite.expression
+    m2cV1 m2cV1Rhs EbnfExpr.nodeAt? EbnfExpr.choiceBranchCount
+  rfl
+
+private theorem typeChoice_branchCount : typeChoice.branchCount = 2 := by
+  unfold typeChoice ChoiceSite.branchCount GrammarSite.expression
+    m2cV1 m2cV1Rhs EbnfExpr.nodeAt? EbnfExpr.choiceBranchCount
+  rfl
+
+private theorem patternChoice_branchCount : patternChoice.branchCount = 8 := by
+  unfold patternChoice ChoiceSite.branchCount GrammarSite.expression
+    m2cV1 m2cV1Rhs EbnfExpr.nodeAt? EbnfExpr.choiceBranchCount
+  rfl
+
+private theorem postfixPartChoice_branchCount :
+    postfixPartChoice.branchCount = 3 := by
+  unfold postfixPartChoice ChoiceSite.branchCount GrammarSite.expression
+    m2cV1 m2cV1Rhs EbnfExpr.nodeAt? EbnfExpr.choiceBranchCount
+  rfl
+
+private theorem expressionStatementChoice_branchCount :
+    expressionStatementChoice.branchCount = 2 := by
+  unfold expressionStatementChoice ChoiceSite.branchCount
+    GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
+    EbnfExpr.choiceBranchCount
+  rfl
+
+private def guardedProductions : List ProductionId := [
+  .choice statementChoice ⟨3, by rw [statementChoice_branchCount]; omega⟩,
+  .choice statementChoice ⟨10, by rw [statementChoice_branchCount]; omega⟩,
+  .choice typeChoice ⟨0, by rw [typeChoice_branchCount]; omega⟩,
+  .choice typeChoice ⟨1, by rw [typeChoice_branchCount]; omega⟩,
+  .choice patternChoice ⟨3, by rw [patternChoice_branchCount]; omega⟩,
+  .choice patternChoice ⟨4, by rw [patternChoice_branchCount]; omega⟩,
+  .choice postfixPartChoice ⟨0, by rw [postfixPartChoice_branchCount]; omega⟩,
+  .choice expressionStatementChoice
+    ⟨1, by rw [expressionStatementChoice_branchCount]; omega⟩,
+  .opt parameterOptional .none,
+  .opt parameterOptional .some,
+  .opt letBindingOptional .none,
+  .opt letBindingOptional .some,
+  .opt atomOptional .none,
+  .opt atomOptional .some,
+  .opt genericPrefixOptional .none,
+  .opt genericPrefixOptional .some,
+  .star matchArmStar .nil,
+  .star matchArmStar .cons
+]
+
+private def guardedKeys : List GuardedProductionKey := [
+  .choice .statement [] 3,
+  .choice .statement [] 10,
+  .choice .type [] 0,
+  .choice .type [] 1,
+  .choice .pattern [] 3,
+  .choice .pattern [] 4,
+  .choice .postfixPart [] 0,
+  .choice .expressionStatement [] 1,
+  .opt .parameter [0] .none,
+  .opt .parameter [0] .some,
+  .opt .letBinding [2, 0, 1] .none,
+  .opt .letBinding [2, 0, 1] .some,
+  .opt .atom [2, 2] .none,
+  .opt .atom [2, 2] .some,
+  .opt .genericPrefix [1] .none,
+  .opt .genericPrefix [1] .some,
+  .star .matchArm [3] .nil,
+  .star .matchArm [3] .cons
+]
+
+private theorem guardedProductions_keys :
+    guardedProductions.map ProductionId.guardedKey? =
+      guardedKeys.map some := by
+  rfl
+
 end Solcore.Surface.Multi.Grammar
