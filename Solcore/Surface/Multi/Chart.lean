@@ -5099,6 +5099,232 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private theorem chargeAddresses?_total_usedRev
+    {tokens : List Token} {state : Type} :
+    ∀ addresses (current : CountedState tokens state),
+      addresses.Nodup →
+      (∀ address, address ∈ addresses →
+        address ∉ current.counter.usedRev) →
+      ∃ result, chargeAddresses? current addresses = some result ∧
+        result.counter.usedRev =
+          addresses.reverse ++ current.counter.usedRev := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current unique fresh
+      exact ⟨current, rfl, by simp⟩
+  | cons address rest induction =>
+      intro current unique pending
+      rw [List.nodup_cons] at unique
+      have fresh := pending address (by simp)
+      let next : CountedState tokens state := {
+        payload := current.payload
+        counter := current.counter.charge address fresh
+      }
+      have stepped : runMappedPrimitive? current address id = some next := by
+        simp [runMappedPrimitive?, fresh, next]
+      have restFresh : ∀ candidate, candidate ∈ rest →
+          candidate ∉ next.counter.usedRev := by
+        intro candidate member used
+        rw [runMappedPrimitive?_usedRev current address id next stepped,
+          List.mem_cons] at used
+        rcases used with equal | old
+        · exact unique.1 (equal.symm ▸ member)
+        · exact pending candidate (by simp [member]) old
+      obtain ⟨result, continued, resultUsed⟩ :=
+        induction next unique.2 restFresh
+      refine ⟨result, ?_, ?_⟩
+      · rw [chargeAddresses?, stepped]
+        exact continued
+      · rw [resultUsed,
+          runMappedPrimitive?_usedRev current address id next stepped]
+        simp [List.reverse_cons, List.append_assoc]
+
+private theorem preFinalGuardSlots_nodup : preFinalGuardSlots.Nodup := by
+  decide
+
+private theorem preFinalGuardAddresses_nodup
+    {tokens : List Token} (key : GuardInstanceKey tokens) :
+    (preFinalGuardSlots.map fun slot =>
+      UnitAddress.guardFinalize slot key).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_map]
+  exact preFinalGuardSlots_nodup.imp fun different equal =>
+    different (UnitAddress.guardFinalize.inj equal).1
+
+private theorem finalizeNextIndexedGuard?_total_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens) (rest : List (GuardInstanceKey tokens))
+    (remaining : current.payload.phaseB.remaining = key :: rest)
+    (ready : PhaseBRunnerReady current) :
+    ∃ result,
+      finalizeNextIndexedGuard? current = some result ∧
+      result.payload.phaseB.remaining = rest ∧
+      PhaseBRunnerReady result := by
+  have unique := ready.2.1
+  rw [remaining, List.nodup_cons] at unique
+  have keyMember : key ∈ current.payload.phaseB.remaining := by
+    rw [remaining]
+    simp
+  have initializeFresh := ready.2.2.1 key keyMember
+    .initializeUndecided
+  let initializeTransition := fun (state : PhaseBIndexed file tokens) => ({
+    phaseB := {
+      state.phaseB with
+      cells := fun candidate =>
+        if candidate = key then some .undecided
+        else state.phaseB.cells candidate
+    }
+    indexes := state.indexes
+  } : PhaseBIndexed file tokens)
+  let initialized : CountedState tokens (PhaseBIndexed file tokens) := {
+    payload := initializeTransition current.payload
+    counter := current.counter.charge
+      (.guardFinalize .initializeUndecided key) initializeFresh
+  }
+  have initializedEq : runMappedPrimitive? current
+      (.guardFinalize .initializeUndecided key) initializeTransition =
+      some initialized := by
+    simp [runMappedPrimitive?, initializeFresh, initialized]
+  let lookupAddresses := preFinalGuardSlots.map fun slot =>
+    UnitAddress.guardFinalize slot key
+  have lookupFresh : ∀ address, address ∈ lookupAddresses →
+      address ∉ initialized.counter.usedRev := by
+    intro address member used
+    simp only [lookupAddresses, List.mem_map] at member
+    rcases member with ⟨slot, slotMember, rfl⟩
+    rw [runMappedPrimitive?_usedRev current _ initializeTransition
+      initialized initializedEq, List.mem_cons] at used
+    rcases used with equal | old
+    · have sameSlot := (UnitAddress.guardFinalize.inj equal).1
+      subst slot
+      simp [preFinalGuardSlots] at slotMember
+    · exact ready.2.2.1 key keyMember _ old
+  obtain ⟨lookedUp, lookedUpEq, lookedUpUsed⟩ :=
+    chargeAddresses?_total_usedRev lookupAddresses initialized
+      (preFinalGuardAddresses_nodup key) lookupFresh
+  have initializedPayload := phaseB_runMappedPrimitive?_payload current
+    (.guardFinalize .initializeUndecided key) initializeTransition
+    initializedEq
+  have lookedUpPayload := phaseB_chargeAddresses?_payload initialized
+    lookupAddresses lookedUp lookedUpEq
+  have complete : FullyMaterializedEvidenceEntries
+      lookedUp.payload.indexes := by
+    rw [lookedUpPayload, initializedPayload]
+    exact ready.1
+  obtain ⟨decision, decisionEq⟩ :=
+    phaseBGuardDecisionFromIndexes?_total lookedUp.payload.indexes
+      complete key
+  have writeFresh : UnitAddress.guardFinalize .writeFinalDecision key ∉
+      lookedUp.counter.usedRev := by
+    intro used
+    rw [lookedUpUsed, List.mem_append, List.mem_reverse,
+      runMappedPrimitive?_usedRev current _ initializeTransition
+        initialized initializedEq,
+      List.mem_cons] at used
+    rcases used with lookup | initMember | old
+    · simp only [lookupAddresses, List.mem_map] at lookup
+      rcases lookup with ⟨slot, slotMember, equal⟩
+      have sameSlot := (UnitAddress.guardFinalize.inj equal).1
+      subst slot
+      simp [preFinalGuardSlots] at slotMember
+    · cases initMember
+    · exact ready.2.2.1 key keyMember .writeFinalDecision old
+  let finalTransition := fun (state : PhaseBIndexed file tokens) => ({
+    phaseB := {
+      phaseA := state.phaseB.phaseA
+      cells := fun candidate =>
+        if candidate = key then some (.final decision)
+        else state.phaseB.cells candidate
+      remaining := rest
+      finalizedRev := key :: state.phaseB.finalizedRev
+    }
+    indexes := state.indexes
+  } : PhaseBIndexed file tokens)
+  let result : CountedState tokens (PhaseBIndexed file tokens) := {
+    payload := finalTransition lookedUp.payload
+    counter := lookedUp.counter.charge
+      (.guardFinalize .writeFinalDecision key) writeFresh
+  }
+  have finalEq : runMappedPrimitive? lookedUp
+      (.guardFinalize .writeFinalDecision key) finalTransition =
+      some result := by
+    simp [runMappedPrimitive?, writeFresh, result]
+  have selected : finalizeNextIndexedGuard? current = some result := by
+    simpa [finalizeNextIndexedGuard?, remaining, initializeTransition,
+      lookupAddresses, finalTransition, initializedEq, lookedUpEq,
+      decisionEq] using finalEq
+  refine ⟨result, selected, by rfl, ?_⟩
+  constructor
+  · rw [phaseB_runMappedPrimitive?_payload lookedUp _ finalTransition finalEq,
+      lookedUpPayload, initializedPayload]
+    exact ready.1
+  refine ⟨unique.2, ?_, ?_⟩
+  · intro candidate candidateMember slot used
+    have candidateRest : candidate ∈ rest := by
+      simpa [result, finalTransition] using candidateMember
+    have different : candidate ≠ key := by
+      intro equal
+      exact unique.1 (equal ▸ candidateRest)
+    rw [runMappedPrimitive?_usedRev lookedUp _ finalTransition result finalEq,
+      lookedUpUsed, List.mem_cons, List.mem_append, List.mem_reverse,
+      runMappedPrimitive?_usedRev current _ initializeTransition
+        initialized initializedEq, List.mem_cons] at used
+    rcases used with final | lookup | initMember | old
+    · exact different (UnitAddress.guardFinalize.inj final).2
+    · simp only [lookupAddresses, List.mem_map] at lookup
+      rcases lookup with ⟨oldSlot, _, equal⟩
+      exact different (UnitAddress.guardFinalize.inj equal).2.symm
+    · exact different (UnitAddress.guardFinalize.inj initMember).2
+    · exact ready.2.2.1 candidate
+        (by rw [remaining, List.mem_cons]; exact Or.inr candidateRest)
+        slot old
+  · intro used
+    rw [runMappedPrimitive?_usedRev lookedUp _ finalTransition result finalEq,
+      lookedUpUsed, List.mem_cons, List.mem_append, List.mem_reverse,
+      runMappedPrimitive?_usedRev current _ initializeTransition
+        initialized initializedEq, List.mem_cons] at used
+    rcases used with final | lookup | initMember | old
+    · cases final
+    · simp only [lookupAddresses, List.mem_map] at lookup
+      rcases lookup with ⟨slot, _, equal⟩
+      cases equal
+    · cases initMember
+    · exact ready.2.2.2 old
+
+private theorem runIndexedPhaseB?_total_ready
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ remaining (current : CountedState tokens (PhaseBIndexed file tokens)),
+      current.payload.phaseB.remaining = remaining →
+      PhaseBRunnerReady current →
+      ∃ result,
+        runIndexedPhaseB? remaining.length current = some result ∧
+        result.payload.phaseB.remaining = [] ∧
+        PhaseBRunnerReady result := by
+  intro remaining
+  induction remaining with
+  | nil =>
+      intro current remainingEq ready
+      exact ⟨current, by simp [runIndexedPhaseB?, remainingEq],
+        remainingEq, ready⟩
+  | cons key rest induction =>
+      intro current remainingEq ready
+      obtain ⟨next, nextEq, nextRemaining, nextReady⟩ :=
+        finalizeNextIndexedGuard?_total_ready current key rest
+          remainingEq ready
+      obtain ⟨result, runEq, done, resultReady⟩ :=
+        induction next nextRemaining nextReady
+      refine ⟨result, ?_, done, resultReady⟩
+      rw [List.length_cons, runIndexedPhaseB?, remainingEq, nextEq]
+      exact runEq
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
