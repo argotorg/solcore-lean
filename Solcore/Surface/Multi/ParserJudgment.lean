@@ -18225,6 +18225,142 @@ theorem canonicalExpected_sorted_nodup_unique
   cases listEq
   rfl
 
+/-- The frontier expectation set, deduplicated and placed in the stable public
+expectation order. -/
+def canonicalExpectedValues
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor) : List Expected :=
+  allExpected.filter fun expected =>
+    @decide (ExpectedMember
+      file tokens memo correct final cursor expected)
+      (expectedMemberDecision
+        owned correct final cursor greatest expected)
+
+/-- Membership in the canonical value list is exactly the declarative frontier
+union. -/
+theorem chart_expected_is_frontier_union
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (expected : Expected) :
+    expected ∈ canonicalExpectedValues
+        owned correct final cursor greatest ↔
+      ExpectedMember file tokens memo correct final cursor expected := by
+  simp only [canonicalExpectedValues, List.mem_filter,
+    decide_eq_true_iff, allExpected_complete, true_and]
+
+private theorem canonicalExpectedValues_nodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor) :
+    (canonicalExpectedValues
+      owned correct final cursor greatest).Nodup := by
+  exact List.Pairwise.filter _ allExpected_nodup
+
+private theorem canonicalExpectedValues_sorted
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor) :
+    (canonicalExpectedValues owned correct final cursor greatest).Pairwise
+      (fun left right => Expected.compare left right = .lt) := by
+  exact List.Pairwise.filter _ allExpected_sorted
+
+/-- Construct the canonical nonempty expectation list exactly when the
+frontier union is nonempty. -/
+def canonicalExpected?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor) :
+    Option { values : NonemptyList Expected //
+      CanonicalExpected
+        file tokens memo correct final cursor values } :=
+  match selectedEq : canonicalExpectedValues
+      owned correct final cursor greatest with
+  | [] => none
+  | head :: tail =>
+      some ⟨{ head := head, tail := tail }, by
+        unfold CanonicalExpected
+        constructor
+        · intro expected
+          have exact := chart_expected_is_frontier_union
+            owned correct final cursor greatest expected
+          simpa only [selectedEq] using exact
+        · constructor
+          · simpa only [selectedEq] using
+              canonicalExpectedValues_nodup
+                owned correct final cursor greatest
+          · simpa only [selectedEq] using
+              canonicalExpectedValues_sorted
+                owned correct final cursor greatest
+      ⟩
+
+/-- The optional construction returns no list exactly when the declarative
+frontier expectation union is empty. -/
+theorem canonicalExpected?_eq_none_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor) :
+    canonicalExpected? owned correct final cursor greatest = none ↔
+      ¬ ∃ expected,
+        ExpectedMember file tokens memo correct final cursor expected := by
+  unfold canonicalExpected?
+  split <;> rename_i selectedEq
+  · constructor
+    · intro returnedNone expectedMember
+      rcases expectedMember with ⟨expected, member⟩
+      have inValues := (chart_expected_is_frontier_union
+        owned correct final cursor greatest expected).mpr member
+      rw [selectedEq] at inValues
+      simp at inValues
+    · intro empty
+      rfl
+  · constructor
+    · intro impossible
+      contradiction
+    · intro empty
+      have notNil : canonicalExpectedValues
+          owned correct final cursor greatest ≠ [] := by
+        intro nilEq
+        rw [selectedEq] at nilEq
+        contradiction
+      rcases List.exists_mem_of_ne_nil
+          (canonicalExpectedValues owned correct final cursor greatest)
+          notNil with ⟨expected, inValues⟩
+      have member := (chart_expected_is_frontier_union
+        owned correct final cursor greatest expected).mp inValues
+      exact (empty ⟨expected, member⟩).elim
+
 /-- The retained token or logical EOF observed at one parser boundary. -/
 inductive FoundAt
     (file : WorkspaceFile) (tokens : List Token) :
