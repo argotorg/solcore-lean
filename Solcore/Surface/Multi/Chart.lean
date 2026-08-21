@@ -4301,4 +4301,303 @@ private theorem dequeueContextualEdge?_backpointerInvariant
 
 end Chart
 
+namespace Chart
+open Solcore.Workspace
+private theorem attemptContextualPrediction?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact invariant
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedInvariant :
+              PhaseCBackpointerInvariant file tokens attempted.payload := by
+            rw [runMappedPrimitive?_payload current
+              (.prediction .R01_predictionAttempt
+                (contextualPredictionKey waiting predicted)) id attemptedEq]
+            exact invariant
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedInvariant
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedInvariant :=
+                  activateWorklistProduction?_backpointerInvariant attempted
+                    productionInstance activated attemptedInvariant activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq] at selected
+                  cases selected
+                  exact activatedInvariant
+                · simp [attemptedEq, used, activatedEq, acceptedEq] at selected
+                  exact insertContextualItem?_backpointerInvariant
+                    activated.1 result .prediction item activatedInvariant
+                      selected
+
+private theorem attemptContextualPredictions?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ (productions : List ProductionId)
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCBackpointerInvariant file tokens current.payload →
+      attemptContextualPredictions? waiting productions current = some result →
+      PhaseCBackpointerInvariant file tokens result.payload := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result invariant selected
+      simp only [attemptContextualPredictions?, Option.some.injEq] at selected
+      cases selected
+      exact invariant
+  | cons predicted rest induction =>
+      intro current result invariant selected
+      simp only [attemptContextualPredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptContextualPrediction?_backpointerInvariant current next
+          waiting predicted invariant nextEq) restEq
+
+private theorem attemptContextualScan?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedInvariant :
+        PhaseCBackpointerInvariant file tokens attempted.payload := by
+      rw [runMappedPrimitive?_payload current
+        (.linear .L04_scanAttempt (contextualLinearKey before)) id attemptedEq]
+      exact invariant
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq, Option.some.injEq] at remainderEq
+        cases remainderEq
+        exact attemptedInvariant
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        exact insertContextualScannedEdge?_backpointerInvariant
+          withItem result edge
+          (insertContextualItem?_backpointerInvariant attempted withItem
+            .scan after attemptedInvariant itemEq) edgeEq
+  · cases selected
+    exact invariant
+
+private theorem attemptContextualCompletion?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold attemptContextualCompletion? at selected
+  cases completionEq : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completionEq, Option.some.injEq] at selected
+      cases selected
+      exact invariant
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      · cases selected
+        exact invariant
+      · simp only [Option.bind_eq_bind,
+          Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        have attemptedInvariant :
+            PhaseCBackpointerInvariant file tokens attempted.payload := by
+          rw [runMappedPrimitive?_payload current
+            (.cubic .U03_completionAttempt
+              (contextualCompletionKey waiting finished)) id attemptedEq]
+          exact invariant
+        exact insertContextualCompletedEdge?_backpointerInvariant
+          withItem result edge
+          (insertContextualItem?_backpointerInvariant attempted withItem
+            .completion after attemptedInvariant itemEq) edgeEq
+
+private theorem attemptContextualCompletionsWith?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ (others : List (ContextualItemKey tokens))
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCBackpointerInvariant file tokens current.payload →
+      attemptContextualCompletionsWith? pivot others current = some result →
+      PhaseCBackpointerInvariant file tokens result.payload := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result invariant selected
+      simp only [attemptContextualCompletionsWith?, Option.some.injEq] at selected
+      cases selected
+      exact invariant
+  | cons other rest induction =>
+      intro current result invariant selected
+      rw [attemptContextualCompletionsWith?] at selected
+      cases forwardEq :
+          attemptContextualCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          have remainderEq := selected
+          simp only [forwardEq] at remainderEq
+          change (if other = pivot then
+              attemptContextualCompletionsWith? pivot rest forward
+            else
+              (attemptContextualCompletion? forward other pivot).bind
+                (attemptContextualCompletionsWith? pivot rest)) =
+            some result at remainderEq
+          have forwardInvariant :=
+            attemptContextualCompletion?_backpointerInvariant current forward
+              pivot other invariant forwardEq
+          by_cases same : other = pivot
+          · rw [if_pos same] at remainderEq
+            exact induction forward result forwardInvariant remainderEq
+          · rw [if_neg same] at remainderEq
+            cases reverseEq :
+                attemptContextualCompletion? forward other pivot with
+            | none => simp [reverseEq] at remainderEq
+            | some reverse =>
+                rw [reverseEq] at remainderEq
+                exact induction reverse result
+                  (attemptContextualCompletion?_backpointerInvariant
+                    forward reverse other pivot forwardInvariant reverseEq)
+                  remainderEq
+
+private theorem processContextualItem?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload)
+    (selected : processContextualItem? owned item current = some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold processContextualItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
+  have predictedInvariant :=
+    attemptContextualPredictions?_backpointerInvariant item allProductionIds
+      current predicted invariant predictedEq
+  have scannedInvariant :=
+    attemptContextualScan?_backpointerInvariant owned predicted scanned item
+      predictedInvariant scannedEq
+  exact attemptContextualCompletionsWith?_backpointerInvariant item
+    scanned.payload.phaseC.contextualItems scanned result scannedInvariant
+      completedEq
+
+private theorem runPhaseCQueues?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result :
+      CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCBackpointerInvariant file tokens current.payload →
+      runPhaseCQueues? owned fuel current = some result →
+      PhaseCBackpointerInvariant file tokens result.payload := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result invariant selected
+      rw [runPhaseCQueues?] at selected
+      split at selected
+      · cases selected
+        exact invariant
+      · contradiction
+  | succ previous induction =>
+      intro current result invariant selected
+      rw [runPhaseCQueues?] at selected
+      cases itemsEq : current.payload.phaseC.itemQueue with
+      | nil =>
+          cases edgesEq : current.payload.phaseC.edgeQueue with
+          | nil =>
+              simp only [itemsEq, edgesEq] at selected
+              cases selected
+              exact invariant
+          | cons edge rest =>
+              simp only [itemsEq, edgesEq] at selected
+              cases dequeuedEq : dequeueContextualEdge? current with
+              | none => simp [dequeuedEq] at selected
+              | some dequeued =>
+                  rw [dequeuedEq] at selected
+                  exact induction dequeued.2 result
+                    (dequeueContextualEdge?_backpointerInvariant current
+                      dequeued invariant dequeuedEq) selected
+      | cons item rest =>
+          simp only [itemsEq] at selected
+          cases dequeuedEq : dequeueContextualItem? current with
+          | none => simp [dequeuedEq] at selected
+          | some dequeued =>
+              rw [dequeuedEq] at selected
+              rcases dequeued with ⟨dequeuedItem, afterDequeue⟩
+              simp only at selected
+              cases processedEq :
+                  processContextualItem? owned dequeuedItem afterDequeue with
+              | none => simp [processedEq] at selected
+              | some processed =>
+                  rw [processedEq] at selected
+                  have dequeuedInvariant :=
+                    dequeueContextualItem?_backpointerInvariant current
+                      (dequeuedItem, afterDequeue) invariant dequeuedEq
+                  exact induction processed result
+                    (processContextualItem?_backpointerInvariant owned
+                      dequeuedItem afterDequeue processed dequeuedInvariant
+                        processedEq) selected
+
+private theorem executePhaseCWorklist?_backpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executePhaseCWorklist? owned current = some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold executePhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueues?_backpointerInvariant owned
+    (chartGBound (tokens.length + 1)) entered result
+      (beginPhaseCWorklist?_backpointerInvariant current entered enteredEq)
+      runEq
+
+private theorem executeObservedPhaseABCWorklist?_backpointerInvariant
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklist? file tokens owned =
+      some result) :
+    PhaseCBackpointerInvariant file tokens result.payload := by
+  unfold executeObservedPhaseABCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, _phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklist?_backpointerInvariant owned phaseB result phaseCEq
+
+end Chart
+
 end Solcore.Surface.Multi
