@@ -13063,6 +13063,183 @@ private theorem ruleReduction_typeAtom_total
     exact ⟨_, .typeAtomTuple origin finish openParen first comma second rest
       closeParen witness⟩
 
+private def projectedTerminalData
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {parsedType : Type}
+    (matched : MatchedTerminal file tokens terminal)
+    (projection : String × parsedType) :
+    RuleReduction.SpelledTerminalData file tokens terminal parsedType := {
+  matched := matched
+  spelling := projection.1
+  parsed := projection.2
+}
+
+private theorem pathInput_exists
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens
+      (.atom (.terminal (.category .pathComponent)))) :
+    ∃ value : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment,
+      EbnfValue.terminalAtom (.category .pathComponent) value.matched = input ∧
+      PathSegmentProjects value.matched value.spelling value.parsed := by
+  let matched := terminalView (.category .pathComponent) input
+  rcases matchedTerminal_path_projection_exists_unique matched with
+    ⟨projection, projects, _unique⟩
+  exact ⟨projectedTerminalData matched projection,
+    terminal_of_view (.category .pathComponent) input, projects⟩
+
+private theorem externalInput_exists
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens
+      (.atom (.terminal (.category .pathComponent)))) :
+    ∃ value : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) ExternalLibraryName,
+      EbnfValue.terminalAtom (.category .pathComponent) value.matched = input ∧
+      ExternalLibraryProjects value.matched value.spelling value.parsed := by
+  let matched := terminalView (.category .pathComponent) input
+  rcases matchedTerminal_external_projection_exists_unique matched with
+    ⟨projection, projects, _unique⟩
+  exact ⟨projectedTerminalData matched projection,
+    terminal_of_view (.category .pathComponent) input, projects⟩
+
+private theorem pathTailInputs_exist
+    {file : WorkspaceFile} {tokens : List Token}
+    (inputs : List (EbnfValue file tokens (.group (.sequence [
+      .atom (.terminal (.symbol .dot)),
+      .atom (.terminal (.category .pathComponent))])))) :
+    ∃ rest : List (MatchedTerminal file tokens (.symbol .dot) ×
+        RuleReduction.SpelledTerminalData file tokens
+          (.category .pathComponent) PathSegment),
+      rest.map dotTailInput = inputs ∧
+      ∀ entry, entry ∈ rest → PathSegmentProjects entry.2.matched
+        entry.2.spelling entry.2.parsed := by
+  induction inputs with
+  | nil => exact ⟨[], rfl, by simp⟩
+  | cons raw tail ih =>
+      let child : EbnfExpr := .sequence [
+        .atom (.terminal (.symbol .dot)),
+        .atom (.terminal (.category .pathComponent))]
+      let rawSequence := groupView child raw
+      let viewed := sequencePairView
+        (.atom (.terminal (.symbol .dot)))
+        (.atom (.terminal (.category .pathComponent))) rawSequence
+      let dot := terminalView (.symbol .dot) viewed.firstValue
+      rcases pathInput_exists viewed.secondValue with
+        ⟨value, valueEq, projects⟩
+      rcases ih with ⟨rest, restEq, restProjects⟩
+      have rawEq : dotTailInput (dot, value) = raw := by
+        unfold dotTailInput
+        rw [terminal_of_view (.symbol .dot) viewed.firstValue,
+          valueEq, viewed.rebuild]
+        exact group_of_view child raw
+      refine ⟨(dot, value) :: rest, ?_, ?_⟩
+      · simp only [List.map_cons]
+        rw [rawEq, restEq]
+      · intro entry entryMem
+        rcases List.mem_cons.mp entryMem with rfl | entryMem
+        · exact projects
+        · exact restProjects entry entryMem
+
+private theorem ruleReduction_moduleRef_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .moduleRef origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .moduleRef)) :
+    ∃ output : RuleValue .moduleRef,
+      RuleReduction file tokens .moduleRef origin finish input output := by
+  let pathAtom : EbnfExpr :=
+    .atom (.terminal (.category .pathComponent))
+  let tailAtom : EbnfExpr := .group (.sequence [
+    .atom (.terminal (.symbol .dot)), pathAtom])
+  let externalChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .at)), pathAtom,
+    .atom (.terminal (.symbol .dot)), pathAtom, .star tailAtom]
+  let localChildren : List EbnfExpr := [pathAtom, .star tailAtom]
+  let branches : List EbnfExpr := [
+    .sequence externalChildren, .sequence localChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have branchesLength : branches.length = 2 := by rfl
+    have bound : branch.val < 2 := by omega
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · generalize sequenceEq :
+        sequenceFlatView externalChildren raw = values
+    rcases values with
+      ⟨rawAt, rawLibrary, rawDot, rawNext, rawStar, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view externalChildren raw
+    rw [sequenceEq] at rawEq
+    let atToken := terminalView (.symbol .at) rawAt
+    let dot := terminalView (.symbol .dot) rawDot
+    have atEq := terminal_of_view (.symbol .at) rawAt
+    have dotEq := terminal_of_view (.symbol .dot) rawDot
+    rcases externalInput_exists rawLibrary with
+      ⟨library, libraryEq, libraryProjects⟩
+    rcases pathInput_exists rawNext with
+      ⟨next, nextEq, nextProjects⟩
+    rcases pathTailInputs_exist (starView tailAtom rawStar) with
+      ⟨rest, restEq, restProjects⟩
+    have rawStarEq : EbnfValue.star tailAtom
+        (rest.map dotTailInput) = rawStar := by
+      rw [restEq]
+      exact star_of_view tailAtom rawStar
+    rw [← inputEq, ← rawEq, ← atEq, ← libraryEq,
+      ← dotEq, ← nextEq, ← rawStarEq]
+    exact ⟨_, .moduleRefExternal origin finish atToken library dot next rest
+      (.externalSigil atToken) libraryProjects nextProjects restProjects witness⟩
+  · generalize sequenceEq : sequenceFlatView localChildren raw = values
+    rcases values with ⟨rawFirst, rawStar, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view localChildren raw
+    rw [sequenceEq] at rawEq
+    rcases pathInput_exists rawFirst with
+      ⟨first, firstEq, firstProjects⟩
+    rcases pathTailInputs_exist (starView tailAtom rawStar) with
+      ⟨rest, restEq, restProjects⟩
+    have rawStarEq : EbnfValue.star tailAtom
+        (rest.map dotTailInput) = rawStar := by
+      rw [restEq]
+      exact star_of_view tailAtom rawStar
+    by_cases standardEq : first.spelling = "std"
+    · have marker : RuleReduction.MarkerProjects file tokens
+          first.matched .standardRoot :=
+        .standardRoot first.matched first.parsed (by
+          simpa [standardEq] using firstProjects)
+      rw [← inputEq, ← rawEq, ← firstEq, ← rawStarEq]
+      exact ⟨_, .moduleRefStandard origin finish first.matched rest
+        marker restProjects witness⟩
+    · by_cases libraryEq : first.spelling = "lib"
+      · have marker : RuleReduction.MarkerProjects file tokens
+            first.matched .libraryRoot :=
+          .libraryRoot first.matched first.parsed (by
+            simpa [libraryEq] using firstProjects)
+        cases rest with
+        | nil =>
+            rw [← inputEq, ← rawEq, ← firstEq, ← rawStarEq]
+            exact ⟨_, .moduleRefRelativeLibraryEmpty origin finish first
+              firstProjects marker witness⟩
+        | cons next remaining =>
+            have nextProjects := restProjects next (by simp)
+            have remainingProjects : ∀ entry, entry ∈ remaining →
+                PathSegmentProjects entry.2.matched
+                  entry.2.spelling entry.2.parsed := by
+              intro entry entryMem
+              exact restProjects entry (by simp [entryMem])
+            rw [← inputEq, ← rawEq, ← firstEq, ← rawStarEq]
+            exact ⟨_, .moduleRefLibraryRoot origin finish first.matched
+              next.1 next.2 remaining marker nextProjects
+              remainingProjects witness⟩
+      · rw [← inputEq, ← rawEq, ← firstEq, ← rawStarEq]
+        exact ⟨_, .moduleRefRelativeOther origin finish first rest
+          firstProjects restProjects standardEq libraryEq witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
