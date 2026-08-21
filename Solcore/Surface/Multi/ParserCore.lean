@@ -636,6 +636,125 @@ structure ContextualItemKey (tokens : List Token) where
   context : GuardContext tokens
   deriving Repr, BEq, DecidableEq
 
+private def allGuardContexts (tokens : List Token) :
+    List (GuardContext tokens) :=
+  .plain ::
+    ((allBoundaries tokens).map .bracedBody ++
+      (allBoundaries tokens).map .armBody ++
+      (allBoundaries tokens).map .postfixInvocation)
+
+private theorem allGuardContexts_complete {tokens : List Token}
+    (context : GuardContext tokens) :
+    context ∈ allGuardContexts tokens := by
+  cases context with
+  | plain => simp [allGuardContexts]
+  | bracedBody bodyStart =>
+      simp [allGuardContexts, allBoundaries_complete bodyStart]
+  | armBody armBodyStart =>
+      simp [allGuardContexts, allBoundaries_complete armBodyStart]
+  | postfixInvocation postfixStart =>
+      simp [allGuardContexts, allBoundaries_complete postfixStart]
+
+private theorem allGuardContexts_map_nodup
+    (tokens : List Token)
+    (make : Boundary tokens → GuardContext tokens)
+    (injective : Function.Injective make) :
+    ((allBoundaries tokens).map make).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_map]
+  have boundariesPairwise :
+      (allBoundaries tokens).Pairwise (fun left right => left ≠ right) := by
+    rw [← List.nodup_iff_pairwise_ne]
+    exact allBoundaries_nodup tokens
+  exact boundariesPairwise.imp fun different equal =>
+    different (injective equal)
+
+private theorem allGuardContexts_nodup (tokens : List Token) :
+    (allGuardContexts tokens).Nodup := by
+  have bracedUnique := allGuardContexts_map_nodup tokens
+    GuardContext.bracedBody (by
+      intro left right equal
+      cases equal
+      rfl)
+  have armUnique := allGuardContexts_map_nodup tokens
+    GuardContext.armBody (by
+      intro left right equal
+      cases equal
+      rfl)
+  have postfixUnique := allGuardContexts_map_nodup tokens
+    GuardContext.postfixInvocation (by
+      intro left right equal
+      cases equal
+      rfl)
+  rw [allGuardContexts, List.nodup_cons]
+  refine ⟨by simp, ?_⟩
+  rw [List.nodup_append]
+  refine ⟨?_, postfixUnique, ?_⟩
+  rw [List.nodup_append]
+  exact ⟨bracedUnique, armUnique, by simp⟩
+  intro left leftMember right rightMember equal
+  rw [List.mem_append] at leftMember
+  rw [List.mem_map] at rightMember
+  rcases rightMember with ⟨rightBoundary, _, rfl⟩
+  cases leftMember with
+  | inl bracedMember =>
+      rw [List.mem_map] at bracedMember
+      rcases bracedMember with ⟨leftBoundary, _, rfl⟩
+      cases equal
+  | inr armMember =>
+      rw [List.mem_map] at armMember
+      rcases armMember with ⟨leftBoundary, _, rfl⟩
+      cases equal
+
+private theorem allGuardContexts_length (tokens : List Token) :
+    (allGuardContexts tokens).length =
+      1 + 3 * (tokens.length + 2) := by
+  simp [allGuardContexts, allBoundaries_length]
+  omega
+
+/-- Every contextual chart item in stable raw-item and context order. -/
+def allContextualItems (tokens : List Token) :
+    List (ContextualItemKey tokens) :=
+  (allDottedItems tokens).flatMap fun raw =>
+    (allGuardContexts tokens).map fun context => { raw, context }
+
+/-- Every contextual chart item occurs in the stable finite enumeration. -/
+theorem allContextualItems_complete {tokens : List Token}
+    (item : ContextualItemKey tokens) :
+    item ∈ allContextualItems tokens := by
+  rw [allContextualItems, List.mem_flatMap]
+  refine ⟨item.raw, allDottedItems_complete item.raw, ?_⟩
+  rw [List.mem_map]
+  exact ⟨item.context, allGuardContexts_complete item.context, by
+    cases item
+    rfl⟩
+
+/-- The contextual-item enumeration contains no duplicate key. -/
+theorem allContextualItems_nodup (tokens : List Token) :
+    (allContextualItems tokens).Nodup := by
+  apply dependentEnumeration_nodup (allDottedItems tokens)
+    (fun _ => allGuardContexts tokens)
+    (fun raw context => ({ raw, context } : ContextualItemKey tokens))
+    (allDottedItems_nodup tokens)
+    (fun _ => allGuardContexts_nodup tokens)
+  intro left right leftContext rightContext equal
+  cases left
+  cases right
+  cases equal
+  rfl
+
+/-- The contextual-item enumeration has the displayed Phase-C cardinality. -/
+theorem allContextualItems_length (tokens : List Token) :
+    (allContextualItems tokens).length =
+      (1 + 3 * (tokens.length + 2)) * D *
+        (tokens.length + 2) * (tokens.length + 2) := by
+  rw [allContextualItems]
+  rw [dependentEnumeration_length (allDottedItems tokens)
+    (fun _ => allGuardContexts tokens) _
+    (1 + 3 * (tokens.length + 2))
+    (fun _ => allGuardContexts_length tokens)]
+  rw [allDottedItems_length]
+  simp only [Nat.mul_comm, Nat.mul_left_comm]
+
 /-- A proof-free contextual scan or completion edge key. -/
 inductive ContextualPackedEdgeKey (tokens : List Token) where
   | scanned
