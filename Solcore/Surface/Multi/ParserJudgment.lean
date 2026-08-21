@@ -9192,6 +9192,96 @@ private theorem ruleReduction_atom_functional
     apply (sourceLoc_eq_iff _ _ _ _).2
     rw [sequenceEq.2.1, sequenceEq.2.2.2.1, restEq]
 
+namespace RuleReduction
+
+/-- A fixed source-rule input and chart interval determine one semantic output. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs rule)}
+    {left right : RuleValue rule}
+    (leftReduces : RuleReduction file tokens rule origin finish input left)
+    (rightReduces : RuleReduction file tokens rule origin finish input right) :
+    left = right := by
+  cases rule <;> first
+    | exact ruleReduction_module_functional leftReduces rightReduces
+    | exact ruleReduction_topItem_functional leftReduces rightReduces
+    | exact ruleReduction_moduleRef_functional leftReduces rightReduces
+    | exact ruleReduction_importDecl_functional leftReduces rightReduces
+    | exact ruleReduction_importEntry_functional leftReduces rightReduces
+    | exact ruleReduction_hidingClause_functional leftReduces rightReduces
+    | exact ruleReduction_exportDecl_functional leftReduces rightReduces
+    | exact ruleReduction_localExportEntry_functional leftReduces rightReduces
+    | exact ruleReduction_remoteExportEntry_functional leftReduces rightReduces
+    | exact ruleReduction_exportItem_functional leftReduces rightReduces
+    | exact ruleReduction_constructorSelection_functional leftReduces rightReduces
+    | exact ruleReduction_pragmaDecl_functional leftReduces rightReduces
+    | exact ruleReduction_genericPrefix_functional leftReduces rightReduces
+    | exact ruleReduction_forallClause_functional leftReduces rightReduces
+    | exact ruleReduction_forallBinder_functional leftReduces rightReduces
+    | exact ruleReduction_optionalComma_functional leftReduces rightReduces
+    | exact ruleReduction_predicateList_functional leftReduces rightReduces
+    | exact ruleReduction_predicate_functional leftReduces rightReduces
+    | exact ruleReduction_functionSignature_functional leftReduces rightReduces
+    | exact ruleReduction_functionDecl_functional leftReduces rightReduces
+    | exact ruleReduction_classMethod_functional leftReduces rightReduces
+    | exact ruleReduction_dataDecl_functional leftReduces rightReduces
+    | exact ruleReduction_dataConstructor_functional leftReduces rightReduces
+    | exact ruleReduction_typeAliasDecl_functional leftReduces rightReduces
+    | exact ruleReduction_classDecl_functional leftReduces rightReduces
+    | exact ruleReduction_instanceDecl_functional leftReduces rightReduces
+    | exact ruleReduction_instanceMethod_functional leftReduces rightReduces
+    | exact ruleReduction_contractDecl_functional leftReduces rightReduces
+    | exact ruleReduction_contractMember_functional leftReduces rightReduces
+    | exact ruleReduction_fieldDecl_functional leftReduces rightReduces
+    | exact ruleReduction_fallbackDecl_functional leftReduces rightReduces
+    | exact ruleReduction_contractConstructorDecl_functional leftReduces rightReduces
+    | exact ruleReduction_parameter_functional leftReduces rightReduces
+    | exact ruleReduction_body_functional leftReduces rightReduces
+    | exact ruleReduction_type_functional leftReduces rightReduces
+    | exact ruleReduction_typeAtom_functional leftReduces rightReduces
+    | exact ruleReduction_qualifiedName_functional leftReduces rightReduces
+    | exact ruleReduction_statement_functional leftReduces rightReduces
+    | exact ruleReduction_letStatement_functional leftReduces rightReduces
+    | exact ruleReduction_letBinding_functional leftReduces rightReduces
+    | exact ruleReduction_returnStatement_functional leftReduces rightReduces
+    | exact ruleReduction_blockStatement_functional leftReduces rightReduces
+    | exact ruleReduction_breakStatement_functional leftReduces rightReduces
+    | exact ruleReduction_continueStatement_functional leftReduces rightReduces
+    | exact ruleReduction_assemblyStatement_functional leftReduces rightReduces
+    | exact ruleReduction_ifStatement_functional leftReduces rightReduces
+    | exact ruleReduction_forStatement_functional leftReduces rightReduces
+    | exact ruleReduction_forInitItem_functional leftReduces rightReduces
+    | exact ruleReduction_forPostItem_functional leftReduces rightReduces
+    | exact ruleReduction_matchStatement_functional leftReduces rightReduces
+    | exact ruleReduction_matchArm_functional leftReduces rightReduces
+    | exact ruleReduction_armStatement_functional leftReduces rightReduces
+    | exact ruleReduction_assignmentStatement_functional leftReduces rightReduces
+    | exact ruleReduction_assignmentOperator_functional leftReduces rightReduces
+    | exact ruleReduction_expressionStatement_functional leftReduces rightReduces
+    | exact ruleReduction_terminalExpression_functional leftReduces rightReduces
+    | exact ruleReduction_pattern_functional leftReduces rightReduces
+    | exact ruleReduction_expression_functional leftReduces rightReduces
+    | exact ruleReduction_annotation_functional leftReduces rightReduces
+    | exact ruleReduction_conditional_functional leftReduces rightReduces
+    | exact ruleReduction_logicalOr_functional leftReduces rightReduces
+    | exact ruleReduction_logicalAnd_functional leftReduces rightReduces
+    | exact ruleReduction_equality_functional leftReduces rightReduces
+    | exact ruleReduction_relational_functional leftReduces rightReduces
+    | exact ruleReduction_bitOr_functional leftReduces rightReduces
+    | exact ruleReduction_bitXor_functional leftReduces rightReduces
+    | exact ruleReduction_bitAnd_functional leftReduces rightReduces
+    | exact ruleReduction_additive_functional leftReduces rightReduces
+    | exact ruleReduction_multiplicative_functional leftReduces rightReduces
+    | exact ruleReduction_prefix_functional leftReduces rightReduces
+    | exact ruleReduction_postfix_functional leftReduces rightReduces
+    | exact ruleReduction_postfixPart_functional leftReduces rightReduces
+    | exact ruleReduction_atom_functional leftReduces rightReduces
+    | exact ruleReduction_lambda_functional leftReduces rightReduces
+    | exact ruleReduction_literal_functional leftReduces rightReduces
+
+end RuleReduction
+
 /-- A module-rule reduction can only produce the full-file, source-owned
 module payload from its exact item list. -/
 theorem ruleReduction_source_backed
@@ -9393,6 +9483,24 @@ theorem actionReduces_eleven_shapes_exact
         intro outputEq
         subst output
         exact .tail site branch origin finish input
+
+namespace ActionReduces
+
+/-- A fixed generated action input and chart interval determine one output. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {action : ActionId} {origin finish : Boundary tokens}
+    {input : GrammarSymbolValues file tokens action.production.rhs}
+    {left right : NonterminalValue file tokens action.production.lhs}
+    (leftReduces : ActionReduces file tokens action origin finish input left)
+    (rightReduces : ActionReduces file tokens action origin finish input right) :
+    left = right := by
+  cases leftReduces <;> cases rightReduces
+  · exact RuleReduction.functional ‹RuleReduction _ _ _ _ _ _ _›
+      ‹RuleReduction _ _ _ _ _ _ _›
+  all_goals rfl
+
+end ActionReduces
 
 mutual
 
