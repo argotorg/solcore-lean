@@ -17955,6 +17955,188 @@ def ExpectedMember
       } ∧
       expected = terminal.expected
 
+/-- Compute the expected terminal contributed by one enabled reached item at a
+fixed frontier cursor, if that item actually waits for a terminal. -/
+def expectedAtFrontierItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (item : ContextualItemKey tokens) : Option Expected := by
+  letI : Decidable
+      (ContextualReach file tokens memo correct final item) :=
+    contextualReachDecision owned correct final item
+  letI : Decidable
+      (EnabledProductionInstance file tokens memo correct final
+        {
+          production := item.raw.production
+          origin := item.raw.origin
+          context := item.context
+        }) :=
+    enabledProductionInstanceDecision correct final
+      {
+        production := item.raw.production
+        origin := item.raw.origin
+        context := item.context
+      }
+  exact
+    if reached : ContextualReach file tokens memo correct final item then
+        if current : item.raw.current = cursor then
+        if enabled : EnabledProductionInstance file tokens memo correct final
+            {
+              production := item.raw.production
+              origin := item.raw.origin
+              context := item.context
+            } then
+        match item.raw.production.rhs[item.raw.dot.val]? with
+        | some (.terminal terminal) => some terminal.expected
+        | _ => none
+        else
+          none
+      else
+        none
+    else
+      none
+
+/-- The item-local computation succeeds exactly for an enabled reached item
+whose next grammar symbol is a terminal with the displayed expectation. -/
+theorem expectedAtFrontierItem?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (item : ContextualItemKey tokens)
+    (expected : Expected) :
+    expectedAtFrontierItem? owned correct final cursor item = some expected ↔
+      ContextualReach file tokens memo correct final item ∧
+      item.raw.current = cursor ∧
+      EnabledProductionInstance file tokens memo correct final
+        {
+          production := item.raw.production
+          origin := item.raw.origin
+          context := item.context
+        } ∧
+      ∃ terminal, NextSymbol item.raw (.terminal terminal) ∧
+        expected = terminal.expected := by
+  unfold expectedAtFrontierItem?
+  split <;> rename_i reached
+  · split <;> rename_i current
+    · split <;> rename_i enabled
+      · cases lookup : item.raw.production.rhs[item.raw.dot.val]? with
+        | none => simp_all [NextSymbol]
+        | some symbol =>
+            cases symbol with
+            | terminal terminal =>
+                have inRange :
+                    item.raw.dot.val < item.raw.production.rhs.length := by
+                  by_cases inRange :
+                      item.raw.dot.val < item.raw.production.rhs.length
+                  · exact inRange
+                  · have outOfRange :
+                        item.raw.production.rhs.length ≤ item.raw.dot.val :=
+                      Nat.le_of_not_gt inRange
+                    rw [List.getElem?_eq_none outOfRange] at lookup
+                    contradiction
+                simp only [Option.some.injEq, NextSymbol, lookup,
+                  GrammarSymbol.terminal.injEq, reached, current, enabled,
+                  true_and]
+                constructor
+                · intro equality
+                  exact ⟨terminal, ⟨inRange, rfl⟩, equality.symm⟩
+                · rintro ⟨candidate, ⟨candidateInRange, same⟩,
+                    equality⟩
+                  subst candidate
+                  exact equality.symm
+            | nonterminal rule => simp_all [NextSymbol]
+      · simp_all
+    · simp_all
+  · simp_all
+
+/-- Stable raw frontier expectations in contextual-item enumeration order.
+Duplicates are deliberately retained for the later canonicalization step. -/
+def frontierExpectedCandidates
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) : List Expected :=
+  (allContextualItems tokens).filterMap
+    (expectedAtFrontierItem? owned correct final cursor)
+
+/-- Raw candidate membership is exactly the declarative expected-frontier
+union once the supplied cursor is known to be greatest. -/
+theorem frontierExpectedCandidates_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (expected : Expected) :
+    expected ∈ frontierExpectedCandidates owned correct final cursor ↔
+      ExpectedMember file tokens memo correct final cursor expected := by
+  rw [frontierExpectedCandidates, List.mem_filterMap]
+  constructor
+  · rintro ⟨item, itemMember, selected⟩
+    have exact := (expectedAtFrontierItem?_eq_some_iff
+      owned correct final cursor item expected).mp selected
+    rcases exact with
+      ⟨reached, current, enabled, terminal, next, equality⟩
+    exact ⟨item, terminal, ⟨greatest, reached, current⟩,
+      next, enabled, equality⟩
+  · rintro ⟨item, terminal, frontier, next, enabled, equality⟩
+    refine ⟨item, allContextualItems_complete item, ?_⟩
+    apply (expectedAtFrontierItem?_eq_some_iff
+      owned correct final cursor item expected).mpr
+    exact ⟨frontier.2.1, frontier.2.2, enabled,
+      terminal, next, equality⟩
+
+private def listMembershipDecision
+    {alpha : Type} [DecidableEq alpha] (needle : alpha) :
+    (values : List alpha) → Decidable (needle ∈ values)
+  | [] => isFalse (by simp)
+  | head :: tail =>
+      if equality : needle = head then
+        isTrue (equality ▸ List.mem_cons_self)
+      else
+        match listMembershipDecision needle tail with
+        | isTrue member => isTrue (List.mem_cons_of_mem head member)
+        | isFalse absent => isFalse (by
+            intro member
+            rcases List.mem_cons.mp member with same | inTail
+            · exact equality same
+            · exact absent inTail)
+
+/-- Declarative expected-frontier membership is constructively decidable once
+the greatest reached cursor is supplied. -/
+def expectedMemberDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (expected : Expected) :
+    Decidable (ExpectedMember
+      file tokens memo correct final cursor expected) := by
+  letI : Decidable
+      (expected ∈ frontierExpectedCandidates owned correct final cursor) :=
+    listMembershipDecision expected
+      (frontierExpectedCandidates owned correct final cursor)
+  exact decidable_of_iff
+    (expected ∈ frontierExpectedCandidates owned correct final cursor)
+    (frontierExpectedCandidates_mem_iff
+      owned correct final cursor greatest expected)
+
 /-- The unique intended sorted and deduplicated expected frontier list. -/
 def CanonicalExpected
     (file : WorkspaceFile) (tokens : List Token)
