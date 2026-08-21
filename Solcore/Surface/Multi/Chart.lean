@@ -1467,4 +1467,220 @@ private theorem rawSaturation_stable (tokens : List Token) :
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def runMappedPrimitive?
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after) :
+    Option (CountedState tokens after) :=
+  if fresh : address ∉ current.counter.usedRev then
+    some {
+      payload := transition current.payload
+      counter := current.counter.charge address fresh
+    }
+  else
+    none
+
+private theorem runMappedPrimitive?_units
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    {result : CountedState tokens after}
+    (selected : runMappedPrimitive? current address transition = some result) :
+    result.counter.units = current.counter.units + 1 := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  · cases selected
+    simp
+  · contradiction
+
+private def chargeAddresses?
+    {tokens : List Token} {state : Type}
+    (current : CountedState tokens state) :
+    List (UnitAddress tokens) → Option (CountedState tokens state)
+  | [] => some current
+  | address :: rest => do
+      let next ← runMappedPrimitive? current address id
+      chargeAddresses? next rest
+
+private def allGuardInstanceKeys (tokens : List Token) :
+    List (GuardInstanceKey tokens) :=
+  allPriorityGuardIds.flatMap fun guard =>
+    (List.finRange (tokens.length + 2)).flatMap fun contextStart =>
+      (List.finRange (tokens.length + 2)).filterMap fun siteCursor =>
+        if ordered : contextStart.val ≤ siteCursor.val then
+          some {
+            guard := guard
+            contextStart := contextStart
+            siteCursor := siteCursor
+            ordered := ordered
+          }
+        else
+          none
+
+private theorem allGuardInstanceKeys_complete
+    {tokens : List Token} (key : GuardInstanceKey tokens) :
+    key ∈ allGuardInstanceKeys tokens := by
+  rw [allGuardInstanceKeys, List.mem_flatMap]
+  refine ⟨key.guard, ?_, ?_⟩
+  · cases key.guard <;> simp [allPriorityGuardIds]
+  · rw [List.mem_flatMap]
+    refine ⟨key.contextStart, List.mem_finRange _, ?_⟩
+    rw [List.mem_filterMap]
+    refine ⟨key.siteCursor, List.mem_finRange _, ?_⟩
+    simp [key.ordered]
+
+private structure PhaseAOpen (file : WorkspaceFile) (tokens : List Token) where
+  rawItems : List (DottedItem tokens)
+  itemQueue : List (DottedItem tokens)
+  rawEdges : List (PackedEdge file tokens)
+  edgeQueue : List (PackedEdge file tokens)
+
+private def beginPhaseA (file : WorkspaceFile) (tokens : List Token) :
+    CountedState tokens (PhaseAOpen file tokens) := {
+  payload := ⟨[], [], [], []⟩
+  counter := (Counter.empty tokens).charge
+    (.phase .initializePhaseA) (by simp [Counter.empty])
+}
+
+@[simp] private theorem beginPhaseA_units
+    (file : WorkspaceFile) (tokens : List Token) :
+    (beginPhaseA file tokens).counter.units = 1 := by
+  simp [beginPhaseA]
+
+private structure PhaseASealed (file : WorkspaceFile) (tokens : List Token) where
+  rawItems : List (DottedItem tokens)
+  rawEdges : List (PackedEdge file tokens)
+
+private structure PhaseBOpen (file : WorkspaceFile) (tokens : List Token) where
+  phaseA : PhaseASealed file tokens
+  cells : GuardInstanceKey tokens → Option GuardMemoState
+  remaining : List (GuardInstanceKey tokens)
+  finalizedRev : List (GuardInstanceKey tokens)
+
+private def enterPhaseB? {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (CountedState tokens (PhaseBOpen file tokens)) :=
+  if _itemsDone : current.payload.itemQueue = [] then
+    if _edgesDone : current.payload.edgeQueue = [] then
+      if _saturated : current.payload.rawItems = rawSaturation tokens then
+        runMappedPrimitive? current (.phase .sealAEnterB) fun state => {
+          phaseA := ⟨state.rawItems, state.rawEdges⟩
+          cells := fun _ => none
+          remaining := allGuardInstanceKeys tokens
+          finalizedRev := []
+        }
+      else
+        none
+    else
+      none
+  else
+    none
+
+private def preFinalGuardSlots : List GuardFinalizeSlot := [
+  .siteTerminalLookup,
+  .adjacentTerminalWindowLookup,
+  .exactSliceLookup,
+  .unguardedSpanLookup,
+  .greatestEndLookup,
+  .delimiterOrRegionLookup
+]
+
+private def finalizeNextGuardWithDecision?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBOpen file tokens))
+    (decision : GuardDecision) :
+    Option (CountedState tokens (PhaseBOpen file tokens)) :=
+  match current.payload.remaining with
+  | [] => none
+  | key :: rest => do
+      let initialized ← runMappedPrimitive? current
+        (.guardFinalize .initializeUndecided key) fun state => {
+          state with
+          cells := fun candidate =>
+            if candidate = key then some .undecided else state.cells candidate
+        }
+      let lookups ← chargeAddresses? initialized
+        (preFinalGuardSlots.map fun slot => .guardFinalize slot key)
+      runMappedPrimitive? lookups
+        (.guardFinalize .writeFinalDecision key) fun state => {
+          phaseA := state.phaseA
+          cells := fun candidate =>
+            if candidate = key then some (.final decision)
+            else state.cells candidate
+          remaining := rest
+          finalizedRev := key :: state.finalizedRev
+        }
+
+private structure PhaseBSealed (file : WorkspaceFile) (tokens : List Token) where
+  phaseA : PhaseASealed file tokens
+  memo : GuardMemo tokens
+  finalizedRev : List (GuardInstanceKey tokens)
+
+private def sealPhaseB?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBOpen file tokens)) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) :=
+  match current.payload.remaining with
+  | _ :: _ => none
+  | [] =>
+      runMappedPrimitive? current (.phase .sealBEnterC) fun state => {
+        phaseA := state.phaseA
+        memo := fun key =>
+          match state.cells key with
+          | some value => value
+          | none => .undecided
+        finalizedRev := state.finalizedRev
+      }
+
+private def contextualLinearKey {tokens : List Token}
+    (item : ContextualItemKey tokens) : ChartLinearKey tokens := {
+  source := .contextual item.context
+  dotted := ⟨item.raw.production, item.raw.dot⟩
+  origin := item.raw.origin
+  current := item.raw.current
+}
+
+private def contextualRoot (tokens : List Token) :
+    ContextualItemKey tokens := {
+  raw := {
+    production := .root .module
+    dot := ⟨0, Nat.zero_lt_succ _⟩
+    origin := Boundary.start tokens
+    current := Boundary.start tokens
+  }
+  context := .plain
+}
+
+private structure PhaseCOpen (file : WorkspaceFile) (tokens : List Token) where
+  phaseA : PhaseASealed file tokens
+  memo : GuardMemo tokens
+  guardWitnesses : List (GuardWitnessKey tokens)
+  contextualItems : List (ContextualItemKey tokens)
+  itemQueue : List (ContextualItemKey tokens)
+  contextualEdges : List (StructurallyValidContextualPackedEdge file tokens)
+  edgeQueue : List (StructurallyValidContextualPackedEdge file tokens)
+
+private def enterPhaseC?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens)) :
+    Option (CountedState tokens (PhaseCOpen file tokens)) := do
+  let root := contextualRoot tokens
+  runMappedPrimitive? current
+    (.linear .L03_itemInsert (contextualLinearKey root)) fun state => {
+      phaseA := state.phaseA
+      memo := state.memo
+      guardWitnesses := []
+      contextualItems := [root]
+      itemQueue := [root]
+      contextualEdges := []
+      edgeQueue := []
+    }
+
+end Chart
+
 end Solcore.Surface.Multi
