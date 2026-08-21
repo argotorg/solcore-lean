@@ -12858,6 +12858,211 @@ private theorem ruleReduction_contractMember_total
     | exact ⟨_, .contractMemberFallback origin finish declaration witness⟩
     | exact ⟨_, .contractMemberConstructor origin finish declaration witness⟩
 
+private theorem ruleReduction_body_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .body origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .body)) :
+    ∃ output : RuleValue .body,
+      RuleReduction file tokens .body origin finish input output := by
+  let statementAtom : EbnfExpr := .atom (.nonterminal .statement)
+  let children : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftBrace)), .star statementAtom,
+    .atom (.terminal (.symbol .rightBrace))]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize viewEq : sequenceFlatView children input = values
+  rcases values with ⟨rawOpen, rawStatements, rawClose, ⟨⟩⟩
+  let openBrace := terminalView (.symbol .leftBrace) rawOpen
+  let statements := (starView statementAtom rawStatements).map
+    (ruleView .statement)
+  let closeBrace := terminalView (.symbol .rightBrace) rawClose
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← sequence_of_flat_view children input, viewEq,
+    ← terminal_of_view (.symbol .leftBrace) rawOpen,
+    ← star_of_view statementAtom rawStatements,
+    ← ruleList_of_view .statement (starView statementAtom rawStatements),
+    ← terminal_of_view (.symbol .rightBrace) rawClose]
+  exact ⟨_, .body origin finish openBrace statements closeBrace witness⟩
+
+private theorem ruleReduction_type_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .type origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .type)) :
+    ∃ output : RuleValue .type,
+      RuleReduction file tokens .type origin finish input output := by
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let atomAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let arrowAtom : EbnfExpr := .atom (.terminal (.symbol .arrow))
+  let arrowSeq : EbnfExpr := .sequence [arrowAtom, typeAtom]
+  let branches : List EbnfExpr := [
+    .sequence [comptimeAtom, typeAtom],
+    .sequence [atomAtom, .optional arrowSeq]]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 2 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have bound : branch.val < 2 := by omega
+    have cases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases cases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · let pair := sequencePairView comptimeAtom typeAtom raw
+    let comptime := terminalView (.contextualKeyword .comptimeKw)
+      pair.firstValue
+    let inner := ruleView .type pair.secondValue
+    rw [← inputEq, ← pair.rebuild,
+      ← terminal_of_view (.contextualKeyword .comptimeKw) pair.firstValue,
+      ← rule_of_view .type pair.secondValue]
+    exact ⟨_, .typeComptime origin finish comptime inner
+      (.comptimeModifier comptime) witness⟩
+  · let pair := sequencePairView atomAtom (.optional arrowSeq) raw
+    let domain := ruleView .typeAtom pair.firstValue
+    generalize optionalEq : optionalView arrowSeq pair.secondValue = viewed
+    cases viewed with
+    | none =>
+        rw [← inputEq, ← pair.rebuild,
+          ← rule_of_view .typeAtom pair.firstValue,
+          ← optional_eq_of_view arrowSeq pair.secondValue optionalEq]
+        exact ⟨domain, .typeAtomOnly origin finish domain⟩
+    | some rawArrow =>
+        let arrowPair := sequencePairView arrowAtom typeAtom rawArrow
+        let arrow := terminalView (.symbol .arrow) arrowPair.firstValue
+        let codomain := ruleView .type arrowPair.secondValue
+        rw [← inputEq, ← pair.rebuild,
+          ← rule_of_view .typeAtom pair.firstValue,
+          ← optional_eq_of_view arrowSeq pair.secondValue optionalEq,
+          ← arrowPair.rebuild,
+          ← terminal_of_view (.symbol .arrow) arrowPair.firstValue,
+          ← rule_of_view .type arrowPair.secondValue]
+        exact ⟨_, .typeFunction origin finish domain arrow codomain witness⟩
+
+private theorem ruleReduction_typeAtom_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .typeAtom origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .typeAtom)) :
+    ∃ output : RuleValue .typeAtom,
+      RuleReduction file tokens .typeAtom origin finish input output := by
+  let atAtom : EbnfExpr := .atom (.terminal (.symbol .at))
+  let atomAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let nameAtom : EbnfExpr := .atom (.nonterminal .qualifiedName)
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let commaAtom : EbnfExpr := .atom (.terminal (.symbol .comma))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let argumentsSeq : EbnfExpr :=
+    .sequence [openAtom, .list1 typeAtom, closeAtom]
+  let tupleTail : EbnfExpr := .group (.sequence [commaAtom, typeAtom])
+  let branches : List EbnfExpr := [
+    .sequence [atAtom, atomAtom],
+    .sequence [nameAtom, .optional argumentsSeq],
+    .sequence [openAtom, closeAtom],
+    .sequence [openAtom, typeAtom, closeAtom],
+    .sequence [openAtom, typeAtom, commaAtom, typeAtom,
+      .star tupleTail, closeAtom]]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 5 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 := by
+    have bound : branch.val < 5 := by omega
+    have cases : branch.val = 0 ∨ branch.val = 1 ∨ branch.val = 2 ∨
+        branch.val = 3 ∨ branch.val = 4 := by omega
+    rcases cases with valueEq | valueEq | valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext valueEq))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl
+  · let pair := sequencePairView atAtom atomAtom raw
+    let atToken := terminalView (.symbol .at) pair.firstValue
+    let inner := ruleView .typeAtom pair.secondValue
+    rw [← inputEq, ← pair.rebuild,
+      ← terminal_of_view (.symbol .at) pair.firstValue,
+      ← rule_of_view .typeAtom pair.secondValue]
+    exact ⟨_, .typeAtomProxy origin finish atToken inner witness⟩
+  · let pair := sequencePairView nameAtom (.optional argumentsSeq) raw
+    let name := ruleView .qualifiedName pair.firstValue
+    generalize optionalEq : optionalView argumentsSeq pair.secondValue = viewed
+    cases viewed with
+    | none =>
+        rw [← inputEq, ← pair.rebuild,
+          ← rule_of_view .qualifiedName pair.firstValue,
+          ← optional_eq_of_view argumentsSeq pair.secondValue optionalEq]
+        exact ⟨_, .typeAtomNamedWithoutArguments origin finish name witness⟩
+    | some rawArguments =>
+        generalize argumentsEq : sequenceFlatView
+          [openAtom, .list1 typeAtom, closeAtom] rawArguments = values
+        rcases values with ⟨rawOpen, rawTypes, rawClose, ⟨⟩⟩
+        let openParen := terminalView (.symbol .leftParen) rawOpen
+        let arguments := (list1TotalView typeAtom rawTypes).map
+          (ruleView .type)
+        let closeParen := terminalView (.symbol .rightParen) rawClose
+        rw [← inputEq, ← pair.rebuild,
+          ← rule_of_view .qualifiedName pair.firstValue,
+          ← optional_eq_of_view argumentsSeq pair.secondValue optionalEq,
+          ← sequence_of_flat_view
+            [openAtom, .list1 typeAtom, closeAtom] rawArguments, argumentsEq,
+          ← terminal_of_view (.symbol .leftParen) rawOpen,
+          ← ruleList1_of_totalView .type rawTypes,
+          ← terminal_of_view (.symbol .rightParen) rawClose]
+        exact ⟨_, .typeAtomNamedWithArguments origin finish name openParen
+          arguments closeParen witness⟩
+  · let pair := sequencePairView openAtom closeAtom raw
+    let openParen := terminalView (.symbol .leftParen) pair.firstValue
+    let closeParen := terminalView (.symbol .rightParen) pair.secondValue
+    rw [← inputEq, ← pair.rebuild,
+      ← terminal_of_view (.symbol .leftParen) pair.firstValue,
+      ← terminal_of_view (.symbol .rightParen) pair.secondValue]
+    exact ⟨_, .typeAtomEmptyTuple origin finish openParen closeParen witness⟩
+  · generalize sequenceEq : sequenceFlatView
+      [openAtom, typeAtom, closeAtom] raw = values
+    rcases values with ⟨rawOpen, rawInner, rawClose, ⟨⟩⟩
+    let openParen := terminalView (.symbol .leftParen) rawOpen
+    let inner := ruleView .type rawInner
+    let closeParen := terminalView (.symbol .rightParen) rawClose
+    rw [← inputEq,
+      ← sequence_of_flat_view [openAtom, typeAtom, closeAtom] raw,
+      sequenceEq, ← terminal_of_view (.symbol .leftParen) rawOpen,
+      ← rule_of_view .type rawInner,
+      ← terminal_of_view (.symbol .rightParen) rawClose]
+    exact ⟨_, .typeAtomGroup origin finish openParen inner closeParen witness⟩
+  · generalize sequenceEq : sequenceFlatView [openAtom, typeAtom,
+      commaAtom, typeAtom, .star tupleTail, closeAtom] raw = values
+    rcases values with
+      ⟨rawOpen, rawFirst, rawComma, rawSecond, rawRest, rawClose, ⟨⟩⟩
+    let openParen := terminalView (.symbol .leftParen) rawOpen
+    let first := ruleView .type rawFirst
+    let comma := terminalView (.symbol .comma) rawComma
+    let second := ruleView .type rawSecond
+    let closeParen := terminalView (.symbol .rightParen) rawClose
+    rcases listInputs_exists (fixedInfixTailInput (.symbol .comma) .type)
+        (fixedInfixTail_exists (.symbol .comma) .type)
+        (starView tupleTail rawRest) with ⟨rest, restEq⟩
+    rw [← inputEq, ← sequence_of_flat_view [openAtom, typeAtom,
+      commaAtom, typeAtom, .star tupleTail, closeAtom] raw, sequenceEq,
+      ← terminal_of_view (.symbol .leftParen) rawOpen,
+      ← rule_of_view .type rawFirst,
+      ← terminal_of_view (.symbol .comma) rawComma,
+      ← rule_of_view .type rawSecond, ← star_of_view tupleTail rawRest,
+      ← restEq, ← terminal_of_view (.symbol .rightParen) rawClose]
+    exact ⟨_, .typeAtomTuple origin finish openParen first comma second rest
+      closeParen witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
