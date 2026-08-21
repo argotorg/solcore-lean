@@ -3241,6 +3241,220 @@ abbrev StructurallyValidContextualPackedEdge
   { key : ContextualPackedEdgeKey tokens //
     ContextualPackedEdgeKey.StructurallyValid file tokens key }
 
+/-- The constructor-specific domain of structurally valid contextual scans. -/
+structure StructurallyValidContextualScannedEdge
+    (file : WorkspaceFile) (tokens : List Token) where
+  before : ContextualItemKey tokens
+  after : ContextualItemKey tokens
+  cursor : TerminalCursor tokens
+  structural : ContextualPackedEdgeKey.StructurallyValid file tokens
+    (.scanned before after cursor)
+
+/-- The constructor-specific domain of structurally valid completions. -/
+structure StructurallyValidContextualCompletedEdge
+    (file : WorkspaceFile) (tokens : List Token) where
+  waiting : ContextualItemKey tokens
+  finished : ContextualItemKey tokens
+  after : ContextualItemKey tokens
+  shared : Boundary tokens
+  structural : ContextualPackedEdgeKey.StructurallyValid file tokens
+    (.completed waiting finished after shared)
+
+private theorem advanceItem_after_functional
+    {tokens : List Token}
+    {before afterLeft afterRight : DottedItem tokens}
+    {next : Boundary tokens}
+    (left : AdvanceItem before next afterLeft)
+    (right : AdvanceItem before next afterRight) :
+    afterLeft = afterRight := by
+  cases afterLeft with
+  | mk leftProduction leftDot leftOrigin leftCurrent =>
+      cases afterRight with
+      | mk rightProduction rightDot rightOrigin rightCurrent =>
+          rcases left with ⟨leftProductionEq, leftDotEq,
+            leftOriginEq, leftCurrentEq⟩
+          rcases right with ⟨rightProductionEq, rightDotEq,
+            rightOriginEq, rightCurrentEq⟩
+          have productionEq : leftProduction = rightProduction :=
+            leftProductionEq.trans rightProductionEq.symm
+          subst rightProduction
+          have dotEq : leftDot = rightDot := by
+            apply Fin.ext
+            exact leftDotEq.trans rightDotEq.symm
+          subst rightDot
+          have originEq : leftOrigin = rightOrigin :=
+            leftOriginEq.trans rightOriginEq.symm
+          have currentEq : leftCurrent = rightCurrent :=
+            leftCurrentEq.trans rightCurrentEq.symm
+          cases originEq
+          cases currentEq
+          rfl
+
+private def dottedSchema {tokens : List Token}
+    (item : DottedItem tokens) : DottedRhs := {
+  production := item.production
+  dot := item.dot
+}
+
+private theorem dottedItem_reconstructed
+    {tokens : List Token} {left right : DottedItem tokens}
+    (schemaEqual : dottedSchema left = dottedSchema right)
+    (originEqual : left.origin = right.origin)
+    (currentEqual : left.current = right.current) :
+    left = right := by
+  cases left with
+  | mk leftProduction leftDot leftOrigin leftCurrent =>
+      cases right with
+      | mk rightProduction rightDot rightOrigin rightCurrent =>
+          simp only [dottedSchema] at schemaEqual
+          cases schemaEqual
+          cases originEqual
+          cases currentEqual
+          rfl
+
+private theorem contextualItem_reconstructed
+    {tokens : List Token} {left right : ContextualItemKey tokens}
+    (rawEqual : left.raw = right.raw)
+    (contextEqual : left.context = right.context) :
+    left = right := by
+  cases left
+  cases right
+  cases rawEqual
+  cases contextEqual
+  rfl
+
+private theorem contextualScannedEdge_before_injective
+    {file : WorkspaceFile} {tokens : List Token} :
+    Function.Injective
+      (fun edge : StructurallyValidContextualScannedEdge file tokens =>
+        edge.before) := by
+  intro left right beforeEqual
+  cases left with
+  | mk leftBefore leftAfter leftCursor leftValid =>
+      cases right with
+      | mk rightBefore rightAfter rightCursor rightValid =>
+          simp only at beforeEqual
+          subst rightBefore
+          rcases leftValid.1 with
+            ⟨_, _, _, _, leftAtCurrent, _, _, leftAdvance⟩
+          rcases rightValid.1 with
+            ⟨_, _, _, _, rightAtCurrent, _, _, rightAdvance⟩
+          have cursorEqual : leftCursor = rightCursor := by
+            apply Fin.ext
+            simpa [TerminalCursor.beforeBoundary] using
+              congrArg Fin.val
+                (leftAtCurrent.trans rightAtCurrent.symm)
+          subst rightCursor
+          have rawAfterEqual : leftAfter.raw = rightAfter.raw :=
+            advanceItem_after_functional leftAdvance rightAdvance
+          have contextAfterEqual :
+              leftAfter.context = rightAfter.context :=
+            leftValid.2.symm.trans rightValid.2
+          have afterEqual : leftAfter = rightAfter :=
+            contextualItem_reconstructed rawAfterEqual contextAfterEqual
+          cases afterEqual
+          rfl
+
+private structure ContextualCompletedEdgeProjection
+    (tokens : List Token) where
+  waitingContext : GuardContext tokens
+  waitingSchema : DottedRhs
+  finishedSchema : DottedRhs
+  waitingOrigin : Boundary tokens
+  shared : Boundary tokens
+  finishedCurrent : Boundary tokens
+
+private def contextualCompletedEdgeProjection
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    ContextualCompletedEdgeProjection tokens := {
+  waitingContext := edge.waiting.context
+  waitingSchema := dottedSchema edge.waiting.raw
+  finishedSchema := dottedSchema edge.finished.raw
+  waitingOrigin := edge.waiting.raw.origin
+  shared := edge.shared
+  finishedCurrent := edge.finished.raw.current
+}
+
+private theorem contextualCompletedEdgeProjection_injective
+    {file : WorkspaceFile} {tokens : List Token} :
+    Function.Injective
+      (@contextualCompletedEdgeProjection file tokens) := by
+  intro left right projectionEqual
+  cases left with
+  | mk leftWaiting leftFinished leftAfter leftShared leftValid =>
+      cases right with
+      | mk rightWaiting rightFinished rightAfter rightShared rightValid =>
+          have waitingContextEqual :
+              leftWaiting.context = rightWaiting.context :=
+            congrArg ContextualCompletedEdgeProjection.waitingContext
+              projectionEqual
+          have waitingSchemaEqual :
+              dottedSchema leftWaiting.raw =
+                dottedSchema rightWaiting.raw :=
+            congrArg ContextualCompletedEdgeProjection.waitingSchema
+              projectionEqual
+          have waitingOriginEqual :
+              leftWaiting.raw.origin = rightWaiting.raw.origin :=
+            congrArg ContextualCompletedEdgeProjection.waitingOrigin
+              projectionEqual
+          have sharedEqual : leftShared = rightShared :=
+            congrArg ContextualCompletedEdgeProjection.shared
+              projectionEqual
+          have finishedSchemaEqual :
+              dottedSchema leftFinished.raw =
+                dottedSchema rightFinished.raw :=
+            congrArg ContextualCompletedEdgeProjection.finishedSchema
+              projectionEqual
+          have finishedCurrentEqual :
+              leftFinished.raw.current = rightFinished.raw.current :=
+            congrArg ContextualCompletedEdgeProjection.finishedCurrent
+              projectionEqual
+          rcases leftValid.1 with
+            ⟨_, _, _, _, leftWaitingAtShared,
+              leftFinishedAtShared, leftAdvance⟩
+          rcases rightValid.1 with
+            ⟨_, _, _, _, rightWaitingAtShared,
+              rightFinishedAtShared, rightAdvance⟩
+          have waitingCurrentEqual :
+              leftWaiting.raw.current = rightWaiting.raw.current :=
+            leftWaitingAtShared.trans
+              (sharedEqual.trans rightWaitingAtShared.symm)
+          have finishedOriginEqual :
+              leftFinished.raw.origin = rightFinished.raw.origin :=
+            leftFinishedAtShared.trans
+              (sharedEqual.trans rightFinishedAtShared.symm)
+          have waitingRawEqual :
+              leftWaiting.raw = rightWaiting.raw :=
+            dottedItem_reconstructed waitingSchemaEqual
+              waitingOriginEqual waitingCurrentEqual
+          have waitingEqual : leftWaiting = rightWaiting :=
+            contextualItem_reconstructed waitingRawEqual
+              waitingContextEqual
+          have finishedRawEqual :
+              leftFinished.raw = rightFinished.raw :=
+            dottedItem_reconstructed finishedSchemaEqual
+              finishedOriginEqual finishedCurrentEqual
+          have finishedContextEqual :
+              leftFinished.context = rightFinished.context := by
+            rw [leftValid.2.1, rightValid.2.1,
+              waitingEqual, finishedRawEqual]
+          have finishedEqual : leftFinished = rightFinished :=
+            contextualItem_reconstructed finishedRawEqual
+              finishedContextEqual
+          cases waitingEqual
+          cases finishedEqual
+          cases sharedEqual
+          have afterRawEqual : leftAfter.raw = rightAfter.raw :=
+            advanceItem_after_functional leftAdvance rightAdvance
+          have afterContextEqual :
+              leftAfter.context = rightAfter.context :=
+            leftValid.2.2.trans rightValid.2.2.symm
+          have afterEqual : leftAfter = rightAfter :=
+            contextualItem_reconstructed afterRawEqual afterContextEqual
+          cases afterEqual
+          rfl
+
 /-- The physical byte selected by one chart boundary. -/
 def BoundaryByte
     (file : WorkspaceFile)
