@@ -4251,6 +4251,58 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private def phaseBTotalityWitnessPhaseA
+    (file : WorkspaceFile) (tokens : List Token) :
+    PhaseAOpen file tokens := {
+  rawItems := rawSaturation tokens
+  itemQueue := []
+  rawEdges := []
+  edgeQueue := []
+}
+
+private def phaseBTotalityWitnessEvaluator
+    (file : WorkspaceFile) (tokens : List Token) :
+    PhaseAIndexEvaluator file tokens := fun _ _ => false
+
+/-- The current carrier admits a fully materialized saturated state whose
+ledger has already consumed the next phase-transition address. -/
+private def phaseBTotalityCollisionInput
+    (file : WorkspaceFile) (tokens : List Token) :
+    CountedState tokens (PhaseAIndexed file tokens) := {
+  payload := {
+    phaseA := phaseBTotalityWitnessPhaseA file tokens
+    entries := canonicalEvidenceEntries
+      (phaseBTotalityWitnessEvaluator file tokens)
+      (phaseBTotalityWitnessPhaseA file tokens)
+  }
+  counter := {
+    usedRev := [.phase .sealAEnterB]
+    unique := by simp
+  }
+}
+
+private theorem phaseBTotalityCollisionInput_fullyMaterialized
+    (file : WorkspaceFile) (tokens : List Token) :
+    FullyMaterializedEvidenceEntries
+      (phaseBTotalityCollisionInput file tokens).payload.entries := by
+  exact canonicalEvidenceEntries_fullyMaterialized
+    (phaseBTotalityWitnessEvaluator file tokens)
+    (phaseBTotalityWitnessPhaseA file tokens)
+
+private theorem executeIndexedPhaseB?_not_total_from_carrier
+    (file : WorkspaceFile) (tokens : List Token) :
+    executeIndexedPhaseB? (phaseBTotalityCollisionInput file tokens) = none := by
+  simp [executeIndexedPhaseB?, enterIndexedPhaseB?, enterPhaseB?,
+    phaseBTotalityCollisionInput, phaseBTotalityWitnessPhaseA,
+    runMappedPrimitive?]
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
