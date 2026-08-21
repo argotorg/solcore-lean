@@ -17337,6 +17337,171 @@ private theorem functional_of_prefix
 
 end CoherentReduction
 
+/-- The additional chart invariant needed for semantic functionality.  The
+current item saturation does not establish it: future executor correspondence
+must show that the child start and completed child production agree whenever
+two retained completions have a common `after` item. -/
+def CompletionBackpointerUnique
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) : Prop :=
+  ∀ {after leftWaiting leftFinished rightWaiting rightFinished}
+      {leftShared rightShared},
+    ContextualEdgeReach file tokens memo correct final
+        (.completed leftWaiting leftFinished after leftShared) →
+      ContextualEdgeReach file tokens memo correct final
+        (.completed rightWaiting rightFinished after rightShared) →
+      leftShared = rightShared ∧
+        leftFinished.raw.production = rightFinished.raw.production
+
+private theorem coherentDottedItem_eq_of_fields
+    {tokens : List Token} {left right : DottedItem tokens}
+    (productionEq : left.production = right.production)
+    (dotEq : left.dot.val = right.dot.val)
+    (originEq : left.origin = right.origin)
+    (currentEq : left.current = right.current) :
+    left = right := by
+  cases left
+  cases right
+  simp only at productionEq dotEq originEq currentEq ⊢
+  subst_vars
+  congr
+  exact Fin.ext dotEq
+
+private theorem coherentContextualItem_eq_of_fields
+    {tokens : List Token} {left right : ContextualItemKey tokens}
+    (rawEq : left.raw = right.raw)
+    (contextEq : left.context = right.context) :
+    left = right := by
+  cases left
+  cases right
+  simp only at rawEq contextEq ⊢
+  subst_vars
+  rfl
+
+/-- A contextual scanned target recovers its unique predecessor and cursor. -/
+private theorem contextualScannedEdge_sameAfter
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {after leftBefore rightBefore : ContextualItemKey tokens}
+    {leftCursor rightCursor : TerminalCursor tokens}
+    (leftEdge : ContextualEdgeReach file tokens memo correct final
+      (.scanned leftBefore after leftCursor))
+    (rightEdge : ContextualEdgeReach file tokens memo correct final
+      (.scanned rightBefore after rightCursor)) :
+    leftBefore = rightBefore ∧ leftCursor = rightCursor := by
+  rcases leftEdge.1.1 with
+    ⟨_, _, _, _, leftAtCurrent, _, _, leftAdvance⟩
+  rcases rightEdge.1.1 with
+    ⟨_, _, _, _, rightAtCurrent, _, _, rightAdvance⟩
+  rcases leftAdvance with
+    ⟨leftProduction, leftDot, leftOrigin, leftCurrent⟩
+  rcases rightAdvance with
+    ⟨rightProduction, rightDot, rightOrigin, rightCurrent⟩
+  have cursorEq : leftCursor = rightCursor := by
+    apply Fin.ext
+    have leftValueEq := congrArg Fin.val leftCurrent
+    have rightValueEq := congrArg Fin.val rightCurrent
+    simp only [TerminalCursor.afterBoundary] at leftValueEq rightValueEq
+    omega
+  have rawEq : leftBefore.raw = rightBefore.raw := by
+    apply coherentDottedItem_eq_of_fields
+    · exact leftProduction.symm.trans rightProduction
+    · omega
+    · exact leftOrigin.symm.trans rightOrigin
+    · rw [← leftAtCurrent, ← rightAtCurrent, cursorEq]
+  have contextEq : leftBefore.context = rightBefore.context :=
+    leftEdge.1.2.trans rightEdge.1.2.symm
+  exact ⟨coherentContextualItem_eq_of_fields rawEq contextEq, cursorEq⟩
+
+/-- Once the two erased backpointer coordinates agree, two contextual
+completion edges with a common target have identical recursive endpoints. -/
+private theorem contextualCompletedEdge_sameAfter_of_backpointer
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {after leftWaiting leftFinished rightWaiting rightFinished :
+      ContextualItemKey tokens}
+    {leftShared rightShared : Boundary tokens}
+    (leftWitness : CompletedEdgeWitness tokens leftWaiting.raw
+      leftFinished.raw after.raw leftShared)
+    (leftEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed leftWaiting leftFinished after leftShared))
+    (rightWitness : CompletedEdgeWitness tokens rightWaiting.raw
+      rightFinished.raw after.raw rightShared)
+    (rightEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed rightWaiting rightFinished after rightShared))
+    (sharedEq : leftShared = rightShared)
+    (finishedProductionEq :
+      leftFinished.raw.production = rightFinished.raw.production) :
+    leftWaiting = rightWaiting ∧ leftFinished = rightFinished := by
+  rcases leftWitness.advance with
+    ⟨leftWaitingProduction, leftWaitingDot, leftWaitingOrigin,
+      leftFinishedCurrent⟩
+  rcases rightWitness.advance with
+    ⟨rightWaitingProduction, rightWaitingDot, rightWaitingOrigin,
+      rightFinishedCurrent⟩
+  have waitingRawEq : leftWaiting.raw = rightWaiting.raw := by
+    apply coherentDottedItem_eq_of_fields
+    · exact leftWaitingProduction.symm.trans rightWaitingProduction
+    · omega
+    · exact leftWaitingOrigin.symm.trans rightWaitingOrigin
+    · exact leftWitness.waitingAtShared.trans
+        (sharedEq.trans rightWitness.waitingAtShared.symm)
+  have waitingContextEq : leftWaiting.context = rightWaiting.context :=
+    leftEdge.1.2.2.symm.trans rightEdge.1.2.2
+  have waitingEq : leftWaiting = rightWaiting :=
+    coherentContextualItem_eq_of_fields waitingRawEq waitingContextEq
+  have finishedRawEq : leftFinished.raw = rightFinished.raw := by
+    apply coherentDottedItem_eq_of_fields finishedProductionEq
+    · have leftComplete := leftWitness.complete
+      have rightComplete := rightWitness.complete
+      unfold CompleteItem at leftComplete rightComplete
+      rw [leftComplete, rightComplete, finishedProductionEq]
+    · exact leftWitness.finishedAtShared.trans
+        (sharedEq.trans rightWitness.finishedAtShared.symm)
+    · exact leftFinishedCurrent.symm.trans rightFinishedCurrent
+  have finishedContextEq :
+      leftFinished.context = rightFinished.context := by
+    rw [leftEdge.1.2.1, rightEdge.1.2.1, waitingEq, finishedRawEq]
+  exact ⟨waitingEq,
+    coherentContextualItem_eq_of_fields finishedRawEq finishedContextEq⟩
+
+/-- For two reached completions with one target, equality of the entire local
+backpointer is equivalent to equality of exactly the two erased coordinates. -/
+private theorem contextualCompletedEdge_sameAfter_iff_backpointer
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {after leftWaiting leftFinished rightWaiting rightFinished :
+      ContextualItemKey tokens}
+    {leftShared rightShared : Boundary tokens}
+    (leftWitness : CompletedEdgeWitness tokens leftWaiting.raw
+      leftFinished.raw after.raw leftShared)
+    (leftEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed leftWaiting leftFinished after leftShared))
+    (rightWitness : CompletedEdgeWitness tokens rightWaiting.raw
+      rightFinished.raw after.raw rightShared)
+    (rightEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed rightWaiting rightFinished after rightShared)) :
+    (leftWaiting = rightWaiting ∧ leftFinished = rightFinished ∧
+        leftShared = rightShared) ↔
+      (leftShared = rightShared ∧
+        leftFinished.raw.production = rightFinished.raw.production) := by
+  constructor
+  · rintro ⟨waitingEq, finishedEq, sharedEq⟩
+    exact ⟨sharedEq, congrArg (fun item => item.raw.production) finishedEq⟩
+  · rintro ⟨sharedEq, productionEq⟩
+    rcases contextualCompletedEdge_sameAfter_of_backpointer
+        leftWitness leftEdge rightWitness rightEdge sharedEq productionEq with
+      ⟨waitingEq, finishedEq⟩
+    exact ⟨waitingEq, finishedEq, sharedEq⟩
+
 /-- A coherent prefix is attached to the exact contextual item reached by its
 derivation; a raw projection from another context cannot be spliced in. -/
 theorem coherentPrefix_no_context_splice
