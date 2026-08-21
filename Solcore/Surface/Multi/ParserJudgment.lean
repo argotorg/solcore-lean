@@ -9388,6 +9388,123 @@ private theorem ruleReduction_topItem_total
     rw [← inputEq, ← rawEq]
     exact ⟨_, .topItemFunction origin finish declaration witness⟩
 
+private theorem eqMp_rebuild
+    {alpha beta : Sort _} (typeEq : alpha = beta) (input : alpha) :
+    Eq.mp typeEq.symm (Eq.mp typeEq input) = input := by
+  cases typeEq
+  rfl
+
+private def starView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.star child)) :
+    List (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_star_eq child) input
+
+private theorem star_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.star child)) :
+    EbnfValue.star child (starView child input) = input := by
+  simp [starView, EbnfValue.star]
+
+private def valuesConsView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (rest : List EbnfExpr)
+    (input : EbnfValues file tokens (child :: rest)) :
+    EbnfValue file tokens child × EbnfValues file tokens rest :=
+  Eq.mp (ebnfValues_cons_eq child rest) input
+
+private theorem values_cons_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (rest : List EbnfExpr)
+    (input : EbnfValues file tokens (child :: rest)) :
+    EbnfValues.cons child rest (valuesConsView child rest input).1
+        (valuesConsView child rest input).2 = input := by
+  exact eqMp_rebuild (ebnfValues_cons_eq child rest) input
+
+private theorem values_nil_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValues file tokens []) :
+    EbnfValues.nil = input := by
+  unfold EbnfValues.nil
+  calc
+    _ = Eq.mp (ebnfValues_nil_eq (file := file) (tokens := tokens)).symm
+        (Eq.mp (ebnfValues_nil_eq (file := file) (tokens := tokens)) input) := by
+      congr
+    _ = input := eqMp_rebuild _ input
+
+private theorem ruleList_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (inputs : List (EbnfValue file tokens (.atom (.nonterminal rule)))) :
+    (inputs.map (ruleView rule)).map (EbnfValue.ruleAtom rule) = inputs := by
+  induction inputs with
+  | nil => rfl
+  | cons head tail ih => simp [rule_of_view, ih]
+
+private theorem ruleReduction_module_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .module origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .module)) :
+    ∃ output : RuleValue .module,
+      RuleReduction file tokens .module origin finish input output := by
+  let itemAtom : EbnfExpr := .atom (.nonterminal .topItem)
+  let eofAtom : EbnfExpr := .atom (.terminal .endOfFile)
+  let children : List EbnfExpr := [.star itemAtom, eofAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  let values := sequenceView children input
+  generalize firstEq : valuesConsView (.star itemAtom) [eofAtom] values = first
+  rcases first with ⟨rawStar, tail⟩
+  generalize secondEq : valuesConsView eofAtom [] tail = second
+  rcases second with ⟨rawEof, nilTail⟩
+  let rawItems := starView itemAtom rawStar
+  let items := rawItems.map (ruleView .topItem)
+  let eof := terminalView .endOfFile rawEof
+  have itemsEq : items.map (EbnfValue.ruleAtom .topItem) = rawItems := by
+    exact ruleList_of_view .topItem rawItems
+  have rawStarEq : EbnfValue.star itemAtom rawItems = rawStar :=
+    star_of_view itemAtom rawStar
+  have rawEofEq : EbnfValue.terminalAtom .endOfFile eof = rawEof :=
+    terminal_of_view .endOfFile rawEof
+  have nilEq : EbnfValues.nil = nilTail := values_nil_unique nilTail
+  have tailEq : EbnfValues.cons eofAtom []
+      (EbnfValue.terminalAtom .endOfFile eof) EbnfValues.nil = tail := by
+    calc
+      _ = EbnfValues.cons eofAtom [] rawEof nilTail := by
+        rw [rawEofEq, nilEq]
+      _ = EbnfValues.cons eofAtom []
+          (valuesConsView eofAtom [] tail).1
+          (valuesConsView eofAtom [] tail).2 := by rw [secondEq]
+      _ = tail := values_cons_of_view eofAtom [] tail
+  have valuesEq : EbnfValues.cons (.star itemAtom) [eofAtom]
+      (EbnfValue.star itemAtom
+        (items.map (EbnfValue.ruleAtom .topItem)))
+      (EbnfValues.cons eofAtom []
+        (EbnfValue.terminalAtom .endOfFile eof) EbnfValues.nil) = values := by
+    calc
+      _ = EbnfValues.cons (.star itemAtom) [eofAtom] rawStar tail := by
+        rw [itemsEq, rawStarEq, tailEq]
+      _ = EbnfValues.cons (.star itemAtom) [eofAtom]
+          (valuesConsView (.star itemAtom) [eofAtom] values).1
+          (valuesConsView (.star itemAtom) [eofAtom] values).2 := by
+        rw [firstEq]
+      _ = values := values_cons_of_view (.star itemAtom) [eofAtom] values
+  have inputEq : EbnfValue.sequence children
+      (EbnfValues.cons (.star itemAtom) [eofAtom]
+        (EbnfValue.star itemAtom
+          (items.map (EbnfValue.ruleAtom .topItem)))
+        (EbnfValues.cons eofAtom []
+          (EbnfValue.terminalAtom .endOfFile eof) EbnfValues.nil)) = input := by
+    calc
+      _ = EbnfValue.sequence children values := by rw [valuesEq]
+      _ = input := sequence_of_view children input
+  have endpoints := ready.2.2 rfl
+  rw [← inputEq]
+  exact ⟨_, .module origin finish items eof endpoints.1 endpoints.2
+    (matchedTerminal_eof_empty_span eof).2.1⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
