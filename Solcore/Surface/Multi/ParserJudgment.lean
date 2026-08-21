@@ -673,6 +673,199 @@ private theorem protectedDelimiterRun_functional
   exact delimiterRun_functional leftRun.toDelimiterRun
     rightRun.toDelimiterRun
 
+private def protectedDelimiterStep?
+    (before : NonemptyList DelimiterCloser) (token : TokenKind) :
+    Option (NonemptyList DelimiterCloser) :=
+  match delimiterStep?
+      (before.head :: before.tail) token with
+  | some (head :: tail) => some ⟨head, tail⟩
+  | _ => none
+
+private theorem protectedDelimiterStep?_eq_some_iff
+    (before after : NonemptyList DelimiterCloser) (token : TokenKind) :
+    protectedDelimiterStep? before token = some after ↔
+      DelimiterStep (before.head :: before.tail) token
+        (after.head :: after.tail) := by
+  constructor
+  · intro computed
+    unfold protectedDelimiterStep? at computed
+    generalize stepEq : delimiterStep?
+      (before.head :: before.tail) token = result at computed
+    cases result with
+    | none => contradiction
+    | some stack =>
+        cases stack with
+        | nil => contradiction
+        | cons head tail =>
+            have afterEq : after = ⟨head, tail⟩ := by
+              exact Option.some.inj computed.symm
+            subst after
+            exact (delimiterStep?_eq_some_iff _ _ _).mp
+              stepEq
+  · intro step
+    unfold protectedDelimiterStep?
+    rw [(delimiterStep?_eq_some_iff _ _ _).mpr step]
+
+private def protectedDelimiterRunFrom?
+    (tokens : List Token) : Nat → Nat →
+      NonemptyList DelimiterCloser →
+      Option (NonemptyList DelimiterCloser)
+  | 0, _, before => some before
+  | fuel + 1, cursor, before =>
+      if inRange : cursor < tokens.length then
+        match protectedDelimiterStep? before tokens[cursor].payload with
+        | some after =>
+            protectedDelimiterRunFrom? tokens fuel (cursor + 1) after
+        | none => none
+      else
+        none
+
+private theorem protectedDelimiterRun_ordered_for_executor
+    {tokens : List Token}
+    {before after : NonemptyList DelimiterCloser}
+    {start finish : Boundary tokens}
+    (run : ProtectedDelimiterRun tokens before start finish after) :
+    start.val ≤ finish.val := by
+  induction run with
+  | nil => exact Nat.le_refl _
+  | cons before after finish cursor start endCursor token atStart lookup
+      step rest induction =>
+      have atStartValue := congrArg Fin.val atStart
+      have beforeValue : cursor.beforeBoundary.val = cursor.val := rfl
+      have afterValue : cursor.afterBoundary.val = cursor.val + 1 := rfl
+      omega
+
+private theorem protectedDelimiterRunFrom?_eq_some_iff
+    {tokens : List Token}
+    (fuel cursor : Nat)
+    (before after : NonemptyList DelimiterCloser)
+    (start finish : Boundary tokens)
+    (startEq : start.val = cursor)
+    (finishEq : finish.val = cursor + fuel) :
+    protectedDelimiterRunFrom? tokens fuel cursor before = some after ↔
+      ProtectedDelimiterRun tokens before start finish after := by
+  induction fuel generalizing cursor before after start finish with
+  | zero =>
+      have finishStart : finish = start := by
+        apply Fin.ext
+        omega
+      subst finish
+      constructor
+      · intro computed
+        have afterEq : after = before := by
+          simpa only [protectedDelimiterRunFrom?, Option.some.injEq] using
+            computed.symm
+        subst after
+        exact .nil before start
+      · intro run
+        cases run with
+        | nil => rfl
+        | cons before next finish terminalCursor relationStart endCursor token
+            atStart lookup step rest =>
+            have restOrdered :=
+              protectedDelimiterRun_ordered_for_executor rest
+            have atStartValue := congrArg Fin.val atStart
+            change terminalCursor.val = start.val at atStartValue
+            change terminalCursor.val + 1 ≤ start.val at restOrdered
+            omega
+  | succ fuel induction =>
+      constructor
+      · intro computed
+        unfold protectedDelimiterRunFrom? at computed
+        split at computed
+        case isFalse => contradiction
+        case isTrue inRange =>
+          generalize stepEq : protectedDelimiterStep?
+            before tokens[cursor].payload = stepResult at computed
+          cases stepResult with
+          | none => contradiction
+          | some next =>
+              let terminalCursor : TerminalCursor tokens :=
+                ⟨cursor, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+              let nextStart : Boundary tokens :=
+                terminalCursor.afterBoundary
+              have atStart : terminalCursor.beforeBoundary = start := by
+                apply Fin.ext
+                change cursor = start.val
+                exact startEq.symm
+              have nextStartEq : nextStart.val = cursor + 1 := rfl
+              have nextFinishEq : finish.val = cursor + 1 + fuel := by
+                omega
+              have rest : ProtectedDelimiterRun tokens next nextStart
+                  finish after :=
+                (induction (cursor + 1) next after nextStart finish
+                  nextStartEq nextFinishEq).mp computed
+              exact .cons before next after terminalCursor start finish
+                tokens[cursor] atStart
+                (List.getElem?_eq_getElem inRange)
+                ((protectedDelimiterStep?_eq_some_iff _ _ _).mp stepEq)
+                rest
+      · intro run
+        cases run with
+        | nil stack boundary => omega
+        | cons relationBefore relationAfter relationFinish terminalCursor
+            relationStart endCursor token atStart lookup step rest =>
+            have cursorEq : terminalCursor.val = cursor := by
+              have rawAtStart := congrArg Fin.val atStart
+              change terminalCursor.val = start.val at rawAtStart
+              omega
+            have inRange : cursor < tokens.length := by
+              by_cases candidate : cursor < tokens.length
+              · exact candidate
+              · have outOfRange : tokens.length ≤ terminalCursor.val := by
+                  omega
+                rw [List.getElem?_eq_none outOfRange] at lookup
+                contradiction
+            have tokenEq : tokens[cursor] = token := by
+              have canonical := List.getElem?_eq_getElem inRange
+              rw [cursorEq] at lookup
+              exact Option.some.inj (canonical.symm.trans lookup)
+            unfold protectedDelimiterRunFrom?
+            rw [dif_pos inRange]
+            rw [(protectedDelimiterStep?_eq_some_iff _ _ _).mpr
+              (tokenEq ▸ step)]
+            have nextStartEq :
+                terminalCursor.afterBoundary.val = cursor + 1 := by
+              change terminalCursor.val + 1 = cursor + 1
+              omega
+            have nextFinishEq : finish.val = cursor + 1 + fuel := by
+              omega
+            exact (induction (cursor + 1) relationAfter after
+              terminalCursor.afterBoundary finish nextStartEq
+              nextFinishEq).mpr rest
+
+/-- Execute one protected delimiter run over a half-open boundary range. -/
+def protectedDelimiterRun?
+    (tokens : List Token) (before : NonemptyList DelimiterCloser)
+    (start finish : Boundary tokens) :
+    Option (NonemptyList DelimiterCloser) :=
+  if _ordered : start.val ≤ finish.val then
+    protectedDelimiterRunFrom? tokens
+      (finish.val - start.val) start.val before
+  else
+    none
+
+/-- Protected execution returns exactly the declarative protected run. -/
+theorem protectedDelimiterRun?_eq_some_iff
+    (tokens : List Token)
+    (before after : NonemptyList DelimiterCloser)
+    (start finish : Boundary tokens) :
+    protectedDelimiterRun? tokens before start finish = some after ↔
+      ProtectedDelimiterRun tokens before start finish after := by
+  unfold protectedDelimiterRun?
+  split
+  case isFalse notOrdered =>
+    constructor
+    · intro impossible
+      contradiction
+    · intro run
+      exact False.elim
+        (notOrdered (protectedDelimiterRun_ordered_for_executor run))
+  case isTrue ordered =>
+    exact protectedDelimiterRunFrom?_eq_some_iff
+      (finish.val - start.val) start.val before after start finish rfl
+        (by omega)
+
 /-- Recover the symbol represented by one stack closer. -/
 private def DelimiterCloser.symbol : DelimiterCloser → Symbol
   | .rightParen => .rightParen
