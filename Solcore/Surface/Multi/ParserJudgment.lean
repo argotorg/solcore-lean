@@ -2949,6 +2949,80 @@ def PhaseBCorrect
   ∀ key decision,
     memo key = .final decision ↔ GuardEvidence file tokens key decision
 
+private def finalGuardDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) : GuardDecision :=
+  match guardEvidenceDecision owned key .positive with
+  | .isTrue _positive => .positive
+  | .isFalse _notPositive =>
+      match guardEvidenceDecision owned key .negative with
+      | .isTrue _negative => .negative
+      | .isFalse _notNegative => .neutral
+
+private theorem finalGuardDecision_evidence
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) :
+    GuardEvidence file tokens key (finalGuardDecision owned key) := by
+  unfold finalGuardDecision
+  cases positive : guardEvidenceDecision owned key .positive with
+  | isTrue positiveEvidence => exact positiveEvidence
+  | isFalse notPositive =>
+      cases negative : guardEvidenceDecision owned key .negative with
+      | isTrue negativeEvidence => exact negativeEvidence
+      | isFalse notNegative =>
+          obtain ⟨decision, evidence⟩ := guard_evidence_total owned key
+          cases decision with
+          | positive => exact False.elim (notPositive evidence)
+          | negative => exact False.elim (notNegative evidence)
+          | neutral => exact evidence
+
+private def finalGuardMemo
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) : GuardMemo tokens :=
+  fun key => .final (finalGuardDecision owned key)
+
+private theorem finalGuardMemo_correct
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    PhaseBCorrect file tokens (finalGuardMemo owned) := by
+  intro key decision
+  constructor
+  · intro stored
+    have selected : finalGuardDecision owned key = decision := by
+      exact GuardMemoState.final.inj stored
+    simpa only [selected] using finalGuardDecision_evidence owned key
+  · intro evidence
+    have selected : finalGuardDecision owned key = decision :=
+      GuardEvidence.functional
+        (finalGuardDecision_evidence owned key) evidence
+    exact congrArg GuardMemoState.final selected
+
+private theorem finalGuardMemo_allFinal
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    AllGuardsFinal (finalGuardMemo owned) := by
+  intro key
+  exact ⟨finalGuardDecision owned key, rfl⟩
+
+theorem phaseBCorrect_iff_guardEvidence
+    {file : WorkspaceFile} {tokens : List Token}
+    (memo : GuardMemo tokens) :
+    PhaseBCorrect file tokens memo ↔
+      ∀ key decision,
+        memo key = .final decision ↔
+          GuardEvidence file tokens key decision :=
+  Iff.rfl
+
+theorem guard_decisions_final_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∃ memo : GuardMemo tokens,
+      PhaseBCorrect file tokens memo ∧ AllGuardsFinal memo :=
+  ⟨finalGuardMemo owned, finalGuardMemo_correct owned,
+    finalGuardMemo_allFinal owned⟩
+
 /-- One accepted decision for one checked guarded-production cell. -/
 def GuardWitness
     (file : WorkspaceFile) (tokens : List Token)
