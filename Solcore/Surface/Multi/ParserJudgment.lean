@@ -14208,6 +14208,141 @@ inductive ActionReduces
       ActionReduces file tokens (.actionFor (.tail site branch))
         origin finish input (ListSite.pack site branch input)
 
+/-- Every ready source-rule input has an exact semantic reduction. -/
+theorem ruleReduction_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens rule origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs rule)) :
+    ∃ output : RuleValue rule,
+      RuleReduction file tokens rule origin finish input output := by
+  cases rule with
+  | «module» => exact ruleReduction_module_total ready input
+  | topItem => exact ruleReduction_topItem_total ready input
+  | moduleRef => exact ruleReduction_moduleRef_total ready input
+  | importDecl => exact ruleReduction_importDecl_total ready input
+  | importEntry => exact ruleReduction_importEntry_total ready input
+  | hidingClause => exact ruleReduction_hidingClause_total ready input
+  | exportDecl => exact ruleReduction_exportDecl_total ready input
+  | localExportEntry => exact ruleReduction_localExportEntry_total ready input
+  | remoteExportEntry => exact ruleReduction_remoteExportEntry_total ready input
+  | exportItem => exact ruleReduction_exportItem_total ready input
+  | constructorSelection =>
+      exact ruleReduction_constructorSelection_total ready input
+  | pragmaDecl => exact ruleReduction_pragmaDecl_total ready input
+  | genericPrefix => exact ruleReduction_genericPrefix_total ready input
+  | forallClause => exact ruleReduction_forallClause_total ready input
+  | forallBinder => exact ruleReduction_forallBinder_total ready input
+  | optionalComma => exact ruleReduction_optionalComma_total ready input
+  | predicateList => exact ruleReduction_predicateList_total ready input
+  | predicate => exact ruleReduction_predicate_total ready input
+  | functionSignature =>
+      exact ruleReduction_functionSignature_total ready input
+  | functionDecl => exact ruleReduction_functionDecl_total ready input
+  | classMethod => exact ruleReduction_classMethod_total ready input
+  | dataDecl => exact ruleReduction_dataDecl_total ready input
+  | dataConstructor => exact ruleReduction_dataConstructor_total ready input
+  | typeAliasDecl => exact ruleReduction_typeAliasDecl_total ready input
+  | classDecl => exact ruleReduction_classDecl_total ready input
+  | instanceDecl => exact ruleReduction_instanceDecl_total ready input
+  | instanceMethod => exact ruleReduction_instanceMethod_total ready input
+  | contractDecl => exact ruleReduction_contractDecl_total ready input
+  | contractMember => exact ruleReduction_contractMember_total ready input
+  | fieldDecl => exact ruleReduction_fieldDecl_total ready input
+  | fallbackDecl => exact ruleReduction_fallbackDecl_total ready input
+  | contractConstructorDecl =>
+      exact ruleReduction_contractConstructorDecl_total ready input
+  | parameter => exact ruleReduction_parameter_total ready input
+  | body => exact ruleReduction_body_total ready input
+  | «type» => exact ruleReduction_type_total ready input
+  | typeAtom => exact ruleReduction_typeAtom_total ready input
+  | qualifiedName => exact ruleReduction_qualifiedName_total ready input
+  | statement => exact ruleReduction_statement_total ready input
+  | letStatement => exact ruleReduction_letStatement_total ready input
+  | letBinding => exact ruleReduction_letBinding_total ready input
+  | returnStatement => exact ruleReduction_returnStatement_total ready input
+  | blockStatement => exact ruleReduction_blockStatement_total ready input
+  | breakStatement => exact ruleReduction_breakStatement_total ready input
+  | continueStatement => exact ruleReduction_continueStatement_total ready input
+  | assemblyStatement =>
+      exact ruleReduction_assemblyStatement_total ready input
+  | ifStatement => exact ruleReduction_ifStatement_total ready input
+  | forStatement => exact ruleReduction_forStatement_total ready input
+  | forInitItem => exact ruleReduction_forInitItem_total ready input
+  | forPostItem => exact ruleReduction_forPostItem_total ready input
+  | matchStatement => exact ruleReduction_matchStatement_total ready input
+  | matchArm => exact ruleReduction_matchArm_total ready input
+  | armStatement => exact ruleReduction_armStatement_total ready input
+  | assignmentStatement =>
+      exact ruleReduction_assignmentStatement_total ready input
+  | assignmentOperator =>
+      exact ruleReduction_assignmentOperator_total ready input
+  | expressionStatement =>
+      exact ruleReduction_expressionStatement_total ready input
+  | terminalExpression =>
+      exact ruleReduction_terminalExpression_total ready input
+  | pattern => exact ruleReduction_pattern_total ready input
+  | expression => exact ruleReduction_expression_total ready input
+  | annotation => exact ruleReduction_annotation_total ready input
+  | conditional => exact ruleReduction_conditional_total ready input
+  | logicalOr => exact ruleReduction_logicalOr_total ready input
+  | logicalAnd => exact ruleReduction_logicalAnd_total ready input
+  | equality => exact ruleReduction_equality_total ready input
+  | relational => exact ruleReduction_relational_total ready input
+  | bitOr => exact ruleReduction_bitOr_total ready input
+  | bitXor => exact ruleReduction_bitXor_total ready input
+  | bitAnd => exact ruleReduction_bitAnd_total ready input
+  | additive => exact ruleReduction_additive_total ready input
+  | multiplicative => exact ruleReduction_multiplicative_total ready input
+  | «prefix» => exact ruleReduction_prefix_total ready input
+  | «postfix» => exact ruleReduction_postfix_total ready input
+  | «postfixPart» => exact ruleReduction_postfixPart_total ready input
+  | «atom» => exact ruleReduction_atom_total ready input
+  | «lambda» => exact ruleReduction_lambda_total ready input
+  | «literal» => exact ruleReduction_literal_total ready input
+
+/-- Every ready generated action input has an exact semantic reduction. -/
+theorem actionReduces_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {action : ActionId} {origin finish : Boundary tokens}
+    (ready : ActionReductionReady file tokens action origin finish)
+    (input : GrammarSymbolValues file tokens action.production.rhs) :
+    ∃ output : NonterminalValue file tokens action.production.lhs,
+      ActionReduces file tokens action origin finish input output := by
+  cases action with
+  | actionFor production =>
+      cases production with
+      | root rule =>
+          rcases ruleReduction_total ready
+            (RootAction.unpack rule input) with ⟨output, reduces⟩
+          exact ⟨output, .root rule origin finish input output reduces⟩
+      | atom site =>
+          exact ⟨AtomSite.pack site input, .atom site origin finish input⟩
+      | seq site =>
+          exact ⟨SequenceSite.pack site input, .seq site origin finish input⟩
+      | group site =>
+          exact ⟨GroupSite.pack site input, .group site origin finish input⟩
+      | choice site branch =>
+          exact ⟨ChoiceSite.pack site branch input,
+            .choice site branch origin finish input⟩
+      | opt site branch =>
+          exact ⟨OptionalSite.pack site branch input,
+            .opt site branch origin finish input⟩
+      | star site branch =>
+          exact ⟨StarSite.pack site branch input,
+            .star site branch origin finish input⟩
+      | plus site branch =>
+          exact ⟨PlusSite.pack site branch input,
+            .plus site branch origin finish input⟩
+      | list0 site branch =>
+          exact ⟨List0Site.pack site branch input,
+            .list0 site branch origin finish input⟩
+      | list1 site =>
+          exact ⟨List1Site.pack site input, .list1 site origin finish input⟩
+      | tail site branch =>
+          exact ⟨ListSite.pack site branch input,
+            .tail site branch origin finish input⟩
+
 /-- The action reduction relation has exactly the eleven production shapes. -/
 theorem actionReduces_eleven_shapes_exact
     {file : WorkspaceFile} {tokens : List Token}
