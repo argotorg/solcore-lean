@@ -3720,6 +3720,265 @@ def pack
 
 end ListSite
 
+/-- Every outer production constructor has its checked total transport from
+the exact RHS-indexed heterogeneous tuple to the corresponding action input or
+auxiliary result. -/
+theorem production_rhs_typed_hlist_transport
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId) :
+    match production with
+    | .root rule => Nonempty (
+        GrammarSymbolValues file tokens (ProductionId.root rule).rhs →
+          EbnfValue file tokens (m2cV1.rhs rule))
+    | .atom site => Nonempty (
+        GrammarSymbolValues file tokens (ProductionId.atom site).rhs →
+          NonterminalValue file tokens (ProductionId.atom site).lhs)
+    | .seq site => Nonempty (
+        GrammarSymbolValues file tokens (ProductionId.seq site).rhs →
+          NonterminalValue file tokens (ProductionId.seq site).lhs)
+    | .group site => Nonempty (
+        GrammarSymbolValues file tokens (ProductionId.group site).rhs →
+          NonterminalValue file tokens (ProductionId.group site).lhs)
+    | .choice site branch => Nonempty (
+        GrammarSymbolValues file tokens
+            (ProductionId.choice site branch).rhs →
+          NonterminalValue file tokens
+            (ProductionId.choice site branch).lhs)
+    | .opt site branch => Nonempty (
+        GrammarSymbolValues file tokens (ProductionId.opt site branch).rhs →
+          NonterminalValue file tokens (ProductionId.opt site branch).lhs)
+    | .star site branch => Nonempty (
+        GrammarSymbolValues file tokens
+            (ProductionId.star site branch).rhs →
+          NonterminalValue file tokens (ProductionId.star site branch).lhs)
+    | .plus site branch => Nonempty (
+        GrammarSymbolValues file tokens
+            (ProductionId.plus site branch).rhs →
+          NonterminalValue file tokens (ProductionId.plus site branch).lhs)
+    | .list0 site branch => Nonempty (
+        GrammarSymbolValues file tokens
+            (ProductionId.list0 site branch).rhs →
+          NonterminalValue file tokens (ProductionId.list0 site branch).lhs)
+    | .list1 site => Nonempty (
+        GrammarSymbolValues file tokens (ProductionId.list1 site).rhs →
+          NonterminalValue file tokens (ProductionId.list1 site).lhs)
+    | .tail site branch => Nonempty (
+        GrammarSymbolValues file tokens (ProductionId.tail site branch).rhs →
+          NonterminalValue file tokens (ProductionId.tail site branch).lhs) := by
+  cases production with
+  | root rule => exact ⟨RootAction.unpack rule⟩
+  | atom site => exact ⟨AtomSite.pack site⟩
+  | seq site => exact ⟨SequenceSite.pack site⟩
+  | group site => exact ⟨GroupSite.pack site⟩
+  | choice site branch => exact ⟨ChoiceSite.pack site branch⟩
+  | opt site branch => exact ⟨OptionalSite.pack site branch⟩
+  | star site branch => exact ⟨StarSite.pack site branch⟩
+  | plus site branch => exact ⟨PlusSite.pack site branch⟩
+  | list0 site branch => exact ⟨List0Site.pack site branch⟩
+  | list1 site => exact ⟨List1Site.pack site⟩
+  | tail site branch => exact ⟨ListSite.pack site branch⟩
+
+/-- Every typed action packer satisfies its checked canonical result equation,
+exhaustively by the eleven outer production constructors and their branches. -/
+theorem actionPackers_typed_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId) :
+    match production with
+    | .root rule => ∀ (values : GrammarSymbolValues file tokens
+        (ProductionId.root rule).rhs),
+        RootAction.unpack (file := file) (tokens := tokens) rule values =
+          EbnfValue.atShape (GrammarSite.root_expression rule)
+            (GrammarSymbolValues.view
+              (ProductionId.rhs_root rule) values).1
+    | .atom site =>
+        (∀ terminal (atomEq : site.atom = .terminal terminal)
+            (values : GrammarSymbolValues file tokens
+              (ProductionId.atom site).rhs),
+          AtomSite.packAtAtom (file := file) (tokens := tokens)
+              site (.terminal terminal) atomEq values =
+            EbnfValue.terminalAtom terminal
+              (Eq.mp
+                (congrArg (GrammarSymbolValue file tokens)
+                  (congrArg EbnfAtom.grammarSymbol atomEq))
+                (Eq.mp
+                  (congrArg (GrammarSymbolValue file tokens) site.symbol_eq)
+                  (GrammarSymbolValues.view
+                    (ProductionId.rhs_atom site) values).1))) ∧
+        (∀ rule (atomEq : site.atom = .nonterminal rule)
+            (values : GrammarSymbolValues file tokens
+              (ProductionId.atom site).rhs),
+          AtomSite.packAtAtom (file := file) (tokens := tokens)
+              site (.nonterminal rule) atomEq values =
+            EbnfValue.ruleAtom (file := file) (tokens := tokens) rule
+              (Eq.mp
+                (congrArg (GrammarSymbolValue file tokens)
+                  (congrArg EbnfAtom.grammarSymbol atomEq))
+                (Eq.mp
+                  (congrArg (GrammarSymbolValue file tokens) site.symbol_eq)
+                  (GrammarSymbolValues.view
+                    (ProductionId.rhs_atom site) values).1)))
+    | .seq site => ∀ (values : GrammarSymbolValues file tokens
+        (ProductionId.seq site).rhs),
+        EbnfValue.atShape site.expression_eq_sequence
+            (SequenceSite.pack site values) =
+          EbnfValue.sequence (site.children.map GrammarSite.expression)
+            (EbnfValues.ofAuxiliaries site.children
+              (GrammarSymbolValues.view
+                (ProductionId.rhs_seq site) values))
+    | .group site => ∀ (values : GrammarSymbolValues file tokens
+        (ProductionId.group site).rhs),
+        EbnfValue.atShape site.expression_eq_group
+            (GroupSite.pack site values) =
+          EbnfValue.group site.child.expression
+            (GrammarSymbolValues.view
+              (ProductionId.rhs_group site) values).1
+    | .choice site branch => ∀ (values : GrammarSymbolValues file tokens
+        (ProductionId.choice site branch).rhs),
+        EbnfValue.atShape site.expression_eq_choice
+            (ChoiceSite.pack site branch values) =
+          EbnfValue.choice site.branchExpressions.toList
+            ⟨site.branchListIndex branch,
+              EbnfValue.transport
+                ((site.branch_expression branch).trans
+                  (site.branch_get_toList branch).symm)
+                (GrammarSymbolValues.view
+                  (ProductionId.rhs_choice site branch) values).1⟩
+    | .opt site branch =>
+        match branch with
+        | .none => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.opt site .none).rhs),
+            EbnfValue.atShape site.expression_eq_optional
+                (OptionalSite.pack site .none values) =
+              EbnfValue.optional site.child.expression none
+        | .some => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.opt site .some).rhs),
+            EbnfValue.atShape site.expression_eq_optional
+                (OptionalSite.pack site .some values) =
+              EbnfValue.optional site.child.expression
+                (some (GrammarSymbolValues.view
+                  (ProductionId.rhs_opt_some site) values).1)
+    | .star site branch =>
+        match branch with
+        | .nil => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.star site .nil).rhs),
+            EbnfValue.atShape site.expression_eq_star
+                (StarSite.pack site .nil values) =
+              EbnfValue.star site.child.expression []
+        | .cons => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.star site .cons).rhs),
+            EbnfValue.atShape site.expression_eq_star
+                (StarSite.pack site .cons values) =
+              EbnfValue.star site.child.expression
+                ((GrammarSymbolValues.view
+                    (ProductionId.rhs_star_cons site) values).1 ::
+                  Eq.mp (ebnfValue_star_eq site.child.expression)
+                    (EbnfValue.atShape site.expression_eq_star
+                      (GrammarSymbolValues.view
+                        (ProductionId.rhs_star_cons site) values).2.1))
+    | .plus site branch =>
+        match branch with
+        | .one => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.plus site .one).rhs),
+            EbnfValue.atShape site.expression_eq_plus
+                (PlusSite.pack site .one values) =
+              EbnfValue.plus site.child.expression {
+                head := (GrammarSymbolValues.view
+                  (ProductionId.rhs_plus_one site) values).1
+                tail := []
+              }
+        | .cons => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.plus site .cons).rhs),
+            let viewed := GrammarSymbolValues.view
+              (ProductionId.rhs_plus_cons site) values
+            let tail := Eq.mp (ebnfValue_plus_eq site.child.expression)
+              (EbnfValue.atShape site.expression_eq_plus viewed.2.1)
+            EbnfValue.atShape site.expression_eq_plus
+                (PlusSite.pack site .cons values) =
+              EbnfValue.plus site.child.expression {
+                head := viewed.1
+                tail := tail.head :: tail.tail
+              }
+    | .list0 site branch =>
+        match branch with
+        | .nil => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.list0 site .nil).rhs),
+            EbnfValue.atShape site.expression_eq_list0
+                (List0Site.pack site .nil values) =
+              EbnfValue.list0 site.element.expression []
+        | .cons => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.list0 site .cons).rhs),
+            let viewed := GrammarSymbolValues.view
+              (ProductionId.rhs_list0_cons site) values
+            let tail := Eq.mp
+              (congrArg
+                (fun element : GrammarSite =>
+                  List (EbnfValue file tokens element.expression))
+                (ListSite.element_list0 site))
+              viewed.2.1
+            EbnfValue.atShape site.expression_eq_list0
+                (List0Site.pack site .cons values) =
+              EbnfValue.list0 site.element.expression (viewed.1 :: tail)
+    | .list1 site => ∀ (values : GrammarSymbolValues file tokens
+        (ProductionId.list1 site).rhs),
+        let viewed := GrammarSymbolValues.view
+          (ProductionId.rhs_list1 site) values
+        let tail := Eq.mp
+          (congrArg
+            (fun element : GrammarSite =>
+              List (EbnfValue file tokens element.expression))
+            (ListSite.element_list1 site))
+          viewed.2.1
+        EbnfValue.atShape site.expression_eq_list1
+            (List1Site.pack site values) =
+          EbnfValue.list1 site.element.expression {
+            head := viewed.1
+            tail := tail
+          }
+    | .tail site branch =>
+        match branch with
+        | .nil => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.tail site .nil).rhs),
+            ListSite.pack site .nil values = []
+        | .cons => ∀ (values : GrammarSymbolValues file tokens
+            (ProductionId.tail site .cons).rhs),
+            ListSite.pack site .cons values =
+              (GrammarSymbolValues.view
+                  (ProductionId.rhs_tail_cons site) values).2.1 ::
+                (GrammarSymbolValues.view
+                  (ProductionId.rhs_tail_cons site) values).2.2.1 := by
+  cases production with
+  | root rule => exact fun values => RootAction.unpack_eq rule values
+  | atom site =>
+      exact ⟨fun terminal atomEq values =>
+          AtomSite.pack_terminal_eq site terminal atomEq values,
+        fun rule atomEq values =>
+          AtomSite.pack_rule_eq site rule atomEq values⟩
+  | seq site => exact fun values => SequenceSite.pack_eq site values
+  | group site => exact fun values => GroupSite.pack_eq site values
+  | choice site branch =>
+      exact fun values => ChoiceSite.pack_eq site branch values
+  | opt site branch =>
+      cases branch with
+      | none => exact fun values => OptionalSite.pack_none_eq site values
+      | some => exact fun values => OptionalSite.pack_some_eq site values
+  | star site branch =>
+      cases branch with
+      | nil => exact fun values => StarSite.pack_nil_eq site values
+      | cons => exact fun values => StarSite.pack_cons_eq site values
+  | plus site branch =>
+      cases branch with
+      | one => exact fun values => PlusSite.pack_one_eq site values
+      | cons => exact fun values => PlusSite.pack_cons_eq site values
+  | list0 site branch =>
+      cases branch with
+      | nil => exact fun values => List0Site.pack_nil_eq site values
+      | cons => exact fun values => List0Site.pack_cons_eq site values
+  | list1 site => exact fun values => List1Site.pack_eq site values
+  | tail site branch =>
+      cases branch with
+      | nil => exact fun values => ListSite.pack_nil_eq site values
+      | cons => exact fun values => ListSite.pack_cons_eq site values
+
 namespace PackedEdgeKey
 
 /-- Exact structural validity for an unguarded scanned or completed edge. -/
