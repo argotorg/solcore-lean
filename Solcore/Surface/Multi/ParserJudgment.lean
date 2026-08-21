@@ -8552,6 +8552,270 @@ private theorem ruleReduction_typeAtom_functional
     apply (sourceLoc_eq_iff _ _ _ _).2
     rw [sequenceEq.2.1, sequenceEq.2.2.2.1, restEq]
 
+private theorem ruleReduction_ifStatement_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .ifStatement)}
+    {left right : RuleValue .ifStatement}
+    (leftReduces : RuleReduction file tokens .ifStatement
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .ifStatement
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have sequenceEq := EbnfValue.sequence_injective _ inputEq
+    have keywordConsEq := EbnfValues.cons_injective _ _ sequenceEq
+    have openConsEq := EbnfValues.cons_injective _ _ keywordConsEq.2
+    have conditionConsEq := EbnfValues.cons_injective _ _ openConsEq.2
+    have conditionEq := EbnfValue.ruleAtom_injective _ conditionConsEq.1
+    have closeConsEq := EbnfValues.cons_injective _ _ conditionConsEq.2
+    have thenBodyConsEq := EbnfValues.cons_injective _ _ closeConsEq.2
+    have thenBodyEq := EbnfValue.ruleAtom_injective _ thenBodyConsEq.1
+    have elseConsEq := EbnfValues.cons_injective _ _ thenBodyConsEq.2
+    have elseOptionEq := EbnfValue.optional_injective _ elseConsEq.1
+  case ifStatementWithoutElse.ifStatementWithoutElse =>
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [conditionEq, thenBodyEq]
+  case ifStatementWithoutElse.ifStatementWithElse => cases elseOptionEq
+  case ifStatementWithElse.ifStatementWithoutElse => cases elseOptionEq
+  case ifStatementWithElse.ifStatementWithElse =>
+    have innerValueEq := Option.some.inj elseOptionEq
+    have innerSequenceEq := EbnfValue.sequence_injective _ innerValueEq
+    have elseKeywordConsEq := EbnfValues.cons_injective _ _ innerSequenceEq
+    have elseBodyConsEq := EbnfValues.cons_injective _ _ elseKeywordConsEq.2
+    have elseBodyEq := EbnfValue.ruleAtom_injective _ elseBodyConsEq.1
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [conditionEq, thenBodyEq, elseBodyEq]
+
+private theorem ruleReduction_forStatement_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .forStatement)}
+    {left right : RuleValue .forStatement}
+    (leftReduces : RuleReduction file tokens .forStatement
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .forStatement
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  have keywordConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have openConsEq := EbnfValues.cons_injective _ _ keywordConsEq.2
+  have initializersConsEq := EbnfValues.cons_injective _ _ openConsEq.2
+  have initializersInputEq :=
+    EbnfValue.list0_injective _ initializersConsEq.1
+  have initializersEq := listMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .forInitItem) initializersInputEq
+  have firstSemicolonConsEq :=
+    EbnfValues.cons_injective _ _ initializersConsEq.2
+  have conditionConsEq :=
+    EbnfValues.cons_injective _ _ firstSemicolonConsEq.2
+  have conditionEq := EbnfValue.ruleAtom_injective _ conditionConsEq.1
+  have secondSemicolonConsEq :=
+    EbnfValues.cons_injective _ _ conditionConsEq.2
+  have postConsEq := EbnfValues.cons_injective _ _ secondSemicolonConsEq.2
+  have postInputEq := EbnfValue.list0_injective _ postConsEq.1
+  have postEq := listMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .forPostItem) postInputEq
+  have closeConsEq := EbnfValues.cons_injective _ _ postConsEq.2
+  have bodyConsEq := EbnfValues.cons_injective _ _ closeConsEq.2
+  have bodyEq := EbnfValue.ruleAtom_injective _ bodyConsEq.1
+  apply (sourceLoc_eq_iff _ _ _ _).2
+  rw [initializersEq, conditionEq, postEq, bodyEq]
+
+private theorem ruleReduction_forInitItem_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .forInitItem)}
+    {left right : RuleValue .forInitItem}
+    (leftReduces : RuleReduction file tokens .forInitItem
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .forInitItem
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have choiceEq := EbnfValue.choice_injective _ inputEq
+    have branchEq := congrArg Sigma.fst choiceEq
+    simp at branchEq
+  all_goals have valueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+  case forInitItemLet.forInitItemLet =>
+    have bindingEq := EbnfValue.ruleAtom_injective .letBinding valueEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [bindingEq]
+  case forInitItemAssignment.forInitItemAssignment =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, ruleAtom_inj_iff] at sequenceEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [sequenceEq.1, sequenceEq.2.1, sequenceEq.2.2.1]
+  case forInitItemExpression.forInitItemExpression =>
+    have expressionEq := EbnfValue.ruleAtom_injective .expression valueEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [expressionEq]
+
+private theorem ruleReduction_forPostItem_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .forPostItem)}
+    {left right : RuleValue .forPostItem}
+    (leftReduces : RuleReduction file tokens .forPostItem
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .forPostItem
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have choiceEq := EbnfValue.choice_injective _ inputEq
+    have branchEq := congrArg Sigma.fst choiceEq
+    simp at branchEq
+  all_goals have valueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+  case forPostItemAssignment.forPostItemAssignment =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, ruleAtom_inj_iff] at sequenceEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [sequenceEq.1, sequenceEq.2.1, sequenceEq.2.2.1]
+  case forPostItemExpression.forPostItemExpression =>
+    have expressionEq := EbnfValue.ruleAtom_injective .expression valueEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [expressionEq]
+
+private theorem ruleReduction_matchStatement_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .matchStatement)}
+    {left right : RuleValue .matchStatement}
+    (leftReduces : RuleReduction file tokens .matchStatement
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .matchStatement
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  have keywordConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have scrutineesConsEq := EbnfValues.cons_injective _ _ keywordConsEq.2
+  have scrutineesInputEq :=
+    EbnfValue.list1_injective _ scrutineesConsEq.1
+  have scrutineesEq := nonemptyListMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .expression) scrutineesInputEq
+  have openConsEq := EbnfValues.cons_injective _ _ scrutineesConsEq.2
+  have armsConsEq := EbnfValues.cons_injective _ _ openConsEq.2
+  have armsInputEq := EbnfValue.plus_injective _ armsConsEq.1
+  have armsEq := nonemptyListMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .matchArm) armsInputEq
+  have closeConsEq := EbnfValues.cons_injective _ _ armsConsEq.2
+  have terminatorConsEq := EbnfValues.cons_injective _ _ closeConsEq.2
+  have terminatorInputEq :=
+    EbnfValue.optional_injective _ terminatorConsEq.1
+  have terminatorEq := Option.map_injective
+    (EbnfValue.terminalAtom_injective (.symbol .semicolon))
+    terminatorInputEq
+  apply (sourceLoc_eq_iff _ _ _ _).2
+  rw [scrutineesEq, armsEq, terminatorEq]
+
+private theorem ruleReduction_matchArm_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .matchArm)}
+    {left right : RuleValue .matchArm}
+    (leftReduces : RuleReduction file tokens .matchArm
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .matchArm
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  have pipeConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have patternsConsEq := EbnfValues.cons_injective _ _ pipeConsEq.2
+  have patternsInputEq := EbnfValue.list1_injective _ patternsConsEq.1
+  have patternsEq := nonemptyListMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .pattern) patternsInputEq
+  have fatArrowConsEq := EbnfValues.cons_injective _ _ patternsConsEq.2
+  have fatArrowEq :=
+    EbnfValue.terminalAtom_injective _ fatArrowConsEq.1
+  have statementsConsEq := EbnfValues.cons_injective _ _ fatArrowConsEq.2
+  have statementsInputEq := EbnfValue.star_injective _ statementsConsEq.1
+  have statementsEq := listMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .armStatement)
+    statementsInputEq
+  apply (sourceLoc_eq_iff _ _ _ _).2
+  rw [patternsEq, fatArrowEq, statementsEq]
+
+private theorem ruleReduction_letBinding_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .letBinding)}
+    {left right : RuleValue .letBinding}
+    (leftReduces : RuleReduction file tokens .letBinding
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .letBinding
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have sequenceEq := EbnfValue.sequence_injective _ inputEq
+    have keywordConsEq := EbnfValues.cons_injective _ _ sequenceEq
+    have nameConsEq := EbnfValues.cons_injective _ _ keywordConsEq.2
+    have nameMatchedEq := EbnfValue.terminalAtom_injective _ nameConsEq.1
+    have typeConsEq := EbnfValues.cons_injective _ _ nameConsEq.2
+    have typeOptionEq := EbnfValue.optional_injective _ typeConsEq.1
+    have initializerConsEq := EbnfValues.cons_injective _ _ typeConsEq.2
+    have initializerInputEq :=
+      EbnfValue.optional_injective _ initializerConsEq.1
+    have initializerEq := Option.map_injective (by
+      intro leftValue rightValue valueEq
+      have innerSequenceEq := EbnfValue.sequence_injective _ valueEq
+      have equalConsEq := EbnfValues.cons_injective _ _ innerSequenceEq
+      have equalEq := EbnfValue.terminalAtom_injective _ equalConsEq.1
+      have expressionConsEq := EbnfValues.cons_injective _ _ equalConsEq.2
+      have expressionEq :=
+        EbnfValue.ruleAtom_injective _ expressionConsEq.1
+      exact Prod.ext equalEq expressionEq) initializerInputEq
+  case letBindingUntyped.letBindingUntyped =>
+    rename_i _ _ _ _ projectsLeft _ witnessLeft
+      _ _ _ _ projectsRight _ witnessRight
+    cases nameMatchedEq
+    have parsedEq := (IdentifierProjects.functional
+      projectsLeft projectsRight).2
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    rw [parsedEq, initializerEq]
+  case letBindingUntyped.letBindingTyped => cases typeOptionEq
+  case letBindingUntyped.letBindingComptime => cases typeOptionEq
+  case letBindingTyped.letBindingUntyped => cases typeOptionEq
+  case letBindingComptime.letBindingUntyped => cases typeOptionEq
+  all_goals
+    have innerValueEq := Option.some.inj typeOptionEq
+    have innerSequenceEq := EbnfValue.sequence_injective _ innerValueEq
+    have colonConsEq := EbnfValues.cons_injective _ _ innerSequenceEq
+    have comptimeConsEq := EbnfValues.cons_injective _ _ colonConsEq.2
+    have comptimeOptionEq :=
+      EbnfValue.optional_injective _ comptimeConsEq.1
+    have typeValueConsEq := EbnfValues.cons_injective _ _ comptimeConsEq.2
+    have typeValueEq := EbnfValue.ruleAtom_injective _ typeValueConsEq.1
+  case letBindingTyped.letBindingComptime => cases comptimeOptionEq
+  case letBindingComptime.letBindingTyped => cases comptimeOptionEq
+  case letBindingTyped.letBindingTyped =>
+    rename_i _ _ _ _ projectsLeft _ _ _ witnessLeft
+      _ _ _ _ projectsRight _ _ _ witnessRight
+    cases nameMatchedEq
+    have parsedEq := (IdentifierProjects.functional
+      projectsLeft projectsRight).2
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    rw [parsedEq, typeValueEq, initializerEq]
+  case letBindingComptime.letBindingComptime =>
+    rename_i _ _ _ _ projectsLeft _ _ _ _ witnessLeft
+      _ _ _ _ projectsRight _ _ _ _ witnessRight
+    have comptimeValueEq := Option.some.inj comptimeOptionEq
+    have comptimeEq := EbnfValue.terminalAtom_injective _ comptimeValueEq
+    cases nameMatchedEq
+    have parsedEq := (IdentifierProjects.functional
+      projectsLeft projectsRight).2
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    rw [parsedEq, comptimeEq, typeValueEq, initializerEq]
+
 /-- A module-rule reduction can only produce the full-file, source-owned
 module payload from its exact item list. -/
 theorem ruleReduction_source_backed
