@@ -2703,8 +2703,9 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
-/-- Guard-specific adjacent terminal observations.  The three coordinates are
-interpreted per guard but always retain an exact successor when one exists. -/
+/-- Guard-specific terminal observations.  Simple windows retain an exact
+successor; G01 canonicalizes both terminal windows into one collision-free
+whole-condition cell keyed by its guard site and closing parenthesis. -/
 private def phaseATerminalWindowGuardBool
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -2712,14 +2713,19 @@ private def phaseATerminalWindowGuardBool
     (contextStart siteCursor resultEnd : Boundary tokens) : Bool :=
   match guard with
   | .G01_statementIf =>
-      (phaseAImmediatelyAfterTerminalBool owned (.hardKeyword .ifKw)
-          contextStart siteCursor &&
-        phaseAImmediatelyAfterTerminalBool owned (.symbol .leftParen)
-          siteCursor resultEnd) ||
-      (phaseAImmediatelyAfterTerminalBool owned (.symbol .rightParen)
-          contextStart siteCursor &&
-        phaseAImmediatelyAfterTerminalBool owned (.symbol .leftBrace)
-          siteCursor resultEnd)
+      decide (resultEnd = siteCursor) &&
+        match phaseABoundaryAt? tokens (contextStart.val + 1),
+            phaseABoundaryAt? tokens (contextStart.val + 2),
+            phaseABoundaryAt? tokens (siteCursor.val + 1) with
+        | some openCursor, some expressionStart, some afterClose =>
+            phaseAImmediatelyAfterTerminalBool owned (.hardKeyword .ifKw)
+                contextStart openCursor &&
+              phaseAImmediatelyAfterTerminalBool owned (.symbol .leftParen)
+                openCursor expressionStart &&
+              phaseAImmediatelyAfterTerminalBool owned (.symbol .rightParen)
+                siteCursor afterClose &&
+              phaseATerminalAtBool owned (.symbol .leftBrace) afterClose
+        | _, _, _ => false
   | .G02_matchArmBoundary =>
       phaseAImmediatelyAfterTerminalBool owned (.symbol .pipe)
         siteCursor resultEnd
@@ -2814,6 +2820,117 @@ private def phaseAEvidenceEntryAt?
         some entry.selected
       else
         phaseAEvidenceEntryAt? rest address
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Canonical set presentation in the stable dotted-item enumeration order. -/
+private def canonicalRawItems (tokens : List Token)
+    (items : List (DottedItem tokens)) : List (DottedItem tokens) :=
+  (allDottedItems tokens).filter fun item => rawMemberBool items item
+
+private theorem rawMemberBool_eq_true_iff
+    {tokens : List Token} (items : List (DottedItem tokens))
+    (item : DottedItem tokens) :
+    rawMemberBool items item = true ↔ item ∈ items := by
+  rw [rawMemberBool, List.any_eq_true]
+  simp only [decide_eq_true_iff]
+  constructor
+  · rintro ⟨candidate, member, rfl⟩
+    exact member
+  · intro member
+    exact ⟨item, member, rfl⟩
+
+private theorem mem_canonicalRawItems_iff
+    {tokens : List Token} (items : List (DottedItem tokens))
+    (item : DottedItem tokens) :
+    item ∈ canonicalRawItems tokens items ↔ item ∈ items := by
+  rw [canonicalRawItems, List.mem_filter,
+    rawMemberBool_eq_true_iff]
+  exact and_iff_right (allDottedItems_complete item)
+
+/-- Canonical equality is exactly extensional item-membership equality. -/
+private theorem canonicalRawItems_eq_iff
+    {tokens : List Token} (left right : List (DottedItem tokens)) :
+    canonicalRawItems tokens left = canonicalRawItems tokens right ↔
+      ∀ item, item ∈ left ↔ item ∈ right := by
+  constructor
+  · intro equal item
+    constructor
+    · intro member
+      have canonicalMember :=
+        (mem_canonicalRawItems_iff left item).mpr member
+      rw [equal] at canonicalMember
+      exact (mem_canonicalRawItems_iff right item).mp canonicalMember
+    · intro member
+      have canonicalMember :=
+        (mem_canonicalRawItems_iff right item).mpr member
+      rw [← equal] at canonicalMember
+      exact (mem_canonicalRawItems_iff left item).mp canonicalMember
+  · intro sameMembers
+    unfold canonicalRawItems
+    congr 1
+    funext item
+    apply Bool.eq_iff_iff.mpr
+    simpa only [rawMemberBool_eq_true_iff] using sameMembers item
+
+private def normalizePhaseARawItems
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (_sameMembers :
+      canonicalRawItems tokens current.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens)) :
+    CountedState tokens (PhaseAOpen file tokens) := {
+  current with
+  payload := {
+    current.payload with
+    rawItems := rawSaturation tokens
+  }
+}
+
+/-- The checked normalization changes order only, never item membership. -/
+private theorem normalizePhaseARawItems_membership
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (same :
+      canonicalRawItems tokens current.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens))
+    (item : DottedItem tokens) :
+    item ∈ (normalizePhaseARawItems current same).payload.rawItems ↔
+      item ∈ current.payload.rawItems := by
+  have extensional := (canonicalRawItems_eq_iff
+    current.payload.rawItems (rawSaturation tokens)).mp same item
+  simpa only [normalizePhaseARawItems] using extensional.symm
+
+/-- Order-insensitive Phase-A sealing through the existing exact gate. -/
+private def enterPhaseBCanonical?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (CountedState tokens (PhaseBOpen file tokens)) :=
+  if _sameMembers :
+      canonicalRawItems tokens current.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens) then
+    enterPhaseB? (normalizePhaseARawItems current _sameMembers)
+  else
+    none
+
+/-- Order-insensitive Phase-A indexing through the existing exact gate. -/
+private def indexSaturatedPhaseACanonicalWith?
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (CountedState tokens (PhaseAIndexed file tokens)) :=
+  if _sameMembers :
+      canonicalRawItems tokens current.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens) then
+    indexSaturatedPhaseAWith? evaluate
+      (normalizePhaseARawItems current _sameMembers)
+  else
+    none
 
 end Chart
 
