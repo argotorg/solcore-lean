@@ -2452,6 +2452,96 @@ theorem nearest_statement_region_functional
       subst rightClose
       exact nextArmOrClose_functional leftNext rightNext
 
+private def TerminalAtBoundary
+    (file : WorkspaceFile) (tokens : List Token)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) : Prop :=
+  ∃ matched : MatchedTerminal file tokens terminal,
+    matched.cursor.beforeBoundary = boundary
+
+private def terminalAtBoundaryDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) :
+    Decidable (TerminalAtBoundary file tokens terminal boundary) := by
+  unfold TerminalAtBoundary
+  if inCursor : boundary.val < tokens.length + 1 then
+    let cursor : TerminalCursor tokens := ⟨boundary.val, inCursor⟩
+    match selected : MatchedTerminal.atCursor?
+        file tokens owned terminal cursor with
+    | some result =>
+        apply isTrue
+        refine ⟨result.val, ?_⟩
+        apply Fin.ext
+        have cursorValue := congrArg Fin.val result.property
+        change result.val.cursor.val = boundary.val
+        simpa [cursor] using cursorValue
+    | none =>
+        apply isFalse
+        rintro ⟨matched, atBoundary⟩
+        have cursorEq : matched.cursor = cursor := by
+          apply Fin.ext
+          have boundaryValue := congrArg Fin.val atBoundary
+          change matched.cursor.val = boundary.val at boundaryValue
+          simpa [cursor] using boundaryValue
+        have terminalAtCursor :
+            TerminalAt file tokens cursor matched.value matched.span := by
+          simpa only [cursorEq] using matched.at
+        obtain ⟨result, computed⟩ := MatchedTerminal.atCursor?_complete
+          owned terminal cursor terminalAtCursor matched.matches
+        rw [selected] at computed
+        contradiction
+  else
+    apply isFalse
+    rintro ⟨matched, atBoundary⟩
+    have cursorValue : matched.cursor.val = boundary.val :=
+      congrArg Fin.val atBoundary
+    exact inCursor (by simpa [cursorValue] using matched.cursor.isLt)
+
+private def ImmediatelyAfterTerminal
+    (file : WorkspaceFile) (tokens : List Token)
+    (terminal : TerminalSymbol)
+    (boundary after : Boundary tokens) : Prop :=
+  ∃ matched : MatchedTerminal file tokens terminal,
+    matched.cursor.beforeBoundary = boundary ∧
+      matched.cursor.afterBoundary = after
+
+private theorem immediatelyAfterTerminal_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol)
+    (boundary after : Boundary tokens) :
+    ImmediatelyAfterTerminal file tokens terminal boundary after ↔
+      TerminalAtBoundary file tokens terminal boundary ∧
+        after.val = boundary.val + 1 := by
+  constructor
+  · rintro ⟨matched, atBoundary, atAfter⟩
+    refine ⟨⟨matched, atBoundary⟩, ?_⟩
+    have beforeValue := congrArg Fin.val atBoundary
+    have afterValue := congrArg Fin.val atAfter
+    change matched.cursor.val = boundary.val at beforeValue
+    change matched.cursor.val + 1 = after.val at afterValue
+    omega
+  · rintro ⟨⟨matched, atBoundary⟩, afterValue⟩
+    refine ⟨matched, atBoundary, ?_⟩
+    apply Fin.ext
+    have beforeValue := congrArg Fin.val atBoundary
+    change matched.cursor.val = boundary.val at beforeValue
+    change matched.cursor.val + 1 = after.val
+    omega
+
+private def immediatelyAfterTerminalDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol)
+    (boundary after : Boundary tokens) :
+    Decidable
+      (ImmediatelyAfterTerminal file tokens terminal boundary after) := by
+  letI : Decidable (TerminalAtBoundary file tokens terminal boundary) :=
+    terminalAtBoundaryDecision owned terminal boundary
+  exact decidable_of_iff
+    (TerminalAtBoundary file tokens terminal boundary ∧
+      after.val = boundary.val + 1)
+    (immediatelyAfterTerminal_iff terminal boundary after).symm
+
 /-- The exact declarative guard-decision relation. -/
 def GuardEvidence
     (file : WorkspaceFile) (tokens : List Token)
