@@ -7133,6 +7133,306 @@ private theorem ruleReduction_literal_functional
     cases payloadEq
     rfl
 
+private theorem ruleReduction_moduleRef_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .moduleRef)}
+    {left right : RuleValue .moduleRef}
+    (leftReduces : RuleReduction file tokens .moduleRef
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .moduleRef
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have rootEq := EbnfValue.transport_injective _ inputEq
+    have choiceEq := EbnfValue.choice_injective _ rootEq
+    have branchEq := congrArg Sigma.fst choiceEq
+    simp at branchEq
+  all_goals
+    have branchValueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+    have sequenceEq := EbnfValue.sequence_injective _ branchValueEq
+    have firstConsEq := EbnfValues.cons_injective _ _ sequenceEq
+    have firstMatchedEq := EbnfValue.terminalAtom_injective _ firstConsEq.1
+  case moduleRefExternal.moduleRefExternal =>
+    rename_i atLeft libraryLeft dotLeft nextLeft restLeft atMarkerLeft
+      libraryProjectsLeft nextProjectsLeft restProjectsLeft witnessLeft
+      atRight libraryRight dotRight nextRight restRight atMarkerRight
+      libraryProjectsRight nextProjectsRight restProjectsRight witnessRight
+    have libraryConsEq := EbnfValues.cons_injective _ _ firstConsEq.2
+    have libraryMatchedEq :=
+      EbnfValue.terminalAtom_injective _ libraryConsEq.1
+    have dotConsEq := EbnfValues.cons_injective _ _ libraryConsEq.2
+    have nextConsEq := EbnfValues.cons_injective _ _ dotConsEq.2
+    have nextMatchedEq := EbnfValue.terminalAtom_injective _ nextConsEq.1
+    have starConsEq := EbnfValues.cons_injective _ _ nextConsEq.2
+    have restInputEq := EbnfValue.star_injective _ starConsEq.1
+    change restLeft.map dotTailInput =
+      restRight.map dotTailInput at restInputEq
+    have libraryLocEq := externalTerminalLoc_functional
+      libraryProjectsLeft libraryProjectsRight libraryMatchedEq
+    have nextLocEq := pathTerminalLoc_functional
+      nextProjectsLeft nextProjectsRight nextMatchedEq
+    have restLocEq := pathDotTailLocated_functional
+      restProjectsLeft restProjectsRight restInputEq
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    cases firstMatchedEq
+    rw [libraryLocEq, nextLocEq, restLocEq]
+  all_goals
+    have starConsEq := EbnfValues.cons_injective _ _ firstConsEq.2
+    have restInputEq := EbnfValue.star_injective _ starConsEq.1
+  all_goals first
+    | exact (moduleRef_standard_library_exclusive firstMatchedEq
+        (by assumption) (by assumption)).elim
+    | exact (moduleRef_standard_library_exclusive firstMatchedEq.symm
+        (by assumption) (by assumption)).elim
+    | exact (moduleRef_standard_relative_exclusive firstMatchedEq
+        (by assumption) (by assumption) (by assumption)).elim
+    | exact (moduleRef_standard_relative_exclusive firstMatchedEq.symm
+        (by assumption) (by assumption) (by assumption)).elim
+    | exact (moduleRef_library_relative_exclusive firstMatchedEq
+        (by assumption) (by assumption) (by assumption)).elim
+    | exact (moduleRef_library_relative_exclusive firstMatchedEq.symm
+        (by assumption) (by assumption) (by assumption)).elim
+    | skip
+  all_goals try simp only [List.cons.injEq] at restInputEq
+  all_goals first
+    | exact (List.cons_ne_nil _ _ restInputEq).elim
+    | exact (List.cons_ne_nil _ _ restInputEq.symm).elim
+    | skip
+  case moduleRefStandard.moduleRefStandard =>
+    rename_i firstLeft restLeft markerLeft projectsLeft witnessLeft
+      firstRight restRight markerRight projectsRight witnessRight
+    change restLeft.map dotTailInput =
+      restRight.map dotTailInput at restInputEq
+    have restLocEq := pathDotTailLocated_functional
+      projectsLeft projectsRight restInputEq
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    cases firstMatchedEq
+    rw [restLocEq]
+  case moduleRefLibraryRoot.moduleRefLibraryRoot =>
+    rename_i firstLeft nextDotLeft nextLeft remainingLeft markerLeft
+      nextProjectsLeft remainingProjectsLeft witnessLeft
+      firstRight nextDotRight nextRight remainingRight markerRight
+      nextProjectsRight remainingProjectsRight witnessRight
+    change dotTailInput (nextDotLeft, nextLeft) =
+        dotTailInput (nextDotRight, nextRight) ∧
+      remainingLeft.map dotTailInput =
+        remainingRight.map dotTailInput at restInputEq
+    have nextMatchedEq := congrArg Prod.snd
+      (dotTailInput_matched_functional restInputEq.1)
+    have nextLocEq := pathTerminalLoc_functional
+      nextProjectsLeft nextProjectsRight nextMatchedEq
+    have remainingLocEq := pathDotTailLocated_functional
+      remainingProjectsLeft remainingProjectsRight restInputEq.2
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    cases firstMatchedEq
+    rw [nextLocEq, remainingLocEq]
+  case moduleRefRelativeLibraryEmpty.moduleRefRelativeLibraryEmpty =>
+    rename_i firstLeft projectsLeft markerLeft witnessLeft
+      firstRight projectsRight markerRight witnessRight
+    have firstLocEq := pathTerminalLoc_functional
+      projectsLeft projectsRight firstMatchedEq
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    rw [firstLocEq]
+  case moduleRefRelativeOther.moduleRefRelativeOther =>
+    rename_i firstLeft restLeft firstProjectsLeft restProjectsLeft
+      notStandardLeft notLibraryLeft witnessLeft firstRight restRight
+      firstProjectsRight restProjectsRight notStandardRight notLibraryRight
+      witnessRight
+    change restLeft.map dotTailInput =
+      restRight.map dotTailInput at restInputEq
+    have firstLocEq := pathTerminalLoc_functional
+      firstProjectsLeft firstProjectsRight firstMatchedEq
+    have restLocEq := pathDotTailLocated_functional
+      restProjectsLeft restProjectsRight restInputEq
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    rw [firstLocEq, restLocEq]
+
+private theorem ruleReduction_qualifiedName_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .qualifiedName)}
+    {left right : RuleValue .qualifiedName}
+    (leftReduces : RuleReduction file tokens .qualifiedName
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .qualifiedName
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i firstLeft restLeft firstProjectsLeft restProjectsLeft witnessLeft
+    firstRight restRight firstProjectsRight restProjectsRight witnessRight
+  have rootEq := EbnfValue.transport_injective _ inputEq
+  have sequenceEq := EbnfValue.sequence_injective _ rootEq
+  have firstConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have firstMatchedEq := EbnfValue.terminalAtom_injective _ firstConsEq.1
+  have starConsEq := EbnfValues.cons_injective _ _ firstConsEq.2
+  have restInputEq := EbnfValue.star_injective _ starConsEq.1
+  change restLeft.map dotTailInput =
+    restRight.map dotTailInput at restInputEq
+  have firstLocEq := identifierTerminalLoc_functional
+    firstProjectsLeft firstProjectsRight firstMatchedEq
+  have restLocEq := identifierDotTailLocated_functional
+    restProjectsLeft restProjectsRight restInputEq
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  rw [firstLocEq, restLocEq]
+
+private theorem ruleReduction_hidingClause_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .hidingClause)}
+    {left right : RuleValue .hidingClause}
+    (leftReduces : RuleReduction file tokens .hidingClause
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .hidingClause
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i _ _ namesLeft _ projectsLeft witnessLeft
+    _ _ namesRight _ projectsRight witnessRight
+  have rootEq := EbnfValue.transport_injective _ inputEq
+  have sequenceEq := EbnfValue.sequence_injective _ rootEq
+  have keywordConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have openConsEq := EbnfValues.cons_injective _ _ keywordConsEq.2
+  have namesConsEq := EbnfValues.cons_injective _ _ openConsEq.2
+  have namesInputEq := EbnfValue.list0_injective _ namesConsEq.1
+  have matchedEq : namesLeft.map (fun value => value.matched) =
+      namesRight.map (fun value => value.matched) := by
+    apply listMap_injective_of_injective
+      (EbnfValue.terminalAtom_injective (.category .identifier))
+    simpa [List.map_map, Function.comp_def] using namesInputEq
+  have namesLocEq := identifierListLocated_functional
+    projectsLeft projectsRight matchedEq
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  rw [namesLocEq]
+
+private theorem ruleReduction_constructorSelection_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .constructorSelection)}
+    {left right : RuleValue .constructorSelection}
+    (leftReduces : RuleReduction file tokens .constructorSelection
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .constructorSelection
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have rootEq := EbnfValue.transport_injective _ inputEq
+    have choiceEq := EbnfValue.choice_injective _ rootEq
+    have branchEq := congrArg Sigma.fst choiceEq
+    simp at branchEq
+  all_goals
+    have branchValueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+    have sequenceEq := EbnfValue.sequence_injective _ branchValueEq
+    have openConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  case constructorSelectionAll.constructorSelectionAll =>
+    rename_i _ starLeft _ _ witnessLeft _ starRight _ _ witnessRight
+    have starConsEq := EbnfValues.cons_injective _ _ openConsEq.2
+    have starEq := EbnfValue.terminalAtom_injective _ starConsEq.1
+    cases starEq
+    exact (sourceLoc_eq_iff witnessLeft witnessRight _ _).2 rfl
+  case constructorSelectionNamed.constructorSelectionNamed =>
+    rename_i _ namesLeft _ headProjectsLeft tailProjectsLeft witnessLeft
+      _ namesRight _ headProjectsRight tailProjectsRight witnessRight
+    have namesConsEq := EbnfValues.cons_injective _ _ openConsEq.2
+    have namesInputEq := EbnfValue.list1_injective _ namesConsEq.1
+    have matchedEq :
+        namesLeft.map (fun value => value.matched) =
+          namesRight.map (fun value => value.matched) := by
+      apply nonemptyListMap_injective_of_injective
+        (EbnfValue.terminalAtom_injective (.category .identifier))
+      simpa [NonemptyList.map, List.map_map, Function.comp_def]
+        using namesInputEq
+    have namesLocEq := identifierNonemptyLocated_functional
+      ⟨headProjectsLeft, tailProjectsLeft⟩
+      ⟨headProjectsRight, tailProjectsRight⟩ matchedEq
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    rw [namesLocEq]
+
+private theorem ruleReduction_pragmaDecl_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .pragmaDecl)}
+    {left right : RuleValue .pragmaDecl}
+    (leftReduces : RuleReduction file tokens .pragmaDecl
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .pragmaDecl
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have rootEq := EbnfValue.transport_injective _ inputEq
+    have choiceEq := EbnfValue.choice_injective _ rootEq
+    have branchEq := congrArg Sigma.fst choiceEq
+    simp at branchEq
+  all_goals
+    have branchValueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+    have sequenceEq := EbnfValue.sequence_injective _ branchValueEq
+    have keywordConsEq := EbnfValues.cons_injective _ _ sequenceEq
+    have kindConsEq := EbnfValues.cons_injective _ _ keywordConsEq.2
+    have kindEq := EbnfValue.terminalAtom_injective _ kindConsEq.1
+    have targetsConsEq := EbnfValues.cons_injective _ _ kindConsEq.2
+    have optionalEq := EbnfValue.optional_injective _ targetsConsEq.1
+    rename_i _ _ targetsLeft _ projectsLeft witnessLeft
+      _ _ targetsRight _ projectsRight witnessRight
+    cases kindEq
+    apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+    cases targetsLeft with
+    | none =>
+        cases targetsRight with
+        | none => rfl
+        | some rightValues => cases optionalEq
+    | some leftValues =>
+        cases targetsRight with
+        | none => cases optionalEq
+        | some rightValues =>
+            have listValueEq := Option.some.inj optionalEq
+            have terminalListEq :=
+              EbnfValue.list1_injective _ listValueEq
+            have matchedEq :
+                leftValues.map (fun value => value.matched) =
+                  rightValues.map (fun value => value.matched) := by
+              apply nonemptyListMap_injective_of_injective
+                (EbnfValue.terminalAtom_injective (.category .identifier))
+              simpa [NonemptyList.map, List.map_map, Function.comp_def]
+                using terminalListEq
+            have locatedEq := identifierNonemptyLocated_functional
+              (projectsLeft leftValues rfl)
+              (projectsRight rightValues rfl) matchedEq
+            congr 1
+            exact congrArg RuleReduction.firstRest locatedEq
+
+private theorem ruleReduction_exportItem_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .exportItem)}
+    {left right : RuleValue .exportItem}
+    (leftReduces : RuleReduction file tokens .exportItem
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .exportItem
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i nameLeft selectionLeft projectsLeft witnessLeft
+    nameRight selectionRight projectsRight witnessRight
+  have rootEq := EbnfValue.transport_injective _ inputEq
+  have sequenceEq := EbnfValue.sequence_injective _ rootEq
+  have nameConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have nameMatchedEq := EbnfValue.terminalAtom_injective _ nameConsEq.1
+  have selectionConsEq := EbnfValues.cons_injective _ _ nameConsEq.2
+  have optionalEq := EbnfValue.optional_injective _ selectionConsEq.1
+  have selectionEq := Option.map_injective
+    (EbnfValue.ruleAtom_injective .constructorSelection) optionalEq
+  have nameLocEq := identifierTerminalLoc_functional
+    projectsLeft projectsRight nameMatchedEq
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  cases selectionEq
+  rw [nameLocEq]
+
 /-- A module-rule reduction can only produce the full-file, source-owned
 module payload from its exact item list. -/
 theorem ruleReduction_source_backed
