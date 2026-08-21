@@ -10232,6 +10232,284 @@ private theorem ruleReduction_relational_total
       · exact ⟨_, .relationalLessEqual origin finish left operator right witness⟩
       · exact ⟨_, .relationalGreaterEqual origin finish left operator right witness⟩
 
+private theorem optional_eq_of_view
+    {file : WorkspaceFile} {tokens : List Token} (child : EbnfExpr)
+    (input : EbnfValue file tokens (.optional child))
+    {viewed : Option (EbnfValue file tokens child)}
+    (viewEq : optionalView child input = viewed) :
+    EbnfValue.optional child viewed = input := by
+  rw [← viewEq]
+  exact optional_of_view child input
+
+private theorem choice_eq_of_view
+    {file : WorkspaceFile} {tokens : List Token} (branches : List EbnfExpr)
+    (input : EbnfValue file tokens (.choice branches))
+    {viewed : (branch : Fin branches.length) ×
+      EbnfValue file tokens (branches.get branch)}
+    (viewEq : choiceView branches input = viewed) :
+    EbnfValue.choice branches viewed = input := by
+  rw [← viewEq]
+  exact choice_of_view branches input
+
+private def list0View
+    {file : WorkspaceFile} {tokens : List Token} (child : EbnfExpr)
+    (input : EbnfValue file tokens (.list0 child)) :
+    List (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_list0_eq child) input
+
+private theorem list0_of_view
+    {file : WorkspaceFile} {tokens : List Token} (child : EbnfExpr)
+    (input : EbnfValue file tokens (.list0 child)) :
+    EbnfValue.list0 child (list0View child input) = input := by
+  simp [list0View, EbnfValue.list0]
+
+private theorem ruleList0_of_view
+    {file : WorkspaceFile} {tokens : List Token} (rule : GrammarRuleId)
+    (input : EbnfValue file tokens
+      (.list0 (.atom (.nonterminal rule)))) :
+    EbnfValue.list0 (.atom (.nonterminal rule))
+      ((list0View (.atom (.nonterminal rule)) input).map (ruleView rule)
+        |>.map (EbnfValue.ruleAtom rule)) = input := by
+  rw [ruleList_of_view]
+  exact list0_of_view _ input
+
+private theorem ruleReduction_annotation_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .annotation origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .annotation)) :
+    ∃ output : RuleValue .annotation,
+      RuleReduction file tokens .annotation origin finish input output := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .conditional)
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let suffix : EbnfExpr := .sequence [colonAtom, typeAtom]
+  change EbnfValue file tokens (.sequence [expressionAtom, .optional suffix]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawExpression rawOptional
+  let expression := ruleView .conditional rawExpression
+  have expressionEq := rule_of_view .conditional rawExpression
+  generalize viewEq : optionalView suffix rawOptional = viewed
+  cases viewed with
+  | none =>
+      have optionalEq := optional_eq_of_view suffix rawOptional viewEq
+      rw [← expressionEq, ← optionalEq]
+      exact ⟨expression, .annotationNone origin finish expression⟩
+  | some rawSuffix =>
+      have optionalEq := optional_eq_of_view suffix rawOptional viewEq
+      generalize suffixEq : sequenceFlatView
+        [colonAtom, typeAtom] rawSuffix = suffixValues
+      rcases suffixValues with ⟨rawColon, rawType, ⟨⟩⟩
+      have rawSuffixEq := sequence_of_flat_view [colonAtom, typeAtom] rawSuffix
+      rw [suffixEq] at rawSuffixEq
+      let colon := terminalView (.symbol .colon) rawColon
+      let typeValue := ruleView .type rawType
+      have colonEq := terminal_of_view (.symbol .colon) rawColon
+      have typeEq := rule_of_view .type rawType
+      let witness := ConsumedSpanWitness.compute
+        file tokens origin finish ready.1 ready.2.1
+      rw [← expressionEq, ← optionalEq, ← rawSuffixEq,
+        ← colonEq, ← typeEq]
+      exact ⟨_, .annotationSome origin finish expression colon typeValue witness⟩
+
+private theorem ruleReduction_conditional_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .conditional origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .conditional)) :
+    ∃ output : RuleValue .conditional,
+      RuleReduction file tokens .conditional origin finish input output := by
+  let keywordChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .ifKw)), .atom (.nonterminal .conditional),
+    .atom (.terminal (.contextualKeyword .thenKw)),
+    .atom (.nonterminal .conditional), .atom (.terminal (.hardKeyword .elseKw)),
+    .atom (.nonterminal .conditional)]
+  let ternaryChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .question)), .atom (.nonterminal .conditional),
+    .atom (.terminal (.symbol .colon)), .atom (.nonterminal .conditional)]
+  let logicalChildren : List EbnfExpr := [
+    .atom (.nonterminal .logicalOr), .optional (.sequence ternaryChildren)]
+  let branches : List EbnfExpr :=
+    [.sequence keywordChildren, .sequence logicalChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 2 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have bound : branch.val < 2 := by omega
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  rcases branchCases with rfl | rfl
+  · generalize sequenceEq : sequenceFlatView keywordChildren raw = values
+    rcases values with
+      ⟨rawIf, rawCondition, rawThen, rawThenBranch, rawElse, rawElseBranch, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view keywordChildren raw
+    rw [sequenceEq] at rawEq
+    let ifKeyword := terminalView (.hardKeyword .ifKw) rawIf
+    let condition := ruleView .conditional rawCondition
+    let thenKeyword := terminalView (.contextualKeyword .thenKw) rawThen
+    let thenBranch := ruleView .conditional rawThenBranch
+    let elseKeyword := terminalView (.hardKeyword .elseKw) rawElse
+    let elseBranch := ruleView .conditional rawElseBranch
+    let witness := ConsumedSpanWitness.compute
+      file tokens origin finish ready.1 ready.2.1
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.hardKeyword .ifKw) rawIf,
+      ← rule_of_view .conditional rawCondition,
+      ← terminal_of_view (.contextualKeyword .thenKw) rawThen,
+      ← rule_of_view .conditional rawThenBranch,
+      ← terminal_of_view (.hardKeyword .elseKw) rawElse,
+      ← rule_of_view .conditional rawElseBranch]
+    exact ⟨_, .conditionalKeyword origin finish ifKeyword condition
+      thenKeyword thenBranch elseKeyword elseBranch witness⟩
+  · generalize sequenceEq : sequenceFlatView logicalChildren raw = values
+    rcases values with ⟨rawCondition, rawOptional, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view logicalChildren raw
+    rw [sequenceEq] at rawEq
+    let condition := ruleView .logicalOr rawCondition
+    have conditionEq := rule_of_view .logicalOr rawCondition
+    generalize optionalEq : optionalView
+      (.sequence ternaryChildren) rawOptional = viewed
+    cases viewed with
+    | none =>
+        have rawOptionalEq := optional_eq_of_view
+          (.sequence ternaryChildren) rawOptional optionalEq
+        rw [← inputEq, ← rawEq, ← conditionEq, ← rawOptionalEq]
+        exact ⟨condition, .conditionalLogical origin finish condition⟩
+    | some rawTernary =>
+        have rawOptionalEq := optional_eq_of_view
+          (.sequence ternaryChildren) rawOptional optionalEq
+        generalize ternaryEq : sequenceFlatView
+          ternaryChildren rawTernary = ternaryValues
+        rcases ternaryValues with
+          ⟨rawQuestion, rawThen, rawColon, rawElse, ⟨⟩⟩
+        have rawTernaryEq := sequence_of_flat_view ternaryChildren rawTernary
+        rw [ternaryEq] at rawTernaryEq
+        let question := terminalView (.symbol .question) rawQuestion
+        let thenBranch := ruleView .conditional rawThen
+        let colon := terminalView (.symbol .colon) rawColon
+        let elseBranch := ruleView .conditional rawElse
+        let witness := ConsumedSpanWitness.compute
+          file tokens origin finish ready.1 ready.2.1
+        rw [← inputEq, ← rawEq, ← conditionEq, ← rawOptionalEq,
+          ← rawTernaryEq, ← terminal_of_view (.symbol .question) rawQuestion,
+          ← rule_of_view .conditional rawThen,
+          ← terminal_of_view (.symbol .colon) rawColon,
+          ← rule_of_view .conditional rawElse]
+        exact ⟨_, .conditionalTernary origin finish condition question
+          thenBranch colon elseBranch witness⟩
+
+private theorem ruleReduction_prefix_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .prefix origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .prefix)) :
+    ∃ output : RuleValue .prefix,
+      RuleReduction file tokens .prefix origin finish input output := by
+  let unaryChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .bang)), .atom (.nonterminal .prefix)]
+  let branches : List EbnfExpr :=
+    [.sequence unaryChildren, .atom (.nonterminal .postfix)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 2 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have bound : branch.val < 2 := by omega
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  rcases branchCases with rfl | rfl
+  · generalize sequenceEq : sequenceFlatView unaryChildren raw = values
+    rcases values with ⟨rawBang, rawOperand, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view unaryChildren raw
+    rw [sequenceEq] at rawEq
+    let bang := terminalView (.symbol .bang) rawBang
+    let operand := ruleView .prefix rawOperand
+    let witness := ConsumedSpanWitness.compute
+      file tokens origin finish ready.1 ready.2.1
+    rw [← inputEq, ← rawEq, ← terminal_of_view (.symbol .bang) rawBang,
+      ← rule_of_view .prefix rawOperand]
+    exact ⟨_, .prefixLogicalNot origin finish bang operand witness⟩
+  · let expression := ruleView .postfix raw
+    rw [← inputEq, ← rule_of_view .postfix raw]
+    exact ⟨expression, .prefixPostfix origin finish expression⟩
+
+private theorem ruleReduction_postfixPart_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .postfixPart origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .postfixPart)) :
+    ∃ output : RuleValue .postfixPart,
+      RuleReduction file tokens .postfixPart origin finish input output := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let callChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)), .list0 expressionAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let selectChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .dot)), .atom (.terminal (.category .identifier))]
+  let indexChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftBracket)), expressionAtom,
+    .atom (.terminal (.symbol .rightBracket))]
+  let branches : List EbnfExpr :=
+    [.sequence callChildren, .sequence selectChildren, .sequence indexChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 3 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have bound : branch.val < 3 := by omega
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  rcases branchCases with rfl | rfl | rfl
+  · generalize sequenceEq : sequenceFlatView callChildren raw = values
+    rcases values with ⟨rawOpen, rawArguments, rawClose, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view callChildren raw
+    rw [sequenceEq] at rawEq
+    let openParen := terminalView (.symbol .leftParen) rawOpen
+    let arguments := (list0View expressionAtom rawArguments).map
+      (ruleView .expression)
+    let closeParen := terminalView (.symbol .rightParen) rawClose
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.symbol .leftParen) rawOpen,
+      ← ruleList0_of_view .expression rawArguments,
+      ← terminal_of_view (.symbol .rightParen) rawClose]
+    exact ⟨_, .postfixPartCall origin finish openParen arguments closeParen⟩
+  · generalize sequenceEq : sequenceFlatView selectChildren raw = values
+    rcases values with ⟨rawDot, rawField, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view selectChildren raw
+    rw [sequenceEq] at rawEq
+    let dot := terminalView (.symbol .dot) rawDot
+    let field := terminalView (.category .identifier) rawField
+    rcases matchedTerminal_identifier_projection_exists_unique field with
+      ⟨projection, projects, _unique⟩
+    rw [← inputEq, ← rawEq, ← terminal_of_view (.symbol .dot) rawDot,
+      ← terminal_of_view (.category .identifier) rawField]
+    exact ⟨_, .postfixPartSelect origin finish dot field
+      projection.1 projection.2 projects⟩
+  · generalize sequenceEq : sequenceFlatView indexChildren raw = values
+    rcases values with ⟨rawOpen, rawIndex, rawClose, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view indexChildren raw
+    rw [sequenceEq] at rawEq
+    let openBracket := terminalView (.symbol .leftBracket) rawOpen
+    let index := ruleView .expression rawIndex
+    let closeBracket := terminalView (.symbol .rightBracket) rawClose
+    rw [← inputEq, ← rawEq,
+      ← terminal_of_view (.symbol .leftBracket) rawOpen,
+      ← rule_of_view .expression rawIndex,
+      ← terminal_of_view (.symbol .rightBracket) rawClose]
+    exact ⟨_, .postfixPartIndex origin finish openBracket index closeBracket⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
