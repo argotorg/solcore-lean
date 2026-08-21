@@ -641,6 +641,108 @@ def ImmediatelyAfterSymbol
       TerminalAt file tokens terminalCursor (.retained token) token.span ∧
       token.payload = .symbol symbol
 
+/-- Executable retained-symbol lookup at one chart boundary. -/
+def symbolAtBoundaryBool
+    (tokens : List Token) (cursor : Boundary tokens)
+    (symbol : Symbol) : Bool :=
+  if inRange : cursor.val < tokens.length then
+    decide (tokens[cursor.val].payload = .symbol symbol)
+  else
+    false
+
+/-- Symbol lookup accepts exactly the declarative boundary observation. -/
+theorem symbolAtBoundaryBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (cursor : Boundary tokens) (symbol : Symbol) :
+    symbolAtBoundaryBool tokens cursor symbol = true ↔
+      SymbolAtBoundary file tokens cursor symbol := by
+  constructor
+  · intro accepted
+    unfold symbolAtBoundaryBool at accepted
+    split at accepted
+    case isFalse => simp at accepted
+    case isTrue inRange =>
+      have payload := of_decide_eq_true accepted
+      let terminalCursor : TerminalCursor tokens :=
+        ⟨cursor.val, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+      refine ⟨terminalCursor, tokens[cursor.val], ?_, ?_, payload⟩
+      · apply Fin.ext
+        rfl
+      · exact .retained terminalCursor tokens[cursor.val] inRange
+          (List.getElem?_eq_getElem inRange)
+          (owned _ (List.getElem_mem inRange))
+  · rintro ⟨terminalCursor, token, atCursor, terminalAt, payload⟩
+    have cursorEq : terminalCursor.val = cursor.val := by
+      exact congrArg Fin.val atCursor
+    cases terminalAt with
+    | retained token inRange lookup valid =>
+        have cursorInRange : cursor.val < tokens.length := by omega
+        have lookupAtCursor : tokens[cursor.val]? = some token := by
+          simpa only [cursorEq] using lookup
+        have tokenEq : tokens[cursor.val] = token := by
+          exact Option.some.inj
+            ((List.getElem?_eq_getElem cursorInRange).symm.trans
+              lookupAtCursor)
+        unfold symbolAtBoundaryBool
+        rw [dif_pos cursorInRange]
+        exact decide_eq_true (tokenEq ▸ payload)
+
+/-- Retained-symbol lookup is constructively decidable on an owned stream. -/
+def symbolAtBoundaryDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (cursor : Boundary tokens) (symbol : Symbol) :
+    Decidable (SymbolAtBoundary file tokens cursor symbol) :=
+  decidable_of_iff
+    (symbolAtBoundaryBool tokens cursor symbol = true)
+    (symbolAtBoundaryBool_eq_true_iff owned cursor symbol)
+
+/-- Executable symbol lookup with its exact successor boundary. -/
+def immediatelyAfterSymbolBool
+    (tokens : List Token) (symbol : Symbol)
+    (symbolCursor after : Boundary tokens) : Bool :=
+  symbolAtBoundaryBool tokens symbolCursor symbol &&
+    decide (after.val = symbolCursor.val + 1)
+
+/-- Successor lookup accepts exactly the declarative symbol observation. -/
+theorem immediatelyAfterSymbolBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : Symbol) (symbolCursor after : Boundary tokens) :
+    immediatelyAfterSymbolBool tokens symbol symbolCursor after = true ↔
+      ImmediatelyAfterSymbol file tokens symbol symbolCursor after := by
+  rw [immediatelyAfterSymbolBool, Bool.and_eq_true, decide_eq_true_iff,
+    symbolAtBoundaryBool_eq_true_iff owned]
+  constructor
+  · rintro ⟨⟨terminalCursor, token, atCursor, terminalAt, payload⟩,
+      afterEq⟩
+    refine ⟨terminalCursor, token, atCursor, ?_, terminalAt, payload⟩
+    apply Fin.ext
+    have atCursorValue := congrArg Fin.val atCursor
+    change terminalCursor.val = symbolCursor.val at atCursorValue
+    change terminalCursor.val + 1 = after.val
+    omega
+  · rintro ⟨terminalCursor, token, atCursor, atAfter, terminalAt, payload⟩
+    refine ⟨⟨terminalCursor, token, atCursor, terminalAt, payload⟩, ?_⟩
+    have atCursorValue := congrArg Fin.val atCursor
+    have atAfterValue := congrArg Fin.val atAfter
+    change terminalCursor.val = symbolCursor.val at atCursorValue
+    change terminalCursor.val + 1 = after.val at atAfterValue
+    omega
+
+/-- Successor symbol evidence is constructively decidable. -/
+def immediatelyAfterSymbolDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : Symbol) (symbolCursor after : Boundary tokens) :
+    Decidable
+      (ImmediatelyAfterSymbol file tokens symbol symbolCursor after) :=
+  decidable_of_iff
+    (immediatelyAfterSymbolBool tokens symbol symbolCursor after = true)
+    (immediatelyAfterSymbolBool_eq_true_iff
+      owned symbol symbolCursor after)
+
 /-- A raw symbol observation has a unique successor boundary. -/
 private theorem rawImmediatelyAfterSymbol_functional
     {tokens : List Token} {symbol : Symbol}
