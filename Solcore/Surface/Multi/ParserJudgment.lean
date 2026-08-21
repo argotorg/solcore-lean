@@ -7697,6 +7697,288 @@ private theorem ruleReduction_dataConstructor_functional
       (EbnfValue.ruleAtom_injective .type) fieldsInputEq
     rw [nameLocEq, openEq, fieldsEq, closeEq]
 
+private theorem optionMap_output_functional
+    {alpha beta gamma : Type}
+    {key : alpha → beta} {output : alpha → gamma}
+    {projects : alpha → Prop} {left right : Option alpha}
+    (leftProjects : ∀ value, left = some value → projects value)
+    (rightProjects : ∀ value, right = some value → projects value)
+    (pointwise : ∀ {leftValue rightValue},
+      projects leftValue → projects rightValue →
+        key leftValue = key rightValue →
+          output leftValue = output rightValue)
+    (keyEq : left.map key = right.map key) :
+    left.map output = right.map output := by
+  cases left with
+  | none =>
+      cases right with
+      | none => rfl
+      | some rightValue => simp at keyEq
+  | some leftValue =>
+      cases right with
+      | none => simp at keyEq
+      | some rightValue =>
+          simp only [Option.map_some, Option.some.injEq] at keyEq ⊢
+          exact pointwise (leftProjects leftValue rfl)
+            (rightProjects rightValue rfl) keyEq
+
+private theorem ruleReduction_forallClause_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .forallClause)}
+    {left right : RuleValue .forallClause}
+    (leftReduces : RuleReduction file tokens .forallClause
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .forallClause
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  simp at inputEq
+  have restEq := listMap_injective_of_injective (by
+    intro left right valueEq
+    simp at valueEq
+    exact Prod.ext valueEq.1 valueEq.2) inputEq.2.2.1
+  apply (sourceLoc_eq_iff _ _ _ _).2
+  rw [inputEq.2.1, restEq]
+
+private theorem ruleReduction_typeAliasDecl_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .typeAliasDecl)}
+    {left right : RuleValue .typeAliasDecl}
+    (leftReduces : RuleReduction file tokens .typeAliasDecl
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .typeAliasDecl
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i _ nameLeft parametersLeft _ bodyLeft _ nameProjectsLeft
+    parameterProjectsLeft witnessLeft _ nameRight parametersRight _
+    bodyRight _ nameProjectsRight parameterProjectsRight witnessRight
+  simp at inputEq
+  have nameLocEq := identifierTerminalLoc_functional
+    nameProjectsLeft nameProjectsRight inputEq.2.1
+  have parametersLocEq : parametersLeft.map (fun value =>
+      value.2.1.map fun parameter => RuleReduction.terminalLoc
+        parameter.matched parameter.parsed) =
+      parametersRight.map (fun value =>
+        value.2.1.map fun parameter => RuleReduction.terminalLoc
+          parameter.matched parameter.parsed) := by
+    apply optionMap_output_functional parameterProjectsLeft
+      parameterProjectsRight _ inputEq.2.2.1
+    intro leftValue rightValue leftProjects rightProjects valueEq
+    simp at valueEq
+    have encodedEq :
+        (leftValue.2.1.map (fun value => value.matched)).map
+            (EbnfValue.terminalAtom (.category .identifier)) =
+          (rightValue.2.1.map (fun value => value.matched)).map
+            (EbnfValue.terminalAtom (.category .identifier)) := by
+      simpa [NonemptyList.map, List.map_map, Function.comp_def]
+        using valueEq.2.1
+    have matchedEq := nonemptyListMap_injective_of_injective
+      (EbnfValue.terminalAtom_injective (.category .identifier)) encodedEq
+    exact identifierNonemptyLocated_functional
+      leftProjects rightProjects matchedEq
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  rw [nameLocEq, parametersLocEq, inputEq.2.2.2.2.1]
+
+private theorem ruleReduction_fieldDecl_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .fieldDecl)}
+    {left right : RuleValue .fieldDecl}
+    (leftReduces : RuleReduction file tokens .fieldDecl
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .fieldDecl
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i nameLeft _ _ _ _ projectsLeft witnessLeft
+    nameRight _ _ _ _ projectsRight witnessRight
+  simp at inputEq
+  have initializerEq := Option.map_injective (by
+    rintro ⟨leftToken, leftValue, _⟩ ⟨rightToken, rightValue, _⟩ valueEq
+    simp at valueEq
+    cases valueEq.1
+    cases valueEq.2
+    rfl) inputEq.2.2.2.1
+  have nameLocEq := identifierTerminalLoc_functional
+    projectsLeft projectsRight inputEq.1
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  rw [nameLocEq, inputEq.2.2.1, initializerEq]
+
+private theorem ruleReduction_parameter_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .parameter)}
+    {left right : RuleValue .parameter}
+    (leftReduces : RuleReduction file tokens .parameter
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .parameter
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i _ nameLeft _ _ projectsLeft witnessLeft
+    _ nameRight _ _ projectsRight witnessRight
+  simp at inputEq
+  have comptimeEq := Option.map_injective
+    (EbnfValue.terminalAtom_injective _) inputEq.1
+  have typeEq := Option.map_injective (by
+    rintro ⟨leftToken, leftValue, _⟩ ⟨rightToken, rightValue, _⟩ valueEq
+    simp at valueEq
+    cases valueEq.1
+    cases valueEq.2
+    rfl) inputEq.2.2
+  have nameLocEq := identifierTerminalLoc_functional
+    projectsLeft projectsRight inputEq.2.1
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  cases comptimeEq
+  rw [nameLocEq, typeEq]
+
+private theorem ruleReduction_functionSignature_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .functionSignature)}
+    {left right : RuleValue .functionSignature}
+    (leftReduces : RuleReduction file tokens .functionSignature
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .functionSignature
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i _ _ _ _ nameLeft _ _ _ _ _ _ projectsLeft witnessLeft
+    _ _ _ _ nameRight _ _ _ _ _ _ projectsRight witnessRight
+  simp at inputEq
+  have genericEq := Option.map_injective
+    (EbnfValue.ruleAtom_injective .genericPrefix) inputEq.1
+  have publicEq := Option.map_injective
+    (EbnfValue.terminalAtom_injective _) inputEq.2.1
+  have payableEq := Option.map_injective
+    (EbnfValue.terminalAtom_injective _) inputEq.2.2.1
+  have parametersEq := listMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .parameter) inputEq.2.2.2.2.2.2.1
+  have returnEq := Option.map_injective (by
+    rintro ⟨leftToken, leftValue, _⟩ ⟨rightToken, rightValue, _⟩ valueEq
+    simp at valueEq
+    cases valueEq.1
+    cases valueEq.2
+    rfl) inputEq.2.2.2.2.2.2.2.2
+  have nameLocEq := identifierTerminalLoc_functional
+    projectsLeft projectsRight inputEq.2.2.2.2.1
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  cases genericEq
+  cases publicEq
+  cases payableEq
+  cases parametersEq
+  cases returnEq
+  rw [nameLocEq]
+
+private theorem ruleReduction_dataDecl_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .dataDecl)}
+    {left right : RuleValue .dataDecl}
+    (leftReduces : RuleReduction file tokens .dataDecl
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .dataDecl
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i _ nameLeft parametersLeft constructorsLeft _ nameProjectsLeft
+    parameterProjectsLeft witnessLeft _ nameRight parametersRight
+    constructorsRight _ nameProjectsRight parameterProjectsRight witnessRight
+  simp at inputEq
+  have nameLocEq := identifierTerminalLoc_functional
+    nameProjectsLeft nameProjectsRight inputEq.2.1
+  have parametersLocEq : parametersLeft.map (fun value =>
+      value.2.1.map fun parameter => RuleReduction.terminalLoc
+        parameter.matched parameter.parsed) =
+      parametersRight.map (fun value =>
+        value.2.1.map fun parameter => RuleReduction.terminalLoc
+          parameter.matched parameter.parsed) := by
+    apply optionMap_output_functional parameterProjectsLeft
+      parameterProjectsRight _ inputEq.2.2.1
+    intro leftValue rightValue leftProjects rightProjects valueEq
+    simp at valueEq
+    have encodedEq :
+        (leftValue.2.1.map (fun value => value.matched)).map
+            (EbnfValue.terminalAtom (.category .identifier)) =
+          (rightValue.2.1.map (fun value => value.matched)).map
+            (EbnfValue.terminalAtom (.category .identifier)) := by
+      simpa [NonemptyList.map, List.map_map, Function.comp_def]
+        using valueEq.2.1
+    exact identifierNonemptyLocated_functional leftProjects rightProjects
+      (nonemptyListMap_injective_of_injective
+        (EbnfValue.terminalAtom_injective _) encodedEq)
+  have constructorsEq : constructorsLeft = constructorsRight := by
+    apply Option.map_injective _ inputEq.2.2.2.1
+    intro leftValue rightValue valueEq
+    simp at valueEq
+    have restEq := listMap_injective_of_injective (by
+      intro left right entryEq
+      have groupEq := EbnfValue.group_injective _ entryEq
+      have sequenceEq := EbnfValue.sequence_injective _ groupEq
+      have firstEq := EbnfValues.cons_injective _ _ sequenceEq
+      have pipeEq := EbnfValue.terminalAtom_injective _ firstEq.1
+      have secondEq := EbnfValues.cons_injective _ _ firstEq.2
+      have constructorEq := EbnfValue.ruleAtom_injective _ secondEq.1
+      exact Prod.ext pipeEq constructorEq) valueEq.2.2
+    rcases leftValue with ⟨leftToken, leftHead, leftRest, _⟩
+    rcases rightValue with ⟨rightToken, rightHead, rightRest, _⟩
+    simp_all
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  cases constructorsEq
+  rw [nameLocEq, parametersLocEq]
+
+private theorem ruleReduction_contractDecl_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .contractDecl)}
+    {left right : RuleValue .contractDecl}
+    (leftReduces : RuleReduction file tokens .contractDecl
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .contractDecl
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  rename_i _ nameLeft parametersLeft _ _ _ nameProjectsLeft
+    parameterProjectsLeft witnessLeft _ nameRight parametersRight _ _ _
+    nameProjectsRight parameterProjectsRight witnessRight
+  simp at inputEq
+  have nameLocEq := identifierTerminalLoc_functional
+    nameProjectsLeft nameProjectsRight inputEq.2.1
+  have parametersLocEq : parametersLeft.map (fun value =>
+      value.2.1.map fun parameter => RuleReduction.terminalLoc
+        parameter.matched parameter.parsed) =
+      parametersRight.map (fun value =>
+        value.2.1.map fun parameter => RuleReduction.terminalLoc
+          parameter.matched parameter.parsed) := by
+    apply optionMap_output_functional parameterProjectsLeft
+      parameterProjectsRight _ inputEq.2.2.1
+    intro leftValue rightValue leftProjects rightProjects valueEq
+    simp at valueEq
+    have encodedEq :
+        (leftValue.2.1.map (fun value => value.matched)).map
+            (EbnfValue.terminalAtom (.category .identifier)) =
+          (rightValue.2.1.map (fun value => value.matched)).map
+            (EbnfValue.terminalAtom (.category .identifier)) := by
+      simpa [NonemptyList.map, List.map_map, Function.comp_def]
+        using valueEq.2.1
+    exact identifierNonemptyLocated_functional leftProjects rightProjects
+      (nonemptyListMap_injective_of_injective
+        (EbnfValue.terminalAtom_injective _) encodedEq)
+  have membersEq := listMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .contractMember) inputEq.2.2.2.2.1
+  apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
+  rw [nameLocEq, parametersLocEq, membersEq]
+
 /-- A module-rule reduction can only produce the full-file, source-owned
 module payload from its exact item list. -/
 theorem ruleReduction_source_backed
