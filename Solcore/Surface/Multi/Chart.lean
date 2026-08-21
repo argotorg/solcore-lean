@@ -4174,18 +4174,13 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
-private def AllGuardMemosFinal
-    {file : WorkspaceFile} {tokens : List Token}
-    (state : PhaseBSealed file tokens) : Prop :=
-  ∀ key, ∃ decision, state.memo key = .final decision
-
 private theorem sealIndexedPhaseB?_allFinal
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseBIndexed file tokens))
     (result : CountedState tokens (PhaseBSealed file tokens))
     (invariant : PhaseBFinalizationInvariant current.payload)
     (selected : sealIndexedPhaseB? current = some result) :
-    AllGuardMemosFinal result.payload := by
+    AllGuardsFinal result.payload.memo := by
   unfold sealIndexedPhaseB? sealPhaseB? at selected
   cases remaining : current.payload.phaseB.remaining with
   | cons key rest => simp [remaining] at selected
@@ -4219,7 +4214,7 @@ private theorem executeIndexedPhaseB?_allFinal
     (current : CountedState tokens (PhaseAIndexed file tokens))
     (result : CountedState tokens (PhaseBSealed file tokens))
     (selected : executeIndexedPhaseB? current = some result) :
-    AllGuardMemosFinal result.payload := by
+    AllGuardsFinal result.payload.memo := by
   unfold executeIndexedPhaseB? at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨entered, enterSelected,
@@ -4237,7 +4232,7 @@ private theorem executeObservedPhaseAB?_allFinal
     (owned : TokensOwnedBy file tokens)
     (result : CountedState tokens (PhaseBSealed file tokens))
     (selected : executeObservedPhaseAB? file tokens owned = some result) :
-    AllGuardMemosFinal result.payload := by
+    AllGuardsFinal result.payload.memo := by
   unfold executeObservedPhaseAB? at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨phaseA, phaseASelected,
