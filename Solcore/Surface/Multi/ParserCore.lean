@@ -4745,4 +4745,79 @@ instance : Ord Expected := ⟨Expected.compare⟩
 
 end Expected
 
+private def allExpectedHardKeywords : List HardKeyword := [
+  .contractKw, .importKw, .exportKw, .hidingKw, .asKw, .letKw,
+  .dataKw, .forallKw, .classKw, .instanceKw, .ifKw, .elseKw,
+  .forKw, .switchKw, .caseKw, .defaultKw, .leaveKw, .continueKw,
+  .breakKw, .assemblyKw, .matchKw, .functionKw, .fallbackKw,
+  .payableKw, .publicKw, .constructorKw, .returnKw, .lamKw,
+  .typeKw, .pragmaKw
+]
+
+private def allExpectedContextualKeywords : List ContextualKeyword := [
+  .thenKw, .comptimeKw
+]
+
+private def allExpectedPragmaKinds : List PragmaKind := [
+  .noCoverageCondition, .noPattersonCondition,
+  .noBoundedVariableCondition, .noGenericInstanceFor
+]
+
+private def allExpectedSymbols : List Symbol := [
+  .colonEqual, .arrow, .fatArrow, .equalEqual, .notEqual,
+  .greaterEqual, .lessEqual, .logicalAnd, .logicalOr, .plusEqual,
+  .minusEqual, .caretEqual, .ampEqual, .pipeEqual, .percentEqual,
+  .plus, .minus, .star, .slash, .percent, .bang, .less, .greater,
+  .equal, .pipe, .amp, .caret, .at, .question, .dot, .colon,
+  .semicolon, .comma, .leftParen, .rightParen, .leftBrace,
+  .rightBrace, .leftBracket, .rightBracket, .underscore
+]
+
+/-- The stable complete enumeration of diagnostic expectation classes. -/
+def allExpected : List Expected :=
+  allExpectedHardKeywords.map .hardKeyword ++
+  allExpectedContextualKeywords.map .contextualKeyword ++
+  allExpectedPragmaKinds.map .pragmaName ++
+  allExpectedSymbols.map .symbol ++
+  [.identifier, .pathComponent, .literal, .assemblyBlock, .endOfFile]
+
+/-- Every diagnostic expectation occurs in the stable enumeration. -/
+theorem allExpected_complete (expected : Expected) :
+    expected ∈ allExpected := by
+  cases expected with
+  | hardKeyword keyword => cases keyword <;>
+      simp [allExpected, allExpectedHardKeywords]
+  | contextualKeyword keyword => cases keyword <;>
+      simp [allExpected, allExpectedContextualKeywords]
+  | pragmaName kind => cases kind <;>
+      simp [allExpected, allExpectedPragmaKinds]
+  | symbol symbol => cases symbol <;>
+      simp [allExpected, allExpectedSymbols]
+  | identifier => simp [allExpected]
+  | pathComponent => simp [allExpected]
+  | literal => simp [allExpected]
+  | assemblyBlock => simp [allExpected]
+  | endOfFile => simp [allExpected]
+
+/-- The stable expectation enumeration contains no duplicates. -/
+theorem allExpected_nodup : allExpected.Nodup := by
+  simp [allExpected, allExpectedHardKeywords,
+    allExpectedContextualKeywords, allExpectedPragmaKinds,
+    allExpectedSymbols]
+
+/-- The expectation enumeration follows the canonical diagnostic order. -/
+theorem allExpected_sorted :
+    allExpected.Pairwise
+      (fun left right => Expected.compare left right = .lt) := by
+  decide
+
+/-- There are exactly eighty-one closed diagnostic expectation classes. -/
+theorem allExpected_length : allExpected.length = 81 := by
+  rfl
+
+/-- Membership in the enumeration is exactly inhabitation by an expectation. -/
+theorem allExpected_exact (expected : Expected) :
+    expected ∈ allExpected ↔ True := by
+  exact iff_true_intro (allExpected_complete expected)
+
 end Solcore.Surface.Multi
