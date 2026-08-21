@@ -3671,4 +3671,173 @@ private def contextualCompletedEdge?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Phase-C chart state extended with the single-valued completion ledger. -/
+private structure PhaseCWorklist
+    (file : WorkspaceFile) (tokens : List Token) where
+  phaseC : PhaseCOpen file tokens
+  completionBackpointers : CompletionBackpointerLedger tokens
+
+private def beginPhaseCWorklist?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens)) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) := do
+  let entered ← enterPhaseC? current
+  pure {
+    payload := ⟨entered.payload, []⟩
+    counter := entered.counter
+  }
+
+/-- Lift the existing production/guard activation machine without separating
+its witness updates from the worklist carrier. -/
+private def activateWorklistProduction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens) × Bool) := do
+  let (activated, accepted) ← activateProduction? {
+    payload := current.payload.phaseC
+    counter := current.counter
+  } productionInstance
+  pure ({
+    payload := ⟨activated.payload,
+      current.payload.completionBackpointers⟩
+    counter := activated.counter
+  }, accepted)
+
+private def phaseCItemMemberBool
+    {tokens : List Token} (items : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) : Bool :=
+  items.any fun candidate => decide (candidate = item)
+
+private def phaseCEdgeMemberBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens) : Bool :=
+  edges.any fun candidate => decide (candidate.val = edge.val)
+
+private inductive ContextualItemInsertSource where
+  | prediction
+  | scan
+  | completion
+
+private def ContextualItemInsertSource.unitKind :
+    ContextualItemInsertSource → ChartLinearUnitKind
+  | .prediction => .L03_itemInsert
+  | .scan => .L05_scannedItemInsert
+  | .completion => .L07_completedItemInsert
+
+private def insertContextualItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  if phaseCItemMemberBool current.payload.phaseC.contextualItems item then
+    some current
+  else
+    runMappedPrimitive? current
+      (.linear source.unitKind (contextualLinearKey item))
+      fun (state : PhaseCWorklist file tokens) => ({
+        phaseC := {
+          state.phaseC with
+          contextualItems := state.phaseC.contextualItems ++ [item]
+          itemQueue := state.phaseC.itemQueue ++ [item]
+        }
+        completionBackpointers := state.completionBackpointers
+      } : PhaseCWorklist file tokens)
+
+/-- Insert a checked scan; the completion ledger is unchanged. -/
+private def insertContextualScannedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  let packed := CompletionBackpointerLedger.packScanned edge
+  if phaseCEdgeMemberBool current.payload.phaseC.contextualEdges packed then
+    some current
+  else
+    runMappedPrimitive? current
+      (.linear .L06_scannedEdgeInsert
+        (contextualLinearKey edge.before))
+      fun (state : PhaseCWorklist file tokens) => ({
+        phaseC := {
+          state.phaseC with
+          contextualEdges := state.phaseC.contextualEdges ++ [packed]
+          edgeQueue := state.phaseC.edgeQueue ++ [packed]
+        }
+        completionBackpointers := state.completionBackpointers
+      } : PhaseCWorklist file tokens)
+
+/-- Atomically add a checked completion, its single-valued backpointer, and
+the exact packed edge queue entry under the one U04 charge. -/
+private def insertContextualCompletedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  let packed := CompletionBackpointerLedger.packCompleted edge
+  if phaseCEdgeMemberBool current.payload.phaseC.contextualEdges packed then
+    some current
+  else do
+    let (nextLedger, nextEdges) ←
+      CompletionBackpointerLedger.insertCompleted?
+        current.payload.completionBackpointers
+        current.payload.phaseC.contextualEdges edge
+    runMappedPrimitive? current
+      (.cubic .U04_completedEdgeInsert
+        (contextualCompletionKey edge.waiting edge.finished))
+      fun (state : PhaseCWorklist file tokens) => ({
+        phaseC := {
+          state.phaseC with
+          contextualEdges := nextEdges
+          edgeQueue := state.phaseC.edgeQueue ++ [packed]
+        }
+        completionBackpointers := nextLedger
+      } : PhaseCWorklist file tokens)
+
+private def dequeueContextualItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens)) :=
+  match current.payload.phaseC.itemQueue with
+  | [] => none
+  | item :: rest => do
+      let next ← runMappedPrimitive? current
+        (.linear .L01_itemDequeue (contextualLinearKey item))
+        fun (state : PhaseCWorklist file tokens) => ({
+          phaseC := { state.phaseC with itemQueue := rest }
+          completionBackpointers := state.completionBackpointers
+        } : PhaseCWorklist file tokens)
+      pure (item, next)
+
+private def dequeueContextualEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens)) :=
+  match current.payload.phaseC.edgeQueue with
+  | [] => none
+  | edge :: rest => do
+      let address : UnitAddress tokens :=
+        match edge.val with
+        | .scanned before _ _ =>
+            .linear .L02_scannedEdgeDequeue (contextualLinearKey before)
+        | .completed waiting finished _ _ =>
+            .cubic .U02_completedEdgeDequeue
+              (contextualCompletionKey waiting finished)
+      let next ← runMappedPrimitive? current address
+        fun (state : PhaseCWorklist file tokens) => ({
+          phaseC := { state.phaseC with edgeQueue := rest }
+          completionBackpointers := state.completionBackpointers
+        } : PhaseCWorklist file tokens)
+      pure (edge, next)
+
+end Chart
+
 end Solcore.Surface.Multi
