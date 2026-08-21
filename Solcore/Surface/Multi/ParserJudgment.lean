@@ -959,6 +959,32 @@ def SameDelimiterDepth
     (tokens : List Token) (start finish : Boundary tokens) : Prop :=
   DelimiterRun tokens [] start finish []
 
+/-- Exact delimiter-run evidence is constructively decidable. -/
+def delimiterRunDecision
+    (tokens : List Token) (before : DelimiterStack)
+    (start finish : Boundary tokens) (after : DelimiterStack) :
+    Decidable (DelimiterRun tokens before start finish after) :=
+  decidable_of_iff
+    (delimiterRun? tokens before start finish = some after)
+    (delimiterRun?_eq_some_iff tokens before after start finish)
+
+/-- Exact protected delimiter-run evidence is constructively decidable. -/
+def protectedDelimiterRunDecision
+    (tokens : List Token) (before : NonemptyList DelimiterCloser)
+    (start finish : Boundary tokens)
+    (after : NonemptyList DelimiterCloser) :
+    Decidable (ProtectedDelimiterRun tokens before start finish after) :=
+  decidable_of_iff
+    (protectedDelimiterRun? tokens before start finish = some after)
+    (protectedDelimiterRun?_eq_some_iff
+      tokens before after start finish)
+
+/-- Equal delimiter depth is constructively decidable. -/
+def sameDelimiterDepthDecision
+    (tokens : List Token) (start finish : Boundary tokens) :
+    Decidable (SameDelimiterDepth tokens start finish) :=
+  delimiterRunDecision tokens [] start finish []
+
 /-- The first allowed symbol reached again at the starting delimiter depth. -/
 def NextSameDepthDelimiter
     (tokens : List Token) (start cursor : Boundary tokens)
