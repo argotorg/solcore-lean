@@ -2347,4 +2347,45 @@ private def sealIndexedPhaseB?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def rawRecognizesBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) : Bool :=
+  phaseA.rawItems.any fun item =>
+    item.dot.val == item.production.rhs.length &&
+      item.production.lhs == symbol &&
+      item.origin == start && item.current == finish
+
+private def rawGreatestEndBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) : Bool :=
+  rawRecognizesBool phaseA symbol start finish &&
+    decide (finish.val ≤ upperBound.val) &&
+    (List.finRange (tokens.length + 2)).all fun candidate =>
+      if candidate.val ≤ upperBound.val then
+        !rawRecognizesBool phaseA symbol start candidate ||
+          decide (candidate.val ≤ finish.val)
+      else
+        true
+
+private def phaseAGreatestEndIndexEvaluator
+    {file : WorkspaceFile} {tokens : List Token} :
+    PhaseAIndexEvaluator file tokens :=
+  fun phaseA address =>
+    match address.kind, address.subject with
+    | .greatestEnd, .inr rule =>
+        rawGreatestEndBool phaseA (.rule rule)
+          address.contextStart address.siteCursor address.resultEnd
+    | _, _ => false
+
+end Chart
+
 end Solcore.Surface.Multi
