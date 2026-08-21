@@ -9938,6 +9938,300 @@ private theorem ruleReduction_expressionStatement_total
     rw [← inputEq, ← rawEq]
     exact ⟨_, .expressionStatementTerminal origin finish expression witness⟩
 
+private structure SequencePairView
+    (file : WorkspaceFile) (tokens : List Token)
+    (first second : EbnfExpr)
+    (input : EbnfValue file tokens (.sequence [first, second])) where
+  firstValue : EbnfValue file tokens first
+  secondValue : EbnfValue file tokens second
+  rebuild : EbnfValue.sequence [first, second]
+    (EbnfValues.cons first [second] firstValue
+      (EbnfValues.cons second [] secondValue EbnfValues.nil)) = input
+
+private def sequencePairView
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : EbnfExpr)
+    (input : EbnfValue file tokens (.sequence [first, second])) :
+    SequencePairView file tokens first second input := by
+  let values := sequenceView [first, second] input
+  generalize firstEq : valuesConsView first [second] values = firstPair
+  rcases firstPair with ⟨firstValue, tail⟩
+  generalize secondEq : valuesConsView second [] tail = secondPair
+  rcases secondPair with ⟨secondValue, nilTail⟩
+  have tailEq : EbnfValues.cons second [] secondValue EbnfValues.nil =
+      tail := by
+    calc
+      _ = EbnfValues.cons second [] secondValue nilTail := by
+        rw [values_nil_unique nilTail]
+      _ = EbnfValues.cons second []
+          (valuesConsView second [] tail).1
+          (valuesConsView second [] tail).2 := by rw [secondEq]
+      _ = tail := values_cons_of_view second [] tail
+  refine ⟨firstValue, secondValue, ?_⟩
+  calc
+    _ = EbnfValue.sequence [first, second]
+        (EbnfValues.cons first [second] firstValue tail) := by rw [tailEq]
+    _ = EbnfValue.sequence [first, second]
+        (EbnfValues.cons first [second]
+          (valuesConsView first [second] values).1
+          (valuesConsView first [second] values).2) := by rw [firstEq]
+    _ = EbnfValue.sequence [first, second] values := by
+      rw [values_cons_of_view first [second] values]
+    _ = input := sequence_of_view [first, second] input
+
+private def groupView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (input : EbnfValue file tokens (.group child)) :
+    EbnfValue file tokens child :=
+  Eq.mp (ebnfValue_group_eq child) input
+
+private theorem group_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (input : EbnfValue file tokens (.group child)) :
+    EbnfValue.group child (groupView child input) = input := by
+  simp [groupView, EbnfValue.group]
+
+private theorem ruleReduction_assignmentOperator_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .assignmentOperator origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .assignmentOperator)) :
+    ∃ output : RuleValue .assignmentOperator,
+      RuleReduction file tokens .assignmentOperator origin finish input output := by
+  let branches : List EbnfExpr := [
+    .atom (.terminal (.symbol .equal)),
+    .atom (.terminal (.symbol .plusEqual)),
+    .atom (.terminal (.symbol .minusEqual)),
+    .atom (.terminal (.symbol .caretEqual)),
+    .atom (.terminal (.symbol .ampEqual)),
+    .atom (.terminal (.symbol .pipeEqual)),
+    .atom (.terminal (.symbol .percentEqual))]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches (choiceView branches input) :=
+        congrArg (EbnfValue.choice branches) viewEq.symm
+      _ = input := choice_of_view branches input
+  have branchesLength : branches.length = 7 := by rfl
+  have bound : branch.val < 7 := by omega
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 ∨ branch = 5 ∨ branch = 6 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 ∨
+        branch.val = 5 ∨ branch.val = 6 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq |
+      valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr
+        (Or.inl (Fin.ext valueEq)))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+        (Or.inl (Fin.ext valueEq))))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+        (Or.inr (Fin.ext valueEq))))))
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  all_goals
+    let terminal := terminalView _ raw
+    have rawEq := terminal_of_view _ raw
+    rw [← inputEq, ← rawEq]
+    first
+    | exact ⟨_, .assignmentOperatorEqual origin finish terminal⟩
+    | exact ⟨_, .assignmentOperatorAddEqual origin finish terminal⟩
+    | exact ⟨_, .assignmentOperatorSubtractEqual origin finish terminal⟩
+    | exact ⟨_, .assignmentOperatorBitXorEqual origin finish terminal⟩
+    | exact ⟨_, .assignmentOperatorBitAndEqual origin finish terminal⟩
+    | exact ⟨_, .assignmentOperatorBitOrEqual origin finish terminal⟩
+    | exact ⟨_, .assignmentOperatorModuloEqual origin finish terminal⟩
+
+private theorem ruleReduction_statement_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .statement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .statement)) :
+    ∃ output : RuleValue .statement,
+      RuleReduction file tokens .statement origin finish input output := by
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .letStatement),
+    .atom (.nonterminal .returnStatement),
+    .atom (.nonterminal .matchStatement),
+    .atom (.nonterminal .ifStatement),
+    .atom (.nonterminal .forStatement),
+    .atom (.nonterminal .assemblyStatement),
+    .atom (.nonterminal .blockStatement),
+    .atom (.nonterminal .breakStatement),
+    .atom (.nonterminal .continueStatement),
+    .atom (.nonterminal .assignmentStatement),
+    .atom (.nonterminal .expressionStatement)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches (choiceView branches input) :=
+        congrArg (EbnfValue.choice branches) viewEq.symm
+      _ = input := choice_of_view branches input
+  have branchesLength : branches.length = 11 := by rfl
+  have bound : branch.val < 11 := by omega
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 ∨ branch = 5 ∨ branch = 6 ∨
+      branch = 7 ∨ branch = 8 ∨ branch = 9 ∨ branch = 10 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 ∨
+        branch.val = 5 ∨ branch.val = 6 ∨ branch.val = 7 ∨
+        branch.val = 8 ∨ branch.val = 9 ∨ branch.val = 10 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq |
+      valueEq | valueEq | valueEq | valueEq | valueEq | valueEq | valueEq
+    all_goals first
+      | exact Or.inl (Fin.ext valueEq)
+      | exact Or.inr (Or.inl (Fin.ext valueEq))
+      | exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+      | exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inl (Fin.ext valueEq))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext valueEq))))))))))
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl
+  all_goals
+    let value := ruleView _ raw
+    have rawEq := rule_of_view _ raw
+    rw [← inputEq, ← rawEq]
+    first
+    | exact ⟨_, .statementLet origin finish value⟩
+    | exact ⟨_, .statementReturn origin finish value⟩
+    | exact ⟨_, .statementMatch origin finish value⟩
+    | exact ⟨_, .statementIf origin finish value⟩
+    | exact ⟨_, .statementFor origin finish value⟩
+    | exact ⟨_, .statementAssembly origin finish value⟩
+    | exact ⟨_, .statementBlock origin finish value⟩
+    | exact ⟨_, .statementBreak origin finish value⟩
+    | exact ⟨_, .statementContinue origin finish value⟩
+    | exact ⟨_, .statementAssignment origin finish value⟩
+    | exact ⟨_, .statementExpression origin finish value⟩
+
+private theorem ruleReduction_equality_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .equality origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .equality)) :
+    ∃ output : RuleValue .equality,
+      RuleReduction file tokens .equality origin finish input output := by
+  let operand : EbnfExpr := .atom (.nonterminal .relational)
+  let branches : List EbnfExpr := [
+    .atom (.terminal (.symbol .equalEqual)),
+    .atom (.terminal (.symbol .notEqual))]
+  let tail : EbnfExpr := .sequence [
+    .group (.choice branches), operand]
+  change EbnfValue file tokens (.sequence [operand, .optional tail]) at input
+  let outer := sequencePairView operand (.optional tail) input
+  let left := ruleView .relational outer.firstValue
+  generalize optionEq : optionalView tail outer.secondValue = viewed
+  cases viewed with
+  | none =>
+      rw [← outer.rebuild, ← rule_of_view .relational outer.firstValue,
+        ← optional_of_view tail outer.secondValue, optionEq]
+      exact ⟨left, .equalityNone origin finish left⟩
+  | some rawTail =>
+      let inner := sequencePairView (.group (.choice branches)) operand rawTail
+      generalize choiceEq : choiceView branches
+        (groupView (.choice branches) inner.firstValue) = chosen
+      rcases chosen with ⟨branch, rawOperator⟩
+      let right := ruleView .relational inner.secondValue
+      have branchesLength : branches.length = 2 := by rfl
+      have bound : branch.val < 2 := by omega
+      have branchCases : branch = 0 ∨ branch = 1 := by
+        have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+        rcases valueCases with valueEq | valueEq
+        · exact Or.inl (Fin.ext valueEq)
+        · exact Or.inr (Fin.ext valueEq)
+      let witness := ConsumedSpanWitness.compute
+        file tokens origin finish ready.1 ready.2.1
+      rcases branchCases with rfl | rfl
+      all_goals
+        let operator := terminalView _ rawOperator
+        rw [← outer.rebuild, ← rule_of_view .relational outer.firstValue,
+          ← optional_of_view tail outer.secondValue, optionEq,
+          ← inner.rebuild,
+          ← group_of_view (.choice branches) inner.firstValue,
+          ← choice_of_view branches
+            (groupView (.choice branches) inner.firstValue), choiceEq,
+          ← terminal_of_view _ rawOperator,
+          ← rule_of_view .relational inner.secondValue]
+        first
+        | exact ⟨_, .equalityEqual origin finish left operator right witness⟩
+        | exact ⟨_, .equalityNotEqual origin finish left operator right witness⟩
+
+private theorem ruleReduction_relational_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .relational origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .relational)) :
+    ∃ output : RuleValue .relational,
+      RuleReduction file tokens .relational origin finish input output := by
+  let operand : EbnfExpr := .atom (.nonterminal .bitOr)
+  let branches : List EbnfExpr := [
+    .atom (.terminal (.symbol .less)), .atom (.terminal (.symbol .greater)),
+    .atom (.terminal (.symbol .lessEqual)),
+    .atom (.terminal (.symbol .greaterEqual))]
+  let tail : EbnfExpr := .sequence [.group (.choice branches), operand]
+  change EbnfValue file tokens (.sequence [operand, .optional tail]) at input
+  let outer := sequencePairView operand (.optional tail) input
+  let left := ruleView .bitOr outer.firstValue
+  generalize optionEq : optionalView tail outer.secondValue = viewed
+  cases viewed with
+  | none =>
+      rw [← outer.rebuild, ← rule_of_view .bitOr outer.firstValue,
+        ← optional_of_view tail outer.secondValue, optionEq]
+      exact ⟨left, .relationalNone origin finish left⟩
+  | some rawTail =>
+      let inner := sequencePairView (.group (.choice branches)) operand rawTail
+      generalize choiceEq : choiceView branches
+        (groupView (.choice branches) inner.firstValue) = chosen
+      rcases chosen with ⟨branch, rawOperator⟩
+      let right := ruleView .bitOr inner.secondValue
+      have branchesLength : branches.length = 4 := by rfl
+      have bound : branch.val < 4 := by omega
+      have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+          branch = 3 := by
+        have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+            branch.val = 2 ∨ branch.val = 3 := by omega
+        rcases valueCases with valueEq | valueEq | valueEq | valueEq
+        · exact Or.inl (Fin.ext valueEq)
+        · exact Or.inr (Or.inl (Fin.ext valueEq))
+        · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+        · exact Or.inr (Or.inr (Or.inr (Fin.ext valueEq)))
+      let witness := ConsumedSpanWitness.compute
+        file tokens origin finish ready.1 ready.2.1
+      rcases branchCases with rfl | rfl | rfl | rfl
+      all_goals
+        let operator := terminalView _ rawOperator
+        rw [← outer.rebuild, ← rule_of_view .bitOr outer.firstValue,
+          ← optional_of_view tail outer.secondValue, optionEq,
+          ← inner.rebuild,
+          ← group_of_view (.choice branches) inner.firstValue,
+          ← choice_of_view branches
+            (groupView (.choice branches) inner.firstValue), choiceEq,
+          ← terminal_of_view _ rawOperator,
+          ← rule_of_view .bitOr inner.secondValue]
+      · exact ⟨_, .relationalLess origin finish left operator right witness⟩
+      · exact ⟨_, .relationalGreater origin finish left operator right witness⟩
+      · exact ⟨_, .relationalLessEqual origin finish left operator right witness⟩
+      · exact ⟨_, .relationalGreaterEqual origin finish left operator right witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
