@@ -2388,4 +2388,92 @@ private def phaseAGreatestEndIndexEvaluator
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Look up one grammar terminal at an exact raw-stream boundary. -/
+private def phaseATerminalAtBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) : Bool :=
+  if inRange : boundary.val < tokens.length + 1 then
+    let cursor : TerminalCursor tokens := ⟨boundary.val, inRange⟩
+    (MatchedTerminal.atCursor? file tokens owned terminal cursor).isSome
+  else
+    false
+
+/-- Look up one grammar terminal and its exact successor boundary. -/
+private def phaseAImmediatelyAfterTerminalBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol)
+    (boundary after : Boundary tokens) : Bool :=
+  phaseATerminalAtBool owned terminal boundary &&
+    decide (after.val = boundary.val + 1)
+
+/-- Observe one retained symbol without consulting a parser judgment. -/
+private def phaseASymbolAtBool
+    {tokens : List Token} (boundary : Boundary tokens)
+    (symbol : Symbol) : Bool :=
+  if inRange : boundary.val < tokens.length then
+    decide (tokens[boundary.val].payload = .symbol symbol)
+  else
+    false
+
+/-- Observe one retained symbol and its exact successor boundary. -/
+private def phaseAImmediatelyAfterSymbolBool
+    {tokens : List Token} (symbol : Symbol)
+    (boundary after : Boundary tokens) : Bool :=
+  phaseASymbolAtBool boundary symbol &&
+    decide (after.val = boundary.val + 1)
+
+/-- Test one retained token against one terminal class.  Logical EOF is
+intentionally excluded from exact slices. -/
+private def phaseAExactSliceAtomBool
+    (tokens : List Token) (terminal : TerminalSymbol)
+    (absolute : Nat) : Bool :=
+  if inRange : absolute < tokens.length then
+    terminalMatchesBool terminal (.retained tokens[absolute])
+  else
+    false
+
+/-- Execute one exact retained-terminal slice. -/
+private def phaseAExactSliceBool
+    (tokens : List Token) (start finish : Boundary tokens)
+    (classes : List TerminalSymbol) : Bool :=
+  decide (finish.val = start.val + classes.length) &&
+    (List.ofFn fun index : Fin classes.length =>
+      phaseAExactSliceAtomBool tokens (classes.get index)
+        (start.val + index.val)).all id
+
+/-- Test membership in one fixed nonempty symbol family. -/
+private def phaseASymbolAllowedBool
+    (symbol : Symbol) (allowed : NonemptyList Symbol) : Bool :=
+  decide (symbol = allowed.head) ||
+    allowed.tail.any fun candidate => decide (symbol = candidate)
+
+/-- Observe an allowed retained symbol at one boundary. -/
+private def phaseAAllowedSymbolAtBool
+    {tokens : List Token} (boundary : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Bool :=
+  if inRange : boundary.val < tokens.length then
+    match tokens[boundary.val].payload with
+    | .symbol symbol => phaseASymbolAllowedBool symbol allowed
+    | _ => false
+  else
+    false
+
+/-- Construct a chart boundary from a checked natural coordinate. -/
+private def phaseABoundaryAt?
+    (tokens : List Token) (coordinate : Nat) :
+    Option (Boundary tokens) :=
+  if inRange : coordinate < tokens.length + 2 then
+    some ⟨coordinate, inRange⟩
+  else
+    none
+
+end Chart
+
 end Solcore.Surface.Multi
