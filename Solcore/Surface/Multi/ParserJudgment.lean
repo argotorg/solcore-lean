@@ -8816,6 +8816,252 @@ private theorem ruleReduction_letBinding_functional
     apply (sourceLoc_eq_iff witnessLeft witnessRight _ _).2
     rw [parsedEq, comptimeEq, typeValueEq, initializerEq]
 
+private def additiveTailInput
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : Sum
+      (MatchedTerminal file tokens (.symbol .plus))
+      (MatchedTerminal file tokens (.symbol .minus)) × Expression) :
+    EbnfValue file tokens (.group (.sequence [
+      .group (.choice [
+        .atom (.terminal (.symbol .plus)),
+        .atom (.terminal (.symbol .minus))]),
+      .atom (.nonterminal .multiplicative)])) :=
+  EbnfValue.group _ (EbnfValue.sequence _
+    (EbnfValues.cons _ _
+      (EbnfValue.group _ (match value.1 with
+        | .inl plus => EbnfValue.choice _
+            ⟨⟨0, by decide⟩, EbnfValue.terminalAtom _ plus⟩
+        | .inr minus => EbnfValue.choice _
+            ⟨⟨1, by decide⟩, EbnfValue.terminalAtom _ minus⟩))
+      (EbnfValues.cons _ _ (EbnfValue.ruleAtom _ value.2)
+        EbnfValues.nil)))
+
+private theorem additiveTailInput_injective
+    {file : WorkspaceFile} {tokens : List Token} :
+    Function.Injective (@additiveTailInput file tokens) := by
+  rintro ⟨leftOperator, leftExpression⟩ ⟨rightOperator, rightExpression⟩ inputEq
+  have groupEq := EbnfValue.group_injective _ inputEq
+  have sequenceEq := EbnfValue.sequence_injective _ groupEq
+  have operatorConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have operatorGroupEq := EbnfValue.group_injective _ operatorConsEq.1
+  have expressionConsEq := EbnfValues.cons_injective _ _ operatorConsEq.2
+  have expressionEq := EbnfValue.ruleAtom_injective _ expressionConsEq.1
+  rcases leftOperator with leftPlus | leftMinus <;>
+    rcases rightOperator with rightPlus | rightMinus
+  all_goals have choiceEq := EbnfValue.choice_injective _ operatorGroupEq
+  all_goals have branchEq := congrArg Sigma.fst choiceEq
+  all_goals simp at branchEq
+  all_goals
+    have valueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+    simp only [List.get_eq_getElem] at valueEq
+    have operatorEq := EbnfValue.terminalAtom_injective _ valueEq
+    cases operatorEq
+    cases expressionEq
+    rfl
+
+private def multiplicativeTailInput
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : Sum
+      (MatchedTerminal file tokens (.symbol .star))
+      (Sum
+        (MatchedTerminal file tokens (.symbol .slash))
+        (MatchedTerminal file tokens (.symbol .percent))) × Expression) :
+    EbnfValue file tokens (.group (.sequence [
+      .group (.choice [
+        .atom (.terminal (.symbol .star)),
+        .atom (.terminal (.symbol .slash)),
+        .atom (.terminal (.symbol .percent))]),
+      .atom (.nonterminal .prefix)])) :=
+  EbnfValue.group _ (EbnfValue.sequence _
+    (EbnfValues.cons _ _
+      (EbnfValue.group _ (match value.1 with
+        | .inl star => EbnfValue.choice _
+            ⟨⟨0, by decide⟩, EbnfValue.terminalAtom _ star⟩
+        | .inr (.inl slash) => EbnfValue.choice _
+            ⟨⟨1, by decide⟩, EbnfValue.terminalAtom _ slash⟩
+        | .inr (.inr percent) => EbnfValue.choice _
+            ⟨⟨2, by decide⟩, EbnfValue.terminalAtom _ percent⟩))
+      (EbnfValues.cons _ _ (EbnfValue.ruleAtom _ value.2)
+        EbnfValues.nil)))
+
+private theorem multiplicativeTailInput_injective
+    {file : WorkspaceFile} {tokens : List Token} :
+    Function.Injective (@multiplicativeTailInput file tokens) := by
+  rintro ⟨leftOperator, leftExpression⟩ ⟨rightOperator, rightExpression⟩ inputEq
+  have groupEq := EbnfValue.group_injective _ inputEq
+  have sequenceEq := EbnfValue.sequence_injective _ groupEq
+  have operatorConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have operatorGroupEq := EbnfValue.group_injective _ operatorConsEq.1
+  have expressionConsEq := EbnfValues.cons_injective _ _ operatorConsEq.2
+  have expressionEq := EbnfValue.ruleAtom_injective _ expressionConsEq.1
+  rcases leftOperator with leftStar | (leftSlash | leftPercent) <;>
+    rcases rightOperator with rightStar | (rightSlash | rightPercent)
+  all_goals have choiceEq := EbnfValue.choice_injective _ operatorGroupEq
+  all_goals have branchEq := congrArg Sigma.fst choiceEq
+  all_goals simp at branchEq
+  all_goals
+    have valueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+    simp only [List.get_eq_getElem] at valueEq
+    have operatorEq := EbnfValue.terminalAtom_injective _ valueEq
+    cases operatorEq
+    cases expressionEq
+    rfl
+
+private theorem ruleReduction_additive_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .additive)}
+    {left right : RuleValue .additive}
+    (leftReduces : RuleReduction file tokens .additive origin finish input left)
+    (rightReduces : RuleReduction file tokens .additive origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  have leftConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have leftEq := EbnfValue.ruleAtom_injective _ leftConsEq.1
+  have restConsEq := EbnfValues.cons_injective _ _ leftConsEq.2
+  have restInputEq := EbnfValue.star_injective _ restConsEq.1
+  change List.map additiveTailInput _ = List.map additiveTailInput _ at restInputEq
+  have restEq := listMap_injective_of_injective
+    additiveTailInput_injective restInputEq
+  rw [leftEq, restEq]
+
+private theorem ruleReduction_multiplicative_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .multiplicative)}
+    {left right : RuleValue .multiplicative}
+    (leftReduces : RuleReduction file tokens .multiplicative
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .multiplicative
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  have leftConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  have leftEq := EbnfValue.ruleAtom_injective _ leftConsEq.1
+  have restConsEq := EbnfValues.cons_injective _ _ leftConsEq.2
+  have restInputEq := EbnfValue.star_injective _ restConsEq.1
+  change List.map multiplicativeTailInput _ =
+    List.map multiplicativeTailInput _ at restInputEq
+  have restEq := listMap_injective_of_injective
+    multiplicativeTailInput_injective restInputEq
+  rw [leftEq, restEq]
+
+private theorem ruleReduction_pattern_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .pattern)}
+    {left right : RuleValue .pattern}
+    (leftReduces : RuleReduction file tokens .pattern origin finish input left)
+    (rightReduces : RuleReduction file tokens .pattern origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have choiceEq := EbnfValue.choice_injective _ inputEq
+    have branchEq := congrArg Sigma.fst choiceEq
+    simp at branchEq
+  all_goals
+    have valueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+    simp only [List.get_eq_getElem] at valueEq
+  case patternWildcard.patternWildcard =>
+    have matchedEq := EbnfValue.terminalAtom_injective _ valueEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    cases matchedEq
+    rfl
+  case patternLiteral.patternLiteral =>
+    have literalEq := EbnfValue.ruleAtom_injective _ valueEq
+    exact (sourceLoc_eq_iff _ _ _ _).2 (congrArg _ literalEq)
+  case patternDotConstructorWithoutArguments.patternDotConstructorWithoutArguments =>
+    rename_i leftDot leftName _ leftParsed leftProjects leftWitness
+      rightDot rightName _ rightParsed rightProjects rightWitness
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, terminalAtom_inj_iff] at sequenceEq
+    cases sequenceEq.1
+    cases sequenceEq.2.1
+    have parsedEq := (IdentifierProjects.functional
+      leftProjects rightProjects).2
+    apply (sourceLoc_eq_iff leftWitness rightWitness _ _).2
+    rw [parsedEq]
+  case patternDotConstructorWithoutArguments.patternDotConstructorWithArguments =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, optional_inj_iff] at sequenceEq
+    cases sequenceEq.2.2.1
+  case patternDotConstructorWithArguments.patternDotConstructorWithoutArguments =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, optional_inj_iff] at sequenceEq
+    cases sequenceEq.2.2.1
+  case patternDotConstructorWithArguments.patternDotConstructorWithArguments =>
+    rename_i leftDot leftName _ leftParsed leftProjects _ leftArguments _
+      leftWitness rightDot rightName _ rightParsed rightProjects _
+      rightArguments _ rightWitness
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, terminalAtom_inj_iff,
+      optional_inj_iff] at sequenceEq
+    have innerEq := Option.some.inj sequenceEq.2.2.1
+    have innerSequenceEq := EbnfValue.sequence_injective _ innerEq
+    simp only [cons_inj_iff, list1_inj_iff] at innerSequenceEq
+    have argumentsEq := nonemptyListMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .pattern) innerSequenceEq.2.1
+    cases sequenceEq.1
+    cases sequenceEq.2.1
+    have parsedEq := (IdentifierProjects.functional
+      leftProjects rightProjects).2
+    apply (sourceLoc_eq_iff leftWitness rightWitness _ _).2
+    rw [parsedEq, argumentsEq]
+  case patternComptime.patternComptime =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, terminalAtom_inj_iff,
+      ruleAtom_inj_iff] at sequenceEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [sequenceEq.1, sequenceEq.2.1]
+  case patternNamedWithoutArguments.patternNamedWithoutArguments =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, ruleAtom_inj_iff] at sequenceEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    cases sequenceEq.1
+    rfl
+  case patternNamedWithoutArguments.patternNamedWithArguments =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, optional_inj_iff] at sequenceEq
+    cases sequenceEq.2.1
+  case patternNamedWithArguments.patternNamedWithoutArguments =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, optional_inj_iff] at sequenceEq
+    cases sequenceEq.2.1
+  case patternNamedWithArguments.patternNamedWithArguments =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, ruleAtom_inj_iff,
+      optional_inj_iff] at sequenceEq
+    have innerEq := Option.some.inj sequenceEq.2.1
+    have innerSequenceEq := EbnfValue.sequence_injective _ innerEq
+    simp only [cons_inj_iff, list1_inj_iff] at innerSequenceEq
+    have argumentsEq := nonemptyListMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .pattern) innerSequenceEq.2.1
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [sequenceEq.1, argumentsEq]
+  case patternEmptyTuple.patternEmptyTuple =>
+    exact (sourceLoc_eq_iff _ _ _ _).2 rfl
+  case patternGroup.patternGroup =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, ruleAtom_inj_iff] at sequenceEq
+    exact (sourceLoc_eq_iff _ _ _ _).2 (congrArg _ sequenceEq.2.1)
+  case patternTuple.patternTuple =>
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, ruleAtom_inj_iff,
+      star_inj_iff] at sequenceEq
+    have restInputEq := sequenceEq.2.2.2.2.1
+    change List.map (fixedInfixTailInput (.symbol .comma) .pattern) _ =
+      List.map (fixedInfixTailInput (.symbol .comma) .pattern) _ at restInputEq
+    have restEq := listMap_injective_of_injective
+      (fixedInfixTailInput_injective (.symbol .comma) .pattern) restInputEq
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    rw [sequenceEq.2.1, sequenceEq.2.2.2.1, restEq]
+
 /-- A module-rule reduction can only produce the full-file, source-owned
 module payload from its exact item list. -/
 theorem ruleReduction_source_backed
