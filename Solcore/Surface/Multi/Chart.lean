@@ -3574,6 +3574,146 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private theorem phaseB_runMappedPrimitive?_payload
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    {result : CountedState tokens after}
+    (selected : runMappedPrimitive? current address transition = some result) :
+    result.payload = transition current.payload := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  · cases selected
+    rfl
+  · contradiction
+
+private theorem materializePhaseAIndexes?_payload
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens) :
+    ∀ addresses
+      (current result : CountedState tokens (PhaseAIndexed file tokens)),
+      materializePhaseAIndexes? evaluate addresses current = some result →
+        result.payload.phaseA = current.payload.phaseA ∧
+        result.payload.entries = current.payload.entries ++
+          addresses.map fun address => ({
+            address := address
+            selected := evaluate current.payload.phaseA address
+          } : PhaseAEvidenceEntry tokens) := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current result selected
+      rw [materializePhaseAIndexes?] at selected
+      cases selected
+      exact ⟨rfl, by simp⟩
+  | cons address rest induction =>
+      intro current result selected
+      rw [materializePhaseAIndexes?] at selected
+      cases charged : runMappedPrimitive? current
+          (UnitAddress.evidenceIndex address)
+          (fun (state : PhaseAIndexed file tokens) => ({
+            state with entries := state.entries ++ [{
+              address := address
+              selected := evaluate state.phaseA address
+            }]
+          } : PhaseAIndexed file tokens)) with
+      | none => simp [charged] at selected
+      | some next =>
+          rw [charged] at selected
+          have nextPayload := phaseB_runMappedPrimitive?_payload current
+            (UnitAddress.evidenceIndex address)
+            (fun (state : PhaseAIndexed file tokens) => ({
+              state with entries := state.entries ++ [{
+                address := address
+                selected := evaluate state.phaseA address
+              }]
+            } : PhaseAIndexed file tokens)) charged
+          rcases induction next result selected with
+            ⟨phaseSame, entriesSame⟩
+          have nextPhase :
+              next.payload.phaseA = current.payload.phaseA := by
+            rw [nextPayload]
+          have nextEntries : next.payload.entries =
+              current.payload.entries ++ [{
+                address := address
+                selected := evaluate current.payload.phaseA address
+              }] := by
+            rw [nextPayload]
+          constructor
+          · exact phaseSame.trans nextPhase
+          · rw [entriesSame, nextEntries, nextPhase]
+            simp [List.append_assoc]
+
+private theorem materializeAllPhaseAIndexes?_entries_eq_canonical
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : CountedState tokens (PhaseAIndexed file tokens))
+    (selected : materializePhaseAIndexes? evaluate
+      (allEvidenceIndexAddresses tokens) (beginPhaseAIndexing current) =
+        some result) :
+    result.payload.entries =
+      canonicalEvidenceEntries evaluate current.payload := by
+  have shape := materializePhaseAIndexes?_payload evaluate
+    (allEvidenceIndexAddresses tokens) (beginPhaseAIndexing current)
+    result selected
+  simpa [beginPhaseAIndexing, canonicalEvidenceEntries] using shape.2
+
+private theorem materializeAllPhaseAIndexes?_fullyMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : CountedState tokens (PhaseAIndexed file tokens))
+    (selected : materializePhaseAIndexes? evaluate
+      (allEvidenceIndexAddresses tokens) (beginPhaseAIndexing current) =
+        some result) :
+    FullyMaterializedEvidenceEntries result.payload.entries := by
+  rw [materializeAllPhaseAIndexes?_entries_eq_canonical
+    evaluate current result selected]
+  exact canonicalEvidenceEntries_fullyMaterialized evaluate current.payload
+
+private theorem indexSaturatedPhaseAWith?_fullyMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : CountedState tokens (PhaseAIndexed file tokens))
+    (selected : indexSaturatedPhaseAWith? evaluate current = some result) :
+    FullyMaterializedEvidenceEntries result.payload.entries := by
+  unfold indexSaturatedPhaseAWith? at selected
+  split at selected
+  next itemsDone =>
+    split at selected
+    next edgesDone =>
+      split at selected
+      next saturated =>
+        exact materializeAllPhaseAIndexes?_fullyMaterialized
+          evaluate current result selected
+      next notSaturated => contradiction
+    next edgesRemain => contradiction
+  next itemsRemain => contradiction
+
+private theorem indexSaturatedPhaseACanonicalWith?_fullyMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : CountedState tokens (PhaseAIndexed file tokens))
+    (selected : indexSaturatedPhaseACanonicalWith? evaluate current =
+      some result) :
+    FullyMaterializedEvidenceEntries result.payload.entries := by
+  unfold indexSaturatedPhaseACanonicalWith? at selected
+  split at selected
+  next sameMembers =>
+    exact indexSaturatedPhaseAWith?_fullyMaterialized evaluate
+      (normalizePhaseARawItems current sameMembers) result selected
+  next differentMembers => contradiction
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
