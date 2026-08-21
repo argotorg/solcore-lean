@@ -643,4 +643,192 @@ private theorem cast_injection
   simp only [Fin.castLE] at rawEqual
   exact rawEqual
 
+private abbrev ProductionInstanceCoordinates (tokens : List Token) :=
+  (ProductionId × GuardContext tokens) × Boundary tokens
+
+private def productionInstanceCoordinates {tokens : List Token}
+    (key : ProductionInstanceKey tokens) :
+    ProductionInstanceCoordinates tokens :=
+  ((key.production, key.context), key.origin)
+
+private def productionInstanceOfCoordinates {tokens : List Token}
+    (coordinates : ProductionInstanceCoordinates tokens) :
+    ProductionInstanceKey tokens :=
+  ⟨coordinates.1.1, coordinates.2, coordinates.1.2⟩
+
+private theorem productionInstance_cardinality (tokens : List Token) :
+    ∃ encode : ProductionInstanceKey tokens →
+        Fin (productionCount * (1 + 3 * (tokens.length + 2)) *
+          (tokens.length + 2)),
+      Function.Injective encode ∧ Function.Surjective encode := by
+  let productionContextCardinality := product_cardinality (by omega)
+    productionId_cardinality (guard_context_cardinality tokens)
+  let coordinateCardinality := product_cardinality (by omega)
+    productionContextCardinality (fin_cardinality (tokens.length + 2))
+  exact transport_cardinality productionInstanceCoordinates
+    productionInstanceOfCoordinates
+    (by intro key; cases key; rfl)
+    (by rintro ⟨⟨_, _⟩, _⟩; rfl)
+    coordinateCardinality
+
+/-- The closed tagged unit-address universe has its exact tight cardinality. -/
+theorem chart_unit_family_complete (tokens : List Token) :
+    let q := tokens.length + 2
+    let c := 1 + 3 * q
+    let source := 1 + c
+    let linear := source * D * q * q
+    let prediction := source * D * productionCount * q * q
+    let cubic := source * D * D * q * q * q
+    let guardCell :=
+      Sigma fun production : ProductionId => Fin (guardOf production).length
+    let guardAddress := (guardCell × GuardContext tokens) × Boundary tokens
+    let unitDomain :=
+      (((((ChartPhaseSlot ⊕
+          (GuardFinalizeSlot × GuardInstanceKey tokens)) ⊕
+        ProductionInstanceKey tokens) ⊕
+        (GuardWitnessSlot × guardAddress)) ⊕
+        (ChartLinearUnitKind × ChartLinearKey tokens)) ⊕
+        (ChartPredictionUnitKind × ChartPredictionKey tokens)) ⊕
+        (ChartCubicUnitKind × ChartCubicKey tokens)
+    ∃ encode : unitDomain → Fin
+        (4 +
+          8 * (allPriorityGuardIds.length * q * (q + 1) / 2) +
+          productionCount * c * q +
+          4 * H * c * q +
+          14 * linear + 2 * prediction + 8 * cubic),
+      Function.Injective encode ∧ Function.Surjective encode := by
+  dsimp only
+  let q := tokens.length + 2
+  let c := 1 + 3 * q
+  let source := 1 + c
+  let linear := source * D * q * q
+  let prediction := source * D * productionCount * q * q
+  let cubic := source * D * D * q * q * q
+  have qPositive : 0 < q := by simp [q]
+  have cPositive : 0 < c := by dsimp only [c]; omega
+  have sourcePositive : 0 < source := by dsimp only [source]; omega
+  have hPositive : 0 < H := by rw [H_eq_eighteen]; omega
+  rcases chart_unit_kind_cardinality with
+    ⟨phaseCardinality, finalizeSlotCardinality, witnessSlotCardinality,
+      linearKindCardinality, predictionKindCardinality,
+      cubicKindCardinality⟩
+  let guardCardinality := guard_instance_cardinality tokens
+  let guardSample : GuardInstanceKey tokens := {
+    guard := .G01_statementIf
+    contextStart := Boundary.start tokens
+    siteCursor := Boundary.start tokens
+    ordered := Nat.le_refl _
+  }
+  have guardPositive :
+      0 < allPriorityGuardIds.length * q * (q + 1) / 2 := by
+    obtain ⟨guardEncode, _guardInjective, _guardSurjective⟩ :=
+      guardCardinality
+    exact Nat.zero_lt_of_lt (guardEncode guardSample).isLt
+  let guardFamilyCardinality := product_cardinality guardPositive
+    finalizeSlotCardinality guardCardinality
+  let witnessAddressCardinality := product_cardinality qPositive
+    (product_cardinality cPositive guardCellAddress_cardinality
+      (guard_context_cardinality tokens)) (fin_cardinality q)
+  have witnessAddressPositive : 0 < H * c * q :=
+    Nat.mul_pos (Nat.mul_pos hPositive cPositive) qPositive
+  let witnessFamilyCardinality := product_cardinality witnessAddressPositive
+    witnessSlotCardinality witnessAddressCardinality
+  rcases chart_key_cardinality tokens with
+    ⟨_sourceCardinality, linearKeyCardinality, predictionKeyCardinality,
+      cubicKeyCardinality⟩
+  have linearPositive : 0 < linear := by
+    exact Nat.mul_pos
+      (Nat.mul_pos (Nat.mul_pos sourcePositive dotted_count_positive)
+        qPositive) qPositive
+  have predictionPositive : 0 < prediction := by
+    exact Nat.mul_pos
+      (Nat.mul_pos
+        (Nat.mul_pos
+          (Nat.mul_pos sourcePositive dotted_count_positive)
+          production_count_positive) qPositive) qPositive
+  have cubicPositive : 0 < cubic := by
+    exact Nat.mul_pos
+      (Nat.mul_pos
+        (Nat.mul_pos
+          (Nat.mul_pos
+            (Nat.mul_pos sourcePositive dotted_count_positive)
+            dotted_count_positive) qPositive) qPositive) qPositive
+  let linearFamilyCardinality := product_cardinality linearPositive
+    linearKindCardinality linearKeyCardinality
+  let predictionFamilyCardinality := product_cardinality predictionPositive
+    predictionKindCardinality predictionKeyCardinality
+  let cubicFamilyCardinality := product_cardinality cubicPositive
+    cubicKindCardinality cubicKeyCardinality
+  let phaseGuardCardinality := sum_cardinality phaseCardinality
+    guardFamilyCardinality
+  let withProductionCardinality := sum_cardinality phaseGuardCardinality
+    (productionInstance_cardinality tokens)
+  let withWitnessCardinality := sum_cardinality withProductionCardinality
+    witnessFamilyCardinality
+  let withLinearCardinality := sum_cardinality withWitnessCardinality
+    linearFamilyCardinality
+  let withPredictionCardinality := sum_cardinality withLinearCardinality
+    predictionFamilyCardinality
+  let allFamilyCardinality := sum_cardinality withPredictionCardinality
+    cubicFamilyCardinality
+  exact cast_cardinality (by
+    simp only [q, c, source, linear, prediction, cubic, Nat.mul_assoc])
+    allFamilyCardinality
+
+/-- Every tagged chart unit occupies a distinct slot below `chartGBound`. -/
+theorem chart_unit_family_injective (tokens : List Token) :
+    let q := tokens.length + 2
+    let c := 1 + 3 * q
+    let source := 1 + c
+    let linear := source * D * q * q
+    let prediction := source * D * productionCount * q * q
+    let cubic := source * D * D * q * q * q
+    let guardCell :=
+      Sigma fun production : ProductionId => Fin (guardOf production).length
+    let guardAddress := (guardCell × GuardContext tokens) × Boundary tokens
+    let unitDomain :=
+      (((((ChartPhaseSlot ⊕
+          (GuardFinalizeSlot × GuardInstanceKey tokens)) ⊕
+        ProductionInstanceKey tokens) ⊕
+        (GuardWitnessSlot × guardAddress)) ⊕
+        (ChartLinearUnitKind × ChartLinearKey tokens)) ⊕
+        (ChartPredictionUnitKind × ChartPredictionKey tokens)) ⊕
+        (ChartCubicUnitKind × ChartCubicKey tokens)
+    ∃ encode : unitDomain → Fin
+        (4 +
+          8 * allPriorityGuardIds.length * q * q +
+          productionCount * c * q +
+          4 * H * c * q +
+          14 * linear + 2 * prediction + 8 * cubic),
+      Function.Injective encode := by
+  dsimp only
+  obtain ⟨tightEncode, tightInjective, _tightSurjective⟩ :=
+    chart_unit_family_complete tokens
+  let q := tokens.length + 2
+  have qSuccLe : q + 1 ≤ 2 * q := by simp [q]; omega
+  have numeratorLe :
+      allPriorityGuardIds.length * q * (q + 1) ≤
+        2 * (allPriorityGuardIds.length * q * q) := by
+    calc
+      allPriorityGuardIds.length * q * (q + 1) ≤
+          allPriorityGuardIds.length * q * (2 * q) :=
+        Nat.mul_le_mul_left _ qSuccLe
+      _ = 2 * (allPriorityGuardIds.length * q * q) := by ac_rfl
+  have rectangleLe :
+      allPriorityGuardIds.length * q * (q + 1) / 2 ≤
+        allPriorityGuardIds.length * q * q :=
+    Nat.div_le_of_le_mul numeratorLe
+  have guardFamilyLe :
+      8 * (allPriorityGuardIds.length * q * (q + 1) / 2) ≤
+        8 * allPriorityGuardIds.length * q * q := by
+    simpa only [Nat.mul_assoc] using Nat.mul_le_mul_left 8 rectangleLe
+  exact cast_injection (by
+    have expandedGuardLe :
+        8 * (allPriorityGuardIds.length * (tokens.length + 2) *
+          (tokens.length + 2 + 1) / 2) ≤
+        8 * allPriorityGuardIds.length * (tokens.length + 2) *
+          (tokens.length + 2) := by
+      simpa only [q] using guardFamilyLe
+    omega) ⟨tightEncode, tightInjective⟩
+
 end Solcore.Surface.Multi
