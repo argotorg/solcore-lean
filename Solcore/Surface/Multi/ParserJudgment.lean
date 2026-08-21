@@ -543,6 +543,187 @@ private theorem rawScanBool_eq_true_iff
   · rintro ⟨witness⟩
     exact rawScan?_complete owned before after witness
 
+private def RawSeed {tokens : List Token}
+    (item : DottedItem tokens) : Prop :=
+  item.dot.val = 0 ∧ item.origin = item.current
+
+private def RawPredict {tokens : List Token}
+    (waiting predicted : DottedItem tokens) : Prop :=
+  NextSymbol waiting (.nonterminal predicted.production.lhs) ∧
+    predicted.dot.val = 0 ∧
+    predicted.origin = waiting.current ∧
+    predicted.current = waiting.current
+
+private def RawComplete {tokens : List Token}
+    (waiting finished after : DottedItem tokens) : Prop :=
+  NextSymbol waiting (.nonterminal finished.production.lhs) ∧
+    CompleteItem finished ∧
+    waiting.current = finished.origin ∧
+    AdvanceItem waiting finished.current after
+
+private def rawSeedDecidable {tokens : List Token}
+    (item : DottedItem tokens) : Decidable (RawSeed item) := by
+  unfold RawSeed
+  infer_instance
+
+private def rawPredictDecidable {tokens : List Token}
+    (waiting predicted : DottedItem tokens) :
+    Decidable (RawPredict waiting predicted) := by
+  unfold RawPredict
+  letI := nextSymbolDecidable waiting
+    (.nonterminal predicted.production.lhs)
+  infer_instance
+
+private def rawCompleteDecidable {tokens : List Token}
+    (waiting finished after : DottedItem tokens) :
+    Decidable (RawComplete waiting finished after) := by
+  unfold RawComplete
+  letI := nextSymbolDecidable waiting
+    (.nonterminal finished.production.lhs)
+  letI := completeItemDecidable finished
+  letI := advanceItemDecidable waiting finished.current after
+  infer_instance
+
+private def RawClosureRule
+    (file : WorkspaceFile) (tokens : List Token)
+    (known : List (DottedItem tokens)) (item : DottedItem tokens) : Prop :=
+  item ∈ known ∨
+    RawSeed item ∨
+    (∃ waiting, waiting ∈ known ∧ RawPredict waiting item) ∨
+    (∃ before, before ∈ known ∧
+      Nonempty (RawScanWitness file tokens before item)) ∨
+    ∃ waiting, waiting ∈ known ∧
+      ∃ finished, finished ∈ known ∧ RawComplete waiting finished item
+
+private def rawMemberBool {tokens : List Token}
+    (known : List (DottedItem tokens)) (item : DottedItem tokens) : Bool :=
+  known.any fun candidate => decide (candidate = item)
+
+private theorem rawMemberBool_eq_true_iff
+    {tokens : List Token} (known : List (DottedItem tokens))
+    (item : DottedItem tokens) :
+    rawMemberBool known item = true ↔ item ∈ known := by
+  rw [rawMemberBool, List.any_eq_true]
+  simp only [decide_eq_true_iff]
+  constructor
+  · rintro ⟨candidate, member, rfl⟩
+    exact member
+  · intro member
+    exact ⟨item, member, rfl⟩
+
+private def rawPredictBool {tokens : List Token}
+    (known : List (DottedItem tokens)) (predicted : DottedItem tokens) : Bool :=
+  known.any fun waiting =>
+    @decide (RawPredict waiting predicted)
+      (rawPredictDecidable waiting predicted)
+
+private theorem rawPredictBool_eq_true_iff
+    {tokens : List Token} (known : List (DottedItem tokens))
+    (predicted : DottedItem tokens) :
+    rawPredictBool known predicted = true ↔
+      ∃ waiting, waiting ∈ known ∧ RawPredict waiting predicted := by
+  rw [rawPredictBool, List.any_eq_true]
+  simp only [decide_eq_true_iff]
+
+private def rawScanAnyBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) (after : DottedItem tokens) : Bool :=
+  known.any fun before => rawScanBool file tokens owned before after
+
+private theorem rawScanAnyBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) (after : DottedItem tokens) :
+    rawScanAnyBool file tokens owned known after = true ↔
+      ∃ before, before ∈ known ∧
+        Nonempty (RawScanWitness file tokens before after) := by
+  rw [rawScanAnyBool, List.any_eq_true]
+  constructor
+  · rintro ⟨before, member, accepted⟩
+    exact ⟨before, member,
+      (rawScanBool_eq_true_iff owned before after).mp accepted⟩
+  · rintro ⟨before, member, witness⟩
+    exact ⟨before, member,
+      (rawScanBool_eq_true_iff owned before after).mpr witness⟩
+
+private def rawCompleteBool {tokens : List Token}
+    (known : List (DottedItem tokens)) (after : DottedItem tokens) : Bool :=
+  known.any fun waiting => known.any fun finished =>
+    @decide (RawComplete waiting finished after)
+      (rawCompleteDecidable waiting finished after)
+
+private theorem rawCompleteBool_eq_true_iff
+    {tokens : List Token} (known : List (DottedItem tokens))
+    (after : DottedItem tokens) :
+    rawCompleteBool known after = true ↔
+      ∃ waiting, waiting ∈ known ∧
+        ∃ finished, finished ∈ known ∧
+          RawComplete waiting finished after := by
+  simp only [rawCompleteBool, List.any_eq_true, decide_eq_true_iff]
+
+private def rawClosureBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) (item : DottedItem tokens) : Bool :=
+  rawMemberBool known item ||
+    (@decide (RawSeed item) (rawSeedDecidable item) ||
+      (rawPredictBool known item ||
+        (rawScanAnyBool file tokens owned known item ||
+          rawCompleteBool known item)))
+
+private theorem rawClosureBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) (item : DottedItem tokens) :
+    rawClosureBool file tokens owned known item = true ↔
+      RawClosureRule file tokens known item := by
+  simp only [rawClosureBool, Bool.or_eq_true,
+    rawMemberBool_eq_true_iff, decide_eq_true_iff,
+    rawPredictBool_eq_true_iff, rawScanAnyBool_eq_true_iff,
+    rawCompleteBool_eq_true_iff, RawClosureRule]
+
+private def rawSaturationStep
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) : List (DottedItem tokens) :=
+  (allDottedItems tokens).filter
+    (rawClosureBool file tokens owned known)
+
+private theorem rawSaturationStep_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) (item : DottedItem tokens) :
+    item ∈ rawSaturationStep file tokens owned known ↔
+      RawClosureRule file tokens known item := by
+  rw [rawSaturationStep, List.mem_filter,
+    rawClosureBool_eq_true_iff owned known item]
+  exact and_iff_right (allDottedItems_complete item)
+
+private theorem rawClosureBool_inflationary
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) (item : DottedItem tokens)
+    (member : item ∈ known) :
+    rawClosureBool file tokens owned known item = true :=
+  (rawClosureBool_eq_true_iff owned known item).mpr (Or.inl member)
+
+private def rawSaturation
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) : List (DottedItem tokens) :=
+  closureIterate (rawSaturationStep file tokens owned)
+    (allDottedItems tokens).length
+
+private theorem rawSaturation_stable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    rawSaturationStep file tokens owned
+        (rawSaturation file tokens owned) =
+      rawSaturation file tokens owned := by
+  exact finiteFilteredClosure_stable (allDottedItems tokens)
+    (rawClosureBool file tokens owned)
+    (rawClosureBool_inflationary owned)
+
 /-- Unguarded recognition is exactly one reached complete matching item. -/
 theorem unguardedRecognizes_exact
     {file : WorkspaceFile} {tokens : List Token}
