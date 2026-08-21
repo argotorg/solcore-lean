@@ -3376,4 +3376,194 @@ private theorem guardedProductions_keys :
       guardedKeys.map some := by
   rfl
 
+private theorem site_eq_of_fields {kind : EbnfNodeKind}
+    (left right : GrammarSiteOfKind kind)
+    (ruleEqual : left.site.val.rule = right.site.val.rule)
+    (pathEqual : left.site.val.path = right.site.val.path) : left = right := by
+  rcases left with ⟨⟨⟨leftRule, leftPath⟩, leftValid⟩, leftKind⟩
+  rcases right with ⟨⟨⟨rightRule, rightPath⟩, rightValid⟩, rightKind⟩
+  change leftRule = rightRule at ruleEqual
+  change leftPath = rightPath at pathEqual
+  cases ruleEqual
+  cases pathEqual
+  rfl
+
+private theorem guardedKey?_injective
+    {left right : ProductionId} {key : GuardedProductionKey}
+    (leftKey : left.guardedKey? = some key)
+    (rightKey : right.guardedKey? = some key) : left = right := by
+  have keysEqual : left.guardedKey? = right.guardedKey? :=
+    leftKey.trans rightKey.symm
+  cases left <;> cases right <;>
+    simp [ProductionId.guardedKey?] at leftKey rightKey keysEqual
+  case choice.choice leftSite leftBranch rightSite rightBranch =>
+    rcases keysEqual with ⟨ruleEqual, pathEqual, branchEqual⟩
+    cases site_eq_of_fields leftSite rightSite ruleEqual pathEqual
+    cases Fin.ext branchEqual
+    rfl
+  case opt.opt leftSite leftBranch rightSite rightBranch =>
+    rcases keysEqual with ⟨ruleEqual, pathEqual, branchEqual⟩
+    cases site_eq_of_fields leftSite rightSite ruleEqual pathEqual
+    cases branchEqual
+    rfl
+  case star.star leftSite leftBranch rightSite rightBranch =>
+    rcases keysEqual with ⟨ruleEqual, pathEqual, branchEqual⟩
+    cases site_eq_of_fields leftSite rightSite ruleEqual pathEqual
+    cases branchEqual
+    rfl
+
+private instance : LawfulBEq GrammarRuleId where
+  rfl := by
+    intro rule
+    cases rule <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private def keyMem (key : GuardedProductionKey) :
+    List GuardedProductionKey → Bool
+  | [] => false
+  | head :: tail => if key = head then true else keyMem key tail
+
+private theorem keyMem_eq_true_iff
+    (key : GuardedProductionKey) (keys : List GuardedProductionKey) :
+    keyMem key keys = true ↔ key ∈ keys := by
+  induction keys with
+  | nil => simp [keyMem]
+  | cons head tail induction => simp [keyMem, induction]
+
+private def guardedKeyIndicator (production : ProductionId) : Nat :=
+  match production.guardedKey? with
+  | some key => if keyMem key guardedKeys then 1 else 0
+  | none => 0
+
+private theorem guardOf_length_eq_indicator (production : ProductionId) :
+    (guardOf production).length = guardedKeyIndicator production := by
+  cases production <;>
+    simp [guardOf, GrammarSite.isAt, guardedKeyIndicator,
+      ProductionId.guardedKey?, guardedKeys, keyMem, beq_iff_eq] <;>
+    grind (splits := 64)
+
+private theorem production_mem_guardedProductions_iff
+    (production : ProductionId) :
+    production ∈ guardedProductions ↔
+      ∃ key ∈ guardedKeys, production.guardedKey? = some key := by
+  constructor
+  · intro member
+    have mapped : production.guardedKey? ∈
+        guardedProductions.map ProductionId.guardedKey? :=
+      List.mem_map.mpr ⟨production, member, rfl⟩
+    rw [guardedProductions_keys] at mapped
+    rcases List.mem_map.mp mapped with ⟨key, keyMember, keyEqual⟩
+    exact ⟨key, keyMember, keyEqual.symm⟩
+  · rintro ⟨key, keyMember, productionKey⟩
+    have mapped : some key ∈ guardedKeys.map some :=
+      List.mem_map.mpr ⟨key, keyMember, rfl⟩
+    rw [← guardedProductions_keys] at mapped
+    rcases List.mem_map.mp mapped with
+      ⟨guardedProduction, guardedMember, guardedKey⟩
+    have equal := guardedKey?_injective productionKey guardedKey
+    exact equal ▸ guardedMember
+
+private theorem guardedKeyIndicator_eq_one_iff (production : ProductionId) :
+    guardedKeyIndicator production = 1 ↔
+      production ∈ guardedProductions := by
+  rw [production_mem_guardedProductions_iff]
+  unfold guardedKeyIndicator
+  split <;> rename_i selected
+  · simp [selected, keyMem_eq_true_iff]
+  · simp [selected]
+
+private theorem guardedKeys_nodup : guardedKeys.Nodup := by
+  unfold guardedKeys
+  decide
+
+private theorem guardedProductions_nodup : guardedProductions.Nodup := by
+  have mappedNodup :
+      (guardedProductions.map ProductionId.guardedKey?).Nodup := by
+    rw [guardedProductions_keys]
+    apply List.Pairwise.map some
+      (fun left right different equal =>
+        different (Option.some.inj equal))
+      guardedKeys_nodup
+  apply List.Pairwise.of_map ProductionId.guardedKey?
+    (fun left right different equal =>
+      different (congrArg ProductionId.guardedKey? equal))
+    mappedNodup
+
+private theorem nodup_perm_of_mem_iff {alpha : Type}
+    (left right : List alpha) (leftNodup : left.Nodup)
+    (rightNodup : right.Nodup)
+    (sameMembers : ∀ value, value ∈ left ↔ value ∈ right) :
+    left.Perm right := by
+  induction left generalizing right with
+  | nil =>
+      cases right with
+      | nil => rfl
+      | cons head tail =>
+          have impossible : head ∈ ([] : List alpha) :=
+            (sameMembers head).mpr (by simp)
+          simp at impossible
+  | cons head tail induction =>
+      rw [List.nodup_cons] at leftNodup
+      have headMember : head ∈ right :=
+        (sameMembers head).mp (by simp)
+      obtain ⟨before, after, rfl⟩ := List.append_of_mem headMember
+      have middleNodup : (head :: (before ++ after)).Nodup :=
+        rightNodup.perm List.perm_middle
+      rw [List.nodup_cons] at middleNodup
+      have tailMembers (value : alpha) :
+          value ∈ tail ↔ value ∈ before ++ after := by
+        constructor
+        · intro member
+          have inRight := (sameMembers value).mp (by simp [member])
+          simp only [List.mem_append, List.mem_cons] at inRight ⊢
+          rcases inRight with inBefore | equal | inAfter
+          · exact Or.inl inBefore
+          · exact (leftNodup.1 (equal ▸ member)).elim
+          · exact Or.inr inAfter
+        · intro member
+          have inRight : value ∈ before ++ head :: after := by
+            simp only [List.mem_append, List.mem_cons] at member ⊢
+            exact member.elim Or.inl (fun inAfter => Or.inr (Or.inr inAfter))
+          rcases List.mem_cons.mp ((sameMembers value).mpr inRight) with
+            equal | inTail
+          · exact (middleNodup.1 (equal ▸ member)).elim
+          · exact inTail
+      exact (List.Perm.cons head
+        (induction (before ++ after) leftNodup.2 middleNodup.2
+          tailMembers)).trans
+          List.perm_middle.symm
+
+private def guardedProductionFilter : List ProductionId :=
+  allProductionIds.filter fun production =>
+    guardedKeyIndicator production == 1
+
+private theorem guardedProductionFilter_perm :
+    guardedProductionFilter.Perm guardedProductions := by
+  apply nodup_perm_of_mem_iff guardedProductionFilter guardedProductions
+  · exact List.Pairwise.filter _ allProductionIds_nodup
+  · exact guardedProductions_nodup
+  · intro production
+    simp only [guardedProductionFilter, List.mem_filter]
+    rw [and_iff_right (allProductionIds_complete production)]
+    rw [beq_iff_eq]
+    exact guardedKeyIndicator_eq_one_iff production
+
+private theorem guardedKeyIndicator_sum_eq_filter_length
+    (productions : List ProductionId) :
+    (productions.map guardedKeyIndicator).sum =
+      (productions.filter fun production =>
+        guardedKeyIndicator production == 1).length := by
+  induction productions with
+  | nil => rfl
+  | cons head tail induction =>
+      have indicatorCases :
+          guardedKeyIndicator head = 0 ∨ guardedKeyIndicator head = 1 := by
+        unfold guardedKeyIndicator
+        split <;> simp
+      rcases indicatorCases with isZero | isOne
+      · simp [isZero, induction]
+      · simp [isOne, induction, Nat.add_comm]
+
 end Solcore.Surface.Multi.Grammar
