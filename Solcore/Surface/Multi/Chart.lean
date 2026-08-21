@@ -3157,4 +3157,117 @@ private def phaseBGuardDecisionFromIndexes?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Finalize the next guard using only the materialized Phase-A indexes.
+The schedule consumes exactly initialization, the six fixed lookup slots, and
+the final write slot for this key. -/
+private def finalizeNextIndexedGuard?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  match current.payload.phaseB.remaining with
+  | [] => none
+  | key :: rest => do
+      let initialized ← runMappedPrimitive? current
+        (.guardFinalize .initializeUndecided key)
+        fun (state : PhaseBIndexed file tokens) => ({
+          phaseB := {
+            state.phaseB with
+            cells := fun candidate =>
+              if candidate = key then some .undecided
+              else state.phaseB.cells candidate
+          }
+          indexes := state.indexes
+        } : PhaseBIndexed file tokens)
+      let lookups ← chargeAddresses? initialized
+        (preFinalGuardSlots.map fun slot => .guardFinalize slot key)
+      let decision ← phaseBGuardDecisionFromIndexes?
+        lookups.payload.indexes key
+      runMappedPrimitive? lookups
+        (.guardFinalize .writeFinalDecision key)
+        fun (state : PhaseBIndexed file tokens) => ({
+          phaseB := {
+            phaseA := state.phaseB.phaseA
+            cells := fun candidate =>
+              if candidate = key then some (.final decision)
+              else state.phaseB.cells candidate
+            remaining := rest
+            finalizedRev := key :: state.phaseB.finalizedRev
+          }
+          indexes := state.indexes
+        } : PhaseBIndexed file tokens)
+
+/-- Run the external-decision-free Phase-B worklist. -/
+private def runIndexedPhaseB?
+    {file : WorkspaceFile} {tokens : List Token} :
+    Nat → CountedState tokens (PhaseBIndexed file tokens) →
+      Option (CountedState tokens (PhaseBIndexed file tokens))
+  | 0, current =>
+      if current.payload.phaseB.remaining = [] then some current else none
+  | fuel + 1, current =>
+      match current.payload.phaseB.remaining with
+      | [] => some current
+      | _ :: _ => do
+          let next ← finalizeNextIndexedGuard? current
+          runIndexedPhaseB? fuel next
+
+/-- A successful Phase-B worklist run has consumed every guard key. -/
+private theorem runIndexedPhaseB?_remaining_empty
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseBIndexed file tokens)),
+      runIndexedPhaseB? fuel current = some result →
+        result.payload.phaseB.remaining = [] := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result selected
+      rw [runIndexedPhaseB?] at selected
+      split at selected
+      · cases selected
+        assumption
+      · contradiction
+  | succ previous induction =>
+      intro current result selected
+      rw [runIndexedPhaseB?] at selected
+      cases remaining : current.payload.phaseB.remaining with
+      | nil =>
+          simp only [remaining] at selected
+          cases selected
+          exact remaining
+      | cons key rest =>
+          simp only [remaining] at selected
+          cases finalized : finalizeNextIndexedGuard? current with
+          | none => simp [finalized] at selected
+          | some next =>
+              rw [finalized] at selected
+              exact induction next result selected
+
+/-- Enter, exhaust, and seal Phase B with no caller-supplied decisions. -/
+private def executeIndexedPhaseB?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) := do
+  let entered ← enterIndexedPhaseB? current
+  let finalized ← runIndexedPhaseB?
+    (allGuardInstanceKeys tokens).length entered
+  sealIndexedPhaseB? finalized
+
+/-- Execute the landed raw Phase A, materialize the proof-free observations,
+then derive and seal every Phase-B guard decision. -/
+private def executeObservedPhaseAB?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) := do
+  let phaseA ← executePhaseA? file tokens owned
+  let indexed ← indexSaturatedPhaseACanonicalWith?
+    (phaseAObservationIndexEvaluator owned) phaseA
+  executeIndexedPhaseB? indexed
+
+end Chart
+
 end Solcore.Surface.Multi
