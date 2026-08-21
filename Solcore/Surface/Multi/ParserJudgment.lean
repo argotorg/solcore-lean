@@ -2017,6 +2017,129 @@ def matchingDelimiterDecision
     (matchingDelimiterDecisionShape_iff
       tokens openCursor closeCursor opening closing)
 
+private def rawAllowedSymbolAtBoundary
+    (tokens : List Token) (cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Prop :=
+  ∃ symbol : Symbol,
+    (symbol = allowed.head ∨ symbol ∈ allowed.tail) ∧
+      rawSymbolAtBoundary tokens cursor symbol
+
+private def symbolAllowedBool
+    (symbol : Symbol) (allowed : NonemptyList Symbol) : Bool :=
+  decide (symbol = allowed.head) ||
+    allowed.tail.any fun candidate => decide (symbol = candidate)
+
+private theorem symbolAllowedBool_eq_true_iff
+    (symbol : Symbol) (allowed : NonemptyList Symbol) :
+    symbolAllowedBool symbol allowed = true ↔
+      symbol = allowed.head ∨ symbol ∈ allowed.tail := by
+  simp [symbolAllowedBool, List.any_eq_true]
+
+private def rawAllowedSymbolAtBoundaryBool
+    (tokens : List Token) (cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Bool :=
+  if inRange : cursor.val < tokens.length then
+    match tokens[cursor.val].payload with
+    | .symbol symbol => symbolAllowedBool symbol allowed
+    | _ => false
+  else
+    false
+
+private theorem rawAllowedSymbolAtBoundaryBool_eq_true_iff
+    (tokens : List Token) (cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    rawAllowedSymbolAtBoundaryBool tokens cursor allowed = true ↔
+      rawAllowedSymbolAtBoundary tokens cursor allowed := by
+  constructor
+  · intro accepted
+    unfold rawAllowedSymbolAtBoundaryBool at accepted
+    split at accepted
+    case isFalse => simp at accepted
+    case isTrue inRange =>
+      generalize payloadEq : tokens[cursor.val].payload = payload at accepted
+      cases payload <;> simp at accepted
+      case symbol symbol =>
+        have allowedMember :=
+          (symbolAllowedBool_eq_true_iff symbol allowed).mp accepted
+        let terminalCursor : TerminalCursor tokens :=
+          ⟨cursor.val, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+        refine ⟨symbol, allowedMember, terminalCursor,
+          tokens[cursor.val], ?_, ?_, payloadEq⟩
+        · apply Fin.ext
+          rfl
+        · exact List.getElem?_eq_getElem inRange
+  · rintro ⟨symbol, allowedMember, terminalCursor, token,
+      atCursor, lookup, payload⟩
+    have cursorEq : terminalCursor.val = cursor.val :=
+      congrArg Fin.val atCursor
+    have inRange : cursor.val < tokens.length := by
+      by_cases candidate : cursor.val < tokens.length
+      · exact candidate
+      · have outOfRange : tokens.length ≤ terminalCursor.val := by
+          omega
+        rw [List.getElem?_eq_none outOfRange] at lookup
+        contradiction
+    have tokenEq : tokens[cursor.val] = token := by
+      have canonical := List.getElem?_eq_getElem inRange
+      rw [cursorEq] at lookup
+      exact Option.some.inj (canonical.symm.trans lookup)
+    have payloadAt : tokens[cursor.val].payload = .symbol symbol := by
+      exact tokenEq ▸ payload
+    unfold rawAllowedSymbolAtBoundaryBool
+    rw [dif_pos inRange, payloadAt]
+    exact (symbolAllowedBool_eq_true_iff symbol allowed).mpr
+      allowedMember
+
+private def rawAllowedSymbolAtBoundaryDecision
+    (tokens : List Token) (cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    Decidable (rawAllowedSymbolAtBoundary tokens cursor allowed) :=
+  decidable_of_iff
+    (rawAllowedSymbolAtBoundaryBool tokens cursor allowed = true)
+    (rawAllowedSymbolAtBoundaryBool_eq_true_iff tokens cursor allowed)
+
+private def NextSameDepthDelimiterDecisionShape
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Prop :=
+  SameDelimiterDepth tokens start cursor ∧
+    rawAllowedSymbolAtBoundary tokens cursor allowed ∧
+    ∀ earlier : Boundary tokens,
+      start.val ≤ earlier.val →
+      earlier.val < cursor.val →
+      SameDelimiterDepth tokens start earlier →
+      ¬ rawAllowedSymbolAtBoundary tokens earlier allowed
+
+private theorem nextSameDepthDelimiterDecisionShape_iff
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    NextSameDepthDelimiterDecisionShape tokens start cursor allowed ↔
+      NextSameDepthDelimiter tokens start cursor allowed := by
+  rfl
+
+/-- The first allowed delimiter at the starting depth is decidable. -/
+def nextSameDepthDelimiterDecision
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    Decidable (NextSameDepthDelimiter tokens start cursor allowed) := by
+  letI (left right : Boundary tokens) :
+      Decidable (SameDelimiterDepth tokens left right) :=
+    sameDelimiterDepthDecision tokens left right
+  letI (candidate : Boundary tokens) :
+      Decidable (rawAllowedSymbolAtBoundary tokens candidate allowed) :=
+    rawAllowedSymbolAtBoundaryDecision tokens candidate allowed
+  let shapeDecision : Decidable
+      (NextSameDepthDelimiterDecisionShape
+        tokens start cursor allowed) := by
+    unfold NextSameDepthDelimiterDecisionShape
+    infer_instance
+  letI : Decidable
+      (NextSameDepthDelimiterDecisionShape
+        tokens start cursor allowed) := shapeDecision
+  exact decidable_of_iff
+    (NextSameDepthDelimiterDecisionShape tokens start cursor allowed)
+    (nextSameDepthDelimiterDecisionShape_iff
+      tokens start cursor allowed)
+
 /-- A raw symbol observation has a unique successor boundary. -/
 private theorem rawImmediatelyAfterSymbol_functional
     {tokens : List Token} {symbol : Symbol}
