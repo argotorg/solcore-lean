@@ -11261,6 +11261,221 @@ private theorem ruleReduction_letBinding_total
           exact ⟨_, .letBindingComptime origin finish keyword name projection.1
             projection.2 projects colon comptime typeValue initializer witness⟩
 
+private theorem additiveTail_exists
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.group (.sequence [
+      .group (.choice [
+        .atom (.terminal (.symbol .plus)),
+        .atom (.terminal (.symbol .minus))]),
+      .atom (.nonterminal .multiplicative)]))) :
+    ∃ value, additiveTailInput value = input := by
+  let operatorExpr : EbnfExpr := .group (.choice [
+    .atom (.terminal (.symbol .plus)),
+    .atom (.terminal (.symbol .minus))])
+  let rightExpr : EbnfExpr := .atom (.nonterminal .multiplicative)
+  let rawSequence := groupView (.sequence [operatorExpr, rightExpr]) input
+  let pair := sequencePairView operatorExpr rightExpr rawSequence
+  let rawOperator := pair.firstValue
+  let rawRight := pair.secondValue
+  let rawChoice := groupView (.choice [
+    .atom (.terminal (.symbol .plus)),
+    .atom (.terminal (.symbol .minus))]) rawOperator
+  generalize viewEq : choiceView [
+    .atom (.terminal (.symbol .plus)),
+    .atom (.terminal (.symbol .minus))] rawChoice = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have choiceEq := choice_eq_of_view _ rawChoice viewEq
+  have operatorEq : EbnfValue.group _
+      (EbnfValue.choice _ ⟨branch, raw⟩) = rawOperator := by
+    rw [choiceEq]
+    exact group_of_view _ rawOperator
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have bound : branch.val < 2 := by
+      simpa only [List.length_cons, List.length_nil] using branch.isLt
+    have values : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases values with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let right := ruleView .multiplicative rawRight
+  have rightEq := rule_of_view .multiplicative rawRight
+  rcases branchCases with rfl | rfl
+  · let terminal := terminalView (.symbol .plus) raw
+    have terminalEq := terminal_of_view (.symbol .plus) raw
+    have encodedOperatorEq : EbnfValue.group _
+        (EbnfValue.choice _ ⟨⟨0, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .plus) terminal⟩) = rawOperator := by
+      have pairEq : (⟨⟨0, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .plus) terminal⟩ :
+          (branch : Fin 2) × EbnfValue file tokens ([
+            .atom (.terminal (.symbol .plus)),
+            .atom (.terminal (.symbol .minus))].get branch)) = ⟨0, raw⟩ :=
+        Sigma.ext (Fin.ext rfl) (heq_of_eq terminalEq)
+      exact (congrArg (EbnfValue.group _) (congrArg
+        (EbnfValue.choice _) pairEq)).trans operatorEq
+    refine ⟨(.inl terminal, right), ?_⟩
+    unfold additiveTailInput
+    rw [encodedOperatorEq, rightEq, pair.rebuild]
+    exact group_of_view _ input
+  · let terminal := terminalView (.symbol .minus) raw
+    have terminalEq := terminal_of_view (.symbol .minus) raw
+    have encodedOperatorEq : EbnfValue.group _
+        (EbnfValue.choice _ ⟨⟨1, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .minus) terminal⟩) = rawOperator := by
+      have pairEq : (⟨⟨1, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .minus) terminal⟩ :
+          (branch : Fin 2) × EbnfValue file tokens ([
+            .atom (.terminal (.symbol .plus)),
+            .atom (.terminal (.symbol .minus))].get branch)) = ⟨1, raw⟩ :=
+        Sigma.ext (Fin.ext rfl) (heq_of_eq terminalEq)
+      exact (congrArg (EbnfValue.group _) (congrArg
+        (EbnfValue.choice _) pairEq)).trans operatorEq
+    refine ⟨(.inr terminal, right), ?_⟩
+    unfold additiveTailInput
+    rw [encodedOperatorEq, rightEq, pair.rebuild]
+    exact group_of_view _ input
+
+private theorem multiplicativeTail_exists
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.group (.sequence [
+      .group (.choice [
+        .atom (.terminal (.symbol .star)),
+        .atom (.terminal (.symbol .slash)),
+        .atom (.terminal (.symbol .percent))]),
+      .atom (.nonterminal .prefix)]))) :
+    ∃ value, multiplicativeTailInput value = input := by
+  let operatorExpr : EbnfExpr := .group (.choice [
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .slash)),
+    .atom (.terminal (.symbol .percent))])
+  let rightExpr : EbnfExpr := .atom (.nonterminal .prefix)
+  let rawSequence := groupView (.sequence [operatorExpr, rightExpr]) input
+  let pair := sequencePairView operatorExpr rightExpr rawSequence
+  let rawOperator := pair.firstValue
+  let rawRight := pair.secondValue
+  let rawChoice := groupView (.choice [
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .slash)),
+    .atom (.terminal (.symbol .percent))]) rawOperator
+  generalize viewEq : choiceView [
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .slash)),
+    .atom (.terminal (.symbol .percent))] rawChoice = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have choiceEq := choice_eq_of_view _ rawChoice viewEq
+  have operatorEq : EbnfValue.group _
+      (EbnfValue.choice _ ⟨branch, raw⟩) = rawOperator := by
+    rw [choiceEq]
+    exact group_of_view _ rawOperator
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have bound : branch.val < 3 := by
+      simpa only [List.length_cons, List.length_nil] using branch.isLt
+    have values : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases values with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  let right := ruleView .prefix rawRight
+  have rightEq := rule_of_view .prefix rawRight
+  rcases branchCases with rfl | rfl | rfl
+  · let terminal := terminalView (.symbol .star) raw
+    have terminalEq := terminal_of_view (.symbol .star) raw
+    have encodedOperatorEq : EbnfValue.group _
+        (EbnfValue.choice _ ⟨⟨0, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .star) terminal⟩) = rawOperator := by
+      have pairEq : (⟨⟨0, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .star) terminal⟩ :
+          (branch : Fin 3) × EbnfValue file tokens ([
+            .atom (.terminal (.symbol .star)),
+            .atom (.terminal (.symbol .slash)),
+            .atom (.terminal (.symbol .percent))].get branch)) = ⟨0, raw⟩ :=
+        Sigma.ext (Fin.ext rfl) (heq_of_eq terminalEq)
+      exact (congrArg (EbnfValue.group _) (congrArg
+        (EbnfValue.choice _) pairEq)).trans operatorEq
+    refine ⟨(.inl terminal, right), ?_⟩
+    unfold multiplicativeTailInput
+    rw [encodedOperatorEq, rightEq, pair.rebuild]
+    exact group_of_view _ input
+  · let terminal := terminalView (.symbol .slash) raw
+    have terminalEq := terminal_of_view (.symbol .slash) raw
+    have encodedOperatorEq : EbnfValue.group _
+        (EbnfValue.choice _ ⟨⟨1, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .slash) terminal⟩) = rawOperator := by
+      have pairEq : (⟨⟨1, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .slash) terminal⟩ :
+          (branch : Fin 3) × EbnfValue file tokens ([
+            .atom (.terminal (.symbol .star)),
+            .atom (.terminal (.symbol .slash)),
+            .atom (.terminal (.symbol .percent))].get branch)) = ⟨1, raw⟩ :=
+        Sigma.ext (Fin.ext rfl) (heq_of_eq terminalEq)
+      exact (congrArg (EbnfValue.group _) (congrArg
+        (EbnfValue.choice _) pairEq)).trans operatorEq
+    refine ⟨(.inr (.inl terminal), right), ?_⟩
+    unfold multiplicativeTailInput
+    rw [encodedOperatorEq, rightEq, pair.rebuild]
+    exact group_of_view _ input
+  · let terminal := terminalView (.symbol .percent) raw
+    have terminalEq := terminal_of_view (.symbol .percent) raw
+    have encodedOperatorEq : EbnfValue.group _
+        (EbnfValue.choice _ ⟨⟨2, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .percent) terminal⟩) = rawOperator := by
+      have pairEq : (⟨⟨2, by decide⟩,
+          EbnfValue.terminalAtom (.symbol .percent) terminal⟩ :
+          (branch : Fin 3) × EbnfValue file tokens ([
+            .atom (.terminal (.symbol .star)),
+            .atom (.terminal (.symbol .slash)),
+            .atom (.terminal (.symbol .percent))].get branch)) = ⟨2, raw⟩ :=
+        Sigma.ext (Fin.ext rfl) (heq_of_eq terminalEq)
+      exact (congrArg (EbnfValue.group _) (congrArg
+        (EbnfValue.choice _) pairEq)).trans operatorEq
+    refine ⟨(.inr (.inr terminal), right), ?_⟩
+    unfold multiplicativeTailInput
+    rw [encodedOperatorEq, rightEq, pair.rebuild]
+    exact group_of_view _ input
+
+private theorem ruleReduction_additive_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .additive origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .additive)) :
+    ∃ output, RuleReduction file tokens .additive origin finish input output := by
+  let tail : EbnfExpr := .group (.sequence [
+    .group (.choice [
+      .atom (.terminal (.symbol .plus)), .atom (.terminal (.symbol .minus))]),
+    .atom (.nonterminal .multiplicative)])
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .multiplicative), .star tail]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawLeft rawStar
+  simp only [totalValuesBuild]
+  let left := ruleView .multiplicative rawLeft
+  rcases listInputs_exists additiveTailInput additiveTail_exists
+      (starView tail rawStar) with ⟨rest, restEq⟩
+  rw [← rule_of_view .multiplicative rawLeft,
+    ← star_of_view tail rawStar, ← restEq]
+  exact ⟨_, .additive origin finish left rest⟩
+
+private theorem ruleReduction_multiplicative_total
+    {file : WorkspaceFile} {tokens : List Token} {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .multiplicative origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .multiplicative)) :
+    ∃ output,
+      RuleReduction file tokens .multiplicative origin finish input output := by
+  let tail : EbnfExpr := .group (.sequence [
+    .group (.choice [
+      .atom (.terminal (.symbol .star)), .atom (.terminal (.symbol .slash)),
+      .atom (.terminal (.symbol .percent))]), .atom (.nonterminal .prefix)])
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .prefix), .star tail]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawLeft rawStar
+  simp only [totalValuesBuild]
+  let left := ruleView .prefix rawLeft
+  rcases listInputs_exists multiplicativeTailInput multiplicativeTail_exists
+      (starView tail rawStar) with ⟨rest, restEq⟩
+  rw [← rule_of_view .prefix rawLeft,
+    ← star_of_view tail rawStar, ← restEq]
+  exact ⟨_, .multiplicative origin finish left rest⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
