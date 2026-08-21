@@ -1527,6 +1527,169 @@ instance {file : WorkspaceFile} {tokens : List Token}
     BEq (MatchedTerminal file tokens terminal) :=
   ⟨fun left right => decide (left = right)⟩
 
+/-- Constructive executable test for the declarative terminal match. -/
+def terminalMatchesBool : TerminalSymbol → TerminalStreamValue → Bool
+  | .hardKeyword expected, .retained token =>
+      decide (token.payload = .hardKeyword expected)
+  | .contextualKeyword expected, .retained token =>
+      decide (token.payload = .identifier expected.spelling)
+  | .pragmaName expected, .retained token =>
+      decide (token.payload = .pragmaName expected)
+  | .symbol expected, .retained token =>
+      decide (token.payload = .symbol expected)
+  | .category .identifier, .retained token =>
+      match token.payload with
+      | .identifier text => (Identifier.parse text).isSome
+      | _ => false
+  | .category .pathComponent, .retained token =>
+      match token.payload with
+      | .identifier text => (PathSegment.parse text).isSome
+      | .hardKeyword keyword => (PathSegment.parse keyword.spelling).isSome
+      | _ => false
+  | .category .decimalLiteral, .retained token =>
+      match token.payload with
+      | .decimalLiteral _ _ => true
+      | _ => false
+  | .category .hexadecimalLiteral, .retained token =>
+      match token.payload with
+      | .hexadecimalLiteral _ _ => true
+      | _ => false
+  | .category .stringLiteral, .retained token =>
+      match token.payload with
+      | .stringLiteral _ _ => true
+      | _ => false
+  | .category .assemblyBlock, .retained token =>
+      match token.payload with
+      | .assemblyBlock _ => true
+      | _ => false
+  | .endOfFile, .endOfFile => true
+  | _, _ => false
+
+/-- The executable terminal test accepts exactly the declarative relation. -/
+theorem terminalMatchesBool_eq_true_iff
+    (terminal : TerminalSymbol) (value : TerminalStreamValue) :
+    terminalMatchesBool terminal value = true ↔
+      TerminalMatches terminal value := by
+  cases terminal with
+  | hardKeyword keyword =>
+      cases value with
+      | retained token =>
+          simp [terminalMatchesBool, TerminalMatches]
+      | endOfFile => simp [terminalMatchesBool, TerminalMatches]
+  | contextualKeyword keyword =>
+      cases value with
+      | retained token =>
+          simp [terminalMatchesBool, TerminalMatches]
+      | endOfFile => simp [terminalMatchesBool, TerminalMatches]
+  | pragmaName kind =>
+      cases value with
+      | retained token =>
+          simp [terminalMatchesBool, TerminalMatches]
+      | endOfFile => simp [terminalMatchesBool, TerminalMatches]
+  | symbol symbol =>
+      cases value with
+      | retained token =>
+          simp [terminalMatchesBool, TerminalMatches]
+      | endOfFile => simp [terminalMatchesBool, TerminalMatches]
+  | category category =>
+      cases category <;> cases value with
+      | retained token =>
+          rcases token with ⟨span, payload⟩
+          cases payload <;>
+            simp [terminalMatchesBool, TerminalMatches,
+              Option.isSome_iff_exists]
+      | endOfFile => simp [terminalMatchesBool, TerminalMatches]
+  | endOfFile =>
+      cases value <;> simp [terminalMatchesBool, TerminalMatches]
+
+/-- Terminal matching is decidable without classical choice. -/
+instance terminalMatchesDecidable
+    (terminal : TerminalSymbol) (value : TerminalStreamValue) :
+    Decidable (TerminalMatches terminal value) :=
+  decidable_of_iff
+    (terminalMatchesBool terminal value = true)
+    (terminalMatchesBool_eq_true_iff terminal value)
+
+namespace MatchedTerminal
+
+/-- Construct the unique checked terminal match at one fixed stream cursor. -/
+def atCursor?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (cursor : TerminalCursor tokens) :
+    Option { matched : MatchedTerminal file tokens terminal //
+      matched.cursor = cursor } :=
+  if inRange : cursor.val < tokens.length then
+    let token := tokens[cursor.val]
+    if matchedEvidence : TerminalMatches terminal (.retained token) then
+      some ⟨{
+        cursor := cursor
+        value := .retained token
+        span := token.span
+        «at» := .retained cursor token inRange
+          (List.getElem?_eq_getElem inRange)
+          (owned token (List.getElem_mem inRange))
+        «matches» := matchedEvidence
+      }, rfl⟩
+    else
+      none
+  else
+    have atEnd : cursor.val = tokens.length := by omega
+    if matchedEvidence : TerminalMatches terminal .endOfFile then
+      some ⟨{
+        cursor := cursor
+        value := .endOfFile
+        span := {
+          source := file.id
+          startByte := file.content.utf8ByteSize
+          endByte := file.content.utf8ByteSize
+        }
+        «at» := .endOfFile cursor atEnd
+        «matches» := matchedEvidence
+      }, rfl⟩
+    else
+      none
+
+/-- A computed terminal observation supplies both declarative premises. -/
+theorem atCursor?_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (cursor : TerminalCursor tokens)
+    {result : { matched : MatchedTerminal file tokens terminal //
+      matched.cursor = cursor }}
+    (_selected : atCursor? file tokens owned terminal cursor = some result) :
+    TerminalAt file tokens cursor result.val.value result.val.span ∧
+      TerminalMatches terminal result.val.value := by
+  constructor
+  · simpa only [result.property] using result.val.at
+  · exact result.val.matches
+
+/-- Every declarative match at the fixed cursor is computed. -/
+theorem atCursor?_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (cursor : TerminalCursor tokens)
+    {value : TerminalStreamValue} {span : SourceSpan}
+    (terminalAt : TerminalAt file tokens cursor value span)
+    (matchedEvidence : TerminalMatches terminal value) :
+    ∃ result, atCursor? file tokens owned terminal cursor = some result := by
+  cases terminalAt with
+  | retained token inRange lookup valid =>
+      have tokenEq : tokens[cursor.val] = token := by
+        exact Option.some.inj
+          ((List.getElem?_eq_getElem inRange).symm.trans lookup)
+      subst token
+      unfold atCursor?
+      rw [dif_pos inRange, dif_pos matchedEvidence]
+      exact ⟨_, rfl⟩
+  | endOfFile atEnd =>
+      have notInRange : ¬ cursor.val < tokens.length := by omega
+      unfold atCursor?
+      rw [dif_neg notInRange, dif_pos matchedEvidence]
+      exact ⟨_, rfl⟩
+
+end MatchedTerminal
+
 /-- A matched logical EOF is at the retained-token limit and has the unique
 empty span at the physical end of the file. -/
 theorem matchedTerminal_eof_empty_span
