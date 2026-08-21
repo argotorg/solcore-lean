@@ -11973,6 +11973,131 @@ private theorem ruleReduction_exportDecl_total
     exact ⟨_, .exportDeclBraced origin finish exportKw reference dot
       openBrace entries closeBrace semicolon witness⟩
 
+private def plusTotalView
+    {file : WorkspaceFile} {tokens : List Token} (child : EbnfExpr)
+    (input : EbnfValue file tokens (.plus child)) :
+    NonemptyList (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_plus_eq child) input
+
+private theorem plus_of_totalView
+    {file : WorkspaceFile} {tokens : List Token} (child : EbnfExpr)
+    (input : EbnfValue file tokens (.plus child)) :
+    EbnfValue.plus child (plusTotalView child input) = input := by
+  simp [plusTotalView, EbnfValue.plus]
+
+private theorem rulePlus_of_totalView
+    {file : WorkspaceFile} {tokens : List Token} (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.plus (.atom (.nonterminal rule)))) :
+    EbnfValue.plus (.atom (.nonterminal rule))
+      ((plusTotalView (.atom (.nonterminal rule)) input).map (ruleView rule)
+        |>.map (EbnfValue.ruleAtom rule)) = input := by
+  let inputs := plusTotalView (.atom (.nonterminal rule)) input
+  have mappedEq : (inputs.map (ruleView rule)).map
+      (EbnfValue.ruleAtom rule) = inputs := by
+    cases inputs with
+    | mk head tail =>
+        simp only [NonemptyList.map, NonemptyList.mk.injEq]
+        exact ⟨rule_of_view rule head, ruleList_of_view rule tail⟩
+  rw [mappedEq]
+  exact plus_of_totalView _ input
+
+private theorem ruleReduction_matchStatement_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .matchStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .matchStatement)) :
+    ∃ output : RuleValue .matchStatement,
+      RuleReduction file tokens .matchStatement origin finish input output := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let armAtom : EbnfExpr := .atom (.nonterminal .matchArm)
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .matchKw)), .list1 expressionAtom,
+    .atom (.terminal (.symbol .leftBrace)), .plus armAtom,
+    .atom (.terminal (.symbol .rightBrace)), .optional semicolonAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize viewEq : sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawMatch, rawScrutinees, rawOpen, rawArms, rawClose,
+    rawTerminator, ⟨⟩⟩
+  let matchKeyword := terminalView (.hardKeyword .matchKw) rawMatch
+  let scrutinees := (list1TotalView expressionAtom rawScrutinees).map
+    (ruleView .expression)
+  let openBrace := terminalView (.symbol .leftBrace) rawOpen
+  let arms := (plusTotalView armAtom rawArms).map (ruleView .matchArm)
+  let closeBrace := terminalView (.symbol .rightBrace) rawClose
+  let terminator := (optionalView semicolonAtom rawTerminator).map
+    (terminalView (.symbol .semicolon))
+  have terminatorEq := optional_map_of_view semicolonAtom
+    (terminalView (.symbol .semicolon))
+    (EbnfValue.terminalAtom (.symbol .semicolon))
+    (terminal_of_view (.symbol .semicolon)) rawTerminator
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← sequence_of_flat_view children input, viewEq,
+    ← terminal_of_view (.hardKeyword .matchKw) rawMatch,
+    ← ruleList1_of_totalView .expression rawScrutinees,
+    ← terminal_of_view (.symbol .leftBrace) rawOpen,
+    ← rulePlus_of_totalView .matchArm rawArms,
+    ← terminal_of_view (.symbol .rightBrace) rawClose, ← terminatorEq]
+  exact ⟨_, .matchStatement origin finish matchKeyword scrutinees openBrace
+    arms closeBrace terminator witness⟩
+
+private theorem ruleReduction_lambda_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .lambda origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .lambda)) :
+    ∃ output : RuleValue .lambda,
+      RuleReduction file tokens .lambda origin finish input output := by
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let arrowAtom : EbnfExpr := .atom (.terminal (.symbol .arrow))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let returnSeq : EbnfExpr := .sequence [arrowAtom, typeAtom]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .lamKw)),
+    .atom (.terminal (.symbol .leftParen)), .list0 parameterAtom,
+    .atom (.terminal (.symbol .rightParen)), .optional returnSeq,
+    .atom (.nonterminal .body)]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize viewEq : sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawLambda, rawOpen, rawParameters, rawClose,
+    rawReturn, rawBody, ⟨⟩⟩
+  let parameters := (list0View parameterAtom rawParameters).map
+    (ruleView .parameter)
+  let decodeReturn (raw : EbnfValue file tokens returnSeq) :=
+    let values := sequenceFlatView [arrowAtom, typeAtom] raw
+    (terminalView (.symbol .arrow) values.1, ruleView .type values.2.1)
+  let encodeReturn (value : MatchedTerminal file tokens (.symbol .arrow) ×
+      TypeExpr) : EbnfValue file tokens returnSeq :=
+    EbnfValue.sequence [arrowAtom, typeAtom]
+      (totalValuesBuild [arrowAtom, typeAtom]
+        (EbnfValue.terminalAtom (.symbol .arrow) value.1,
+          EbnfValue.ruleAtom .type value.2, ()))
+  have returnRoundtrip : ∀ raw, encodeReturn (decodeReturn raw) = raw := by
+    intro raw
+    generalize returnEq : sequenceFlatView [arrowAtom, typeAtom] raw = pair
+    rcases pair with ⟨rawArrow, rawType, ⟨⟩⟩
+    simp only [decodeReturn, encodeReturn, returnEq]
+    rw [terminal_of_view (.symbol .arrow) rawArrow,
+      rule_of_view .type rawType]
+    have rebuild := sequence_of_flat_view [arrowAtom, typeAtom] raw
+    rw [returnEq] at rebuild
+    exact rebuild
+  let returnType := (optionalView returnSeq rawReturn).map decodeReturn
+  have returnEq := optional_map_of_view returnSeq decodeReturn encodeReturn
+    returnRoundtrip rawReturn
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← sequence_of_flat_view children input, viewEq,
+    ← terminal_of_view (.hardKeyword .lamKw) rawLambda,
+    ← terminal_of_view (.symbol .leftParen) rawOpen,
+    ← ruleList0_of_view .parameter rawParameters,
+    ← terminal_of_view (.symbol .rightParen) rawClose, ← returnEq,
+    ← rule_of_view .body rawBody]
+  exact ⟨_, .lambda origin finish (terminalView _ rawLambda)
+    (terminalView _ rawOpen) parameters (terminalView _ rawClose)
+    returnType (ruleView _ rawBody) witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
