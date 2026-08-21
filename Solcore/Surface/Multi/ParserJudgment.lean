@@ -436,6 +436,176 @@ theorem delimiterRun_functional
           subst rightAfter
           exact induction rightRest
 
+private def delimiterStep? :
+    DelimiterStack → TokenKind → Option DelimiterStack
+  | before, .symbol .leftParen => some (.rightParen :: before)
+  | before, .symbol .leftBracket => some (.rightBracket :: before)
+  | before, .symbol .leftBrace => some (.rightBrace :: before)
+  | .rightParen :: rest, .symbol .rightParen => some rest
+  | .rightBracket :: rest, .symbol .rightBracket => some rest
+  | .rightBrace :: rest, .symbol .rightBrace => some rest
+  | _, .symbol .rightParen => none
+  | _, .symbol .rightBracket => none
+  | _, .symbol .rightBrace => none
+  | before, _ => some before
+
+private theorem delimiterStep?_eq_some_iff
+    (before after : DelimiterStack) (token : TokenKind) :
+    delimiterStep? before token = some after ↔
+      DelimiterStep before token after := by
+  cases token <;> simp [delimiterStep?, DelimiterStep, eq_comm]
+  case symbol symbol =>
+    cases symbol <;> simp [eq_comm]
+    all_goals
+      cases before with
+      | nil => simp [eq_comm]
+      | cons head tail =>
+          cases head <;> simp [eq_comm]
+
+private def delimiterRunFrom?
+    (tokens : List Token) : Nat → Nat → DelimiterStack →
+      Option DelimiterStack
+  | 0, _, before => some before
+  | fuel + 1, cursor, before =>
+      if inRange : cursor < tokens.length then
+        match delimiterStep? before tokens[cursor].payload with
+        | some after => delimiterRunFrom? tokens fuel (cursor + 1) after
+        | none => none
+      else
+        none
+
+private theorem delimiterRunFrom?_eq_some_iff
+    {tokens : List Token}
+    (fuel cursor : Nat) (before after : DelimiterStack)
+    (start finish : Boundary tokens)
+    (startEq : start.val = cursor)
+    (finishEq : finish.val = cursor + fuel) :
+    delimiterRunFrom? tokens fuel cursor before = some after ↔
+      DelimiterRun tokens before start finish after := by
+  induction fuel generalizing cursor before after start finish with
+  | zero =>
+      have finishStart : finish = start := by
+        apply Fin.ext
+        omega
+      subst finish
+      constructor
+      · intro computed
+        have afterEq : after = before := by
+          simpa only [delimiterRunFrom?, Option.some.injEq] using computed.symm
+        subst after
+        exact .nil before start
+      · intro run
+        have afterEq : after = before :=
+          delimiterRun_functional run (.nil before start)
+        subst after
+        rfl
+  | succ fuel induction =>
+      constructor
+      · intro computed
+        unfold delimiterRunFrom? at computed
+        split at computed
+        case isFalse => contradiction
+        case isTrue inRange =>
+          generalize stepEq : delimiterStep? before tokens[cursor].payload =
+            stepResult at computed
+          cases stepResult with
+          | none => contradiction
+          | some next =>
+              let terminalCursor : TerminalCursor tokens :=
+                ⟨cursor, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+              let nextStart : Boundary tokens := terminalCursor.afterBoundary
+              have atStart : terminalCursor.beforeBoundary = start := by
+                apply Fin.ext
+                change cursor = start.val
+                exact startEq.symm
+              have nextStartEq : nextStart.val = cursor + 1 := rfl
+              have nextFinishEq : finish.val = cursor + 1 + fuel := by
+                omega
+              have rest :
+                  DelimiterRun tokens next nextStart finish after :=
+                (induction (cursor + 1) next after nextStart finish
+                  nextStartEq nextFinishEq).mp computed
+              exact .cons before next after terminalCursor start finish
+                tokens[cursor] atStart
+                (List.getElem?_eq_getElem inRange)
+                ((delimiterStep?_eq_some_iff _ _ _).mp stepEq) rest
+      · intro run
+        cases run with
+        | nil stack boundary => omega
+        | cons relationBefore relationAfter relationFinish terminalCursor
+            relationStart endCursor token atStart lookup step rest =>
+            have cursorEq : terminalCursor.val = cursor := by
+              have rawAtStart := congrArg Fin.val atStart
+              change terminalCursor.val = start.val at rawAtStart
+              omega
+            have inRange : cursor < tokens.length := by
+              by_cases candidate : cursor < tokens.length
+              · exact candidate
+              · have outOfRange : tokens.length ≤ terminalCursor.val := by
+                  omega
+                rw [List.getElem?_eq_none outOfRange] at lookup
+                contradiction
+            have tokenEq : tokens[cursor] = token := by
+              have canonical := List.getElem?_eq_getElem inRange
+              rw [cursorEq] at lookup
+              exact Option.some.inj (canonical.symm.trans lookup)
+            unfold delimiterRunFrom?
+            rw [dif_pos inRange]
+            rw [(delimiterStep?_eq_some_iff _ _ _).mpr
+              (tokenEq ▸ step)]
+            have nextStartEq :
+                terminalCursor.afterBoundary.val = cursor + 1 := by
+              change terminalCursor.val + 1 = cursor + 1
+              omega
+            have nextFinishEq : finish.val = cursor + 1 + fuel := by
+              omega
+            exact (induction (cursor + 1) relationAfter after
+              terminalCursor.afterBoundary finish nextStartEq
+              nextFinishEq).mpr rest
+
+private theorem delimiterRun_ordered_for_executor
+    {tokens : List Token} {before after : DelimiterStack}
+    {start finish : Boundary tokens}
+    (run : DelimiterRun tokens before start finish after) :
+    start.val ≤ finish.val := by
+  induction run with
+  | nil => exact Nat.le_refl _
+  | cons before after finish cursor start endCursor token atStart lookup
+      step rest induction =>
+      have atStartValue := congrArg Fin.val atStart
+      have beforeValue : cursor.beforeBoundary.val = cursor.val := rfl
+      have afterValue : cursor.afterBoundary.val = cursor.val + 1 := rfl
+      omega
+
+/-- Execute the unique delimiter run over one half-open boundary range. -/
+def delimiterRun?
+    (tokens : List Token) (before : DelimiterStack)
+    (start finish : Boundary tokens) : Option DelimiterStack :=
+  if _ordered : start.val ≤ finish.val then
+    delimiterRunFrom? tokens (finish.val - start.val) start.val before
+  else
+    none
+
+/-- Delimiter execution returns exactly the declarative run result. -/
+theorem delimiterRun?_eq_some_iff
+    (tokens : List Token) (before after : DelimiterStack)
+    (start finish : Boundary tokens) :
+    delimiterRun? tokens before start finish = some after ↔
+      DelimiterRun tokens before start finish after := by
+  unfold delimiterRun?
+  split
+  case isFalse notOrdered =>
+    constructor
+    · intro impossible
+      contradiction
+    · intro run
+      exact False.elim
+        (notOrdered (delimiterRun_ordered_for_executor run))
+  case isTrue ordered =>
+    exact delimiterRunFrom?_eq_some_iff
+      (finish.val - start.val) start.val before after start finish rfl
+        (by omega)
+
 /-- Convert a nonempty list to its head-cons-tail representation. -/
 private def NonemptyList.toList {alpha : Type}
     (values : NonemptyList alpha) : List alpha :=
