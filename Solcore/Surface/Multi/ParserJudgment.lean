@@ -7433,6 +7433,270 @@ private theorem ruleReduction_exportItem_functional
   cases selectionEq
   rw [nameLocEq]
 
+private theorem ruleReduction_localExportEntry_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .localExportEntry)}
+    {left right : RuleValue .localExportEntry}
+    (leftReduces : RuleReduction file tokens .localExportEntry
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .localExportEntry
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  all_goals simp_all [RuleReduction.marker]
+
+private theorem ruleReduction_remoteExportEntry_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .remoteExportEntry)}
+    {left right : RuleValue .remoteExportEntry}
+    (leftReduces : RuleReduction file tokens .remoteExportEntry
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .remoteExportEntry
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  all_goals simp_all [RuleReduction.marker]
+
+private theorem ruleReduction_importEntry_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .importEntry)}
+    {left right : RuleValue .importEntry}
+    (leftReduces : RuleReduction file tokens .importEntry
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .importEntry
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  case importEntryWildcard.importEntryWildcard =>
+    simp_all [RuleReduction.marker]
+  case importEntryNamed.importEntryNamed =>
+    rename_i nameLeft projectsLeft _ nameRight projectsRight _
+    rw [identifierTerminalLoc_functional projectsLeft projectsRight inputEq]
+  case importEntryAliased.importEntryAliased =>
+    rename_i nameLeft aliasLeft _ nameProjectsLeft aliasProjectsLeft _
+      nameRight aliasRight _ nameProjectsRight aliasProjectsRight _
+    rw [identifierTerminalLoc_functional
+      nameProjectsLeft nameProjectsRight inputEq.1]
+    rw [identifierTerminalLoc_functional
+      aliasProjectsLeft aliasProjectsRight inputEq.2.2]
+
+private theorem ruleReduction_importDecl_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .importDecl)}
+    {left right : RuleValue .importDecl}
+    (leftReduces : RuleReduction file tokens .importDecl
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .importDecl
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  case importDeclModule.importDeclModule =>
+    rcases inputEq with ⟨_, referenceEq, _⟩
+    cases referenceEq
+    rfl
+  case importDeclAliased.importDeclAliased =>
+    rename_i _ referenceLeft _ nameLeft _ projectsLeft _
+      _ referenceRight _ nameRight _ projectsRight _
+    rcases inputEq with ⟨_, referenceEq, _, nameMatchedEq, _⟩
+    have nameLocEq := identifierTerminalLoc_functional
+      projectsLeft projectsRight nameMatchedEq
+    rw [referenceEq, nameLocEq]
+  case importDeclItems.importDeclItems =>
+    rcases inputEq with ⟨_, referenceEq, _, openEq,
+      entriesInputEq, closeEq, hidingInputEq, _⟩
+    have entriesEq := listMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .importEntry) entriesInputEq
+    have hidingEq := Option.map_injective
+      (EbnfValue.ruleAtom_injective .hidingClause) hidingInputEq
+    cases referenceEq
+    cases openEq
+    cases entriesEq
+    cases closeEq
+    cases hidingEq
+    rfl
+
+private theorem ruleReduction_exportDecl_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .exportDecl)}
+    {left right : RuleValue .exportDecl}
+    (leftReduces : RuleReduction file tokens .exportDecl
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .exportDecl
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals
+    have rootEq := EbnfValue.transport_injective _ inputEq
+    have choiceEq := EbnfValue.choice_injective _ rootEq
+    have branchEq := congrArg Sigma.fst choiceEq
+    simp at branchEq
+  all_goals
+    have valueEq := eq_of_heq (Sigma.ext_iff.mp choiceEq).2
+    have sequenceEq := EbnfValue.sequence_injective _ valueEq
+    simp only [cons_inj_iff, terminalAtom_inj_iff,
+      ruleAtom_inj_iff, list0_inj_iff] at sequenceEq
+    clear inputEq rootEq choiceEq branchEq valueEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  case exportDeclLocal.exportDeclLocal =>
+    rcases sequenceEq with ⟨_, openEq, entriesInputEq, closeEq, _⟩
+    have entriesEq := listMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .localExportEntry) entriesInputEq
+    cases openEq
+    cases entriesEq
+    cases closeEq
+    rfl
+  case exportDeclModule.exportDeclModule =>
+    rcases sequenceEq with ⟨_, referenceEq, _⟩
+    cases referenceEq
+    rfl
+  case exportDeclAliased.exportDeclAliased =>
+    rename_i _ referenceLeft _ nameLeft _ projectsLeft _
+      _ referenceRight _ nameRight _ projectsRight _
+    rcases sequenceEq with ⟨_, referenceEq, _, nameMatchedEq, _⟩
+    have nameLocEq := identifierTerminalLoc_functional
+      projectsLeft projectsRight nameMatchedEq
+    rw [referenceEq, nameLocEq]
+  case exportDeclWildcard.exportDeclWildcard =>
+    have referenceEq := sequenceEq.2.1
+    have dotEq := sequenceEq.2.2.1
+    have starEq := sequenceEq.2.2.2.1
+    simp [RuleReduction.marker, referenceEq, dotEq, starEq]
+  case exportDeclBraced.exportDeclBraced =>
+    have referenceEq := sequenceEq.2.1
+    have openEq := sequenceEq.2.2.2.1
+    have entriesInputEq := sequenceEq.2.2.2.2.1
+    have closeEq := sequenceEq.2.2.2.2.2.1
+    have entriesEq := listMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .remoteExportEntry) entriesInputEq
+    rw [referenceEq, openEq, entriesEq, closeEq]
+
+private theorem ruleReduction_genericPrefix_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .genericPrefix)}
+    {left right : RuleValue .genericPrefix}
+    (leftReduces : RuleReduction file tokens .genericPrefix
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .genericPrefix
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  all_goals simp_all
+
+private theorem ruleReduction_predicateList_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .predicateList)}
+    {left right : RuleValue .predicateList}
+    (leftReduces : RuleReduction file tokens .predicateList
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .predicateList
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces
+  cases rightReduces
+  simp at inputEq
+  exact nonemptyListMap_injective_of_injective
+    (EbnfValue.ruleAtom_injective .predicate) inputEq
+
+private theorem ruleReduction_predicate_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .predicate)}
+    {left right : RuleValue .predicate}
+    (leftReduces : RuleReduction file tokens .predicate
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .predicate
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  case predicateWithoutArguments.predicateWithoutArguments =>
+    rcases inputEq with ⟨mainEq, _, classEq⟩
+    rw [mainEq, classEq]
+  case predicateWithArguments.predicateWithArguments =>
+    rcases inputEq with ⟨mainEq, _, classEq, openEq,
+      parametersInputEq, closeEq⟩
+    have parametersEq := nonemptyListMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .type) parametersInputEq
+    rw [mainEq, classEq, openEq, parametersEq, closeEq]
+
+private theorem ruleReduction_forallBinder_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .forallBinder)}
+    {left right : RuleValue .forallBinder}
+    (leftReduces : RuleReduction file tokens .forallBinder
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .forallBinder
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  case forallBinderBare.forallBinderBare =>
+    rename_i nameLeft projectsLeft _ nameRight projectsRight _
+    rw [identifierTerminalLoc_functional projectsLeft projectsRight inputEq]
+  case forallBinderBoundedWithoutArguments.forallBinderBoundedWithoutArguments =>
+    rename_i nameLeft _ _ projectsLeft _
+      nameRight _ _ projectsRight _
+    rcases inputEq with ⟨nameMatchedEq, _, classEq⟩
+    have nameLocEq := identifierTerminalLoc_functional
+      projectsLeft projectsRight nameMatchedEq
+    rw [nameLocEq, classEq]
+  case forallBinderBoundedWithArguments.forallBinderBoundedWithArguments =>
+    rename_i nameLeft _ _ _ argumentsLeft _ projectsLeft _
+      nameRight _ _ _ argumentsRight _ projectsRight _
+    rcases inputEq with ⟨nameMatchedEq, _, classEq, openEq,
+      argumentsInputEq, closeEq⟩
+    have nameLocEq := identifierTerminalLoc_functional
+      projectsLeft projectsRight nameMatchedEq
+    have argumentsEq := nonemptyListMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .type) argumentsInputEq
+    rw [nameLocEq, classEq, openEq, argumentsEq, closeEq]
+
+private theorem ruleReduction_dataConstructor_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .dataConstructor)}
+    {left right : RuleValue .dataConstructor}
+    (leftReduces : RuleReduction file tokens .dataConstructor
+      origin finish input left)
+    (rightReduces : RuleReduction file tokens .dataConstructor
+      origin finish input right) : left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
+  case dataConstructorWithoutArguments.dataConstructorWithoutArguments =>
+    rename_i nameLeft projectsLeft _ nameRight projectsRight _
+    rw [identifierTerminalLoc_functional projectsLeft projectsRight inputEq]
+  case dataConstructorWithArguments.dataConstructorWithArguments =>
+    rename_i nameLeft _ fieldsLeft _ projectsLeft _
+      nameRight _ fieldsRight _ projectsRight _
+    rcases inputEq with ⟨nameMatchedEq, openEq, fieldsInputEq, closeEq⟩
+    have nameLocEq := identifierTerminalLoc_functional
+      projectsLeft projectsRight nameMatchedEq
+    have fieldsEq := nonemptyListMap_injective_of_injective
+      (EbnfValue.ruleAtom_injective .type) fieldsInputEq
+    rw [nameLocEq, openEq, fieldsEq, closeEq]
+
 /-- A module-rule reduction can only produce the full-file, source-owned
 module payload from its exact item list. -/
 theorem ruleReduction_source_backed
