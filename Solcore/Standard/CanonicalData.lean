@@ -11891,4 +11891,196 @@ private theorem storageGenericContentUtf8Group02_valid : storageGenericContentUt
 
 end CanonicalUtf8Groups01
 
+section CanonicalUtf8Groups02
+
+set_option maxRecDepth 100000
+set_option maxHeartbeats 0
+
+private theorem dispatchContentUtf8Group00_valid : dispatchContentUtf8Group00.IsValidUTF8 := by
+  have valid00 : dispatchContentUtf8Chunk000.IsValidUTF8 := by decide
+  have valid01 : dispatchContentUtf8Chunk001.IsValidUTF8 := by decide
+  have valid02 : dispatchContentUtf8Chunk002.IsValidUTF8 := by decide
+  have valid03 : dispatchContentUtf8Chunk003.IsValidUTF8 := by decide
+  have valid04 : dispatchContentUtf8Chunk004.IsValidUTF8 := by decide
+  have valid05 : dispatchContentUtf8Chunk005.IsValidUTF8 := by decide
+  have valid06 : dispatchContentUtf8Chunk006.IsValidUTF8 := by decide
+  have valid07 : dispatchContentUtf8Chunk007.IsValidUTF8 := by decide
+  have valid08 : dispatchContentUtf8Chunk008.IsValidUTF8 := by decide
+  have valid09 : dispatchContentUtf8Chunk009.IsValidUTF8 := by decide
+  have valid10 : dispatchContentUtf8Chunk010.IsValidUTF8 := by decide
+  have valid11 : dispatchContentUtf8Chunk011.IsValidUTF8 := by decide
+  have valid12 : dispatchContentUtf8Chunk012.IsValidUTF8 := by decide
+  have valid13 : dispatchContentUtf8Chunk013.IsValidUTF8 := by decide
+  have valid14 : dispatchContentUtf8Chunk014.IsValidUTF8 := by decide
+  have valid15 : dispatchContentUtf8Chunk015.IsValidUTF8 := by decide
+  have valid16 : dispatchContentUtf8Chunk016.IsValidUTF8 := by decide
+  have valid17 : dispatchContentUtf8Chunk017.IsValidUTF8 := by decide
+  have valid18 : dispatchContentUtf8Chunk018.IsValidUTF8 := by decide
+  have valid19 : dispatchContentUtf8Chunk019.IsValidUTF8 := by decide
+  have valid20 : dispatchContentUtf8Chunk020.IsValidUTF8 := by decide
+  have valid21 : dispatchContentUtf8Chunk021.IsValidUTF8 := by decide
+  have valid22 : dispatchContentUtf8Chunk022.IsValidUTF8 := by decide
+  have valid23 : dispatchContentUtf8Chunk023.IsValidUTF8 := by decide
+  have valid24 : dispatchContentUtf8Chunk024.IsValidUTF8 := by decide
+  have valid25 : dispatchContentUtf8Chunk025.IsValidUTF8 := by decide
+  have valid26 : dispatchContentUtf8Chunk026.IsValidUTF8 := by decide
+  have valid27 : dispatchContentUtf8Chunk027.IsValidUTF8 := by decide
+  have valid28 : dispatchContentUtf8Chunk028.IsValidUTF8 := by decide
+  have valid29 : dispatchContentUtf8Chunk029.IsValidUTF8 := by decide
+  have valid30 : dispatchContentUtf8Chunk030.IsValidUTF8 := by decide
+  have valid31 : dispatchContentUtf8Chunk031.IsValidUTF8 := by decide
+  have joined01 := valid00.append valid01
+  have joined02 := joined01.append valid02
+  have joined03 := joined02.append valid03
+  have joined04 := joined03.append valid04
+  have joined05 := joined04.append valid05
+  have joined06 := joined05.append valid06
+  have joined07 := joined06.append valid07
+  have joined08 := joined07.append valid08
+  have joined09 := joined08.append valid09
+  have joined10 := joined09.append valid10
+  have joined11 := joined10.append valid11
+  have joined12 := joined11.append valid12
+  have joined13 := joined12.append valid13
+  have joined14 := joined13.append valid14
+  have joined15 := joined14.append valid15
+  have joined16 := joined15.append valid16
+  have joined17 := joined16.append valid17
+  have joined18 := joined17.append valid18
+  have joined19 := joined18.append valid19
+  have joined20 := joined19.append valid20
+  have joined21 := joined20.append valid21
+  have joined22 := joined21.append valid22
+  have joined23 := joined22.append valid23
+  have joined24 := joined23.append valid24
+  have joined25 := joined24.append valid25
+  have joined26 := joined25.append valid26
+  have joined27 := joined26.append valid27
+  have joined28 := joined27.append valid28
+  have joined29 := joined28.append valid29
+  have joined30 := joined29.append valid30
+  have joined31 := joined30.append valid31
+  simpa [dispatchContentUtf8Group00, joinByteChunks, ByteArray.append_assoc] using
+    joined31
+
+private theorem dispatchContentUtf8Group01_valid : dispatchContentUtf8Group01.IsValidUTF8 := by
+  have valid00 : dispatchContentUtf8Chunk032.IsValidUTF8 := by decide
+  have valid01 : dispatchContentUtf8Chunk033.IsValidUTF8 := by decide
+  have valid02 : dispatchContentUtf8Chunk034.IsValidUTF8 := by decide
+  have valid03 : dispatchContentUtf8Chunk035.IsValidUTF8 := by decide
+  have valid04 : dispatchContentUtf8Chunk036.IsValidUTF8 := by decide
+  have valid05 : dispatchContentUtf8Chunk037.IsValidUTF8 := by decide
+  have valid06 : dispatchContentUtf8Chunk038.IsValidUTF8 := by decide
+  have valid07 : dispatchContentUtf8Chunk039.IsValidUTF8 := by decide
+  have valid08 : dispatchContentUtf8Chunk040.IsValidUTF8 := by decide
+  have valid09 : dispatchContentUtf8Chunk041.IsValidUTF8 := by decide
+  have valid10 : dispatchContentUtf8Chunk042.IsValidUTF8 := by decide
+  have valid11 : dispatchContentUtf8Chunk043.IsValidUTF8 := by decide
+  have valid12 : dispatchContentUtf8Chunk044.IsValidUTF8 := by decide
+  have valid13 : dispatchContentUtf8Chunk045.IsValidUTF8 := by decide
+  have valid14 : dispatchContentUtf8Chunk046.IsValidUTF8 := by decide
+  have valid15 : dispatchContentUtf8Chunk047.IsValidUTF8 := by decide
+  have valid16 : dispatchContentUtf8Chunk048.IsValidUTF8 := by decide
+  have valid17 : dispatchContentUtf8Chunk049.IsValidUTF8 := by decide
+  have valid18 : dispatchContentUtf8Chunk050.IsValidUTF8 := by decide
+  have valid19 : dispatchContentUtf8Chunk051.IsValidUTF8 := by decide
+  have valid20 : dispatchContentUtf8Chunk052.IsValidUTF8 := by decide
+  have valid21 : dispatchContentUtf8Chunk053.IsValidUTF8 := by decide
+  have valid22 : dispatchContentUtf8Chunk054.IsValidUTF8 := by decide
+  have valid23 : dispatchContentUtf8Chunk055.IsValidUTF8 := by decide
+  have valid24 : dispatchContentUtf8Chunk056.IsValidUTF8 := by decide
+  have valid25 : dispatchContentUtf8Chunk057.IsValidUTF8 := by decide
+  have valid26 : dispatchContentUtf8Chunk058.IsValidUTF8 := by decide
+  have valid27 : dispatchContentUtf8Chunk059.IsValidUTF8 := by decide
+  have valid28 : dispatchContentUtf8Chunk060.IsValidUTF8 := by decide
+  have valid29 : dispatchContentUtf8Chunk061.IsValidUTF8 := by decide
+  have valid30 : dispatchContentUtf8Chunk062.IsValidUTF8 := by decide
+  have valid31 : dispatchContentUtf8Chunk063.IsValidUTF8 := by decide
+  have joined01 := valid00.append valid01
+  have joined02 := joined01.append valid02
+  have joined03 := joined02.append valid03
+  have joined04 := joined03.append valid04
+  have joined05 := joined04.append valid05
+  have joined06 := joined05.append valid06
+  have joined07 := joined06.append valid07
+  have joined08 := joined07.append valid08
+  have joined09 := joined08.append valid09
+  have joined10 := joined09.append valid10
+  have joined11 := joined10.append valid11
+  have joined12 := joined11.append valid12
+  have joined13 := joined12.append valid13
+  have joined14 := joined13.append valid14
+  have joined15 := joined14.append valid15
+  have joined16 := joined15.append valid16
+  have joined17 := joined16.append valid17
+  have joined18 := joined17.append valid18
+  have joined19 := joined18.append valid19
+  have joined20 := joined19.append valid20
+  have joined21 := joined20.append valid21
+  have joined22 := joined21.append valid22
+  have joined23 := joined22.append valid23
+  have joined24 := joined23.append valid24
+  have joined25 := joined24.append valid25
+  have joined26 := joined25.append valid26
+  have joined27 := joined26.append valid27
+  have joined28 := joined27.append valid28
+  have joined29 := joined28.append valid29
+  have joined30 := joined29.append valid30
+  have joined31 := joined30.append valid31
+  simpa [dispatchContentUtf8Group01, joinByteChunks, ByteArray.append_assoc] using
+    joined31
+
+private theorem dispatchContentUtf8Group02_valid : dispatchContentUtf8Group02.IsValidUTF8 := by
+  have valid00 : dispatchContentUtf8Chunk064.IsValidUTF8 := by decide
+  have valid01 : dispatchContentUtf8Chunk065.IsValidUTF8 := by decide
+  have valid02 : dispatchContentUtf8Chunk066.IsValidUTF8 := by decide
+  have valid03 : dispatchContentUtf8Chunk067.IsValidUTF8 := by decide
+  have valid04 : dispatchContentUtf8Chunk068.IsValidUTF8 := by decide
+  have valid05 : dispatchContentUtf8Chunk069.IsValidUTF8 := by decide
+  have valid06 : dispatchContentUtf8Chunk070.IsValidUTF8 := by decide
+  have valid07 : dispatchContentUtf8Chunk071.IsValidUTF8 := by decide
+  have valid08 : dispatchContentUtf8Chunk072.IsValidUTF8 := by decide
+  have valid09 : dispatchContentUtf8Chunk073.IsValidUTF8 := by decide
+  have valid10 : dispatchContentUtf8Chunk074.IsValidUTF8 := by decide
+  have valid11 : dispatchContentUtf8Chunk075.IsValidUTF8 := by decide
+  have valid12 : dispatchContentUtf8Chunk076.IsValidUTF8 := by decide
+  have valid13 : dispatchContentUtf8Chunk077.IsValidUTF8 := by decide
+  have valid14 : dispatchContentUtf8Chunk078.IsValidUTF8 := by decide
+  have valid15 : dispatchContentUtf8Chunk079.IsValidUTF8 := by decide
+  have valid16 : dispatchContentUtf8Chunk080.IsValidUTF8 := by decide
+  have valid17 : dispatchContentUtf8Chunk081.IsValidUTF8 := by decide
+  have valid18 : dispatchContentUtf8Chunk082.IsValidUTF8 := by decide
+  have valid19 : dispatchContentUtf8Chunk083.IsValidUTF8 := by decide
+  have valid20 : dispatchContentUtf8Chunk084.IsValidUTF8 := by decide
+  have valid21 : dispatchContentUtf8Chunk085.IsValidUTF8 := by decide
+  have valid22 : dispatchContentUtf8Chunk086.IsValidUTF8 := by decide
+  have valid23 : dispatchContentUtf8Chunk087.IsValidUTF8 := by decide
+  have joined01 := valid00.append valid01
+  have joined02 := joined01.append valid02
+  have joined03 := joined02.append valid03
+  have joined04 := joined03.append valid04
+  have joined05 := joined04.append valid05
+  have joined06 := joined05.append valid06
+  have joined07 := joined06.append valid07
+  have joined08 := joined07.append valid08
+  have joined09 := joined08.append valid09
+  have joined10 := joined09.append valid10
+  have joined11 := joined10.append valid11
+  have joined12 := joined11.append valid12
+  have joined13 := joined12.append valid13
+  have joined14 := joined13.append valid14
+  have joined15 := joined14.append valid15
+  have joined16 := joined15.append valid16
+  have joined17 := joined16.append valid17
+  have joined18 := joined17.append valid18
+  have joined19 := joined18.append valid19
+  have joined20 := joined19.append valid20
+  have joined21 := joined20.append valid21
+  have joined22 := joined21.append valid22
+  have joined23 := joined22.append valid23
+  simpa [dispatchContentUtf8Group02, joinByteChunks, ByteArray.append_assoc] using
+    joined23
+
+end CanonicalUtf8Groups02
+
 end Solcore.Standard
