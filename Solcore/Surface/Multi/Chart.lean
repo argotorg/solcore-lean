@@ -4432,6 +4432,266 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private theorem insertRawSeeds?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ items
+      (current result : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseAReservedFresh current.counter →
+      insertRawSeeds? items current = some result →
+      PhaseAReservedFresh result.counter := by
+  intro items
+  induction items with
+  | nil =>
+      intro current result invariant selected
+      cases selected
+      exact invariant
+  | cons item rest induction =>
+      intro current result invariant selected
+      rw [insertRawSeeds?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, inserted, continued⟩
+      exact induction next result
+        (insertRawItem?_reservedFresh current next .seedOrPrediction item
+          invariant inserted) continued
+
+private theorem attemptPrediction?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (predicted : ProductionId)
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : attemptPrediction? current waiting predicted = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting predicted with
+  | none =>
+      simp only [prediction] at selected
+      cases selected
+      exact invariant
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, inserted⟩
+      have attemptedInvariant := runMappedPrimitive?_reservedFresh
+        current _ id invariant (by simp [phaseAReservedAddress])
+        attempted attemptedEq
+      exact insertRawItem?_reservedFresh attempted result
+        .seedOrPrediction item attemptedInvariant inserted
+
+private theorem attemptPredictions?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ candidates
+      (current result : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseAReservedFresh current.counter →
+      attemptPredictions? waiting candidates current = some result →
+      PhaseAReservedFresh result.counter := by
+  intro candidates
+  induction candidates with
+  | nil =>
+      intro current result invariant selected
+      cases selected
+      exact invariant
+  | cons candidate rest induction =>
+      intro current result invariant selected
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, attempted, continued⟩
+      exact induction next result
+        (attemptPrediction?_reservedFresh current next waiting candidate
+          invariant attempted) continued
+
+private theorem attemptScan?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens)
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : attemptScan? owned current before = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold attemptScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have attemptedInvariant := runMappedPrimitive?_reservedFresh
+      current _ id invariant (by simp [phaseAReservedAddress])
+      attempted attemptedEq
+    cases scan : scannedEdge? owned before with
+    | none =>
+        simp only [scan] at remainder
+        cases remainder
+        exact attemptedInvariant
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scan, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        exact insertRawEdge?_reservedFresh withItem result edge
+          (insertRawItem?_reservedFresh attempted withItem .scan after
+            attemptedInvariant itemEq) edgeEq
+  next notApplicable =>
+    cases selected
+    exact invariant
+
+private theorem attemptCompletion?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : attemptCompletion? current waiting finished = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold attemptCompletion? at selected
+  cases completion : completedEdge? (file := file) waiting finished with
+  | none =>
+      simp only [completion] at selected
+      cases selected
+      exact invariant
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completion] at selected
+      split at selected
+      next attemptedBefore =>
+        cases selected
+        exact invariant
+      next fresh =>
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨attempted, attemptedEq,
+          withItem, itemEq, edgeEq⟩
+        have attemptedInvariant := runMappedPrimitive?_reservedFresh
+          current _ id invariant (by simp [phaseAReservedAddress])
+          attempted attemptedEq
+        exact insertRawEdge?_reservedFresh withItem result edge
+          (insertRawItem?_reservedFresh attempted withItem .completion after
+            attemptedInvariant itemEq) edgeEq
+
+private theorem attemptCompletionsWith?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    ∀ others
+      (current result : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseAReservedFresh current.counter →
+      attemptCompletionsWith? pivot others current = some result →
+      PhaseAReservedFresh result.counter := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result invariant selected
+      cases selected
+      exact invariant
+  | cons other rest induction =>
+      intro current result invariant selected
+      rw [attemptCompletionsWith?] at selected
+      cases forwardEq : attemptCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardInvariant := attemptCompletion?_reservedFresh
+            current forward pivot other invariant forwardEq
+          split at selected
+          next same =>
+            exact induction forward result forwardInvariant selected
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq : attemptCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact induction reverse result
+                  (attemptCompletion?_reservedFresh forward reverse
+                    other pivot forwardInvariant reverseEq) selected
+
+private theorem processRawItem?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : processRawItem? owned item current = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completionEq⟩
+  exact attemptCompletionsWith?_reservedFresh item
+    scanned.payload.rawItems scanned result
+    (attemptScan?_reservedFresh owned predicted scanned item
+      (attemptPredictions?_reservedFresh item allProductionIds
+        current predicted invariant predictedEq) scannedEq)
+    completionEq
+
+private theorem runPhaseAQueues?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseAReservedFresh current.counter →
+      runPhaseAQueues? owned fuel current = some result →
+      PhaseAReservedFresh result.counter := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result invariant selected
+      rw [runPhaseAQueues?] at selected
+      split at selected <;> try contradiction
+      cases selected
+      exact invariant
+  | succ fuel induction =>
+      intro current result invariant selected
+      rw [runPhaseAQueues?] at selected
+      cases items : current.payload.itemQueue with
+      | nil =>
+          cases edges : current.payload.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact invariant
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueRawEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result
+                    (dequeueRawEdge?_reservedFresh current pair invariant
+                      dequeued) selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueRawItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨dequeuedItem, afterDequeue⟩
+              simp only at selected
+              cases processed :
+                  processRawItem? owned dequeuedItem afterDequeue with
+              | none => simp [processed] at selected
+              | some next =>
+                  rw [processed] at selected
+                  exact induction next result
+                    (processRawItem?_reservedFresh owned dequeuedItem
+                      afterDequeue next
+                      (dequeueRawItem?_reservedFresh current
+                        (dequeuedItem, afterDequeue) invariant dequeued)
+                      processed) selected
+
+private theorem executePhaseA?_reservedFresh
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold executePhaseA? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨seeded, seededEq, runEq⟩
+  exact runPhaseAQueues?_reservedFresh owned _ seeded result
+    (insertRawSeeds?_reservedFresh (rawSeedItems tokens)
+      (beginPhaseA file tokens) seeded
+      (beginPhaseA_reservedFresh file tokens) seededEq) runEq
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
