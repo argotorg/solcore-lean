@@ -3495,4 +3495,180 @@ end CompletionBackpointerLedger
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def contextualPredictionKey {tokens : List Token}
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId) :
+    ChartPredictionKey tokens := {
+  source := .contextual waiting.context
+  dotted := ⟨waiting.raw.production, waiting.raw.dot⟩
+  production := predicted
+  origin := waiting.raw.origin
+  current := waiting.raw.current
+}
+
+private def contextualCompletionKey {tokens : List Token}
+    (waiting finished : ContextualItemKey tokens) : ChartCubicKey tokens := {
+  source := .contextual waiting.context
+  waiting := ⟨waiting.raw.production, waiting.raw.dot⟩
+  finished := ⟨finished.raw.production, finished.raw.dot⟩
+  origin := waiting.raw.origin
+  shared := waiting.raw.current
+  current := finished.raw.current
+}
+
+/-- Form the exact dot-zero prediction and its guarded production instance. -/
+private def contextualPredictedItem?
+    {tokens : List Token}
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId) :
+    Option (ContextualItemKey tokens × ProductionInstanceKey tokens) :=
+  match waiting.raw.production.rhs[waiting.raw.dot.val]? with
+  | some (.nonterminal symbol) =>
+      if _sameLhs : predicted.lhs = symbol then
+        let context := descendContext waiting predicted
+        let item : ContextualItemKey tokens := {
+          raw := {
+            production := predicted
+            dot := ⟨0, Nat.zero_lt_succ _⟩
+            origin := waiting.raw.current
+            current := waiting.raw.current
+          }
+          context := context
+        }
+        some (item, {
+          production := predicted
+          origin := waiting.raw.current
+          context := context
+        })
+      else
+        none
+  | _ => none
+
+/-- Construct a checked contextual scan directly from Core terminal evidence. -/
+private def contextualScannedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before : ContextualItemKey tokens) :
+    Option (ContextualItemKey tokens ×
+      StructurallyValidContextualScannedEdge file tokens) :=
+  if nextInRange :
+      before.raw.dot.val < before.raw.production.rhs.length then
+    match nextEq : before.raw.production.rhs[before.raw.dot.val] with
+    | .terminal terminal =>
+        if currentInRange : before.raw.current.val < tokens.length + 1 then
+          let cursor : TerminalCursor tokens :=
+            ⟨before.raw.current.val, currentInRange⟩
+          match MatchedTerminal.atCursor?
+              file tokens owned terminal cursor with
+          | none => none
+          | some matched =>
+              let afterRaw : DottedItem tokens := {
+                production := before.raw.production
+                dot := ⟨before.raw.dot.val + 1, by omega⟩
+                origin := before.raw.origin
+                current := cursor.afterBoundary
+              }
+              let after : ContextualItemKey tokens := {
+                raw := afterRaw
+                context := before.context
+              }
+              let witness : ScannedEdgeWitness
+                  file tokens before.raw after.raw cursor := {
+                terminal := terminal
+                matched := matched.val
+                sameCursor := matched.property
+                next := by
+                  constructor
+                  · exact nextInRange
+                  · rw [List.getElem?_eq_getElem nextInRange, nextEq]
+                atCurrent := Fin.ext rfl
+                advance := by
+                  rw [matched.property]
+                  simp [AdvanceItem, after, afterRaw]
+              }
+              let rawValid : PackedEdgeKey.Valid file tokens
+                  (.scanned before.raw after.raw cursor) :=
+                packedEdge_scanned_valid_iff.mpr ⟨witness⟩
+              let structural :
+                  ContextualPackedEdgeKey.StructurallyValid file tokens
+                    (.scanned before after cursor) := ⟨rawValid, rfl⟩
+              some (after, {
+                before := before
+                after := after
+                cursor := cursor
+                structural := structural
+              })
+        else
+          none
+    | _ => none
+  else
+    none
+
+/-- Construct a checked contextual completion with both context equations. -/
+private def contextualCompletedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished : ContextualItemKey tokens) :
+    Option (ContextualItemKey tokens ×
+      StructurallyValidContextualCompletedEdge file tokens) :=
+  if nextInRange :
+      waiting.raw.dot.val < waiting.raw.production.rhs.length then
+    match nextEq : waiting.raw.production.rhs[waiting.raw.dot.val] with
+    | .nonterminal symbol =>
+        if sameLhs : symbol = finished.raw.production.lhs then
+          if complete :
+              finished.raw.dot.val = finished.raw.production.rhs.length then
+            if sameCursor : waiting.raw.current = finished.raw.origin then
+              if sameContext : finished.context =
+                  descendContext waiting finished.raw.production then
+                let afterRaw : DottedItem tokens := {
+                  production := waiting.raw.production
+                  dot := ⟨waiting.raw.dot.val + 1, by omega⟩
+                  origin := waiting.raw.origin
+                  current := finished.raw.current
+                }
+                let after : ContextualItemKey tokens := {
+                  raw := afterRaw
+                  context := waiting.context
+                }
+                let witness : CompletedEdgeWitness tokens waiting.raw
+                    finished.raw after.raw waiting.raw.current := {
+                  next := by
+                    constructor
+                    · exact nextInRange
+                    · rw [List.getElem?_eq_getElem nextInRange,
+                        nextEq, sameLhs]
+                  complete := complete
+                  waitingAtShared := rfl
+                  finishedAtShared := sameCursor.symm
+                  advance := by simp [AdvanceItem, after, afterRaw]
+                }
+                let rawValid : PackedEdgeKey.Valid file tokens
+                    (.completed waiting.raw finished.raw after.raw
+                      waiting.raw.current) :=
+                  packedEdge_completed_valid_iff.mpr ⟨witness⟩
+                let structural :
+                    ContextualPackedEdgeKey.StructurallyValid file tokens
+                      (.completed waiting finished after
+                        waiting.raw.current) :=
+                  ⟨rawValid, sameContext, rfl⟩
+                some (after, {
+                  waiting := waiting
+                  finished := finished
+                  after := after
+                  shared := waiting.raw.current
+                  structural := structural
+                })
+              else none
+            else none
+          else none
+        else none
+    | _ => none
+  else
+    none
+
+end Chart
+
 end Solcore.Surface.Multi
