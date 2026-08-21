@@ -5032,6 +5032,73 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private theorem enterIndexedPhaseB?_total_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (ready : PhaseBIndexedReady current) :
+    ∃ result,
+      enterIndexedPhaseB? current = some result ∧
+      result.payload.phaseB.remaining = allGuardInstanceKeys tokens ∧
+      PhaseBRunnerReady result := by
+  let phaseAInput : CountedState tokens (PhaseAOpen file tokens) := {
+    payload := current.payload.phaseA
+    counter := current.counter
+  }
+  let transition := fun (state : PhaseAOpen file tokens) => ({
+    phaseA := ⟨state.rawItems, state.rawEdges⟩
+    cells := fun _ => none
+    remaining := allGuardInstanceKeys tokens
+    finalizedRev := []
+  } : PhaseBOpen file tokens)
+  have sealFresh : UnitAddress.phase .sealAEnterB ∉
+      phaseAInput.counter.usedRev :=
+    ready.2.2.2.2 (.phase .sealAEnterB)
+      (by simp [phaseBEntryReservedAddress])
+  let entered : CountedState tokens (PhaseBOpen file tokens) := {
+    payload := transition phaseAInput.payload
+    counter := phaseAInput.counter.charge (.phase .sealAEnterB) sealFresh
+  }
+  have stepped : runMappedPrimitive? phaseAInput (.phase .sealAEnterB)
+      transition = some entered := by
+    simp [runMappedPrimitive?, sealFresh, entered]
+  have enteredEq : enterPhaseB? phaseAInput = some entered := by
+    unfold enterPhaseB?
+    rw [dif_pos (by simpa [phaseAInput] using ready.1)]
+    rw [dif_pos (by simpa [phaseAInput] using ready.2.1)]
+    rw [dif_pos (by simpa [phaseAInput] using ready.2.2.1)]
+    exact stepped
+  let result : CountedState tokens (PhaseBIndexed file tokens) := {
+    payload := ⟨entered.payload, current.payload.entries⟩
+    counter := entered.counter
+  }
+  have selected : enterIndexedPhaseB? current = some result := by
+    simp [enterIndexedPhaseB?, phaseAInput, enteredEq, result]
+  refine ⟨result, selected, by rfl, ready.2.2.2.1, ?_⟩
+  refine ⟨?_, ?_, ?_⟩
+  · simpa [result, entered, transition] using
+      allGuardInstanceKeys_nodup tokens
+  · intro key member slot used
+    simp only [result, entered, phaseAInput, Counter.charge,
+      List.mem_cons] at used
+    rcases used with equal | old
+    · cases equal
+    · exact ready.2.2.2.2 (.guardFinalize slot key)
+        (by simp [phaseBEntryReservedAddress]) old
+  · intro used
+    simp only [result, entered, phaseAInput, Counter.charge,
+      List.mem_cons] at used
+    rcases used with equal | old
+    · cases equal
+    · exact ready.2.2.2.2 (.phase .sealBEnterC)
+        (by simp [phaseBEntryReservedAddress]) old
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
