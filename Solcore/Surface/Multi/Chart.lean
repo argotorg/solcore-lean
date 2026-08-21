@@ -3714,6 +3714,253 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private theorem phaseBReadIndex?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (kind : EvidenceIndexKind)
+    (subject : PriorityGuardId ⊕ GrammarRuleId)
+    (contextStart siteCursor resultEnd : Boundary tokens) :
+    ∃ selected, phaseBReadIndex? entries kind subject
+      contextStart siteCursor resultEnd = some selected := by
+  exact phaseAEvidenceEntryAt?_total_of_fullyMaterialized entries complete {
+    kind := kind
+    subject := subject
+    contextStart := contextStart
+    siteCursor := siteCursor
+    resultEnd := resultEnd
+  }
+
+private theorem phaseBAllReads?_total :
+    ∀ reads : List (Option Bool),
+      (∀ read, read ∈ reads → ∃ selected, read = some selected) →
+      ∃ selected, phaseBAllReads? reads = some selected
+  | [], _ => ⟨true, rfl⟩
+  | read :: rest, total => by
+      obtain ⟨head, headSelected⟩ := total read (by simp)
+      obtain ⟨tail, tailSelected⟩ := phaseBAllReads?_total rest
+        (by
+          intro candidate member
+          exact total candidate (by simp [member]))
+      exact ⟨head && tail, by
+        simp [phaseBAllReads?, headSelected, tailSelected]⟩
+
+private theorem phaseBAnyReads?_total :
+    ∀ reads : List (Option Bool),
+      (∀ read, read ∈ reads → ∃ selected, read = some selected) →
+      ∃ selected, phaseBAnyReads? reads = some selected
+  | [], _ => ⟨false, rfl⟩
+  | read :: rest, total => by
+      obtain ⟨head, headSelected⟩ := total read (by simp)
+      obtain ⟨tail, tailSelected⟩ := phaseBAnyReads?_total rest
+        (by
+          intro candidate member
+          exact total candidate (by simp [member]))
+      exact ⟨head || tail, by
+        simp [phaseBAnyReads?, headSelected, tailSelected]⟩
+
+private theorem phaseBWithBoundary?_total
+    (tokens : List Token) (coordinate : Nat)
+    (read : Boundary tokens → Option Bool)
+    (total : ∀ boundary, ∃ selected, read boundary = some selected) :
+    ∃ selected, phaseBWithBoundary? tokens coordinate read = some selected := by
+  unfold phaseBWithBoundary?
+  cases boundary : phaseABoundaryAt? tokens coordinate with
+  | none => exact ⟨false, rfl⟩
+  | some value => exact total value
+
+private theorem phaseBG01Positive?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ selected, phaseBG01Positive? entries key = some selected := by
+  unfold phaseBG01Positive?
+  apply phaseBWithBoundary?_total
+  intro openCursor
+  apply phaseBWithBoundary?_total
+  intro expressionStart
+  apply phaseBAllReads?_total
+  intro outer outerMember
+  simp only [List.mem_singleton] at outerMember
+  subst outer
+  apply phaseBAnyReads?_total
+  intro candidate candidateMember
+  rw [List.mem_map] at candidateMember
+  rcases candidateMember with ⟨closeCursor, _, rfl⟩
+  apply phaseBAllReads?_total
+  intro read readMember
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at readMember
+  rcases readMember with rfl | rfl | rfl
+  · exact phaseBReadIndex?_total entries complete .terminalWindow
+      (.inl .G01_statementIf) key.siteCursor closeCursor closeCursor
+  · exact phaseBReadIndex?_total entries complete .delimiterOrRegion
+      (.inl .G01_statementIf) openCursor closeCursor closeCursor
+  · exact phaseBReadIndex?_total entries complete .greatestEnd
+      (.inr .expression) expressionStart closeCursor closeCursor
+
+private theorem phaseBG02Observations?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ selected, phaseBG02Observations? entries key = some selected := by
+  obtain ⟨header, headerSelected⟩ := phaseBReadIndex?_total entries complete
+    .delimiterOrRegion (.inl .G02_matchArmBoundary)
+    key.contextStart key.siteCursor key.siteCursor
+  change phaseBReadDelimiterGuard? entries .G02_matchArmBoundary
+    key.contextStart key.siteCursor key.siteCursor = some header
+    at headerSelected
+  obtain ⟨pipe, pipeSelected⟩ := phaseBWithBoundary?_total tokens
+    (key.siteCursor.val + 1)
+    (fun after => phaseBReadTerminalGuard? entries .G02_matchArmBoundary
+      key.contextStart key.siteCursor after)
+    (fun after => phaseBReadIndex?_total entries complete
+      .terminalWindow (.inl .G02_matchArmBoundary)
+      key.contextStart key.siteCursor after)
+  exact ⟨(header, pipe), by
+    simp [phaseBG02Observations?, headerSelected, pipeSelected]⟩
+
+private theorem phaseBComptimeAtSitePositive?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ selected,
+      phaseBComptimeAtSitePositive? entries key = some selected := by
+  unfold phaseBComptimeAtSitePositive?
+  apply phaseBWithBoundary?_total
+  intro after
+  exact phaseBReadIndex?_total entries complete .terminalWindow
+    (.inl key.guard) key.contextStart key.siteCursor after
+
+private theorem phaseBG06Positive?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ selected, phaseBG06Positive? entries key = some selected := by
+  unfold phaseBG06Positive?
+  apply phaseBWithBoundary?_total
+  intro expressionStart
+  apply phaseBAllReads?_total
+  intro read readMember
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at readMember
+  rcases readMember with rfl | rfl
+  · exact phaseBReadIndex?_total entries complete .terminalWindow
+      (.inl .G06_patternComptime) key.contextStart key.siteCursor
+      expressionStart
+  · apply phaseBAnyReads?_total
+    intro candidate candidateMember
+    rw [List.mem_map] at candidateMember
+    rcases candidateMember with ⟨limit, _, rfl⟩
+    apply phaseBAllReads?_total
+    intro inner innerMember
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at innerMember
+    rcases innerMember with rfl | rfl
+    · exact phaseBReadIndex?_total entries complete .delimiterOrRegion
+        (.inl .G06_patternComptime) expressionStart limit limit
+    · exact phaseBReadIndex?_total entries complete .greatestEnd
+        (.inr .expression) expressionStart limit limit
+
+private theorem phaseBG07Positive?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ selected, phaseBG07Positive? entries key = some selected := by
+  unfold phaseBG07Positive?
+  apply phaseBWithBoundary?_total
+  intro after
+  apply phaseBAllReads?_total
+  intro read readMember
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at readMember
+  rcases readMember with rfl | rfl
+  · exact phaseBReadIndex?_total entries complete .exactSlice
+      (.inl .G07_leadingDotArguments) key.contextStart key.siteCursor
+      key.siteCursor
+  · exact phaseBReadIndex?_total entries complete .terminalWindow
+      (.inl .G07_leadingDotArguments) key.contextStart key.siteCursor after
+
+private theorem phaseBG08Positive?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ selected, phaseBG08Positive? entries key = some selected := by
+  unfold phaseBG08Positive?
+  apply phaseBAnyReads?_total
+  intro candidate candidateMember
+  rw [List.mem_map] at candidateMember
+  rcases candidateMember with ⟨regionEnd, _, rfl⟩
+  apply phaseBAllReads?_total
+  intro read readMember
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at readMember
+  rcases readMember with rfl | rfl
+  · exact phaseBReadIndex?_total entries complete .delimiterOrRegion
+      (.inl .G08_terminalExpression) key.contextStart key.siteCursor regionEnd
+  · exact phaseBReadIndex?_total entries complete .greatestEnd
+      (.inr .expression) key.siteCursor regionEnd regionEnd
+
+private theorem phaseBG09Positive?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ selected, phaseBG09Positive? entries key = some selected := by
+  unfold phaseBG09Positive?
+  apply phaseBAnyReads?_total
+  intro candidate candidateMember
+  rw [List.mem_map] at candidateMember
+  rcases candidateMember with ⟨arrowCursor, _, rfl⟩
+  apply phaseBAllReads?_total
+  intro read readMember
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at readMember
+  rcases readMember with rfl | rfl
+  · exact phaseBReadIndex?_total entries complete .terminalWindow
+      (.inl .G09_genericContext) key.contextStart key.siteCursor arrowCursor
+  · exact phaseBReadIndex?_total entries complete .greatestEnd
+      (.inr .predicateList) key.siteCursor arrowCursor arrowCursor
+
+private theorem phaseBGuardDecisionFromIndexes?_total
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (key : GuardInstanceKey tokens) :
+    ∃ decision, phaseBGuardDecisionFromIndexes? entries key = some decision := by
+  cases guard : key.guard <;>
+    simp only [phaseBGuardDecisionFromIndexes?, guard]
+  · obtain ⟨selected, equal⟩ := phaseBG01Positive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+  · obtain ⟨selected, equal⟩ := phaseBG02Observations?_total entries complete key
+    rcases selected with ⟨header, pipe⟩
+    rw [equal]
+    exact ⟨if header then .positive else if pipe then .negative else .neutral,
+      rfl⟩
+  · obtain ⟨selected, equal⟩ :=
+      phaseBComptimeAtSitePositive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+  · obtain ⟨selected, equal⟩ :=
+      phaseBComptimeAtSitePositive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+  · obtain ⟨selected, equal⟩ :=
+      phaseBComptimeAtSitePositive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+  · obtain ⟨selected, equal⟩ := phaseBG06Positive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+  · obtain ⟨selected, equal⟩ := phaseBG07Positive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+  · obtain ⟨selected, equal⟩ := phaseBG08Positive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+  · obtain ⟨selected, equal⟩ := phaseBG09Positive?_total entries complete key
+    rw [equal]
+    exact ⟨if selected then .positive else .negative, rfl⟩
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
