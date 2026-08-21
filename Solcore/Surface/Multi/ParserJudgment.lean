@@ -17502,6 +17502,236 @@ private theorem contextualCompletedEdge_sameAfter_iff_backpointer
       ⟨waitingEq, finishedEq⟩
     exact ⟨waitingEq, finishedEq, sharedEq⟩
 
+private theorem scanned_completed_sameAfter_false
+    {file : WorkspaceFile} {tokens : List Token}
+    {before waiting finished after : ContextualItemKey tokens}
+    {cursor : TerminalCursor tokens} {shared : Boundary tokens}
+    (scanned : ScannedEdgeWitness
+      file tokens before.raw after.raw cursor)
+    (completed : CompletedEdgeWitness
+      tokens waiting.raw finished.raw after.raw shared) :
+    False := by
+  rcases scanned.advance with
+    ⟨scanProduction, scanDot, _, _⟩
+  rcases completed.advance with
+    ⟨completeProduction, completeDot, _, _⟩
+  have productionEq : before.raw.production = waiting.raw.production :=
+    scanProduction.symm.trans completeProduction
+  have rhsEq : before.raw.production.rhs = waiting.raw.production.rhs :=
+    congrArg ProductionId.rhs productionEq
+  have dotEq : before.raw.dot.val = waiting.raw.dot.val := by omega
+  let scanIndex : Nat := before.raw.dot.val
+  let completeIndex : Nat := waiting.raw.dot.val
+  have indexEq : scanIndex = completeIndex := dotEq
+  have impossible :
+      some (GrammarSymbol.terminal scanned.terminal) =
+        some (GrammarSymbol.nonterminal finished.raw.production.lhs) := by
+    calc
+      _ = getElem? before.raw.production.rhs scanIndex :=
+        scanned.next.2.symm
+      _ = getElem? waiting.raw.production.rhs completeIndex := by
+        rw [rhsEq, indexEq]
+      _ = _ := completed.next.2
+  exact GrammarSymbol.noConfusion (Option.some.inj impossible)
+
+private def PrefixFunctionalMotive
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (item : ContextualItemKey tokens)
+    (left : PrefixValues file tokens item)
+    (_ : CoherentPrefix file tokens memo correct final item left) : Prop :=
+  ∀ {right : PrefixValues file tokens item},
+    CoherentPrefix file tokens memo correct final item right → left = right
+
+private def ReductionFunctionalMotive
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (item : ContextualItemKey tokens)
+    (left : NonterminalValue file tokens item.raw.production.lhs)
+    (_ : CoherentReduction file tokens memo correct final item left) : Prop :=
+  ∀ {right : NonterminalValue file tokens item.raw.production.lhs},
+    CoherentReduction file tokens memo correct final item right → left = right
+
+private theorem zeroCase
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (item : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final item)
+    (zero : item.raw.dot.val = 0) :
+    PrefixFunctionalMotive file tokens memo correct final item
+      (PrefixValues.zeroValue item zero) (.zero item reached zero) := by
+  intro right rightCoherent
+  cases rightCoherent with
+  | zero _ _ rightZero =>
+      have zeroEq : zero = rightZero := Subsingleton.elim _ _
+      cases zeroEq
+      rfl
+  | scan =>
+      rcases ScannedEdgeWitness.advance
+          ‹ScannedEdgeWitness _ _ _ _ _› with ⟨_, advanced, _, _⟩
+      omega
+  | complete =>
+      rcases CompletedEdgeWitness.advance
+          ‹CompletedEdgeWitness _ _ _ _ _› with ⟨_, advanced, _, _⟩
+      omega
+
+private theorem scanCase
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (before after : ContextualItemKey tokens)
+    (cursor : TerminalCursor tokens)
+    (priorValues : PrefixValues file tokens before)
+    (witness : ScannedEdgeWitness file tokens before.raw after.raw cursor)
+    (edge : ContextualEdgeReach file tokens memo correct final
+      (.scanned before after cursor))
+    (prior : CoherentPrefix file tokens memo correct final before priorValues)
+    (priorIH : PrefixFunctionalMotive file tokens memo correct final
+      before priorValues prior) :
+    PrefixFunctionalMotive file tokens memo correct final after
+      (PrefixValues.scanValue before after witness.terminal witness.next
+        witness.matched witness.advance priorValues)
+      (.scan before after cursor priorValues witness edge prior) := by
+  intro right rightCoherent
+  cases rightCoherent with
+  | zero =>
+      rcases witness.advance with ⟨_, advanced, _, _⟩
+      omega
+  | scan rightBefore _ rightCursor rightPrior rightWitness rightEdge
+      rightPriorCoherent =>
+      rcases contextualScannedEdge_sameAfter edge rightEdge with
+        ⟨beforeEq, cursorEq⟩
+      subst rightBefore
+      subst rightCursor
+      have priorEq : priorValues = rightPrior := priorIH rightPriorCoherent
+      have witnessEq : witness = rightWitness :=
+        ScannedEdgeWitness.functional witness rightWitness
+      cases witnessEq
+      cases priorEq
+      rfl
+  | complete _ _ _ _ _ _ rightWitness _ _ _ =>
+      exact False.elim
+        (scanned_completed_sameAfter_false witness rightWitness)
+
+private theorem completeCase
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (backpointer :
+      CompletionBackpointerUnique file tokens memo correct final)
+    (waiting finished after : ContextualItemKey tokens)
+    (shared : Boundary tokens)
+    (priorValues : PrefixValues file tokens waiting)
+    (childValue : NonterminalValue file tokens
+      finished.raw.production.lhs)
+    (witness : CompletedEdgeWitness tokens waiting.raw finished.raw
+      after.raw shared)
+    (edge : ContextualEdgeReach file tokens memo correct final
+      (.completed waiting finished after shared))
+    (prior : CoherentPrefix file tokens memo correct final
+      waiting priorValues)
+    (child : CoherentReduction file tokens memo correct final
+      finished childValue)
+    (priorIH : PrefixFunctionalMotive file tokens memo correct final
+      waiting priorValues prior)
+    (childIH : ReductionFunctionalMotive file tokens memo correct final
+      finished childValue child) :
+    PrefixFunctionalMotive file tokens memo correct final after
+      (PrefixValues.completeValue waiting finished after witness.next
+        witness.advance priorValues childValue)
+      (.complete waiting finished after shared priorValues childValue witness
+        edge prior child) := by
+  intro right rightCoherent
+  cases rightCoherent with
+  | zero =>
+      rcases witness.advance with ⟨_, advanced, _, _⟩
+      omega
+  | scan _ _ _ _ rightWitness _ _ =>
+      exact False.elim
+        (scanned_completed_sameAfter_false rightWitness witness)
+  | complete rightWaiting rightFinished _ rightShared rightPrior rightChild
+      rightWitness rightEdge rightPriorCoherent rightChildCoherent =>
+      rcases backpointer edge rightEdge with
+        ⟨sharedEq, finishedProductionEq⟩
+      rcases contextualCompletedEdge_sameAfter_of_backpointer
+          witness edge rightWitness rightEdge sharedEq finishedProductionEq with
+        ⟨waitingEq, finishedEq⟩
+      subst rightWaiting
+      subst rightFinished
+      subst rightShared
+      have priorEq : priorValues = rightPrior :=
+        priorIH rightPriorCoherent
+      have childEq : childValue = rightChild :=
+        childIH rightChildCoherent
+      have witnessEq : witness = rightWitness :=
+        CompletedEdgeWitness.functional witness rightWitness
+      cases witnessEq
+      cases priorEq
+      cases childEq
+      rfl
+
+private theorem reduceCase
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (item : ContextualItemKey tokens)
+    (priorValues : PrefixValues file tokens item)
+    (output : NonterminalValue file tokens item.raw.production.lhs)
+    (reached : ContextualReach file tokens memo correct final item)
+    (complete : CompleteItem item.raw)
+    (coherentPrefix : CoherentPrefix file tokens memo correct final
+      item priorValues)
+    (action : ActionReduces file tokens (.actionFor item.raw.production)
+      item.raw.origin item.raw.current
+      (PrefixValues.fullValue item complete priorValues) output)
+    (prefixIH : PrefixFunctionalMotive file tokens memo correct final
+      item priorValues coherentPrefix) :
+    ReductionFunctionalMotive file tokens memo correct final item output
+      (.reduce item priorValues output reached complete coherentPrefix action) := by
+  intro right rightCoherent
+  cases rightCoherent with
+  | reduce _ rightPrior _ _ rightComplete rightPrefix rightAction =>
+      have priorEq : priorValues = rightPrior := prefixIH rightPrefix
+      have completeEq : complete = rightComplete := Subsingleton.elim _ _
+      cases completeEq
+      cases priorEq
+      exact ActionReduces.functional action rightAction
+
+namespace CoherentReduction
+
+/-- Coherent reductions are functional once the saturated chart has unique
+completion backpointers. -/
+theorem functional_of_completionBackpointer
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (backpointer :
+      CompletionBackpointerUnique file tokens memo correct final)
+    {item : ContextualItemKey tokens}
+    {left right : NonterminalValue file tokens item.raw.production.lhs}
+    (leftCoherent : CoherentReduction
+      file tokens memo correct final item left)
+    (rightCoherent : CoherentReduction
+      file tokens memo correct final item right) :
+    left = right :=
+  CoherentReduction.rec
+    (motive_1 := PrefixFunctionalMotive file tokens memo correct final)
+    (motive_2 := ReductionFunctionalMotive file tokens memo correct final)
+    zeroCase scanCase (completeCase backpointer) reduceCase leftCoherent
+    rightCoherent
+
+end CoherentReduction
+
 /-- A coherent prefix is attached to the exact contextual item reached by its
 derivation; a raw projection from another context cannot be spliced in. -/
 theorem coherentPrefix_no_context_splice
