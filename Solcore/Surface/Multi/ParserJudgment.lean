@@ -259,6 +259,147 @@ theorem unguardedReach_least
       exact complete waiting finished after waitingInduction finishedInduction
         next finishedComplete sameCursor advance
 
+private def closureIterate {α : Type}
+    (step : List α → List α) : Nat → List α
+  | 0 => []
+  | n + 1 => step (closureIterate step n)
+
+private theorem closureIterate_stable_of_stable
+    {α : Type} (step : List α → List α) {start finish : Nat}
+    (stable : closureIterate step start =
+      closureIterate step (start + 1))
+    (later : start ≤ finish) :
+    closureIterate step finish =
+      closureIterate step (finish + 1) := by
+  obtain ⟨offset, rfl⟩ := Nat.exists_eq_add_of_le later
+  clear later
+  induction offset with
+  | zero => simpa using stable
+  | succ offset induction =>
+      change step (closureIterate step (start + offset)) =
+        step (closureIterate step (start + offset + 1))
+      exact congrArg step induction
+
+private theorem finiteClosure_stable
+    {α : Type} [DecidableEq α]
+    (carrier : List α) (step : List α → List α)
+    (ascending : ∀ stage,
+      (closureIterate step stage).Sublist
+        (closureIterate step (stage + 1)))
+    (bounded : ∀ stage,
+      (closureIterate step stage).Sublist carrier) :
+    step (closureIterate step carrier.length) =
+      closureIterate step carrier.length := by
+  let final := closureIterate step carrier.length
+  match stable : decide
+      (final = closureIterate step (carrier.length + 1)) with
+  | true =>
+      have equality : final =
+          closureIterate step (carrier.length + 1) :=
+        of_decide_eq_true stable
+      exact equality.symm
+  | false =>
+      have notStable : final ≠
+          closureIterate step (carrier.length + 1) :=
+        of_decide_eq_false stable
+      have noEarlier (stage : Nat) (beforeFinal : stage ≤ carrier.length) :
+          closureIterate step stage ≠
+            closureIterate step (stage + 1) := by
+        intro equality
+        exact notStable (closureIterate_stable_of_stable
+          step equality beforeFinal)
+      have lower (stage : Nat) (within : stage ≤ carrier.length + 1) :
+          stage ≤ (closureIterate step stage).length := by
+        induction stage with
+        | zero => simp
+        | succ previous induction =>
+            have previousWithin : previous ≤ carrier.length + 1 := by
+              omega
+            have previousBeforeFinal : previous ≤ carrier.length := by
+              omega
+            have previousLower := induction previousWithin
+            have growth := ascending previous
+            have lengthLe := growth.length_le
+            have lengthNe :
+                (closureIterate step previous).length ≠
+                  (closureIterate step (previous + 1)).length := by
+              intro sameLength
+              exact noEarlier previous previousBeforeFinal
+                (growth.eq_of_length sameLength)
+            omega
+      have finalLower := lower (carrier.length + 1) (by omega)
+      have finalUpper := (bounded (carrier.length + 1)).length_le
+      exfalso
+      omega
+
+private theorem filter_sublist_filter_of_imp
+    {α : Type} (values : List α) (left right : α → Bool)
+    (implies : ∀ value, value ∈ values →
+      left value = true → right value = true) :
+    (values.filter left).Sublist (values.filter right) := by
+  induction values with
+  | nil => exact .slnil
+  | cons head tail induction =>
+      have tailImplication : ∀ value, value ∈ tail →
+          left value = true → right value = true := by
+        intro value member selected
+        exact implies value (List.mem_cons_of_mem head member) selected
+      have tailSublist := induction tailImplication
+      simp only [List.filter_cons]
+      match leftTrue : left head with
+      | false =>
+          match rightTrue : right head with
+          | false => exact tailSublist
+          | true => exact tailSublist.cons head
+      | true =>
+          have selected : right head = true :=
+            implies head (List.mem_cons_self) leftTrue
+          rw [selected]
+          exact tailSublist.cons_cons head
+
+private theorem filteredClosure_ascending
+    {α : Type} (carrier : List α) (select : List α → α → Bool)
+    (inflationary : ∀ known item, item ∈ known →
+      select known item = true) :
+    ∀ stage,
+      (closureIterate (fun known => carrier.filter (select known)) stage).Sublist
+        (closureIterate (fun known => carrier.filter (select known))
+          (stage + 1)) := by
+  intro stage
+  cases stage with
+  | zero => exact List.nil_sublist _
+  | succ previous =>
+      simp only [closureIterate]
+      apply filter_sublist_filter_of_imp
+      intro item member selected
+      apply inflationary
+      rw [List.mem_filter]
+      exact ⟨member, selected⟩
+
+private theorem filteredClosure_bounded
+    {α : Type} (carrier : List α) (select : List α → α → Bool) :
+    ∀ stage,
+      (closureIterate (fun known => carrier.filter (select known)) stage).Sublist
+        carrier := by
+  intro stage
+  cases stage with
+  | zero => exact List.nil_sublist _
+  | succ _ => exact List.filter_sublist
+
+private theorem finiteFilteredClosure_stable
+    {α : Type} [DecidableEq α]
+    (carrier : List α) (select : List α → α → Bool)
+    (inflationary : ∀ known item, item ∈ known →
+      select known item = true) :
+    (carrier.filter (select
+      (closureIterate (fun known => carrier.filter (select known))
+        carrier.length))) =
+      closureIterate (fun known => carrier.filter (select known))
+        carrier.length := by
+  exact finiteClosure_stable carrier _
+    (filteredClosure_ascending carrier select inflationary)
+    (filteredClosure_bounded carrier select)
+
 /-- Unguarded recognition is exactly one reached complete matching item. -/
 theorem unguardedRecognizes_exact
     {file : WorkspaceFile} {tokens : List Token}
