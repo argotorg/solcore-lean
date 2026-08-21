@@ -4298,6 +4298,140 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private def phaseAReservedAddress {tokens : List Token} :
+    UnitAddress tokens → Prop
+  | .phase .sealAEnterB => True
+  | .phase .sealBEnterC => True
+  | .guardFinalize _ _ => True
+  | .cubic .U01_evidenceIndex _ => True
+  | _ => False
+
+private def PhaseAReservedFresh {tokens : List Token}
+    (counter : Counter tokens) : Prop :=
+  ∀ address, phaseAReservedAddress address →
+    address ∉ counter.usedRev
+
+private theorem runMappedPrimitive?_reservedFresh
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (invariant : PhaseAReservedFresh current.counter)
+    (available : ¬ phaseAReservedAddress address)
+    (result : CountedState tokens after)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  next fresh =>
+    cases selected
+    intro candidate reserved member
+    simp only [Counter.charge, List.mem_cons] at member
+    rcases member with equal | old
+    · exact available (equal ▸ reserved)
+    · exact invariant candidate reserved old
+  next collision => contradiction
+
+private theorem runMappedPrimitive?_usedRev
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (result : CountedState tokens after)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    result.counter.usedRev = address :: current.counter.usedRev := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  next fresh =>
+    cases selected
+    rfl
+  next collision => contradiction
+
+private theorem beginPhaseA_reservedFresh
+    (file : WorkspaceFile) (tokens : List Token) :
+    PhaseAReservedFresh (beginPhaseA file tokens).counter := by
+  intro address reserved member
+  simp only [beginPhaseA, Counter.charge, Counter.empty,
+    List.mem_cons, List.not_mem_nil, or_false] at member
+  subst address
+  exact reserved
+
+private theorem insertRawItem?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : insertRawItem? current source item = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold insertRawItem? at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · apply runMappedPrimitive?_reservedFresh current _ _ invariant _
+      result selected
+    cases source <;> simp [phaseAReservedAddress]
+
+private theorem insertRawEdge?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : insertRawEdge? current edge = some result) :
+    PhaseAReservedFresh result.counter := by
+  unfold insertRawEdge? at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · apply runMappedPrimitive?_reservedFresh current _ _ invariant _
+      result selected
+    cases edge.val <;> simp [phaseAReservedAddress]
+
+private theorem dequeueRawItem?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : DottedItem tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : dequeueRawItem? current = some result) :
+    PhaseAReservedFresh result.2.counter := by
+  unfold dequeueRawItem? at selected
+  cases queue : current.payload.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, stepped, output⟩
+      simp only [pure, Option.some.injEq] at output
+      subst result
+      exact runMappedPrimitive?_reservedFresh current _ _ invariant
+        (by simp [phaseAReservedAddress]) next stepped
+
+private theorem dequeueRawEdge?_reservedFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : PackedEdge file tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (invariant : PhaseAReservedFresh current.counter)
+    (selected : dequeueRawEdge? current = some result) :
+    PhaseAReservedFresh result.2.counter := by
+  unfold dequeueRawEdge? at selected
+  cases queue : current.payload.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, stepped, output⟩
+      simp only [pure, Option.some.injEq] at output
+      subst result
+      apply runMappedPrimitive?_reservedFresh current _ _ invariant _
+        next stepped
+      cases edge.val <;> simp [phaseAReservedAddress]
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
