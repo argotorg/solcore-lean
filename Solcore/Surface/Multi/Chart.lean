@@ -1992,4 +1992,202 @@ private def dequeueRawEdge?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def rawSeedItems (tokens : List Token) :
+    List (DottedItem tokens) :=
+  (allDottedItems tokens).filter rawSeedBool
+
+private def insertRawSeeds?
+    {file : WorkspaceFile} {tokens : List Token} :
+    List (DottedItem tokens) →
+      CountedState tokens (PhaseAOpen file tokens) →
+      Option (CountedState tokens (PhaseAOpen file tokens))
+  | [], current => some current
+  | item :: rest, current => do
+      let next ← insertRawItem? current .seedOrPrediction item
+      insertRawSeeds? rest next
+
+private def attemptPrediction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (predicted : ProductionId) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  match predictedItem? waiting predicted with
+  | none => some current
+  | some item => do
+      let attempted ← runMappedPrimitive? current
+        (.prediction .R01_predictionAttempt
+          (rawPredictionKey waiting predicted)) id
+      insertRawItem? attempted .seedOrPrediction item
+
+private def attemptPredictions?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    List ProductionId → CountedState tokens (PhaseAOpen file tokens) →
+      Option (CountedState tokens (PhaseAOpen file tokens))
+  | [], current => some current
+  | predicted :: rest, current => do
+      let next ← attemptPrediction? current waiting predicted
+      attemptPredictions? waiting rest next
+
+private def rawScanApplicable {tokens : List Token}
+    (item : DottedItem tokens) : Bool :=
+  match item.production.rhs[item.dot.val]? with
+  | some (.terminal _) => decide (item.current.val < tokens.length + 1)
+  | _ => false
+
+private def attemptScan?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  if rawScanApplicable before then do
+    let attempted ← runMappedPrimitive? current
+      (.linear .L04_scanAttempt (rawLinearKey before)) id
+    match scannedEdge? owned before with
+    | none => some attempted
+    | some (after, edge) => do
+        let withItem ← insertRawItem? attempted .scan after
+        insertRawEdge? withItem edge
+  else
+    some current
+
+private def attemptCompletion?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  match completedEdge? (file := file) waiting finished with
+  | none => some current
+  | some (after, edge) =>
+      let address : UnitAddress tokens :=
+        .cubic .U03_completionAttempt
+          (rawCompletionKey waiting finished)
+      if address ∈ current.counter.usedRev then
+        some current
+      else do
+        let attempted ← runMappedPrimitive? current address id
+        let withItem ← insertRawItem? attempted .completion after
+        insertRawEdge? withItem edge
+
+private def attemptCompletionsWith?
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    List (DottedItem tokens) →
+      CountedState tokens (PhaseAOpen file tokens) →
+      Option (CountedState tokens (PhaseAOpen file tokens))
+  | [], current => some current
+  | other :: rest, current => do
+      let forward ← attemptCompletion? current pivot other
+      let reverse ←
+        if other = pivot then
+          some forward
+        else
+          attemptCompletion? forward other pivot
+      attemptCompletionsWith? pivot rest reverse
+
+private def processRawItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : DottedItem tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) := do
+  let predicted ← attemptPredictions? item allProductionIds current
+  let scanned ← attemptScan? owned predicted item
+  attemptCompletionsWith? item scanned.payload.rawItems scanned
+
+private def runPhaseAQueues?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Nat → CountedState tokens (PhaseAOpen file tokens) →
+      Option (CountedState tokens (PhaseAOpen file tokens))
+  | 0, current =>
+      if current.payload.itemQueue.isEmpty &&
+          current.payload.edgeQueue.isEmpty then
+        some current
+      else
+        none
+  | fuel + 1, current =>
+      match current.payload.itemQueue with
+      | _ :: _ =>
+          match dequeueRawItem? current with
+          | none => none
+          | some (item, afterDequeue) => do
+              let processed ← processRawItem? owned item afterDequeue
+              runPhaseAQueues? owned fuel processed
+      | [] =>
+          match current.payload.edgeQueue with
+          | _ :: _ =>
+              match dequeueRawEdge? current with
+              | none => none
+              | some (_, afterDequeue) =>
+                  runPhaseAQueues? owned fuel afterDequeue
+          | [] => some current
+
+private def executePhaseA?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) := do
+  let seeded ← insertRawSeeds? (rawSeedItems tokens)
+    (beginPhaseA file tokens)
+  runPhaseAQueues? owned (chartGBound (tokens.length + 1)) seeded
+
+private theorem runPhaseAQueues?_queues_empty
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result : CountedState tokens (PhaseAOpen file tokens)),
+      runPhaseAQueues? owned fuel current = some result →
+        result.payload.itemQueue = [] ∧
+          result.payload.edgeQueue = [] := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result selected
+      rw [runPhaseAQueues?] at selected
+      split at selected
+      · cases selected
+        rename_i condition
+        have queues := Bool.and_eq_true_iff.mp condition
+        exact ⟨List.isEmpty_iff.mp queues.1,
+          List.isEmpty_iff.mp queues.2⟩
+      · contradiction
+  | succ previous induction =>
+      intro current result selected
+      rw [runPhaseAQueues?] at selected
+      cases items : current.payload.itemQueue with
+      | nil =>
+          cases edges : current.payload.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact ⟨items, edges⟩
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueRawEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueRawItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨dequeuedItem, afterDequeue⟩
+              simp only at selected
+              cases processing :
+                  processRawItem? owned dequeuedItem afterDequeue with
+              | none => simp [processing] at selected
+              | some processed =>
+                  rw [processing] at selected
+                  exact induction processed result selected
+
+end Chart
+
 end Solcore.Surface.Multi
