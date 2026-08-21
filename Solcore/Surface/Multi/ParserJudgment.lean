@@ -17824,6 +17824,80 @@ inductive Parses : WorkspaceFile → List Token → ParsedModuleV1 → Prop wher
       (sourceBacked : SourceBackedRoot file tokens module) :
       Parses file tokens module
 
+private theorem finalMemo_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {leftMemo rightMemo : GuardMemo tokens}
+    (leftCorrect : PhaseBCorrect file tokens leftMemo)
+    (leftFinal : AllGuardsFinal leftMemo)
+    (rightCorrect : PhaseBCorrect file tokens rightMemo)
+    (rightFinal : AllGuardsFinal rightMemo) :
+    leftMemo = rightMemo := by
+  funext key
+  rcases leftFinal key with ⟨leftDecision, leftState⟩
+  rcases rightFinal key with ⟨rightDecision, rightState⟩
+  have leftEvidence : GuardEvidence file tokens key leftDecision :=
+    (leftCorrect key leftDecision).mp leftState
+  have rightEvidence : GuardEvidence file tokens key rightDecision :=
+    (rightCorrect key rightDecision).mp rightState
+  have decisionEq : leftDecision = rightDecision :=
+    GuardEvidence.functional leftEvidence rightEvidence
+  subst rightDecision
+  exact leftState.trans rightState.symm
+
+namespace SourceBackedRoot
+
+/-- Complete source-backed roots are functional once every finalized chart has
+unique completion backpointers. -/
+theorem functional_of_completionBackpointer
+    {file : WorkspaceFile} {tokens : List Token}
+    (backpointer : ∀ (memo : GuardMemo tokens)
+        (correct : PhaseBCorrect file tokens memo)
+        (final : AllGuardsFinal memo),
+      CompletionBackpointerUnique file tokens memo correct final)
+    {left right : ParsedModuleV1}
+    (leftRoot : SourceBackedRoot file tokens left)
+    (rightRoot : SourceBackedRoot file tokens right) :
+    left = right := by
+  rcases leftRoot with
+    ⟨leftMemo, leftCorrect, leftFinal, _, _, leftReduction⟩
+  rcases rightRoot with
+    ⟨rightMemo, rightCorrect, rightFinal, _, _, rightReduction⟩
+  have memoEq : leftMemo = rightMemo :=
+    finalMemo_eq leftCorrect leftFinal rightCorrect rightFinal
+  subst rightMemo
+  have correctEq : leftCorrect = rightCorrect := Subsingleton.elim _ _
+  subst rightCorrect
+  have finalEq : leftFinal = rightFinal := Subsingleton.elim _ _
+  subst rightFinal
+  exact CoherentReduction.functional_of_completionBackpointer
+    (backpointer leftMemo leftCorrect leftFinal)
+    leftReduction rightReduction
+
+end SourceBackedRoot
+
+namespace Parses
+
+/-- Public successful parsing is functional under the same explicit
+completion-backpointer invariant required by coherent reductions. -/
+theorem functional_of_completionBackpointer
+    {file : WorkspaceFile} {tokens : List Token}
+    (backpointer : ∀ (memo : GuardMemo tokens)
+        (correct : PhaseBCorrect file tokens memo)
+        (final : AllGuardsFinal memo),
+      CompletionBackpointerUnique file tokens memo correct final)
+    {left right : ParsedModuleV1}
+    (leftParses : Parses file tokens left)
+    (rightParses : Parses file tokens right) :
+    left = right := by
+  cases leftParses with
+  | sourceBackedRoot leftOwned leftRoot =>
+      cases rightParses with
+      | sourceBackedRoot rightOwned rightRoot =>
+          exact SourceBackedRoot.functional_of_completionBackpointer
+            backpointer leftRoot rightRoot
+
+end Parses
+
 /-- The greatest cursor reached by the fully saturated contextual relation. -/
 def GreatestReachableCursor
     (file : WorkspaceFile) (tokens : List Token)
