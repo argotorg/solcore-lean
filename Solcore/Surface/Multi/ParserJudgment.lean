@@ -12339,6 +12339,276 @@ private theorem ruleReduction_predicate_total
       exact ⟨_, .predicateWithArguments origin finish main colon className
         openParen parameters closeParen witness⟩
 
+private def terminalRulePairView
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.sequence [
+      .atom (.terminal terminal), .atom (.nonterminal rule)])) :
+    MatchedTerminal file tokens terminal × (RuleValue rule × Unit) :=
+  let values := sequenceFlatView
+    [.atom (.terminal terminal), .atom (.nonterminal rule)] input
+  (terminalView terminal values.1, ruleView rule values.2.1, ())
+
+private def terminalRulePairInput
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (rule : GrammarRuleId)
+    (value : MatchedTerminal file tokens terminal × (RuleValue rule × Unit)) :
+    EbnfValue file tokens (.sequence [
+      .atom (.terminal terminal), .atom (.nonterminal rule)]) :=
+  EbnfValue.sequence _ (totalValuesBuild _
+    (EbnfValue.terminalAtom terminal value.1,
+      EbnfValue.ruleAtom rule value.2.1, ()))
+
+private theorem terminalRulePair_roundtrip
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.sequence [
+      .atom (.terminal terminal), .atom (.nonterminal rule)])) :
+    terminalRulePairInput terminal rule
+      (terminalRulePairView terminal rule input) = input := by
+  generalize viewEq : sequenceFlatView
+    [.atom (.terminal terminal), .atom (.nonterminal rule)] input = values
+  rcases values with ⟨rawTerminal, rawRule, ⟨⟩⟩
+  have inputEq := sequence_of_flat_view
+    [.atom (.terminal terminal), .atom (.nonterminal rule)] input
+  rw [viewEq] at inputEq
+  unfold terminalRulePairInput terminalRulePairView
+  simp only [viewEq]
+  rw [terminal_of_view terminal rawTerminal, rule_of_view rule rawRule]
+  exact inputEq
+
+private theorem ruleReduction_functionSignature_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .functionSignature origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .functionSignature)) :
+    ∃ output : RuleValue .functionSignature,
+      RuleReduction file tokens .functionSignature origin finish input output := by
+  let genericAtom : EbnfExpr := .atom (.nonterminal .genericPrefix)
+  let publicAtom : EbnfExpr := .atom (.terminal (.hardKeyword .publicKw))
+  let payableAtom : EbnfExpr := .atom (.terminal (.hardKeyword .payableKw))
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let returnChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .arrow)), .atom (.nonterminal .type)]
+  let children : List EbnfExpr := [.optional genericAtom, .optional publicAtom,
+    .optional payableAtom, .atom (.terminal (.hardKeyword .functionKw)),
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .leftParen)), .list0 parameterAtom,
+    .atom (.terminal (.symbol .rightParen)), .optional returnChild]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : sequenceFlatView children input = values
+  rcases values with ⟨rawGeneric, rawPublic, rawPayable, rawFunction,
+    rawName, rawOpen, rawParameters, rawClose, rawReturn, ⟨⟩⟩
+  have rawEq := sequence_of_flat_view children input
+  rw [sequenceEq] at rawEq
+  let genericPrefix := (optionalView genericAtom rawGeneric).map
+    (ruleView .genericPrefix)
+  let publicToken := (optionalView publicAtom rawPublic).map
+    (terminalView (.hardKeyword .publicKw))
+  let payableToken := (optionalView payableAtom rawPayable).map
+    (terminalView (.hardKeyword .payableKw))
+  let functionKw := terminalView (.hardKeyword .functionKw) rawFunction
+  let matched := terminalView (.category .identifier) rawName
+  let openParen := terminalView (.symbol .leftParen) rawOpen
+  let parameters := (list0View parameterAtom rawParameters).map
+    (ruleView .parameter)
+  let closeParen := terminalView (.symbol .rightParen) rawClose
+  let returnValue := (optionalView returnChild rawReturn).map
+    (terminalRulePairView (.symbol .arrow) .type)
+  rcases matchedTerminal_identifier_projection_exists_unique matched with
+    ⟨projection, nameProjects, _unique⟩
+  let name := identifierData matched projection
+  have genericEq := optional_map_of_view genericAtom
+    (ruleView .genericPrefix) (EbnfValue.ruleAtom .genericPrefix)
+    (rule_of_view .genericPrefix) rawGeneric
+  have publicEq := optional_map_of_view publicAtom
+    (terminalView (.hardKeyword .publicKw))
+    (EbnfValue.terminalAtom (.hardKeyword .publicKw))
+    (terminal_of_view (.hardKeyword .publicKw)) rawPublic
+  have payableEq := optional_map_of_view payableAtom
+    (terminalView (.hardKeyword .payableKw))
+    (EbnfValue.terminalAtom (.hardKeyword .payableKw))
+    (terminal_of_view (.hardKeyword .payableKw)) rawPayable
+  have parametersEq := ruleList0_of_view .parameter rawParameters
+  have returnEq := optional_map_of_view returnChild
+    (terminalRulePairView (.symbol .arrow) .type)
+    (terminalRulePairInput (.symbol .arrow) .type)
+    (terminalRulePair_roundtrip (.symbol .arrow) .type) rawReturn
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← rawEq, ← genericEq, ← publicEq, ← payableEq,
+    ← terminal_of_view (.hardKeyword .functionKw) rawFunction,
+    ← terminal_of_view (.category .identifier) rawName,
+    ← terminal_of_view (.symbol .leftParen) rawOpen, ← parametersEq,
+    ← terminal_of_view (.symbol .rightParen) rawClose, ← returnEq]
+  exact ⟨_, .functionSignature origin finish genericPrefix publicToken
+    payableToken functionKw name openParen parameters closeParen returnValue
+    (fun terminal _ => .publicModifier terminal)
+    (fun terminal _ => .payableModifier terminal) nameProjects witness⟩
+
+private theorem ruleReduction_typeAliasDecl_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .typeAliasDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .typeAliasDecl)) :
+    ∃ output : RuleValue .typeAliasDecl,
+      RuleReduction file tokens .typeAliasDecl origin finish input output := by
+  let identifierAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let parameterChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .typeKw)), identifierAtom,
+    .optional parameterChild, .atom (.terminal (.symbol .equal)),
+    .atom (.nonterminal .type), .atom (.terminal (.symbol .semicolon))]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : sequenceFlatView children input = values
+  rcases values with ⟨rawTypeKw, rawName, rawOptional,
+    rawEqual, rawBody, rawSemicolon, ⟨⟩⟩
+  have rawEq := sequence_of_flat_view children input
+  rw [sequenceEq] at rawEq
+  let typeKw := terminalView (.hardKeyword .typeKw) rawTypeKw
+  let matched := terminalView (.category .identifier) rawName
+  let equal := terminalView (.symbol .equal) rawEqual
+  let body := ruleView .type rawBody
+  let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+  rcases matchedTerminal_identifier_projection_exists_unique matched with
+    ⟨projection, nameProjects, _unique⟩
+  let name := identifierData matched projection
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  generalize optionalEq : optionalView parameterChild rawOptional = viewed
+  cases viewed with
+  | none =>
+      have rawOptionalEq := optional_eq_of_view
+        parameterChild rawOptional optionalEq
+      rw [← rawEq, ← terminal_of_view (.hardKeyword .typeKw) rawTypeKw,
+        ← terminal_of_view (.category .identifier) rawName, ← rawOptionalEq,
+        ← terminal_of_view (.symbol .equal) rawEqual,
+        ← rule_of_view .type rawBody,
+        ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+      exact ⟨_, .typeAliasDecl origin finish typeKw name none equal body
+        semicolon nameProjects (by simp) witness⟩
+  | some rawParameters =>
+      have rawOptionalEq := optional_eq_of_view
+        parameterChild rawOptional optionalEq
+      generalize parametersEq : sequenceFlatView [
+        .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+        .atom (.terminal (.symbol .rightParen))] rawParameters = values
+      rcases values with ⟨rawOpen, rawNames, rawClose, ⟨⟩⟩
+      have rawParametersEq := sequence_of_flat_view [
+        .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+        .atom (.terminal (.symbol .rightParen))] rawParameters
+      rw [parametersEq] at rawParametersEq
+      let openParen := terminalView (.symbol .leftParen) rawOpen
+      let closeParen := terminalView (.symbol .rightParen) rawClose
+      rcases identifierNonemptyInputs_exist
+        (list1TotalView identifierAtom rawNames) with
+        ⟨names, namesEq, headProjects, tailProjects⟩
+      have rawNamesEq : EbnfValue.list1 identifierAtom
+          (names.map (fun value => EbnfValue.terminalAtom
+            (.category .identifier) value.matched)) = rawNames := by
+        rw [namesEq]
+        exact list1_of_totalView identifierAtom rawNames
+      let parameters := some (openParen, names, closeParen, ())
+      rw [← rawEq, ← terminal_of_view (.hardKeyword .typeKw) rawTypeKw,
+        ← terminal_of_view (.category .identifier) rawName, ← rawOptionalEq,
+        ← rawParametersEq,
+        ← terminal_of_view (.symbol .leftParen) rawOpen, ← rawNamesEq,
+        ← terminal_of_view (.symbol .rightParen) rawClose,
+        ← terminal_of_view (.symbol .equal) rawEqual,
+        ← rule_of_view .type rawBody,
+        ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+      exact ⟨_, .typeAliasDecl origin finish typeKw name parameters equal
+        body semicolon nameProjects (fun value valueEq => by
+          have valueEq' : value = (openParen, names, closeParen, ()) := by
+            apply Option.some.inj
+            simpa [parameters] using valueEq.symm
+          subst value
+          exact ⟨headProjects, tailProjects⟩) witness⟩
+
+private theorem ruleReduction_fieldDecl_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .fieldDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .fieldDecl)) :
+    ∃ output : RuleValue .fieldDecl,
+      RuleReduction file tokens .fieldDecl origin finish input output := by
+  let initializerChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .equal)), .atom (.nonterminal .expression)]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .colon)), .atom (.nonterminal .type),
+    .optional initializerChild, .atom (.terminal (.symbol .semicolon))]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : sequenceFlatView children input = values
+  rcases values with
+    ⟨rawName, rawColon, rawType, rawInitializer, rawSemicolon, ⟨⟩⟩
+  have rawEq := sequence_of_flat_view children input
+  rw [sequenceEq] at rawEq
+  let matched := terminalView (.category .identifier) rawName
+  let colon := terminalView (.symbol .colon) rawColon
+  let typeValue := ruleView .type rawType
+  let initializer := (optionalView initializerChild rawInitializer).map
+    (terminalRulePairView (.symbol .equal) .expression)
+  let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+  rcases matchedTerminal_identifier_projection_exists_unique matched with
+    ⟨projection, nameProjects, _unique⟩
+  let name := identifierData matched projection
+  have initializerEq := optional_map_of_view initializerChild
+    (terminalRulePairView (.symbol .equal) .expression)
+    (terminalRulePairInput (.symbol .equal) .expression)
+    (terminalRulePair_roundtrip (.symbol .equal) .expression) rawInitializer
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← rawEq, ← terminal_of_view (.category .identifier) rawName,
+    ← terminal_of_view (.symbol .colon) rawColon,
+    ← rule_of_view .type rawType, ← initializerEq,
+    ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+  exact ⟨_, .fieldDecl origin finish name colon typeValue initializer
+    semicolon nameProjects witness⟩
+
+private theorem ruleReduction_parameter_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .parameter origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .parameter)) :
+    ∃ output : RuleValue .parameter,
+      RuleReduction file tokens .parameter origin finish input output := by
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let typeChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .colon)), .atom (.nonterminal .type)]
+  let children : List EbnfExpr := [.optional comptimeAtom,
+    .atom (.terminal (.category .identifier)), .optional typeChild]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : sequenceFlatView children input = values
+  rcases values with ⟨rawComptime, rawName, rawType, ⟨⟩⟩
+  have rawEq := sequence_of_flat_view children input
+  rw [sequenceEq] at rawEq
+  let comptimeToken := (optionalView comptimeAtom rawComptime).map
+    (terminalView (.contextualKeyword .comptimeKw))
+  let matched := terminalView (.category .identifier) rawName
+  let typeValue := (optionalView typeChild rawType).map
+    (terminalRulePairView (.symbol .colon) .type)
+  rcases matchedTerminal_identifier_projection_exists_unique matched with
+    ⟨projection, nameProjects, _unique⟩
+  let name := identifierData matched projection
+  have comptimeEq := optional_map_of_view comptimeAtom
+    (terminalView (.contextualKeyword .comptimeKw))
+    (EbnfValue.terminalAtom (.contextualKeyword .comptimeKw))
+    (terminal_of_view (.contextualKeyword .comptimeKw)) rawComptime
+  have typeEq := optional_map_of_view typeChild
+    (terminalRulePairView (.symbol .colon) .type)
+    (terminalRulePairInput (.symbol .colon) .type)
+    (terminalRulePair_roundtrip (.symbol .colon) .type) rawType
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← rawEq, ← comptimeEq,
+    ← terminal_of_view (.category .identifier) rawName, ← typeEq]
+  exact ⟨_, .parameter origin finish comptimeToken name typeValue
+    (fun terminal _ => .comptimeModifier terminal) nameProjects witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
