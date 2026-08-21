@@ -954,4 +954,286 @@ theorem chart_unit_family_injective (tokens : List Token) :
       simpa only [q] using guardFamilyLe
     omega) ⟨tightEncode, tightInjective⟩
 
+private abbrev GuardAddress (tokens : List Token) :=
+  (GuardCellAddress × GuardContext tokens) × Boundary tokens
+
+private abbrev AddressSum (tokens : List Token) :=
+  (((((ChartPhaseSlot ⊕
+      (GuardFinalizeSlot × GuardInstanceKey tokens)) ⊕
+    ProductionInstanceKey tokens) ⊕
+    (GuardWitnessSlot × GuardAddress tokens)) ⊕
+    (ChartLinearUnitKind × ChartLinearKey tokens)) ⊕
+    (ChartPredictionUnitKind × ChartPredictionKey tokens)) ⊕
+    (ChartCubicUnitKind × ChartCubicKey tokens)
+
+/-- One and only one charge identity for every primitive chart unit. -/
+private inductive UnitAddress (tokens : List Token) where
+  | phase (slot : ChartPhaseSlot)
+  | guardFinalize
+      (slot : GuardFinalizeSlot) (key : GuardInstanceKey tokens)
+  | production (key : ProductionInstanceKey tokens)
+  | guardWitness
+      (slot : GuardWitnessSlot) (key : GuardAddress tokens)
+  | linear (kind : ChartLinearUnitKind) (key : ChartLinearKey tokens)
+  | prediction
+      (kind : ChartPredictionUnitKind) (key : ChartPredictionKey tokens)
+  | cubic (kind : ChartCubicUnitKind) (key : ChartCubicKey tokens)
+  deriving DecidableEq
+
+private def UnitAddress.toSum {tokens : List Token} :
+    UnitAddress tokens → AddressSum tokens
+  | .phase slot => .inl (.inl (.inl (.inl (.inl (.inl slot)))))
+  | .guardFinalize slot key =>
+      .inl (.inl (.inl (.inl (.inl (.inr (slot, key))))))
+  | .production key => .inl (.inl (.inl (.inl (.inr key))))
+  | .guardWitness slot key => .inl (.inl (.inl (.inr (slot, key))))
+  | .linear kind key => .inl (.inl (.inr (kind, key)))
+  | .prediction kind key => .inl (.inr (kind, key))
+  | .cubic kind key => .inr (kind, key)
+
+private def UnitAddress.ofSum {tokens : List Token} :
+    AddressSum tokens → UnitAddress tokens
+  | .inl (.inl (.inl (.inl (.inl (.inl slot))))) => .phase slot
+  | .inl (.inl (.inl (.inl (.inl (.inr (slot, key)))))) =>
+      .guardFinalize slot key
+  | .inl (.inl (.inl (.inl (.inr key)))) => .production key
+  | .inl (.inl (.inl (.inr (slot, key)))) => .guardWitness slot key
+  | .inl (.inl (.inr (kind, key))) => .linear kind key
+  | .inl (.inr (kind, key)) => .prediction kind key
+  | .inr (kind, key) => .cubic kind key
+
+private theorem UnitAddress.toSum_injective {tokens : List Token} :
+    Function.Injective (@UnitAddress.toSum tokens) := by
+  intro left right equal
+  cases left <;> cases right <;>
+    simp only [UnitAddress.toSum, Sum.inl.injEq, Sum.inr.injEq,
+      Prod.mk.injEq] at equal
+  all_goals first
+    | contradiction
+    | (rcases equal with ⟨leftEqual, rightEqual⟩
+       cases leftEqual
+       cases rightEqual
+       rfl)
+    | (cases equal; rfl)
+
+private theorem UnitAddress.toSum_surjective {tokens : List Token} :
+    Function.Surjective (@UnitAddress.toSum tokens) := by
+  intro address
+  refine ⟨UnitAddress.ofSum address, ?_⟩
+  rcases address with left | cubic
+  · rcases left with left | prediction
+    · rcases left with left | linear
+      · rcases left with left | witness
+        · rcases left with left | production
+          · rcases left with phase | guard <;> rfl
+          · rfl
+        · rfl
+      · rfl
+    · rfl
+  · rfl
+
+/-- The landed U01 bridge occupies exactly the cubic U01 counter family. -/
+private def UnitAddress.evidenceIndex {tokens : List Token}
+    (address : EvidenceIndexAddress tokens) : UnitAddress tokens :=
+  let unit := evidenceIndexUnitAddress address
+  .cubic unit.1 unit.2
+
+private theorem UnitAddress.evidenceIndex_injective {tokens : List Token} :
+    Function.Injective (@UnitAddress.evidenceIndex tokens) := by
+  intro left right equal
+  apply evidenceIndexUnitAddress_injective
+  simp only [UnitAddress.evidenceIndex] at equal
+  have fields := UnitAddress.cubic.inj equal
+  exact Prod.ext fields.1 fields.2
+
+private def tightAddressCount (tokens : List Token) : Nat :=
+  let q := tokens.length + 2
+  let c := 1 + 3 * q
+  let source := 1 + c
+  let linear := source * D * q * q
+  let prediction := source * D * productionCount * q * q
+  let cubic := source * D * D * q * q * q
+  4 + 8 * (allPriorityGuardIds.length * q * (q + 1) / 2) +
+    productionCount * c * q + 4 * H * c * q +
+    14 * linear + 2 * prediction + 8 * cubic
+
+private theorem unitAddress_complete (tokens : List Token) :
+    ∃ encode : UnitAddress tokens → Fin (tightAddressCount tokens),
+      Function.Injective encode ∧ Function.Surjective encode := by
+  have cardinality := chart_unit_family_complete tokens
+  change ∃ encode : AddressSum tokens → Fin (tightAddressCount tokens),
+    Function.Injective encode ∧ Function.Surjective encode at cardinality
+  obtain ⟨encode, injective, surjective⟩ := cardinality
+  refine ⟨encode ∘ UnitAddress.toSum,
+    injective.comp UnitAddress.toSum_injective, ?_⟩
+  intro index
+  obtain ⟨address, equal⟩ := surjective index
+  obtain ⟨unit, sameAddress⟩ := UnitAddress.toSum_surjective address
+  exact ⟨unit, by simp [Function.comp_apply, sameAddress, equal]⟩
+
+/-- The ADR bound takes `T`, including the one logical EOF terminal. -/
+def chartGBound (terminalCount : Nat) : Nat :=
+  let q := terminalCount + 1
+  let c := 1 + 3 * q
+  let source := 1 + c
+  let linear := source * D * q * q
+  let prediction := source * D * productionCount * q * q
+  let cubic := source * D * D * q * q * q
+  4 + 8 * allPriorityGuardIds.length * q * q +
+    productionCount * c * q + 4 * H * c * q +
+    14 * linear + 2 * prediction + 8 * cubic
+
+private theorem unitAddress_injective (tokens : List Token) :
+    ∃ encode : UnitAddress tokens →
+        Fin (chartGBound (tokens.length + 1)),
+      Function.Injective encode := by
+  obtain ⟨encode, injective⟩ := chart_unit_family_injective tokens
+  exact ⟨encode ∘ UnitAddress.toSum,
+    injective.comp UnitAddress.toSum_injective⟩
+
+/-- The executable ledger of already charged primitive addresses. -/
+private structure Counter (tokens : List Token) where
+  usedRev : List (UnitAddress tokens)
+  unique : usedRev.Nodup
+
+private def Counter.empty (tokens : List Token) : Counter tokens :=
+  ⟨[], by simp⟩
+
+private def Counter.units {tokens : List Token}
+    (counter : Counter tokens) : Nat :=
+  counter.usedRev.length
+
+/-- Charge exactly one fresh primitive address. -/
+private def Counter.charge {tokens : List Token}
+    (counter : Counter tokens) (address : UnitAddress tokens)
+    (fresh : address ∉ counter.usedRev) : Counter tokens :=
+  ⟨address :: counter.usedRev, List.nodup_cons.mpr ⟨fresh, counter.unique⟩⟩
+
+/-- One logical primitive: its state transition has exactly one charge. -/
+private structure PrimitiveStep (tokens : List Token) (state : Type) where
+  address : UnitAddress tokens
+  transition : state → state
+
+/-- Executor payload paired with the only counter that may advance it. -/
+private structure CountedState (tokens : List Token) (state : Type) where
+  payload : state
+  counter : Counter tokens
+
+private def CountedState.runPrimitive {tokens : List Token} {state : Type}
+    (current : CountedState tokens state) (step : PrimitiveStep tokens state)
+    (fresh : step.address ∉ current.counter.usedRev) :
+    CountedState tokens state := {
+  payload := step.transition current.payload
+  counter := current.counter.charge step.address fresh
+}
+
+@[simp] private theorem Counter.units_empty (tokens : List Token) :
+    (Counter.empty tokens).units = 0 :=
+  rfl
+
+@[simp] private theorem Counter.units_charge {tokens : List Token}
+    (counter : Counter tokens) (address : UnitAddress tokens)
+    (fresh : address ∉ counter.usedRev) :
+    (counter.charge address fresh).units = counter.units + 1 := by
+  simp [Counter.charge, Counter.units]
+
+@[simp] private theorem CountedState.runPrimitive_units
+    {tokens : List Token} {state : Type}
+    (current : CountedState tokens state) (step : PrimitiveStep tokens state)
+    (fresh : step.address ∉ current.counter.usedRev) :
+    (current.runPrimitive step fresh).counter.units =
+      current.counter.units + 1 := by
+  simp [CountedState.runPrimitive]
+
+private theorem map_nodup_of_injective
+    {alpha beta : Type} (encode : alpha → beta)
+    (injective : Function.Injective encode) {values : List alpha}
+    (unique : values.Nodup) : (values.map encode).Nodup := by
+  induction values with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.nodup_cons] at unique
+      simp only [List.map_cons]
+      rw [List.nodup_cons]
+      refine ⟨?_, induction unique.2⟩
+      intro member
+      rw [List.mem_map] at member
+      rcases member with ⟨value, valueMember, equal⟩
+      exact unique.1 ((injective equal.symm) ▸ valueMember)
+
+private theorem nodup_length_le_of_subset
+    {alpha : Type} [BEq alpha] [LawfulBEq alpha]
+    {left right : List alpha} (unique : left.Nodup)
+    (subset : left ⊆ right) : left.length ≤ right.length := by
+  induction left generalizing right with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.nodup_cons] at unique
+      have headMember : head ∈ right := subset (by simp)
+      have tailSubset : tail ⊆ right.erase head := by
+        intro value valueMember
+        rw [List.mem_erase_of_ne]
+        · exact subset (by simp [valueMember])
+        · intro equal
+          exact unique.1 (equal.symm ▸ valueMember)
+      have tailBound := induction unique.2 tailSubset
+      rw [List.length_erase_of_mem headMember] at tailBound
+      simp only [List.length_cons]
+      have rightPositive := List.length_pos_of_mem headMember
+      omega
+
+/-- A collision-free ledger over chart slots stays within the ADR bound. -/
+private theorem oneUseLedger_units_le_chartGBound
+    {tokens : List Token} {actualUnits : Nat}
+    (oneUse :
+      ∃ usedSlots : List (Fin (chartGBound (tokens.length + 1))),
+        usedSlots.Nodup ∧ actualUnits = usedSlots.length) :
+    actualUnits ≤ chartGBound (tokens.length + 1) := by
+  rcases oneUse with ⟨usedSlots, unique, count⟩
+  rw [count]
+  have subset : usedSlots ⊆
+      List.finRange (chartGBound (tokens.length + 1)) := by
+    intro slot _
+    exact List.mem_finRange slot
+  have bound := nodup_length_le_of_subset unique subset
+  simpa using bound
+
+/-- Any state constructible only through fresh charges is within the ADR bound. -/
+private theorem Counter.units_le_chartGBound {tokens : List Token}
+    (counter : Counter tokens) :
+    counter.units ≤ chartGBound (tokens.length + 1) := by
+  obtain ⟨encode, injective⟩ := unitAddress_injective tokens
+  apply oneUseLedger_units_le_chartGBound
+  refine ⟨counter.usedRev.map encode,
+    map_nodup_of_injective encode injective counter.unique, ?_⟩
+  simp [Counter.units]
+
+/-- At the bound, no primitive address can remain fresh. -/
+private theorem Counter.no_fresh_at_bound {tokens : List Token}
+    (counter : Counter tokens)
+    (full : counter.units = chartGBound (tokens.length + 1))
+    (address : UnitAddress tokens) : address ∈ counter.usedRev := by
+  by_cases member : address ∈ counter.usedRev
+  · exact member
+  · have nextBound :=
+      (counter.charge address member).units_le_chartGBound
+    rw [Counter.units_charge, full] at nextBound
+    omega
+
+/-- Final executor output; its unit count is derived from the unique ledger. -/
+private structure Execution (tokens : List Token) (result : Type) where
+  value : result
+  counter : Counter tokens
+
+private def Execution.actualUnits {tokens : List Token} {result : Type}
+    (execution : Execution tokens result) : Nat :=
+  execution.counter.units
+
+/-- A counted executor result inherits the one-use-ledger bound. -/
+private theorem Execution.actualUnits_le_chartGBound
+    {tokens : List Token} {result : Type}
+    (execution : Execution tokens result) :
+    execution.actualUnits ≤ chartGBound (tokens.length + 1) :=
+  execution.counter.units_le_chartGBound
+
 end Solcore.Surface.Multi
