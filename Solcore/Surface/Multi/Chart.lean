@@ -4174,6 +4174,83 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private def AllGuardMemosFinal
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : PhaseBSealed file tokens) : Prop :=
+  ∀ key, ∃ decision, state.memo key = .final decision
+
+private theorem sealIndexedPhaseB?_allFinal
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (invariant : PhaseBFinalizationInvariant current.payload)
+    (selected : sealIndexedPhaseB? current = some result) :
+    AllGuardMemosFinal result.payload := by
+  unfold sealIndexedPhaseB? sealPhaseB? at selected
+  cases remaining : current.payload.phaseB.remaining with
+  | cons key rest => simp [remaining] at selected
+  | nil =>
+      simp only [remaining] at selected
+      have payload := phaseB_runMappedPrimitive?_payload {
+        payload := current.payload.phaseB
+        counter := current.counter
+      } (.phase .sealBEnterC) (fun state => ({
+        phaseA := state.phaseA
+        memo := fun key =>
+          match state.cells key with
+          | some value => value
+          | none => .undecided
+        finalizedRev := state.finalizedRev
+      } : PhaseBSealed file tokens)) selected
+      intro lookupKey
+      have finalized :
+          lookupKey ∈ current.payload.phaseB.finalizedRev := by
+        rcases invariant.1 lookupKey with pending | finalized
+        · rw [remaining] at pending
+          contradiction
+        · exact finalized
+      obtain ⟨decision, cell⟩ := invariant.2 lookupKey finalized
+      refine ⟨decision, ?_⟩
+      rw [payload]
+      simp [cell]
+
+private theorem executeIndexedPhaseB?_allFinal
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (selected : executeIndexedPhaseB? current = some result) :
+    AllGuardMemosFinal result.payload := by
+  unfold executeIndexedPhaseB? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enterSelected,
+    finalized, runSelected, sealSelected⟩
+  have enteredInvariant :=
+    enterIndexedPhaseB?_invariant current entered enterSelected
+  have finalInvariant := runIndexedPhaseB?_invariant
+    (allGuardInstanceKeys tokens).length entered finalized
+    enteredInvariant runSelected
+  exact sealIndexedPhaseB?_allFinal finalized result
+    finalInvariant sealSelected
+
+private theorem executeObservedPhaseAB?_allFinal
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (selected : executeObservedPhaseAB? file tokens owned = some result) :
+    AllGuardMemosFinal result.payload := by
+  unfold executeObservedPhaseAB? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseA, phaseASelected,
+    indexed, indexedSelected, phaseBSelected⟩
+  exact executeIndexedPhaseB?_allFinal indexed result phaseBSelected
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
