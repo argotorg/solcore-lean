@@ -1683,4 +1683,99 @@ private def enterPhaseC?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def guardWitnessFor?
+    {tokens : List Token}
+    (memo : GuardMemo tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (cell : PriorityGuardId × Polarity) :
+    Option (GuardWitnessKey tokens) :=
+  match selected : GuardAnchor.decide productionInstance cell with
+  | none => none
+  | some guardInstance =>
+      match memo guardInstance with
+      | .undecided => none
+      | .final decision =>
+          if _accepted : cell.2.accepts decision = true then
+            some ⟨{
+              productionInstance := productionInstance
+              guardInstance := guardInstance
+              polarity := cell.2
+            }, by
+              have anchor : GuardAnchor productionInstance cell guardInstance :=
+                GuardAnchor.decide_eq_some_iff.mp selected
+              have sameGuard : guardInstance.guard = cell.1 :=
+                anchor.2.1
+              constructor
+              · simpa only [sameGuard] using anchor.1
+              · simpa only [sameGuard] using anchor⟩
+          else
+            none
+
+private def guardCellAddress
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length) :
+    GuardAddress tokens :=
+  ((⟨productionInstance.production, index⟩, productionInstance.context),
+    productionInstance.origin)
+
+private def preInsertWitnessSlots : List GuardWitnessSlot := [
+  .constructAnchor,
+  .lookupFinalDecision,
+  .comparePolarity
+]
+
+private def processGuardCell?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length) :
+    Option (CountedState tokens (PhaseCOpen file tokens) × Bool) := do
+  let address := guardCellAddress productionInstance index
+  let inspected ← chargeAddresses? current
+    (preInsertWitnessSlots.map fun slot => .guardWitness slot address)
+  let witness := guardWitnessFor? current.payload.memo productionInstance
+    ((guardOf productionInstance.production).get index)
+  let inserted ← runMappedPrimitive? inspected
+    (.guardWitness .insertWitness address) fun state =>
+      match witness with
+      | none => state
+      | some key => {
+          state with guardWitnesses := key :: state.guardWitnesses
+        }
+  pure (inserted, witness.isSome)
+
+private def processGuardCells?
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    List (Fin (guardOf productionInstance.production).length) →
+      CountedState tokens (PhaseCOpen file tokens) →
+      Option (CountedState tokens (PhaseCOpen file tokens) × Bool)
+  | [], current => some (current, true)
+  | index :: rest, current => do
+      let (next, accepted) ←
+        processGuardCell? current productionInstance index
+      let (finished, restAccepted) ←
+        processGuardCells? productionInstance rest next
+      pure (finished, accepted && restAccepted)
+
+private def activateProduction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens) :
+    Option (CountedState tokens (PhaseCOpen file tokens) × Bool) := do
+  let attempted ← runMappedPrimitive? current
+    (.production productionInstance) id
+  processGuardCells? productionInstance
+    (List.ofFn fun index :
+      Fin (guardOf productionInstance.production).length => index)
+    attempted
+
+end Chart
+
 end Solcore.Surface.Multi
