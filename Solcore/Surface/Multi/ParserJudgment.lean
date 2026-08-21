@@ -2680,6 +2680,61 @@ def GuardEvidence
       | .negative => ¬ genericContext
       | .neutral => False
 
+private theorem guardEvidence_total_of_positiveDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (positive : Decidable (GuardEvidence file tokens key .positive)) :
+    ∃ decision : GuardDecision,
+      GuardEvidence file tokens key decision := by
+  cases positive with
+  | isTrue evidence => exact ⟨.positive, evidence⟩
+  | isFalse noPositive =>
+      let pipe := symbolAtBoundaryDecision owned key.siteCursor .pipe
+      cases key with
+      | mk guard contextStart siteCursor ordered =>
+          cases guard with
+          | G01_statementIf =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+          | G02_matchArmBoundary =>
+              cases pipe with
+              | isTrue pipeAtSite =>
+                  refine ⟨.negative, owned, pipeAtSite, ?_⟩
+                  intro evidence
+                  exact noPositive ⟨owned, evidence⟩
+              | isFalse noPipe =>
+                  exact ⟨.neutral, owned, noPipe⟩
+          | G03_parameterComptime =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+          | G04_letComptime =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+          | G05_typeComptime =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+          | G06_patternComptime =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+          | G07_leadingDotArguments =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+          | G08_terminalExpression =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+          | G09_genericContext =>
+              refine ⟨.negative, owned, ?_⟩
+              intro evidence
+              exact noPositive ⟨owned, evidence⟩
+
 private theorem binaryGuardDecision_functional
     (positive : Prop)
     {left right : GuardDecision}
