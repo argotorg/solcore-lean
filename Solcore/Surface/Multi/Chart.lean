@@ -4893,6 +4893,145 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private def guardKeysAt
+    (tokens : List Token) (guard : PriorityGuardId)
+    (contextStart : Boundary tokens) : List (GuardInstanceKey tokens) :=
+  (List.finRange (tokens.length + 2)).filterMap fun siteCursor =>
+    if ordered : contextStart.val ≤ siteCursor.val then
+      some {
+        guard := guard
+        contextStart := contextStart
+        siteCursor := siteCursor
+        ordered := ordered
+      }
+    else
+      none
+
+private theorem mem_guardKeysAt_fields
+    {tokens : List Token} {guard : PriorityGuardId}
+    {contextStart : Boundary tokens} {key : GuardInstanceKey tokens}
+    (member : key ∈ guardKeysAt tokens guard contextStart) :
+    key.guard = guard ∧ key.contextStart = contextStart := by
+  rw [guardKeysAt, List.mem_filterMap] at member
+  rcases member with ⟨siteCursor, _, selected⟩
+  split at selected
+  · simp only [Option.some.injEq] at selected
+    subst key
+    exact ⟨rfl, rfl⟩
+  · contradiction
+
+private theorem guardKeysAt_nodup
+    (tokens : List Token) (guard : PriorityGuardId)
+    (contextStart : Boundary tokens) :
+    (guardKeysAt tokens guard contextStart).Nodup := by
+  rw [List.nodup_iff_pairwise_ne]
+  apply List.Pairwise.filterMap _ _
+    (phaseBFinRange_nodup (tokens.length + 2))
+  intro left right different leftKey leftEq rightKey rightEq equal
+  unfold guardKeysAt at leftEq rightEq
+  split at leftEq
+  next leftOrdered =>
+    simp only [Option.some.injEq] at leftEq
+    split at rightEq
+    next rightOrdered =>
+      simp only [Option.some.injEq] at rightEq
+      have leftCursor := congrArg GuardInstanceKey.siteCursor leftEq
+      have sameCursor := congrArg GuardInstanceKey.siteCursor equal
+      have rightCursor := congrArg GuardInstanceKey.siteCursor rightEq
+      exact different (leftCursor.trans (sameCursor.trans rightCursor.symm))
+    next => contradiction
+  next => contradiction
+
+private def guardKeysFor
+    (tokens : List Token) (guard : PriorityGuardId) :
+    List (GuardInstanceKey tokens) :=
+  (List.finRange (tokens.length + 2)).flatMap fun contextStart =>
+    guardKeysAt tokens guard contextStart
+
+private theorem mem_guardKeysFor_guard
+    {tokens : List Token} {guard : PriorityGuardId}
+    {key : GuardInstanceKey tokens}
+    (member : key ∈ guardKeysFor tokens guard) : key.guard = guard := by
+  rw [guardKeysFor, List.mem_flatMap] at member
+  rcases member with ⟨contextStart, _, keyMember⟩
+  exact (mem_guardKeysAt_fields keyMember).1
+
+private theorem guardKeysFor_nodup
+    (tokens : List Token) (guard : PriorityGuardId) :
+    (guardKeysFor tokens guard).Nodup := by
+  unfold guardKeysFor
+  have blocks : ∀ contexts : List (Boundary tokens), contexts.Nodup →
+      (contexts.flatMap fun contextStart =>
+        guardKeysAt tokens guard contextStart).Nodup := by
+    intro contexts unique
+    induction contexts with
+    | nil => simp
+    | cons contextStart rest induction =>
+        rw [List.nodup_cons] at unique
+        simp only [List.flatMap_cons]
+        rw [List.nodup_append]
+        refine ⟨guardKeysAt_nodup tokens guard contextStart,
+          induction unique.2, ?_⟩
+        intro left leftMember right rightMember equal
+        have leftContext := (mem_guardKeysAt_fields leftMember).2
+        rw [List.mem_flatMap] at rightMember
+        rcases rightMember with ⟨other, otherMember, keyMember⟩
+        have rightContext := (mem_guardKeysAt_fields keyMember).2
+        have sameContext : contextStart = other := by
+          rw [← leftContext, equal, rightContext]
+        exact unique.1 (sameContext ▸ otherMember)
+  exact blocks _ (phaseBFinRange_nodup _)
+
+private theorem allPriorityGuardIds_nodup :
+    allPriorityGuardIds.Nodup := by decide
+
+private theorem allGuardInstanceKeys_nodup (tokens : List Token) :
+    (allGuardInstanceKeys tokens).Nodup := by
+  have blocks : ∀ guards : List PriorityGuardId, guards.Nodup →
+      (guards.flatMap fun guard => guardKeysFor tokens guard).Nodup := by
+    intro guards unique
+    induction guards with
+    | nil => simp
+    | cons guard rest induction =>
+        rw [List.nodup_cons] at unique
+        simp only [List.flatMap_cons]
+        rw [List.nodup_append]
+        refine ⟨guardKeysFor_nodup tokens guard,
+          induction unique.2, ?_⟩
+        intro left leftMember right rightMember equal
+        have leftGuard := mem_guardKeysFor_guard leftMember
+        rw [List.mem_flatMap] at rightMember
+        rcases rightMember with ⟨other, otherMember, keyMember⟩
+        have rightGuard := mem_guardKeysFor_guard keyMember
+        have sameGuard : guard = other := by
+          rw [← leftGuard, equal, rightGuard]
+        exact unique.1 (sameGuard ▸ otherMember)
+  change (allPriorityGuardIds.flatMap fun guard =>
+    guardKeysFor tokens guard).Nodup
+  exact blocks allPriorityGuardIds allPriorityGuardIds_nodup
+
+private def PhaseBRunFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) : Prop :=
+  current.payload.phaseB.remaining.Nodup ∧
+  (∀ key, key ∈ current.payload.phaseB.remaining →
+    ∀ slot, UnitAddress.guardFinalize slot key ∉
+      current.counter.usedRev) ∧
+  UnitAddress.phase .sealBEnterC ∉ current.counter.usedRev
+
+private def PhaseBRunnerReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) : Prop :=
+  FullyMaterializedEvidenceEntries current.payload.indexes ∧
+    PhaseBRunFresh current
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
