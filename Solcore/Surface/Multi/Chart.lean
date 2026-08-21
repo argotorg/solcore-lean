@@ -3014,4 +3014,147 @@ private def phaseBWithBoundary?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- G01: `if (` window, exact closing paren, complete expression, and the
+adjacent `) {` window. -/
+private def phaseBG01Positive?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun openCursor =>
+    phaseBWithBoundary? tokens (key.siteCursor.val + 2) fun expressionStart =>
+      phaseBAllReads? [
+        phaseBAnyReads?
+          ((List.finRange (tokens.length + 2)).map fun closeCursor =>
+            phaseBAllReads? [
+              phaseBReadTerminalGuard? entries .G01_statementIf
+                key.siteCursor closeCursor closeCursor,
+              phaseBReadDelimiterGuard? entries .G01_statementIf
+                openCursor closeCursor closeCursor,
+              phaseBReadGreatestRule? entries .expression
+                expressionStart closeCursor closeCursor
+            ])
+      ]
+
+/-- G02's header and raw pipe observations remain separate because only this
+guard has a neutral result. -/
+private def phaseBG02Observations?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option (Bool × Bool) := do
+  let header ← phaseBReadDelimiterGuard? entries
+    .G02_matchArmBoundary key.contextStart key.siteCursor key.siteCursor
+  let pipe ← phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun after =>
+    phaseBReadTerminalGuard? entries .G02_matchArmBoundary
+      key.contextStart key.siteCursor after
+  pure (header, pipe)
+
+/-- G03--G05: contextual `comptime` at the exact guard site. -/
+private def phaseBComptimeAtSitePositive?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun after =>
+    phaseBReadTerminalGuard? entries key.guard
+      key.contextStart key.siteCursor after
+
+/-- G06: contextual `comptime`, then the first same-depth pattern delimiter,
+with the greatest expression ending exactly there. -/
+private def phaseBG06Positive?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun expressionStart =>
+    phaseBAllReads? [
+      phaseBReadTerminalGuard? entries .G06_patternComptime
+        key.contextStart key.siteCursor expressionStart,
+      phaseBAnyReads?
+        ((List.finRange (tokens.length + 2)).map fun limit =>
+          phaseBAllReads? [
+            phaseBReadDelimiterGuard? entries .G06_patternComptime
+              expressionStart limit limit,
+            phaseBReadGreatestRule? entries .expression
+              expressionStart limit limit
+          ])
+    ]
+
+/-- G07: exact `. identifier` slice from the retained postfix origin and an
+opening parenthesis at the site. -/
+private def phaseBG07Positive?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun after =>
+    phaseBAllReads? [
+      phaseBReadExactSliceGuard? entries .G07_leadingDotArguments
+        key.contextStart key.siteCursor key.siteCursor,
+      phaseBReadTerminalGuard? entries .G07_leadingDotArguments
+        key.contextStart key.siteCursor after
+    ]
+
+/-- G08: the nearest statement-region end is also the greatest complete
+expression end from the guarded site. -/
+private def phaseBG08Positive?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBAnyReads?
+    ((List.finRange (tokens.length + 2)).map fun regionEnd =>
+      phaseBAllReads? [
+        phaseBReadDelimiterGuard? entries .G08_terminalExpression
+          key.contextStart key.siteCursor regionEnd,
+        phaseBReadGreatestRule? entries .expression
+          key.siteCursor regionEnd regionEnd
+      ])
+
+/-- G09: the greatest nonempty predicate-list end is an exact fat arrow. -/
+private def phaseBG09Positive?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBAnyReads?
+    ((List.finRange (tokens.length + 2)).map fun arrowCursor =>
+      phaseBAllReads? [
+        phaseBReadTerminalGuard? entries .G09_genericContext
+          key.contextStart key.siteCursor arrowCursor,
+        phaseBReadGreatestRule? entries .predicateList
+          key.siteCursor arrowCursor arrowCursor
+      ])
+
+/-- Derive the declarative table's unique final decision from finalized U01
+observations.  Only G02 can return neutral. -/
+private def phaseBGuardDecisionFromIndexes?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option GuardDecision :=
+  match key.guard with
+  | .G01_statementIf => do
+      let positive ← phaseBG01Positive? entries key
+      pure (if positive then .positive else .negative)
+  | .G02_matchArmBoundary => do
+      let (header, pipe) ← phaseBG02Observations? entries key
+      pure (if header then .positive else if pipe then .negative else .neutral)
+  | .G03_parameterComptime | .G04_letComptime |
+      .G05_typeComptime => do
+      let positive ← phaseBComptimeAtSitePositive? entries key
+      pure (if positive then .positive else .negative)
+  | .G06_patternComptime => do
+      let positive ← phaseBG06Positive? entries key
+      pure (if positive then .positive else .negative)
+  | .G07_leadingDotArguments => do
+      let positive ← phaseBG07Positive? entries key
+      pure (if positive then .positive else .negative)
+  | .G08_terminalExpression => do
+      let positive ← phaseBG08Positive? entries key
+      pure (if positive then .positive else .negative)
+  | .G09_genericContext => do
+      let positive ← phaseBG09Positive? entries key
+      pure (if positive then .positive else .negative)
+
+end Chart
+
 end Solcore.Surface.Multi
