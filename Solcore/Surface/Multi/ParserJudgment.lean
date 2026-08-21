@@ -19042,4 +19042,32 @@ theorem parse_diagnostic_constructors_exclusive
     ParseDiagnostic.Applies.functional unexpected repeated
   contradiction
 
+/-- A repeated non-associative operator selects the G10 diagnostic and rules
+out every ordinary unexpected-token diagnostic at the same parse input. -/
+theorem chart_repeated_nonassoc_overrides
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    {level : NonAssociativeLevel}
+    {operator : Located InfixOperator}
+    (noRoot : ¬ ∃ module, SourceBackedRoot file tokens module)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (repeated : RepeatedNonAssociativeAt
+      file tokens memo correct final cursor level operator) :
+    ParseDiagnostic.Applies file tokens
+        (.repeatedNonAssociative operator.span level operator) ∧
+      ∀ span found expected,
+        ¬ ParseDiagnostic.Applies file tokens
+          (.unexpected span found expected) := by
+  have applies : ParseDiagnostic.Applies file tokens
+      (.repeatedNonAssociative operator.span level operator) :=
+    .repeatedNonAssociative file tokens memo correct final cursor
+      level operator noRoot greatest repeated
+  refine ⟨applies, ?_⟩
+  intro span found expected unexpected
+  exact parse_diagnostic_constructors_exclusive unexpected applies
+
 end Solcore.Surface.Multi
