@@ -3050,6 +3050,201 @@ def EnabledProductionInstance
           witnessKey.polarity = polarity ∧
           GuardWitness file tokens memo correct allFinal witnessKey
 
+/-- Guard-witness evidence is decidable from a correct finalized memo. -/
+def guardWitnessDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (key : GuardWitnessKey tokens) :
+    Decidable (GuardWitness file tokens memo correct final key) := by
+  unfold GuardWitness
+  match selected : memo key.guardInstance with
+  | .undecided =>
+      exfalso
+      obtain ⟨decision, sealed⟩ := final key.guardInstance
+      rw [selected] at sealed
+      contradiction
+  | .final decision =>
+      match allowed : decision.allows key.polarity with
+      | true =>
+          apply isTrue
+          exact ⟨decision, rfl,
+            (correct key.guardInstance decision).mp selected, allowed⟩
+      | false =>
+          apply isFalse
+          rintro ⟨other, stored, _evidence, otherAllowed⟩
+          have same : other = decision :=
+            (GuardMemoState.final.inj stored).symm
+          subst other
+          rw [allowed] at otherAllowed
+          contradiction
+
+private def EnabledGuardCell
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens)
+    (cell : PriorityGuardId × Polarity) : Prop :=
+  ∃ witnessKey : GuardWitnessKey tokens,
+    witnessKey.productionInstance = productionInstance ∧
+      witnessKey.guardInstance.guard = cell.1 ∧
+      witnessKey.polarity = cell.2 ∧
+      GuardWitness file tokens memo correct final witnessKey
+
+private def enabledGuardCellDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens)
+    (cell : PriorityGuardId × Polarity) :
+    Decidable
+      (EnabledGuardCell file tokens memo correct final
+        productionInstance cell) := by
+  unfold EnabledGuardCell
+  match selected : GuardAnchor.decide productionInstance cell with
+  | none =>
+      apply isFalse
+      rintro ⟨other, productionEq, guardEq, polarityEq, _witness⟩
+      have otherAnchor :
+          GuardAnchor productionInstance cell other.guardInstance := by
+        have retained := other.property.2
+        change GuardAnchor other.val.productionInstance
+          (other.val.guardInstance.guard, other.val.polarity)
+          other.val.guardInstance at retained
+        change other.val.productionInstance = productionInstance at productionEq
+        change other.val.guardInstance.guard = cell.1 at guardEq
+        change other.val.polarity = cell.2 at polarityEq
+        rw [productionEq, guardEq, polarityEq] at retained
+        exact retained
+      have computed := GuardAnchor.decide_eq_some_iff.mpr otherAnchor
+      rw [selected] at computed
+      contradiction
+  | some guardInstance =>
+      have anchor : GuardAnchor productionInstance cell guardInstance :=
+        GuardAnchor.decide_eq_some_iff.mp selected
+      have guardEq : guardInstance.guard = cell.1 := anchor.2.1
+      let raw : GuardWitnessKey.Raw tokens := {
+        productionInstance := productionInstance
+        guardInstance := guardInstance
+        polarity := cell.2
+      }
+      have valid : GuardWitnessKey.Valid raw := by
+        unfold GuardWitnessKey.Valid
+        constructor
+        · simpa only [raw, guardEq] using anchor.1
+        · simpa only [raw, guardEq] using anchor
+      let key : GuardWitnessKey tokens := ⟨raw, valid⟩
+      match guardWitnessDecision correct final key with
+      | isTrue witness =>
+          apply isTrue
+          exact ⟨key, rfl, guardEq, rfl, witness⟩
+      | isFalse noWitness =>
+          apply isFalse
+          rintro ⟨other, productionEq, otherGuardEq, polarityEq, witness⟩
+          have otherAnchor :
+              GuardAnchor productionInstance cell other.guardInstance := by
+            have retained := other.property.2
+            change GuardAnchor other.val.productionInstance
+              (other.val.guardInstance.guard, other.val.polarity)
+              other.val.guardInstance at retained
+            change other.val.productionInstance =
+              productionInstance at productionEq
+            change other.val.guardInstance.guard = cell.1 at otherGuardEq
+            change other.val.polarity = cell.2 at polarityEq
+            rw [productionEq, otherGuardEq, polarityEq] at retained
+            exact retained
+          have guardInstanceEq : other.guardInstance = guardInstance :=
+            GuardAnchor.functional otherAnchor anchor
+          apply noWitness
+          unfold GuardWitness at witness ⊢
+          rcases witness with ⟨decision, stored, evidence, allowed⟩
+          refine ⟨decision, ?_, ?_, ?_⟩
+          · change memo guardInstance = .final decision
+            simpa only [guardInstanceEq] using stored
+          · change GuardEvidence file tokens guardInstance decision
+            simpa only [guardInstanceEq] using evidence
+          · change decision.allows cell.2 = true
+            simpa only [polarityEq] using allowed
+
+private def listForallMemberDecision
+    {alpha : Type} (values : List alpha) (predicate : alpha → Prop)
+    (predicateDecision : ∀ value, Decidable (predicate value)) :
+    Decidable (∀ value, value ∈ values → predicate value) :=
+  match values with
+  | [] => isTrue (by simp)
+  | head :: tail =>
+      match predicateDecision head with
+      | isFalse absent =>
+          isFalse (by
+            intro all
+            exact absent (all head List.mem_cons_self))
+      | isTrue present =>
+          match listForallMemberDecision tail predicate predicateDecision with
+          | isFalse absent =>
+              isFalse (by
+                intro all
+                apply absent
+                intro value member
+                exact all value (List.mem_cons_of_mem head member))
+          | isTrue rest =>
+              isTrue (by
+                intro value member
+                rcases List.mem_cons.mp member with same | inTail
+                · subst value
+                  exact present
+                · exact rest value inTail)
+
+private theorem enabledProductionInstance_iff_guardCells
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens) :
+    EnabledProductionInstance file tokens memo correct final
+        productionInstance ↔
+      ∀ cell, cell ∈ guardOf productionInstance.production →
+        EnabledGuardCell file tokens memo correct final
+          productionInstance cell := by
+  unfold EnabledProductionInstance EnabledGuardCell
+  constructor
+  · intro enabled cell member
+    rcases cell with ⟨guard, polarity⟩
+    exact enabled guard polarity member
+  · intro enabled guard polarity member
+    exact enabled (guard, polarity) member
+
+/-- Production enablement is decidable from a correct finalized guard memo. -/
+def enabledProductionInstanceDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens) :
+    Decidable
+      (EnabledProductionInstance file tokens memo correct final
+        productionInstance) := by
+  letI cellDecision (cell : PriorityGuardId × Polarity) :
+      Decidable
+        (EnabledGuardCell file tokens memo correct final
+          productionInstance cell) :=
+    enabledGuardCellDecision correct final productionInstance cell
+  letI allCellsDecision : Decidable
+      (∀ cell, cell ∈ guardOf productionInstance.production →
+        EnabledGuardCell file tokens memo correct final
+          productionInstance cell) :=
+    listForallMemberDecision (guardOf productionInstance.production)
+      (EnabledGuardCell file tokens memo correct final productionInstance)
+      cellDecision
+  exact decidable_of_iff
+    (∀ cell, cell ∈ guardOf productionInstance.production →
+      EnabledGuardCell file tokens memo correct final
+        productionInstance cell)
+    (enabledProductionInstance_iff_guardCells
+      correct final productionInstance).symm
+
 /-- The least Phase-C reachability relation after all guards are finalized. -/
 inductive ContextualReach
     (file : WorkspaceFile)
