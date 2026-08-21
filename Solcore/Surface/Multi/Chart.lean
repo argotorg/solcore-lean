@@ -3993,9 +3993,9 @@ private def executePhaseCWorklist?
   let entered ← beginPhaseCWorklist? current
   runPhaseCQueues? owned (chartGBound (tokens.length + 1)) entered
 
-/-- Execute the landed observed Phase A/B pipeline through contextual chart
-saturation.  This deliberately stops before values, diagnostics, and outcome
-selection. -/
+/-- Execute the landed observed Phase A/B pipeline through the contextual
+worklist drain.  Saturation correspondence, values, diagnostics, and outcome
+selection are deliberately proved by later layers. -/
 private def executeObservedPhaseABCWorklist?
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens) :
