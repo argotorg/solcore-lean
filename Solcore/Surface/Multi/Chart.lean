@@ -3271,6 +3271,305 @@ private def executeObservedPhaseAB?
 end Chart
 
 namespace Chart
+open Grammar
+open Solcore.Workspace
+private theorem phaseBFinRange_nodup (size : Nat) :
+    (List.finRange size).Nodup := by
+  induction size with
+  | zero => simp
+  | succ size induction =>
+      rw [show List.finRange (size + 1) =
+        0 :: (List.finRange size).map Fin.succ from List.finRange_succ]
+      rw [List.nodup_cons]
+      constructor
+      · intro member
+        rw [List.mem_map] at member
+        rcases member with ⟨value, _, equal⟩
+        exact Fin.succ_ne_zero value equal
+      · rw [List.nodup_iff_pairwise_ne, List.pairwise_map]
+        exact induction.imp fun different equal =>
+          different (Fin.succ_inj.mp equal)
+
+private structure EvidenceBoundaryPair (tokens : List Token) where
+  siteCursor : Boundary tokens
+  resultEnd : Boundary tokens
+private theorem EvidenceBoundaryPair.eq_of_fields
+    {tokens : List Token} {left right : EvidenceBoundaryPair tokens}
+    (siteCursor : left.siteCursor = right.siteCursor)
+    (resultEnd : left.resultEnd = right.resultEnd) : left = right := by
+  cases left
+  cases right
+  simp only at siteCursor resultEnd
+  cases siteCursor
+  cases resultEnd
+  rfl
+private def allEvidenceBoundaryPairs (tokens : List Token) :
+    List (EvidenceBoundaryPair tokens) :=
+  (List.finRange (tokens.length + 2)).flatMap fun siteCursor =>
+    (List.finRange (tokens.length + 2)).map fun resultEnd =>
+      ⟨siteCursor, resultEnd⟩
+
+private theorem allEvidenceBoundaryPairs_nodup (tokens : List Token) :
+    (allEvidenceBoundaryPairs tokens).Nodup := by
+  apply dependentEnumeration_nodup
+    (List.finRange (tokens.length + 2))
+    (fun _ => List.finRange (tokens.length + 2))
+    (fun siteCursor resultEnd =>
+      (⟨siteCursor, resultEnd⟩ : EvidenceBoundaryPair tokens))
+    (phaseBFinRange_nodup _)
+    (fun _ => phaseBFinRange_nodup _)
+  intro left right leftEnd rightEnd equal
+  have owner : left = right :=
+    congrArg EvidenceBoundaryPair.siteCursor equal
+  subst right
+  have item : leftEnd = rightEnd :=
+    congrArg EvidenceBoundaryPair.resultEnd equal
+  subst rightEnd
+  rfl
+
+private structure EvidenceBoundaryTriple (tokens : List Token) where
+  contextStart : Boundary tokens
+  pair : EvidenceBoundaryPair tokens
+
+private theorem EvidenceBoundaryTriple.eq_of_fields
+    {tokens : List Token} {left right : EvidenceBoundaryTriple tokens}
+    (contextStart : left.contextStart = right.contextStart)
+    (pair : left.pair = right.pair) : left = right := by
+  cases left
+  cases right
+  simp only at contextStart pair
+  cases contextStart
+  cases pair
+  rfl
+
+private def allEvidenceBoundaryTriples (tokens : List Token) :
+    List (EvidenceBoundaryTriple tokens) :=
+  (List.finRange (tokens.length + 2)).flatMap fun contextStart =>
+    (allEvidenceBoundaryPairs tokens).map fun pair =>
+      ⟨contextStart, pair⟩
+
+private theorem allEvidenceBoundaryTriples_nodup (tokens : List Token) :
+    (allEvidenceBoundaryTriples tokens).Nodup := by
+  apply dependentEnumeration_nodup
+    (List.finRange (tokens.length + 2))
+    (fun _ => allEvidenceBoundaryPairs tokens)
+    (fun contextStart pair =>
+      (⟨contextStart, pair⟩ : EvidenceBoundaryTriple tokens))
+    (phaseBFinRange_nodup _)
+    (fun _ => allEvidenceBoundaryPairs_nodup tokens)
+  intro left right leftPair rightPair equal
+  have owner : left = right :=
+    congrArg EvidenceBoundaryTriple.contextStart equal
+  subst right
+  have item : leftPair = rightPair :=
+    congrArg EvidenceBoundaryTriple.pair equal
+  subst rightPair
+  rfl
+
+private structure EvidenceSubjectCoordinates (tokens : List Token) where
+  subject : PriorityGuardId ⊕ GrammarRuleId
+  boundaries : EvidenceBoundaryTriple tokens
+
+private theorem EvidenceSubjectCoordinates.eq_of_fields
+    {tokens : List Token} {left right : EvidenceSubjectCoordinates tokens}
+    (subject : left.subject = right.subject)
+    (boundaries : left.boundaries = right.boundaries) : left = right := by
+  cases left
+  cases right
+  simp only at subject boundaries
+  cases subject
+  cases boundaries
+  rfl
+
+private def allEvidenceSubjectCoordinates (tokens : List Token) :
+    List (EvidenceSubjectCoordinates tokens) :=
+  allEvidenceIndexSubjects.flatMap fun subject =>
+    (allEvidenceBoundaryTriples tokens).map fun boundaries =>
+      ⟨subject, boundaries⟩
+
+private theorem allEvidenceIndexSubjects_nodup :
+    allEvidenceIndexSubjects.Nodup := by
+  decide
+
+private theorem allEvidenceSubjectCoordinates_nodup (tokens : List Token) :
+    (allEvidenceSubjectCoordinates tokens).Nodup := by
+  apply dependentEnumeration_nodup
+    allEvidenceIndexSubjects
+    (fun _ => allEvidenceBoundaryTriples tokens)
+    (fun subject boundaries =>
+      (⟨subject, boundaries⟩ : EvidenceSubjectCoordinates tokens))
+    allEvidenceIndexSubjects_nodup
+    (fun _ => allEvidenceBoundaryTriples_nodup tokens)
+  intro left right leftBoundaries rightBoundaries equal
+  have owner : left = right :=
+    congrArg EvidenceSubjectCoordinates.subject equal
+  subst right
+  have item : leftBoundaries = rightBoundaries :=
+    congrArg EvidenceSubjectCoordinates.boundaries equal
+  subst rightBoundaries
+  rfl
+
+private def EvidenceIndexAddress.ofCoordinates
+    {tokens : List Token} (kind : EvidenceIndexKind)
+    (coordinates : EvidenceSubjectCoordinates tokens) :
+    EvidenceIndexAddress tokens := {
+  kind := kind
+  subject := coordinates.subject
+  contextStart := coordinates.boundaries.contextStart
+  siteCursor := coordinates.boundaries.pair.siteCursor
+  resultEnd := coordinates.boundaries.pair.resultEnd
+}
+
+private def canonicalEvidenceIndexAddresses (tokens : List Token) :
+    List (EvidenceIndexAddress tokens) :=
+  allEvidenceIndexKinds.flatMap fun kind =>
+    (allEvidenceSubjectCoordinates tokens).map
+      (EvidenceIndexAddress.ofCoordinates kind)
+
+private theorem allEvidenceIndexKinds_nodup :
+    allEvidenceIndexKinds.Nodup := by
+  decide
+
+private theorem canonicalEvidenceIndexAddresses_nodup
+    (tokens : List Token) :
+    (canonicalEvidenceIndexAddresses tokens).Nodup := by
+  apply dependentEnumeration_nodup
+    allEvidenceIndexKinds
+    (fun _ => allEvidenceSubjectCoordinates tokens)
+    EvidenceIndexAddress.ofCoordinates
+    allEvidenceIndexKinds_nodup
+    (fun _ => allEvidenceSubjectCoordinates_nodup tokens)
+  intro left right leftCoordinates rightCoordinates equal
+  have owner : left = right := congrArg EvidenceIndexAddress.kind equal
+  subst right
+  have subject : leftCoordinates.subject = rightCoordinates.subject :=
+    congrArg EvidenceIndexAddress.subject equal
+  have contextStart : leftCoordinates.boundaries.contextStart =
+      rightCoordinates.boundaries.contextStart :=
+    congrArg EvidenceIndexAddress.contextStart equal
+  have siteCursor : leftCoordinates.boundaries.pair.siteCursor =
+      rightCoordinates.boundaries.pair.siteCursor :=
+    congrArg EvidenceIndexAddress.siteCursor equal
+  have resultEnd : leftCoordinates.boundaries.pair.resultEnd =
+      rightCoordinates.boundaries.pair.resultEnd :=
+    congrArg EvidenceIndexAddress.resultEnd equal
+  have pair : leftCoordinates.boundaries.pair =
+      rightCoordinates.boundaries.pair :=
+    EvidenceBoundaryPair.eq_of_fields siteCursor resultEnd
+  have boundaries : leftCoordinates.boundaries =
+      rightCoordinates.boundaries :=
+    EvidenceBoundaryTriple.eq_of_fields contextStart pair
+  have coordinates : leftCoordinates = rightCoordinates :=
+    EvidenceSubjectCoordinates.eq_of_fields subject boundaries
+  subst rightCoordinates
+  rfl
+
+private theorem allEvidenceIndexAddresses_eq_canonical
+    (tokens : List Token) :
+    allEvidenceIndexAddresses tokens =
+      canonicalEvidenceIndexAddresses tokens := by
+  simp only [allEvidenceIndexAddresses, canonicalEvidenceIndexAddresses,
+    allEvidenceSubjectCoordinates, allEvidenceBoundaryTriples,
+    allEvidenceBoundaryPairs, EvidenceIndexAddress.ofCoordinates,
+    List.map_flatMap, List.map_map, Function.comp_def]
+
+private theorem allEvidenceIndexAddresses_nodup (tokens : List Token) :
+    (allEvidenceIndexAddresses tokens).Nodup := by
+  rw [allEvidenceIndexAddresses_eq_canonical]
+  exact canonicalEvidenceIndexAddresses_nodup tokens
+
+private def EvidenceEntriesAddressNodup
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens)) :
+    Prop :=
+  (entries.map PhaseAEvidenceEntry.address).Nodup
+
+private def EvidenceEntriesCover
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens)) :
+    Prop :=
+  ∀ address, ∃ selected,
+    ({ address := address, selected := selected } :
+      PhaseAEvidenceEntry tokens) ∈ entries
+
+private def FullyMaterializedEvidenceEntries
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens)) :
+    Prop :=
+  EvidenceEntriesAddressNodup entries ∧ EvidenceEntriesCover entries
+
+private def canonicalEvidenceEntries
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (phaseA : PhaseAOpen file tokens) :
+    List (PhaseAEvidenceEntry tokens) :=
+  (allEvidenceIndexAddresses tokens).map fun address => {
+    address := address
+    selected := evaluate phaseA address
+  }
+
+private theorem canonicalEvidenceEntries_fullyMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (phaseA : PhaseAOpen file tokens) :
+    FullyMaterializedEvidenceEntries
+      (canonicalEvidenceEntries evaluate phaseA) := by
+  constructor
+  · unfold EvidenceEntriesAddressNodup canonicalEvidenceEntries
+    rw [List.map_map]
+    change (List.map id (allEvidenceIndexAddresses tokens)).Nodup
+    rw [List.map_id]
+    exact allEvidenceIndexAddresses_nodup tokens
+  · intro address
+    refine ⟨evaluate phaseA address, ?_⟩
+    rw [canonicalEvidenceEntries, List.mem_map]
+    exact ⟨address, allEvidenceIndexAddresses_complete address, rfl⟩
+
+private theorem evidenceIndexKind_beq_self (kind : EvidenceIndexKind) :
+    (kind == kind) = true := by cases kind <;> rfl
+
+private theorem evidenceSubject_beq_self
+    (subject : PriorityGuardId ⊕ GrammarRuleId) :
+    (subject == subject) = true := by
+  cases subject with
+  | inl guard => cases guard <;> rfl
+  | inr rule => cases rule <;> rfl
+
+private theorem phaseAEvidenceAddressEqBool_self
+    {tokens : List Token} (address : EvidenceIndexAddress tokens) :
+    phaseAEvidenceAddressEqBool address address = true := by
+  cases address
+  simp [phaseAEvidenceAddressEqBool, evidenceIndexKind_beq_self,
+    evidenceSubject_beq_self]
+
+private theorem phaseAEvidenceEntryAt?_some_of_mem
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    {address : EvidenceIndexAddress tokens} {selected : Bool}
+    (member : ({ address := address, selected := selected } :
+      PhaseAEvidenceEntry tokens) ∈ entries) :
+    ∃ observed, phaseAEvidenceEntryAt? entries address = some observed := by
+  induction entries with
+  | nil => simp at member
+  | cons head tail induction =>
+      rw [List.mem_cons] at member
+      rcases member with equal | member
+      · subst head
+        exact ⟨selected, by
+          simp [phaseAEvidenceEntryAt?, phaseAEvidenceAddressEqBool_self]⟩
+      · rw [phaseAEvidenceEntryAt?]
+        split
+        · exact ⟨head.selected, rfl⟩
+        · exact induction member
+
+private theorem phaseAEvidenceEntryAt?_total_of_fullyMaterialized
+    {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
+    (complete : FullyMaterializedEvidenceEntries entries)
+    (address : EvidenceIndexAddress tokens) :
+    ∃ selected, phaseAEvidenceEntryAt? entries address = some selected := by
+  obtain ⟨selected, member⟩ := complete.2 address
+  exact phaseAEvidenceEntryAt?_some_of_mem entries member
+
+end Chart
+
+namespace Chart
 
 open Grammar
 open Solcore.Workspace
