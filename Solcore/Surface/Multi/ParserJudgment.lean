@@ -13581,6 +13581,146 @@ private theorem ruleReduction_atom_total
     exact ⟨_, .atomTuple origin finish openParen first comma second rest
       closeParen witness⟩
 
+private theorem optionalIdentifierTargets_exist
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens
+      (.optional (.list1 (.atom (.terminal (.category .identifier)))))) :
+    ∃ targets : Option (NonemptyList
+        (RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)),
+      EbnfValue.optional
+        (.list1 (.atom (.terminal (.category .identifier))))
+        (targets.map fun values =>
+          EbnfValue.list1 (.atom (.terminal (.category .identifier)))
+            (values.map fun name => EbnfValue.terminalAtom
+              (.category .identifier) name.matched)) = input ∧
+      ∀ values, targets = some values →
+        IdentifierProjects values.head.matched
+          values.head.spelling values.head.parsed ∧
+        ∀ name, name ∈ values.tail →
+          IdentifierProjects name.matched name.spelling name.parsed := by
+  let child : EbnfExpr :=
+    .list1 (.atom (.terminal (.category .identifier)))
+  generalize viewEq : optionalView child input = viewed
+  cases viewed with
+  | none =>
+      refine ⟨none, ?_, ?_⟩
+      · exact optional_eq_of_view child input viewEq
+      · intro values impossible
+        cases impossible
+  | some raw =>
+      rcases identifierNonemptyInputs_exist
+          (list1TotalView (.atom (.terminal (.category .identifier))) raw) with
+        ⟨targets, targetsEq, headProjects, tailProjects⟩
+      refine ⟨some targets, ?_, ?_⟩
+      · simp only [Option.map]
+        rw [targetsEq, list1_of_totalView]
+        exact optional_eq_of_view child input viewEq
+      · intro values valuesEq
+        cases valuesEq
+        exact ⟨headProjects, tailProjects⟩
+
+private theorem ruleReduction_pragmaDecl_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .pragmaDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .pragmaDecl)) :
+    ∃ output : RuleValue .pragmaDecl,
+      RuleReduction file tokens .pragmaDecl origin finish input output := by
+  let targetsAtom : EbnfExpr :=
+    .optional (.list1 (.atom (.terminal (.category .identifier))))
+  let coverageChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .pragmaKw)),
+    .atom (.terminal (.pragmaName .noCoverageCondition)), targetsAtom,
+    .atom (.terminal (.symbol .semicolon))]
+  let pattersonChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .pragmaKw)),
+    .atom (.terminal (.pragmaName .noPattersonCondition)), targetsAtom,
+    .atom (.terminal (.symbol .semicolon))]
+  let boundedChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .pragmaKw)),
+    .atom (.terminal (.pragmaName .noBoundedVariableCondition)), targetsAtom,
+    .atom (.terminal (.symbol .semicolon))]
+  let genericChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .pragmaKw)),
+    .atom (.terminal (.pragmaName .noGenericInstanceFor)), targetsAtom,
+    .atom (.terminal (.symbol .semicolon))]
+  let branches : List EbnfExpr := [.sequence coverageChildren,
+    .sequence pattersonChildren, .sequence boundedChildren,
+    .sequence genericChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize choiceViewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input choiceViewEq
+  have branchesLength : branches.length = 4 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨ branch = 3 := by
+    have branchBound : branch.val < 4 := by
+      rw [← branchesLength]
+      exact branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+    · exact Or.inr (Or.inr (Or.inr (Fin.ext valueEq)))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl
+  · generalize sequenceEq : sequenceFlatView coverageChildren raw = values
+    rcases values with ⟨rawPragma, rawKind, rawTargets, rawSemicolon, ⟨⟩⟩
+    let pragmaKw := terminalView (.hardKeyword .pragmaKw) rawPragma
+    let kindToken := terminalView (.pragmaName .noCoverageCondition) rawKind
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rcases optionalIdentifierTargets_exist rawTargets with
+      ⟨targets, targetsEq, targetProjects⟩
+    rw [← inputEq, ← sequence_of_flat_view coverageChildren raw, sequenceEq,
+      ← terminal_of_view (.hardKeyword .pragmaKw) rawPragma,
+      ← terminal_of_view (.pragmaName .noCoverageCondition) rawKind,
+      ← targetsEq, ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .pragmaDeclNoCoverageCondition origin finish pragmaKw kindToken
+      targets semicolon targetProjects witness⟩
+  · generalize sequenceEq : sequenceFlatView pattersonChildren raw = values
+    rcases values with ⟨rawPragma, rawKind, rawTargets, rawSemicolon, ⟨⟩⟩
+    let pragmaKw := terminalView (.hardKeyword .pragmaKw) rawPragma
+    let kindToken := terminalView (.pragmaName .noPattersonCondition) rawKind
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rcases optionalIdentifierTargets_exist rawTargets with
+      ⟨targets, targetsEq, targetProjects⟩
+    rw [← inputEq, ← sequence_of_flat_view pattersonChildren raw, sequenceEq,
+      ← terminal_of_view (.hardKeyword .pragmaKw) rawPragma,
+      ← terminal_of_view (.pragmaName .noPattersonCondition) rawKind,
+      ← targetsEq, ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .pragmaDeclNoPattersonCondition origin finish pragmaKw kindToken
+      targets semicolon targetProjects witness⟩
+  · generalize sequenceEq : sequenceFlatView boundedChildren raw = values
+    rcases values with ⟨rawPragma, rawKind, rawTargets, rawSemicolon, ⟨⟩⟩
+    let pragmaKw := terminalView (.hardKeyword .pragmaKw) rawPragma
+    let kindToken := terminalView
+      (.pragmaName .noBoundedVariableCondition) rawKind
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rcases optionalIdentifierTargets_exist rawTargets with
+      ⟨targets, targetsEq, targetProjects⟩
+    rw [← inputEq, ← sequence_of_flat_view boundedChildren raw, sequenceEq,
+      ← terminal_of_view (.hardKeyword .pragmaKw) rawPragma,
+      ← terminal_of_view (.pragmaName .noBoundedVariableCondition) rawKind,
+      ← targetsEq, ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .pragmaDeclNoBoundedVariableCondition origin finish
+      pragmaKw kindToken targets semicolon targetProjects witness⟩
+  · generalize sequenceEq : sequenceFlatView genericChildren raw = values
+    rcases values with ⟨rawPragma, rawKind, rawTargets, rawSemicolon, ⟨⟩⟩
+    let pragmaKw := terminalView (.hardKeyword .pragmaKw) rawPragma
+    let kindToken := terminalView (.pragmaName .noGenericInstanceFor) rawKind
+    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+    rcases optionalIdentifierTargets_exist rawTargets with
+      ⟨targets, targetsEq, targetProjects⟩
+    rw [← inputEq, ← sequence_of_flat_view genericChildren raw, sequenceEq,
+      ← terminal_of_view (.hardKeyword .pragmaKw) rawPragma,
+      ← terminal_of_view (.pragmaName .noGenericInstanceFor) rawKind,
+      ← targetsEq, ← terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact ⟨_, .pragmaDeclNoGenericInstanceFor origin finish pragmaKw kindToken
+      targets semicolon targetProjects witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
