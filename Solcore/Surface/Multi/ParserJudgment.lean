@@ -400,6 +400,149 @@ private theorem finiteFilteredClosure_stable
     (filteredClosure_ascending carrier select inflationary)
     (filteredClosure_bounded carrier select)
 
+private abbrev RawScanWitness
+    (file : WorkspaceFile) (tokens : List Token)
+    (before after : DottedItem tokens) : Type :=
+  Sigma fun cursor : TerminalCursor tokens =>
+    ScannedEdgeWitness file tokens before after cursor
+
+private def nextSymbolDecidable
+    {tokens : List Token} (item : DottedItem tokens)
+    (symbol : GrammarSymbol) : Decidable (NextSymbol item symbol) := by
+  unfold NextSymbol
+  infer_instance
+
+private def completeItemDecidable
+    {tokens : List Token} (item : DottedItem tokens) :
+    Decidable (CompleteItem item) := by
+  unfold CompleteItem
+  infer_instance
+
+private def advanceItemDecidable
+    {tokens : List Token} (before : DottedItem tokens)
+    (next : Boundary tokens) (after : DottedItem tokens) :
+    Decidable (AdvanceItem before next after) := by
+  unfold AdvanceItem
+  infer_instance
+
+private abbrev LocatedTerminalCursor
+    (tokens : List Token) (boundary : Boundary tokens) : Type :=
+  { cursor : TerminalCursor tokens // cursor.beforeBoundary = boundary }
+
+private def terminalCursorAt?
+    (tokens : List Token) (boundary : Boundary tokens) :
+    Option (LocatedTerminalCursor tokens boundary) :=
+  if inRange : boundary.val < tokens.length + 1 then
+    some ⟨⟨boundary.val, inRange⟩, Fin.ext rfl⟩
+  else
+    none
+
+private theorem terminalCursorAt?_complete
+    {tokens : List Token} (boundary : Boundary tokens)
+    (cursor : TerminalCursor tokens)
+    (atBoundary : cursor.beforeBoundary = boundary) :
+    ∃ result, terminalCursorAt? tokens boundary = some result ∧
+      result.val = cursor := by
+  have inRange : boundary.val < tokens.length + 1 := by
+    have sameValue : cursor.val = boundary.val :=
+      congrArg Fin.val atBoundary
+    omega
+  unfold terminalCursorAt?
+  rw [dif_pos inRange]
+  refine ⟨_, rfl, ?_⟩
+  apply Fin.ext
+  exact (congrArg Fin.val atBoundary).symm
+
+private def rawScan?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (before after : DottedItem tokens) :
+    Option (RawScanWitness file tokens before after) :=
+  match before.production.rhs[before.dot.val]? with
+  | some (.terminal terminal) =>
+      letI : Decidable (NextSymbol before (.terminal terminal)) :=
+        nextSymbolDecidable before (.terminal terminal)
+      if next : NextSymbol before (.terminal terminal) then
+        match terminalCursorAt? tokens before.current with
+        | some located =>
+          letI : Decidable
+              (AdvanceItem before located.val.afterBoundary after) :=
+            advanceItemDecidable before located.val.afterBoundary after
+          match MatchedTerminal.atCursor?
+              file tokens owned terminal located.val with
+          | some result =>
+              if advance : AdvanceItem before located.val.afterBoundary after then
+                some ⟨located.val, {
+                  terminal := terminal
+                  matched := result.val
+                  sameCursor := result.property
+                  next := next
+                  atCurrent := located.property
+                  advance := by
+                    simpa only [result.property] using advance
+                }⟩
+              else
+                none
+          | none => none
+        | none => none
+      else
+        none
+  | _ => none
+
+private theorem rawScan?_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : DottedItem tokens)
+    {witness : RawScanWitness file tokens before after}
+    (_selected : rawScan? file tokens owned before after = some witness) :
+    Nonempty (RawScanWitness file tokens before after) := by
+  exact ⟨witness⟩
+
+private theorem rawScan?_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : DottedItem tokens)
+    (witness : RawScanWitness file tokens before after) :
+    ∃ result, rawScan? file tokens owned before after = some result := by
+  rcases witness with ⟨cursor, witness⟩
+  rcases witness with
+    ⟨terminal, matched, sameCursor, next, atCurrent, advance⟩
+  obtain ⟨located, cursorSelected, locatedEq⟩ :=
+    terminalCursorAt?_complete before.current cursor atCurrent
+  obtain ⟨result, selected⟩ := MatchedTerminal.atCursor?_complete
+    owned terminal located.val
+    (by
+      rw [locatedEq]
+      rw [← sameCursor]
+      exact matched.at)
+    matched.matches
+  have computedAdvance :
+      AdvanceItem before located.val.afterBoundary after := by
+    rw [locatedEq]
+    rw [← sameCursor]
+    exact advance
+  simp [rawScan?, next.2, next, cursorSelected, selected,
+    computedAdvance]
+
+private def rawScanBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (before after : DottedItem tokens) : Bool :=
+  (rawScan? file tokens owned before after).isSome
+
+private theorem rawScanBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : DottedItem tokens) :
+    rawScanBool file tokens owned before after = true ↔
+      Nonempty (RawScanWitness file tokens before after) := by
+  rw [rawScanBool, Option.isSome_iff_exists]
+  constructor
+  · rintro ⟨witness, selected⟩
+    exact rawScan?_sound owned before after selected
+  · rintro ⟨witness⟩
+    exact rawScan?_complete owned before after witness
+
 /-- Unguarded recognition is exactly one reached complete matching item. -/
 theorem unguardedRecognizes_exact
     {file : WorkspaceFile} {tokens : List Token}
