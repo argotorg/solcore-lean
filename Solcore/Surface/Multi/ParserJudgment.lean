@@ -2271,6 +2271,37 @@ def ArmHeaderAt
           (.aux Grammar.matchArmPatternListSite.site)
           patternStart arrowCursor arrowCursor
 
+/-- Match-arm header evidence is constructively decidable on an owned stream. -/
+def armHeaderAtDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart cursor : Boundary tokens) :
+    Decidable (ArmHeaderAt file tokens regionStart cursor) := by
+  unfold ArmHeaderAt
+  letI (left right : Boundary tokens) :
+      Decidable (SameDelimiterDepth tokens left right) :=
+    sameDelimiterDepthDecision tokens left right
+  letI (candidate : Boundary tokens) (symbol : Symbol) :
+      Decidable (SymbolAtBoundary file tokens candidate symbol) :=
+    symbolAtBoundaryDecision owned candidate symbol
+  letI (symbol : Symbol) (symbolCursor after : Boundary tokens) :
+      Decidable
+        (ImmediatelyAfterSymbol file tokens symbol symbolCursor after) :=
+    immediatelyAfterSymbolDecision owned symbol symbolCursor after
+  letI (start finish : Boundary tokens) (allowed : NonemptyList Symbol) :
+      Decidable (NextSameDepthDelimiter tokens start finish allowed) :=
+    nextSameDepthDelimiterDecision tokens start finish allowed
+  letI (symbol : NonterminalSymbol)
+      (start upperBound finish : Boundary tokens) :
+      Decidable
+        (GreatestUnguardedEnd file tokens symbol start upperBound finish) :=
+    greatestUnguardedEndDecision owned symbol start upperBound finish
+  letI boundaryExistsDecidable
+      (predicate : Boundary tokens → Prop) [DecidablePred predicate] :
+      Decidable (∃ candidate, predicate candidate) :=
+    Nat.decidableExistsFin predicate
+  infer_instance
+
 /-- A brace pair strictly containing one cursor. -/
 def ContainingBraceFrame
     (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
