@@ -391,4 +391,256 @@ private theorem chart_key_cardinality (tokens : List Token) :
       (by rintro ⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩; rfl)
       cubicCoordinatesCardinality
 
+private theorem sum_cardinality
+    {α β : Type} {leftSize rightSize : Nat}
+    (leftCardinality :
+      ∃ encode : α → Fin leftSize,
+        Function.Injective encode ∧ Function.Surjective encode)
+    (rightCardinality :
+      ∃ encode : β → Fin rightSize,
+        Function.Injective encode ∧ Function.Surjective encode) :
+    ∃ encode : α ⊕ β → Fin (leftSize + rightSize),
+      Function.Injective encode ∧ Function.Surjective encode := by
+  obtain ⟨leftEncode, leftInjective, leftSurjective⟩ := leftCardinality
+  obtain ⟨rightEncode, rightInjective, rightSurjective⟩ :=
+    rightCardinality
+  let encode : α ⊕ β → Fin (leftSize + rightSize)
+    | .inl value => ⟨(leftEncode value).val,
+        Nat.lt_of_lt_of_le (leftEncode value).isLt
+          (Nat.le_add_right leftSize rightSize)⟩
+    | .inr value => ⟨leftSize + (rightEncode value).val, by
+        have := (rightEncode value).isLt
+        omega⟩
+  refine ⟨encode, ?_, ?_⟩
+  · intro left right equal
+    cases left with
+    | inl leftValue =>
+        cases right with
+        | inl rightValue =>
+            have rawEqual := congrArg Fin.val equal
+            simp only [encode] at rawEqual
+            exact congrArg Sum.inl
+              (leftInjective (Fin.ext rawEqual))
+        | inr rightValue =>
+            have rawEqual := congrArg Fin.val equal
+            have leftBound := (leftEncode leftValue).isLt
+            simp only [encode] at rawEqual
+            omega
+    | inr leftValue =>
+        cases right with
+        | inl rightValue =>
+            have rawEqual := congrArg Fin.val equal
+            have rightBound := (leftEncode rightValue).isLt
+            simp only [encode] at rawEqual
+            omega
+        | inr rightValue =>
+            have rawEqual := congrArg Fin.val equal
+            simp only [encode] at rawEqual
+            exact congrArg Sum.inr
+              (rightInjective (Fin.ext (Nat.add_left_cancel rawEqual)))
+  · intro index
+    by_cases inLeft : index.val < leftSize
+    · let leftIndex : Fin leftSize := ⟨index.val, inLeft⟩
+      obtain ⟨value, equal⟩ := leftSurjective leftIndex
+      refine ⟨.inl value, Fin.ext ?_⟩
+      simpa [encode, leftIndex] using congrArg Fin.val equal
+    · have leftLower : leftSize ≤ index.val := Nat.le_of_not_gt inLeft
+      let rightIndex : Fin rightSize := ⟨index.val - leftSize, by
+        have := index.isLt
+        omega⟩
+      obtain ⟨value, equal⟩ := rightSurjective rightIndex
+      refine ⟨.inr value, Fin.ext ?_⟩
+      have rawEqual := congrArg Fin.val equal
+      simp only [encode]
+      dsimp only [rightIndex] at rawEqual
+      omega
+
+private instance : LawfulBEq ChartPhaseSlot where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq GuardFinalizeSlot where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq GuardWitnessSlot where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq ChartLinearUnitKind where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq ChartPredictionUnitKind where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq ChartCubicUnitKind where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private theorem chart_unit_kind_cardinality :
+    (∃ encode : ChartPhaseSlot → Fin 4,
+      Function.Injective encode ∧ Function.Surjective encode) ∧
+    (∃ encode : GuardFinalizeSlot → Fin 8,
+      Function.Injective encode ∧ Function.Surjective encode) ∧
+    (∃ encode : GuardWitnessSlot → Fin 4,
+      Function.Injective encode ∧ Function.Surjective encode) ∧
+    (∃ encode : ChartLinearUnitKind → Fin 14,
+      Function.Injective encode ∧ Function.Surjective encode) ∧
+    (∃ encode : ChartPredictionUnitKind → Fin 2,
+      Function.Injective encode ∧ Function.Surjective encode) ∧
+    (∃ encode : ChartCubicUnitKind → Fin 8,
+      Function.Injective encode ∧ Function.Surjective encode) := by
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · simpa using enumeration_cardinality
+      ([.initializePhaseA, .sealAEnterB, .sealBEnterC,
+        .selectFinalOutcome] : List ChartPhaseSlot)
+      (by intro slot; cases slot <;> simp) (by decide)
+  · simpa using enumeration_cardinality
+      ([.initializeUndecided, .siteTerminalLookup,
+        .adjacentTerminalWindowLookup, .exactSliceLookup,
+        .unguardedSpanLookup, .greatestEndLookup,
+        .delimiterOrRegionLookup, .writeFinalDecision] :
+        List GuardFinalizeSlot)
+      (by intro slot; cases slot <;> simp) (by decide)
+  · simpa using enumeration_cardinality
+      ([.constructAnchor, .lookupFinalDecision, .comparePolarity,
+        .insertWitness] : List GuardWitnessSlot)
+      (by intro slot; cases slot <;> simp) (by decide)
+  · simpa using enumeration_cardinality
+      ([.L01_itemDequeue, .L02_scannedEdgeDequeue, .L03_itemInsert,
+        .L04_scanAttempt, .L05_scannedItemInsert, .L06_scannedEdgeInsert,
+        .L07_completedItemInsert, .L08_frontierDequeue,
+        .L09_frontierInsert, .L10_expectedCandidate, .L11_foundCandidate,
+        .L12_scannedAction, .L13_epsilonAction,
+        .L14_frontierScannedTraversal] : List ChartLinearUnitKind)
+      (by intro kind; cases kind <;> simp) (by decide)
+  · simpa using enumeration_cardinality
+      ([.R01_predictionAttempt, .R02_frontierPrediction] :
+        List ChartPredictionUnitKind)
+      (by intro kind; cases kind <;> simp) (by decide)
+  · simpa using enumeration_cardinality
+      ([.U01_evidenceIndex, .U02_completedEdgeDequeue,
+        .U03_completionAttempt, .U04_completedEdgeInsert,
+        .U05_completedAction, .U06_frontierCompletion,
+        .U07_frontierCompletedTraversal, .U08_G10Candidate] :
+        List ChartCubicUnitKind)
+      (by intro kind; cases kind <;> simp) (by decide)
+
+private theorem dependentEnumeration_nodup
+    {α γ : Type} {β : α → Type}
+    (values : List α) (items : (value : α) → List (β value))
+    (make : (value : α) → β value → γ)
+    (valuesUnique : values.Nodup)
+    (itemsUnique : ∀ value, (items value).Nodup)
+    (makeInjective : ∀ {left right} {leftItem : β left}
+      {rightItem : β right},
+      make left leftItem = make right rightItem →
+        Sigma.mk left leftItem = Sigma.mk right rightItem) :
+    (values.flatMap fun value =>
+      (items value).map (make value)).Nodup := by
+  induction values with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.nodup_cons] at valuesUnique
+      simp only [List.flatMap_cons]
+      rw [List.nodup_append]
+      have mappedUnique : ((items head).map (make head)).Nodup := by
+        rw [List.nodup_iff_pairwise_ne, List.pairwise_map]
+        exact (itemsUnique head).imp fun different equal =>
+          different (eq_of_heq
+            (Sigma.ext_iff.mp (makeInjective equal)).2)
+      refine ⟨mappedUnique, induction valuesUnique.2, ?_⟩
+      intro left leftMember right rightMember equal
+      rw [List.mem_map] at leftMember
+      rcases leftMember with ⟨leftItem, _, rfl⟩
+      rw [List.mem_flatMap] at rightMember
+      rcases rightMember with ⟨owner, ownerMember, rightMember⟩
+      rw [List.mem_map] at rightMember
+      rcases rightMember with ⟨rightItem, _, rfl⟩
+      have ownerEqual := congrArg Sigma.fst (makeInjective equal)
+      change head = owner at ownerEqual
+      exact valuesUnique.1 (ownerEqual.symm ▸ ownerMember)
+
+private abbrev GuardCellAddress :=
+  Sigma fun production : ProductionId => Fin (guardOf production).length
+
+private def allGuardCellAddresses : List GuardCellAddress :=
+  allProductionIds.flatMap fun production =>
+    (List.ofFn fun cell : Fin (guardOf production).length => cell).map
+      (Sigma.mk production)
+
+private theorem allGuardCellAddresses_complete
+    (address : GuardCellAddress) : address ∈ allGuardCellAddresses := by
+  rcases address with ⟨production, cell⟩
+  rw [allGuardCellAddresses, List.mem_flatMap]
+  refine ⟨production, allProductionIds_complete production, ?_⟩
+  rw [List.mem_map]
+  exact ⟨cell, List.mem_ofFn.mpr ⟨cell, rfl⟩, rfl⟩
+
+private theorem allGuardCellAddresses_nodup :
+    allGuardCellAddresses.Nodup := by
+  apply dependentEnumeration_nodup allProductionIds
+    (fun production =>
+      List.ofFn fun cell : Fin (guardOf production).length => cell)
+    (fun production cell => Sigma.mk production cell)
+    allProductionIds_nodup
+  · intro production
+    rw [List.nodup_iff_pairwise_ne, List.pairwise_iff_getElem]
+    intro left right _ _ before equal
+    simp only [List.getElem_ofFn] at equal
+    have sameValue : left = right := congrArg Fin.val equal
+    omega
+  · intro left right leftCell rightCell equal
+    exact equal
+
+private theorem allGuardCellAddresses_length :
+    allGuardCellAddresses.length = H := by
+  simp [allGuardCellAddresses, H]
+
+private theorem guardCellAddress_cardinality :
+    ∃ encode : GuardCellAddress → Fin H,
+      Function.Injective encode ∧ Function.Surjective encode := by
+  rw [← allGuardCellAddresses_length]
+  exact enumeration_cardinality allGuardCellAddresses
+    allGuardCellAddresses_complete allGuardCellAddresses_nodup
+
+private theorem cast_cardinality
+    {α : Type} {sourceSize targetSize : Nat}
+    (sizesEqual : sourceSize = targetSize)
+    (cardinality : ∃ encode : α → Fin sourceSize,
+      Function.Injective encode ∧ Function.Surjective encode) :
+    ∃ encode : α → Fin targetSize,
+      Function.Injective encode ∧ Function.Surjective encode := by
+  cases sizesEqual
+  exact cardinality
+
+private theorem cast_injection
+    {α : Type} {sourceSize targetSize : Nat}
+    (atMost : sourceSize ≤ targetSize)
+    (injection : ∃ encode : α → Fin sourceSize,
+      Function.Injective encode) :
+    ∃ encode : α → Fin targetSize, Function.Injective encode := by
+  obtain ⟨encode, injective⟩ := injection
+  refine ⟨fun value => Fin.castLE atMost (encode value), ?_⟩
+  intro left right equal
+  apply injective
+  apply Fin.ext
+  have rawEqual := congrArg Fin.val equal
+  simp only [Fin.castLE] at rawEqual
+  exact rawEqual
+
 end Solcore.Surface.Multi
