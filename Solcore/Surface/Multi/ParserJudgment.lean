@@ -896,6 +896,85 @@ def unguardedReachDecision
       (rawSaturation file tokens owned) item).trans
         (rawSaturation_mem_iff owned item))
 
+private def RecognizingItem
+    (file : WorkspaceFile) (tokens : List Token)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens)
+    (item : DottedItem tokens) : Prop :=
+  UnguardedReach file tokens item ∧
+    CompleteItem item ∧
+    item.production.lhs = symbol ∧
+    item.origin = start ∧
+    item.current = finish
+
+private def recognizingItemDecidable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens)
+    (item : DottedItem tokens) :
+    Decidable (RecognizingItem file tokens symbol start finish item) := by
+  unfold RecognizingItem CompleteItem
+  letI : Decidable (UnguardedReach file tokens item) :=
+    unguardedReachDecision owned item
+  infer_instance
+
+private def recognizingItemBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens)
+    (item : DottedItem tokens) : Bool :=
+  @decide (RecognizingItem file tokens symbol start finish item)
+    (recognizingItemDecidable owned symbol start finish item)
+
+private theorem recognizingItemBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens)
+    (item : DottedItem tokens) :
+    recognizingItemBool file tokens owned symbol start finish item = true ↔
+      RecognizingItem file tokens symbol start finish item := by
+  unfold recognizingItemBool
+  exact @decide_eq_true_iff
+    (RecognizingItem file tokens symbol start finish item)
+    (recognizingItemDecidable owned symbol start finish item)
+
+private def unguardedRecognizesBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) : Bool :=
+  (allDottedItems tokens).any
+    (recognizingItemBool file tokens owned symbol start finish)
+
+private theorem unguardedRecognizesBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    unguardedRecognizesBool file tokens owned symbol start finish = true ↔
+      UnguardedRecognizes file tokens symbol start finish := by
+  unfold unguardedRecognizesBool UnguardedRecognizes
+  rw [List.any_eq_true]
+  constructor
+  · rintro ⟨item, _member, accepted⟩
+    refine ⟨item, ?_⟩
+    simpa only [RecognizingItem] using
+      (recognizingItemBool_eq_true_iff
+        owned symbol start finish item).mp accepted
+  · intro recognized
+    rcases recognized with ⟨item, evidence⟩
+    refine ⟨item, allDottedItems_complete item, ?_⟩
+    apply (recognizingItemBool_eq_true_iff
+      owned symbol start finish item).mpr
+    simpa only [RecognizingItem] using evidence
+
+/-- Unguarded recognition is constructively decidable on an owned stream. -/
+def unguardedRecognizesDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    Decidable (UnguardedRecognizes file tokens symbol start finish) :=
+  decidable_of_iff
+    (unguardedRecognizesBool file tokens owned symbol start finish = true)
+    (unguardedRecognizesBool_eq_true_iff owned symbol start finish)
+
 /-- Unguarded recognition is exactly one reached complete matching item. -/
 theorem unguardedRecognizes_exact
     {file : WorkspaceFile} {tokens : List Token}
