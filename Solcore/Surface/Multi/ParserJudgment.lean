@@ -9505,6 +9505,300 @@ private theorem ruleReduction_module_total
   exact ⟨_, .module origin finish items eof endpoints.1 endpoints.2
     (matchedTerminal_eof_empty_span eof).2.1⟩
 
+private def TotalValues
+    (file : WorkspaceFile) (tokens : List Token) : List EbnfExpr → Type
+  | [] => Unit
+  | child :: rest =>
+      EbnfValue file tokens child × TotalValues file tokens rest
+
+private def totalValuesView
+    {file : WorkspaceFile} {tokens : List Token} :
+    (children : List EbnfExpr) →
+      EbnfValues file tokens children → TotalValues file tokens children
+  | [], _ => ()
+  | child :: rest, input =>
+      let viewed := valuesConsView child rest input
+      (viewed.1, totalValuesView rest viewed.2)
+
+private def totalValuesBuild
+    {file : WorkspaceFile} {tokens : List Token} :
+    (children : List EbnfExpr) →
+      TotalValues file tokens children → EbnfValues file tokens children
+  | [], _ => EbnfValues.nil
+  | child :: rest, viewed =>
+      EbnfValues.cons child rest viewed.1
+        (totalValuesBuild rest viewed.2)
+
+private theorem totalValues_build_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr) (input : EbnfValues file tokens children) :
+    totalValuesBuild children (totalValuesView children input) = input := by
+  induction children with
+  | nil => exact values_nil_unique input
+  | cons child rest ih =>
+      simp only [totalValuesView, totalValuesBuild]
+      let viewed := valuesConsView child rest input
+      calc
+        _ = EbnfValues.cons child rest viewed.1 viewed.2 := by
+          apply congrArg (EbnfValues.cons child rest viewed.1)
+          exact ih viewed.2
+        _ = input := values_cons_of_view child rest input
+
+private def sequenceFlatView
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    TotalValues file tokens children :=
+  totalValuesView children (sequenceView children input)
+
+private theorem sequence_of_flat_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    EbnfValue.sequence children
+      (totalValuesBuild children (sequenceFlatView children input)) = input := by
+  unfold sequenceFlatView
+  rw [totalValues_build_view]
+  exact sequence_of_view children input
+
+private theorem sequence2_exists
+    {file : WorkspaceFile} {tokens : List Token} {outputType : Type}
+    (first second : EbnfExpr)
+    (relation : EbnfValue file tokens (.sequence [first, second]) →
+      outputType → Prop)
+    (input : EbnfValue file tokens (.sequence [first, second]))
+    (build : ∀ firstValue secondValue,
+      ∃ output, relation
+        (EbnfValue.sequence [first, second]
+          (totalValuesBuild [first, second]
+            (firstValue, secondValue, ()))) output) :
+    ∃ output, relation input output := by
+  generalize viewEq : sequenceFlatView [first, second] input = viewed
+  rcases viewed with ⟨firstValue, secondValue, ⟨⟩⟩
+  rw [← sequence_of_flat_view [first, second] input, viewEq]
+  exact build firstValue secondValue
+
+private theorem ruleReduction_instanceMethod_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .instanceMethod origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .instanceMethod)) :
+    ∃ output : RuleValue .instanceMethod,
+      RuleReduction file tokens .instanceMethod origin finish input output := by
+  change EbnfValue file tokens (.atom (.nonterminal .functionDecl)) at input
+  let value := ruleView .functionDecl input
+  have inputEq := rule_of_view .functionDecl input
+  rw [← inputEq]
+  exact ⟨value, .instanceMethod origin finish value⟩
+
+private theorem ruleReduction_blockStatement_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .blockStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .blockStatement)) :
+    ∃ output : RuleValue .blockStatement,
+      RuleReduction file tokens .blockStatement origin finish input output := by
+  change EbnfValue file tokens (.atom (.nonterminal .body)) at input
+  let body := ruleView .body input
+  have inputEq := rule_of_view .body input
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← inputEq]
+  exact ⟨_, .blockStatement origin finish body witness⟩
+
+private theorem ruleReduction_armStatement_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .armStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .armStatement)) :
+    ∃ output : RuleValue .armStatement,
+      RuleReduction file tokens .armStatement origin finish input output := by
+  change EbnfValue file tokens (.atom (.nonterminal .statement)) at input
+  let statement := ruleView .statement input
+  have inputEq := rule_of_view .statement input
+  rw [← inputEq]
+  exact ⟨statement, .armStatement origin finish statement⟩
+
+private theorem ruleReduction_terminalExpression_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .terminalExpression origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .terminalExpression)) :
+    ∃ output : RuleValue .terminalExpression,
+      RuleReduction file tokens .terminalExpression origin finish input output := by
+  change EbnfValue file tokens (.atom (.nonterminal .expression)) at input
+  let expression := ruleView .expression input
+  have inputEq := rule_of_view .expression input
+  rw [← inputEq]
+  exact ⟨expression, .terminalExpression origin finish expression⟩
+
+private theorem ruleReduction_expression_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .expression origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .expression)) :
+    ∃ output : RuleValue .expression,
+      RuleReduction file tokens .expression origin finish input output := by
+  change EbnfValue file tokens (.atom (.nonterminal .annotation)) at input
+  let expression := ruleView .annotation input
+  have inputEq := rule_of_view .annotation input
+  rw [← inputEq]
+  exact ⟨expression, .expression origin finish expression⟩
+
+private theorem ruleReduction_functionDecl_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .functionDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .functionDecl)) :
+    ∃ output : RuleValue .functionDecl,
+      RuleReduction file tokens .functionDecl origin finish input output := by
+  let children : List EbnfExpr := [
+    .atom (.nonterminal .functionSignature), .atom (.nonterminal .body)]
+  change EbnfValue file tokens (.sequence children) at input
+  apply sequence2_exists _ _ _ input
+  intro rawSignature rawBody
+  let signature := ruleView .functionSignature rawSignature
+  let body := ruleView .body rawBody
+  have signatureEq := rule_of_view .functionSignature rawSignature
+  have bodyEq := rule_of_view .body rawBody
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← signatureEq, ← bodyEq]
+  exact ⟨_, .functionDecl origin finish signature body witness⟩
+
+private theorem ruleReduction_classMethod_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .classMethod origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .classMethod)) :
+    ∃ output : RuleValue .classMethod,
+      RuleReduction file tokens .classMethod origin finish input output := by
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .functionSignature),
+    .atom (.terminal (.symbol .semicolon))]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawSignature rawSemicolon
+  let signature := ruleView .functionSignature rawSignature
+  let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+  have signatureEq := rule_of_view .functionSignature rawSignature
+  have semicolonEq := terminal_of_view (.symbol .semicolon) rawSemicolon
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← signatureEq, ← semicolonEq]
+  exact ⟨_, .classMethod origin finish signature semicolon witness⟩
+
+private theorem ruleReduction_letStatement_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .letStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .letStatement)) :
+    ∃ output : RuleValue .letStatement,
+      RuleReduction file tokens .letStatement origin finish input output := by
+  change EbnfValue file tokens (.sequence [
+    .atom (.nonterminal .letBinding),
+    .atom (.terminal (.symbol .semicolon))]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawBinding rawSemicolon
+  let binding := ruleView .letBinding rawBinding
+  let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+  have bindingEq := rule_of_view .letBinding rawBinding
+  have semicolonEq := terminal_of_view (.symbol .semicolon) rawSemicolon
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← bindingEq, ← semicolonEq]
+  exact ⟨_, .letStatement origin finish binding semicolon witness⟩
+
+private theorem ruleReduction_breakStatement_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .breakStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .breakStatement)) :
+    ∃ output : RuleValue .breakStatement,
+      RuleReduction file tokens .breakStatement origin finish input output := by
+  change EbnfValue file tokens (.sequence [
+    .atom (.terminal (.hardKeyword .breakKw)),
+    .atom (.terminal (.symbol .semicolon))]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawKeyword rawSemicolon
+  let keyword := terminalView (.hardKeyword .breakKw) rawKeyword
+  let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+  have keywordEq := terminal_of_view (.hardKeyword .breakKw) rawKeyword
+  have semicolonEq := terminal_of_view (.symbol .semicolon) rawSemicolon
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← keywordEq, ← semicolonEq]
+  exact ⟨_, .breakStatement origin finish keyword semicolon witness⟩
+
+private theorem ruleReduction_continueStatement_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .continueStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .continueStatement)) :
+    ∃ output : RuleValue .continueStatement,
+      RuleReduction file tokens .continueStatement origin finish input output := by
+  change EbnfValue file tokens (.sequence [
+    .atom (.terminal (.hardKeyword .continueKw)),
+    .atom (.terminal (.symbol .semicolon))]) at input
+  apply sequence2_exists _ _ _ input
+  intro rawKeyword rawSemicolon
+  let keyword := terminalView (.hardKeyword .continueKw) rawKeyword
+  let semicolon := terminalView (.symbol .semicolon) rawSemicolon
+  have keywordEq := terminal_of_view (.hardKeyword .continueKw) rawKeyword
+  have semicolonEq := terminal_of_view (.symbol .semicolon) rawSemicolon
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rw [← keywordEq, ← semicolonEq]
+  exact ⟨_, .continueStatement origin finish keyword semicolon witness⟩
+
+private theorem ruleReduction_literal_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (_ready : RuleReductionReady file tokens .literal origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .literal)) :
+    ∃ output : RuleValue .literal,
+      RuleReduction file tokens .literal origin finish input output := by
+  let branches : List EbnfExpr := [
+    .atom (.terminal (.category .decimalLiteral)),
+    .atom (.terminal (.category .hexadecimalLiteral)),
+    .atom (.terminal (.category .stringLiteral))]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches (choiceView branches input) :=
+        congrArg (EbnfValue.choice branches) viewEq.symm
+      _ = input := choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have branchesLength : branches.length = 3 := by rfl
+    have bound : branch.val < 3 := by omega
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by
+      omega
+    rcases valueCases with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  rcases branchCases with rfl | rfl | rfl
+  · let terminal := terminalView (.category .decimalLiteral) raw
+    have rawEq := terminal_of_view (.category .decimalLiteral) raw
+    rcases matchedTerminal_literal_projection_exists_unique terminal
+        (Or.inl rfl) with ⟨payload, projects, _unique⟩
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .literalDecimal origin finish terminal payload projects⟩
+  · let terminal := terminalView (.category .hexadecimalLiteral) raw
+    have rawEq := terminal_of_view (.category .hexadecimalLiteral) raw
+    rcases matchedTerminal_literal_projection_exists_unique terminal
+        (Or.inr (Or.inl rfl)) with ⟨payload, projects, _unique⟩
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .literalHexadecimal origin finish terminal payload projects⟩
+  · let terminal := terminalView (.category .stringLiteral) raw
+    have rawEq := terminal_of_view (.category .stringLiteral) raw
+    rcases matchedTerminal_literal_projection_exists_unique terminal
+        (Or.inr (Or.inr rfl)) with ⟨payload, projects, _unique⟩
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .literalString origin finish terminal payload projects⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
