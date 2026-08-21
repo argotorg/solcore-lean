@@ -3455,6 +3455,246 @@ private theorem contextualCompletedEdgeProjection_injective
           cases afterEqual
           rfl
 
+private theorem block_encode_injective
+    {width leftBlock rightBlock leftOffset rightOffset : Nat}
+    (leftBound : leftOffset < width)
+    (rightBound : rightOffset < width)
+    (equal : leftBlock * width + leftOffset =
+      rightBlock * width + rightOffset) :
+    leftBlock = rightBlock ∧ leftOffset = rightOffset := by
+  have positive : 0 < width := Nat.zero_lt_of_lt leftBound
+  have quotient (block offset : Nat) (bound : offset < width) :
+      (block * width + offset) / width = block := by
+    rw [Nat.add_comm, Nat.mul_comm block width,
+      Nat.add_mul_div_left _ _ positive, Nat.div_eq_of_lt bound]
+    exact Nat.zero_add block
+  have blockEqual : leftBlock = rightBlock := by
+    rw [← quotient leftBlock leftOffset leftBound, equal,
+      quotient rightBlock rightOffset rightBound]
+  exact ⟨blockEqual, by
+    rw [blockEqual] at equal
+    exact Nat.add_left_cancel equal⟩
+
+private theorem product_cardinality
+    {α β : Type} {leftSize rightSize : Nat}
+    (rightPositive : 0 < rightSize)
+    (leftCardinality :
+      ∃ encode : α → Fin leftSize,
+        Function.Injective encode ∧ Function.Surjective encode)
+    (rightCardinality :
+      ∃ encode : β → Fin rightSize,
+        Function.Injective encode ∧ Function.Surjective encode) :
+    ∃ encode : α × β → Fin (leftSize * rightSize),
+      Function.Injective encode ∧ Function.Surjective encode := by
+  obtain ⟨leftEncode, leftInjective, leftSurjective⟩ := leftCardinality
+  obtain ⟨rightEncode, rightInjective, rightSurjective⟩ :=
+    rightCardinality
+  let encode (value : α × β) : Fin (leftSize * rightSize) :=
+    ⟨(leftEncode value.1).val * rightSize +
+        (rightEncode value.2).val, by
+      have rowBound :
+          (leftEncode value.1).val * rightSize +
+              (rightEncode value.2).val <
+            ((leftEncode value.1).val + 1) * rightSize := by
+        rw [Nat.add_mul]
+        simpa only [Nat.one_mul] using Nat.add_lt_add_left
+          (rightEncode value.2).isLt
+          ((leftEncode value.1).val * rightSize)
+      exact Nat.lt_of_lt_of_le rowBound
+        (Nat.mul_le_mul_right rightSize
+          (Nat.succ_le_of_lt (leftEncode value.1).isLt))⟩
+  refine ⟨encode, ?_, ?_⟩
+  · intro left right equal
+    have rawEqual := congrArg Fin.val equal
+    have coordinates := block_encode_injective
+      (rightEncode left.2).isLt (rightEncode right.2).isLt rawEqual
+    exact Prod.ext (leftInjective (Fin.ext coordinates.1))
+      (rightInjective (Fin.ext coordinates.2))
+  · intro value
+    let leftIndex : Fin leftSize :=
+      ⟨value.val / rightSize,
+        (Nat.div_lt_iff_lt_mul rightPositive).mpr value.isLt⟩
+    let rightIndex : Fin rightSize :=
+      ⟨value.val % rightSize, Nat.mod_lt _ rightPositive⟩
+    obtain ⟨left, leftEqual⟩ := leftSurjective leftIndex
+    obtain ⟨right, rightEqual⟩ := rightSurjective rightIndex
+    refine ⟨(left, right), Fin.ext ?_⟩
+    simp only [encode]
+    rw [leftEqual, rightEqual]
+    simpa [leftIndex, rightIndex, Nat.add_comm, Nat.mul_comm] using
+      Nat.mod_add_div value.val rightSize
+
+private theorem fin_cardinality (size : Nat) :
+    ∃ encode : Fin size → Fin size,
+      Function.Injective encode ∧ Function.Surjective encode :=
+  ⟨id, Function.injective_id, Function.surjective_id⟩
+
+private theorem dotted_count_positive : 0 < D := by
+  let dotted : DottedRhs := {
+    production := .root .module
+    dot := ⟨0, Nat.zero_lt_succ _⟩
+  }
+  have member := allDottedRhs_complete dotted
+  have positive : 0 < allDottedRhs.length :=
+    List.length_pos_of_mem member
+  simpa [allDottedRhs_length] using positive
+
+private abbrev ContextualItemCoordinates (tokens : List Token) :=
+  ((GuardContext tokens × DottedRhs) × Boundary tokens) × Boundary tokens
+
+private def contextualItemCoordinates {tokens : List Token}
+    (item : ContextualItemKey tokens) : ContextualItemCoordinates tokens :=
+  (((item.context, {
+    production := item.raw.production
+    dot := item.raw.dot
+  }), item.raw.origin), item.raw.current)
+
+private def contextualItemOfCoordinates {tokens : List Token}
+    (coordinates : ContextualItemCoordinates tokens) :
+    ContextualItemKey tokens := {
+  raw := {
+    production := coordinates.1.1.2.production
+    dot := coordinates.1.1.2.dot
+    origin := coordinates.1.2
+    current := coordinates.2
+  }
+  context := coordinates.1.1.1
+}
+
+private theorem contextualItemCoordinates_bijective
+    {tokens : List Token} :
+    Function.Injective (@contextualItemCoordinates tokens) ∧
+      Function.Surjective (@contextualItemCoordinates tokens) := by
+  have leftInverse : Function.LeftInverse
+      (@contextualItemOfCoordinates tokens)
+      (@contextualItemCoordinates tokens) := by
+    intro item
+    cases item with
+    | mk raw context => cases raw; rfl
+  have rightInverse : Function.RightInverse
+      (@contextualItemOfCoordinates tokens)
+      (@contextualItemCoordinates tokens) := by
+    intro coordinates
+    rcases coordinates with ⟨contextSchemaOrigin, current⟩
+    rcases contextSchemaOrigin with ⟨contextSchema, origin⟩
+    rcases contextSchema with ⟨context, schema⟩
+    cases schema
+    rfl
+  exact ⟨leftInverse.injective, rightInverse.surjective⟩
+
+private abbrev CompletedEdgeCoordinates (tokens : List Token) :=
+  (((((GuardContext tokens × DottedRhs) × DottedRhs) ×
+    Boundary tokens) × Boundary tokens) × Boundary tokens)
+
+private def completedEdgeCoordinates {tokens : List Token}
+    (projection : ContextualCompletedEdgeProjection tokens) :
+    CompletedEdgeCoordinates tokens :=
+  (((((projection.waitingContext, projection.waitingSchema),
+    projection.finishedSchema), projection.waitingOrigin),
+    projection.shared), projection.finishedCurrent)
+
+private def completedEdgeProjectionOfCoordinates {tokens : List Token}
+    (coordinates : CompletedEdgeCoordinates tokens) :
+    ContextualCompletedEdgeProjection tokens := {
+  waitingContext := coordinates.1.1.1.1.1
+  waitingSchema := coordinates.1.1.1.1.2
+  finishedSchema := coordinates.1.1.1.2
+  waitingOrigin := coordinates.1.1.2
+  shared := coordinates.1.2
+  finishedCurrent := coordinates.2
+}
+
+private theorem completedEdgeCoordinates_bijective
+    {tokens : List Token} :
+    Function.Injective (@completedEdgeCoordinates tokens) ∧
+      Function.Surjective (@completedEdgeCoordinates tokens) := by
+  have leftInverse : Function.LeftInverse
+      (@completedEdgeProjectionOfCoordinates tokens)
+      (@completedEdgeCoordinates tokens) := by
+    intro projection
+    cases projection
+    rfl
+  have rightInverse : Function.RightInverse
+      (@completedEdgeProjectionOfCoordinates tokens)
+      (@completedEdgeCoordinates tokens) := by
+    intro coordinates
+    rcases coordinates with ⟨withShared, current⟩
+    rcases withShared with ⟨withOrigin, shared⟩
+    rcases withOrigin with ⟨withFinished, origin⟩
+    rcases withFinished with ⟨contextWaiting, finished⟩
+    rcases contextWaiting with ⟨context, waiting⟩
+    rfl
+  exact ⟨leftInverse.injective, rightInverse.surjective⟩
+
+/-- Exact contextual item cardinality and constructor-specific valid edge
+bounds, with the finished context reconstructed rather than counted twice. -/
+theorem contextual_item_edge_cardinality
+    (file : WorkspaceFile) (tokens : List Token) :
+    (∃ encode : ContextualItemKey tokens →
+        Fin ((1 + 3 * (tokens.length + 2)) * D *
+          (tokens.length + 2) * (tokens.length + 2)),
+      Function.Injective encode ∧ Function.Surjective encode) ∧
+    (∃ encode : StructurallyValidContextualScannedEdge file tokens →
+        Fin ((1 + 3 * (tokens.length + 2)) * D *
+          (tokens.length + 2) * (tokens.length + 2)),
+      Function.Injective encode) ∧
+    (∃ encode : StructurallyValidContextualCompletedEdge file tokens →
+        Fin ((1 + 3 * (tokens.length + 2)) * D * D *
+          (tokens.length + 2) * (tokens.length + 2) *
+          (tokens.length + 2)),
+      Function.Injective encode) := by
+  let q := tokens.length + 2
+  have qPositive : 0 < q := by simp [q]
+  obtain ⟨contextDottedEncode, contextDottedInjective,
+      contextDottedSurjective⟩ := product_cardinality
+    dotted_count_positive (guard_context_cardinality tokens)
+      dottedRhs_cardinality
+  obtain ⟨contextDottedOriginEncode, contextDottedOriginInjective,
+      contextDottedOriginSurjective⟩ := product_cardinality qPositive
+    ⟨contextDottedEncode, contextDottedInjective,
+      contextDottedSurjective⟩ (fin_cardinality q)
+  obtain ⟨itemCoordinateEncode, itemCoordinateInjective,
+      itemCoordinateSurjective⟩ := product_cardinality qPositive
+    ⟨contextDottedOriginEncode, contextDottedOriginInjective,
+      contextDottedOriginSurjective⟩ (fin_cardinality q)
+  let itemEncode (item : ContextualItemKey tokens) :=
+    itemCoordinateEncode (contextualItemCoordinates item)
+  have itemInjective : Function.Injective itemEncode :=
+    itemCoordinateInjective.comp contextualItemCoordinates_bijective.1
+  have itemSurjective : Function.Surjective itemEncode := by
+    intro value
+    obtain ⟨coordinates, equal⟩ := itemCoordinateSurjective value
+    obtain ⟨item, itemEqual⟩ :=
+      contextualItemCoordinates_bijective.2 coordinates
+    refine ⟨item, ?_⟩
+    change itemCoordinateEncode (contextualItemCoordinates item) = value
+    rw [itemEqual, equal]
+  refine ⟨⟨itemEncode, itemInjective, itemSurjective⟩, ?_, ?_⟩
+  · exact ⟨fun edge => itemEncode edge.before,
+      itemInjective.comp contextualScannedEdge_before_injective⟩
+  · obtain ⟨withFinishedEncode, withFinishedInjective,
+        withFinishedSurjective⟩ := product_cardinality
+      dotted_count_positive
+      ⟨contextDottedEncode, contextDottedInjective,
+        contextDottedSurjective⟩ dottedRhs_cardinality
+    obtain ⟨withOriginEncode, withOriginInjective, withOriginSurjective⟩ :=
+      product_cardinality qPositive
+        ⟨withFinishedEncode, withFinishedInjective,
+          withFinishedSurjective⟩ (fin_cardinality q)
+    obtain ⟨withSharedEncode, withSharedInjective, withSharedSurjective⟩ :=
+      product_cardinality qPositive
+        ⟨withOriginEncode, withOriginInjective, withOriginSurjective⟩
+        (fin_cardinality q)
+    obtain ⟨completedCoordinateEncode, completedCoordinateInjective, _⟩ :=
+      product_cardinality qPositive
+        ⟨withSharedEncode, withSharedInjective, withSharedSurjective⟩
+        (fin_cardinality q)
+    exact ⟨fun edge => completedCoordinateEncode
+        (completedEdgeCoordinates (contextualCompletedEdgeProjection edge)),
+      completedCoordinateInjective.comp
+        (completedEdgeCoordinates_bijective.1.comp
+          contextualCompletedEdgeProjection_injective)⟩
+
 /-- The physical byte selected by one chart boundary. -/
 def BoundaryByte
     (file : WorkspaceFile)
