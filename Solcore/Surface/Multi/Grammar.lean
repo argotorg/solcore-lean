@@ -3003,6 +3003,133 @@ def D : Nat :=
   (expanded.productions.map fun production =>
     production.rhs.length + 1).sum
 
+private theorem enumeration_cardinality
+    {α : Type} [BEq α] [LawfulBEq α]
+    (values : List α)
+    (complete : ∀ value : α, value ∈ values)
+    (unique : values.Nodup) :
+    ∃ encode : α → Fin values.length,
+      Function.Injective encode ∧ Function.Surjective encode := by
+  let encode : α → Fin values.length := fun value =>
+    ⟨values.idxOf value, List.idxOf_lt_length_of_mem (complete value)⟩
+  refine ⟨encode, ?_, ?_⟩
+  · intro left right equal
+    have leftBound : values.idxOf left < values.length :=
+      List.idxOf_lt_length_of_mem (complete left)
+    have rightBound : values.idxOf right < values.length :=
+      List.idxOf_lt_length_of_mem (complete right)
+    have leftSelected : values[values.idxOf left]'leftBound = left := by
+      exact beq_iff_eq.mp (List.findIdx_getElem
+        (xs := values) (p := (· == left)) (w := leftBound))
+    have rightSelected : values[values.idxOf right]'rightBound = right := by
+      exact beq_iff_eq.mp (List.findIdx_getElem
+        (xs := values) (p := (· == right)) (w := rightBound))
+    have sameSelected :
+        values[values.idxOf left]'leftBound =
+          values[values.idxOf right]'rightBound :=
+      congrArg values.get equal
+    exact leftSelected.symm.trans (sameSelected.trans rightSelected)
+  · intro index
+    let value := values[index]
+    refine ⟨value, Fin.ext ?_⟩
+    change values.idxOf value = index.val
+    have valueBound : values.idxOf value < values.length :=
+      List.idxOf_lt_length_of_mem (complete value)
+    apply (List.getElem?_inj valueBound unique).mp
+    rw [List.getElem?_eq_getElem valueBound,
+      List.getElem?_eq_getElem index.isLt]
+    have selected : values[values.idxOf value]'valueBound = value := by
+      exact beq_iff_eq.mp (List.findIdx_getElem
+        (xs := values) (p := (· == value)) (w := valueBound))
+    simpa [value] using congrArg some selected
+
+private theorem dependentEnumeration_nodup
+    {α γ : Type} {β : α → Type}
+    (values : List α) (items : (value : α) → List (β value))
+    (make : (value : α) → β value → γ)
+    (valuesUnique : values.Nodup)
+    (itemsUnique : ∀ value, (items value).Nodup)
+    (makeInjective : ∀ {left right} {leftItem : β left}
+      {rightItem : β right},
+      make left leftItem = make right rightItem →
+        Sigma.mk left leftItem = Sigma.mk right rightItem) :
+    (values.flatMap fun value =>
+      (items value).map (make value)).Nodup := by
+  induction values with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.nodup_cons] at valuesUnique
+      simp only [List.flatMap_cons]
+      rw [List.nodup_append]
+      have mappedUnique :
+          ((items head).map (make head)).Nodup := by
+        rw [List.nodup_iff_pairwise_ne]
+        rw [List.pairwise_map]
+        exact (itemsUnique head).imp fun different equal =>
+          different (eq_of_heq
+            (Sigma.ext_iff.mp (makeInjective equal)).2)
+      refine ⟨mappedUnique, induction valuesUnique.2, ?_⟩
+      intro left leftMember right rightMember equal
+      rw [List.mem_map] at leftMember
+      rcases leftMember with ⟨leftItem, _, rfl⟩
+      rw [List.mem_flatMap] at rightMember
+      rcases rightMember with ⟨owner, ownerMember, rightMember⟩
+      rw [List.mem_map] at rightMember
+      rcases rightMember with ⟨rightItem, _, rfl⟩
+      have ownerEqual := congrArg Sigma.fst (makeInjective equal)
+      change head = owner at ownerEqual
+      exact valuesUnique.1 (ownerEqual.symm ▸ ownerMember)
+
+/-- Every stable dotted RHS in production-table and dot order. -/
+def allDottedRhs : List DottedRhs :=
+  allProductionIds.flatMap fun production =>
+    (List.ofFn fun dot : Fin (production.rhs.length + 1) => dot).map
+      fun dot => ({ production, dot } : DottedRhs)
+
+/-- Every dotted RHS occurs in the stable enumeration. -/
+theorem allDottedRhs_complete (dotted : DottedRhs) :
+    dotted ∈ allDottedRhs := by
+  rw [allDottedRhs, List.mem_flatMap]
+  refine ⟨dotted.production, allProductionIds_complete _, ?_⟩
+  rw [List.mem_map]
+  refine ⟨dotted.dot, ?_, rfl⟩
+  rw [List.mem_ofFn]
+  exact ⟨dotted.dot, rfl⟩
+
+private theorem allDottedRhs_nodup : allDottedRhs.Nodup := by
+  apply dependentEnumeration_nodup allProductionIds
+    (fun production =>
+      List.ofFn fun dot : Fin (production.rhs.length + 1) => dot)
+    (fun production dot => ({ production, dot } : DottedRhs))
+    allProductionIds_nodup
+  · intro production
+    rw [List.nodup_iff_pairwise_ne]
+    rw [List.pairwise_iff_getElem]
+    intro left right _ _ before equal
+    simp only [List.getElem_ofFn] at equal
+    have sameValue : left = right := congrArg Fin.val equal
+    omega
+  · intro left right leftDot rightDot equal
+    cases equal
+    rfl
+
+/-- The dotted RHS enumeration has exactly the displayed dotted count. -/
+theorem allDottedRhs_length : allDottedRhs.length = D := by
+  rw [allDottedRhs, List.length_flatMap]
+  simp only [List.length_map, List.length_ofFn]
+  unfold D
+  rw [ebnf_expansion_finite.2.1]
+  simp only [List.map_map]
+  rfl
+
+/-- Exact finite cardinality of stable dotted RHS positions. -/
+theorem dottedRhs_cardinality :
+    ∃ encode : DottedRhs → Fin D,
+      Function.Injective encode ∧ Function.Surjective encode := by
+  rw [← allDottedRhs_length]
+  exact enumeration_cardinality allDottedRhs
+    allDottedRhs_complete allDottedRhs_nodup
+
 /-- The fast memo-key cardinality derived from its finite enumeration. -/
 def F : Nat :=
   allFastMemoKeyKinds.length
