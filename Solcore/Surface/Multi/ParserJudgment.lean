@@ -6387,6 +6387,295 @@ attribute [local simp] transport_inj_iff terminalAtom_inj_iff
   optional_inj_iff star_inj_iff plus_inj_iff list0_inj_iff
   list1_inj_iff cons_inj_iff
 
+universe u v w
+
+private theorem listMap_injective_of_injective
+    {alpha : Type u} {beta : Type v} {function : alpha → beta}
+    (injective : Function.Injective function) :
+    Function.Injective (List.map function) := by
+  intro left right inputEq
+  induction left generalizing right with
+  | nil => simpa using inputEq
+  | cons head tail ih =>
+      cases right with
+      | nil => simp at inputEq
+      | cons otherHead otherTail =>
+          simp only [List.map_cons, List.cons.injEq] at inputEq
+          rw [injective inputEq.1, ih inputEq.2]
+private theorem nonemptyListMap_injective_of_injective
+    {alpha beta : Type} {function : alpha → beta}
+    (injective : Function.Injective function) :
+    Function.Injective (NonemptyList.map function) := by
+  rintro ⟨leftHead, leftTail⟩ ⟨rightHead, rightTail⟩ inputEq
+  have headEq := congrArg NonemptyList.head inputEq
+  have tailEq := congrArg NonemptyList.tail inputEq
+  simp only [NonemptyList.map] at headEq tailEq
+  have := injective headEq
+  have := listMap_injective_of_injective injective tailEq
+  subst_vars
+  rfl
+private theorem listMap_output_functional
+    {alpha : Type u} {beta : Type v} {gamma : Type w}
+    {key : alpha → beta} {output : alpha → gamma}
+    {projects : alpha → Prop} {left right : List alpha}
+    (leftProjects : ∀ value, value ∈ left → projects value)
+    (rightProjects : ∀ value, value ∈ right → projects value)
+    (pointwise : ∀ {leftValue rightValue},
+      projects leftValue → projects rightValue →
+        key leftValue = key rightValue →
+          output leftValue = output rightValue)
+    (keyEq : left.map key = right.map key) :
+    left.map output = right.map output := by
+  induction left generalizing right with
+  | nil => simpa using keyEq
+  | cons head tail ih =>
+      cases right with
+      | nil => simp at keyEq
+      | cons otherHead otherTail =>
+          simp only [List.map_cons, List.cons.injEq] at keyEq ⊢
+          refine ⟨pointwise
+            (leftProjects head (by simp))
+            (rightProjects otherHead (by simp)) keyEq.1, ?_⟩
+          exact ih
+            (fun value member => leftProjects value (by simp [member]))
+            (fun value member => rightProjects value (by simp [member]))
+            keyEq.2
+private theorem nonemptyListMap_output_functional
+    {alpha beta gamma : Type}
+    {key : alpha → beta} {output : alpha → gamma}
+    {projects : alpha → Prop} {left right : NonemptyList alpha}
+    (leftProjects : projects left.head ∧
+      ∀ value, value ∈ left.tail → projects value)
+    (rightProjects : projects right.head ∧
+      ∀ value, value ∈ right.tail → projects value)
+    (pointwise : ∀ {leftValue rightValue},
+      projects leftValue → projects rightValue →
+        key leftValue = key rightValue →
+          output leftValue = output rightValue)
+    (keyEq : left.map key = right.map key) :
+    left.map output = right.map output := by
+  have headKeyEq := congrArg NonemptyList.head keyEq
+  have tailKeyEq := congrArg NonemptyList.tail keyEq
+  simp only [NonemptyList.map] at headKeyEq tailKeyEq
+  have headEq := pointwise leftProjects.1 rightProjects.1 headKeyEq
+  have tailEq := listMap_output_functional leftProjects.2 rightProjects.2
+    pointwise tailKeyEq
+  cases left
+  cases right
+  simp only [NonemptyList.map] at headEq tailEq ⊢
+  simp only [NonemptyList.mk.injEq]
+  exact ⟨headEq, tailEq⟩
+private theorem spelledTerminalLoc_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {parsedType : Type}
+    (Projects : MatchedTerminal file tokens terminal →
+      String → parsedType → Prop)
+    (projectsFunctional : ∀ {matched leftSpelling rightSpelling
+        leftParsed rightParsed},
+      Projects matched leftSpelling leftParsed →
+        Projects matched rightSpelling rightParsed →
+          leftParsed = rightParsed)
+    {left right : RuleReduction.SpelledTerminalData file tokens
+      terminal parsedType}
+    (leftProjects : Projects left.matched left.spelling left.parsed)
+    (rightProjects : Projects right.matched right.spelling right.parsed)
+    (matchedEq : left.matched = right.matched) :
+    RuleReduction.terminalLoc left.matched left.parsed =
+      RuleReduction.terminalLoc right.matched right.parsed := by
+  cases left with
+  | mk leftMatched leftSpelling leftParsed =>
+      cases right with
+      | mk rightMatched rightSpelling rightParsed =>
+          cases matchedEq
+          have parsedEq : leftParsed = rightParsed := by
+            simpa using projectsFunctional leftProjects rightProjects
+          cases parsedEq
+          rfl
+private theorem identifierTerminalLoc_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier}
+    (leftProjects : IdentifierProjects left.matched left.spelling left.parsed)
+    (rightProjects : IdentifierProjects right.matched right.spelling right.parsed)
+    (matchedEq : left.matched = right.matched) :
+    RuleReduction.terminalLoc left.matched left.parsed =
+      RuleReduction.terminalLoc right.matched right.parsed :=
+  spelledTerminalLoc_functional IdentifierProjects
+    (fun left right => (IdentifierProjects.functional left right).2)
+    leftProjects rightProjects matchedEq
+private theorem pathTerminalLoc_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : RuleReduction.SpelledTerminalData file tokens
+      (.category .pathComponent) PathSegment}
+    (leftProjects : PathSegmentProjects left.matched left.spelling left.parsed)
+    (rightProjects : PathSegmentProjects right.matched right.spelling right.parsed)
+    (matchedEq : left.matched = right.matched) :
+    RuleReduction.terminalLoc left.matched left.parsed =
+      RuleReduction.terminalLoc right.matched right.parsed :=
+  spelledTerminalLoc_functional PathSegmentProjects
+    (fun left right => (PathSegmentProjects.functional left right).2)
+    leftProjects rightProjects matchedEq
+private theorem externalTerminalLoc_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : RuleReduction.SpelledTerminalData file tokens
+      (.category .pathComponent) ExternalLibraryName}
+    (leftProjects : ExternalLibraryProjects
+      left.matched left.spelling left.parsed)
+    (rightProjects : ExternalLibraryProjects
+      right.matched right.spelling right.parsed)
+    (matchedEq : left.matched = right.matched) :
+    RuleReduction.terminalLoc left.matched left.parsed =
+      RuleReduction.terminalLoc right.matched right.parsed :=
+  spelledTerminalLoc_functional ExternalLibraryProjects
+    (fun left right => (ExternalLibraryProjects.functional left right).2)
+    leftProjects rightProjects matchedEq
+private theorem identifierListLocated_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : List (RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier)}
+    (leftProjects : ∀ value, value ∈ left →
+      IdentifierProjects value.matched value.spelling value.parsed)
+    (rightProjects : ∀ value, value ∈ right →
+      IdentifierProjects value.matched value.spelling value.parsed)
+    (matchedEq : left.map (fun value => value.matched) =
+      right.map (fun value => value.matched)) :
+    left.map (fun value => RuleReduction.terminalLoc
+      value.matched value.parsed) =
+      right.map (fun value => RuleReduction.terminalLoc
+        value.matched value.parsed) :=
+  listMap_output_functional leftProjects rightProjects
+    identifierTerminalLoc_functional matchedEq
+
+private theorem identifierNonemptyLocated_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : NonemptyList (RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier)}
+    (leftProjects : IdentifierProjects left.head.matched
+      left.head.spelling left.head.parsed ∧
+      ∀ value, value ∈ left.tail →
+        IdentifierProjects value.matched value.spelling value.parsed)
+    (rightProjects : IdentifierProjects right.head.matched
+      right.head.spelling right.head.parsed ∧
+      ∀ value, value ∈ right.tail →
+        IdentifierProjects value.matched value.spelling value.parsed)
+    (matchedEq : left.map (fun value => value.matched) =
+      right.map (fun value => value.matched)) :
+    left.map (fun value => RuleReduction.terminalLoc
+      value.matched value.parsed) =
+      right.map (fun value => RuleReduction.terminalLoc
+        value.matched value.parsed) :=
+  nonemptyListMap_output_functional leftProjects rightProjects
+    identifierTerminalLoc_functional matchedEq
+private def dotTailInput
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {parsedType : Type}
+    (value : MatchedTerminal file tokens (.symbol .dot) ×
+      RuleReduction.SpelledTerminalData file tokens terminal parsedType) :
+    EbnfValue file tokens (.group (.sequence [
+      .atom (.terminal (.symbol .dot)), .atom (.terminal terminal)])) :=
+  EbnfValue.group _ (EbnfValue.sequence _
+    (EbnfValues.cons _ _ (EbnfValue.terminalAtom _ value.1)
+      (EbnfValues.cons _ _ (EbnfValue.terminalAtom _ value.2.matched)
+        EbnfValues.nil)))
+
+private theorem dotTailInput_matched_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {parsedType : Type}
+    {left right : MatchedTerminal file tokens (.symbol .dot) ×
+      RuleReduction.SpelledTerminalData file tokens terminal parsedType}
+    (inputEq : dotTailInput left = dotTailInput right) :
+    (left.1, left.2.matched) = (right.1, right.2.matched) := by
+  have groupEq := EbnfValue.group_injective _ inputEq
+  have sequenceEq := EbnfValue.sequence_injective _ groupEq
+  have firstEq := EbnfValues.cons_injective _ _ sequenceEq
+  have dotEq := EbnfValue.terminalAtom_injective _ firstEq.1
+  have secondEq := EbnfValues.cons_injective _ _ firstEq.2
+  have terminalEq := EbnfValue.terminalAtom_injective _ secondEq.1
+  exact Prod.ext dotEq terminalEq
+
+private theorem identifierDotTailLocated_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : List
+      (MatchedTerminal file tokens (.symbol .dot) ×
+        RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)}
+    (leftProjects : ∀ value, value ∈ left →
+      IdentifierProjects value.2.matched value.2.spelling value.2.parsed)
+    (rightProjects : ∀ value, value ∈ right →
+      IdentifierProjects value.2.matched value.2.spelling value.2.parsed)
+    (inputEq : left.map dotTailInput = right.map dotTailInput) :
+    left.map (fun value => RuleReduction.terminalLoc
+      value.2.matched value.2.parsed) =
+      right.map (fun value => RuleReduction.terminalLoc
+        value.2.matched value.2.parsed) := by
+  apply listMap_output_functional leftProjects rightProjects _ inputEq
+  intro leftValue rightValue leftProof rightProof valueEq
+  exact identifierTerminalLoc_functional leftProof rightProof
+    (congrArg Prod.snd (dotTailInput_matched_functional valueEq))
+
+private theorem pathDotTailLocated_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : List
+      (MatchedTerminal file tokens (.symbol .dot) ×
+        RuleReduction.SpelledTerminalData file tokens
+          (.category .pathComponent) PathSegment)}
+    (leftProjects : ∀ value, value ∈ left →
+      PathSegmentProjects value.2.matched value.2.spelling value.2.parsed)
+    (rightProjects : ∀ value, value ∈ right →
+      PathSegmentProjects value.2.matched value.2.spelling value.2.parsed)
+    (inputEq : left.map dotTailInput = right.map dotTailInput) :
+    left.map (fun value => RuleReduction.terminalLoc
+      value.2.matched value.2.parsed) =
+      right.map (fun value => RuleReduction.terminalLoc
+        value.2.matched value.2.parsed) := by
+  apply listMap_output_functional leftProjects rightProjects _ inputEq
+  intro leftValue rightValue leftProof rightProof valueEq
+  exact pathTerminalLoc_functional leftProof rightProof
+    (congrArg Prod.snd (dotTailInput_matched_functional valueEq))
+
+private theorem moduleRef_standard_library_exclusive
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : MatchedTerminal file tokens (.category .pathComponent)}
+    (matchedEq : left = right)
+    (standard : RuleReduction.MarkerProjects file tokens left .standardRoot)
+    (library : RuleReduction.MarkerProjects file tokens right .libraryRoot) :
+    False := by
+  subst right
+  have kindEq := RuleReduction.MarkerProjects.functional standard library
+  contradiction
+
+private theorem moduleRef_standard_relative_exclusive
+    {file : WorkspaceFile} {tokens : List Token}
+    {root : MatchedTerminal file tokens (.category .pathComponent)}
+    {relative : RuleReduction.SpelledTerminalData file tokens
+      (.category .pathComponent) PathSegment}
+    (matchedEq : root = relative.matched)
+    (standard : RuleReduction.MarkerProjects file tokens root .standardRoot)
+    (relativeProjects : PathSegmentProjects relative.matched
+      relative.spelling relative.parsed)
+    (notStandard : relative.spelling ≠ "std") : False := by
+  subst root
+  cases standard with
+  | standardRoot _ parsed standardProjects =>
+      exact notStandard
+        (PathSegmentProjects.functional relativeProjects standardProjects).1
+
+private theorem moduleRef_library_relative_exclusive
+    {file : WorkspaceFile} {tokens : List Token}
+    {root : MatchedTerminal file tokens (.category .pathComponent)}
+    {relative : RuleReduction.SpelledTerminalData file tokens
+      (.category .pathComponent) PathSegment}
+    (matchedEq : root = relative.matched)
+    (library : RuleReduction.MarkerProjects file tokens root .libraryRoot)
+    (relativeProjects : PathSegmentProjects relative.matched
+      relative.spelling relative.parsed)
+    (notLibrary : relative.spelling ≠ "lib") : False := by
+  subst root
+  cases library with
+  | libraryRoot _ parsed libraryProjects =>
+      exact notLibrary
+        (PathSegmentProjects.functional relativeProjects libraryProjects).1
+
 private theorem ruleReduction_topItem_functional
     {file : WorkspaceFile} {tokens : List Token}
     {origin finish : Boundary tokens}
