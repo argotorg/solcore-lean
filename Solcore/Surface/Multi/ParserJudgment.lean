@@ -18361,6 +18361,64 @@ theorem canonicalExpected?_eq_none_iff
         owned correct final cursor greatest expected).mp inValues
       exact (empty ⟨expected, member⟩).elim
 
+/-- The exact progress witness still missing from a rootless saturated chart:
+some enabled reached item at the greatest cursor waits for a terminal. -/
+def TerminalFrontierWait
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) : Prop :=
+  ∃ item : ContextualItemKey tokens,
+    ∃ terminal : TerminalSymbol,
+      FrontierReach file tokens memo correct final cursor item ∧
+      NextSymbol item.raw (.terminal terminal) ∧
+      EnabledProductionInstance file tokens memo correct final {
+        production := item.raw.production
+        origin := item.raw.origin
+        context := item.context
+      }
+
+/-- Terminal progress at the greatest cursor is exactly nonemptiness of the
+declarative expected-frontier union. -/
+theorem terminalFrontierWait_iff_expected_nonempty
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens} :
+    TerminalFrontierWait file tokens memo correct final cursor ↔
+      ∃ expected,
+        ExpectedMember file tokens memo correct final cursor expected := by
+  constructor
+  · rintro ⟨item, terminal, frontier, next, enabled⟩
+    exact ⟨terminal.expected, item, terminal, frontier,
+      next, enabled, rfl⟩
+  · rintro ⟨expected, item, terminal, frontier, next, enabled,
+      equality⟩
+    exact ⟨item, terminal, frontier, next, enabled⟩
+
+/-- Under the explicit terminal-progress premise, canonicalization cannot
+return the empty option. This is the constructive conditional available before
+an executor-level failure outcome proves progress. -/
+theorem canonicalExpected?_ne_none_of_terminalFrontierWait
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (waiting : TerminalFrontierWait
+      file tokens memo correct final cursor) :
+    canonicalExpected? owned correct final cursor greatest ≠ none := by
+  intro returnedNone
+  have empty := (canonicalExpected?_eq_none_iff
+    owned correct final cursor greatest).mp returnedNone
+  exact empty
+    ((terminalFrontierWait_iff_expected_nonempty).mp waiting)
+
 /-- The retained token or logical EOF observed at one parser boundary. -/
 inductive FoundAt
     (file : WorkspaceFile) (tokens : List Token) :
