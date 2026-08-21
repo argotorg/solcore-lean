@@ -5325,6 +5325,114 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
+private theorem sealIndexedPhaseB?_total_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (remaining : current.payload.phaseB.remaining = [])
+    (ready : PhaseBRunnerReady current) :
+    ∃ result, sealIndexedPhaseB? current = some result := by
+  let phaseBInput : CountedState tokens (PhaseBOpen file tokens) := {
+    payload := current.payload.phaseB
+    counter := current.counter
+  }
+  have sealFresh : UnitAddress.phase .sealBEnterC ∉
+      phaseBInput.counter.usedRev := by
+    simpa [phaseBInput] using ready.2.2.2
+  let transition := fun (state : PhaseBOpen file tokens) => ({
+    phaseA := state.phaseA
+    memo := fun key =>
+      match state.cells key with
+      | some value => value
+      | none => .undecided
+    finalizedRev := state.finalizedRev
+  } : PhaseBSealed file tokens)
+  let result : CountedState tokens (PhaseBSealed file tokens) := {
+    payload := transition phaseBInput.payload
+    counter := phaseBInput.counter.charge (.phase .sealBEnterC) sealFresh
+  }
+  have stepped : runMappedPrimitive? phaseBInput (.phase .sealBEnterC)
+      transition = some result := by
+    simp [runMappedPrimitive?, sealFresh, result]
+  refine ⟨result, ?_⟩
+  simpa [sealIndexedPhaseB?, sealPhaseB?, phaseBInput, remaining,
+    transition] using stepped
+
+private theorem executeIndexedPhaseB?_total_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (ready : PhaseBIndexedReady current) :
+    ∃ result, executeIndexedPhaseB? current = some result := by
+  obtain ⟨entered, enteredEq, enteredRemaining, enteredReady⟩ :=
+    enterIndexedPhaseB?_total_ready current ready
+  obtain ⟨finalized, runEq, finalizedRemaining, finalizedReady⟩ :=
+    runIndexedPhaseB?_total_ready (allGuardInstanceKeys tokens)
+      entered enteredRemaining enteredReady
+  obtain ⟨result, sealedEq⟩ := sealIndexedPhaseB?_total_ready
+    finalized finalizedRemaining finalizedReady
+  exact ⟨result, by
+    unfold executeIndexedPhaseB?
+    rw [enteredEq]
+    simp only [Option.bind_eq_bind, Option.bind_some]
+    rw [runEq]
+    simp only [Option.bind_some]
+    exact sealedEq⟩
+
+private theorem executeObservedPhaseAB?_total_of_phaseA_ready
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : CountedState tokens (PhaseAOpen file tokens))
+    (executed : executePhaseA? file tokens owned = some phaseA)
+    (sameMembers : canonicalRawItems tokens phaseA.payload.rawItems =
+      canonicalRawItems tokens (rawSaturation tokens)) :
+    ∃ result, executeObservedPhaseAB? file tokens owned = some result := by
+  obtain ⟨indexed, indexedEq, indexedReady⟩ :=
+    executePhaseA?_index_total_owned file tokens owned phaseA executed
+      sameMembers
+  obtain ⟨result, phaseBEq⟩ :=
+    executeIndexedPhaseB?_total_ready indexed indexedReady
+  exact ⟨result, by
+    unfold executeObservedPhaseAB?
+    rw [executed]
+    simp only [Option.bind_eq_bind, Option.bind_some]
+    rw [indexedEq]
+    simp only [Option.bind_some]
+    exact phaseBEq⟩
+
+private def ObservedPhaseABPrerequisites
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) : Prop :=
+  ∃ phaseA : CountedState tokens (PhaseAOpen file tokens),
+    executePhaseA? file tokens owned = some phaseA ∧
+    canonicalRawItems tokens phaseA.payload.rawItems =
+      canonicalRawItems tokens (rawSaturation tokens)
+
+private theorem executeObservedPhaseAB?_total_iff_prerequisites
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    (∃ result, executeObservedPhaseAB? file tokens owned = some result) ↔
+      ObservedPhaseABPrerequisites file tokens owned := by
+  constructor
+  · rintro ⟨result, selected⟩
+    unfold executeObservedPhaseAB? at selected
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨phaseA, phaseAEq,
+      indexed, indexedEq, phaseBEq⟩
+    refine ⟨phaseA, phaseAEq, ?_⟩
+    unfold indexSaturatedPhaseACanonicalWith? at indexedEq
+    split at indexedEq
+    next sameMembers => exact sameMembers
+    next differentMembers => contradiction
+  · rintro ⟨phaseA, phaseAEq, sameMembers⟩
+    exact executeObservedPhaseAB?_total_of_phaseA_ready
+      file tokens owned phaseA phaseAEq sameMembers
+
+end Chart
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- The exact completion coordinates erased by the target item. -/
 private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
   Boundary tokens × ProductionId
