@@ -724,6 +724,178 @@ private theorem rawSaturation_stable
     (rawClosureBool file tokens owned)
     (rawClosureBool_inflationary owned)
 
+private theorem dottedItem_eq_of_fields
+    {tokens : List Token} {left right : DottedItem tokens}
+    (production : left.production = right.production)
+    (dot : left.dot.val = right.dot.val)
+    (origin : left.origin = right.origin)
+    (current : left.current = right.current) :
+    left = right := by
+  cases left with
+  | mk leftProduction leftDot leftOrigin leftCurrent =>
+      cases right with
+      | mk rightProduction rightDot rightOrigin rightCurrent =>
+          simp only at production dot origin current
+          subst rightProduction
+          have dotEq : leftDot = rightDot := Fin.ext dot
+          subst rightDot
+          subst rightOrigin
+          subst rightCurrent
+          rfl
+
+private theorem rawClosureRule_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    {known : List (DottedItem tokens)} {item : DottedItem tokens}
+    (knownSound : ∀ knownItem, knownItem ∈ known →
+      UnguardedReach file tokens knownItem)
+    (rule : RawClosureRule file tokens known item) :
+    UnguardedReach file tokens item := by
+  rcases rule with carried | seeded | predicted | scanned | completed
+  · exact knownSound item carried
+  · rcases seeded with ⟨zero, sameCursor⟩
+    let seedItem : DottedItem tokens := {
+      production := item.production
+      dot := ⟨0, Nat.zero_lt_succ _⟩
+      origin := item.current
+      current := item.current
+    }
+    have seedEq : seedItem = item := dottedItem_eq_of_fields
+      rfl zero.symm sameCursor.symm rfl
+    rw [← seedEq]
+    exact .seed item.production item.current
+  · rcases predicted with ⟨waiting, member, next, zero,
+      sameOrigin, sameCurrent⟩
+    let predictedItem : DottedItem tokens := {
+      production := item.production
+      dot := ⟨0, Nat.zero_lt_succ _⟩
+      origin := waiting.current
+      current := waiting.current
+    }
+    have predictedEq : predictedItem = item := dottedItem_eq_of_fields
+      rfl zero.symm sameOrigin.symm sameCurrent.symm
+    rw [← predictedEq]
+    exact .predict waiting item.production (knownSound waiting member) next
+  · rcases scanned with ⟨before, member, cursor, witness⟩
+    rcases witness with
+      ⟨terminal, matched, sameCursor, next, atCurrent, advance⟩
+    have exactAdvance : AdvanceItem before cursor.afterBoundary item := by
+      rw [← sameCursor]
+      exact advance
+    have exactAt : TerminalAt file tokens cursor
+        matched.value matched.span := by
+      rw [← sameCursor]
+      exact matched.at
+    exact .scan before item cursor terminal matched.value matched.span
+      (knownSound before member) next atCurrent exactAt matched.matches
+      exactAdvance
+  · rcases completed with
+      ⟨waiting, waitingMember, finished, finishedMember,
+        next, complete, sameCursor, advance⟩
+    exact .complete waiting finished item
+      (knownSound waiting waitingMember)
+      (knownSound finished finishedMember)
+      next complete sameCursor advance
+
+private theorem rawSaturationStage_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ stage item,
+      item ∈ closureIterate (rawSaturationStep file tokens owned) stage →
+        UnguardedReach file tokens item := by
+  intro stage
+  induction stage with
+  | zero =>
+      intro item member
+      simp [closureIterate] at member
+  | succ previous induction =>
+      intro item member
+      apply rawClosureRule_sound induction
+      exact (rawSaturationStep_mem_iff owned _ item).mp member
+
+private theorem rawSaturation_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) {item : DottedItem tokens}
+    (member : item ∈ rawSaturation file tokens owned) :
+    UnguardedReach file tokens item := by
+  exact rawSaturationStage_sound owned
+    (allDottedItems tokens).length item member
+
+private theorem rawSaturation_rule_closed
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {item : DottedItem tokens}
+    (rule : RawClosureRule file tokens
+      (rawSaturation file tokens owned) item) :
+    item ∈ rawSaturation file tokens owned := by
+  rw [← rawSaturation_stable owned]
+  exact (rawSaturationStep_mem_iff owned _ item).mpr rule
+
+private theorem rawSaturation_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) {item : DottedItem tokens}
+    (reached : UnguardedReach file tokens item) :
+    item ∈ rawSaturation file tokens owned := by
+  apply unguardedReach_least
+    (fun candidate => candidate ∈ rawSaturation file tokens owned)
+  · intro production cursor
+    apply rawSaturation_rule_closed owned
+    exact Or.inr (Or.inl ⟨rfl, rfl⟩)
+  · intro waiting predicted waitingMember next
+    apply rawSaturation_rule_closed owned
+    exact Or.inr (Or.inr (Or.inl
+      ⟨waiting, waitingMember, next, rfl, rfl, rfl⟩))
+  · intro before after cursor terminal value span beforeMember next
+      atCurrent terminalAt terminalMatches advance
+    apply rawSaturation_rule_closed owned
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    apply Or.inl
+    refine ⟨before, beforeMember, ?_⟩
+    exact ⟨⟨cursor, {
+      terminal := terminal
+      matched := {
+        cursor := cursor
+        value := value
+        span := span
+        «at» := terminalAt
+        «matches» := terminalMatches
+      }
+      sameCursor := rfl
+      next := next
+      atCurrent := atCurrent
+      advance := advance
+    }⟩⟩
+  · intro waiting finished after waitingMember finishedMember next
+      complete sameCursor advance
+    apply rawSaturation_rule_closed owned
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    exact ⟨waiting, waitingMember, finished, finishedMember,
+      next, complete, sameCursor, advance⟩
+  · exact reached
+
+private theorem rawSaturation_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens) :
+    item ∈ rawSaturation file tokens owned ↔
+      UnguardedReach file tokens item := by
+  exact ⟨rawSaturation_sound owned,
+    rawSaturation_complete owned⟩
+
+/-- Unguarded reachability is constructively decidable on an owned stream. -/
+def unguardedReachDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens) :
+    Decidable (UnguardedReach file tokens item) :=
+  decidable_of_iff
+    (rawMemberBool (rawSaturation file tokens owned) item = true)
+    ((rawMemberBool_eq_true_iff
+      (rawSaturation file tokens owned) item).trans
+        (rawSaturation_mem_iff owned item))
+
 /-- Unguarded recognition is exactly one reached complete matching item. -/
 theorem unguardedRecognizes_exact
     {file : WorkspaceFile} {tokens : List Token}
