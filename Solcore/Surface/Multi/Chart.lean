@@ -2476,4 +2476,142 @@ private def phaseABoundaryAt?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The proof-free delimiter stack used only while materializing Phase A. -/
+private inductive PhaseADelimiterCloser where
+  | rightParen
+  | rightBracket
+  | rightBrace
+  deriving BEq, DecidableEq
+
+private abbrev PhaseADelimiterStack := List PhaseADelimiterCloser
+
+/-- Execute one deterministic delimiter-stack transition. -/
+private def phaseADelimiterStep? :
+    PhaseADelimiterStack → TokenKind → Option PhaseADelimiterStack
+  | before, .symbol .leftParen =>
+      some (.rightParen :: before)
+  | before, .symbol .leftBracket =>
+      some (.rightBracket :: before)
+  | before, .symbol .leftBrace =>
+      some (.rightBrace :: before)
+  | .rightParen :: rest, .symbol .rightParen => some rest
+  | .rightBracket :: rest, .symbol .rightBracket => some rest
+  | .rightBrace :: rest, .symbol .rightBrace => some rest
+  | _, .symbol .rightParen => none
+  | _, .symbol .rightBracket => none
+  | _, .symbol .rightBrace => none
+  | before, _ => some before
+
+/-- Run exactly `fuel` retained-token delimiter transitions. -/
+private def phaseADelimiterRunFrom?
+    (tokens : List Token) : Nat → Nat → PhaseADelimiterStack →
+      Option PhaseADelimiterStack
+  | 0, _, before => some before
+  | fuel + 1, cursor, before =>
+      if inRange : cursor < tokens.length then
+        match phaseADelimiterStep? before tokens[cursor].payload with
+        | some after =>
+            phaseADelimiterRunFrom? tokens fuel (cursor + 1) after
+        | none => none
+      else
+        none
+
+/-- Execute an exact half-open delimiter range. -/
+private def phaseADelimiterRun?
+    (tokens : List Token) (before : PhaseADelimiterStack)
+    (start finish : Boundary tokens) : Option PhaseADelimiterStack :=
+  if _ordered : start.val ≤ finish.val then
+    phaseADelimiterRunFrom? tokens (finish.val - start.val)
+      start.val before
+  else
+    none
+
+/-- Test whether a half-open range returns to its starting depth. -/
+private def phaseASameDelimiterDepthBool
+    (tokens : List Token) (start finish : Boundary tokens) : Bool :=
+  decide (phaseADelimiterRun? tokens [] start finish = some [])
+
+/-- A protected step rejects consumption of the bottom stack entry. -/
+private def phaseAProtectedDelimiterStep?
+    (before : PhaseADelimiterStack) (token : TokenKind) :
+    Option PhaseADelimiterStack :=
+  match before with
+  | [] => none
+  | _ :: _ =>
+      match phaseADelimiterStep? before token with
+      | some after@(_ :: _) => some after
+      | _ => none
+
+/-- Run an exact range while retaining a nonempty stack. -/
+private def phaseAProtectedDelimiterRunFrom?
+    (tokens : List Token) : Nat → Nat → PhaseADelimiterStack →
+      Option PhaseADelimiterStack
+  | 0, _, [] => none
+  | 0, _, before@(_ :: _) => some before
+  | fuel + 1, cursor, before =>
+      if inRange : cursor < tokens.length then
+        match phaseAProtectedDelimiterStep?
+            before tokens[cursor].payload with
+        | some after =>
+            phaseAProtectedDelimiterRunFrom? tokens fuel
+              (cursor + 1) after
+        | none => none
+      else
+        none
+
+/-- Execute one protected half-open delimiter range. -/
+private def phaseAProtectedDelimiterRun?
+    (tokens : List Token) (before : PhaseADelimiterStack)
+    (start finish : Boundary tokens) : Option PhaseADelimiterStack :=
+  if _ordered : start.val ≤ finish.val then
+    phaseAProtectedDelimiterRunFrom? tokens
+      (finish.val - start.val) start.val before
+  else
+    none
+
+/-- Select the only legal closing symbol and stack entry for an opener. -/
+private def phaseADelimiterPair? :
+    Symbol → Option (Symbol × PhaseADelimiterCloser)
+  | .leftParen => some (.rightParen, .rightParen)
+  | .leftBracket => some (.rightBracket, .rightBracket)
+  | .leftBrace => some (.rightBrace, .rightBrace)
+  | _ => none
+
+/-- Test one exact matched-delimiter pair with a protected interior. -/
+private def phaseAMatchingDelimiterBool
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens)
+    (opening closing : Symbol) : Bool :=
+  match phaseADelimiterPair? opening with
+  | none => false
+  | some (expectedClosing, closer) =>
+      decide (closing = expectedClosing) &&
+        phaseASymbolAtBool openCursor opening &&
+        phaseASymbolAtBool closeCursor closing &&
+        match phaseABoundaryAt? tokens (openCursor.val + 1) with
+        | none => false
+        | some interiorStart =>
+            decide (phaseAProtectedDelimiterRun? tokens [closer]
+              interiorStart closeCursor = some [closer])
+
+/-- Test that `cursor` is the first allowed symbol back at the starting
+delimiter depth. -/
+private def phaseANextSameDepthDelimiterBool
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Bool :=
+  phaseASameDelimiterDepthBool tokens start cursor &&
+    phaseAAllowedSymbolAtBool cursor allowed &&
+    (List.finRange (tokens.length + 2)).all fun earlier =>
+      if start.val ≤ earlier.val && earlier.val < cursor.val &&
+          phaseASameDelimiterDepthBool tokens start earlier then
+        !phaseAAllowedSymbolAtBool earlier allowed
+      else
+        true
+
+end Chart
+
 end Solcore.Surface.Multi
