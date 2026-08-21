@@ -3270,4 +3270,229 @@ private def executeObservedPhaseAB?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The exact completion coordinates erased by the target item. -/
+private abbrev CompletionBackpointerCoordinates (tokens : List Token) :=
+  Boundary tokens × ProductionId
+
+/-- One executable association-list row, keyed by the exact contextual target. -/
+private structure CompletionBackpointerEntry (tokens : List Token) where
+  after : ContextualItemKey tokens
+  shared : Boundary tokens
+  finishedProduction : ProductionId
+  deriving Repr, BEq, DecidableEq
+
+namespace CompletionBackpointerEntry
+
+private def coordinates {tokens : List Token}
+    (entry : CompletionBackpointerEntry tokens) :
+    CompletionBackpointerCoordinates tokens :=
+  (entry.shared, entry.finishedProduction)
+
+private def ofCompleted
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    CompletionBackpointerEntry tokens := {
+  after := edge.after
+  shared := edge.shared
+  finishedProduction := edge.finished.raw.production
+}
+
+end CompletionBackpointerEntry
+
+/-- The machine stores at most one row for each exact contextual target. -/
+private abbrev CompletionBackpointerLedger (tokens : List Token) :=
+  List (CompletionBackpointerEntry tokens)
+
+namespace CompletionBackpointerLedger
+
+private def lookup? {tokens : List Token}
+    (after : ContextualItemKey tokens) :
+    CompletionBackpointerLedger tokens →
+      Option (CompletionBackpointerCoordinates tokens)
+  | [] => none
+  | entry :: rest =>
+      if entry.after = after then some entry.coordinates
+      else lookup? after rest
+
+/-- Insert a new target, reuse an agreeing row, and reject a conflict. -/
+private def insert? {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (entry : CompletionBackpointerEntry tokens) :
+    Option (CompletionBackpointerLedger tokens) :=
+  match lookup? entry.after ledger with
+  | none => some (entry :: ledger)
+  | some stored =>
+      if stored = entry.coordinates then some ledger else none
+
+private theorem lookup?_eq_none_iff
+    {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (after : ContextualItemKey tokens) :
+    lookup? after ledger = none ↔
+      ∀ entry, entry ∈ ledger → entry.after ≠ after := by
+  induction ledger with
+  | nil => simp [lookup?]
+  | cons head tail induction =>
+      by_cases equal : head.after = after
+      · simp [lookup?, equal]
+      · simp [lookup?, equal, induction]
+
+private theorem insert?_covers
+    {tokens : List Token}
+    {ledger result : CompletionBackpointerLedger tokens}
+    (entry : CompletionBackpointerEntry tokens)
+    (selected : insert? ledger entry = some result) :
+    lookup? entry.after result = some entry.coordinates := by
+  unfold insert? at selected
+  split at selected
+  next absent =>
+    cases selected
+    simp [lookup?]
+  next stored present =>
+    split at selected
+    next equal =>
+      cases selected
+      exact present.trans (congrArg some equal)
+    next different => contradiction
+
+private theorem insert?_preserves_lookup
+    {tokens : List Token}
+    {ledger result : CompletionBackpointerLedger tokens}
+    (entry : CompletionBackpointerEntry tokens)
+    (selected : insert? ledger entry = some result)
+    {after : ContextualItemKey tokens}
+    {coordinates : CompletionBackpointerCoordinates tokens}
+    (covered : lookup? after ledger = some coordinates) :
+    lookup? after result = some coordinates := by
+  unfold insert? at selected
+  split at selected
+  next absent =>
+    cases selected
+    by_cases equal : entry.after = after
+    · subst after
+      rw [absent] at covered
+      contradiction
+    · simp [lookup?, equal, covered]
+  next stored present =>
+    split at selected
+    next equal => cases selected; exact covered
+    next different => contradiction
+
+private def CoversCompleted
+    {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (after : ContextualItemKey tokens)
+    (shared : Boundary tokens)
+    (finishedProduction : ProductionId) : Prop :=
+  lookup? after ledger = some (shared, finishedProduction)
+
+private def CoversPackedEdges
+    (file : WorkspaceFile) (tokens : List Token)
+    (ledger : CompletionBackpointerLedger tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens)) : Prop :=
+  ∀ edge, edge ∈ edges →
+    match edge.1 with
+    | .scanned _ _ _ => True
+    | .completed _ finished after shared =>
+        CoversCompleted ledger after shared finished.raw.production
+
+private def packCompleted
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    StructurallyValidContextualPackedEdge file tokens :=
+  ⟨.completed edge.waiting edge.finished edge.after edge.shared,
+    edge.structural⟩
+
+private def packScanned
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualScannedEdge file tokens) :
+    StructurallyValidContextualPackedEdge file tokens :=
+  ⟨.scanned edge.before edge.after edge.cursor, edge.structural⟩
+
+private theorem coversPackedEdges_nil
+    (file : WorkspaceFile) (tokens : List Token) :
+    CoversPackedEdges file tokens [] [] := by
+  intro edge member
+  simp at member
+
+private theorem coversPackedEdges_cons_scanned
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger : CompletionBackpointerLedger tokens}
+    {edges : List (StructurallyValidContextualPackedEdge file tokens)}
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (covers : CoversPackedEdges file tokens ledger edges) :
+    CoversPackedEdges file tokens ledger (edges ++ [packScanned edge]) := by
+  intro candidate member
+  rw [List.mem_append] at member
+  rcases member with oldMember | inserted
+  · exact covers candidate oldMember
+  · simp only [List.mem_singleton] at inserted
+    subst candidate
+    trivial
+
+private theorem insert?_coversPackedEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger result : CompletionBackpointerLedger tokens}
+    {edges : List (StructurallyValidContextualPackedEdge file tokens)}
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : insert? ledger
+      (CompletionBackpointerEntry.ofCompleted edge) = some result)
+    (covers : CoversPackedEdges file tokens ledger edges) :
+    CoversPackedEdges file tokens result (edges ++ [packCompleted edge]) := by
+  intro candidate member
+  rw [List.mem_append] at member
+  rcases member with oldMember | inserted
+  · have oldCovered := covers candidate oldMember
+    cases key : candidate.1 with
+    | scanned before after cursor =>
+        simp only [key] at oldCovered
+        trivial
+    | completed waiting finished after shared =>
+        simp only [key] at oldCovered
+        unfold CoversCompleted at oldCovered ⊢
+        exact insert?_preserves_lookup
+          (CompletionBackpointerEntry.ofCompleted edge) selected oldCovered
+  · simp only [List.mem_singleton] at inserted
+    subst candidate
+    change lookup? edge.after result =
+      some (edge.shared, edge.finished.raw.production)
+    exact insert?_covers (CompletionBackpointerEntry.ofCompleted edge) selected
+
+/-- The atomic proof-free state update used inside the U04 edge insertion. -/
+private def insertCompleted?
+    {file : WorkspaceFile} {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    Option (CompletionBackpointerLedger tokens ×
+      List (StructurallyValidContextualPackedEdge file tokens)) := do
+  let nextLedger ← insert? ledger
+    (CompletionBackpointerEntry.ofCompleted edge)
+  pure (nextLedger, edges ++ [packCompleted edge])
+
+private theorem insertCompleted?_coversPackedEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger resultLedger : CompletionBackpointerLedger tokens}
+    {edges resultEdges :
+      List (StructurallyValidContextualPackedEdge file tokens)}
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : insertCompleted? ledger edges edge =
+      some (resultLedger, resultEdges))
+    (covers : CoversPackedEdges file tokens ledger edges) :
+    CoversPackedEdges file tokens resultLedger resultEdges := by
+  unfold insertCompleted? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨nextLedger, inserted, equal⟩
+  cases equal
+  exact insert?_coversPackedEdges edge inserted covers
+
+end CompletionBackpointerLedger
+
+end Chart
+
 end Solcore.Surface.Multi
