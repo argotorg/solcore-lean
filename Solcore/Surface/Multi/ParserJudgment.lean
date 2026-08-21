@@ -1473,6 +1473,29 @@ inductive MarkerProjects
       (terminal : MatchedTerminal file tokens (.hardKeyword .defaultKw)) :
       MarkerProjects file tokens terminal .defaultModifier
 
+namespace MarkerProjects
+
+/-- One matched terminal projects to at most one syntax-marker kind. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    {matched : MatchedTerminal file tokens terminal}
+    {left right : SyntaxMarker}
+    (leftProjects : RuleReduction.MarkerProjects
+      file tokens matched left)
+    (rightProjects : RuleReduction.MarkerProjects
+      file tokens matched right) :
+    left = right := by
+  cases leftProjects <;> cases rightProjects
+  all_goals try rfl
+  all_goals
+    rename_i leftParsed leftProjection rightParsed rightProjection
+    have spellingEq :=
+      (PathSegmentProjects.functional leftProjection rightProjection).1
+    contradiction
+
+end MarkerProjects
+
 /-- Locate one explicitly indexed syntax marker at its exact terminal span. -/
 def marker
     {file : WorkspaceFile} {tokens : List Token}

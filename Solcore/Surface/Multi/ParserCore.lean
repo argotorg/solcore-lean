@@ -1313,6 +1313,26 @@ theorem matchedTerminal_identifier_projection_exists_unique
       subst otherParsed
       rfl
 
+namespace IdentifierProjects
+
+/-- One matched identifier has at most one spelling and parsed value. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {matched : MatchedTerminal file tokens (.category .identifier)}
+    {leftSpelling rightSpelling : String}
+    {leftParsed rightParsed : Identifier}
+    (leftProjects : IdentifierProjects matched leftSpelling leftParsed)
+    (rightProjects : IdentifierProjects matched rightSpelling rightParsed) :
+    leftSpelling = rightSpelling ∧ leftParsed = rightParsed := by
+  rcases matchedTerminal_identifier_projection_exists_unique matched with
+    ⟨canonical, canonicalProjects, unique⟩
+  have pairEq :=
+    (unique (leftSpelling, leftParsed) leftProjects).trans
+      (unique (rightSpelling, rightParsed) rightProjects).symm
+  exact Prod.mk.inj pairEq
+
+end IdentifierProjects
+
 /-- Every matched path component has exactly one spelling-and-value projection. -/
 theorem matchedTerminal_path_projection_exists_unique
     {file : WorkspaceFile} {tokens : List Token}
@@ -1365,6 +1385,26 @@ theorem matchedTerminal_path_projection_exists_unique
           Option.some.inj (otherParse.symm.trans parseEq)
         subst otherParsed
         rfl
+
+namespace PathSegmentProjects
+
+/-- One matched path component has at most one spelling and parsed value. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {matched : MatchedTerminal file tokens (.category .pathComponent)}
+    {leftSpelling rightSpelling : String}
+    {leftParsed rightParsed : PathSegment}
+    (leftProjects : PathSegmentProjects matched leftSpelling leftParsed)
+    (rightProjects : PathSegmentProjects matched rightSpelling rightParsed) :
+    leftSpelling = rightSpelling ∧ leftParsed = rightParsed := by
+  rcases matchedTerminal_path_projection_exists_unique matched with
+    ⟨canonical, canonicalProjects, unique⟩
+  have pairEq :=
+    (unique (leftSpelling, leftParsed) leftProjects).trans
+      (unique (rightSpelling, rightParsed) rightProjects).symm
+  exact Prod.mk.inj pairEq
+
+end PathSegmentProjects
 
 /-- Every matched external-library component has one spelling-and-value projection. -/
 theorem matchedTerminal_external_projection_exists_unique
@@ -1426,6 +1466,28 @@ theorem matchedTerminal_external_projection_exists_unique
           Option.some.inj (otherParse.symm.trans externalParse)
         subst otherParsed
         rfl
+
+namespace ExternalLibraryProjects
+
+/-- One matched external component has at most one spelling and parsed value. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {matched : MatchedTerminal file tokens (.category .pathComponent)}
+    {leftSpelling rightSpelling : String}
+    {leftParsed rightParsed : ExternalLibraryName}
+    (leftProjects : ExternalLibraryProjects
+      matched leftSpelling leftParsed)
+    (rightProjects : ExternalLibraryProjects
+      matched rightSpelling rightParsed) :
+    leftSpelling = rightSpelling ∧ leftParsed = rightParsed := by
+  rcases matchedTerminal_external_projection_exists_unique matched with
+    ⟨canonical, canonicalProjects, unique⟩
+  have pairEq :=
+    (unique (leftSpelling, leftParsed) leftProjects).trans
+      (unique (rightSpelling, rightParsed) rightProjects).symm
+  exact Prod.mk.inj pairEq
+
+end ExternalLibraryProjects
 
 /-- Every matched literal in the closed literal category has one exact payload. -/
 theorem matchedTerminal_literal_projection_exists_unique
@@ -1528,6 +1590,32 @@ theorem matchedTerminal_literal_projection_exists_unique
           subst otherDecoded
           exact otherLiteral
 
+namespace LiteralProjects
+
+/-- One matched literal terminal has at most one literal payload. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    {matched : MatchedTerminal file tokens terminal}
+    {left right : LiteralPayload}
+    (leftProjects : LiteralProjects matched left)
+    (rightProjects : LiteralProjects matched right) :
+    left = right := by
+  have literalTerminal :
+      terminal = .category .decimalLiteral ∨
+        terminal = .category .hexadecimalLiteral ∨
+        terminal = .category .stringLiteral := by
+    rcases leftProjects with ⟨token, valueEq, branch⟩
+    rcases branch with branch | branch | branch
+    · exact Or.inl branch.1
+    · exact Or.inr (Or.inl branch.1)
+    · exact Or.inr (Or.inr branch.1)
+  rcases matchedTerminal_literal_projection_exists_unique
+      matched literalTerminal with ⟨canonical, canonicalProjects, unique⟩
+  exact (unique _ leftProjects).trans (unique _ rightProjects).symm
+
+end LiteralProjects
+
 /-- Every matched assembly block has exactly one retained assembly slice. -/
 theorem matchedTerminal_assembly_projection_exists_unique
     {file : WorkspaceFile} {tokens : List Token}
@@ -1551,6 +1639,22 @@ theorem matchedTerminal_assembly_projection_exists_unique
         simpa only [TerminalStreamValue.retained.injEq] using valueEq
       subst otherToken
       exact TokenKind.assemblyBlock.inj (otherPayload.symm.trans payloadEq)
+
+namespace AssemblySliceProjects
+
+/-- One matched assembly block has at most one retained slice. -/
+theorem functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {matched : MatchedTerminal file tokens (.category .assemblyBlock)}
+    {left right : AssemblySlice}
+    (leftProjects : AssemblySliceProjects matched left)
+    (rightProjects : AssemblySliceProjects matched right) :
+    left = right := by
+  rcases matchedTerminal_assembly_projection_exists_unique matched with
+    ⟨canonical, canonicalProjects, unique⟩
+  exact (unique _ leftProjects).trans (unique _ rightProjects).symm
+
+end AssemblySliceProjects
 
 /-- The structural size of one finite EBNF expression. -/
 def ebnfSize : EbnfExpr → Nat
@@ -2079,6 +2183,125 @@ def list1
       EbnfValue file tokens (EbnfExpr.list1 element) :=
   Eq.mp (ebnfValue_list1_eq element).symm
 
+/-- Expression-index transport does not identify distinct EBNF values. -/
+theorem transport_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : EbnfExpr} (indexEq : left = right) :
+    Function.Injective (transport (file := file) (tokens := tokens) indexEq) := by
+  cases indexEq
+  intro first second valueEq
+  exact valueEq
+
+/-- The terminal-atom builder retains its exact matched terminal. -/
+theorem terminalAtom_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) :
+    Function.Injective
+      (terminalAtom (file := file) (tokens := tokens) terminal) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_atom_terminal_eq terminal)) valueEq
+  simpa [terminalAtom, cast_cast] using viewedEq
+
+/-- The rule-atom builder retains its exact semantic value. -/
+theorem ruleAtom_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId) :
+    Function.Injective
+      (ruleAtom (file := file) (tokens := tokens) rule) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_atom_nonterminal_eq rule)) valueEq
+  simpa [ruleAtom, cast_cast] using viewedEq
+
+/-- The sequence builder retains its heterogeneous child tuple. -/
+theorem sequence_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr) :
+    Function.Injective
+      (sequence (file := file) (tokens := tokens) children) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_sequence_eq children)) valueEq
+  simpa [sequence, cast_cast] using viewedEq
+
+/-- The group builder retains its child value. -/
+theorem group_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+    Function.Injective
+      (group (file := file) (tokens := tokens) child) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_group_eq child)) valueEq
+  simpa [group, cast_cast] using viewedEq
+
+/-- The choice builder retains its dependent branch/value pair. -/
+theorem choice_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (branches : List EbnfExpr) :
+    Function.Injective
+      (choice (file := file) (tokens := tokens) branches) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_choice_eq branches)) valueEq
+  simpa [choice, cast_cast] using viewedEq
+
+/-- The optional builder retains absence or the exact child value. -/
+theorem optional_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+    Function.Injective
+      (optional (file := file) (tokens := tokens) child) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_optional_eq child)) valueEq
+  simpa [optional, cast_cast] using viewedEq
+
+/-- The star builder retains its ordered child list. -/
+theorem star_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+    Function.Injective
+      (star (file := file) (tokens := tokens) child) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_star_eq child)) valueEq
+  simpa [star, cast_cast] using viewedEq
+
+/-- The plus builder retains its nonempty child list. -/
+theorem plus_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+    Function.Injective
+      (plus (file := file) (tokens := tokens) child) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_plus_eq child)) valueEq
+  simpa [plus, cast_cast] using viewedEq
+
+/-- The list-zero builder retains its ordered child list. -/
+theorem list0_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+    Function.Injective
+      (list0 (file := file) (tokens := tokens) child) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_list0_eq child)) valueEq
+  simpa [list0, cast_cast] using viewedEq
+
+/-- The list-one builder retains its nonempty child list. -/
+theorem list1_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) :
+    Function.Injective
+      (list1 (file := file) (tokens := tokens) child) := by
+  intro first second valueEq
+  have viewedEq := congrArg
+    (Eq.mp (ebnfValue_list1_eq child)) valueEq
+  simpa [list1, cast_cast] using viewedEq
+
 end EbnfValue
 
 namespace GrammarSymbolValues
@@ -2134,6 +2357,20 @@ def cons
   change cast _ (cast _ (head, tail)) = (head, tail)
   rw [cast_cast]
   apply cast_eq
+
+/-- The sequence-cons builder retains both its head and heterogeneous tail. -/
+theorem cons_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (rest : List EbnfExpr)
+    {firstHead secondHead : EbnfValue file tokens child}
+    {firstTail secondTail : EbnfValues file tokens rest}
+    (valueEq : cons child rest firstHead firstTail =
+      cons child rest secondHead secondTail) :
+    firstHead = secondHead ∧ firstTail = secondTail := by
+  have pairEq := congrArg
+    (Eq.mp (ebnfValues_cons_eq
+      (file := file) (tokens := tokens) child rest)) valueEq
+  simpa using pairEq
 
 /-- Convert auxiliary nonterminal values to their expression-indexed tuple. -/
 def ofAuxiliaries
@@ -3245,6 +3482,23 @@ theorem functional
     _ = right := rightEq.symm
 
 end SourceLocates
+
+/-- Source location with a fixed interval is injective in its payload. -/
+theorem sourceLoc_eq_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens} {alpha : Type}
+    (leftWitness rightWitness : ConsumedSpanWitness
+      file tokens origin finish)
+    (left right : alpha) :
+    sourceLoc leftWitness left = sourceLoc rightWitness right ↔ left = right := by
+  constructor
+  · intro locatedEq
+    exact congrArg Located.payload locatedEq
+  · intro payloadEq
+    subst right
+    exact SourceLocates.functional
+      (consumedSpanWitness_sourceLocates leftWitness left)
+      (consumedSpanWitness_sourceLocates rightWitness left)
 
 namespace ConsumedSpanWitness
 
