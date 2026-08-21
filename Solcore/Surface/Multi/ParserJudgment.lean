@@ -6287,6 +6287,272 @@ inductive RuleReduction
             EbnfValue.terminalAtom (.category .stringLiteral) terminal⟩)
         (RuleReduction.terminalLoc terminal payload)
 
+private theorem transport_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : EbnfExpr} (indexEq : left = right)
+    {first second : EbnfValue file tokens left} :
+    EbnfValue.transport indexEq first = EbnfValue.transport indexEq second ↔
+      first = second :=
+  (EbnfValue.transport_injective indexEq).eq_iff
+
+private theorem terminalAtom_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    {first second : MatchedTerminal file tokens terminal} :
+    EbnfValue.terminalAtom terminal first =
+        EbnfValue.terminalAtom terminal second ↔ first = second :=
+  (EbnfValue.terminalAtom_injective terminal).eq_iff
+
+private theorem ruleAtom_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {first second : RuleValue rule} :
+    EbnfValue.ruleAtom (file := file) (tokens := tokens) rule first =
+        EbnfValue.ruleAtom rule second ↔ first = second :=
+  (EbnfValue.ruleAtom_injective rule).eq_iff
+
+private theorem sequence_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {children : List EbnfExpr}
+    {first second : EbnfValues file tokens children} :
+    EbnfValue.sequence children first = EbnfValue.sequence children second ↔
+      first = second :=
+  (EbnfValue.sequence_injective children).eq_iff
+
+private theorem group_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {child : EbnfExpr} {first second : EbnfValue file tokens child} :
+    EbnfValue.group child first = EbnfValue.group child second ↔ first = second :=
+  (EbnfValue.group_injective child).eq_iff
+
+private theorem choice_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {branches : List EbnfExpr}
+    {first second : (branch : Fin branches.length) ×
+      EbnfValue file tokens (branches.get branch)} :
+    EbnfValue.choice branches first = EbnfValue.choice branches second ↔
+      first = second :=
+  (EbnfValue.choice_injective branches).eq_iff
+
+private theorem optional_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {child : EbnfExpr}
+    {first second : Option (EbnfValue file tokens child)} :
+    EbnfValue.optional child first = EbnfValue.optional child second ↔
+      first = second :=
+  (EbnfValue.optional_injective child).eq_iff
+
+private theorem star_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {child : EbnfExpr}
+    {first second : List (EbnfValue file tokens child)} :
+    EbnfValue.star child first = EbnfValue.star child second ↔ first = second :=
+  (EbnfValue.star_injective child).eq_iff
+
+private theorem plus_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {child : EbnfExpr}
+    {first second : NonemptyList (EbnfValue file tokens child)} :
+    EbnfValue.plus child first = EbnfValue.plus child second ↔ first = second :=
+  (EbnfValue.plus_injective child).eq_iff
+
+private theorem list0_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {child : EbnfExpr}
+    {first second : List (EbnfValue file tokens child)} :
+    EbnfValue.list0 child first = EbnfValue.list0 child second ↔ first = second :=
+  (EbnfValue.list0_injective child).eq_iff
+
+private theorem list1_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {child : EbnfExpr}
+    {first second : NonemptyList (EbnfValue file tokens child)} :
+    EbnfValue.list1 child first = EbnfValue.list1 child second ↔ first = second :=
+  (EbnfValue.list1_injective child).eq_iff
+
+private theorem cons_inj_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {child : EbnfExpr} {rest : List EbnfExpr}
+    {firstHead secondHead : EbnfValue file tokens child}
+    {firstTail secondTail : EbnfValues file tokens rest} :
+    EbnfValues.cons child rest firstHead firstTail =
+        EbnfValues.cons child rest secondHead secondTail ↔
+      firstHead = secondHead ∧ firstTail = secondTail := by
+  constructor
+  · exact EbnfValues.cons_injective child rest
+  · rintro ⟨rfl, rfl⟩
+    rfl
+
+attribute [local simp] transport_inj_iff terminalAtom_inj_iff
+  ruleAtom_inj_iff sequence_inj_iff group_inj_iff choice_inj_iff
+  optional_inj_iff star_inj_iff plus_inj_iff list0_inj_iff
+  list1_inj_iff cons_inj_iff
+
+private theorem ruleReduction_topItem_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .topItem)}
+    {left right : RuleValue .topItem}
+    (leftReduces : RuleReduction file tokens .topItem origin finish input left)
+    (rightReduces : RuleReduction file tokens .topItem origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals first
+    | apply (sourceLoc_eq_iff _ _ _ _).2
+      exact congrArg _ inputEq
+    | apply (sourceLoc_eq_iff _ _ _ _).2
+      exact congrArg _ (ruleAtom_inj_iff.mp inputEq)
+
+private theorem ruleReduction_optionalComma_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .optionalComma)}
+    {left right : RuleValue .optionalComma}
+    (leftReduces : RuleReduction file tokens .optionalComma origin finish input left)
+    (rightReduces : RuleReduction file tokens .optionalComma origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals simp at inputEq
+  all_goals subst_vars <;> rfl
+
+private theorem ruleReduction_assignmentOperator_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .assignmentOperator)}
+    {left right : RuleValue .assignmentOperator}
+    (leftReduces : RuleReduction file tokens .assignmentOperator origin finish input left)
+    (rightReduces : RuleReduction file tokens .assignmentOperator origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals have choiceEq := EbnfValue.choice_injective _ inputEq
+  all_goals have choiceParts := Sigma.ext_iff.mp choiceEq
+  all_goals simp at choiceParts
+  all_goals have terminalEq :=
+    EbnfValue.terminalAtom_injective _ choiceParts
+  all_goals cases terminalEq <;> rfl
+
+private theorem ruleReduction_equality_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .equality)}
+    {left right : RuleValue .equality}
+    (leftReduces : RuleReduction file tokens .equality origin finish input left)
+    (rightReduces : RuleReduction file tokens .equality origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  all_goals have outerConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  all_goals have leftEq :=
+    EbnfValue.ruleAtom_injective _ outerConsEq.1
+  all_goals have optionConsEq :=
+    EbnfValues.cons_injective _ _ outerConsEq.2
+  all_goals have optionEq :=
+    EbnfValue.optional_injective _ optionConsEq.1
+  all_goals try exact leftEq
+  all_goals first
+    | have innerValueEq := Option.some.inj optionEq
+    | cases optionEq
+  all_goals have innerSequenceEq :=
+    EbnfValue.sequence_injective _ innerValueEq
+  all_goals have operatorConsEq :=
+    EbnfValues.cons_injective _ _ innerSequenceEq
+  all_goals have groupedEq :=
+    EbnfValue.group_injective _ operatorConsEq.1
+  all_goals have operatorChoiceEq :=
+    EbnfValue.choice_injective _ groupedEq
+  all_goals have branchEq := congrArg Sigma.fst operatorChoiceEq
+  all_goals simp at branchEq
+  all_goals have operatorChoiceParts := Sigma.ext_iff.mp operatorChoiceEq
+  all_goals have operatorValueEq := eq_of_heq operatorChoiceParts.2
+  all_goals have operatorEq :=
+    EbnfValue.terminalAtom_injective _ operatorValueEq
+  all_goals have rightConsEq :=
+    EbnfValues.cons_injective _ _ operatorConsEq.2
+  all_goals have rightEq :=
+    EbnfValue.ruleAtom_injective _ rightConsEq.1
+  all_goals cases leftEq
+  all_goals cases operatorEq
+  all_goals cases rightEq
+  all_goals exact (sourceLoc_eq_iff _ _ _ _).2 rfl
+
+private theorem ruleReduction_relational_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .relational)}
+    {left right : RuleValue .relational}
+    (leftReduces : RuleReduction file tokens .relational origin finish input left)
+    (rightReduces : RuleReduction file tokens .relational origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  all_goals have outerConsEq := EbnfValues.cons_injective _ _ sequenceEq
+  all_goals have leftEq :=
+    EbnfValue.ruleAtom_injective _ outerConsEq.1
+  all_goals have optionConsEq :=
+    EbnfValues.cons_injective _ _ outerConsEq.2
+  all_goals have optionEq :=
+    EbnfValue.optional_injective _ optionConsEq.1
+  all_goals try exact leftEq
+  all_goals first
+    | have innerValueEq := Option.some.inj optionEq
+    | cases optionEq
+  all_goals have innerSequenceEq :=
+    EbnfValue.sequence_injective _ innerValueEq
+  all_goals have operatorConsEq :=
+    EbnfValues.cons_injective _ _ innerSequenceEq
+  all_goals have groupedEq :=
+    EbnfValue.group_injective _ operatorConsEq.1
+  all_goals have operatorChoiceEq :=
+    EbnfValue.choice_injective _ groupedEq
+  all_goals have branchEq := congrArg Sigma.fst operatorChoiceEq
+  all_goals simp at branchEq
+  all_goals have operatorChoiceParts := Sigma.ext_iff.mp operatorChoiceEq
+  all_goals have operatorValueEq := eq_of_heq operatorChoiceParts.2
+  all_goals have operatorEq :=
+    EbnfValue.terminalAtom_injective _ operatorValueEq
+  all_goals have rightConsEq :=
+    EbnfValues.cons_injective _ _ operatorConsEq.2
+  all_goals have rightEq :=
+    EbnfValue.ruleAtom_injective _ rightConsEq.1
+  all_goals cases leftEq
+  all_goals cases operatorEq
+  all_goals cases rightEq
+  all_goals exact (sourceLoc_eq_iff _ _ _ _).2 rfl
+
+private theorem ruleReduction_statement_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs .statement)}
+    {left right : RuleValue .statement}
+    (leftReduces : RuleReduction file tokens .statement origin finish input left)
+    (rightReduces : RuleReduction file tokens .statement origin finish input right) :
+    left = right := by
+  generalize inputEq : input = rightInput at rightReduces
+  cases leftReduces <;> cases rightReduces
+  all_goals have choiceEq := EbnfValue.choice_injective _ inputEq
+  all_goals have branchEq := congrArg Sigma.fst choiceEq
+  all_goals simp at branchEq
+  all_goals have choiceParts := Sigma.ext_iff.mp choiceEq
+  all_goals have valueEq := eq_of_heq choiceParts.2
+  all_goals simp only [List.get_eq_getElem] at valueEq
+  all_goals first
+    | exact EbnfValue.ruleAtom_injective .letStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .returnStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .matchStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .ifStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .forStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .assemblyStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .blockStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .breakStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .continueStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .assignmentStatement valueEq
+    | exact EbnfValue.ruleAtom_injective .expressionStatement valueEq
+
 /-- A module-rule reduction can only produce the full-file, source-owned
 module payload from its exact item list. -/
 theorem ruleReduction_source_backed
