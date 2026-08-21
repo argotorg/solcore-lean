@@ -2249,6 +2249,300 @@ theorem allProductionIds_complete (production : ProductionId) :
         apply List.mem_flatMap.mpr
         exact ⟨site, allListSites_complete site, by simp⟩
 
+private theorem filterMap_nodup_of_functional
+    {α β : Type} (parse : α → Option β) (values : List α)
+    (unique : values.Nodup)
+    (functional : ∀ (left right : α) (result : β),
+      parse left = some result → parse right = some result → left = right) :
+    (values.filterMap parse).Nodup := by
+  rw [List.nodup_iff_pairwise_ne] at unique ⊢
+  rw [List.pairwise_filterMap]
+  exact unique.imp (fun {left right} different result leftSelected
+    other otherSelected equal => by
+      subst other
+      exact different (functional left right result leftSelected otherSelected))
+private def productionGrammarSiteKeysForRule
+    (rule : GrammarRuleId) : List GrammarSiteKey :=
+  ((m2cV1.rhs rule).sitePaths.map fun path => { rule, path })
+private theorem map_nodup_of_injective
+    {α β : Type} (function : α → β) (values : List α)
+    (unique : values.Nodup)
+    (injective : ∀ {left right}, function left = function right →
+      left = right) :
+    (values.map function).Nodup := by
+  rw [List.nodup_iff_pairwise_ne] at unique ⊢
+  rw [List.pairwise_map]
+  exact unique.imp fun different equal => different (injective equal)
+private theorem finRange_nodup (size : Nat) :
+    (List.finRange size).Nodup := by
+  induction size with
+  | zero => simp
+  | succ size induction =>
+      rw [show List.finRange (size + 1) =
+        0 :: (List.finRange size).map Fin.succ from List.finRange_succ]
+      rw [List.nodup_cons]
+      constructor
+      · intro member
+        rw [List.mem_map] at member
+        rcases member with ⟨value, _, equal⟩
+        have valueEqual := congrArg Fin.val equal
+        simp at valueEqual
+      · exact map_nodup_of_injective Fin.succ _ induction (by
+          intro left right equal
+          apply Fin.ext
+          exact Nat.succ.inj (congrArg Fin.val equal))
+private theorem dependentFlatMap_nodup
+    {α γ : Type} {β : α → Type}
+    (values : List α) (items : (value : α) → List (β value))
+    (make : (value : α) → β value → γ)
+    (valuesUnique : values.Nodup)
+    (itemsUnique : ∀ value, (items value).Nodup)
+    (makeInjective : ∀ {left right} {leftItem : β left}
+      {rightItem : β right},
+      make left leftItem = make right rightItem →
+        Sigma.mk left leftItem = Sigma.mk right rightItem) :
+    (values.flatMap fun value =>
+      (items value).map (make value)).Nodup := by
+  induction values with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.nodup_cons] at valuesUnique
+      simp only [List.flatMap_cons]
+      rw [List.nodup_append]
+      refine ⟨map_nodup_of_injective (make head) _ (itemsUnique head) ?_,
+        induction valuesUnique.2, ?_⟩
+      · intro left right equal
+        exact eq_of_heq (Sigma.ext_iff.mp (makeInjective equal)).2
+      · intro left leftMember right rightMember equal
+        rw [List.mem_map] at leftMember
+        rcases leftMember with ⟨leftItem, _, rfl⟩
+        rw [List.mem_flatMap] at rightMember
+        rcases rightMember with ⟨owner, ownerMember, rightMember⟩
+        rw [List.mem_map] at rightMember
+        rcases rightMember with ⟨rightItem, _, rfl⟩
+        have ownerEqual := congrArg Sigma.fst (makeInjective equal)
+        change head = owner at ownerEqual
+        exact valuesUnique.1 (ownerEqual.symm ▸ ownerMember)
+private theorem allGrammarSiteKeys_nodup :
+    (allGrammarRuleIds.flatMap productionGrammarSiteKeysForRule).Nodup := by
+  apply dependentFlatMap_nodup _ _ _
+    (by decide) (by intro rule; cases rule <;> decide)
+  intro left right leftItem rightItem equal; cases equal; rfl
+private theorem allGrammarSites_nodup : allGrammarSites.Nodup := by
+  rw [show allGrammarSites =
+      (allGrammarRuleIds.flatMap
+        productionGrammarSiteKeysForRule).filterMap GrammarSite.ofKey? by
+    rfl]
+  apply filterMap_nodup_of_functional
+    GrammarSite.ofKey? _ allGrammarSiteKeys_nodup
+  intro left right result leftSelected rightSelected
+  unfold GrammarSite.ofKey? at leftSelected rightSelected
+  split at leftSelected <;> split at rightSelected <;> simp_all
+  exact congrArg Subtype.val (leftSelected.trans rightSelected.symm)
+private theorem sitesOfKind_nodup (kind : EbnfNodeKind) :
+    (allGrammarSites.filterMap (GrammarSiteOfKind.ofSite? kind)).Nodup := by
+  apply filterMap_nodup_of_functional
+    (GrammarSiteOfKind.ofSite? kind) _ allGrammarSites_nodup
+  intro left right result leftSelected rightSelected
+  unfold GrammarSiteOfKind.ofSite? at leftSelected rightSelected
+  split at leftSelected <;> split at rightSelected <;> simp_all
+  exact congrArg GrammarSiteOfKind.site
+    (leftSelected.trans rightSelected.symm)
+private theorem namedSitesOfKind_nodup
+    {kind : EbnfNodeKind} (sites : List (GrammarSiteOfKind kind))
+    (definition : sites = allGrammarSites.filterMap
+      (GrammarSiteOfKind.ofSite? kind)) : sites.Nodup := by
+  rw [definition]
+  exact sitesOfKind_nodup kind
+private def productionListSiteOfGrammarSite? (site : GrammarSite) :
+    Option ListSite :=
+  match GrammarSiteOfKind.ofSite? .list0 site with
+  | some list0Site => some (.list0 list0Site)
+  | none =>
+      match GrammarSiteOfKind.ofSite? .list1 site with
+      | some list1Site => some (.list1 list1Site)
+      | none => none
+private theorem ofSite?_site
+    {kind : EbnfNodeKind} {site : GrammarSite}
+    {result : GrammarSiteOfKind kind}
+    (selected : GrammarSiteOfKind.ofSite? kind site = some result) :
+    result.site = site := by
+  unfold GrammarSiteOfKind.ofSite? at selected
+  split at selected <;> simp_all
+  exact (congrArg GrammarSiteOfKind.site selected).symm
+private theorem productionListSiteOfGrammarSite?_owner
+    {site : GrammarSite} {result : ListSite}
+    (selected : productionListSiteOfGrammarSite? site = some result) :
+    result.owner = site := by
+  unfold productionListSiteOfGrammarSite? at selected
+  cases list0Selected : GrammarSiteOfKind.ofSite? .list0 site with
+  | some list0Site =>
+      simp only [list0Selected, Option.some.injEq] at selected
+      subst result
+      exact ofSite?_site list0Selected
+  | none =>
+      simp only [list0Selected] at selected
+      cases list1Selected : GrammarSiteOfKind.ofSite? .list1 site with
+      | some list1Site =>
+          simp only [list1Selected, Option.some.injEq] at selected
+          subst result
+          exact ofSite?_site list1Selected
+      | none => simp [list1Selected] at selected
+private theorem allListSites_nodup : allListSites.Nodup := by
+  rw [show allListSites = allGrammarSites.filterMap
+      productionListSiteOfGrammarSite? by rfl]
+  apply filterMap_nodup_of_functional
+    productionListSiteOfGrammarSite? _ allGrammarSites_nodup
+  intro left right result leftSelected rightSelected
+  exact (productionListSiteOfGrammarSite?_owner leftSelected).symm.trans
+    (productionListSiteOfGrammarSite?_owner rightSelected)
+private theorem binaryFlatMap_nodup {α β γ : Type} (values : List α)
+    (first second : β) (make : α → β → γ) (unique : values.Nodup)
+    (itemsUnique : ([first, second] : List β).Nodup)
+    (makeInjective : ∀ {a b x y}, make a x = make b y →
+      (⟨a, x⟩ : Sigma fun _ : α => β) = ⟨b, y⟩) :
+    (values.flatMap fun value => [make value first, make value second]).Nodup :=
+  dependentFlatMap_nodup values (fun _ => [first, second]) make
+    unique (fun _ => itemsUnique) makeInjective
+private def productionTag : ProductionId → Nat
+  | .root _ => 0
+  | .atom _ => 1
+  | .seq _ => 2
+  | .group _ => 3
+  | .choice _ _ => 4
+  | .opt _ _ => 5
+  | .star _ _ => 6
+  | .plus _ _ => 7
+  | .list0 _ _ => 8
+  | .list1 _ => 9
+  | .tail _ _ => 10
+private theorem dependentFlatMap_tagged
+    {α γ : Type} {β : α → Type}
+    (tag : γ → Nat) (number : Nat) (values : List α)
+    (items : (value : α) → List (β value))
+    (make : (value : α) → β value → γ)
+    (tagMake : ∀ value item, tag (make value item) = number) :
+    ∀ output ∈ values.flatMap fun value =>
+      (items value).map (make value), tag output = number := by
+  intro output member
+  rw [List.mem_flatMap] at member
+  rcases member with ⟨value, _, member⟩
+  rw [List.mem_map] at member
+  rcases member with ⟨item, _, rfl⟩
+  exact tagMake value item
+private theorem append_nodup_of_tag_bound
+    (bound : Nat) (left right : List ProductionId)
+    (leftUnique : left.Nodup) (rightUnique : right.Nodup)
+    (leftBound : ∀ value ∈ left, productionTag value < bound)
+    (rightTag : ∀ value ∈ right, productionTag value = bound) :
+    (left ++ right).Nodup ∧
+      ∀ value ∈ left ++ right, productionTag value < bound + 1 := by
+  constructor
+  · rw [List.nodup_append]
+    refine ⟨leftUnique, rightUnique, ?_⟩
+    intro leftValue leftMember rightValue rightMember valueEqual
+    have smaller := leftBound leftValue leftMember
+    rw [congrArg productionTag valueEqual,
+      rightTag rightValue rightMember] at smaller
+    exact Nat.lt_irrefl bound smaller
+  · intro value member
+    rw [List.mem_append] at member
+    rcases member with leftMember | rightMember
+    · exact Nat.lt_succ_of_lt (leftBound value leftMember)
+    · rw [rightTag value rightMember]
+      exact Nat.lt_succ_self bound
+/-- Stable production IDs occur without duplication. -/
+theorem allProductionIds_nodup : allProductionIds.Nodup := by
+  have rootUnique : (allGrammarRuleIds.map ProductionId.root).Nodup :=
+    map_nodup_of_injective _ _ (by decide)
+      (by intro left right equal; cases equal; rfl)
+  have atomUnique : (allAtomSites.map ProductionId.atom).Nodup :=
+    map_nodup_of_injective _ _ (namedSitesOfKind_nodup allAtomSites rfl)
+      (by intro left right equal; cases equal; rfl)
+  have sequenceUnique : (allSequenceSites.map ProductionId.seq).Nodup :=
+    map_nodup_of_injective _ _
+      (namedSitesOfKind_nodup allSequenceSites rfl)
+      (by intro left right equal; cases equal; rfl)
+  have groupUnique : (allGroupSites.map ProductionId.group).Nodup :=
+    map_nodup_of_injective _ _ (namedSitesOfKind_nodup allGroupSites rfl)
+      (by intro left right equal; cases equal; rfl)
+  have choiceUnique :
+      (allChoiceSites.flatMap fun site =>
+        (List.finRange site.branchCount).map fun branch =>
+          ProductionId.choice site branch).Nodup :=
+    dependentFlatMap_nodup _ _ _
+      (namedSitesOfKind_nodup allChoiceSites rfl)
+      (fun site => finRange_nodup site.branchCount)
+      (by intro left right leftItem rightItem equal; cases equal; rfl)
+  have optionalUnique :
+      (allOptionalSites.flatMap fun site =>
+        [ProductionId.opt site .none, ProductionId.opt site .some]).Nodup :=
+    binaryFlatMap_nodup _ .none .some ProductionId.opt
+      (namedSitesOfKind_nodup allOptionalSites rfl) (by simp)
+      (by intro left right leftItem rightItem equal; cases equal; rfl)
+  have starUnique :
+      (allStarSites.flatMap fun site =>
+        [ProductionId.star site .nil, ProductionId.star site .cons]).Nodup :=
+    binaryFlatMap_nodup _ .nil .cons ProductionId.star
+      (namedSitesOfKind_nodup allStarSites rfl) (by simp)
+      (by intro left right leftItem rightItem equal; cases equal; rfl)
+  have plusUnique :
+      (allPlusSites.flatMap fun site =>
+        [ProductionId.plus site .one, ProductionId.plus site .cons]).Nodup :=
+    binaryFlatMap_nodup _ .one .cons ProductionId.plus
+      (namedSitesOfKind_nodup allPlusSites rfl) (by simp)
+      (by intro left right leftItem rightItem equal; cases equal; rfl)
+  have list0Unique :
+      (allList0Sites.flatMap fun site =>
+        [ProductionId.list0 site .nil,
+          ProductionId.list0 site .cons]).Nodup :=
+    binaryFlatMap_nodup _ .nil .cons ProductionId.list0
+      (namedSitesOfKind_nodup allList0Sites rfl) (by simp)
+      (by intro left right leftItem rightItem equal; cases equal; rfl)
+  have list1Unique : (allList1Sites.map ProductionId.list1).Nodup :=
+    map_nodup_of_injective _ _ (namedSitesOfKind_nodup allList1Sites rfl)
+      (by intro left right equal; cases equal; rfl)
+  have tailUnique :
+      (allListSites.flatMap fun site =>
+        [ProductionId.tail site .nil, ProductionId.tail site .cons]).Nodup :=
+    binaryFlatMap_nodup _ .nil .cons ProductionId.tail
+      allListSites_nodup (by simp)
+      (by intro left right leftItem rightItem equal; cases equal; rfl)
+  have rootBound : ∀ value ∈ allGrammarRuleIds.map ProductionId.root,
+      productionTag value < 1 := by simp [productionTag]
+  have first := append_nodup_of_tag_bound 1 _ _ rootUnique atomUnique
+    rootBound (by simp [productionTag])
+  have second := append_nodup_of_tag_bound 2 _ _ first.1 sequenceUnique
+    first.2 (by simp [productionTag])
+  have third := append_nodup_of_tag_bound 3 _ _ second.1 groupUnique
+    second.2 (by simp [productionTag])
+  have fourth := append_nodup_of_tag_bound 4 _ _ third.1 choiceUnique
+    third.2 (dependentFlatMap_tagged productionTag 4 _ _ _
+      (fun _ _ => rfl))
+  have fifth := append_nodup_of_tag_bound 5 _ _ fourth.1 optionalUnique
+    fourth.2 (dependentFlatMap_tagged productionTag 5 allOptionalSites
+      (fun _ => ([.none, .some] : List OptionalBranch))
+      ProductionId.opt (fun _ _ => rfl))
+  have sixth := append_nodup_of_tag_bound 6 _ _ fifth.1 starUnique
+    fifth.2 (dependentFlatMap_tagged productionTag 6 allStarSites
+      (fun _ => ([.nil, .cons] : List NilConsBranch))
+      ProductionId.star (fun _ _ => rfl))
+  have seventh := append_nodup_of_tag_bound 7 _ _ sixth.1 plusUnique
+    sixth.2 (dependentFlatMap_tagged productionTag 7 allPlusSites
+      (fun _ => ([.one, .cons] : List OneConsBranch))
+      ProductionId.plus (fun _ _ => rfl))
+  have eighth := append_nodup_of_tag_bound 8 _ _ seventh.1 list0Unique
+    seventh.2 (dependentFlatMap_tagged productionTag 8 allList0Sites
+      (fun _ => ([.nil, .cons] : List NilConsBranch))
+      ProductionId.list0 (fun _ _ => rfl))
+  have ninth := append_nodup_of_tag_bound 9 _ _ eighth.1 list1Unique
+    eighth.2 (by simp [productionTag])
+  have tenth := append_nodup_of_tag_bound 10 _ _ ninth.1 tailUnique
+    ninth.2 (dependentFlatMap_tagged productionTag 10 allListSites
+      (fun _ => ([.nil, .cons] : List NilConsBranch))
+      ProductionId.tail (fun _ _ => rfl))
+  exact tenth.1
+
 /-- Stable action IDs inherited from production order. -/
 def allActionIds : List ActionId :=
   allProductionIds.map .actionFor
