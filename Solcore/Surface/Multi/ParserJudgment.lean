@@ -14431,6 +14431,35 @@ theorem actionReduces_eleven_shapes_exact
         subst output
         exact .tail site branch origin finish input
 
+/-- The displayed seventy-five source rules are duplicate-free, exhaust the
+semantic carrier, and each have one unique ready reduction result. -/
+theorem ruleReduction_seventyFive_exhaustive :
+    allGrammarRuleIds.length = 75 ∧
+      allGrammarRuleIds.Nodup ∧
+      ruleValueEquationTags = allGrammarRuleIds ∧
+      ∀ rule : GrammarRuleId,
+        rule ∈ allGrammarRuleIds ∧
+        ∀ {file : WorkspaceFile} {tokens : List Token}
+            {origin finish : Boundary tokens},
+          RuleReductionReady file tokens rule origin finish →
+          ∀ input : EbnfValue file tokens (m2cV1.rhs rule),
+          ∃ output : RuleValue rule,
+            RuleReduction file tokens rule origin finish input output ∧
+            ∀ other : RuleValue rule,
+              RuleReduction file tokens rule origin finish input other →
+                other = output := by
+  refine ⟨grammarRuleCount_eq_seventyFive, ?_,
+    ruleValue_allGrammarRuleIds_exhaustive, ?_⟩
+  · simp [allGrammarRuleIds]
+  · intro rule
+    constructor
+    · cases rule <;> simp [allGrammarRuleIds]
+    · intro file tokens origin finish ready input
+      rcases ruleReduction_total ready input with ⟨output, reduces⟩
+      refine ⟨output, reduces, ?_⟩
+      intro other otherReduces
+      exact RuleReduction.functional otherReduces reduces
+
 namespace ActionReduces
 
 /-- A fixed generated action input and chart interval determine one output. -/
