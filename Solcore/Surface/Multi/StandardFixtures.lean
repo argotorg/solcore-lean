@@ -52,4 +52,23 @@ theorem decodeUtf8Strict_roundTrip
         String.toUTF8_eq_toByteArray,
         String.toByteArray_ofList] using encoded
 
+/-- Every successfully decoded canonical path and source body re-encodes to
+the exact raw fixture bytes. -/
+theorem canonicalStandard_byteRoundTrip
+    (index : Fin 6) {pathText contentText : String}
+    (pathDecoded :
+      decodeUtf8Strict
+          (Solcore.Standard.canonicalRawFiles.get index).logicalPathUtf8 =
+        .ok pathText)
+    (contentDecoded :
+      decodeUtf8Strict
+          (Solcore.Standard.canonicalRawFiles.get index).contentUtf8 =
+        .ok contentText) :
+    String.toUTF8 pathText =
+        (Solcore.Standard.canonicalRawFiles.get index).logicalPathUtf8 ∧
+      String.toUTF8 contentText =
+        (Solcore.Standard.canonicalRawFiles.get index).contentUtf8 :=
+  ⟨decodeUtf8Strict_roundTrip pathDecoded,
+    decodeUtf8Strict_roundTrip contentDecoded⟩
+
 end Solcore.Surface.Multi
