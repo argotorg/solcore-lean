@@ -9573,6 +9573,113 @@ mutual
 
 end
 
+namespace PrefixValues
+
+/-- Proof choices do not affect the semantic value of an empty prefix. -/
+private theorem zeroValue_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    (item : ContextualItemKey tokens)
+    (leftZero rightZero : item.raw.dot.val = 0) :
+    zeroValue (file := file) item leftZero =
+      zeroValue (file := file) item rightZero := by
+  have zeroEq : leftZero = rightZero := Subsingleton.elim _ _
+  cases zeroEq
+  rfl
+
+/-- A fixed scanned edge and prior value determine its extended prefix value. -/
+private theorem scanValue_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : ContextualItemKey tokens}
+    {cursor : TerminalCursor tokens}
+    (leftWitness rightWitness : ScannedEdgeWitness
+      file tokens before.raw after.raw cursor)
+    {leftPrior rightPrior : PrefixValues file tokens before}
+    (priorEq : leftPrior = rightPrior) :
+    scanValue before after leftWitness.terminal leftWitness.next
+        leftWitness.matched leftWitness.advance leftPrior =
+      scanValue before after rightWitness.terminal rightWitness.next
+        rightWitness.matched rightWitness.advance rightPrior := by
+  have witnessEq : leftWitness = rightWitness :=
+    ScannedEdgeWitness.functional leftWitness rightWitness
+  cases witnessEq
+  cases priorEq
+  rfl
+
+/-- A fixed completed edge, prior value, and child value determine its prefix. -/
+private theorem completeValue_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    {waiting finished after : ContextualItemKey tokens}
+    {shared : Boundary tokens}
+    (leftWitness rightWitness : CompletedEdgeWitness
+      tokens waiting.raw finished.raw after.raw shared)
+    {leftPrior rightPrior : PrefixValues file tokens waiting}
+    {leftChild rightChild : NonterminalValue
+      file tokens finished.raw.production.lhs}
+    (priorEq : leftPrior = rightPrior)
+    (childEq : leftChild = rightChild) :
+    completeValue waiting finished after leftWitness.next
+        leftWitness.advance leftPrior leftChild =
+      completeValue waiting finished after rightWitness.next
+        rightWitness.advance rightPrior rightChild := by
+  have witnessEq : leftWitness = rightWitness :=
+    CompletedEdgeWitness.functional leftWitness rightWitness
+  cases witnessEq
+  cases priorEq
+  cases childEq
+  rfl
+
+/-- Completion-proof choices do not affect reindexing a full prefix value. -/
+private theorem fullValue_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    (item : ContextualItemKey tokens)
+    (leftComplete rightComplete : CompleteItem item.raw)
+    {leftPrior rightPrior : PrefixValues file tokens item}
+    (priorEq : leftPrior = rightPrior) :
+    fullValue item leftComplete leftPrior =
+      fullValue item rightComplete rightPrior := by
+  have completeEq : leftComplete = rightComplete := Subsingleton.elim _ _
+  cases completeEq
+  cases priorEq
+  rfl
+
+end PrefixValues
+
+namespace CoherentReduction
+
+/-- Prefix functionality is the only remaining semantic premise needed for
+completed-reduction functionality at a fixed contextual item. -/
+private theorem functional_of_prefix
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    {left right : NonterminalValue file tokens item.raw.production.lhs}
+    (prefixFunctional :
+      ∀ {leftValues rightValues : PrefixValues file tokens item},
+        CoherentPrefix file tokens memo correct final item leftValues →
+        CoherentPrefix file tokens memo correct final item rightValues →
+        leftValues = rightValues)
+    (leftCoherent : CoherentReduction
+      file tokens memo correct final item left)
+    (rightCoherent : CoherentReduction
+      file tokens memo correct final item right) :
+    left = right := by
+  cases leftCoherent with
+  | reduce item leftPrior leftOutput leftReached leftComplete leftPrefix
+      leftAction =>
+      cases rightCoherent with
+      | reduce _ rightPrior rightOutput rightReached rightComplete rightPrefix
+          rightAction =>
+          have priorEq : leftPrior = rightPrior :=
+            prefixFunctional leftPrefix rightPrefix
+          have inputEq := PrefixValues.fullValue_functional
+            item leftComplete rightComplete priorEq
+          rw [← inputEq] at rightAction
+          exact ActionReduces.functional leftAction rightAction
+
+end CoherentReduction
+
 /-- A coherent prefix is attached to the exact contextual item reached by its
 derivation; a raw projection from another context cannot be spliced in. -/
 theorem coherentPrefix_no_context_splice
