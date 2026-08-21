@@ -2934,4 +2934,84 @@ private def indexSaturatedPhaseACanonicalWith?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Read one exact materialized U01 address. -/
+private def phaseBReadIndex?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (kind : EvidenceIndexKind)
+    (subject : PriorityGuardId ⊕ GrammarRuleId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseAEvidenceEntryAt? entries {
+    kind := kind
+    subject := subject
+    contextStart := contextStart
+    siteCursor := siteCursor
+    resultEnd := resultEnd
+  }
+
+/-- Conjoin materialized reads without treating absence as false. -/
+private def phaseBAllReads? : List (Option Bool) → Option Bool
+  | [] => some true
+  | read :: rest => do
+      let selected ← read
+      let restSelected ← phaseBAllReads? rest
+      pure (selected && restSelected)
+
+/-- Disjoin materialized reads without allowing a successful earlier read to
+hide an absent later candidate. -/
+private def phaseBAnyReads? : List (Option Bool) → Option Bool
+  | [] => some false
+  | read :: rest => do
+      let selected ← read
+      let restSelected ← phaseBAnyReads? rest
+      pure (selected || restSelected)
+
+private def phaseBReadTerminalGuard?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseBReadIndex? entries .terminalWindow (.inl guard)
+    contextStart siteCursor resultEnd
+
+private def phaseBReadExactSliceGuard?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseBReadIndex? entries .exactSlice (.inl guard)
+    contextStart siteCursor resultEnd
+
+private def phaseBReadGreatestRule?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (rule : GrammarRuleId)
+    (start upperBound finish : Boundary tokens) : Option Bool :=
+  phaseBReadIndex? entries .greatestEnd (.inr rule)
+    start upperBound finish
+
+private def phaseBReadDelimiterGuard?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseBReadIndex? entries .delimiterOrRegion (.inl guard)
+    contextStart siteCursor resultEnd
+
+/-- A coordinate outside the boundary universe is a genuine failed
+observation, not an absent table cell. -/
+private def phaseBWithBoundary?
+    (tokens : List Token) (coordinate : Nat)
+    (read : Boundary tokens → Option Bool) : Option Bool :=
+  match phaseABoundaryAt? tokens coordinate with
+  | none => some false
+  | some boundary => read boundary
+
+end Chart
+
 end Solcore.Surface.Multi
