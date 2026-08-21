@@ -111,6 +111,129 @@ inductive ChartCubicUnitKind where
   | U08_G10Candidate
   deriving Repr, BEq, DecidableEq
 
+private def rootDottedZero (rule : GrammarRuleId) : DottedRhs := {
+  production := .root rule
+  dot := ⟨0, by simp [ProductionId.rhs]⟩
+}
+
+private def rootDottedOne (rule : GrammarRuleId) : DottedRhs := {
+  production := .root rule
+  dot := ⟨1, by simp [ProductionId.rhs]⟩
+}
+
+/-- Rules use root dot zero; guards use nine fixed root dot-one schemas. -/
+private def evidenceSubjectDotted :
+    PriorityGuardId ⊕ GrammarRuleId → DottedRhs
+  | .inl .G01_statementIf => rootDottedOne .module
+  | .inl .G02_matchArmBoundary => rootDottedOne .topItem
+  | .inl .G03_parameterComptime => rootDottedOne .moduleRef
+  | .inl .G04_letComptime => rootDottedOne .importDecl
+  | .inl .G05_typeComptime => rootDottedOne .importEntry
+  | .inl .G06_patternComptime => rootDottedOne .hidingClause
+  | .inl .G07_leadingDotArguments => rootDottedOne .exportDecl
+  | .inl .G08_terminalExpression => rootDottedOne .localExportEntry
+  | .inl .G09_genericContext => rootDottedOne .remoteExportEntry
+  | .inr rule => rootDottedZero rule
+
+private theorem evidenceSubjectDotted_injective :
+    Function.Injective evidenceSubjectDotted := by
+  intro left right equal
+  cases left with
+  | inl leftGuard =>
+      cases right with
+      | inl rightGuard =>
+          cases leftGuard <;> cases rightGuard <;>
+            simp_all [evidenceSubjectDotted, rootDottedOne]
+      | inr rightRule =>
+          cases leftGuard <;>
+            simp_all [evidenceSubjectDotted, rootDottedOne,
+              rootDottedZero]
+  | inr leftRule =>
+      cases right with
+      | inl rightGuard =>
+          cases rightGuard <;>
+            simp_all [evidenceSubjectDotted, rootDottedOne,
+              rootDottedZero]
+      | inr rightRule =>
+          simp_all [evidenceSubjectDotted, rootDottedZero]
+
+/-- The four index kinds use four distinct fixed root schemas. -/
+private def evidenceKindDotted : EvidenceIndexKind → DottedRhs
+  | .terminalWindow => rootDottedZero .module
+  | .exactSlice => rootDottedZero .topItem
+  | .greatestEnd => rootDottedZero .moduleRef
+  | .delimiterOrRegion => rootDottedZero .importDecl
+
+private theorem evidenceKindDotted_injective :
+    Function.Injective evidenceKindDotted := by
+  intro left right equal
+  cases left <;> cases right <;>
+    simp_all [evidenceKindDotted, rootDottedZero]
+
+private structure EvidenceIndexAddress (tokens : List Token) where
+  kind : EvidenceIndexKind
+  subject : PriorityGuardId ⊕ GrammarRuleId
+  contextStart : Boundary tokens
+  siteCursor : Boundary tokens
+  resultEnd : Boundary tokens
+
+/-- Explicit U01 embedding, with raw Phase-A source and three boundaries. -/
+private def evidenceIndexKey {tokens : List Token}
+    (address : EvidenceIndexAddress tokens) : ChartCubicKey tokens := {
+  source := .rawEvidence
+  waiting := evidenceSubjectDotted address.subject
+  finished := evidenceKindDotted address.kind
+  origin := address.contextStart
+  shared := address.siteCursor
+  current := address.resultEnd
+}
+
+private theorem EvidenceIndexAddress.eq_of_fields
+    {tokens : List Token} {left right : EvidenceIndexAddress tokens}
+    (kind : left.kind = right.kind)
+    (subject : left.subject = right.subject)
+    (contextStart : left.contextStart = right.contextStart)
+    (siteCursor : left.siteCursor = right.siteCursor)
+    (resultEnd : left.resultEnd = right.resultEnd) : left = right := by
+  cases left
+  cases right
+  simp only at kind subject contextStart siteCursor resultEnd
+  cases kind
+  cases subject
+  cases contextStart
+  cases siteCursor
+  cases resultEnd
+  rfl
+
+/-- Distinct evidence-index candidates cannot consume one U01 address. -/
+private theorem evidenceIndexKey_injective :
+    ∀ {tokens : List Token},
+      Function.Injective (@evidenceIndexKey tokens) := by
+  intro tokens
+  intro left right equal
+  apply EvidenceIndexAddress.eq_of_fields
+  · apply evidenceKindDotted_injective
+    exact congrArg ChartCubicKey.finished equal
+  · apply evidenceSubjectDotted_injective
+    exact congrArg ChartCubicKey.waiting equal
+  · exact congrArg ChartCubicKey.origin equal
+  · exact congrArg ChartCubicKey.shared equal
+  · exact congrArg ChartCubicKey.current equal
+
+/-- Embed one evidence-index candidate in the exact tagged U01 unit family. -/
+private def evidenceIndexUnitAddress {tokens : List Token}
+    (address : EvidenceIndexAddress tokens) :
+    ChartCubicUnitKind × ChartCubicKey tokens :=
+  (.U01_evidenceIndex, evidenceIndexKey address)
+
+private theorem evidenceIndexUnitAddress_injective :
+    ∀ {tokens : List Token},
+      Function.Injective (@evidenceIndexUnitAddress tokens) := by
+  intro tokens
+  intro left right equal
+  apply evidenceIndexKey_injective
+  exact congrArg Prod.snd equal
+
 private theorem enumeration_cardinality
     {α : Type} [BEq α] [LawfulBEq α]
     (values : List α)
