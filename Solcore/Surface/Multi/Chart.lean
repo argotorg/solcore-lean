@@ -1778,4 +1778,218 @@ private def activateProduction?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def rawLinearKey {tokens : List Token}
+    (item : DottedItem tokens) : ChartLinearKey tokens := {
+  source := .rawEvidence
+  dotted := ⟨item.production, item.dot⟩
+  origin := item.origin
+  current := item.current
+}
+
+private def rawPredictionKey {tokens : List Token}
+    (waiting : DottedItem tokens) (predicted : ProductionId) :
+    ChartPredictionKey tokens := {
+  source := .rawEvidence
+  dotted := ⟨waiting.production, waiting.dot⟩
+  production := predicted
+  origin := waiting.origin
+  current := waiting.current
+}
+
+private def rawCompletionKey {tokens : List Token}
+    (waiting finished : DottedItem tokens) : ChartCubicKey tokens := {
+  source := .rawEvidence
+  waiting := ⟨waiting.production, waiting.dot⟩
+  finished := ⟨finished.production, finished.dot⟩
+  origin := waiting.origin
+  shared := waiting.current
+  current := finished.current
+}
+
+private def predictedItem? {tokens : List Token}
+    (waiting : DottedItem tokens) (predicted : ProductionId) :
+    Option (DottedItem tokens) :=
+  match waiting.production.rhs[waiting.dot.val]? with
+  | some (.nonterminal symbol) =>
+      if _sameLhs : predicted.lhs = symbol then
+        some {
+          production := predicted
+          dot := ⟨0, Nat.zero_lt_succ _⟩
+          origin := waiting.current
+          current := waiting.current
+        }
+      else
+        none
+  | _ => none
+
+private def scannedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (before : DottedItem tokens) :
+    Option (DottedItem tokens × PackedEdge file tokens) :=
+  if nextInRange : before.dot.val < before.production.rhs.length then
+    match nextEq : before.production.rhs[before.dot.val] with
+    | .terminal terminal =>
+        if currentInRange : before.current.val < tokens.length + 1 then
+          let cursor : TerminalCursor tokens :=
+            ⟨before.current.val, currentInRange⟩
+          match selected : MatchedTerminal.atCursor?
+              file tokens owned terminal cursor with
+          | none => none
+          | some matched =>
+              let after : DottedItem tokens := {
+                production := before.production
+                dot := ⟨before.dot.val + 1, by omega⟩
+                origin := before.origin
+                current := cursor.afterBoundary
+              }
+              let witness : ScannedEdgeWitness
+                  file tokens before after cursor := {
+                terminal := terminal
+                matched := matched.val
+                sameCursor := matched.property
+                next := by
+                  constructor
+                  · exact nextInRange
+                  · rw [List.getElem?_eq_getElem nextInRange, nextEq]
+                atCurrent := Fin.ext rfl
+                advance := by
+                  rw [matched.property]
+                  simp [AdvanceItem, after]
+              }
+              some (after, ⟨.scanned before after cursor,
+                packedEdge_scanned_valid_iff.mpr ⟨witness⟩⟩)
+        else
+          none
+    | _ => none
+  else
+    none
+
+private def completedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished : DottedItem tokens) :
+    Option (DottedItem tokens × PackedEdge file tokens) :=
+  if nextInRange : waiting.dot.val < waiting.production.rhs.length then
+    match nextEq : waiting.production.rhs[waiting.dot.val] with
+    | .nonterminal symbol =>
+        if sameLhs : symbol = finished.production.lhs then
+          if complete : finished.dot.val = finished.production.rhs.length then
+            if sameCursor : waiting.current = finished.origin then
+              let after : DottedItem tokens := {
+                production := waiting.production
+                dot := ⟨waiting.dot.val + 1, by omega⟩
+                origin := waiting.origin
+                current := finished.current
+              }
+              let witness : CompletedEdgeWitness
+                  tokens waiting finished after waiting.current := {
+                next := by
+                  constructor
+                  · exact nextInRange
+                  · rw [List.getElem?_eq_getElem nextInRange, nextEq, sameLhs]
+                complete := complete
+                waitingAtShared := rfl
+                finishedAtShared := sameCursor.symm
+                advance := by simp [AdvanceItem, after]
+              }
+              some (after, ⟨.completed waiting finished after waiting.current,
+                packedEdge_completed_valid_iff.mpr ⟨witness⟩⟩)
+            else
+              none
+          else
+            none
+        else
+          none
+    | _ => none
+  else
+    none
+
+private inductive RawItemInsertSource where
+  | seedOrPrediction
+  | scan
+  | completion
+
+private def RawItemInsertSource.unitKind :
+    RawItemInsertSource → ChartLinearUnitKind
+  | .seedOrPrediction => .L03_itemInsert
+  | .scan => .L05_scannedItemInsert
+  | .completion => .L07_completedItemInsert
+
+private def insertRawItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  if rawMemberBool current.payload.rawItems item then
+    some current
+  else
+    runMappedPrimitive? current
+      (.linear source.unitKind (rawLinearKey item)) fun state => {
+        state with
+        rawItems := state.rawItems ++ [item]
+        itemQueue := state.itemQueue ++ [item]
+      }
+
+private def insertRawEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  if current.payload.rawEdges.any fun candidate =>
+      decide (candidate.val = edge.val) then
+    some current
+  else
+    let address : UnitAddress tokens :=
+      match edge.val with
+      | .scanned before _ _ =>
+          .linear .L06_scannedEdgeInsert (rawLinearKey before)
+      | .completed waiting finished _ _ =>
+          .cubic .U04_completedEdgeInsert
+            (rawCompletionKey waiting finished)
+    runMappedPrimitive? current address fun state => {
+      state with
+      rawEdges := state.rawEdges ++ [edge]
+      edgeQueue := state.edgeQueue ++ [edge]
+    }
+
+private def dequeueRawItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (DottedItem tokens ×
+      CountedState tokens (PhaseAOpen file tokens)) :=
+  match current.payload.itemQueue with
+  | [] => none
+  | item :: rest => do
+      let next ← runMappedPrimitive? current
+        (.linear .L01_itemDequeue (rawLinearKey item)) fun state => {
+          state with itemQueue := rest
+        }
+      pure (item, next)
+
+private def dequeueRawEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (PackedEdge file tokens ×
+      CountedState tokens (PhaseAOpen file tokens)) :=
+  match current.payload.edgeQueue with
+  | [] => none
+  | edge :: rest => do
+      let address : UnitAddress tokens :=
+        match edge.val with
+        | .scanned before _ _ =>
+            .linear .L02_scannedEdgeDequeue (rawLinearKey before)
+        | .completed waiting finished _ _ =>
+            .cubic .U02_completedEdgeDequeue
+              (rawCompletionKey waiting finished)
+      let next ← runMappedPrimitive? current address fun state => {
+        state with edgeQueue := rest
+      }
+      pure (edge, next)
+
+end Chart
+
 end Solcore.Surface.Multi
