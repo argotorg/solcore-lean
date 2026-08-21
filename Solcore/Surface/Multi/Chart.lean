@@ -3840,4 +3840,221 @@ private def dequeueContextualEdge?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Attempt one applicable contextual prediction, then activate its exact
+production instance once.  A rejected guard set is a charged no-op. -/
+private def attemptContextualPrediction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  match contextualPredictedItem? waiting predicted with
+  | none => some current
+  | some (item, productionInstance) => do
+      let attempted ← runMappedPrimitive? current
+        (.prediction .R01_predictionAttempt
+          (contextualPredictionKey waiting predicted)) id
+      let activationAddress : UnitAddress tokens :=
+        .production productionInstance
+      if activationAddress ∈ attempted.counter.usedRev then
+        some attempted
+      else do
+        let (activated, accepted) ←
+          activateWorklistProduction? attempted productionInstance
+        if accepted then
+          insertContextualItem? activated .prediction item
+        else
+          some activated
+
+private def attemptContextualPredictions?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    List ProductionId →
+      CountedState tokens (PhaseCWorklist file tokens) →
+      Option (CountedState tokens (PhaseCWorklist file tokens))
+  | [], current => some current
+  | predicted :: rest, current => do
+      let next ← attemptContextualPrediction? current waiting predicted
+      attemptContextualPredictions? waiting rest next
+
+private def contextualScanApplicable {tokens : List Token}
+    (item : ContextualItemKey tokens) : Bool :=
+  match item.raw.production.rhs[item.raw.dot.val]? with
+  | some (.terminal _) =>
+      decide (item.raw.current.val < tokens.length + 1)
+  | _ => false
+
+/-- Every applicable terminal scan consumes L04, including a mismatch. -/
+private def attemptContextualScan?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  if contextualScanApplicable before then do
+    let attempted ← runMappedPrimitive? current
+      (.linear .L04_scanAttempt (contextualLinearKey before)) id
+    match contextualScannedEdge? owned before with
+    | none => some attempted
+    | some (after, edge) => do
+        let withItem ← insertContextualItem? attempted .scan after
+        insertContextualScannedEdge? withItem edge
+  else
+    some current
+
+/-- Charge U03 only for a structurally and contextually compatible pair.
+U04 remains the atomic completed-edge/backpointer insertion. -/
+private def attemptContextualCompletion?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  match contextualCompletedEdge? (file := file) waiting finished with
+  | none => some current
+  | some (after, edge) =>
+      let address : UnitAddress tokens :=
+        .cubic .U03_completionAttempt
+          (contextualCompletionKey waiting finished)
+      if address ∈ current.counter.usedRev then
+        some current
+      else do
+        let attempted ← runMappedPrimitive? current address id
+        let withItem ← insertContextualItem? attempted .completion after
+        insertContextualCompletedEdge? withItem edge
+
+private def attemptContextualCompletionsWith?
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    List (ContextualItemKey tokens) →
+      CountedState tokens (PhaseCWorklist file tokens) →
+      Option (CountedState tokens (PhaseCWorklist file tokens))
+  | [], current => some current
+  | other :: rest, current => do
+      let forward ← attemptContextualCompletion? current pivot other
+      let reverse ←
+        if other = pivot then
+          some forward
+        else
+          attemptContextualCompletion? forward other pivot
+      attemptContextualCompletionsWith? pivot rest reverse
+
+private def processContextualItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) := do
+  let predicted ←
+    attemptContextualPredictions? item allProductionIds current
+  let scanned ← attemptContextualScan? owned predicted item
+  attemptContextualCompletionsWith? item
+    scanned.payload.phaseC.contextualItems scanned
+
+/-- Drain item work before checked-edge work.  Edge dequeues are retained here;
+semantic action reductions belong to the later value/frontier slice. -/
+private def runPhaseCQueues?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Nat → CountedState tokens (PhaseCWorklist file tokens) →
+      Option (CountedState tokens (PhaseCWorklist file tokens))
+  | 0, current =>
+      if current.payload.phaseC.itemQueue.isEmpty &&
+          current.payload.phaseC.edgeQueue.isEmpty then
+        some current
+      else
+        none
+  | fuel + 1, current =>
+      match current.payload.phaseC.itemQueue with
+      | _ :: _ =>
+          match dequeueContextualItem? current with
+          | none => none
+          | some (item, afterDequeue) => do
+              let processed ←
+                processContextualItem? owned item afterDequeue
+              runPhaseCQueues? owned fuel processed
+      | [] =>
+          match current.payload.phaseC.edgeQueue with
+          | _ :: _ =>
+              match dequeueContextualEdge? current with
+              | none => none
+              | some (_, afterDequeue) =>
+                  runPhaseCQueues? owned fuel afterDequeue
+          | [] => some current
+
+private def executePhaseCWorklist?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens)) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) := do
+  let entered ← beginPhaseCWorklist? current
+  runPhaseCQueues? owned (chartGBound (tokens.length + 1)) entered
+
+/-- Execute the landed observed Phase A/B pipeline through contextual chart
+saturation.  This deliberately stops before values, diagnostics, and outcome
+selection. -/
+private def executeObservedPhaseABCWorklist?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) := do
+  let phaseB ← executeObservedPhaseAB? file tokens owned
+  executePhaseCWorklist? owned phaseB
+
+private theorem runPhaseCQueues?_queues_empty
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      runPhaseCQueues? owned fuel current = some result →
+        result.payload.phaseC.itemQueue = [] ∧
+          result.payload.phaseC.edgeQueue = [] := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result selected
+      rw [runPhaseCQueues?] at selected
+      split at selected
+      · cases selected
+        rename_i condition
+        have queues := Bool.and_eq_true_iff.mp condition
+        exact ⟨List.isEmpty_iff.mp queues.1,
+          List.isEmpty_iff.mp queues.2⟩
+      · contradiction
+  | succ previous induction =>
+      intro current result selected
+      rw [runPhaseCQueues?] at selected
+      cases items : current.payload.phaseC.itemQueue with
+      | nil =>
+          cases edges : current.payload.phaseC.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact ⟨items, edges⟩
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueContextualEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueContextualItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨dequeuedItem, afterDequeue⟩
+              simp only at selected
+              cases processing :
+                  processContextualItem? owned dequeuedItem afterDequeue with
+              | none => simp [processing] at selected
+              | some processed =>
+                  rw [processing] at selected
+                  exact induction processed result selected
+
+end Chart
+
 end Solcore.Surface.Multi
