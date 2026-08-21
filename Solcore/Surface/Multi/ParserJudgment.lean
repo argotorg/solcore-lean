@@ -3671,6 +3671,214 @@ private theorem contextualSaturation_stable
     (contextualClosureBool file tokens owned memo correct final)
     (contextualClosureBool_inflationary owned correct final)
 
+private theorem contextualItem_eq_of_fields
+    {tokens : List Token}
+    {left right : ContextualItemKey tokens}
+    (production : left.raw.production = right.raw.production)
+    (dot : left.raw.dot.val = right.raw.dot.val)
+    (origin : left.raw.origin = right.raw.origin)
+    (current : left.raw.current = right.raw.current)
+    (context : left.context = right.context) :
+    left = right := by
+  cases left with
+  | mk leftRaw leftContext =>
+      cases right with
+      | mk rightRaw rightContext =>
+          simp only at production dot origin current context
+          have rawEq : leftRaw = rightRaw :=
+            dottedItem_eq_of_fields production dot origin current
+          subst rightRaw
+          subst rightContext
+          rfl
+
+private theorem contextualClosureRule_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {known : List (ContextualItemKey tokens)}
+    {item : ContextualItemKey tokens}
+    (knownSound : ∀ knownItem, knownItem ∈ known →
+      ContextualReach file tokens memo correct final knownItem)
+    (rule : ContextualClosureRule file tokens memo correct final
+      known item) :
+    ContextualReach file tokens memo correct final item := by
+  rcases rule with carried | rooted | predicted | scanned | completed
+  · exact knownSound item carried
+  · rcases rooted with
+      ⟨production, zero, origin, current, context⟩
+    let rootItem : ContextualItemKey tokens := {
+      raw := {
+        production := .root .module
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := Boundary.start tokens
+        current := Boundary.start tokens
+      }
+      context := .plain
+    }
+    have rootEq : rootItem = item := contextualItem_eq_of_fields
+      production.symm zero.symm origin.symm current.symm context.symm
+    rw [← rootEq]
+    exact .root
+  · rcases predicted with
+      ⟨waiting, member, next, zero, origin, current, context, enabled⟩
+    let predictedItem : ContextualItemKey tokens := {
+      raw := {
+        production := item.raw.production
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := waiting.raw.current
+        current := waiting.raw.current
+      }
+      context := descendContext waiting item.raw.production
+    }
+    have predictedEq : predictedItem = item := contextualItem_eq_of_fields
+      rfl zero.symm origin.symm current.symm context.symm
+    rw [← predictedEq]
+    exact .predict waiting item.raw.production
+      (knownSound waiting member) next enabled
+  · rcases scanned with
+      ⟨before, member, ⟨⟨cursor, witness⟩⟩, contextEq⟩
+    have rawValid : PackedEdgeKey.Valid file tokens
+        (.scanned before.raw item.raw cursor) :=
+      packedEdge_scanned_valid_iff.mpr ⟨witness⟩
+    exact .scan before item cursor (knownSound before member)
+      ⟨rawValid, contextEq⟩
+  · rcases completed with
+      ⟨waiting, waitingMember, finished, finishedMember,
+        ⟨next, complete, sameCursor, advance⟩,
+        finishedContext, afterContext⟩
+    have rawValid : PackedEdgeKey.Valid file tokens
+        (.completed waiting.raw finished.raw item.raw
+          waiting.raw.current) :=
+      ⟨finished.raw.production.lhs, next, complete, rfl, rfl,
+        sameCursor.symm, advance⟩
+    exact .complete waiting finished item waiting.raw.current
+      (knownSound waiting waitingMember)
+      (knownSound finished finishedMember)
+      ⟨rawValid, finishedContext, afterContext⟩
+
+private theorem contextualSaturationStage_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    ∀ stage item,
+      item ∈ closureIterate
+        (contextualSaturationStep file tokens owned memo correct final)
+        stage →
+      ContextualReach file tokens memo correct final item := by
+  intro stage
+  induction stage with
+  | zero =>
+      intro item member
+      simp [closureIterate] at member
+  | succ previous induction =>
+      intro item member
+      apply contextualClosureRule_sound induction
+      exact (contextualSaturationStep_mem_iff
+        owned correct final _ item).mp member
+
+private theorem contextualSaturation_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {item : ContextualItemKey tokens}
+    (member : item ∈
+      contextualSaturation file tokens owned memo correct final) :
+    ContextualReach file tokens memo correct final item := by
+  exact contextualSaturationStage_sound owned correct final
+    (allContextualItems tokens).length item member
+
+private theorem contextualSaturation_rule_closed
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {item : ContextualItemKey tokens}
+    (rule : ContextualClosureRule file tokens memo correct final
+      (contextualSaturation file tokens owned memo correct final) item) :
+    item ∈ contextualSaturation file tokens owned memo correct final := by
+  rw [← contextualSaturation_stable owned correct final]
+  exact (contextualSaturationStep_mem_iff
+    owned correct final _ item).mpr rule
+
+private theorem contextualSaturation_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    item ∈ contextualSaturation file tokens owned memo correct final := by
+  apply contextual_predict_scan_complete_closed
+    (fun candidate => candidate ∈
+      contextualSaturation file tokens owned memo correct final)
+  · apply contextualSaturation_rule_closed owned correct final
+    exact Or.inr (Or.inl ⟨rfl, rfl, rfl, rfl, rfl⟩)
+  · intro waiting predicted waitingMember next enabled
+    apply contextualSaturation_rule_closed owned correct final
+    exact Or.inr (Or.inr (Or.inl
+      ⟨waiting, waitingMember, next, rfl, rfl, rfl, rfl, enabled⟩))
+  · intro before after cursor beforeMember structural
+    apply contextualSaturation_rule_closed owned correct final
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    apply Or.inl
+    refine ⟨before, beforeMember, ?_, structural.2⟩
+    rcases packedEdge_scanned_valid_iff.mp structural.1 with ⟨witness⟩
+    exact ⟨⟨cursor, witness⟩⟩
+  · intro waiting finished after shared waitingMember finishedMember
+      structural
+    apply contextualSaturation_rule_closed owned correct final
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    rcases structural.1 with
+      ⟨symbol, next, complete, lhs, waitingAt, finishedAt, advance⟩
+    have exactNext : NextSymbol waiting.raw
+        (.nonterminal finished.raw.production.lhs) := by
+      rw [lhs]
+      exact next
+    exact ⟨waiting, waitingMember, finished, finishedMember,
+      ⟨exactNext, complete, waitingAt.trans finishedAt.symm, advance⟩,
+      structural.2.1, structural.2.2⟩
+  · exact reached
+
+private theorem contextualSaturation_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (item : ContextualItemKey tokens) :
+    item ∈ contextualSaturation file tokens owned memo correct final ↔
+      ContextualReach file tokens memo correct final item :=
+  ⟨contextualSaturation_sound owned correct final,
+    contextualSaturation_complete owned correct final⟩
+
+/-- Contextual reachability is decidable after explicit Phase-B finalization. -/
+def contextualReachDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (item : ContextualItemKey tokens) :
+    Decidable (ContextualReach file tokens memo correct final item) :=
+  decidable_of_iff
+    (contextualMemberBool
+      (contextualSaturation file tokens owned memo correct final) item = true)
+    ((contextualMemberBool_eq_true_iff
+      (contextualSaturation file tokens owned memo correct final) item).trans
+        (contextualSaturation_mem_iff owned correct final item))
+
 /-- Structural validity plus reachability of every endpoint of one edge. -/
 def ContextualEdgeReach
     (file : WorkspaceFile) (tokens : List Token)
