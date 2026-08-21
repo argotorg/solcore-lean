@@ -11476,6 +11476,247 @@ private theorem ruleReduction_multiplicative_total
     ← star_of_view tail rawStar, ← restEq]
   exact ⟨_, .multiplicative origin finish left rest⟩
 
+private theorem identifierNonemptyInputs_exist
+    {file : WorkspaceFile} {tokens : List Token}
+    (inputs : NonemptyList (EbnfValue file tokens
+      (.atom (.terminal (.category .identifier))))) :
+    ∃ names : NonemptyList (RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier),
+      names.map (fun name => EbnfValue.terminalAtom
+        (.category .identifier) name.matched) = inputs ∧
+      IdentifierProjects names.head.matched
+        names.head.spelling names.head.parsed ∧
+      ∀ name, name ∈ names.tail →
+        IdentifierProjects name.matched name.spelling name.parsed := by
+  rcases inputs with ⟨rawHead, rawTail⟩
+  rcases identifierInputs_exist (rawHead :: rawTail) with
+    ⟨names, namesEq, namesProjects⟩
+  cases names with
+  | nil => cases namesEq
+  | cons head tail =>
+      simp only [List.map_cons, List.cons.injEq] at namesEq
+      refine ⟨⟨head, tail⟩, ?_, namesProjects head (by simp), ?_⟩
+      · simp only [NonemptyList.map, NonemptyList.mk.injEq]
+        exact namesEq
+      · intro name nameMem
+        exact namesProjects name (by simp [nameMem])
+
+private theorem ruleReduction_importEntry_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .importEntry origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .importEntry)) :
+    ∃ output : RuleValue .importEntry,
+      RuleReduction file tokens .importEntry origin finish input output := by
+  let starAtom : EbnfExpr := .atom (.terminal (.symbol .star))
+  let identifierAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .asKw)), identifierAtom]
+  let namedChildren : List EbnfExpr := [
+    identifierAtom, .optional (.sequence aliasChildren)]
+  let branches : List EbnfExpr := [starAtom, .sequence namedChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 2 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · let star := terminalView (.symbol .star) raw
+    have starEq := terminal_of_view (.symbol .star) raw
+    rw [← inputEq, ← starEq]
+    exact ⟨_, .importEntryWildcard origin finish star
+      (.wildcardStar star) witness⟩
+  · generalize sequenceEq : sequenceFlatView namedChildren raw = values
+    rcases values with ⟨rawName, rawOptional, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view namedChildren raw
+    rw [sequenceEq] at rawEq
+    let matched := terminalView (.category .identifier) rawName
+    have rawNameEq := terminal_of_view (.category .identifier) rawName
+    rcases matchedTerminal_identifier_projection_exists_unique matched with
+      ⟨projection, nameProjects, _unique⟩
+    let name := identifierData matched projection
+    generalize optionalEq : optionalView
+      (.sequence aliasChildren) rawOptional = aliasValue
+    cases aliasValue with
+    | none =>
+        have rawOptionalEq := optional_eq_of_view
+          (.sequence aliasChildren) rawOptional optionalEq
+        rw [← inputEq, ← rawEq, ← rawNameEq, ← rawOptionalEq]
+        exact ⟨_, .importEntryNamed origin finish name nameProjects witness⟩
+    | some rawAlias =>
+        have rawOptionalEq := optional_eq_of_view
+          (.sequence aliasChildren) rawOptional optionalEq
+        generalize aliasEq : sequenceFlatView aliasChildren rawAlias = values
+        rcases values with ⟨rawAs, rawAliasName, ⟨⟩⟩
+        have rawAliasEq := sequence_of_flat_view aliasChildren rawAlias
+        rw [aliasEq] at rawAliasEq
+        let asKw := terminalView (.hardKeyword .asKw) rawAs
+        let aliasMatched := terminalView
+          (.category .identifier) rawAliasName
+        have asEq := terminal_of_view (.hardKeyword .asKw) rawAs
+        have aliasNameEq := terminal_of_view
+          (.category .identifier) rawAliasName
+        rcases matchedTerminal_identifier_projection_exists_unique
+          aliasMatched with ⟨aliasProjection, aliasProjects, _unique⟩
+        let alias := identifierData aliasMatched aliasProjection
+        rw [← inputEq, ← rawEq, ← rawNameEq, ← rawOptionalEq,
+          ← rawAliasEq, ← asEq, ← aliasNameEq]
+        exact ⟨_, .importEntryAliased origin finish name alias asKw
+          nameProjects aliasProjects witness⟩
+
+private theorem ruleReduction_localExportEntry_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .localExportEntry origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .localExportEntry)) :
+    ∃ output : RuleValue .localExportEntry,
+      RuleReduction file tokens .localExportEntry origin finish input output := by
+  let starAtom : EbnfExpr := .atom (.terminal (.symbol .star))
+  let allChildren : List EbnfExpr := [.atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .dot)), starAtom]
+  let branches : List EbnfExpr := [starAtom,
+    .atom (.nonterminal .exportItem), .sequence allChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 3 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl
+  · let star := terminalView (.symbol .star) raw
+    have rawEq := terminal_of_view (.symbol .star) raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .localExportEntryWildcard origin finish star
+      (.wildcardStar star) witness⟩
+  · let item := ruleView .exportItem raw
+    have rawEq := rule_of_view .exportItem raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .localExportEntryItem origin finish item witness⟩
+  · generalize sequenceEq : sequenceFlatView allChildren raw = values
+    rcases values with ⟨rawReference, rawDot, rawStar, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view allChildren raw
+    rw [sequenceEq] at rawEq
+    let reference := ruleView .moduleRef rawReference
+    let dot := terminalView (.symbol .dot) rawDot
+    let star := terminalView (.symbol .star) rawStar
+    have referenceEq := rule_of_view .moduleRef rawReference
+    have dotEq := terminal_of_view (.symbol .dot) rawDot
+    have starEq := terminal_of_view (.symbol .star) rawStar
+    rw [← inputEq, ← rawEq, ← referenceEq, ← dotEq, ← starEq]
+    exact ⟨_, .localExportEntryAllFrom origin finish reference dot star
+      (.wildcardStar star) witness⟩
+
+private theorem ruleReduction_remoteExportEntry_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .remoteExportEntry origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .remoteExportEntry)) :
+    ∃ output : RuleValue .remoteExportEntry,
+      RuleReduction file tokens .remoteExportEntry origin finish input output := by
+  let branches : List EbnfExpr := [
+    .atom (.terminal (.symbol .star)), .atom (.nonterminal .exportItem)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 2 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · let star := terminalView (.symbol .star) raw
+    have rawEq := terminal_of_view (.symbol .star) raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .remoteExportEntryWildcard origin finish star
+      (.wildcardStar star) witness⟩
+  · let item := ruleView .exportItem raw
+    have rawEq := rule_of_view .exportItem raw
+    rw [← inputEq, ← rawEq]
+    exact ⟨_, .remoteExportEntryItem origin finish item witness⟩
+
+private theorem ruleReduction_constructorSelection_total
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens .constructorSelection origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .constructorSelection)) :
+    ∃ output : RuleValue .constructorSelection,
+      RuleReduction file tokens .constructorSelection origin finish
+        input output := by
+  let identifierAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let allChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)),
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .rightParen))]
+  let namedChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let branches : List EbnfExpr :=
+    [.sequence allChildren, .sequence namedChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq := choice_eq_of_view branches input viewEq
+  have branchesLength : branches.length = 2 := by rfl
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · generalize sequenceEq : sequenceFlatView allChildren raw = values
+    rcases values with ⟨rawOpen, rawStar, rawClose, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view allChildren raw
+    rw [sequenceEq] at rawEq
+    let openParen := terminalView (.symbol .leftParen) rawOpen
+    let star := terminalView (.symbol .star) rawStar
+    let closeParen := terminalView (.symbol .rightParen) rawClose
+    have openEq := terminal_of_view (.symbol .leftParen) rawOpen
+    have starEq := terminal_of_view (.symbol .star) rawStar
+    have closeEq := terminal_of_view (.symbol .rightParen) rawClose
+    rw [← inputEq, ← rawEq, ← openEq, ← starEq, ← closeEq]
+    exact ⟨_, .constructorSelectionAll origin finish openParen star
+      closeParen (.wildcardStar star) witness⟩
+  · generalize sequenceEq : sequenceFlatView namedChildren raw = values
+    rcases values with ⟨rawOpen, rawNames, rawClose, ⟨⟩⟩
+    have rawEq := sequence_of_flat_view namedChildren raw
+    rw [sequenceEq] at rawEq
+    let openParen := terminalView (.symbol .leftParen) rawOpen
+    let closeParen := terminalView (.symbol .rightParen) rawClose
+    have openEq := terminal_of_view (.symbol .leftParen) rawOpen
+    have closeEq := terminal_of_view (.symbol .rightParen) rawClose
+    rcases identifierNonemptyInputs_exist
+      (list1TotalView identifierAtom rawNames) with
+      ⟨names, namesEq, headProjects, tailProjects⟩
+    have rawNamesEq : EbnfValue.list1 identifierAtom
+        (names.map (fun name => EbnfValue.terminalAtom
+          (.category .identifier) name.matched)) = rawNames := by
+      rw [namesEq]
+      exact list1_of_totalView identifierAtom rawNames
+    rw [← inputEq, ← rawEq, ← openEq, ← rawNamesEq, ← closeEq]
+    exact ⟨_, .constructorSelectionNamed origin finish openParen names
+      closeParen headProjects tailProjects witness⟩
+
 namespace RuleReduction
 
 /-- A fixed source-rule input and chart interval determine one semantic output. -/
