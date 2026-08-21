@@ -2614,4 +2614,88 @@ private def phaseANextSameDepthDelimiterBool
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Recognize the fixed match-arm pattern-list header at one same-depth pipe. -/
+private def phaseAArmHeaderBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (regionStart cursor : Boundary tokens) : Bool :=
+  decide (regionStart.val ≤ cursor.val) &&
+    phaseASameDelimiterDepthBool tokens regionStart cursor &&
+    phaseASymbolAtBool cursor .pipe &&
+    match phaseABoundaryAt? tokens (cursor.val + 1) with
+    | none => false
+    | some patternStart =>
+        phaseAImmediatelyAfterSymbolBool .pipe cursor patternStart &&
+          (List.finRange (tokens.length + 2)).any fun arrowCursor =>
+            phaseANextSameDepthDelimiterBool tokens patternStart
+                arrowCursor ⟨.fatArrow, []⟩ &&
+              rawGreatestEndBool phaseA
+                (.aux Grammar.matchArmPatternListSite.site)
+                patternStart arrowCursor arrowCursor
+
+/-- Test one brace frame strictly containing a cursor. -/
+private def phaseAContainingBraceFrameBool
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Bool :=
+  decide (openCursor.val < cursor.val) &&
+    decide (cursor.val < closeCursor.val) &&
+    phaseAMatchingDelimiterBool tokens openCursor closeCursor
+      .leftBrace .rightBrace
+
+/-- Test that a containing brace frame has the greatest opening cursor. -/
+private def phaseAInnermostContainingBraceFrameBool
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Bool :=
+  phaseAContainingBraceFrameBool tokens cursor openCursor closeCursor &&
+    (List.finRange (tokens.length + 2)).all fun otherOpen =>
+      (List.finRange (tokens.length + 2)).all fun otherClose =>
+        !phaseAContainingBraceFrameBool tokens cursor otherOpen otherClose ||
+          decide (otherOpen.val ≤ openCursor.val)
+
+/-- Test the first same-frame next-arm header or containing close brace. -/
+private def phaseANextArmOrCloseBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (regionStart closeCursor regionEnd : Boundary tokens) : Bool :=
+  decide (regionStart.val ≤ regionEnd.val) &&
+    decide (regionEnd.val ≤ closeCursor.val) &&
+    phaseASameDelimiterDepthBool tokens regionStart regionEnd &&
+    (decide (regionEnd = closeCursor) ||
+      phaseAArmHeaderBool phaseA regionStart regionEnd) &&
+    (List.finRange (tokens.length + 2)).all fun earlier =>
+      if regionStart.val ≤ earlier.val &&
+          earlier.val < regionEnd.val &&
+          phaseASameDelimiterDepthBool tokens regionStart earlier then
+        !(decide (earlier = closeCursor) ||
+          phaseAArmHeaderBool phaseA regionStart earlier)
+      else
+        true
+
+/-- Test the exact nearest braced-body or match-arm statement region. -/
+private def phaseANearestStatementRegionBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (regionStart regionEnd : Boundary tokens) : Bool :=
+  let bracedBody :=
+    (List.finRange (tokens.length + 2)).any fun openCursor =>
+      phaseAImmediatelyAfterSymbolBool .leftBrace openCursor regionStart &&
+        phaseAMatchingDelimiterBool tokens openCursor regionEnd
+          .leftBrace .rightBrace
+  let armBody :=
+    (List.finRange (tokens.length + 2)).any fun arrowCursor =>
+      phaseAImmediatelyAfterSymbolBool .fatArrow arrowCursor regionStart &&
+        (List.finRange (tokens.length + 2)).any fun openCursor =>
+          (List.finRange (tokens.length + 2)).any fun closeCursor =>
+            phaseAInnermostContainingBraceFrameBool tokens arrowCursor
+                openCursor closeCursor &&
+              phaseANextArmOrCloseBool phaseA regionStart closeCursor regionEnd
+  bracedBody || armBody
+
+end Chart
+
 end Solcore.Surface.Multi
