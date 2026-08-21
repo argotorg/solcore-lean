@@ -96,6 +96,112 @@ def ExactSlice
           TerminalAt file tokens cursor (.retained token) token.span ∧
           TerminalMatches (classes.get index) (.retained token)
 
+/-- Test one retained terminal at an absolute boundary coordinate. -/
+private def exactSliceAtomBool
+    (tokens : List Token) (terminal : TerminalSymbol)
+    (absolute : Nat) : Bool :=
+  if inRange : absolute < tokens.length then
+    terminalMatchesBool terminal (.retained tokens[absolute])
+  else
+    false
+
+private theorem exactSliceAtomBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (absolute : Nat) :
+    exactSliceAtomBool tokens terminal absolute = true ↔
+      ∃ cursor : TerminalCursor tokens,
+      ∃ token : Token,
+        cursor.beforeBoundary.val = absolute ∧
+          TerminalAt file tokens cursor (.retained token) token.span ∧
+          TerminalMatches terminal (.retained token) := by
+  constructor
+  · intro accepted
+    unfold exactSliceAtomBool at accepted
+    split at accepted
+    case isFalse => simp at accepted
+    case isTrue inRange =>
+      let cursor : TerminalCursor tokens :=
+        ⟨absolute, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+      let token := tokens[absolute]
+      refine ⟨cursor, token, rfl, ?_, ?_⟩
+      · exact .retained cursor token inRange
+          (List.getElem?_eq_getElem inRange)
+          (owned token (List.getElem_mem inRange))
+      · exact (terminalMatchesBool_eq_true_iff _ _).mp accepted
+  · rintro ⟨cursor, token, atAbsolute, terminalAt, matchedEvidence⟩
+    cases terminalAt with
+    | retained token inRange lookup valid =>
+        change cursor.val = absolute at atAbsolute
+        subst absolute
+        have tokenEq : tokens[cursor.val] = token := by
+          exact Option.some.inj
+            ((List.getElem?_eq_getElem inRange).symm.trans lookup)
+        subst token
+        unfold exactSliceAtomBool
+        rw [dif_pos inRange]
+        exact (terminalMatchesBool_eq_true_iff _ _).mpr matchedEvidence
+
+private theorem all_ofFn_eq_true_iff
+    {size : Nat} (predicate : Fin size → Bool) :
+    (List.ofFn predicate).all id = true ↔
+      ∀ index, predicate index = true := by
+  rw [List.all_eq_true]
+  constructor
+  · intro accepted index
+    exact accepted (predicate index)
+      (List.mem_ofFn.mpr ⟨index, rfl⟩)
+  · intro accepted value member
+    rw [List.mem_ofFn] at member
+    rcases member with ⟨index, rfl⟩
+    exact accepted index
+
+/-- Executable exact-slice query over one owned retained-token stream. -/
+def exactSliceBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (_owned : TokensOwnedBy file tokens)
+    (start finish : Boundary tokens)
+    (classes : List TerminalSymbol) : Bool :=
+  decide (finish.val = start.val + classes.length) &&
+    (List.ofFn fun index : Fin classes.length =>
+      exactSliceAtomBool tokens (classes.get index)
+        (start.val + index.val)).all id
+
+/-- The executable query accepts exactly the declarative exact slice. -/
+theorem exactSliceBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start finish : Boundary tokens)
+    (classes : List TerminalSymbol) :
+    exactSliceBool file tokens owned start finish classes = true ↔
+      ExactSlice file tokens start finish classes := by
+  unfold exactSliceBool ExactSlice
+  rw [Bool.and_eq_true, decide_eq_true_iff, all_ofFn_eq_true_iff]
+  constructor
+  · rintro ⟨finishEq, accepted⟩
+    refine ⟨finishEq, ?_⟩
+    intro index
+    exact (exactSliceAtomBool_eq_true_iff
+      owned (classes.get index) (start.val + index.val)).mp
+        (accepted index)
+  · rintro ⟨finishEq, accepted⟩
+    refine ⟨finishEq, ?_⟩
+    intro index
+    exact (exactSliceAtomBool_eq_true_iff
+      owned (classes.get index) (start.val + index.val)).mpr
+        (accepted index)
+
+/-- Exact-slice evidence is constructively decidable on an owned stream. -/
+def exactSliceDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start finish : Boundary tokens)
+    (classes : List TerminalSymbol) :
+    Decidable (ExactSlice file tokens start finish classes) :=
+  decidable_of_iff
+    (exactSliceBool file tokens owned start finish classes = true)
+    (exactSliceBool_eq_true_iff owned start finish classes)
+
 /-- Every relation closed under the four unguarded rules contains its reach. -/
 theorem unguardedReach_least
     {file : WorkspaceFile} {tokens : List Token}
