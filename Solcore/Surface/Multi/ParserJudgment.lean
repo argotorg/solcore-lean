@@ -2752,6 +2752,63 @@ def GuardEvidence
       | .negative => ¬ genericContext
       | .neutral => False
 
+/-- Declarative guard evidence is constructively decidable on an owned stream. -/
+def guardEvidenceDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) (decision : GuardDecision) :
+    Decidable (GuardEvidence file tokens key decision) := by
+  unfold GuardEvidence
+  letI : Decidable (TokensOwnedBy file tokens) := isTrue owned
+  letI (terminal : TerminalSymbol) (boundary : Boundary tokens) :
+      Decidable
+        (∃ matched : MatchedTerminal file tokens terminal,
+          matched.cursor.beforeBoundary = boundary) :=
+    terminalAtBoundaryDecision owned terminal boundary
+  letI (terminal : TerminalSymbol)
+      (boundary after : Boundary tokens) :
+      Decidable
+        (∃ matched : MatchedTerminal file tokens terminal,
+          matched.cursor.beforeBoundary = boundary ∧
+            matched.cursor.afterBoundary = after) :=
+    immediatelyAfterTerminalDecision owned terminal boundary after
+  letI (openCursor closeCursor : Boundary tokens)
+      (opening closing : Symbol) :
+      Decidable
+        (MatchingDelimiter tokens openCursor closeCursor opening closing) :=
+    matchingDelimiterDecision tokens openCursor closeCursor opening closing
+  letI (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+      Decidable (UnguardedRecognizes file tokens symbol start finish) :=
+    unguardedRecognizesDecision owned symbol start finish
+  letI (regionStart cursor : Boundary tokens) :
+      Decidable (ArmHeaderAt file tokens regionStart cursor) :=
+    armHeaderAtDecision owned regionStart cursor
+  letI (cursor : Boundary tokens) (symbol : Symbol) :
+      Decidable (SymbolAtBoundary file tokens cursor symbol) :=
+    symbolAtBoundaryDecision owned cursor symbol
+  letI (start finish : Boundary tokens) (allowed : NonemptyList Symbol) :
+      Decidable (NextSameDepthDelimiter tokens start finish allowed) :=
+    nextSameDepthDelimiterDecision tokens start finish allowed
+  letI (symbol : NonterminalSymbol)
+      (start upperBound finish : Boundary tokens) :
+      Decidable
+        (GreatestUnguardedEnd file tokens symbol start upperBound finish) :=
+    greatestUnguardedEndDecision owned symbol start upperBound finish
+  letI (start finish : Boundary tokens) (expected : List TerminalSymbol) :
+      Decidable (ExactSlice file tokens start finish expected) :=
+    exactSliceDecision owned start finish expected
+  letI (regionStart regionEnd : Boundary tokens) :
+      Decidable
+        (NearestStatementRegion file tokens regionStart regionEnd) :=
+    nearestStatementRegionDecision owned regionStart regionEnd
+  letI boundaryExistsDecidable
+      (predicate : Boundary tokens → Prop) [DecidablePred predicate] :
+      Decidable (∃ candidate, predicate candidate) :=
+    Nat.decidableExistsFin predicate
+  cases key with
+  | mk guard contextStart siteCursor ordered =>
+      cases guard <;> cases decision <;> infer_instance
+
 private theorem guardEvidence_total_of_positiveDecision
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
