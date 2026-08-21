@@ -17466,6 +17466,71 @@ theorem functional
 
 end GreatestReachableCursor
 
+/-- The finite carrier of exactly the reached contextual items. -/
+private def reachedContextualItems
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    List (ContextualItemKey tokens) :=
+  (allContextualItems tokens).filter fun item =>
+    @decide (ContextualReach file tokens memo correct final item)
+      (contextualReachDecision owned correct final item)
+
+private theorem reachedContextualItems_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (item : ContextualItemKey tokens) :
+    item ∈ reachedContextualItems file tokens owned memo correct final ↔
+      ContextualReach file tokens memo correct final item := by
+  simp only [reachedContextualItems, List.mem_filter,
+    decide_eq_true_iff, allContextualItems_complete, true_and]
+
+/-- The reached Phase-C carrier always has a greatest cursor. -/
+theorem chart_greatest_cursor_exists
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    ∃ cursor : Boundary tokens,
+      GreatestReachableCursor file tokens memo correct final cursor := by
+  let root : ContextualItemKey tokens := {
+    raw := {
+      production := .root .module
+      dot := ⟨0, Nat.zero_lt_succ _⟩
+      origin := Boundary.start tokens
+      current := Boundary.start tokens
+    }
+    context := .plain
+  }
+  let reached :=
+    reachedContextualItems file tokens owned memo correct final
+  have rootReached :
+      ContextualReach file tokens memo correct final root := by
+    exact .root
+  have rootMember : root ∈ reached := by
+    exact (reachedContextualItems_mem_iff
+      owned correct final root).mpr rootReached
+  have nonempty : reached ≠ [] := List.ne_nil_of_mem rootMember
+  let greatest := reached.maxOn
+    (fun item => item.raw.current.val) nonempty
+  refine ⟨greatest.raw.current, ?_⟩
+  constructor
+  · refine ⟨greatest, ?_, rfl⟩
+    exact (reachedContextualItems_mem_iff
+      owned correct final greatest).mp List.maxOn_mem
+  · intro item itemReached
+    exact List.le_apply_maxOn_of_mem
+      (β := Nat) (α := ContextualItemKey tokens)
+      (xs := reached) (f := fun candidate => candidate.raw.current.val)
+      ((reachedContextualItems_mem_iff
+        owned correct final item).mpr itemReached)
+
 /-- One reached contextual item at the greatest cursor. -/
 def FrontierReach
     (file : WorkspaceFile) (tokens : List Token)
