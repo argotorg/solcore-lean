@@ -711,6 +711,249 @@ def polarity
 
 end GuardWitnessKey
 
+namespace Grammar
+
+/-- One cell of the executable guard table, retaining its full production. -/
+private structure GuardTableCell where
+  production : ProductionId
+  guard : PriorityGuardId
+  polarity : Polarity
+  deriving Repr, DecidableEq
+
+/-- All cells of the executable guard table in production order. -/
+private def allGuardTableCells : List GuardTableCell :=
+  allProductionIds.flatMap fun production =>
+    (guardOf production).map fun cell => {
+      production := production
+      guard := cell.1
+      polarity := cell.2
+    }
+
+private theorem allGuardTableCells_length :
+    allGuardTableCells.length = H := by
+  simp [H, allGuardTableCells]
+
+private theorem allGuardTableCells_complete
+    (production : ProductionId) (guard : PriorityGuardId)
+    (polarity : Polarity)
+    (member : (guard, polarity) ∈ guardOf production) :
+    ({ production, guard, polarity } : GuardTableCell) ∈
+      allGuardTableCells := by
+  rw [allGuardTableCells, List.mem_flatMap]
+  refine ⟨production, allProductionIds_complete production, ?_⟩
+  rw [List.mem_map]
+  exact ⟨(guard, polarity), member, rfl⟩
+
+/-- Stable rank of a full cell in the executable guard table. -/
+private def GuardTableCell.rank (cell : GuardTableCell) : Nat :=
+  allGuardTableCells.findIdx fun candidate => decide (candidate = cell)
+
+private theorem GuardTableCell.rank_lt
+    (cell : GuardTableCell) (member : cell ∈ allGuardTableCells) :
+    cell.rank < H := by
+  rw [GuardTableCell.rank, ← allGuardTableCells_length,
+    List.findIdx_lt_length]
+  exact ⟨cell, member, by simp⟩
+
+private theorem GuardTableCell.rank_injective_on_mem
+    {left right : GuardTableCell}
+    (leftMember : left ∈ allGuardTableCells)
+    (rightMember : right ∈ allGuardTableCells)
+    (same : left.rank = right.rank) :
+    left = right := by
+  have leftBound := left.rank_lt leftMember
+  have rightBound := right.rank_lt rightMember
+  have leftLengthBound : left.rank < allGuardTableCells.length := by
+    rw [allGuardTableCells_length]
+    exact leftBound
+  have rightLengthBound : right.rank < allGuardTableCells.length := by
+    rw [allGuardTableCells_length]
+    exact rightBound
+  have leftFound := List.findIdx_getElem
+    (p := fun candidate : GuardTableCell => decide (candidate = left))
+    (xs := allGuardTableCells) (w := leftLengthBound)
+  have rightFound := List.findIdx_getElem
+    (p := fun candidate : GuardTableCell => decide (candidate = right))
+    (xs := allGuardTableCells) (w := rightLengthBound)
+  change decide
+    (allGuardTableCells[left.rank] = left) = true at leftFound
+  change decide
+    (allGuardTableCells[right.rank] = right) = true at rightFound
+  have leftEq : allGuardTableCells[left.rank] = left :=
+    of_decide_eq_true leftFound
+  have rightEq : allGuardTableCells[right.rank] = right :=
+    of_decide_eq_true rightFound
+  have sameIndex :
+      (⟨left.rank, leftLengthBound⟩ : Fin allGuardTableCells.length) =
+        ⟨right.rank, rightLengthBound⟩ := Fin.ext same
+  have sameEntry := congrArg
+    (fun index : Fin allGuardTableCells.length =>
+      allGuardTableCells[index]) sameIndex
+  exact leftEq.symm.trans (sameEntry.trans rightEq)
+
+end Grammar
+
+namespace GuardWitnessKey
+
+private def tableCell {tokens : List Token}
+    (key : GuardWitnessKey tokens) : GuardTableCell := {
+  production := key.productionInstance.production
+  guard := key.guardInstance.guard
+  polarity := key.polarity
+}
+
+private theorem tableCell_mem {tokens : List Token}
+    (key : GuardWitnessKey tokens) :
+    tableCell key ∈ allGuardTableCells := by
+  exact allGuardTableCells_complete _ _ _ key.property.1
+
+end GuardWitnessKey
+
+private theorem mixedRadix_injective {width : Nat}
+    {leftBlock rightBlock leftOffset rightOffset : Nat}
+    (leftOffsetBound : leftOffset < width)
+    (rightOffsetBound : rightOffset < width)
+    (equality :
+      leftBlock * width + leftOffset =
+        rightBlock * width + rightOffset) :
+    leftBlock = rightBlock ∧ leftOffset = rightOffset := by
+  have widthPositive : 0 < width := Nat.zero_lt_of_lt leftOffsetBound
+  have quotient (block offset : Nat) (offsetBound : offset < width) :
+      (block * width + offset) / width = block := by
+    rw [Nat.add_comm, Nat.mul_comm block width,
+      Nat.add_mul_div_left _ _ widthPositive, Nat.div_eq_of_lt offsetBound]
+    exact Nat.zero_add block
+  have sameBlock : leftBlock = rightBlock := by
+    rw [← quotient leftBlock leftOffset leftOffsetBound,
+      equality, quotient rightBlock rightOffset rightOffsetBound]
+  constructor
+  · exact sameBlock
+  · rw [sameBlock] at equality
+    exact Nat.add_left_cancel equality
+
+private theorem productionInstance_eq_of_fields
+    {tokens : List Token} {left right : ProductionInstanceKey tokens}
+    (production : left.production = right.production)
+    (origin : left.origin = right.origin)
+    (context : left.context = right.context) :
+    left = right := by
+  cases left
+  cases right
+  simp only at production origin context
+  cases production
+  cases origin
+  cases context
+  rfl
+
+private theorem GuardWitnessKey.Raw.eq_of_fields
+    {tokens : List Token} {left right : GuardWitnessKey.Raw tokens}
+    (productionInstance :
+      left.productionInstance = right.productionInstance)
+    (guardInstance : left.guardInstance = right.guardInstance)
+    (polarity : left.polarity = right.polarity) :
+    left = right := by
+  cases left
+  cases right
+  simp only at productionInstance guardInstance polarity
+  cases productionInstance
+  cases guardInstance
+  cases polarity
+  rfl
+
+/-- Guard witnesses inject into their exact grammar cell, context, and origin. -/
+theorem guard_witness_cardinality (tokens : List Token) :
+    ∃ encode : GuardWitnessKey tokens →
+        Fin (H * (1 + 3 * (tokens.length + 2)) * (tokens.length + 2)),
+      Function.Injective encode := by
+  obtain ⟨contextEncode, contextInjective, _contextSurjective⟩ :=
+    guard_context_cardinality tokens
+  let q := tokens.length + 2
+  let c := 1 + 3 * q
+  let rawEncode (key : GuardWitnessKey tokens) : Nat :=
+    (key.tableCell.rank * c +
+      (contextEncode key.productionInstance.context).val) * q +
+      key.productionInstance.origin.val
+  let encode (key : GuardWitnessKey tokens) :
+      Fin (H * (1 + 3 * (tokens.length + 2)) *
+        (tokens.length + 2)) := ⟨rawEncode key, by
+    have cellBound := key.tableCell.rank_lt key.tableCell_mem
+    have contextBound :=
+      (contextEncode key.productionInstance.context).isLt
+    have originBound := key.productionInstance.origin.isLt
+    have innerBound :
+        key.tableCell.rank * c +
+            (contextEncode key.productionInstance.context).val < H * c := by
+      have rowBound :
+          key.tableCell.rank * c +
+              (contextEncode key.productionInstance.context).val <
+            (key.tableCell.rank + 1) * c := by
+        rw [Nat.add_mul]
+        simpa only [Nat.one_mul] using
+          Nat.add_lt_add_left contextBound (key.tableCell.rank * c)
+      exact Nat.lt_of_lt_of_le rowBound
+        (Nat.mul_le_mul_right c (Nat.succ_le_of_lt cellBound))
+    have outerBound : rawEncode key < H * c * q := by
+      have blockBound :
+          (key.tableCell.rank * c +
+              (contextEncode key.productionInstance.context).val) * q +
+              key.productionInstance.origin.val <
+            ((key.tableCell.rank * c +
+              (contextEncode key.productionInstance.context).val) + 1) * q := by
+        calc
+          _ < (key.tableCell.rank * c +
+                (contextEncode key.productionInstance.context).val) * q + q :=
+            Nat.add_lt_add_left originBound _
+          _ = _ := by simp only [Nat.add_mul, Nat.one_mul, Nat.add_assoc]
+      exact Nat.lt_of_lt_of_le blockBound
+        (Nat.mul_le_mul_right q (Nat.succ_le_of_lt innerBound))
+    simpa [q, c] using outerBound
+  ⟩
+  refine ⟨encode, ?_⟩
+  intro left right equality
+  have rawEquality : rawEncode left = rawEncode right :=
+    congrArg Fin.val equality
+  have originBlocks := mixedRadix_injective
+    left.productionInstance.origin.isLt
+    right.productionInstance.origin.isLt rawEquality
+  have contextBlocks := mixedRadix_injective
+    (contextEncode left.productionInstance.context).isLt
+    (contextEncode right.productionInstance.context).isLt originBlocks.1
+  have cellEq : left.tableCell = right.tableCell :=
+    GuardTableCell.rank_injective_on_mem
+      left.tableCell_mem right.tableCell_mem contextBlocks.1
+  have productionEq : left.productionInstance.production =
+      right.productionInstance.production :=
+    congrArg GuardTableCell.production cellEq
+  have guardEq : left.guardInstance.guard = right.guardInstance.guard :=
+    congrArg GuardTableCell.guard cellEq
+  have polarityEq : left.polarity = right.polarity :=
+    congrArg GuardTableCell.polarity cellEq
+  have contextEq : left.productionInstance.context =
+      right.productionInstance.context := by
+    apply contextInjective
+    apply Fin.ext
+    exact contextBlocks.2
+  have originEq : left.productionInstance.origin =
+      right.productionInstance.origin :=
+    Fin.ext originBlocks.2
+  have productionInstanceEq : left.productionInstance =
+      right.productionInstance :=
+    productionInstance_eq_of_fields productionEq originEq contextEq
+  have leftAnchor := left.property.2
+  have rightAnchor := right.property.2
+  change left.val.productionInstance =
+    right.val.productionInstance at productionInstanceEq
+  change left.val.guardInstance.guard =
+    right.val.guardInstance.guard at guardEq
+  change left.val.polarity = right.val.polarity at polarityEq
+  rw [productionInstanceEq, guardEq, polarityEq] at leftAnchor
+  have guardInstanceEq : left.val.guardInstance = right.val.guardInstance :=
+    GuardAnchor.functional leftAnchor rightAnchor
+  apply Subtype.ext
+  change left.val = right.val
+  exact GuardWitnessKey.Raw.eq_of_fields
+    productionInstanceEq guardInstanceEq polarityEq
+
 /-- The absent or source-preserving comma between repeated forall binders. -/
 inductive OptionalCommaValue where
   | absent
