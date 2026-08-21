@@ -975,6 +975,26 @@ def unguardedRecognizesDecision
     (unguardedRecognizesBool file tokens owned symbol start finish = true)
     (unguardedRecognizesBool_eq_true_iff owned symbol start finish)
 
+/-- Greatest unguarded recognition is constructively decidable. -/
+def greatestUnguardedEndDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) :
+    Decidable
+      (GreatestUnguardedEnd file tokens symbol start upperBound finish) := by
+  unfold GreatestUnguardedEnd
+  letI recognizesDecidable (other : Boundary tokens) :
+      Decidable (UnguardedRecognizes file tokens symbol start other) :=
+    unguardedRecognizesDecision owned symbol start other
+  letI maximalDecidable : Decidable
+      (∀ other : Boundary tokens,
+        UnguardedRecognizes file tokens symbol start other →
+          other.val ≤ upperBound.val →
+          other.val ≤ finish.val) :=
+    Nat.decidableForallFin _
+  infer_instance
+
 /-- Unguarded recognition is exactly one reached complete matching item. -/
 theorem unguardedRecognizes_exact
     {file : WorkspaceFile} {tokens : List Token}
