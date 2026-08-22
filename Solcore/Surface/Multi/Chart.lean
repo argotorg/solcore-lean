@@ -18503,3 +18503,243 @@ theorem saturatedStatementRegionObservation_eq_observed
     saturatedNextArmOrCloseBool_eq_observed]
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem contextualLinearKey_injective {tokens : List Token} :
+    Function.Injective (contextualLinearKey (tokens := tokens)) := by
+  intro left right equal
+  have raw : left.raw = right.raw := dottedItem_eq_of_fields
+    (congrArg (fun key => key.dotted.production) equal)
+    (congrArg (fun key => key.dotted.dot.val) equal)
+    (congrArg (fun key => key.origin) equal)
+    (congrArg (fun key => key.current) equal)
+  have context : left.context = right.context := by
+    have source := congrArg ChartLinearKey.source equal
+    simpa [contextualLinearKey] using source
+  exact contextualItem_eq_of_fields raw context
+
+private structure PhaseCItemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop where
+  inserted : ∀ (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens),
+    (.linear source.unitKind (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    item ∈ current.payload.phaseC.contextualItems
+  dequeued : ∀ item,
+    (.linear .L01_itemDequeue (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    item ∈ current.payload.phaseC.contextualItems
+  predicted : ∀ item production,
+    (.prediction .R01_predictionAttempt
+      (contextualPredictionKey item production) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    (.linear .L01_itemDequeue (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev
+  scanned : ∀ item,
+    (.linear .L04_scanAttempt (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    (.linear .L01_itemDequeue (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev
+  scannedEdge : ∀ item,
+    (.linear .L06_scannedEdgeInsert (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    (.linear .L01_itemDequeue (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev
+  queueFresh : ∀ item, item ∈ current.payload.phaseC.itemQueue →
+    (.linear .L01_itemDequeue (contextualLinearKey item) :
+      UnitAddress tokens) ∉ current.counter.usedRev
+  itemsNodup : current.payload.phaseC.contextualItems.Nodup
+  queueNodup : current.payload.phaseC.itemQueue.Nodup
+  queueSubset : current.payload.phaseC.itemQueue ⊆
+    current.payload.phaseC.contextualItems
+
+private theorem beginPhaseCWorklist?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCItemSafe result := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  have payload := runMappedPrimitive?_payload current _ _ enteredEq
+  have used := runMappedPrimitive?_usedRev current _ _ entered enteredEq
+  constructor
+  · intro source item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · cases source with
+      | prediction =>
+          simp only [ContextualItemInsertSource.unitKind,
+            UnitAddress.linear.injEq, true_and] at equal
+          have itemEq := contextualLinearKey_injective equal
+          rw [itemEq, payload]
+          simp
+      | scan => simp [ContextualItemInsertSource.unitKind] at equal
+      | completion => simp [ContextualItemInsertSource.unitKind] at equal
+    · exact (fresh _ (by
+        cases source <;>
+          simp [phaseCInitialAddress, contextualLinearKey])).elim old
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · exact (fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])).elim old
+  · intro item production member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · exact (fresh _ (by
+        simp [phaseCInitialAddress, contextualPredictionKey])).elim old
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · exact (fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])).elim old
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · exact (fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])).elim old
+  · intro item member usedItem
+    rw [payload] at member
+    simp only [List.mem_singleton] at member
+    subst item
+    rw [used, List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · simp at equal
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey]) old
+  · simp [payload]
+  · simp [payload]
+  · intro item member
+    simpa [payload] using member
+
+private theorem insertContextualItem?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (safe : PhaseCItemSafe current)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCItemSafe result := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact safe
+  next absent =>
+    have payload := runMappedPrimitive?_payload current _ _ selected
+    have used := runMappedPrimitive?_usedRev current _ _ result selected
+    have itemAbsent : item ∉ current.payload.phaseC.contextualItems := by
+      intro member
+      exact absent ((phaseCItemMemberBool_true_iff _ item).mpr member)
+    constructor
+    · intro candidateSource candidate member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp only [UnitAddress.linear.injEq] at equal
+        have keys : contextualLinearKey candidate =
+            contextualLinearKey item := equal.2
+        rw [contextualLinearKey_injective keys, payload]
+        simp
+      · rw [payload]
+        exact List.mem_append_left _
+          (safe.inserted candidateSource candidate old)
+    · intro candidate member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;>
+          simp [ContextualItemInsertSource.unitKind] at equal
+      · rw [payload]
+        exact List.mem_append_left _ (safe.dequeued candidate old)
+    · intro candidate production member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;>
+          simp [ContextualItemInsertSource.unitKind] at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _
+          (safe.predicted candidate production old)
+    · intro candidate member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;>
+          simp [ContextualItemInsertSource.unitKind] at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scanned candidate old)
+    · intro candidate member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;>
+          simp [ContextualItemInsertSource.unitKind] at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scannedEdge candidate old)
+    · intro candidate member usedCandidate
+      rw [payload] at member
+      simp only [List.mem_append, List.mem_singleton] at member
+      rw [used, List.mem_cons] at usedCandidate
+      rcases member with oldMember | equal
+      · rcases usedCandidate with collision | oldUsed
+        · cases source <;>
+            simp [ContextualItemInsertSource.unitKind] at collision
+        · exact safe.queueFresh candidate oldMember oldUsed
+      · subst candidate
+        rcases usedCandidate with collision | oldUsed
+        · cases source <;>
+            simp [ContextualItemInsertSource.unitKind] at collision
+        · exact itemAbsent (safe.dequeued item oldUsed)
+    · rw [payload, List.nodup_append]
+      refine ⟨safe.itemsNodup, by simp, ?_⟩
+      intro candidate member singleton singletonMember equal
+      have singletonEq : singleton = item :=
+        List.eq_of_mem_singleton singletonMember
+      apply itemAbsent
+      rw [← singletonEq, ← equal]
+      exact member
+    · rw [payload]
+      have notQueued : item ∉ current.payload.phaseC.itemQueue :=
+        fun member => itemAbsent (safe.queueSubset member)
+      rw [List.nodup_append]
+      refine ⟨safe.queueNodup, by simp, ?_⟩
+      intro candidate member singleton singletonMember equal
+      have singletonEq : singleton = item :=
+        List.eq_of_mem_singleton singletonMember
+      apply notQueued
+      rw [← singletonEq, ← equal]
+      exact member
+    · intro candidate member
+      rw [payload] at member ⊢
+      simp only [List.mem_append, List.mem_singleton] at member ⊢
+      exact member.elim (fun old => Or.inl (safe.queueSubset old)) Or.inr
+
+private theorem insertContextualItem?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (safe : PhaseCItemSafe current) :
+    ∃ result, insertContextualItem? current source item = some result := by
+  unfold insertContextualItem?
+  split
+  next present => exact ⟨current, rfl⟩
+  next absent =>
+    have fresh : (.linear source.unitKind (contextualLinearKey item) :
+        UnitAddress tokens) ∉ current.counter.usedRev := by
+      intro used
+      exact absent ((phaseCItemMemberBool_true_iff _ item).mpr
+        (safe.inserted source item used))
+    simp [runMappedPrimitive?, fresh]
+
+end Solcore.Surface.Multi.Chart
