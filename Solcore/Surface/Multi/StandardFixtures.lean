@@ -71,4 +71,22 @@ theorem canonicalStandard_byteRoundTrip
   ⟨decodeUtf8Strict_roundTrip pathDecoded,
     decodeUtf8Strict_roundTrip contentDecoded⟩
 
+/-- Every canonical path and source body has a successful strict UTF-8
+decode. -/
+theorem canonicalStandard_utf8Strict (index : Fin 6) :
+    ∃ pathText contentText,
+      decodeUtf8Strict
+          (Solcore.Standard.canonicalRawFiles.get index).logicalPathUtf8 =
+        .ok pathText ∧
+      decodeUtf8Strict
+          (Solcore.Standard.canonicalRawFiles.get index).contentUtf8 =
+        .ok contentText := by
+  have valid :=
+    Solcore.Standard.canonicalRawFiles_utf8Valid index
+  rcases (decodeUtf8Strict_accepts_iff_valid _).mpr valid.1 with
+    ⟨pathText, pathDecoded⟩
+  rcases (decodeUtf8Strict_accepts_iff_valid _).mpr valid.2 with
+    ⟨contentText, contentDecoded⟩
+  exact ⟨pathText, contentText, pathDecoded, contentDecoded⟩
+
 end Solcore.Surface.Multi
