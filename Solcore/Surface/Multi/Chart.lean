@@ -8364,4 +8364,37 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_basic
 
 end Chart
 
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Canonical U01 materialization preserves G02's independent pipe bit;
+only the header bit remains tied to the raw-saturation observation. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_matchArmPipe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (key : GuardInstanceKey tokens)
+    (isMatchArm : key.guard = .G02_matchArmBoundary) :
+    ∃ header,
+      phaseBGuardObservationFromIndexes?
+          (canonicalEvidenceEntries
+            (phaseAObservationIndexEvaluator owned) phaseA) key =
+        some (header, matchArmPipeObservationBool owned key) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G02_matchArmBoundary at isMatchArm
+  subst guard
+  simp [phaseBGuardObservationFromIndexes?, phaseBG02Observations?,
+    phaseBReadDelimiterGuard?, phaseBReadTerminalGuard?,
+    phaseBWithBoundary?, phaseBReadIndex?,
+    phaseAEvidenceEntryAt?_canonical_exact,
+    phaseAObservationIndexEvaluator, phaseATerminalWindowGuardBool,
+    phaseADelimiterOrRegionGuardBool,
+    phaseAImmediateSuccessorOption_exact,
+    matchArmPipeObservationBool, observedTerminalAtBool_eq_phaseA]
+
+end Chart
+
 end Solcore.Surface.Multi
