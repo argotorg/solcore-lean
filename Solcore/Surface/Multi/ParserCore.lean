@@ -5080,3 +5080,49 @@ theorem allExpected_exact (expected : Expected) :
   exact iff_true_intro (allExpected_complete expected)
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- The ten generated production families whose semantic action is a direct,
+proof-free packer.  Source-rule roots are deliberately excluded: their
+reductions also construct source spans and remain the separate execution
+boundary. -/
+def AuxiliaryProduction : ProductionId → Prop
+  | .root _ => False
+  | .atom _ => True
+  | .seq _ => True
+  | .group _ => True
+  | .choice _ _ => True
+  | .opt _ _ => True
+  | .star _ _ => True
+  | .plus _ _ => True
+  | .list0 _ _ => True
+  | .list1 _ => True
+  | .tail _ _ => True
+
+/-- Execute any auxiliary generated action by its checked grammar-site
+packer.  The result is computational; the proof argument only excludes the
+source-rule root branch. -/
+def executeAuxiliaryAction
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId)
+    (auxiliary : AuxiliaryProduction production)
+    (input : GrammarSymbolValues file tokens production.rhs) :
+    NonterminalValue file tokens production.lhs :=
+  match production with
+  | .root _ => False.elim auxiliary
+  | .atom site => AtomSite.pack site input
+  | .seq site => SequenceSite.pack site input
+  | .group site => GroupSite.pack site input
+  | .choice site branch => ChoiceSite.pack site branch input
+  | .opt site branch => OptionalSite.pack site branch input
+  | .star site branch => StarSite.pack site branch input
+  | .plus site branch => PlusSite.pack site branch input
+  | .list0 site branch => List0Site.pack site branch input
+  | .list1 site => List1Site.pack site input
+  | .tail site branch => ListSite.pack site branch input
+
+end Solcore.Surface.Multi
