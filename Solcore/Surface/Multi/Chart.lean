@@ -9092,7 +9092,21 @@ private def phaseAReservedAddress {tokens : List Token} :
   | .phase .sealAEnterB => True
   | .phase .sealBEnterC => True
   | .guardFinalize _ _ => True
+  | .production _ => True
+  | .guardWitness _ _ => True
+  | .linear _ key =>
+      match key.source with
+      | .contextual _ => True
+      | .rawEvidence => False
+  | .prediction _ key =>
+      match key.source with
+      | .contextual _ => True
+      | .rawEvidence => False
   | .cubic .U01_evidenceIndex _ => True
+  | .cubic _ key =>
+      match key.source with
+      | .contextual _ => True
+      | .rawEvidence => False
   | _ => False
 
 private def PhaseAReservedFresh {tokens : List Token}
@@ -9156,7 +9170,7 @@ private theorem insertRawItem?_reservedFresh
     exact invariant
   · apply runMappedPrimitive?_reservedFresh current _ _ invariant _
       result selected
-    cases source <;> simp [phaseAReservedAddress]
+    cases source <;> simp [phaseAReservedAddress, rawLinearKey]
 
 private theorem insertRawEdge?_reservedFresh
     {file : WorkspaceFile} {tokens : List Token}
@@ -9171,7 +9185,8 @@ private theorem insertRawEdge?_reservedFresh
     exact invariant
   · apply runMappedPrimitive?_reservedFresh current _ _ invariant _
       result selected
-    cases edge.val <;> simp [phaseAReservedAddress]
+    cases edge.val <;> simp [phaseAReservedAddress,
+      rawLinearKey, rawCompletionKey]
 
 private theorem dequeueRawItem?_reservedFresh
     {file : WorkspaceFile} {tokens : List Token}
@@ -9191,7 +9206,7 @@ private theorem dequeueRawItem?_reservedFresh
       simp only [pure, Option.some.injEq] at output
       subst result
       exact runMappedPrimitive?_reservedFresh current _ _ invariant
-        (by simp [phaseAReservedAddress]) next stepped
+        (by simp [phaseAReservedAddress, rawLinearKey]) next stepped
 
 private theorem dequeueRawEdge?_reservedFresh
     {file : WorkspaceFile} {tokens : List Token}
@@ -9212,7 +9227,8 @@ private theorem dequeueRawEdge?_reservedFresh
       subst result
       apply runMappedPrimitive?_reservedFresh current _ _ invariant _
         next stepped
-      cases edge.val <;> simp [phaseAReservedAddress]
+      cases edge.val <;> simp [phaseAReservedAddress,
+        rawLinearKey, rawCompletionKey]
 
 end Chart
 
@@ -9261,7 +9277,8 @@ private theorem attemptPrediction?_reservedFresh
         Option.bind_eq_some_iff] at selected
       rcases selected with ⟨attempted, attemptedEq, inserted⟩
       have attemptedInvariant := runMappedPrimitive?_reservedFresh
-        current _ id invariant (by simp [phaseAReservedAddress])
+        current _ id invariant
+          (by simp [phaseAReservedAddress, rawPredictionKey])
         attempted attemptedEq
       exact insertRawItem?_reservedFresh attempted result
         .seedOrPrediction item attemptedInvariant inserted
@@ -9303,7 +9320,8 @@ private theorem attemptScan?_reservedFresh
     simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
     rcases selected with ⟨attempted, attemptedEq, remainder⟩
     have attemptedInvariant := runMappedPrimitive?_reservedFresh
-      current _ id invariant (by simp [phaseAReservedAddress])
+      current _ id invariant
+        (by simp [phaseAReservedAddress, rawLinearKey])
       attempted attemptedEq
     cases scan : scannedEdge? owned before with
     | none =>
@@ -9346,7 +9364,8 @@ private theorem attemptCompletion?_reservedFresh
         rcases selected with ⟨attempted, attemptedEq,
           withItem, itemEq, edgeEq⟩
         have attemptedInvariant := runMappedPrimitive?_reservedFresh
-          current _ id invariant (by simp [phaseAReservedAddress])
+          current _ id invariant
+            (by simp [phaseAReservedAddress, rawCompletionKey])
           attempted attemptedEq
         exact insertRawEdge?_reservedFresh withItem result edge
           (insertRawItem?_reservedFresh attempted withItem .completion after
