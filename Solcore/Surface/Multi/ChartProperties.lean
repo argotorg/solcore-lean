@@ -2819,3 +2819,142 @@ theorem executeObservedContextualWorklist?_completionBackpointerUnique
         file tokens owned result selected)
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+
+/-- The protected singleton-brace executor is exactly its declarative run. -/
+theorem observedProtectedRightBraceRun_exact
+    (tokens : List Token) (start finish : Boundary tokens) :
+    Chart.observedProtectedDelimiterRun? tokens [.rightBrace]
+        start finish = some [.rightBrace] ↔
+      ProtectedDelimiterRun tokens
+        { head := .rightBrace, tail := [] } start finish
+        { head := .rightBrace, tail := [] } := by
+  simpa [nonemptyValues, observedNonemptyToSemantic,
+    observedCloserToSemantic] using
+    observedProtectedDelimiterRun?_eq_some_iff tokens
+      { head := Chart.ObservedDelimiterCloser.rightBrace, tail := [] }
+      { head := Chart.ObservedDelimiterCloser.rightBrace, tail := [] }
+      start finish
+
+/-- The public matching-brace bit recognizes exactly one protected matching
+brace pair in the declarative parser semantics. -/
+theorem observedMatchingBraceBool_exact
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) :
+    Chart.observedMatchingBraceBool tokens openCursor closeCursor = true ↔
+      MatchingDelimiter tokens openCursor closeCursor
+        .leftBrace .rightBrace := by
+  unfold Chart.observedMatchingBraceBool MatchingDelimiter
+  simp only [Bool.and_eq_true, true_and]
+  constructor
+  · rintro ⟨⟨openAccepted, closeAccepted⟩, runAccepted⟩
+    generalize boundaryEq : Chart.observedBoundaryAt? tokens
+      (openCursor.val + 1) = result at runAccepted
+    cases result with
+    | none => simp at runAccepted
+    | some interiorStart =>
+        have coordinateEq : interiorStart.val = openCursor.val + 1 :=
+          (chart_observedBoundaryAt?_eq_some_iff
+            (openCursor.val + 1) interiorStart).mp boundaryEq
+        rcases (observedRawSymbolAtBool_exact tokens openCursor
+          .leftBrace).mp openAccepted with
+          ⟨terminalCursor, token, atOpen, lookup, payload⟩
+        have atInterior : terminalCursor.afterBoundary = interiorStart := by
+          apply Fin.ext
+          have atOpenValue := congrArg Fin.val atOpen
+          change terminalCursor.val = openCursor.val at atOpenValue
+          change terminalCursor.val + 1 = interiorStart.val
+          omega
+        refine ⟨interiorStart,
+          ⟨terminalCursor, token, atOpen, atInterior, lookup, payload⟩,
+          (observedRawSymbolAtBool_exact tokens closeCursor
+            .rightBrace).mp closeAccepted,
+          ?_⟩
+        exact (observedProtectedRightBraceRun_exact tokens
+          interiorStart closeCursor).mp (of_decide_eq_true runAccepted)
+  · rintro ⟨interiorStart,
+      ⟨terminalCursor, token, atOpen, atInterior, lookup, payload⟩,
+      closeObserved, run⟩
+    have coordinateEq : interiorStart.val = openCursor.val + 1 := by
+      have atOpenValue := congrArg Fin.val atOpen
+      have atInteriorValue := congrArg Fin.val atInterior
+      change terminalCursor.val = openCursor.val at atOpenValue
+      change terminalCursor.val + 1 = interiorStart.val at atInteriorValue
+      omega
+    have boundaryEq : Chart.observedBoundaryAt? tokens
+        (openCursor.val + 1) = some interiorStart :=
+      (chart_observedBoundaryAt?_eq_some_iff
+        (openCursor.val + 1) interiorStart).mpr coordinateEq
+    refine ⟨⟨
+      (observedRawSymbolAtBool_exact tokens openCursor .leftBrace).mpr
+        ⟨terminalCursor, token, atOpen, lookup, payload⟩,
+      (observedRawSymbolAtBool_exact tokens closeCursor .rightBrace).mpr
+        closeObserved⟩, ?_⟩
+    rw [boundaryEq]
+    exact decide_eq_true
+      ((observedProtectedRightBraceRun_exact tokens
+        interiorStart closeCursor).mpr run)
+
+private theorem observedContainingBraceFrameBool_exact
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Chart.observedContainingBraceFrameBool tokens cursor openCursor
+        closeCursor = true ↔
+      ContainingBraceFrame tokens cursor openCursor closeCursor := by
+  unfold Chart.observedContainingBraceFrameBool ContainingBraceFrame
+  simp only [Bool.and_eq_true, decide_eq_true_iff,
+    observedMatchingBraceBool_exact]
+  constructor
+  · rintro ⟨⟨openLt, closeLt⟩, matching⟩
+    exact ⟨openLt, closeLt, matching⟩
+  · rintro ⟨openLt, closeLt, matching⟩
+    exact ⟨⟨openLt, closeLt⟩, matching⟩
+
+/-- The proof-free greatest-opening brace-frame bit is exactly the
+declarative innermost-frame judgment. -/
+theorem observedInnermostContainingBraceFrameBool_exact
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Chart.observedInnermostContainingBraceFrameBool tokens cursor
+        openCursor closeCursor = true ↔
+      InnermostContainingBraceFrame tokens cursor openCursor
+        closeCursor := by
+  unfold Chart.observedInnermostContainingBraceFrameBool
+    InnermostContainingBraceFrame
+  simp only [Bool.and_eq_true,
+    observedContainingBraceFrameBool_exact]
+  constructor
+  · rintro ⟨containing, greatest⟩
+    refine ⟨containing, ?_⟩
+    intro otherOpen otherClose otherContaining
+    rw [List.all_eq_true] at greatest
+    have selectedOpen := greatest otherOpen (List.mem_finRange _)
+    rw [List.all_eq_true] at selectedOpen
+    have selected := selectedOpen otherClose (List.mem_finRange _)
+    have containingTrue :=
+      (observedContainingBraceFrameBool_exact tokens cursor
+        otherOpen otherClose).mpr otherContaining
+    rw [containingTrue] at selected
+    simpa using selected
+  · rintro ⟨containing, greatest⟩
+    refine ⟨containing, ?_⟩
+    rw [List.all_eq_true]
+    intro otherOpen _memberOpen
+    rw [List.all_eq_true]
+    intro otherClose _memberClose
+    by_cases otherContaining :
+        ContainingBraceFrame tokens cursor otherOpen otherClose
+    · have containingTrue :=
+        (observedContainingBraceFrameBool_exact tokens cursor
+          otherOpen otherClose).mpr otherContaining
+      have otherLe := greatest otherOpen otherClose otherContaining
+      simp [containingTrue, otherLe]
+    · have containingFalse :
+          Chart.observedContainingBraceFrameBool tokens cursor
+              otherOpen otherClose = false := by
+        exact Bool.eq_false_iff.mpr fun selected => otherContaining
+          ((observedContainingBraceFrameBool_exact tokens cursor
+            otherOpen otherClose).mp selected)
+      simp [containingFalse]
+
+end Solcore.Surface.Multi
