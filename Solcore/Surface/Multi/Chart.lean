@@ -10325,4 +10325,201 @@ theorem executeObservedGuardWorklist?_allGuardsFinal
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Public membership view of the proof-free raw saturation. -/
+def SaturatedRawItem (tokens : List Token) (item : DottedItem tokens) : Prop :=
+  item ∈ rawSaturation tokens
+
+/-- Every grammar seed belongs to raw saturation. -/
+theorem saturatedRawItem_seed
+    {tokens : List Token} (production : ProductionId)
+    (cursor : Boundary tokens) :
+    SaturatedRawItem tokens {
+      production := production
+      dot := ⟨0, Nat.zero_lt_succ _⟩
+      origin := cursor
+      current := cursor
+    } := by
+  exact rawSaturation_seed_closed rfl rfl
+
+/-- Raw saturation is closed under one unguarded prediction. -/
+theorem saturatedRawItem_predict
+    {tokens : List Token} (waiting : DottedItem tokens)
+    (predicted : ProductionId)
+    (waitingMember : SaturatedRawItem tokens waiting)
+    (next : NextSymbol waiting (.nonterminal predicted.lhs)) :
+    SaturatedRawItem tokens {
+      production := predicted
+      dot := ⟨0, Nat.zero_lt_succ _⟩
+      origin := waiting.current
+      current := waiting.current
+    } := by
+  exact rawSaturation_predict_closed waitingMember next rfl rfl rfl
+
+/-- Raw saturation is closed under one exact terminal scan. -/
+theorem saturatedRawItem_scan
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : DottedItem tokens) (cursor : TerminalCursor tokens)
+    (terminal : TerminalSymbol) (value : TerminalStreamValue)
+    (span : SourceSpan)
+    (beforeMember : SaturatedRawItem tokens before)
+    (next : NextSymbol before (.terminal terminal))
+    (atCurrent : cursor.beforeBoundary = before.current)
+    (terminalAt : TerminalAt file tokens cursor value span)
+    (matchedEvidence : TerminalMatches terminal value)
+    (advance : AdvanceItem before cursor.afterBoundary after) :
+    SaturatedRawItem tokens after := by
+  apply rawSaturation_scan_closed beforeMember
+  apply packedEdge_scanned_valid_iff.mpr
+  exact ⟨{
+    terminal := terminal
+    matched := {
+      cursor := cursor
+      value := value
+      span := span
+      «at» := terminalAt
+      «matches» := matchedEvidence
+    }
+    sameCursor := rfl
+    next := next
+    atCurrent := atCurrent
+    advance := advance
+  }⟩
+
+/-- Raw saturation is closed under one exact completion. -/
+theorem saturatedRawItem_complete
+    {tokens : List Token}
+    (waiting finished after : DottedItem tokens)
+    (waitingMember : SaturatedRawItem tokens waiting)
+    (finishedMember : SaturatedRawItem tokens finished)
+    (next : NextSymbol waiting
+      (.nonterminal finished.production.lhs))
+    (finishedComplete : CompleteItem finished)
+    (sameCursor : waiting.current = finished.origin)
+    (advance : AdvanceItem waiting finished.current after) :
+    SaturatedRawItem tokens after :=
+  rawSaturation_complete_closed waitingMember finishedMember next
+    finishedComplete sameCursor advance
+
+/-- Leastness interface for raw saturation.  The decidability argument is
+operational only and does not become a semantic dependency. -/
+theorem saturatedRawItem_induction
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (property : DottedItem tokens → Prop)
+    (propertyDecision : ∀ item, Decidable (property item))
+    (seed : ∀ production cursor,
+      property ({
+        production := production
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := cursor
+        current := cursor
+      } : DottedItem tokens))
+    (predict : ∀ waiting predicted,
+      property waiting →
+      NextSymbol waiting (.nonterminal predicted.lhs) →
+      property ({
+        production := predicted
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := waiting.current
+        current := waiting.current
+      } : DottedItem tokens))
+    (scan : ∀ before after cursor terminal value span,
+      property before →
+      NextSymbol before (.terminal terminal) →
+      cursor.beforeBoundary = before.current →
+      TerminalAt file tokens cursor value span →
+      TerminalMatches terminal value →
+      AdvanceItem before cursor.afterBoundary after →
+      property after)
+    (complete : ∀ waiting finished after,
+      property waiting → property finished →
+      NextSymbol waiting (.nonterminal finished.production.lhs) →
+      CompleteItem finished →
+      waiting.current = finished.origin →
+      AdvanceItem waiting finished.current after →
+      property after)
+    {item : DottedItem tokens}
+    (member : SaturatedRawItem tokens item) : property item := by
+  let acceptedItems := (allDottedItems tokens).filter fun candidate =>
+    @decide (property candidate) (propertyDecision candidate)
+  have accepted_iff (candidate : DottedItem tokens) :
+      candidate ∈ acceptedItems ↔ property candidate := by
+    simp [acceptedItems, allDottedItems_complete,
+      @decide_eq_true_iff (property candidate) (propertyDecision candidate)]
+  have closed : ExecutableRawClosed owned acceptedItems := by
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · intro candidate candidateSeed
+      apply (accepted_iff candidate).mpr
+      rw [rawSeedItems, List.mem_filter] at candidateSeed
+      have selected := candidateSeed.2
+      simp only [rawSeedBool, Bool.and_eq_true, beq_iff_eq] at selected
+      let canonical : DottedItem tokens := {
+        production := candidate.production
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := candidate.current
+        current := candidate.current
+      }
+      have canonicalEq : canonical = candidate :=
+        dottedItem_eq_of_fields rfl selected.1.symm selected.2.symm rfl
+      have canonicalProperty : property canonical := by
+        simpa only [canonical] using
+          seed candidate.production candidate.current
+      exact canonicalEq ▸ canonicalProperty
+    · intro waiting waitingMember production result computed
+      apply (accepted_iff result).mpr
+      have waitingAccepted := (accepted_iff waiting).mp waitingMember
+      unfold predictedItem? at computed
+      split at computed
+      next symbol nextEq =>
+        split at computed
+        next sameLhs =>
+          cases computed
+          apply predict waiting production waitingAccepted
+          rcases List.getElem?_eq_some_iff.mp nextEq with ⟨bound, _⟩
+          exact ⟨bound, by simpa [sameLhs] using nextEq⟩
+        next => contradiction
+      next => contradiction
+    · intro before beforeMember after edge computed
+      apply (accepted_iff after).mpr
+      have beforeAccepted := (accepted_iff before).mp beforeMember
+      obtain ⟨cursor, shape⟩ :=
+        scannedEdge?_shape owned before after edge computed
+      have valid : PackedEdgeKey.Valid file tokens
+          (.scanned before after cursor) := by
+        rw [← shape]
+        exact edge.property
+      rcases valid with ⟨terminal, value, span, next, atCurrent,
+        terminalAt, matchedEvidence, advance⟩
+      exact scan before after cursor terminal value span beforeAccepted next
+        atCurrent terminalAt matchedEvidence advance
+    · intro waiting waitingMember finished finishedMember after edge computed
+      apply (accepted_iff after).mpr
+      have waitingAccepted := (accepted_iff waiting).mp waitingMember
+      have finishedAccepted := (accepted_iff finished).mp finishedMember
+      obtain ⟨shared, shape⟩ :=
+        completedEdge?_shape waiting finished after edge computed
+      have valid : PackedEdgeKey.Valid file tokens
+          (.completed waiting finished after shared) := by
+        rw [← shape]
+        exact edge.property
+      rcases valid with ⟨symbol, next, finishedComplete, lhs,
+        waitingAtShared, finishedAtShared, advance⟩
+      have exactNext : NextSymbol waiting
+          (.nonterminal finished.production.lhs) := by
+        simpa [lhs] using next
+      exact complete waiting finished after waitingAccepted finishedAccepted
+        exactNext finishedComplete
+        (waitingAtShared.trans finishedAtShared.symm) advance
+  apply (accepted_iff item).mp
+  apply rawSaturation_subset_of_closed
+    (closed.rawClosureBool owned acceptedItems) item
+  exact member
+
+end Chart
+
 end Solcore.Surface.Multi
