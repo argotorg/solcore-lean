@@ -3171,3 +3171,61 @@ theorem saturatedGuardMemo_eq_semantic
   rw [saturatedGuardPositiveObservationBool_eq_semantic owned key]
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+
+/-- Every successful observed guard worklist returns the unified semantic
+guard memo, without an additional correctness premise. -/
+theorem executeObservedGuardWorklist?_memo_eq_semantic
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.GuardWorklistResult tokens)
+    (selected : Chart.executeObservedGuardWorklist? file tokens owned =
+      some result) :
+    result.memo = semanticGuardMemo owned :=
+  (Chart.executeObservedGuardWorklist?_memo_eq_saturated
+    file tokens owned result selected).trans
+      (saturatedGuardMemo_eq_semantic owned)
+
+/-- Every successful observed Phase-A/Phase-B worklist is declaratively
+correct, unconditionally. -/
+theorem executeObservedGuardWorklist?_phaseBCorrect
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.GuardWorklistResult tokens)
+    (selected : Chart.executeObservedGuardWorklist? file tokens owned =
+      some result) :
+    PhaseBCorrect file tokens result.memo := by
+  rw [executeObservedGuardWorklist?_memo_eq_semantic
+    file tokens owned result selected]
+  exact semanticGuardMemo_correct owned
+
+/-- Phase C preserves the same unified semantic guard memo exposed by its
+successful observed Phase-A/Phase-B prefix. -/
+theorem executeObservedContextualWorklist?_memo_eq_semantic
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    result.memo = semanticGuardMemo owned :=
+  (Chart.executeObservedContextualWorklist?_memo_eq_saturated
+    file tokens owned result selected).trans
+      (saturatedGuardMemo_eq_semantic owned)
+
+/-- Every successful observed contextual worklist carries an unconditionally
+correct Phase-B memo. -/
+theorem executeObservedContextualWorklist?_phaseBCorrect
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    PhaseBCorrect file tokens result.memo := by
+  rw [executeObservedContextualWorklist?_memo_eq_semantic
+    file tokens owned result selected]
+  exact semanticGuardMemo_correct owned
+
+end Solcore.Surface.Multi
