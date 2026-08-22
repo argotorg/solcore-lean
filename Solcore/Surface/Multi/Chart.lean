@@ -15924,4 +15924,290 @@ theorem rawPatternDelimiterObservation_eq_observed
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def phaseCInitialAddress {tokens : List Token} :
+    UnitAddress tokens → Prop
+  | .production _ => True
+  | .guardWitness _ _ => True
+  | .linear _ key =>
+      match key.source with
+      | .contextual _ => True
+      | .rawEvidence => False
+  | .prediction _ key =>
+      match key.source with
+      | .contextual _ => True
+      | .rawEvidence => False
+  | .cubic _ key =>
+      match key.source with
+      | .contextual _ => True
+      | .rawEvidence => False
+  | _ => False
+
+private def PhaseCInitialFresh {tokens : List Token}
+    (counter : Counter tokens) : Prop :=
+  ∀ address, phaseCInitialAddress address →
+    address ∉ counter.usedRev
+
+private theorem PhaseAReservedFresh.phaseCInitialFresh
+    {tokens : List Token} {counter : Counter tokens}
+    (invariant : PhaseAReservedFresh counter) :
+    PhaseCInitialFresh counter := by
+  intro address reserved
+  apply invariant address
+  cases address with
+  | production => simp [phaseAReservedAddress]
+  | cubic kind key =>
+      cases kind <;>
+        simp_all [phaseAReservedAddress, phaseCInitialAddress]
+  | phase => simp_all [phaseCInitialAddress]
+  | guardFinalize => simp_all [phaseCInitialAddress]
+  | guardWitness =>
+      simp_all [phaseAReservedAddress, phaseCInitialAddress]
+  | linear =>
+      simp_all [phaseAReservedAddress, phaseCInitialAddress]
+  | prediction =>
+      simp_all [phaseAReservedAddress, phaseCInitialAddress]
+
+private theorem runMappedPrimitive?_phaseCInitialFresh
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (invariant : PhaseCInitialFresh current.counter)
+    (available : ¬ phaseCInitialAddress address)
+    (result : CountedState tokens after)
+    (selected : runMappedPrimitive? current address transition =
+      some result) :
+    PhaseCInitialFresh result.counter := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  next fresh =>
+    cases selected
+    intro candidate reserved member
+    simp only [Counter.charge, List.mem_cons] at member
+    rcases member with equal | old
+    · exact available (equal ▸ reserved)
+    · exact invariant candidate reserved old
+  next collision => contradiction
+
+private theorem chargeAddresses?_phaseCInitialFresh
+    {tokens : List Token} {state : Type} :
+    ∀ addresses (current result : CountedState tokens state),
+      (∀ address, address ∈ addresses →
+        ¬ phaseCInitialAddress address) →
+      PhaseCInitialFresh current.counter →
+      chargeAddresses? current addresses = some result →
+      PhaseCInitialFresh result.counter := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current result _available invariant selected
+      cases selected
+      exact invariant
+  | cons address rest induction =>
+      intro current result available invariant selected
+      rw [chargeAddresses?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, continued⟩
+      exact induction next result
+        (fun candidate member => available candidate (by simp [member]))
+        (runMappedPrimitive?_phaseCInitialFresh current address id invariant
+          (available address (by simp)) next nextEq) continued
+
+private theorem materializePhaseAIndexes?_phaseCInitialFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens) :
+    ∀ addresses
+      (current result : CountedState tokens (PhaseAIndexed file tokens)),
+      PhaseCInitialFresh current.counter →
+      materializePhaseAIndexes? evaluate addresses current = some result →
+      PhaseCInitialFresh result.counter := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current result invariant selected
+      cases selected
+      exact invariant
+  | cons address rest induction =>
+      intro current result invariant selected
+      rw [materializePhaseAIndexes?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, continued⟩
+      exact induction next result
+        (runMappedPrimitive?_phaseCInitialFresh current
+          (UnitAddress.evidenceIndex address) _ invariant
+          (by simp [phaseCInitialAddress, UnitAddress.evidenceIndex,
+            evidenceIndexUnitAddress, evidenceIndexKey]) next nextEq)
+        continued
+
+private theorem indexSaturatedPhaseACanonicalWith?_phaseCInitialFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : CountedState tokens (PhaseAIndexed file tokens))
+    (invariant : PhaseCInitialFresh current.counter)
+    (selected : indexSaturatedPhaseACanonicalWith? evaluate current =
+      some result) :
+    PhaseCInitialFresh result.counter := by
+  unfold indexSaturatedPhaseACanonicalWith? at selected
+  split at selected
+  next sameMembers =>
+    unfold indexSaturatedPhaseAWith? at selected
+    split at selected
+    next itemsDone =>
+      split at selected
+      next edgesDone =>
+        split at selected
+        next saturated =>
+          exact materializePhaseAIndexes?_phaseCInitialFresh evaluate _
+            (beginPhaseAIndexing
+              (normalizePhaseARawItems current sameMembers)) result
+            (by simpa [beginPhaseAIndexing, normalizePhaseARawItems] using
+              invariant) selected
+        next notSaturated => contradiction
+      next edgesRemain => contradiction
+    next itemsRemain => contradiction
+  next different => contradiction
+
+private theorem enterIndexedPhaseB?_phaseCInitialFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (result : CountedState tokens (PhaseBIndexed file tokens))
+    (invariant : PhaseCInitialFresh current.counter)
+    (selected : enterIndexedPhaseB? current = some result) :
+    PhaseCInitialFresh result.counter := by
+  unfold enterIndexedPhaseB? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseB? at enteredEq
+  split at enteredEq
+  next itemsDone =>
+    split at enteredEq
+    next edgesDone =>
+      split at enteredEq
+      next saturated =>
+        exact runMappedPrimitive?_phaseCInitialFresh {
+          payload := current.payload.phaseA
+          counter := current.counter
+        } (.phase .sealAEnterB) _ invariant
+          (by simp [phaseCInitialAddress]) entered enteredEq
+      next notSaturated => contradiction
+    next edgesRemain => contradiction
+  next itemsRemain => contradiction
+
+private theorem finalizeNextIndexedGuard?_phaseCInitialFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseBIndexed file tokens))
+    (invariant : PhaseCInitialFresh current.counter)
+    (selected : finalizeNextIndexedGuard? current = some result) :
+    PhaseCInitialFresh result.counter := by
+  unfold finalizeNextIndexedGuard? at selected
+  cases remaining : current.payload.phaseB.remaining with
+  | nil => simp [remaining] at selected
+  | cons key rest =>
+      simp only [remaining, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨initialized, initializedEq,
+        lookedUp, lookedUpEq, decision, _decisionEq, finalEq⟩
+      have initializedFresh := runMappedPrimitive?_phaseCInitialFresh
+        current (.guardFinalize .initializeUndecided key) _ invariant
+          (by simp [phaseCInitialAddress]) initialized initializedEq
+      have lookedUpFresh := chargeAddresses?_phaseCInitialFresh
+        (preFinalGuardSlots.map fun slot =>
+          UnitAddress.guardFinalize slot key) initialized lookedUp
+        (by simp [phaseCInitialAddress]) initializedFresh lookedUpEq
+      exact runMappedPrimitive?_phaseCInitialFresh lookedUp
+        (.guardFinalize .writeFinalDecision key) _ lookedUpFresh
+          (by simp [phaseCInitialAddress]) result finalEq
+
+private theorem runIndexedPhaseB?_phaseCInitialFresh
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseBIndexed file tokens)),
+      PhaseCInitialFresh current.counter →
+      runIndexedPhaseB? fuel current = some result →
+      PhaseCInitialFresh result.counter := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result invariant selected
+      rw [runIndexedPhaseB?] at selected
+      split at selected
+      · cases selected
+        exact invariant
+      · contradiction
+  | succ fuel induction =>
+      intro current result invariant selected
+      rw [runIndexedPhaseB?] at selected
+      cases remaining : current.payload.phaseB.remaining with
+      | nil =>
+          simp only [remaining] at selected
+          cases selected
+          exact invariant
+      | cons key rest =>
+          simp only [remaining] at selected
+          cases finalized : finalizeNextIndexedGuard? current with
+          | none => simp [finalized] at selected
+          | some next =>
+              rw [finalized] at selected
+              exact induction next result
+                (finalizeNextIndexedGuard?_phaseCInitialFresh current next
+                  invariant finalized) selected
+
+private theorem sealIndexedPhaseB?_phaseCInitialFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (invariant : PhaseCInitialFresh current.counter)
+    (selected : sealIndexedPhaseB? current = some result) :
+    PhaseCInitialFresh result.counter := by
+  unfold sealIndexedPhaseB? sealPhaseB? at selected
+  cases remaining : current.payload.phaseB.remaining with
+  | cons key rest => simp [remaining] at selected
+  | nil =>
+      simp only [remaining] at selected
+      exact runMappedPrimitive?_phaseCInitialFresh {
+        payload := current.payload.phaseB
+        counter := current.counter
+      } (.phase .sealBEnterC) _ invariant
+        (by simp [phaseCInitialAddress]) result selected
+
+private theorem executeIndexedPhaseB?_phaseCInitialFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (invariant : PhaseCInitialFresh current.counter)
+    (selected : executeIndexedPhaseB? current = some result) :
+    PhaseCInitialFresh result.counter := by
+  unfold executeIndexedPhaseB? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq,
+    finalized, finalizedEq, sealedEq⟩
+  exact sealIndexedPhaseB?_phaseCInitialFresh finalized result
+    (runIndexedPhaseB?_phaseCInitialFresh _ entered finalized
+      (enterIndexedPhaseB?_phaseCInitialFresh current entered invariant
+        enteredEq) finalizedEq) sealedEq
+
+private theorem executeObservedPhaseAB?_phaseCInitialFresh
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (selected : executeObservedPhaseAB? file tokens owned = some result) :
+    PhaseCInitialFresh result.counter := by
+  unfold executeObservedPhaseAB? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseA, phaseAEq,
+    indexed, indexedEq, phaseBEq⟩
+  exact executeIndexedPhaseB?_phaseCInitialFresh indexed result
+    (indexSaturatedPhaseACanonicalWith?_phaseCInitialFresh
+      (phaseAObservationIndexEvaluator owned) phaseA indexed
+      (executePhaseA?_reservedFresh file tokens owned phaseA phaseAEq
+        |>.phaseCInitialFresh) indexedEq) phaseBEq
+
+end Chart
+
 end Solcore.Surface.Multi
