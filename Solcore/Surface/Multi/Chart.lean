@@ -11248,4 +11248,167 @@ private theorem dequeueContextualEdge?_operationalInvariant
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem contextualPredictedItem?_operational
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (waiting item : ContextualItemKey tokens)
+    (predicted : ProductionId)
+    (productionInstance : ProductionInstanceKey tokens)
+    (waitingReached : OperationalContextualReach file tokens
+      memo waiting)
+    (enabled : MemoEnablesProduction memo productionInstance)
+    (selected : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance)) :
+    OperationalContextualReach file tokens memo item := by
+  unfold contextualPredictedItem? at selected
+  split at selected
+  next symbol nextEq =>
+    split at selected
+    next sameLhs =>
+      cases selected
+      apply OperationalContextualReach.predict waiting predicted
+        waitingReached
+      · rcases List.getElem?_eq_some_iff.mp nextEq with
+          ⟨bound, lookup⟩
+        exact ⟨bound, by simpa [sameLhs] using nextEq⟩
+      · exact enabled
+    next different => contradiction
+  next => contradiction
+
+private theorem insertContextualItem?_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (selected : insertContextualItem? current source item = some result) :
+    result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold insertContextualItem? at selected
+  split at selected
+  · cases selected
+    rfl
+  · rw [runMappedPrimitive?_payload current _ _ selected]
+
+private theorem attemptContextualPrediction?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (waitingReached : OperationalContextualReach file tokens
+      current.payload.phaseC.memo waiting)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCOperationalInvariant file tokens result.payload ∧
+      result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact ⟨invariant, rfl⟩
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedPayload := runMappedPrimitive?_payload current _ id
+            attemptedEq
+          change attempted.payload = current.payload at attemptedPayload
+          have attemptedInvariant :
+              PhaseCOperationalInvariant file tokens attempted.payload := by
+            rw [attemptedPayload]
+            exact invariant
+          have waitingAttempted : OperationalContextualReach file tokens
+              attempted.payload.phaseC.memo waiting := by
+            rw [attemptedPayload]
+            exact waitingReached
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            refine ⟨attemptedInvariant, ?_⟩
+            rw [attemptedPayload]
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedInvariant :=
+                  activateWorklistProduction?_operationalInvariant attempted
+                    productionInstance activated attemptedInvariant activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  cases selected
+                  refine ⟨activatedInvariant, ?_⟩
+                  have carrier := activateWorklistProduction?_reachCarrier
+                    attempted productionInstance activated activatedEq
+                  have memoEq := congrArg PhaseCReachCarrier.memo carrier
+                  change activated.1.payload.phaseC.memo =
+                    attempted.payload.phaseC.memo at memoEq
+                  exact memoEq.trans (by rw [attemptedPayload])
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  have enabled :=
+                    activateWorklistProduction?_accepted_sound attempted
+                      productionInstance activated activatedEq acceptedEq
+                  have itemReached := contextualPredictedItem?_operational
+                    waiting item predicted productionInstance waitingAttempted
+                      enabled predictedEq
+                  have carrier := activateWorklistProduction?_reachCarrier
+                    attempted productionInstance activated activatedEq
+                  have memoEq := congrArg PhaseCReachCarrier.memo carrier
+                  change activated.1.payload.phaseC.memo =
+                    attempted.payload.phaseC.memo at memoEq
+                  have itemReachedActivated :
+                      OperationalContextualReach file tokens
+                        activated.1.payload.phaseC.memo item := by
+                    rw [memoEq]
+                    exact itemReached
+                  refine ⟨insertContextualItem?_operationalInvariant
+                    activated.1 result .prediction item activatedInvariant
+                    itemReachedActivated selected, ?_⟩
+                  have insertedMemo := insertContextualItem?_memo
+                    activated.1 result .prediction item selected
+                  exact insertedMemo.trans (memoEq.trans (by
+                    rw [attemptedPayload]))
+
+private theorem attemptContextualPredictions?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ (productions : List ProductionId)
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCOperationalInvariant file tokens current.payload →
+      OperationalContextualReach file tokens
+        current.payload.phaseC.memo waiting →
+      attemptContextualPredictions? waiting productions current = some result →
+      PhaseCOperationalInvariant file tokens result.payload ∧
+        result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result invariant _ selected
+      cases selected
+      exact ⟨invariant, rfl⟩
+  | cons predicted rest induction =>
+      intro current result invariant waitingReached selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      have nextSound :=
+        attemptContextualPrediction?_operationalInvariant current next
+          waiting predicted invariant waitingReached nextEq
+      have restSound := induction next result nextSound.1
+        (by rw [nextSound.2]; exact waitingReached) restEq
+      exact ⟨restSound.1, restSound.2.trans nextSound.2⟩
+
+end Chart
+
+
 end Solcore.Surface.Multi
