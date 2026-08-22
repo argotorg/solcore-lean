@@ -17525,6 +17525,234 @@ private theorem activateWorklistProduction?_total_fresh
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem PhaseCContentGrowth.itemsAndEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : CountedState tokens (PhaseCWorklist file tokens)}
+    (growth : PhaseCContentGrowth before after)
+    {item : ContextualItemKey tokens}
+    {key : ContextualPackedEdgeKey tokens}
+    (materialized : item ∈ before.payload.phaseC.contextualItems ∧
+      ∃ retained, retained ∈ before.payload.phaseC.contextualEdges ∧
+        retained.val = key) :
+    item ∈ after.payload.phaseC.contextualItems ∧
+      ∃ retained, retained ∈ after.payload.phaseC.contextualEdges ∧
+        retained.val = key := by
+  obtain ⟨itemMember, retained, edgeMember, same⟩ := materialized
+  exact ⟨growth.items itemMember, retained, growth.edges edgeMember, same⟩
+
+private theorem attemptContextualPrediction?_materialized_of_ledger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (item : ContextualItemKey tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (computed : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance))
+    (enabled : MemoEnablesProduction current.payload.phaseC.memo
+      productionInstance)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    item ∈ result.payload.phaseC.contextualItems := by
+  rcases attemptContextualPrediction?_materialization_boundary current result
+      waiting predicted item productionInstance computed enabled selected with
+    old | materialized
+  · have growth := attemptContextualPrediction?_contentGrowth current result
+      waiting predicted selected
+    rw [contextualPredictedItem?_item_eq_instance waiting predicted item
+      productionInstance computed]
+    exact growth.items (ledger.prediction productionInstance enabled old)
+  · exact materialized
+
+private theorem attemptContextualPredictions?_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAttemptLedgerMaterialized current →
+      attemptContextualPredictions? waiting productions current =
+        some result →
+      ∀ predicted, predicted ∈ productions →
+      ∀ item productionInstance,
+        contextualPredictedItem? waiting predicted =
+          some (item, productionInstance) →
+        MemoEnablesProduction current.payload.phaseC.memo
+          productionInstance →
+        item ∈ result.payload.phaseC.contextualItems := by
+  intro productions
+  induction productions with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result ledger selected predicted member item
+        productionInstance computed enabled
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, continued⟩
+      rw [List.mem_cons] at member
+      rcases member with same | member
+      · subst predicted
+        exact (attemptContextualPredictions?_contentGrowth waiting rest next
+          result continued).items
+          (attemptContextualPrediction?_materialized_of_ledger current next
+            waiting head item productionInstance ledger computed enabled
+              nextEq)
+      · have firstGrowth := attemptContextualPrediction?_contentGrowth current
+          next waiting head nextEq
+        exact induction next result
+          (attemptContextualPrediction?_attemptLedger current next waiting
+            head ledger nextEq) continued predicted member item
+              productionInstance computed (by
+                rw [firstGrowth.memo]
+                exact enabled)
+
+private theorem contextualScannedEdge?_applicable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (selected : contextualScannedEdge? owned before = some (after, edge)) :
+    contextualScanApplicable before = true := by
+  unfold contextualScannedEdge? at selected
+  unfold contextualScanApplicable
+  split at selected <;> try contradiction
+  next nextInRange =>
+    split at selected <;> try contradiction
+    next terminal nextEq =>
+      split at selected <;> try contradiction
+      next currentInRange =>
+        simp [List.getElem?_eq_getElem nextInRange, nextEq,
+          currentInRange]
+
+private theorem attemptContextualScan?_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (computed : contextualScannedEdge? owned before = some (after, edge))
+    (selected : attemptContextualScan? owned current before = some result) :
+    after ∈ result.payload.phaseC.contextualItems ∧
+      ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+        retained.val = .scanned edge.before edge.after edge.cursor := by
+  unfold attemptContextualScan? at selected
+  rw [if_pos (contextualScannedEdge?_applicable owned before after edge
+    computed)] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, remainder⟩
+  rw [computed] at remainder
+  simp only [Option.bind_eq_some_iff] at remainder
+  rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+  have itemCoverage := insertContextualItem?_coverage attempted withItem
+    .scan after itemEq
+  have edgeCoverage := insertContextualScannedEdge?_coverage withItem result
+    edge edgeEq
+  exact ⟨edgeCoverage.1.items itemCoverage.2, edgeCoverage.2⟩
+
+private theorem attemptContextualCompletion?_materialized_of_ledger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (computed : contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge))
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    after ∈ result.payload.phaseC.contextualItems ∧
+      ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+        retained.val = .completed edge.waiting edge.finished edge.after
+          edge.shared := by
+  rcases attemptContextualCompletion?_materialization_boundary current result
+      waiting finished after edge computed selected with old | materialized
+  · have growth := attemptContextualCompletion?_contentGrowth current result
+      waiting finished selected
+    obtain ⟨itemMember, retained, edgeMember, same⟩ :=
+      ledger.completion waiting finished after edge computed old
+    exact ⟨growth.items itemMember, retained, growth.edges edgeMember, same⟩
+  · exact materialized
+
+private theorem attemptContextualCompletionsWith?_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ others
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAttemptLedgerMaterialized current →
+      attemptContextualCompletionsWith? pivot others current = some result →
+      ∀ other, other ∈ others →
+      (∀ after edge,
+        contextualCompletedEdge? (file := file) pivot other =
+          some (after, edge) →
+        after ∈ result.payload.phaseC.contextualItems ∧
+          ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+            retained.val = .completed edge.waiting edge.finished edge.after
+              edge.shared) ∧
+      (∀ after edge,
+        contextualCompletedEdge? (file := file) other pivot =
+          some (after, edge) →
+        after ∈ result.payload.phaseC.contextualItems ∧
+          ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+            retained.val = .completed edge.waiting edge.finished edge.after
+              edge.shared) := by
+  intro others
+  induction others with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result ledger selected other member
+      rw [attemptContextualCompletionsWith?] at selected
+      cases forwardEq : attemptContextualCompletion? current pivot head with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          simp only [Option.bind_eq_bind, Option.bind_some] at selected
+          have forwardLedger := attemptContextualCompletion?_attemptLedger
+            current forward pivot head ledger forwardEq
+          by_cases same : head = pivot
+          · rw [if_pos same] at selected
+            subst head
+            rw [List.mem_cons] at member
+            rcases member with equal | member
+            · subst other
+              constructor <;> intro after edge computed
+              · exact (attemptContextualCompletionsWith?_contentGrowth pivot
+                  rest forward result selected).itemsAndEdges
+                  (attemptContextualCompletion?_materialized_of_ledger current
+                    forward pivot pivot after edge ledger computed forwardEq)
+              · exact (attemptContextualCompletionsWith?_contentGrowth pivot
+                  rest forward result selected).itemsAndEdges
+                  (attemptContextualCompletion?_materialized_of_ledger current
+                    forward pivot pivot after edge ledger computed forwardEq)
+            · exact induction forward result forwardLedger selected other member
+          · rw [if_neg same] at selected
+            simp only [Option.bind_eq_some_iff] at selected
+            rcases selected with ⟨reverse, reverseEq, continued⟩
+            rw [List.mem_cons] at member
+            rcases member with equal | member
+            · subst other
+              constructor
+              · intro after edge computed
+                exact (attemptContextualCompletionsWith?_contentGrowth pivot
+                  rest reverse result continued).itemsAndEdges
+                  ((attemptContextualCompletion?_contentGrowth forward reverse
+                    head pivot reverseEq).itemsAndEdges
+                    (attemptContextualCompletion?_materialized_of_ledger current
+                      forward pivot head after edge ledger computed forwardEq))
+              · intro after edge computed
+                exact (attemptContextualCompletionsWith?_contentGrowth pivot
+                  rest reverse result continued).itemsAndEdges
+                  (attemptContextualCompletion?_materialized_of_ledger forward
+                    reverse head pivot after edge forwardLedger computed
+                      reverseEq)
+            · exact induction reverse result
+                (attemptContextualCompletion?_attemptLedger forward reverse
+                  head pivot forwardLedger reverseEq) continued other member
+
+end Chart
+
 end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi.Chart
