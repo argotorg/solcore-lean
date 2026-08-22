@@ -3469,6 +3469,125 @@ private theorem executePhaseA?_failure_boundary
           budget failed
       exact Or.inr ⟨seeded, blocked, rfl, reachable, operationBlocked⟩
 
+private theorem insertRawItem?_coverage
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (selected : insertRawItem? current source item = some result) :
+    current.payload.rawItems ⊆ result.payload.rawItems ∧
+      current.payload.itemQueue ⊆ result.payload.itemQueue ∧
+      item ∈ result.payload.rawItems := by
+  unfold insertRawItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨fun _ => id, fun _ => id,
+      (rawMemberBool_true_iff current.payload.rawItems item).mp present⟩
+  next absent =>
+    have payload := phaseA_runMappedPrimitive?_payload current
+      (.linear source.unitKind (rawLinearKey item)) _ result selected
+    rw [payload]
+    exact ⟨fun candidate member => by simp [member],
+      fun candidate member => by simp [member], by simp⟩
+
+private theorem insertRawEdge?_itemPayload
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (selected : insertRawEdge? current edge = some result) :
+    result.payload.rawItems = current.payload.rawItems ∧
+      result.payload.itemQueue = current.payload.itemQueue := by
+  unfold insertRawEdge? at selected
+  split at selected
+  · cases selected
+    exact ⟨rfl, rfl⟩
+  · split at selected <;>
+      have payload := phaseA_runMappedPrimitive?_payload current _ _ result selected
+    all_goals simp [payload]
+private theorem insertRawEdge?_coverage
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (selected : insertRawEdge? current edge = some result) :
+    current.payload.rawEdges ⊆ result.payload.rawEdges ∧
+      ∃ candidate, candidate ∈ result.payload.rawEdges ∧
+        candidate.val = edge.val := by
+  unfold insertRawEdge? at selected
+  split at selected
+  next present =>
+    cases selected
+    rw [List.any_eq_true] at present
+    rcases present with ⟨candidate, member, same⟩
+    exact ⟨fun _ => id, candidate, member, by simpa using same⟩
+  next absent =>
+    split at selected <;>
+      have payload := phaseA_runMappedPrimitive?_payload current _ _ result selected
+    all_goals
+      rw [payload]
+      exact ⟨fun candidate member => by simp [member], edge, by simp⟩
+
+private def CompletionAttemptLedgerMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  ∀ waiting finished after (edge : PackedEdge file tokens),
+    completedEdge? waiting finished = some (after, edge) →
+    (.cubic .U03_completionAttempt
+      (rawCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    after ∈ current.payload.rawItems ∧
+      ∃ candidate, candidate ∈ current.payload.rawEdges ∧
+        candidate.val = edge.val
+
+private theorem attemptCompletion?_materialization_boundary
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (computed : completedEdge? waiting finished = some (after, edge))
+    (selected : attemptCompletion? current waiting finished = some result) :
+    ((.cubic .U03_completionAttempt
+        (rawCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev ∧ result = current) ∨
+      (after ∈ result.payload.rawItems ∧
+        ∃ candidate, candidate ∈ result.payload.rawEdges ∧
+          candidate.val = edge.val) := by
+  unfold attemptCompletion? at selected
+  rw [computed] at selected
+  simp only at selected
+  split at selected
+  next used =>
+    cases selected
+    exact Or.inl ⟨used, rfl⟩
+  next fresh =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq,
+      withItem, itemEq, edgeEq⟩
+    have itemCoverage := insertRawItem?_coverage attempted withItem
+      .completion after itemEq
+    have edgePayload := insertRawEdge?_itemPayload withItem result edge edgeEq
+    have edgeCoverage := insertRawEdge?_coverage withItem result edge edgeEq
+    exact Or.inr ⟨by
+      rw [edgePayload.1]
+      exact itemCoverage.2.2, edgeCoverage.2⟩
+
+private theorem attemptCompletion?_materialized_of_ledger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (computed : completedEdge? waiting finished = some (after, edge))
+    (selected : attemptCompletion? current waiting finished = some result) :
+    after ∈ result.payload.rawItems ∧
+      ∃ candidate, candidate ∈ result.payload.rawEdges ∧
+        candidate.val = edge.val := by
+  rcases attemptCompletion?_materialization_boundary current result
+    waiting finished after edge computed selected with skipped | materialized
+  · rw [skipped.2]
+    exact ledger waiting finished after edge computed skipped.1
+  · exact materialized
+
+
 end Chart
 
 namespace Chart
