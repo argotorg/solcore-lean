@@ -13492,4 +13492,141 @@ private theorem stdContentUtf8Group17_valid : stdContentUtf8Group17.IsValidUTF8 
 
 end CanonicalUtf8Groups08
 
+section CanonicalUtf8Assembly
+
+set_option maxRecDepth 100000
+set_option maxHeartbeats 0
+
+private theorem abiGenericLogicalPathUtf8_valid :
+    abiGenericLogicalPathUtf8.IsValidUTF8 := by
+  decide
+
+private theorem abiGenericContentUtf8_valid :
+    abiGenericContentUtf8.IsValidUTF8 := by
+  simpa [abiGenericContentUtf8, joinByteChunks] using
+    abiGenericContentUtf8Group00_valid.append abiGenericContentUtf8Group01_valid
+
+private theorem genericLogicalPathUtf8_valid :
+    genericLogicalPathUtf8.IsValidUTF8 := by
+  decide
+
+private theorem genericContentUtf8_valid :
+    genericContentUtf8.IsValidUTF8 := by
+  simpa [genericContentUtf8, joinByteChunks] using genericContentUtf8Group00_valid
+
+private theorem storageGenericLogicalPathUtf8_valid :
+    storageGenericLogicalPathUtf8.IsValidUTF8 := by
+  decide
+
+private theorem storageGenericContentUtf8_valid :
+    storageGenericContentUtf8.IsValidUTF8 := by
+  simpa [storageGenericContentUtf8, joinByteChunks, ByteArray.append_assoc] using
+    (storageGenericContentUtf8Group00_valid.append
+      storageGenericContentUtf8Group01_valid).append
+        storageGenericContentUtf8Group02_valid
+
+private theorem dispatchLogicalPathUtf8_valid :
+    dispatchLogicalPathUtf8.IsValidUTF8 := by
+  decide
+
+private theorem dispatchContentUtf8_valid :
+    dispatchContentUtf8.IsValidUTF8 := by
+  simpa [dispatchContentUtf8, joinByteChunks, ByteArray.append_assoc] using
+    (dispatchContentUtf8Group00_valid.append
+      dispatchContentUtf8Group01_valid).append dispatchContentUtf8Group02_valid
+
+private theorem opcodesLogicalPathUtf8_valid :
+    opcodesLogicalPathUtf8.IsValidUTF8 := by
+  decide
+
+private theorem opcodesContentUtf8_valid :
+    opcodesContentUtf8.IsValidUTF8 := by
+  simpa [opcodesContentUtf8, joinByteChunks, ByteArray.append_assoc] using
+    (opcodesContentUtf8Group00_valid.append
+      opcodesContentUtf8Group01_valid).append opcodesContentUtf8Group02_valid
+
+private theorem stdLogicalPathUtf8_valid : stdLogicalPathUtf8.IsValidUTF8 := by
+  decide
+
+private theorem stdContentUtf8_valid : stdContentUtf8.IsValidUTF8 := by
+  have valid01 := stdContentUtf8Group00_valid.append stdContentUtf8Group01_valid
+  have valid02 := valid01.append stdContentUtf8Group02_valid
+  have valid03 := valid02.append stdContentUtf8Group03_valid
+  have valid04 := valid03.append stdContentUtf8Group04_valid
+  have valid05 := valid04.append stdContentUtf8Group05_valid
+  have valid06 := valid05.append stdContentUtf8Group06_valid
+  have valid07 := valid06.append stdContentUtf8Group07_valid
+  have valid08 := valid07.append stdContentUtf8Group08_valid
+  have valid09 := valid08.append stdContentUtf8Group09_valid
+  have valid10 := valid09.append stdContentUtf8Group10_valid
+  have valid11 := valid10.append stdContentUtf8Group11_valid
+  have valid12 := valid11.append stdContentUtf8Group12_valid
+  have valid13 := valid12.append stdContentUtf8Group13_valid
+  have valid14 := valid13.append stdContentUtf8Group14_valid
+  have valid15 := valid14.append stdContentUtf8Group15_valid
+  have valid16 := valid15.append stdContentUtf8Group16_valid
+  have valid17 := valid16.append stdContentUtf8Group17_valid
+  simpa [stdContentUtf8, joinByteChunks, ByteArray.append_assoc] using valid17
+
+private theorem abiGenericRawFile_utf8Valid :
+    abiGenericRawFile.logicalPathUtf8.IsValidUTF8 ∧
+      abiGenericRawFile.contentUtf8.IsValidUTF8 := by
+  exact ⟨abiGenericLogicalPathUtf8_valid, abiGenericContentUtf8_valid⟩
+
+private theorem genericRawFile_utf8Valid :
+    genericRawFile.logicalPathUtf8.IsValidUTF8 ∧
+      genericRawFile.contentUtf8.IsValidUTF8 := by
+  exact ⟨genericLogicalPathUtf8_valid, genericContentUtf8_valid⟩
+
+private theorem storageGenericRawFile_utf8Valid :
+    storageGenericRawFile.logicalPathUtf8.IsValidUTF8 ∧
+      storageGenericRawFile.contentUtf8.IsValidUTF8 := by
+  exact ⟨storageGenericLogicalPathUtf8_valid, storageGenericContentUtf8_valid⟩
+
+private theorem dispatchRawFile_utf8Valid :
+    dispatchRawFile.logicalPathUtf8.IsValidUTF8 ∧
+      dispatchRawFile.contentUtf8.IsValidUTF8 := by
+  exact ⟨dispatchLogicalPathUtf8_valid, dispatchContentUtf8_valid⟩
+
+private theorem opcodesRawFile_utf8Valid :
+    opcodesRawFile.logicalPathUtf8.IsValidUTF8 ∧
+      opcodesRawFile.contentUtf8.IsValidUTF8 := by
+  exact ⟨opcodesLogicalPathUtf8_valid, opcodesContentUtf8_valid⟩
+
+private theorem stdRawFile_utf8Valid :
+    stdRawFile.logicalPathUtf8.IsValidUTF8 ∧ stdRawFile.contentUtf8.IsValidUTF8 := by
+  exact ⟨stdLogicalPathUtf8_valid, stdContentUtf8_valid⟩
+
+/-- Every canonical path and source body is strict UTF-8. -/
+theorem canonicalRawFiles_utf8Valid (index : Fin 6) :
+    (canonicalRawFiles.get index).logicalPathUtf8.IsValidUTF8 ∧
+      (canonicalRawFiles.get index).contentUtf8.IsValidUTF8 := by
+  refine Fin.cases ?_ (fun index => ?_) index
+  · change abiGenericRawFile.logicalPathUtf8.IsValidUTF8 ∧
+      abiGenericRawFile.contentUtf8.IsValidUTF8
+    exact abiGenericRawFile_utf8Valid
+  · refine Fin.cases ?_ (fun index => ?_) index
+    · change genericRawFile.logicalPathUtf8.IsValidUTF8 ∧
+        genericRawFile.contentUtf8.IsValidUTF8
+      exact genericRawFile_utf8Valid
+    · refine Fin.cases ?_ (fun index => ?_) index
+      · change storageGenericRawFile.logicalPathUtf8.IsValidUTF8 ∧
+          storageGenericRawFile.contentUtf8.IsValidUTF8
+        exact storageGenericRawFile_utf8Valid
+      · refine Fin.cases ?_ (fun index => ?_) index
+        · change dispatchRawFile.logicalPathUtf8.IsValidUTF8 ∧
+            dispatchRawFile.contentUtf8.IsValidUTF8
+          exact dispatchRawFile_utf8Valid
+        · refine Fin.cases ?_ (fun index => ?_) index
+          · change opcodesRawFile.logicalPathUtf8.IsValidUTF8 ∧
+              opcodesRawFile.contentUtf8.IsValidUTF8
+            exact opcodesRawFile_utf8Valid
+          · refine Fin.cases ?_ (fun index => ?_) index
+            · change stdRawFile.logicalPathUtf8.IsValidUTF8 ∧
+                stdRawFile.contentUtf8.IsValidUTF8
+              exact stdRawFile_utf8Valid
+            · exact Fin.elim0 index
+
+end CanonicalUtf8Assembly
+
 end Solcore.Standard
