@@ -11784,4 +11784,217 @@ private theorem processContextualItem?_operationalInvariant
 end Chart
 
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem runPhaseCQueues?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result :
+      CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCOperationalInvariant file tokens current.payload →
+      runPhaseCQueues? owned fuel current = some result →
+      PhaseCOperationalInvariant file tokens result.payload ∧
+        result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result invariant selected
+      rw [runPhaseCQueues?] at selected
+      split at selected
+      · cases selected
+        exact ⟨invariant, rfl⟩
+      · contradiction
+  | succ previous induction =>
+      intro current result invariant selected
+      rw [runPhaseCQueues?] at selected
+      cases itemsEq : current.payload.phaseC.itemQueue with
+      | nil =>
+          cases edgesEq : current.payload.phaseC.edgeQueue with
+          | nil =>
+              simp only [itemsEq, edgesEq] at selected
+              cases selected
+              exact ⟨invariant, rfl⟩
+          | cons edge rest =>
+              simp only [itemsEq, edgesEq] at selected
+              cases dequeuedEq : dequeueContextualEdge? current with
+              | none => simp [dequeuedEq] at selected
+              | some dequeued =>
+                  rw [dequeuedEq] at selected
+                  have dequeuedInvariant :=
+                    dequeueContextualEdge?_operationalInvariant current
+                      dequeued invariant dequeuedEq
+                  have restSound := induction dequeued.2 result
+                    dequeuedInvariant selected
+                  exact ⟨restSound.1, restSound.2.trans
+                    (dequeueContextualEdge?_memo current dequeued dequeuedEq)⟩
+      | cons item rest =>
+          simp only [itemsEq] at selected
+          cases dequeuedEq : dequeueContextualItem? current with
+          | none => simp [dequeuedEq] at selected
+          | some dequeued =>
+              rw [dequeuedEq] at selected
+              rcases dequeued with ⟨pivot, afterDequeue⟩
+              simp only at selected
+              cases processedEq :
+                  processContextualItem? owned pivot afterDequeue with
+              | none => simp [processedEq] at selected
+              | some processed =>
+                  rw [processedEq] at selected
+                  have dequeuedSound :=
+                    dequeueContextualItem?_operationalInvariant current
+                      (pivot, afterDequeue) invariant dequeuedEq
+                  have dequeuedMemo := dequeueContextualItem?_memo current
+                    (pivot, afterDequeue) dequeuedEq
+                  have pivotReached : OperationalContextualReach file tokens
+                      afterDequeue.payload.phaseC.memo pivot := by
+                    rw [dequeuedMemo]
+                    exact dequeuedSound.1
+                  have processedSound :=
+                    processContextualItem?_operationalInvariant owned pivot
+                      afterDequeue processed dequeuedSound.2 pivotReached
+                        processedEq
+                  have restSound := induction processed result
+                    processedSound.1 selected
+                  exact ⟨restSound.1, restSound.2.trans
+                    (processedSound.2.trans dequeuedMemo)⟩
+
+private theorem beginPhaseCWorklist?_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    result.payload.phaseC.memo = current.payload.memo := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  rw [runMappedPrimitive?_payload current _ _ enteredEq]
+
+private theorem executePhaseCWorklist?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executePhaseCWorklist? owned current = some result) :
+    PhaseCOperationalInvariant file tokens result.payload ∧
+      result.payload.phaseC.memo = current.payload.memo := by
+  unfold executePhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  have runSound := runPhaseCQueues?_operationalInvariant owned
+    (chartGBound (tokens.length + 1)) entered result
+      (beginPhaseCWorklist?_operationalInvariant current entered enteredEq)
+      runEq
+  exact ⟨runSound.1,
+    runSound.2.trans (beginPhaseCWorklist?_memo current entered enteredEq)⟩
+
+private theorem executeObservedPhaseABCWorklist?_operationalInvariant
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklist? file tokens owned =
+      some result) :
+    PhaseCOperationalInvariant file tokens result.payload := by
+  unfold executeObservedPhaseABCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, _phaseBEq, phaseCEq⟩
+  exact (executePhaseCWorklist?_operationalInvariant owned phaseB result
+    phaseCEq).1
+
+private theorem executeObservedPhaseABCWorklist?_allFinal
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklist? file tokens owned =
+      some result) :
+    AllGuardsFinal result.payload.phaseC.memo := by
+  unfold executeObservedPhaseABCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  have final := executeObservedPhaseAB?_allFinal file tokens owned phaseB
+    phaseBEq
+  have memoEq := (executePhaseCWorklist?_operationalInvariant owned phaseB
+    result phaseCEq).2
+  rw [memoEq]
+  exact final
+
+/-- Every item and checked edge exposed by a successful observed contextual
+worklist execution is operationally reachable under its returned memo. -/
+theorem executeObservedContextualWorklist?_operational_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    (∀ item, item ∈ result.items →
+      OperationalContextualReach file tokens result.memo item) ∧
+    (∀ edge, edge ∈ result.edges →
+      OperationalContextualEdgeReach file tokens result.memo edge.val) := by
+  unfold executeObservedContextualWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  have invariant :=
+    executeObservedPhaseABCWorklist?_operationalInvariant file tokens owned
+      internal internalEq
+  exact ⟨invariant.1, invariant.2.2.1⟩
+
+/-- A successful observed contextual worklist always exposes a fully sealed
+guard memo. -/
+theorem executeObservedContextualWorklist?_allGuardsFinal
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    AllGuardsFinal result.memo := by
+  unfold executeObservedContextualWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCWorklist?_allFinal file tokens owned internal
+    internalEq
+
+private theorem PhaseCBackpointerInvariant.retainedConsistent
+    {file : WorkspaceFile} {tokens : List Token}
+    {state : PhaseCWorklist file tokens}
+    (invariant : PhaseCBackpointerInvariant file tokens state) :
+    RetainedCompletionBackpointersConsistent
+      state.phaseC.contextualEdges := by
+  intro left leftMember right rightMember
+  unfold PhaseCBackpointerInvariant at invariant
+  have leftCovered := invariant left leftMember
+  have rightCovered := invariant right rightMember
+  cases leftKey : left.val <;> cases rightKey : right.val
+  all_goals simp only [leftKey, rightKey] at leftCovered rightCovered ⊢
+  intro afterEq
+  unfold CompletionBackpointerLedger.CoversCompleted at leftCovered rightCovered
+  rw [afterEq] at leftCovered
+  have coordinates := Option.some.inj (leftCovered.symm.trans rightCovered)
+  exact ⟨congrArg Prod.fst coordinates,
+    congrArg Prod.snd coordinates⟩
+
+/-- The executable ledger is single-valued on every completed edge retained
+by a successful observed contextual worklist. -/
+theorem executeObservedContextualWorklist?_retainedBackpointersConsistent
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    RetainedCompletionBackpointersConsistent result.edges := by
+  unfold executeObservedContextualWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact (executeObservedPhaseABCWorklist?_backpointerInvariant
+    file tokens owned internal internalEq).retainedConsistent
+
+end Chart
+
+
 end Solcore.Surface.Multi
