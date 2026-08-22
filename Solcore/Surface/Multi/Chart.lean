@@ -8722,4 +8722,53 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_G02
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- A proof-free nearest-statement-region oracle supplied by Phase A. -/
+abbrev StatementRegionObservation (tokens : List Token) :=
+  Boundary tokens → Boundary tokens → Bool
+
+/-- G08's complete positive observation, parameterized by the nearest-region
+and greatest-end oracles whose semantic adequacy belongs to Phase A. -/
+def terminalExpressionPositiveObservationBool
+    {tokens : List Token}
+    (region : StatementRegionObservation tokens)
+    (greatest : GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  (List.finRange (tokens.length + 2)).any fun regionEnd =>
+    region key.contextStart regionEnd &&
+      greatest (.rule .expression)
+        key.siteCursor regionEnd regionEnd
+
+/-- Canonical U01 reads implement G08's public parameterized observation. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_G08
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (key : GuardInstanceKey tokens)
+    (isTerminalExpression : key.guard = .G08_terminalExpression) :
+    phaseBGuardObservationFromIndexes?
+        (canonicalEvidenceEntries
+          (phaseAObservationIndexEvaluator owned) phaseA) key =
+      some (terminalExpressionPositiveObservationBool
+        (fun regionStart regionEnd =>
+          phaseANearestStatementRegionBool phaseA regionStart regionEnd)
+        (fun symbol start upperBound finish =>
+          rawGreatestEndBool phaseA symbol start upperBound finish) key,
+        false) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G08_terminalExpression at isTerminalExpression
+  subst guard
+  simp [phaseBGuardObservationFromIndexes?, phaseBG08Positive?,
+    phaseBReadDelimiterGuard?, phaseBReadGreatestRule?,
+    phaseBReadIndex?, phaseAEvidenceEntryAt?_canonical_exact,
+    phaseAObservationIndexEvaluator, phaseADelimiterOrRegionGuardBool,
+    phaseBAllReads?, phaseBAnyReads?_map_some,
+    terminalExpressionPositiveObservationBool]
+
+end Chart
+
 end Solcore.Surface.Multi
