@@ -10522,4 +10522,97 @@ theorem saturatedRawItem_induction
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Recognition computed over the canonical proof-free raw saturation. -/
+def saturatedRawRecognizesBool
+    (tokens : List Token) (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) : Bool :=
+  (rawSaturation tokens).any fun item =>
+    item.dot.val == item.production.rhs.length &&
+      item.production.lhs == symbol &&
+      item.origin == start && item.current == finish
+
+/-- The saturated recognition Boolean exposes exactly one complete raw item. -/
+theorem saturatedRawRecognizesBool_eq_true_iff
+    (tokens : List Token) (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) :
+    saturatedRawRecognizesBool tokens symbol start finish = true ↔
+      ∃ item : DottedItem tokens,
+        SaturatedRawItem tokens item ∧
+          CompleteItem item ∧
+          item.production.lhs = symbol ∧
+          item.origin = start ∧
+          item.current = finish := by
+  unfold saturatedRawRecognizesBool
+  rw [List.any_eq_true]
+  simp only [Bool.and_eq_true, beq_iff_eq]
+  constructor
+  · rintro ⟨item, member, ⟨⟨⟨complete, lhs⟩, origin⟩, current⟩⟩
+    exact ⟨item, member, complete, lhs, origin, current⟩
+  · rintro ⟨item, member, complete, lhs, origin, current⟩
+    exact ⟨item, member, ⟨⟨⟨complete, lhs⟩, origin⟩, current⟩⟩
+
+/-- Greatest-end observation computed over canonical raw saturation. -/
+def saturatedRawGreatestEndObservation
+    (tokens : List Token) : GreatestEndObservation tokens :=
+  fun symbol start upperBound finish =>
+    saturatedRawRecognizesBool tokens symbol start finish &&
+      decide (finish.val ≤ upperBound.val) &&
+      (List.finRange (tokens.length + 2)).all fun candidate =>
+        if candidate.val ≤ upperBound.val then
+          !saturatedRawRecognizesBool tokens symbol start candidate ||
+            decide (candidate.val ≤ finish.val)
+        else
+          true
+
+private theorem list_any_eq_of_mem_iff
+    {alpha : Type} (left right : List alpha) (select : alpha → Bool)
+    (sameMembers : ∀ value, value ∈ left ↔ value ∈ right) :
+    left.any select = right.any select := by
+  apply Bool.eq_iff_iff.mpr
+  simp only [List.any_eq_true]
+  constructor
+  · rintro ⟨value, member, selected⟩
+    exact ⟨value, (sameMembers value).mp member, selected⟩
+  · rintro ⟨value, member, selected⟩
+    exact ⟨value, (sameMembers value).mpr member, selected⟩
+
+private theorem rawRecognizesBool_eq_saturated
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (sameMembers : ∀ item,
+      item ∈ phaseA.rawItems ↔ SaturatedRawItem tokens item)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    rawRecognizesBool phaseA symbol start finish =
+      saturatedRawRecognizesBool tokens symbol start finish := by
+  unfold rawRecognizesBool saturatedRawRecognizesBool
+  apply list_any_eq_of_mem_iff
+  simpa only [SaturatedRawItem] using sameMembers
+
+/-- A saturated Phase-A item carrier computes the canonical greatest-end
+observation. -/
+private theorem rawGreatestEndBool_eq_saturated
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (sameMembers : ∀ item,
+      item ∈ phaseA.rawItems ↔ SaturatedRawItem tokens item)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) :
+    rawGreatestEndBool phaseA symbol start upperBound finish =
+      saturatedRawGreatestEndObservation tokens symbol start
+        upperBound finish := by
+  have recognizesEq : ∀ candidate,
+      rawRecognizesBool phaseA symbol start candidate =
+        saturatedRawRecognizesBool tokens symbol start candidate :=
+    fun candidate => rawRecognizesBool_eq_saturated phaseA sameMembers
+      symbol start candidate
+  simp only [rawGreatestEndBool, saturatedRawGreatestEndObservation,
+    recognizesEq]
+
+end Chart
+
 end Solcore.Surface.Multi
