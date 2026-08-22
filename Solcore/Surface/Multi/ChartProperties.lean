@@ -132,4 +132,205 @@ theorem phaseBCorrect_of_exact_guard_observations
     (positive key) (pipeAtSite key) (positiveExact key)
       (pipeExact key) decision
 
+
+/-- The Chart terminal observation is exactly the checked terminal witness. -/
+theorem chart_observedTerminalAtBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) :
+    Chart.observedTerminalAtBool owned terminal boundary = true ↔
+      ∃ matched : MatchedTerminal file tokens terminal,
+        matched.cursor.beforeBoundary = boundary := by
+  constructor
+  · intro accepted
+    unfold Chart.observedTerminalAtBool at accepted
+    split at accepted
+    case isFalse => simp at accepted
+    case isTrue inRange =>
+      let cursor : TerminalCursor tokens := ⟨boundary.val, inRange⟩
+      change (MatchedTerminal.atCursor?
+        file tokens owned terminal cursor).isSome = true at accepted
+      obtain ⟨result, selected⟩ := Option.isSome_iff_exists.mp accepted
+      refine ⟨result.val, ?_⟩
+      apply Fin.ext
+      have cursorEq := congrArg Fin.val result.property
+      change result.val.cursor.val = boundary.val
+      simpa [cursor] using cursorEq
+  · rintro ⟨matched, atBoundary⟩
+    have inRange : boundary.val < tokens.length + 1 := by
+      have cursorEq := congrArg Fin.val atBoundary
+      change matched.cursor.val = boundary.val at cursorEq
+      omega
+    let cursor : TerminalCursor tokens := ⟨boundary.val, inRange⟩
+    have cursorEq : matched.cursor = cursor := by
+      apply Fin.ext
+      have atValue := congrArg Fin.val atBoundary
+      change matched.cursor.val = boundary.val at atValue
+      simpa [cursor] using atValue
+    have terminalAt : TerminalAt file tokens cursor
+        matched.value matched.span := by
+      simpa only [← cursorEq] using matched.at
+    obtain ⟨result, selected⟩ := MatchedTerminal.atCursor?_complete
+      owned terminal cursor terminalAt matched.matches
+    unfold Chart.observedTerminalAtBool
+    rw [dif_pos inRange]
+    change (MatchedTerminal.atCursor?
+      file tokens owned terminal cursor).isSome = true
+    rw [selected]
+    rfl
+
+/-- Symbol-terminal observation specializes to the public symbol judgment. -/
+theorem chart_observedSymbolAtBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (cursor : Boundary tokens) (symbol : Symbol) :
+    Chart.observedTerminalAtBool owned (.symbol symbol) cursor = true ↔
+      SymbolAtBoundary file tokens cursor symbol := by
+  rw [chart_observedTerminalAtBool_eq_true_iff]
+  constructor
+  · rintro ⟨matched, atCursor⟩
+    rcases matched with
+      ⟨terminalCursor, value, span, terminalAt, matchedEvidence⟩
+    cases value with
+    | retained token =>
+        cases terminalAt with
+        | retained _ inRange lookup valid =>
+            refine ⟨terminalCursor, token, atCursor,
+              .retained terminalCursor token inRange lookup valid, ?_⟩
+            simpa [TerminalMatches] using matchedEvidence
+    | endOfFile =>
+        simp [TerminalMatches] at matchedEvidence
+  · rintro ⟨terminalCursor, token, atCursor, terminalAt, payload⟩
+    refine ⟨{
+      cursor := terminalCursor
+      value := .retained token
+      span := token.span
+      «at» := terminalAt
+      «matches» := ?_
+    }, atCursor⟩
+    simpa [TerminalMatches] using payload
+
+/-- The Chart exact-slice observation is the declarative exact slice. -/
+theorem chart_observedExactSliceBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start finish : Boundary tokens)
+    (classes : List TerminalSymbol) :
+    Chart.observedExactSliceBool tokens start finish classes = true ↔
+      ExactSlice file tokens start finish classes := by
+  have executableEq :
+      Chart.observedExactSliceBool tokens start finish classes =
+        exactSliceBool file tokens owned start finish classes := by
+    rfl
+  rw [executableEq]
+  exact exactSliceBool_eq_true_iff owned start finish classes
+
+/-- G03--G05 and G07 have saturation-independent exact positive bits. -/
+theorem basicGuardPositiveObservation?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (supported :
+      key.guard = .G03_parameterComptime ∨
+      key.guard = .G04_letComptime ∨
+      key.guard = .G05_typeComptime ∨
+      key.guard = .G07_leadingDotArguments) :
+    ∃ observed,
+      Chart.basicGuardPositiveObservation? owned key = some observed ∧
+        (observed = true ↔
+          GuardEvidence file tokens key .positive) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  cases guard with
+  | G01_statementIf => simp at supported
+  | G02_matchArmBoundary => simp at supported
+  | G03_parameterComptime =>
+      refine ⟨Chart.observedTerminalAtBool owned
+        (.contextualKeyword .comptimeKw) siteCursor, rfl, ?_⟩
+      simpa [GuardEvidence, owned] using
+        chart_observedTerminalAtBool_eq_true_iff owned
+          (.contextualKeyword .comptimeKw) siteCursor
+  | G04_letComptime =>
+      refine ⟨Chart.observedTerminalAtBool owned
+        (.contextualKeyword .comptimeKw) siteCursor, rfl, ?_⟩
+      simpa [GuardEvidence, owned] using
+        chart_observedTerminalAtBool_eq_true_iff owned
+          (.contextualKeyword .comptimeKw) siteCursor
+  | G05_typeComptime =>
+      refine ⟨Chart.observedTerminalAtBool owned
+        (.contextualKeyword .comptimeKw) siteCursor, rfl, ?_⟩
+      simpa [GuardEvidence, owned] using
+        chart_observedTerminalAtBool_eq_true_iff owned
+          (.contextualKeyword .comptimeKw) siteCursor
+  | G06_patternComptime => simp at supported
+  | G07_leadingDotArguments =>
+      refine ⟨Chart.observedExactSliceBool tokens
+          contextStart siteCursor [
+            .symbol .dot,
+            .category .identifier
+          ] &&
+        Chart.observedTerminalAtBool owned
+          (.symbol .leftParen) siteCursor, rfl, ?_⟩
+      rw [Bool.and_eq_true,
+        chart_observedExactSliceBool_eq_true_iff owned,
+        chart_observedSymbolAtBool_eq_true_iff owned]
+      simp [GuardEvidence, owned]
+  | G08_terminalExpression => simp at supported
+  | G09_genericContext => simp at supported
+
+/-- G02's pipe bit is exact independently of its saturation-backed header. -/
+theorem matchArmPipeObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) :
+    Chart.matchArmPipeObservationBool owned key = true ↔
+      SymbolAtBoundary file tokens key.siteCursor .pipe := by
+  exact chart_observedSymbolAtBool_eq_true_iff
+    owned key.siteCursor .pipe
+
+/-- Each saturation-independent positive observation already classifies to
+the exact declarative decision. -/
+theorem basicGuardClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (supported :
+      key.guard = .G03_parameterComptime ∨
+      key.guard = .G04_letComptime ∨
+      key.guard = .G05_typeComptime ∨
+      key.guard = .G07_leadingDotArguments)
+    {observed : Bool}
+    (selected :
+      Chart.basicGuardPositiveObservation? owned key = some observed)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard observed false = decision ↔
+      GuardEvidence file tokens key decision := by
+  obtain ⟨canonical, canonicalSelected, exact⟩ :=
+    basicGuardPositiveObservation?_exact owned key supported
+  have observedEq : observed = canonical := by
+    exact Option.some.inj (selected.symm.trans canonicalSelected)
+  subst canonical
+  apply guardEvidence_iff_classified_observation owned key observed false exact
+  intro impossible
+  exfalso
+  rcases supported with supported | supported | supported | supported <;>
+    simp_all
+
+/-- Once the G02 header bit is saturation-exact, its already-exact pipe bit
+closes the entire three-way decision. -/
+theorem matchArmClassifiedObservation_exact_of_header
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (_isMatchArm : key.guard = .G02_matchArmBoundary)
+    (header : Bool)
+    (headerExact :
+      header = true ↔ GuardEvidence file tokens key .positive)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard header
+        (Chart.matchArmPipeObservationBool owned key) = decision ↔
+      GuardEvidence file tokens key decision := by
+  exact guardEvidence_iff_classified_observation owned key header
+    (Chart.matchArmPipeObservationBool owned key) headerExact
+      (fun _ => matchArmPipeObservationBool_exact owned key) decision
+
 end Solcore.Surface.Multi
