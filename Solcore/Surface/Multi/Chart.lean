@@ -12126,4 +12126,232 @@ private theorem executePhaseA?_rawGreatestEndBool_eq_saturated
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseBOperationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (state : PhaseBIndexed file tokens) : Prop :=
+  state.indexes = entries ∧
+    ∀ key, key ∈ state.phaseB.finalizedRev →
+      ∃ decision,
+        phaseBGuardDecisionFromIndexes? entries key = some decision ∧
+          state.phaseB.cells key = some (.final decision)
+
+private theorem enterIndexedPhaseB?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (result : CountedState tokens (PhaseBIndexed file tokens))
+    (selected : enterIndexedPhaseB? current = some result) :
+    PhaseBOperationalInvariant current.payload.entries result.payload := by
+  unfold enterIndexedPhaseB? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  constructor
+  · rfl
+  · intro key member
+    have initialized := enterPhaseB?_initializes {
+      payload := current.payload.phaseA
+      counter := current.counter
+    } entered enteredEq
+    rw [initialized.2] at member
+    contradiction
+
+private theorem finalizeNextIndexedGuard?_operationalShape
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseBIndexed file tokens))
+    (selected : finalizeNextIndexedGuard? current = some result) :
+    ∃ key decision,
+      result.payload.indexes = current.payload.indexes ∧
+      phaseBGuardDecisionFromIndexes? current.payload.indexes key =
+        some decision ∧
+      result.payload.phaseB.finalizedRev =
+        key :: current.payload.phaseB.finalizedRev ∧
+      ∀ candidate, result.payload.phaseB.cells candidate =
+        if candidate = key then some (.final decision)
+        else current.payload.phaseB.cells candidate := by
+  unfold finalizeNextIndexedGuard? at selected
+  cases remaining : current.payload.phaseB.remaining with
+  | nil => simp [remaining] at selected
+  | cons key rest =>
+      simp only [remaining] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨afterInitialize, initialized,
+        afterLookups, charged, decision, decided, finalSelected⟩
+      have initializePayload := phaseB_runMappedPrimitive?_payload current
+        (.guardFinalize .initializeUndecided key)
+        (fun (state : PhaseBIndexed file tokens) => ({
+          phaseB := {
+            state.phaseB with
+            cells := fun candidate =>
+              if candidate = key then some .undecided
+              else state.phaseB.cells candidate
+          }
+          indexes := state.indexes
+        } : PhaseBIndexed file tokens)) initialized
+      have lookupPayload := phaseB_chargeAddresses?_payload afterInitialize
+        (preFinalGuardSlots.map fun slot => .guardFinalize slot key)
+        afterLookups charged
+      have finalPayload := phaseB_runMappedPrimitive?_payload afterLookups
+        (.guardFinalize .writeFinalDecision key)
+        (fun (state : PhaseBIndexed file tokens) => ({
+          phaseB := {
+            phaseA := state.phaseB.phaseA
+            cells := fun candidate =>
+              if candidate = key then some (.final decision)
+              else state.phaseB.cells candidate
+            remaining := rest
+            finalizedRev := key :: state.phaseB.finalizedRev
+          }
+          indexes := state.indexes
+        } : PhaseBIndexed file tokens)) finalSelected
+      refine ⟨key, decision, ?_, ?_, ?_, ?_⟩
+      · rw [finalPayload, lookupPayload, initializePayload]
+      · rw [lookupPayload, initializePayload] at decided
+        exact decided
+      · rw [finalPayload, lookupPayload, initializePayload]
+      · intro candidate
+        rw [finalPayload, lookupPayload, initializePayload]
+        by_cases same : candidate = key
+        · simp [same]
+        · simp [same]
+
+private theorem finalizeNextIndexedGuard?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (current result : CountedState tokens (PhaseBIndexed file tokens))
+    (invariant : PhaseBOperationalInvariant entries current.payload)
+    (selected : finalizeNextIndexedGuard? current = some result) :
+    PhaseBOperationalInvariant entries result.payload := by
+  obtain ⟨key, decision, indexes, decided, finalized, cells⟩ :=
+    finalizeNextIndexedGuard?_operationalShape current result selected
+  have decidedAtEntries :
+      phaseBGuardDecisionFromIndexes? entries key = some decision := by
+    rw [← invariant.1]
+    exact decided
+  constructor
+  · exact indexes.trans invariant.1
+  · intro candidate member
+    rw [finalized, List.mem_cons] at member
+    rcases member with same | old
+    · subst candidate
+      exact ⟨decision, decidedAtEntries, by simp [cells]⟩
+    · obtain ⟨oldDecision, oldSelected, oldCell⟩ :=
+        invariant.2 candidate old
+      by_cases same : candidate = key
+      · subst candidate
+        have decisionEq : oldDecision = decision := by
+          exact Option.some.inj (oldSelected.symm.trans decidedAtEntries)
+        subst oldDecision
+        exact ⟨decision, decidedAtEntries, by simp [cells]⟩
+      · exact ⟨oldDecision, oldSelected, by simp [cells, same, oldCell]⟩
+
+private theorem runIndexedPhaseB?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens)) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseBIndexed file tokens)),
+      PhaseBOperationalInvariant entries current.payload →
+      runIndexedPhaseB? fuel current = some result →
+      PhaseBOperationalInvariant entries result.payload := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result invariant selected
+      rw [runIndexedPhaseB?] at selected
+      split at selected
+      · cases selected
+        exact invariant
+      · contradiction
+  | succ fuel induction =>
+      intro current result invariant selected
+      rw [runIndexedPhaseB?] at selected
+      cases remaining : current.payload.phaseB.remaining with
+      | nil =>
+          simp only [remaining] at selected
+          cases selected
+          exact invariant
+      | cons key rest =>
+          simp only [remaining] at selected
+          cases finalized : finalizeNextIndexedGuard? current with
+          | none => simp [finalized] at selected
+          | some next =>
+              rw [finalized] at selected
+              exact induction next result
+                (finalizeNextIndexedGuard?_operationalInvariant entries
+                  current next invariant finalized) selected
+
+private theorem sealIndexedPhaseB?_memo_eq_cell
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (selected : sealIndexedPhaseB? current = some result)
+    (key : GuardInstanceKey tokens) :
+    result.payload.memo key =
+      match current.payload.phaseB.cells key with
+      | some value => value
+      | none => .undecided := by
+  unfold sealIndexedPhaseB? sealPhaseB? at selected
+  cases remaining : current.payload.phaseB.remaining with
+  | cons head tail => simp [remaining] at selected
+  | nil =>
+      simp only [remaining] at selected
+      have payload := phaseB_runMappedPrimitive?_payload {
+        payload := current.payload.phaseB
+        counter := current.counter
+      } (.phase .sealBEnterC) (fun state => ({
+        phaseA := state.phaseA
+        memo := fun key =>
+          match state.cells key with
+          | some value => value
+          | none => .undecided
+        finalizedRev := state.finalizedRev
+      } : PhaseBSealed file tokens)) selected
+      rw [payload]
+
+/-- Every successfully executed indexed Phase-B cell contains exactly the
+decision computed from its immutable materialized Phase-A table. -/
+private theorem executeIndexedPhaseB?_memo_from_indexes
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (result : CountedState tokens (PhaseBSealed file tokens))
+    (selected : executeIndexedPhaseB? current = some result)
+    (key : GuardInstanceKey tokens) :
+    ∃ decision,
+      phaseBGuardDecisionFromIndexes? current.payload.entries key =
+          some decision ∧
+        result.payload.memo key = .final decision := by
+  unfold executeIndexedPhaseB? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq,
+    finalized, runEq, sealedEq⟩
+  have enteredOperational :=
+    enterIndexedPhaseB?_operationalInvariant current entered enteredEq
+  have finalOperational := runIndexedPhaseB?_operationalInvariant
+    current.payload.entries (allGuardInstanceKeys tokens).length
+    entered finalized enteredOperational runEq
+  have enteredCoverage :=
+    enterIndexedPhaseB?_invariant current entered enteredEq
+  have finalCoverage := runIndexedPhaseB?_invariant
+    (allGuardInstanceKeys tokens).length entered finalized
+    enteredCoverage runEq
+  have remainingEmpty := runIndexedPhaseB?_remaining_empty
+    (allGuardInstanceKeys tokens).length entered finalized runEq
+  have keyFinalized : key ∈ finalized.payload.phaseB.finalizedRev := by
+    rcases finalCoverage.1 key with pending | done
+    · rw [remainingEmpty] at pending
+      contradiction
+    · exact done
+  obtain ⟨decision, decided, cell⟩ :=
+    finalOperational.2 key keyFinalized
+  refine ⟨decision, decided, ?_⟩
+  rw [sealIndexedPhaseB?_memo_eq_cell finalized result sealedEq key,
+    cell]
+
+end Chart
+
 end Solcore.Surface.Multi
