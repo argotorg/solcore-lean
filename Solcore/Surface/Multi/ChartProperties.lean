@@ -598,4 +598,47 @@ theorem patternComptimeClassifiedObservation_exact
     contradiction
 
 
+/-- G02's positive bit is exact once Phase A's arm-header oracle is exact. -/
+theorem matchArmHeaderObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (header : Chart.MatchArmHeaderObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isMatchArm : key.guard = .G02_matchArmBoundary)
+    (headerExact : ∀ regionStart cursor,
+      header regionStart cursor = true ↔
+        ArmHeaderAt file tokens regionStart cursor) :
+    Chart.matchArmHeaderObservationBool header key = true ↔
+      GuardEvidence file tokens key .positive := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G02_matchArmBoundary at isMatchArm
+  subst guard
+  simp [Chart.matchArmHeaderObservationBool, GuardEvidence, owned,
+    headerExact]
+
+/-- G02's full three-way classification is exact under that single Phase-A
+header contract; its pipe observation is discharged unconditionally. -/
+theorem matchArmClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (header : Chart.MatchArmHeaderObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isMatchArm : key.guard = .G02_matchArmBoundary)
+    (headerExact : ∀ regionStart cursor,
+      header regionStart cursor = true ↔
+        ArmHeaderAt file tokens regionStart cursor)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.matchArmHeaderObservationBool header key)
+        (Chart.matchArmPipeObservationBool owned key) = decision ↔
+      GuardEvidence file tokens key decision := by
+  apply guardEvidence_iff_classified_observation owned key
+    (Chart.matchArmHeaderObservationBool header key)
+      (Chart.matchArmPipeObservationBool owned key)
+  · exact matchArmHeaderObservationBool_exact owned header key
+      isMatchArm headerExact
+  · intro _
+    exact matchArmPipeObservationBool_exact owned key
+
+
 end Solcore.Surface.Multi
