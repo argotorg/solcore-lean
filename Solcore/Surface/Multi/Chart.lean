@@ -10741,4 +10741,281 @@ def executeObservedContextualWorklist?
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem guardWitnessFor?_isSome_iff
+    {tokens : List Token}
+    (memo : GuardMemo tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (cell : PriorityGuardId × Polarity) :
+    (guardWitnessFor? memo productionInstance cell).isSome = true ↔
+      ∃ guardInstance decision,
+        GuardAnchor productionInstance cell guardInstance ∧
+          memo guardInstance = .final decision ∧
+          decision.allows cell.2 = true := by
+  unfold guardWitnessFor?
+  split
+  next anchorEq =>
+      simp only [Option.isSome_none, Bool.false_eq_true, false_iff]
+      rintro ⟨guardInstance, decision, anchor, _stored, _accepted⟩
+      have computed := GuardAnchor.decide_eq_some_iff.mpr anchor
+      rw [anchorEq] at computed
+      contradiction
+  next guardInstance anchorEq =>
+      cases memoEq : memo guardInstance with
+      | undecided =>
+          simp only [Option.isSome_none, Bool.false_eq_true, false_iff]
+          rintro ⟨other, decision, anchor, stored, _accepted⟩
+          have computed := GuardAnchor.decide_eq_some_iff.mpr anchor
+          rw [anchorEq] at computed
+          have same : other = guardInstance := (Option.some.inj computed).symm
+          subst other
+          rw [memoEq] at stored
+          contradiction
+      | final decision =>
+          cases acceptedEq : cell.2.accepts decision with
+          | false =>
+              simp only [acceptedEq, ↓reduceDIte, Option.isSome_none,
+                Bool.false_eq_true, false_iff]
+              rintro ⟨other, otherDecision, anchor, stored, accepted⟩
+              have computed := GuardAnchor.decide_eq_some_iff.mpr anchor
+              rw [anchorEq] at computed
+              have same : other = guardInstance :=
+                (Option.some.inj computed).symm
+              subst other
+              have decisionEq : otherDecision = decision :=
+                GuardMemoState.final.inj (stored.symm.trans memoEq)
+              subst otherDecision
+              exact Bool.false_ne_true (acceptedEq.symm.trans accepted)
+          | true =>
+              simp only [acceptedEq, ↓reduceDIte, Option.isSome_some]
+              constructor
+              · intro _
+                exact ⟨guardInstance, decision,
+                  GuardAnchor.decide_eq_some_iff.mp anchorEq,
+                  memoEq, acceptedEq⟩
+              · intro _
+                trivial
+
+private structure PhaseCReachCarrier
+    (file : WorkspaceFile) (tokens : List Token) where
+  memo : GuardMemo tokens
+  items : List (ContextualItemKey tokens)
+  itemQueue : List (ContextualItemKey tokens)
+  edges : List (StructurallyValidContextualPackedEdge file tokens)
+  edgeQueue : List (StructurallyValidContextualPackedEdge file tokens)
+
+private def PhaseCOpen.reachCarrier
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : PhaseCOpen file tokens) : PhaseCReachCarrier file tokens := {
+  memo := state.memo
+  items := state.contextualItems
+  itemQueue := state.itemQueue
+  edges := state.contextualEdges
+  edgeQueue := state.edgeQueue
+}
+
+private theorem processGuardCell?_reachCarrier
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : processGuardCell? current productionInstance index =
+      some result) :
+    result.1.payload.reachCarrier = current.payload.reachCarrier := by
+  unfold processGuardCell? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨inspected, inspectedEq, inserted, insertedEq, resultEq⟩
+  cases resultEq
+  have inspectedPayload := chargeAddresses?_payload
+    (preInsertWitnessSlots.map fun slot =>
+      .guardWitness slot (guardCellAddress productionInstance index))
+    current inspected inspectedEq
+  have insertedPayload := runMappedPrimitive?_payload inspected
+    (.guardWitness .insertWitness
+      (guardCellAddress productionInstance index)) _ insertedEq
+  rw [insertedPayload, inspectedPayload]
+  split <;> rfl
+
+private theorem processGuardCells?_reachCarrier
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ∀ (indices : List
+        (Fin (guardOf productionInstance.production).length))
+      (current : CountedState tokens (PhaseCOpen file tokens))
+      (result : CountedState tokens (PhaseCOpen file tokens) × Bool),
+      processGuardCells? productionInstance indices current = some result →
+        result.1.payload.reachCarrier = current.payload.reachCarrier := by
+  intro indices
+  induction indices with
+  | nil =>
+      intro current result selected
+      simp only [processGuardCells?, Option.some.injEq] at selected
+      cases selected
+      rfl
+  | cons index rest induction =>
+      intro current result selected
+      simp only [processGuardCells?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with
+        ⟨processed, processedEq, finished, finishedEq, resultEq⟩
+      cases resultEq
+      exact (induction processed.1 finished finishedEq).trans
+        (processGuardCell?_reachCarrier current productionInstance index
+          processed processedEq)
+
+private theorem processGuardCell?_accepted_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : processGuardCell? current productionInstance index =
+      some result)
+    (accepted : result.2 = true) :
+    ∃ guardInstance decision,
+      GuardAnchor productionInstance
+          ((guardOf productionInstance.production).get index)
+          guardInstance ∧
+        current.payload.memo guardInstance = .final decision ∧
+        decision.allows
+          ((guardOf productionInstance.production).get index).2 = true := by
+  unfold processGuardCell? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨inspected, inspectedEq, inserted, insertedEq, resultEq⟩
+  cases resultEq
+  exact (guardWitnessFor?_isSome_iff current.payload.memo
+    productionInstance
+    ((guardOf productionInstance.production).get index)).mp accepted
+
+private theorem processGuardCells?_accepted_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ∀ (indices : List
+        (Fin (guardOf productionInstance.production).length))
+      (current : CountedState tokens (PhaseCOpen file tokens))
+      (result : CountedState tokens (PhaseCOpen file tokens) × Bool),
+      processGuardCells? productionInstance indices current = some result →
+      result.2 = true →
+      ∀ index, index ∈ indices →
+        ∃ guardInstance decision,
+          GuardAnchor productionInstance
+              ((guardOf productionInstance.production).get index)
+              guardInstance ∧
+            current.payload.memo guardInstance = .final decision ∧
+            decision.allows
+              ((guardOf productionInstance.production).get index).2 = true := by
+  intro indices
+  induction indices with
+  | nil =>
+      intro current result selected accepted index member
+      simp at member
+  | cons head rest induction =>
+      intro current result selected accepted index member
+      simp only [processGuardCells?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with
+        ⟨processed, processedEq, finished, finishedEq, resultEq⟩
+      cases resultEq
+      have both : processed.2 = true ∧ finished.2 = true :=
+        Bool.and_eq_true_iff.mp accepted
+      rcases List.mem_cons.mp member with same | inRest
+      · subst index
+        exact processGuardCell?_accepted_sound current productionInstance
+          head processed processedEq both.1
+      · have sound := induction processed.1 finished finishedEq both.2
+          index inRest
+        have carrier := processGuardCell?_reachCarrier current
+          productionInstance head processed processedEq
+        have memoEq := congrArg PhaseCReachCarrier.memo carrier
+        change processed.1.payload.memo = current.payload.memo at memoEq
+        rw [memoEq] at sound
+        exact sound
+
+private theorem activateProduction?_accepted_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : activateProduction? current productionInstance = some result)
+    (accepted : result.2 = true) :
+    MemoEnablesProduction current.payload.memo productionInstance := by
+  unfold activateProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, processedEq⟩
+  intro guard polarity member
+  obtain ⟨index, indexValue⟩ := List.get_of_mem member
+  have indexMember : index ∈
+      List.ofFn (fun index :
+        Fin (guardOf productionInstance.production).length => index) :=
+    List.mem_ofFn.mpr ⟨index, rfl⟩
+  have sound := processGuardCells?_accepted_sound productionInstance _
+    attempted result processedEq accepted index indexMember
+  have attemptedPayload := runMappedPrimitive?_payload current
+    (.production productionInstance) id attemptedEq
+  change attempted.payload = current.payload at attemptedPayload
+  rw [attemptedPayload] at sound
+  simpa only [indexValue] using sound
+
+private theorem activateWorklistProduction?_accepted_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result)
+    (accepted : result.2 = true) :
+    MemoEnablesProduction current.payload.phaseC.memo productionInstance := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  exact activateProduction?_accepted_sound
+    { payload := current.payload.phaseC, counter := current.counter }
+    productionInstance activated activatedEq accepted
+
+private theorem activateProduction?_reachCarrier
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : activateProduction? current productionInstance =
+      some result) :
+    result.1.payload.reachCarrier = current.payload.reachCarrier := by
+  unfold activateProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, processedEq⟩
+  have processed := processGuardCells?_reachCarrier productionInstance _
+    attempted result processedEq
+  have attemptedPayload := runMappedPrimitive?_payload current
+    (.production productionInstance) id attemptedEq
+  change attempted.payload = current.payload at attemptedPayload
+  exact processed.trans (congrArg PhaseCOpen.reachCarrier attemptedPayload)
+
+private theorem activateWorklistProduction?_reachCarrier
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    result.1.payload.phaseC.reachCarrier =
+      current.payload.phaseC.reachCarrier := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  exact activateProduction?_reachCarrier
+    { payload := current.payload.phaseC, counter := current.counter }
+    productionInstance activated activatedEq
+
+end Chart
+
+
 end Solcore.Surface.Multi
