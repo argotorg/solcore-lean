@@ -6539,6 +6539,221 @@ private theorem dequeueRawEdge?_edgeSafe
   · simpa [payloadQueue] using queueUnique.2
 
 
+private theorem dequeueRawItem?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens) (rest : List (DottedItem tokens))
+    (queue : current.payload.itemQueue = item :: rest)
+    (safe : PhaseACompletionSafe current)
+    (selected : dequeueRawItem? current = some (item, after)) :
+    PhaseACompletionSafe after := by
+  unfold dequeueRawItem? at selected
+  rw [queue] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  exact runMappedPrimitive?_completionSafe_of_not_insert current after _ _ safe
+    (by simp) nextEq
+
+private theorem dequeueRawItem?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens) (rest : List (DottedItem tokens))
+    (queue : current.payload.itemQueue = item :: rest)
+    (safe : PhaseAEdgeSafe current)
+    (selected : dequeueRawItem? current = some (item, after)) :
+    PhaseAEdgeSafe after := by
+  unfold dequeueRawItem? at selected
+  rw [queue] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  apply runMappedPrimitive?_edgeSafe_of_queue_eq current after _ _ safe
+    (by intro state; rfl) _ nextEq
+  intro edge equal
+  rcases edge with ⟨edge, valid⟩
+  cases edge <;> simp [rawEdgeDequeueAddress] at equal
+
+private theorem attemptPrediction?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (production : ProductionId)
+    (safe : PhaseACompletionSafe current)
+    (selected : attemptPrediction? current waiting production = some result) :
+    PhaseACompletionSafe result := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting production with
+  | none =>
+      simp only [prediction] at selected
+      cases selected
+      exact safe
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, itemEq⟩
+      have attemptedSafe := runMappedPrimitive?_completionSafe_of_not_insert
+        current attempted _ id safe (by simp) attemptedEq
+      exact insertRawItem?_completionSafe attempted result .seedOrPrediction
+        item attemptedSafe itemEq
+
+private theorem attemptPrediction?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (production : ProductionId)
+    (safe : PhaseAEdgeSafe current)
+    (selected : attemptPrediction? current waiting production = some result) :
+    PhaseAEdgeSafe result := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting production with
+  | none =>
+      simp only [prediction] at selected
+      cases selected
+      exact safe
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, itemEq⟩
+      have attemptedSafe := runMappedPrimitive?_edgeSafe_of_queue_eq current
+        attempted _ id safe (by intro state; rfl) (by
+          intro edge equal
+          rcases edge with ⟨edge, valid⟩
+          cases edge <;> simp [rawEdgeDequeueAddress] at equal) attemptedEq
+      exact insertRawItem?_edgeSafe attempted result .seedOrPrediction item
+        attemptedSafe itemEq
+
+private theorem attemptPredictions?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions (current result :
+        CountedState tokens (PhaseAOpen file tokens)),
+      PhaseACompletionSafe current →
+      attemptPredictions? waiting productions current = some result →
+      PhaseACompletionSafe result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result safe selected
+      cases selected
+      exact safe
+  | cons production rest induction =>
+      intro current result safe selected
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPrediction?_completionSafe current next waiting production safe
+          nextEq) restEq
+
+private theorem attemptPredictions?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions (current result :
+        CountedState tokens (PhaseAOpen file tokens)),
+      PhaseAEdgeSafe current →
+      attemptPredictions? waiting productions current = some result →
+      PhaseAEdgeSafe result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result safe selected
+      cases selected
+      exact safe
+  | cons production rest induction =>
+      intro current result safe selected
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPrediction?_edgeSafe current next waiting production safe nextEq)
+        restEq
+
+private theorem insertScannedRawEdge?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before after : DottedItem tokens) (cursor : TerminalCursor tokens)
+    (edge : PackedEdge file tokens)
+    (shape : edge.val = .scanned before after cursor)
+    (safe : PhaseACompletionSafe current)
+    (selected : insertRawEdge? current edge = some result) :
+    PhaseACompletionSafe result := by
+  unfold insertRawEdge? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact safe
+  next absent =>
+    simp only [shape] at selected
+    exact runMappedPrimitive?_completionSafe_of_not_insert current result _ _
+      safe (by simp) selected
+
+private theorem attemptScan?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens) (safe : PhaseACompletionSafe current)
+    (selected : attemptScan? owned current before = some result) :
+    PhaseACompletionSafe result := by
+  unfold attemptScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have attemptedSafe := runMappedPrimitive?_completionSafe_of_not_insert
+      current attempted _ id safe (by simp) attemptedEq
+    cases scan : scannedEdge? owned before with
+    | none =>
+        simp only [scan] at remainder
+        cases remainder
+        exact attemptedSafe
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scan, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        have itemSafe := insertRawItem?_completionSafe attempted withItem .scan
+          after attemptedSafe itemEq
+        obtain ⟨cursor, shape⟩ := scannedEdge?_shape owned before after edge scan
+        exact insertScannedRawEdge?_completionSafe withItem result before after
+          cursor edge shape itemSafe edgeEq
+  next notApplicable =>
+    cases selected
+    exact safe
+
+private theorem attemptScan?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens) (safe : PhaseAEdgeSafe current)
+    (selected : attemptScan? owned current before = some result) :
+    PhaseAEdgeSafe result := by
+  unfold attemptScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have attemptedSafe := runMappedPrimitive?_edgeSafe_of_queue_eq current
+      attempted _ id safe (by intro state; rfl) (by
+        intro edge equal
+        rcases edge with ⟨edge, valid⟩
+        cases edge <;> simp [rawEdgeDequeueAddress] at equal) attemptedEq
+    cases scan : scannedEdge? owned before with
+    | none =>
+        simp only [scan] at remainder
+        cases remainder
+        exact attemptedSafe
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scan, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        have itemSafe := insertRawItem?_edgeSafe attempted withItem .scan after
+          attemptedSafe itemEq
+        exact insertRawEdge?_edgeSafe withItem result edge itemSafe edgeEq
+  next notApplicable =>
+    cases selected
+    exact safe
+
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
