@@ -5195,6 +5195,220 @@ private theorem insertRawItem?_total
     simp [runMappedPrimitive?, fresh]
 
 
+private theorem dequeueRawItem?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : DottedItem tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (safe : PhaseAItemSafe current)
+    (selected : dequeueRawItem? current = some result) :
+    PhaseAItemSafe result.2 := by
+  unfold dequeueRawItem? at selected
+  cases queue : current.payload.itemQueue with
+  | nil => simp [queue] at selected
+  | cons head rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      have payload := phaseA_runMappedPrimitive?_payload current _ _ next nextEq
+      have used := phaseA_runMappedPrimitive?_usedRev current _ _ next nextEq
+      have unique : head ∉ rest ∧ rest.Nodup := by
+        have queueNodup := safe.queueNodup
+        rw [queue, List.nodup_cons] at queueNodup
+        exact queueNodup
+      constructor
+      · intro source item member
+        rw [used] at member
+        simp only [List.mem_cons] at member
+        rcases member with equal | old
+        · cases source <;> simp [RawItemInsertSource.unitKind] at equal
+        · rw [payload]
+          exact safe.inserted source item old
+      · intro item member
+        rw [used] at member
+        simp only [List.mem_cons] at member
+        rcases member with equal | old
+        · simp only [UnitAddress.linear.injEq] at equal
+          rw [rawLinearKey_injective equal.2, payload]
+          exact safe.queueSubset (by simp [queue])
+        · rw [payload]
+          exact safe.dequeued item old
+      · intro item production member
+        rw [used] at member
+        simp only [List.mem_cons] at member
+        rcases member with equal | old
+        · simp at equal
+        · rw [used]
+          exact List.mem_cons_of_mem _ (safe.predicted item production old)
+      · intro item member
+        rw [used] at member
+        simp only [List.mem_cons] at member
+        rcases member with equal | old
+        · simp at equal
+        · rw [used]
+          exact List.mem_cons_of_mem _ (safe.scanned item old)
+      · intro item member
+        rw [used] at member
+        simp only [List.mem_cons] at member
+        rcases member with equal | old
+        · simp at equal
+        · rw [used]
+          exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+      · intro item member usedItem
+        rw [payload] at member
+        rw [used] at usedItem
+        simp only [List.mem_cons] at usedItem
+        rcases usedItem with collision | old
+        · simp only [UnitAddress.linear.injEq] at collision
+          have same := rawLinearKey_injective collision.2
+          exact unique.1 (same ▸ member)
+        · exact safe.queueFresh item (by simp [queue, member]) old
+      · simpa [payload] using safe.rawNodup
+      · simpa [payload] using unique.2
+      · intro item member
+        rw [payload] at member ⊢
+        exact safe.queueSubset (by simp [queue, member])
+
+private structure PhaseAItemWorkFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens) : Prop where
+  dequeued : (.linear .L01_itemDequeue (rawLinearKey item) :
+    UnitAddress tokens) ∈ current.counter.usedRev
+  predictions : ∀ production,
+    (.prediction .R01_predictionAttempt
+      (rawPredictionKey item production) : UnitAddress tokens) ∉
+        current.counter.usedRev
+  scan : (.linear .L04_scanAttempt (rawLinearKey item) :
+    UnitAddress tokens) ∉ current.counter.usedRev
+  scannedEdge : (.linear .L06_scannedEdgeInsert (rawLinearKey item) :
+    UnitAddress tokens) ∉ current.counter.usedRev
+
+private theorem dequeueRawItem?_workFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens) (rest : List (DottedItem tokens))
+    (queue : current.payload.itemQueue = item :: rest)
+    (safe : PhaseAItemSafe current)
+    (selected : dequeueRawItem? current = some (item, after)) :
+    PhaseAItemWorkFresh after item := by
+  unfold dequeueRawItem? at selected
+  simp only [queue, Option.bind_eq_bind,
+    Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  have used := phaseA_runMappedPrimitive?_usedRev current _ _ after nextEq
+  have dequeueFresh := safe.queueFresh item (by simp [queue])
+  constructor
+  · rw [used]
+    simp
+  · intro production member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with collision | old
+    · simp at collision
+    · exact dequeueFresh (safe.predicted item production old)
+  · intro member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with collision | old
+    · simp at collision
+    · exact dequeueFresh (safe.scanned item old)
+  · intro member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with collision | old
+    · simp at collision
+    · exact dequeueFresh (safe.scannedEdge item old)
+
+private theorem dequeueRawItem?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens) (rest : List (DottedItem tokens))
+    (queue : current.payload.itemQueue = item :: rest)
+    (safe : PhaseAItemSafe current) :
+    ∃ after, dequeueRawItem? current = some (item, after) := by
+  have fresh := safe.queueFresh item (by simp [queue])
+  unfold dequeueRawItem?
+  rw [queue]
+  simp [runMappedPrimitive?, fresh]
+
+private theorem rawPredictionKey_waiting_eq
+    {tokens : List Token} {leftWaiting rightWaiting : DottedItem tokens}
+    {leftProduction rightProduction : ProductionId}
+    (equal : rawPredictionKey leftWaiting leftProduction =
+      rawPredictionKey rightWaiting rightProduction) :
+    leftWaiting = rightWaiting :=
+  dottedItem_eq_of_fields
+    (congrArg (fun key => key.dotted.production) equal)
+    (congrArg (fun key => key.dotted.dot.val) equal)
+    (congrArg (fun key => key.origin) equal)
+    (congrArg (fun key => key.current) equal)
+
+private theorem chargePrediction_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (production : ProductionId)
+    (safe : PhaseAItemSafe current)
+    (dequeued : (.linear .L01_itemDequeue (rawLinearKey waiting) :
+      UnitAddress tokens) ∈ current.counter.usedRev)
+    (selected : runMappedPrimitive? current
+      (.prediction .R01_predictionAttempt
+        (rawPredictionKey waiting production)) id = some result) :
+    PhaseAItemSafe result := by
+  have payload := phaseA_runMappedPrimitive?_payload current _ id result selected
+  have used := phaseA_runMappedPrimitive?_usedRev current _ id result selected
+  constructor
+  · intro source item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · simpa [payload] using safe.inserted source item old
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · simpa [payload] using safe.dequeued item old
+  · intro item predicted member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp only [UnitAddress.prediction.injEq] at equal
+      have waitingEq := rawPredictionKey_waiting_eq equal.2
+      rw [waitingEq, used]
+      exact List.mem_cons_of_mem _ dequeued
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.predicted item predicted old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scanned item old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+  · intro item member usedItem
+    rw [payload] at member
+    rw [used] at usedItem
+    simp only [List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · simp at equal
+    · exact safe.queueFresh item member old
+  · simpa [payload] using safe.rawNodup
+  · simpa [payload] using safe.queueNodup
+  · simpa [payload] using safe.queueSubset
+
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
