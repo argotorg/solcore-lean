@@ -18013,6 +18013,155 @@ private theorem processContextualItem?_fairPending
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem beginPhaseCWorklist?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCFairPending owned result := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  have payload := runMappedPrimitive?_payload current _ _ enteredEq
+  unfold PhaseCFairPending
+  rw [payload]
+  refine ⟨by simp [contextualRoot], ?_, ?_, ?_⟩
+  · intro waiting member predicted item productionInstance computed enabled
+    left
+    simpa only [List.mem_singleton] using member
+  · intro before member after edge computed
+    left
+    simpa only [List.mem_singleton] using member
+  · intro waiting waitingMember finished finishedMember after edge computed
+    left
+    simpa only [List.mem_singleton] using waitingMember
+
+private theorem dequeueContextualEdge?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (fair : PhaseCFairPending owned current)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCFairPending owned result.2 := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      unfold PhaseCFairPending at fair ⊢
+      rw [payload]
+      exact fair
+
+private theorem runPhaseCQueues?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAttemptLedgerMaterialized current →
+      PhaseCFairPending owned current →
+      runPhaseCQueues? owned fuel current = some result →
+      PhaseCFairPending owned result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result ledger fair selected
+      rw [runPhaseCQueues?] at selected
+      split at selected <;> try contradiction
+      cases selected
+      exact fair
+  | succ fuel induction =>
+      intro current result ledger fair selected
+      rw [runPhaseCQueues?] at selected
+      cases items : current.payload.phaseC.itemQueue with
+      | nil =>
+          cases edges : current.payload.phaseC.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact fair
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueContextualEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result
+                    (dequeueContextualEdge?_attemptLedger current pair ledger
+                      dequeued)
+                    (dequeueContextualEdge?_fairPending owned current pair fair
+                      dequeued) selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueContextualItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨pivot, afterDequeue⟩
+              simp only at selected
+              cases processed :
+                  processContextualItem? owned pivot afterDequeue with
+              | none => simp [processed] at selected
+              | some next =>
+                  rw [processed] at selected
+                  have afterLedger := dequeueContextualItem?_attemptLedger
+                    current (pivot, afterDequeue) ledger dequeued
+                  have shape := dequeueContextualItem?_fairShape current
+                    afterDequeue item pivot rest items dequeued
+                  have pivotEq := shape.1
+                  subst item
+                  exact induction next result
+                    (processContextualItem?_attemptLedger owned pivot
+                      afterDequeue next afterLedger processed)
+                    (processContextualItem?_fairPending owned current
+                      afterDequeue next pivot rest fair items shape.2.1
+                      shape.2.2.1 shape.2.2.2.1 shape.2.2.2.2
+                      afterLedger processed) selected
+
+private theorem executePhaseCWorklist?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : executePhaseCWorklist? owned current = some result) :
+    PhaseCFairPending owned result := by
+  unfold executePhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueues?_fairPending owned _ entered result
+    (beginPhaseCWorklist?_attemptLedger current entered fresh enteredEq)
+    (beginPhaseCWorklist?_fairPending owned current entered enteredEq) runEq
+
+private theorem executeObservedPhaseABCWorklist?_fairPending
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklist? file tokens owned =
+      some result) :
+    PhaseCFairPending owned result := by
+  unfold executeObservedPhaseABCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklist?_fairPending owned phaseB result
+    (executeObservedPhaseAB?_phaseCInitialFresh file tokens owned phaseB
+      phaseBEq) phaseCEq
+
+end Chart
+
 end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi.Chart
