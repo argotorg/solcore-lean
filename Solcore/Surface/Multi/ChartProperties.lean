@@ -333,4 +333,52 @@ theorem matchArmClassifiedObservation_exact_of_header
     (Chart.matchArmPipeObservationBool owned key) headerExact
       (fun _ => matchArmPipeObservationBool_exact owned key) decision
 
+
+/-- G09 is exact once the raw Phase-A greatest predicate-list end is exact. -/
+theorem genericContextPositiveObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isGeneric : key.guard = .G09_genericContext)
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .predicateList) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .predicateList)
+          start upperBound finish) :
+    Chart.genericContextPositiveObservationBool owned greatest key = true ↔
+      GuardEvidence file tokens key .positive := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G09_genericContext at isGeneric
+  subst guard
+  simp [Chart.genericContextPositiveObservationBool, GuardEvidence, owned,
+    List.any_eq_true, chart_observedSymbolAtBool_eq_true_iff,
+    greatestExact]
+
+/-- Thus G09's classifier is declaratively exact under only the explicit
+Phase-A greatest-end adequacy boundary. -/
+theorem genericContextClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isGeneric : key.guard = .G09_genericContext)
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .predicateList) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .predicateList)
+          start upperBound finish)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.genericContextPositiveObservationBool owned greatest key)
+        false = decision ↔
+      GuardEvidence file tokens key decision := by
+  apply guardEvidence_iff_classified_observation owned key
+    (Chart.genericContextPositiveObservationBool owned greatest key)
+      false
+  · exact genericContextPositiveObservationBool_exact owned greatest key
+      isGeneric greatestExact
+  · intro impossible
+    rw [isGeneric] at impossible
+    contradiction
+
+
 end Solcore.Surface.Multi
