@@ -2488,3 +2488,118 @@ theorem observedProtectedRightParenRun_exact
       start finish
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+
+private theorem observedRawSymbolAtBool_exact
+    (tokens : List Token) (cursor : Boundary tokens) (symbol : Symbol) :
+    Chart.observedRawSymbolAtBool cursor symbol = true ↔
+      ∃ terminalCursor : TerminalCursor tokens,
+      ∃ token : Token,
+        terminalCursor.beforeBoundary = cursor ∧
+          tokens[terminalCursor.val]? = some token ∧
+          token.payload = .symbol symbol := by
+  constructor
+  · intro accepted
+    unfold Chart.observedRawSymbolAtBool at accepted
+    split at accepted
+    case isFalse => simp at accepted
+    case isTrue inRange =>
+      have payload := of_decide_eq_true accepted
+      let terminalCursor : TerminalCursor tokens :=
+        ⟨cursor.val, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+      refine ⟨terminalCursor, tokens[cursor.val], ?_, ?_, payload⟩
+      · apply Fin.ext
+        rfl
+      · exact List.getElem?_eq_getElem inRange
+  · rintro ⟨terminalCursor, token, atCursor, lookup, payload⟩
+    have cursorEq : terminalCursor.val = cursor.val :=
+      congrArg Fin.val atCursor
+    have inRange : cursor.val < tokens.length := by
+      by_cases candidate : cursor.val < tokens.length
+      · exact candidate
+      · have outOfRange : tokens.length ≤ terminalCursor.val := by
+          omega
+        rw [List.getElem?_eq_none outOfRange] at lookup
+        contradiction
+    have tokenEq : tokens[cursor.val] = token := by
+      have canonical := List.getElem?_eq_getElem inRange
+      rw [cursorEq] at lookup
+      exact Option.some.inj (canonical.symm.trans lookup)
+    unfold Chart.observedRawSymbolAtBool
+    rw [dif_pos inRange]
+    exact decide_eq_true (tokenEq ▸ payload)
+
+/-- The public G01 parenthesis bit recognizes exactly one protected matching
+pair in the declarative parser semantics. -/
+theorem observedMatchingParenthesisBool_exact
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) :
+    Chart.observedMatchingParenthesisBool tokens openCursor closeCursor =
+        true ↔
+      MatchingDelimiter tokens openCursor closeCursor
+        .leftParen .rightParen := by
+  unfold Chart.observedMatchingParenthesisBool MatchingDelimiter
+  simp only [Bool.and_eq_true, true_and]
+  constructor
+  · rintro ⟨⟨openAccepted, closeAccepted⟩, runAccepted⟩
+    generalize boundaryEq : Chart.observedBoundaryAt? tokens
+      (openCursor.val + 1) = result at runAccepted
+    cases result with
+    | none => simp at runAccepted
+    | some interiorStart =>
+        have coordinateEq : interiorStart.val = openCursor.val + 1 :=
+          (chart_observedBoundaryAt?_eq_some_iff
+            (openCursor.val + 1) interiorStart).mp boundaryEq
+        rcases (observedRawSymbolAtBool_exact tokens openCursor
+          .leftParen).mp openAccepted with
+          ⟨terminalCursor, token, atOpen, lookup, payload⟩
+        have atInterior : terminalCursor.afterBoundary = interiorStart := by
+          apply Fin.ext
+          have atOpenValue := congrArg Fin.val atOpen
+          change terminalCursor.val = openCursor.val at atOpenValue
+          change terminalCursor.val + 1 = interiorStart.val
+          omega
+        refine ⟨interiorStart,
+          ⟨terminalCursor, token, atOpen, atInterior, lookup, payload⟩,
+          (observedRawSymbolAtBool_exact tokens closeCursor
+            .rightParen).mp closeAccepted,
+          ?_⟩
+        exact (observedProtectedRightParenRun_exact tokens
+          interiorStart closeCursor).mp (of_decide_eq_true runAccepted)
+  · rintro ⟨interiorStart,
+      ⟨terminalCursor, token, atOpen, atInterior, lookup, payload⟩,
+      closeObserved, run⟩
+    have coordinateEq : interiorStart.val = openCursor.val + 1 := by
+      have atOpenValue := congrArg Fin.val atOpen
+      have atInteriorValue := congrArg Fin.val atInterior
+      change terminalCursor.val = openCursor.val at atOpenValue
+      change terminalCursor.val + 1 = interiorStart.val at atInteriorValue
+      omega
+    have boundaryEq : Chart.observedBoundaryAt? tokens
+        (openCursor.val + 1) = some interiorStart :=
+      (chart_observedBoundaryAt?_eq_some_iff
+        (openCursor.val + 1) interiorStart).mpr coordinateEq
+    refine ⟨⟨
+      (observedRawSymbolAtBool_exact tokens openCursor .leftParen).mpr
+        ⟨terminalCursor, token, atOpen, lookup, payload⟩,
+      (observedRawSymbolAtBool_exact tokens closeCursor .rightParen).mpr
+        closeObserved⟩, ?_⟩
+    rw [boundaryEq]
+    exact decide_eq_true
+      ((observedProtectedRightParenRun_exact tokens
+        interiorStart closeCursor).mpr run)
+
+/-- The canonical U01 G01 bit agrees with the constructive semantic oracle. -/
+theorem rawMatchingParenthesisObservation_eq_semantic
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) :
+    Chart.rawMatchingParenthesisObservation tokens openCursor closeCursor =
+      semanticMatchingParenthesisObservation tokens openCursor
+        closeCursor := by
+  rw [Chart.rawMatchingParenthesisObservation_eq_observed]
+  apply Bool.eq_iff_iff.mpr
+  rw [observedMatchingParenthesisBool_exact,
+    semanticMatchingParenthesisObservation_exact]
+
+end Solcore.Surface.Multi
