@@ -641,4 +641,59 @@ theorem matchArmClassifiedObservation_exact
     exact matchArmPipeObservationBool_exact owned key
 
 
+/-- G08 is exact once nearest-region and raw greatest-expression observations
+are exact. -/
+theorem terminalExpressionPositiveObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (region : Chart.StatementRegionObservation tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isTerminalExpression : key.guard = .G08_terminalExpression)
+    (regionExact : ∀ regionStart regionEnd,
+      region regionStart regionEnd = true ↔
+        NearestStatementRegion file tokens regionStart regionEnd)
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .expression) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .expression)
+          start upperBound finish) :
+    Chart.terminalExpressionPositiveObservationBool region greatest key =
+        true ↔
+      GuardEvidence file tokens key .positive := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G08_terminalExpression at isTerminalExpression
+  subst guard
+  simp [Chart.terminalExpressionPositiveObservationBool, GuardEvidence,
+    owned, List.any_eq_true, regionExact, greatestExact]
+
+/-- G08 classification is exact under the same two explicit phase contracts. -/
+theorem terminalExpressionClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (region : Chart.StatementRegionObservation tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isTerminalExpression : key.guard = .G08_terminalExpression)
+    (regionExact : ∀ regionStart regionEnd,
+      region regionStart regionEnd = true ↔
+        NearestStatementRegion file tokens regionStart regionEnd)
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .expression) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .expression)
+          start upperBound finish)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.terminalExpressionPositiveObservationBool
+          region greatest key) false = decision ↔
+      GuardEvidence file tokens key decision := by
+  apply guardEvidence_iff_classified_observation owned key
+    (Chart.terminalExpressionPositiveObservationBool region greatest key)
+      false
+  · exact terminalExpressionPositiveObservationBool_exact owned region
+      greatest key isTerminalExpression regionExact greatestExact
+  · intro impossible
+    rw [isTerminalExpression] at impossible
+    contradiction
+
+
 end Solcore.Surface.Multi
