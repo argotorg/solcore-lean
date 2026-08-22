@@ -11411,4 +11411,242 @@ private theorem attemptContextualPredictions?_operationalInvariant
 end Chart
 
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem contextualScannedEdge?_operational
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (owned : TokensOwnedBy file tokens)
+    (before after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (beforeReached : OperationalContextualReach file tokens memo before)
+    (selected : contextualScannedEdge? owned before = some (after, edge)) :
+    OperationalContextualReach file tokens memo after ∧
+      OperationalContextualEdgeReach file tokens memo
+        (.scanned edge.before edge.after edge.cursor) := by
+  unfold contextualScannedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  simp only at selected
+  split at selected <;> try contradiction
+  next matched matchEq =>
+    have pairEq := Option.some.inj selected
+    have beforeEq : before = edge.before := by
+      simpa only using congrArg (fun pair => pair.2.before) pairEq
+    have generatedAfterEq : after = edge.after := by
+      have first := congrArg (fun pair => pair.1) pairEq
+      have second := congrArg (fun pair => pair.2.after) pairEq
+      exact first.symm.trans second
+    have beforeEdgeReached : OperationalContextualReach file tokens memo
+        edge.before := by
+      rw [← beforeEq]
+      exact beforeReached
+    have afterEdgeReached := OperationalContextualReach.scan edge.before
+      edge.after edge.cursor beforeEdgeReached edge.structural
+    have afterReached : OperationalContextualReach file tokens memo after := by
+      rw [generatedAfterEq]
+      exact afterEdgeReached
+    exact ⟨afterReached, edge.structural, beforeEdgeReached,
+      afterEdgeReached⟩
+
+private theorem insertContextualScannedEdge?_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    rfl
+  · rw [runMappedPrimitive?_payload current _ _ selected]
+
+private theorem attemptContextualScan?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (beforeReached : OperationalContextualReach file tokens
+      current.payload.phaseC.memo before)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCOperationalInvariant file tokens result.payload ∧
+      result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have attemptedPayload := runMappedPrimitive?_payload current _ id
+      attemptedEq
+    change attempted.payload = current.payload at attemptedPayload
+    have attemptedInvariant :
+        PhaseCOperationalInvariant file tokens attempted.payload := by
+      rw [attemptedPayload]
+      exact invariant
+    have beforeAttempted : OperationalContextualReach file tokens
+        attempted.payload.phaseC.memo before := by
+      rw [attemptedPayload]
+      exact beforeReached
+    cases scanEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scanEq, Option.some.injEq] at remainder
+        cases remainder
+        refine ⟨attemptedInvariant, ?_⟩
+        rw [attemptedPayload]
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scanEq, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        have edgeReached := contextualScannedEdge?_operational owned
+          before after edge beforeAttempted scanEq
+        have itemInvariant := insertContextualItem?_operationalInvariant
+          attempted withItem .scan after attemptedInvariant edgeReached.1 itemEq
+        have itemMemo := insertContextualItem?_memo attempted withItem .scan
+          after itemEq
+        have edgeReachedWithItem : OperationalContextualEdgeReach file tokens
+            withItem.payload.phaseC.memo
+            (.scanned edge.before edge.after edge.cursor) := by
+          rw [itemMemo]
+          exact edgeReached.2
+        refine ⟨insertContextualScannedEdge?_operationalInvariant
+          withItem result edge itemInvariant edgeReachedWithItem edgeEq, ?_⟩
+        exact (insertContextualScannedEdge?_memo withItem result edge edgeEq).trans
+          (itemMemo.trans (by rw [attemptedPayload]))
+  next notApplicable =>
+    cases selected
+    exact ⟨invariant, rfl⟩
+
+private theorem contextualCompletedEdge?_operational
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (waitingReached : OperationalContextualReach file tokens memo waiting)
+    (finishedReached : OperationalContextualReach file tokens memo finished)
+    (selected : contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge)) :
+    OperationalContextualReach file tokens memo after ∧
+      OperationalContextualEdgeReach file tokens memo
+        (.completed edge.waiting edge.finished edge.after edge.shared) := by
+  unfold contextualCompletedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  next sameContext =>
+    have pairEq := Option.some.inj selected
+    have waitingEq : waiting = edge.waiting := by
+      simpa only using congrArg (fun pair => pair.2.waiting) pairEq
+    have finishedEq : finished = edge.finished := by
+      simpa only using congrArg (fun pair => pair.2.finished) pairEq
+    have generatedAfterEq : after = edge.after := by
+      have first := congrArg (fun pair => pair.1) pairEq
+      have second := congrArg (fun pair => pair.2.after) pairEq
+      exact first.symm.trans second
+    have waitingEdgeReached : OperationalContextualReach file tokens memo
+        edge.waiting := by
+      rw [← waitingEq]
+      exact waitingReached
+    have finishedEdgeReached : OperationalContextualReach file tokens memo
+        edge.finished := by
+      rw [← finishedEq]
+      exact finishedReached
+    have afterEdgeReached := OperationalContextualReach.complete edge.waiting
+      edge.finished edge.after edge.shared waitingEdgeReached
+        finishedEdgeReached edge.structural
+    have afterReached : OperationalContextualReach file tokens memo after := by
+      rw [generatedAfterEq]
+      exact afterEdgeReached
+    exact ⟨afterReached, edge.structural, waitingEdgeReached,
+      finishedEdgeReached, afterEdgeReached⟩
+
+private theorem insertContextualCompletedEdge?_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    rfl
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, insertedEq, chargedEq⟩
+    rw [runMappedPrimitive?_payload current _ _ chargedEq]
+
+private theorem attemptContextualCompletion?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (waitingReached : OperationalContextualReach file tokens
+      current.payload.phaseC.memo waiting)
+    (finishedReached : OperationalContextualReach file tokens
+      current.payload.phaseC.memo finished)
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    PhaseCOperationalInvariant file tokens result.payload ∧
+      result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold attemptContextualCompletion? at selected
+  cases completionEq : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completionEq, Option.some.injEq] at selected
+      cases selected
+      exact ⟨invariant, rfl⟩
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      next attemptedBefore =>
+        cases selected
+        exact ⟨invariant, rfl⟩
+      next fresh =>
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        have attemptedPayload := runMappedPrimitive?_payload current _ id
+          attemptedEq
+        change attempted.payload = current.payload at attemptedPayload
+        have attemptedInvariant :
+            PhaseCOperationalInvariant file tokens attempted.payload := by
+          rw [attemptedPayload]
+          exact invariant
+        have waitingAttempted : OperationalContextualReach file tokens
+            attempted.payload.phaseC.memo waiting := by
+          rw [attemptedPayload]
+          exact waitingReached
+        have finishedAttempted : OperationalContextualReach file tokens
+            attempted.payload.phaseC.memo finished := by
+          rw [attemptedPayload]
+          exact finishedReached
+        have edgeReached := contextualCompletedEdge?_operational waiting
+          finished after edge waitingAttempted finishedAttempted completionEq
+        have itemInvariant := insertContextualItem?_operationalInvariant
+          attempted withItem .completion after attemptedInvariant
+            edgeReached.1 itemEq
+        have itemMemo := insertContextualItem?_memo attempted withItem
+          .completion after itemEq
+        have edgeReachedWithItem : OperationalContextualEdgeReach file tokens
+            withItem.payload.phaseC.memo
+            (.completed edge.waiting edge.finished edge.after edge.shared) := by
+          rw [itemMemo]
+          exact edgeReached.2
+        refine ⟨insertContextualCompletedEdge?_operationalInvariant
+          withItem result edge itemInvariant edgeReachedWithItem edgeEq, ?_⟩
+        exact (insertContextualCompletedEdge?_memo withItem result edge edgeEq).trans
+          (itemMemo.trans (by rw [attemptedPayload]))
+
+end Chart
+
+
 end Solcore.Surface.Multi
