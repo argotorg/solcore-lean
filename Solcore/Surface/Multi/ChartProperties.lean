@@ -1646,4 +1646,99 @@ theorem executeObservedContextualWorklist?_completionBackpointerUnique_of_edge_c
   rw [leftKey, rightKey] at consistent
   exact consistent rfl
 
+open Solcore.Workspace
+open Grammar
+
+private theorem contextualReach_operational
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    Chart.OperationalContextualReach file tokens memo item := by
+  induction reached with
+  | root => exact Chart.OperationalContextualReach.root
+  | predict waiting predicted _ next enabled waitingInduction =>
+      exact Chart.OperationalContextualReach.predict waiting predicted
+        waitingInduction next
+          ((memoEnablesProduction_iff_enabled correct final _).mpr enabled)
+  | scan before after cursor _ structural beforeInduction =>
+      exact Chart.OperationalContextualReach.scan before after cursor
+        beforeInduction structural
+  | complete waiting finished after shared _ _ structural
+      waitingInduction finishedInduction =>
+      exact Chart.OperationalContextualReach.complete waiting finished after
+        shared waitingInduction finishedInduction structural
+
+private theorem contextualEdgeReach_operational
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {key : ContextualPackedEdgeKey tokens}
+    (reached : ContextualEdgeReach file tokens memo correct final key) :
+    Chart.OperationalContextualEdgeReach file tokens memo key := by
+  rcases reached with ⟨structural, endpoints⟩
+  constructor
+  · exact structural
+  · cases key with
+    | scanned before after cursor =>
+        exact ⟨contextualReach_operational correct final endpoints.1,
+          contextualReach_operational correct final endpoints.2⟩
+    | completed waiting finished after shared =>
+        exact ⟨contextualReach_operational correct final endpoints.1,
+          contextualReach_operational correct final endpoints.2.1,
+          contextualReach_operational correct final endpoints.2.2⟩
+
+/-- Declarative completeness factors through one exact operational boundary:
+the successful result must be closed under every Phase-C rule.  Queue
+fairness/freshness is precisely what remains to establish that premise. -/
+theorem executeObservedContextualWorklist?_complete_of_operationalClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (correct : PhaseBCorrect file tokens result.memo)
+    (closed : Chart.OperationalContextualClosure file tokens result.memo
+      result.items result.edges) :
+    ∃ final : AllGuardsFinal result.memo,
+      (∀ item, ContextualReach file tokens result.memo correct final item →
+        item ∈ result.items) ∧
+      (∀ key, ContextualEdgeReach file tokens result.memo correct final key →
+        ∃ retained, retained ∈ result.edges ∧ retained.val = key) := by
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  refine ⟨final, ?_, ?_⟩
+  · intro item reached
+    exact closed.reach_complete
+      (contextualReach_operational correct final reached)
+  · intro key reached
+    exact closed.edge_complete
+      (contextualEdgeReach_operational correct final reached)
+
+/-- No unconditional backpointer uniqueness is claimed: retained-ledger
+consistency becomes declarative uniqueness only after the same operational
+closure/fairness premise supplies edge coverage. -/
+theorem executeObservedContextualWorklist?_completionBackpointerUnique_of_operationalClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (correct : PhaseBCorrect file tokens result.memo)
+    (closed : Chart.OperationalContextualClosure file tokens result.memo
+      result.items result.edges) :
+    ∃ final : AllGuardsFinal result.memo,
+      CompletionBackpointerUnique file tokens result.memo correct final := by
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  refine ⟨final,
+    executeObservedContextualWorklist?_completionBackpointerUnique_of_edge_complete
+      file tokens owned result selected correct final ?_⟩
+  intro key reached
+  exact closed.edge_complete
+    (contextualEdgeReach_operational correct final reached)
+
 end Solcore.Surface.Multi
