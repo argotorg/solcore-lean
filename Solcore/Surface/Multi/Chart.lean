@@ -17526,3 +17526,92 @@ private theorem activateWorklistProduction?_total_fresh
 end Chart
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Raw retained-symbol observation with its exact successor boundary. -/
+def observedImmediatelyAfterRawSymbolBool
+    {tokens : List Token} (symbol : Symbol)
+    (boundary after : Boundary tokens) : Bool :=
+  observedRawSymbolAtBool boundary symbol &&
+    decide (after.val = boundary.val + 1)
+
+/-- The first allowed symbol returning to one delimiter depth, generalized
+from G06's fixed delimiter family for use by match-arm headers. -/
+def observedNextSameDepthDelimiterBool
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Bool :=
+  observedSameDelimiterDepthBool tokens start cursor &&
+    observedAllowedSymbolAtBool cursor allowed &&
+    (List.finRange (tokens.length + 2)).all fun earlier =>
+      if start.val ≤ earlier.val && earlier.val < cursor.val &&
+          observedSameDelimiterDepthBool tokens start earlier then
+        !observedAllowedSymbolAtBool earlier allowed
+      else
+        true
+
+/-- Public proof-free view of the canonical match-arm header oracle. -/
+def observedSaturatedMatchArmHeaderObservation
+    (tokens : List Token) : MatchArmHeaderObservation tokens :=
+  fun regionStart cursor =>
+    decide (regionStart.val ≤ cursor.val) &&
+      observedSameDelimiterDepthBool tokens regionStart cursor &&
+      observedRawSymbolAtBool cursor .pipe &&
+      match observedBoundaryAt? tokens (cursor.val + 1) with
+      | none => false
+      | some patternStart =>
+          observedImmediatelyAfterRawSymbolBool .pipe cursor patternStart &&
+            (List.finRange (tokens.length + 2)).any fun arrowCursor =>
+              observedNextSameDepthDelimiterBool tokens patternStart
+                  arrowCursor ⟨.fatArrow, []⟩ &&
+                saturatedRawGreatestEndObservation tokens
+                  (.aux Grammar.matchArmPatternListSite.site)
+                  patternStart arrowCursor arrowCursor
+
+private theorem observedImmediatelyAfterRawSymbolBool_eq_phaseA
+    {tokens : List Token} (symbol : Symbol)
+    (boundary after : Boundary tokens) :
+    observedImmediatelyAfterRawSymbolBool symbol boundary after =
+      phaseAImmediatelyAfterSymbolBool symbol boundary after := by
+  simp [observedImmediatelyAfterRawSymbolBool,
+    phaseAImmediatelyAfterSymbolBool, observedRawSymbolAtBool_eq_phaseA]
+
+private theorem observedSameDelimiterDepthBool_eq_phaseA
+    (tokens : List Token) (start finish : Boundary tokens) :
+    observedSameDelimiterDepthBool tokens start finish =
+      phaseASameDelimiterDepthBool tokens start finish := by
+  unfold observedSameDelimiterDepthBool phaseASameDelimiterDepthBool
+  have run := phaseADelimiterRun?_observed tokens [] start finish
+  simp only [List.map_nil] at run
+  rw [← run]
+  cases phaseADelimiterRun? tokens [] start finish <;> simp
+
+private theorem observedNextSameDepthDelimiterBool_eq_phaseA
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    observedNextSameDepthDelimiterBool tokens start cursor allowed =
+      phaseANextSameDepthDelimiterBool tokens start cursor allowed := by
+  simp only [observedNextSameDepthDelimiterBool,
+    phaseANextSameDepthDelimiterBool,
+    observedSameDelimiterDepthBool_eq_phaseA,
+    observedAllowedSymbolAtBool_eq_phaseA]
+
+/-- The public header view is definitionally faithful to the canonical raw
+saturation oracle consumed by Phase B. -/
+theorem saturatedMatchArmHeaderObservation_eq_observed
+    (tokens : List Token) (regionStart cursor : Boundary tokens) :
+    saturatedMatchArmHeaderObservation tokens regionStart cursor =
+      observedSaturatedMatchArmHeaderObservation tokens
+        regionStart cursor := by
+  simp only [saturatedMatchArmHeaderObservation,
+    observedSaturatedMatchArmHeaderObservation,
+    observedSameDelimiterDepthBool_eq_phaseA,
+    observedRawSymbolAtBool_eq_phaseA,
+    observedBoundaryAt?_eq_phaseA,
+    observedImmediatelyAfterRawSymbolBool_eq_phaseA,
+    observedNextSameDepthDelimiterBool_eq_phaseA]
+
+end Solcore.Surface.Multi.Chart
