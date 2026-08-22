@@ -12102,4 +12102,28 @@ theorem OperationalContextualClosure.edge_complete
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Every successful Phase-A worklist computes the canonical saturated
+greatest-end observation. -/
+private theorem executePhaseA?_rawGreatestEndBool_eq_saturated
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) :
+    rawGreatestEndBool result.payload symbol start upperBound finish =
+      saturatedRawGreatestEndObservation tokens symbol start
+        upperBound finish := by
+  apply rawGreatestEndBool_eq_saturated result.payload
+  intro item
+  simpa only [SaturatedRawItem] using
+    executePhaseA?_membership_eq file tokens owned result selected item
+
+end Chart
+
 end Solcore.Surface.Multi
