@@ -3963,6 +3963,98 @@ private theorem attemptScan?_completionLedger
   have subsets := attemptScan?_subsets owned current result before selected
   exact ledger.mono subsets.1 subsets.2
 
+private def CompletionAttemptAddressesExtendedBy
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens) : Prop :=
+  ∀ candidateWaiting candidateFinished,
+    (.cubic .U03_completionAttempt
+      (rawCompletionKey candidateWaiting candidateFinished) :
+        UnitAddress tokens) ∈ after.counter.usedRev →
+    (.cubic .U03_completionAttempt
+      (rawCompletionKey candidateWaiting candidateFinished) :
+        UnitAddress tokens) ∈ before.counter.usedRev ∨
+    (rawCompletionKey candidateWaiting candidateFinished =
+        rawCompletionKey waiting finished ∧
+      ∃ after edge, completedEdge? (file := file) waiting finished =
+        some (after, edge))
+
+private theorem attemptCompletion?_content_extension
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (selected : attemptCompletion? current waiting finished = some result) :
+    PhaseAContentSubset current result ∧
+      CompletionAttemptAddressesExtendedBy current result waiting finished := by
+  unfold attemptCompletion? at selected
+  cases completion : completedEdge? (file := file) waiting finished with
+  | none =>
+      simp only [completion] at selected
+      cases selected
+      exact ⟨.refl current, fun _ _ member => Or.inl member⟩
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completion] at selected
+      split at selected
+      next usedBefore =>
+        cases selected
+        exact ⟨.refl current, fun _ _ member => Or.inl member⟩
+      next fresh =>
+        simp only [Option.bind_eq_bind,
+          Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨attempted, attemptedEq,
+          withItem, itemEq, edgeEq⟩
+        have attemptedContent : PhaseAContentSubset current attempted := by
+          unfold PhaseAContentSubset
+          rw [phaseA_runMappedPrimitive?_payload current _ id attempted
+            attemptedEq]
+          exact ⟨fun _ => id, fun _ => id⟩
+        have itemSubset := insertRawItem?_subsets attempted withItem
+          .completion after itemEq
+        have edgeSubset := insertRawEdge?_subsets withItem result edge edgeEq
+        constructor
+        · exact attemptedContent.trans (itemSubset.1.trans edgeSubset.1)
+        · intro candidateWaiting candidateFinished member
+          have inAttempted := itemSubset.2 candidateWaiting candidateFinished
+            (edgeSubset.2 candidateWaiting candidateFinished member)
+          rw [phaseA_runMappedPrimitive?_usedRev current _ id attempted
+            attemptedEq] at inAttempted
+          simp only [List.mem_cons] at inAttempted
+          rcases inAttempted with equal | old
+          · right
+            have keyEq : rawCompletionKey candidateWaiting candidateFinished =
+                rawCompletionKey waiting finished := by
+              simpa only [UnitAddress.cubic.injEq, true_and] using equal
+            exact ⟨keyEq, after, edge, completion⟩
+          · exact Or.inl old
+
+private theorem attemptCompletion?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : attemptCompletion? current waiting finished = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  have extension := attemptCompletion?_content_extension current result
+    waiting finished selected
+  intro candidateWaiting candidateFinished after edge computed used
+  rcases extension.2 candidateWaiting candidateFinished used with
+    old | extended
+  · obtain ⟨itemMember, candidate, edgeMember, same⟩ :=
+      ledger candidateWaiting candidateFinished after edge computed old
+    exact ⟨extension.1.1 itemMember,
+      candidate, extension.1.2 edgeMember, same⟩
+  · rcases extended with ⟨sameKey, actualAfter, actualEdge, completion⟩
+    have sameResult := completedEdge?_eq_of_rawCompletionKey_eq
+      candidateWaiting candidateFinished after edge
+      waiting finished actualAfter actualEdge computed completion sameKey
+    obtain ⟨actualItem, candidate, candidateMember, candidateSame⟩ :=
+      attemptCompletion?_materialized_of_ledger current result
+        waiting finished actualAfter actualEdge ledger completion selected
+    rw [sameResult.1, sameResult.2]
+    exact ⟨actualItem, candidate, candidateMember, candidateSame⟩
+
+
 
 
 
