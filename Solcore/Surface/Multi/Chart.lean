@@ -6754,6 +6754,146 @@ private theorem attemptScan?_edgeSafe
     exact safe
 
 
+private structure PhaseAAllSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) : Prop where
+  item : PhaseAItemSafe current
+  completion : PhaseACompletionSafe current
+  edge : PhaseAEdgeSafe current
+
+private theorem beginPhaseA_allSafe
+    (file : WorkspaceFile) (tokens : List Token) :
+    PhaseAAllSafe (beginPhaseA file tokens) :=
+  ⟨beginPhaseA_itemSafe file tokens, beginPhaseA_completionSafe file tokens,
+    beginPhaseA_edgeSafe file tokens⟩
+
+private theorem insertRawSeeds?_total_allSafe
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ seeds (current : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseAAllSafe current →
+      ∃ result, insertRawSeeds? seeds current = some result ∧
+        PhaseAAllSafe result := by
+  intro seeds
+  induction seeds with
+  | nil =>
+      intro current safe
+      exact ⟨current, rfl, safe⟩
+  | cons item rest induction =>
+      intro current safe
+      obtain ⟨next, nextEq⟩ := insertRawItem?_total current
+        .seedOrPrediction item safe.item
+      have nextSafe : PhaseAAllSafe next := {
+        item := insertRawItem?_itemSafe current next .seedOrPrediction item
+          safe.item nextEq
+        completion := insertRawItem?_completionSafe current next
+          .seedOrPrediction item safe.completion nextEq
+        edge := insertRawItem?_edgeSafe current next .seedOrPrediction item
+          safe.edge nextEq
+      }
+      obtain ⟨result, restEq, resultSafe⟩ := induction next nextSafe
+      exact ⟨result, by simp [insertRawSeeds?, nextEq, restEq], resultSafe⟩
+
+private theorem processRawItem?_total_allSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (safe : PhaseAAllSafe current) (work : PhaseAItemWorkFresh current item) :
+    ∃ result, processRawItem? owned item current = some result ∧
+      PhaseAAllSafe result := by
+  obtain ⟨predicted, predictedEq, predictedItemSafe, predictedDequeued,
+      predictedScanFresh, predictedEdgeFresh⟩ :=
+    attemptPredictions?_total_itemSafe item allProductionIds current
+      allProductionIds_nodup safe.item work.dequeued
+      (by intro production member; exact work.predictions production)
+      work.scan work.scannedEdge
+  have predictedCompletionSafe := attemptPredictions?_completionSafe item
+    allProductionIds current predicted safe.completion predictedEq
+  have predictedEdgeSafe := attemptPredictions?_edgeSafe item allProductionIds
+    current predicted safe.edge predictedEq
+  obtain ⟨scanned, scannedEq, scannedItemSafe⟩ :=
+    attemptScan?_total_itemSafe owned predicted item predictedItemSafe
+      predictedDequeued predictedScanFresh predictedEdgeFresh
+  have scannedCompletionSafe := attemptScan?_completionSafe owned predicted scanned
+    item predictedCompletionSafe scannedEq
+  have scannedEdgeSafe := attemptScan?_edgeSafe owned predicted scanned item
+    predictedEdgeSafe scannedEq
+  obtain ⟨result, completionEq, resultItemSafe, resultCompletionSafe,
+    resultEdgeSafe⟩ := attemptCompletionsWith?_total_allSafe item
+      scanned.payload.rawItems scanned scannedItemSafe scannedCompletionSafe
+      scannedEdgeSafe
+  refine ⟨result, ?_, ⟨resultItemSafe, resultCompletionSafe,
+    resultEdgeSafe⟩⟩
+  unfold processRawItem?
+  rw [predictedEq]
+  simp only [Option.bind_eq_bind, Option.bind_some]
+  rw [scannedEq]
+  exact completionEq
+
+private theorem dequeueRawItem?_queue_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens)
+    (selected : dequeueRawItem? current = some (item, after)) :
+    ∃ rest, current.payload.itemQueue = item :: rest := by
+  unfold dequeueRawItem? at selected
+  cases queue : current.payload.itemQueue with
+  | nil => simp [queue] at selected
+  | cons head rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      simp only [pure, Option.some.injEq, Prod.mk.injEq] at output
+      rcases output with ⟨headEq, nextEqual⟩
+      subst head
+      exact ⟨rest, rfl⟩
+
+private theorem dequeueRawEdge?_queue_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (selected : dequeueRawEdge? current = some (edge, after)) :
+    ∃ rest, current.payload.edgeQueue = edge :: rest := by
+  unfold dequeueRawEdge? at selected
+  cases queue : current.payload.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons head rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      simp only [pure, Option.some.injEq, Prod.mk.injEq] at output
+      rcases output with ⟨headEq, nextEqual⟩
+      subst head
+      exact ⟨rest, rfl⟩
+
+private theorem dequeueRawItem?_allSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens) (safe : PhaseAAllSafe current)
+    (selected : dequeueRawItem? current = some (item, after)) :
+    PhaseAAllSafe after ∧ PhaseAItemWorkFresh after item := by
+  obtain ⟨rest, queue⟩ := dequeueRawItem?_queue_shape current after item selected
+  exact ⟨{
+    item := dequeueRawItem?_itemSafe current (item, after) safe.item selected
+    completion := dequeueRawItem?_completionSafe current after item rest queue
+      safe.completion selected
+    edge := dequeueRawItem?_edgeSafe current after item rest queue safe.edge selected
+  }, dequeueRawItem?_workFresh current after item rest queue safe.item selected⟩
+
+private theorem dequeueRawEdge?_allSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens) (safe : PhaseAAllSafe current)
+    (selected : dequeueRawEdge? current = some (edge, after)) :
+    PhaseAAllSafe after := by
+  obtain ⟨rest, queue⟩ := dequeueRawEdge?_queue_shape current after edge selected
+  exact {
+    item := dequeueRawEdge?_itemSafe current after edge rest queue safe.item selected
+    completion := dequeueRawEdge?_completionSafe current after edge rest queue
+      safe.completion selected
+    edge := dequeueRawEdge?_edgeSafe current after edge rest queue safe.edge selected
+  }
+
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
