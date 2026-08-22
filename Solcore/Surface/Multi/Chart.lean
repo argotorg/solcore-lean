@@ -5595,6 +5595,207 @@ private theorem attemptPredictions?_total_itemSafe
         resultSafe, resultDequeued, resultScanFresh, resultEdgeFresh⟩
 
 
+private theorem chargeScan_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens) (safe : PhaseAItemSafe current)
+    (dequeued : (.linear .L01_itemDequeue (rawLinearKey before) :
+      UnitAddress tokens) ∈ current.counter.usedRev)
+    (selected : runMappedPrimitive? current
+      (.linear .L04_scanAttempt (rawLinearKey before)) id = some result) :
+    PhaseAItemSafe result := by
+  have payload := phaseA_runMappedPrimitive?_payload current _ id result selected
+  have used := phaseA_runMappedPrimitive?_usedRev current _ id result selected
+  constructor
+  · intro source item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · cases source <;> simp [RawItemInsertSource.unitKind] at equal
+    · simpa [payload] using safe.inserted source item old
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · simpa [payload] using safe.dequeued item old
+  · intro item production member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.predicted item production old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp only [UnitAddress.linear.injEq] at equal
+      rw [rawLinearKey_injective equal.2, used]
+      exact List.mem_cons_of_mem _ dequeued
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scanned item old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+  · intro item member usedItem
+    rw [payload] at member
+    rw [used] at usedItem
+    simp only [List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · simp at equal
+    · exact safe.queueFresh item member old
+  · simpa [payload] using safe.rawNodup
+  · simpa [payload] using safe.queueNodup
+  · simpa [payload] using safe.queueSubset
+
+private theorem insertScannedRawEdge?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before after : DottedItem tokens) (cursor : TerminalCursor tokens)
+    (edge : PackedEdge file tokens)
+    (shape : edge.val = .scanned before after cursor)
+    (safe : PhaseAItemSafe current)
+    (dequeued : (.linear .L01_itemDequeue (rawLinearKey before) :
+      UnitAddress tokens) ∈ current.counter.usedRev)
+    (selected : insertRawEdge? current edge = some result) :
+    PhaseAItemSafe result := by
+  unfold insertRawEdge? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact safe
+  next absent =>
+    simp only [shape] at selected
+    have payload := phaseA_runMappedPrimitive?_payload current _ _ result
+      selected
+    have used := phaseA_runMappedPrimitive?_usedRev current _ _ result selected
+    constructor
+    · intro source item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;> simp [RawItemInsertSource.unitKind] at equal
+      · simpa [payload] using safe.inserted source item old
+    · intro item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · simpa [payload] using safe.dequeued item old
+    · intro item production member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.predicted item production old)
+    · intro item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scanned item old)
+    · intro item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp only [UnitAddress.linear.injEq] at equal
+        rw [rawLinearKey_injective equal.2, used]
+        exact List.mem_cons_of_mem _ dequeued
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+    · intro item member usedItem
+      rw [payload] at member
+      rw [used] at usedItem
+      simp only [List.mem_cons] at usedItem
+      rcases usedItem with equal | old
+      · simp at equal
+      · exact safe.queueFresh item member old
+    · simpa [payload] using safe.rawNodup
+    · simpa [payload] using safe.queueNodup
+    · simpa [payload] using safe.queueSubset
+
+private theorem insertScannedRawEdge?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (before after : DottedItem tokens) (cursor : TerminalCursor tokens)
+    (edge : PackedEdge file tokens)
+    (shape : edge.val = .scanned before after cursor)
+    (fresh : (.linear .L06_scannedEdgeInsert (rawLinearKey before) :
+      UnitAddress tokens) ∉ current.counter.usedRev) :
+    ∃ result, insertRawEdge? current edge = some result := by
+  unfold insertRawEdge?
+  split
+  next present => exact ⟨current, rfl⟩
+  next absent =>
+    simp only [shape]
+    simp [runMappedPrimitive?, fresh]
+
+private theorem attemptScan?_total_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens) (safe : PhaseAItemSafe current)
+    (dequeued : (.linear .L01_itemDequeue (rawLinearKey before) :
+      UnitAddress tokens) ∈ current.counter.usedRev)
+    (scanFresh : (.linear .L04_scanAttempt (rawLinearKey before) :
+      UnitAddress tokens) ∉ current.counter.usedRev)
+    (edgeFresh : (.linear .L06_scannedEdgeInsert (rawLinearKey before) :
+      UnitAddress tokens) ∉ current.counter.usedRev) :
+    ∃ result, attemptScan? owned current before = some result ∧
+      PhaseAItemSafe result := by
+  unfold attemptScan?
+  split
+  next applicable =>
+    let attempted : CountedState tokens (PhaseAOpen file tokens) := {
+      payload := current.payload
+      counter := current.counter.charge _ scanFresh
+    }
+    have attemptedEq : runMappedPrimitive? current
+        (.linear .L04_scanAttempt (rawLinearKey before)) id = some attempted := by
+      simp [runMappedPrimitive?, scanFresh, attempted]
+    have attemptedSafe := chargeScan_itemSafe current attempted before safe
+      dequeued attemptedEq
+    have attemptedDequeued : (.linear .L01_itemDequeue
+        (rawLinearKey before) : UnitAddress tokens) ∈
+        attempted.counter.usedRev := by
+      rw [phaseA_runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+      exact List.mem_cons_of_mem _ dequeued
+    have attemptedEdgeFresh : (.linear .L06_scannedEdgeInsert
+        (rawLinearKey before) : UnitAddress tokens) ∉
+        attempted.counter.usedRev := by
+      rw [phaseA_runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+      simp [edgeFresh]
+    cases scan : scannedEdge? owned before with
+    | none => exact ⟨attempted, by simp [attemptedEq], attemptedSafe⟩
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        obtain ⟨withItem, itemEq⟩ := insertRawItem?_total attempted .scan after
+          attemptedSafe
+        have withItemSafe := insertRawItem?_itemSafe attempted withItem .scan
+          after attemptedSafe itemEq
+        have withItemDequeued := insertRawItem?_used_mono attempted withItem
+          .scan after itemEq attemptedDequeued
+        have withItemEdgeFresh := insertRawItem?_preserves_fresh attempted
+          withItem .scan after _ (by
+            intro source item
+            cases source <;> simp [RawItemInsertSource.unitKind])
+          attemptedEdgeFresh itemEq
+        obtain ⟨cursor, shape⟩ := scannedEdge?_shape owned before after edge scan
+        obtain ⟨result, edgeEq⟩ := insertScannedRawEdge?_total withItem
+          before after cursor edge shape withItemEdgeFresh
+        exact ⟨result, by simp [attemptedEq, itemEq, edgeEq],
+          insertScannedRawEdge?_itemSafe withItem result before after cursor edge
+            shape withItemSafe withItemDequeued edgeEq⟩
+  next notApplicable => exact ⟨current, rfl, safe⟩
+
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
