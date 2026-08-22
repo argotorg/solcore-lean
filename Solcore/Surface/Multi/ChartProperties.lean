@@ -1507,4 +1507,143 @@ theorem saturatedRawGreatestEndObservation_eq_semantic
     semanticGreatestEndObservation_exact owned]
 
 
+open Solcore.Workspace
+open Grammar
+
+private theorem memoEnablesProduction_iff_enabled
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens) :
+    Chart.MemoEnablesProduction memo productionInstance ↔
+      EnabledProductionInstance file tokens memo correct final
+        productionInstance := by
+  constructor
+  · intro enabled guard polarity member
+    obtain ⟨guardInstance, decision, anchor, stored, allowed⟩ :=
+      enabled guard polarity member
+    have sameGuard : guardInstance.guard = guard := anchor.2.1
+    let raw : GuardWitnessKey.Raw tokens := {
+      productionInstance := productionInstance
+      guardInstance := guardInstance
+      polarity := polarity
+    }
+    have valid : GuardWitnessKey.Valid raw := by
+      constructor
+      · simpa only [raw, sameGuard] using member
+      · simpa only [raw, sameGuard] using anchor
+    let key : GuardWitnessKey tokens := ⟨raw, valid⟩
+    refine ⟨key, rfl, sameGuard, rfl, decision, stored, ?_, allowed⟩
+    exact (correct guardInstance decision).mp stored
+  · intro enabled guard polarity member
+    obtain ⟨key, productionEq, guardEq, polarityEq,
+      decision, stored, _evidence, allowed⟩ :=
+      enabled guard polarity member
+    refine ⟨key.guardInstance, decision, ?_, ?_, ?_⟩
+    · have anchor := key.property.2
+      change GuardAnchor key.productionInstance
+        (key.guardInstance.guard, key.polarity) key.guardInstance at anchor
+      change key.productionInstance = productionInstance at productionEq
+      change key.guardInstance.guard = guard at guardEq
+      change key.polarity = polarity at polarityEq
+      rw [productionEq, guardEq, polarityEq] at anchor
+      exact anchor
+    · exact stored
+    · simpa only [polarityEq] using allowed
+
+private theorem operationalContextualReach_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {item : ContextualItemKey tokens}
+    (reached : Chart.OperationalContextualReach file tokens memo item) :
+    ContextualReach file tokens memo correct final item := by
+  induction reached with
+  | root => exact ContextualReach.root
+  | predict waiting predicted _ next enabled waitingInduction =>
+      exact ContextualReach.predict waiting predicted waitingInduction next
+        ((memoEnablesProduction_iff_enabled correct final _).mp enabled)
+  | scan before after cursor _ structural beforeInduction =>
+      exact ContextualReach.scan before after cursor beforeInduction structural
+  | complete waiting finished after shared _ _ structural
+      waitingInduction finishedInduction =>
+      exact ContextualReach.complete waiting finished after shared
+        waitingInduction finishedInduction structural
+
+private theorem operationalContextualEdgeReach_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {key : ContextualPackedEdgeKey tokens}
+    (reached : Chart.OperationalContextualEdgeReach file tokens memo key) :
+    ContextualEdgeReach file tokens memo correct final key := by
+  rcases reached with ⟨structural, endpoints⟩
+  constructor
+  · exact structural
+  · cases key with
+    | scanned before after cursor =>
+        exact ⟨operationalContextualReach_sound correct final endpoints.1,
+          operationalContextualReach_sound correct final endpoints.2⟩
+    | completed waiting finished after shared =>
+        exact ⟨operationalContextualReach_sound correct final endpoints.1,
+          operationalContextualReach_sound correct final endpoints.2.1,
+          operationalContextualReach_sound correct final endpoints.2.2⟩
+
+/-- Conditional semantic soundness of the actual checked Phase-C worklist.
+The only remaining Phase-B premise is exact correctness of the returned memo;
+finality follows from successful observed execution. -/
+theorem executeObservedContextualWorklist?_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (correct : PhaseBCorrect file tokens result.memo) :
+    ∃ final : AllGuardsFinal result.memo,
+      (∀ item, item ∈ result.items →
+        ContextualReach file tokens result.memo correct final item) ∧
+      (∀ edge, edge ∈ result.edges →
+        ContextualEdgeReach file tokens result.memo correct final edge.val) := by
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  have operational :=
+    Chart.executeObservedContextualWorklist?_operational_sound
+      file tokens owned result selected
+  refine ⟨final, ?_, ?_⟩
+  · intro item member
+    exact operationalContextualReach_sound correct final
+      (operational.1 item member)
+  · intro edge member
+    exact operationalContextualEdgeReach_sound correct final
+      (operational.2 edge member)
+
+/-- Retained ledger consistency upgrades to the declarative completion
+backpointer invariant exactly when every declaratively reached edge is
+retained.  Proving that edge-completeness premise is the remaining worklist
+fairness/correspondence obligation. -/
+theorem executeObservedContextualWorklist?_completionBackpointerUnique_of_edge_complete
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (correct : PhaseBCorrect file tokens result.memo)
+    (final : AllGuardsFinal result.memo)
+    (edgeComplete : ∀ key,
+      ContextualEdgeReach file tokens result.memo correct final key →
+        ∃ retained, retained ∈ result.edges ∧ retained.val = key) :
+    CompletionBackpointerUnique file tokens result.memo correct final := by
+  intro after leftWaiting leftFinished rightWaiting rightFinished
+    leftShared rightShared leftReached rightReached
+  obtain ⟨left, leftMember, leftKey⟩ := edgeComplete _ leftReached
+  obtain ⟨right, rightMember, rightKey⟩ := edgeComplete _ rightReached
+  have consistent :=
+    Chart.executeObservedContextualWorklist?_retainedBackpointersConsistent
+      file tokens owned result selected left leftMember right rightMember
+  rw [leftKey, rightKey] at consistent
+  exact consistent rfl
+
 end Solcore.Surface.Multi
