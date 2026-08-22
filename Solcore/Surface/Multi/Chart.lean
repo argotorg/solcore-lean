@@ -8576,4 +8576,104 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_G09
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Public checked construction of one chart boundary. -/
+def observedBoundaryAt?
+    (tokens : List Token) (coordinate : Nat) : Option (Boundary tokens) :=
+  if inRange : coordinate < tokens.length + 2 then
+    some ⟨coordinate, inRange⟩
+  else
+    none
+
+/-- Proof-free terminal observation with its exact successor boundary. -/
+def observedImmediatelyAfterTerminalBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol)
+    (boundary after : Boundary tokens) : Bool :=
+  observedTerminalAtBool owned terminal boundary &&
+    decide (after.val = boundary.val + 1)
+
+/-- The same-depth pattern delimiter oracle used by G06. -/
+abbrev PatternDelimiterObservation (tokens : List Token) :=
+  Boundary tokens → Boundary tokens → Bool
+
+/-- G06's complete positive observation, parameterized by the delimiter and
+greatest-end facts whose adequacy is proved at their own phase boundaries. -/
+def patternComptimePositiveObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (nextDelimiter : PatternDelimiterObservation tokens)
+    (greatest : GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  match observedBoundaryAt? tokens (key.siteCursor.val + 1) with
+  | none => false
+  | some expressionStart =>
+      observedImmediatelyAfterTerminalBool owned
+          (.contextualKeyword .comptimeKw)
+          key.siteCursor expressionStart &&
+        (List.finRange (tokens.length + 2)).any fun limit =>
+          nextDelimiter expressionStart limit &&
+            greatest (.rule .expression)
+              expressionStart limit limit
+
+private theorem observedBoundaryAt?_eq_phaseA
+    (tokens : List Token) (coordinate : Nat) :
+    observedBoundaryAt? tokens coordinate =
+      phaseABoundaryAt? tokens coordinate :=
+  rfl
+
+private theorem observedImmediatelyAfterTerminalBool_eq_phaseA
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol)
+    (boundary after : Boundary tokens) :
+    observedImmediatelyAfterTerminalBool owned terminal boundary after =
+      phaseAImmediatelyAfterTerminalBool owned terminal boundary after := by
+  simp [observedImmediatelyAfterTerminalBool,
+    phaseAImmediatelyAfterTerminalBool,
+    observedTerminalAtBool_eq_phaseA]
+
+/-- Canonical U01 reads implement G06's public parameterized observation. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_G06
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (key : GuardInstanceKey tokens)
+    (isPattern : key.guard = .G06_patternComptime) :
+    phaseBGuardObservationFromIndexes?
+        (canonicalEvidenceEntries
+          (phaseAObservationIndexEvaluator owned) phaseA) key =
+      some (patternComptimePositiveObservationBool owned
+        (fun start limit =>
+          phaseANextSameDepthDelimiterBool tokens start limit {
+            head := .comma
+            tail := [.rightParen, .fatArrow]
+          })
+        (fun symbol start upperBound finish =>
+          rawGreatestEndBool phaseA symbol start upperBound finish) key,
+        false) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G06_patternComptime at isPattern
+  subst guard
+  simp [phaseBGuardObservationFromIndexes?, phaseBG06Positive?,
+    phaseBWithBoundary?,
+    phaseBReadTerminalGuard?, phaseBReadDelimiterGuard?,
+    phaseBReadGreatestRule?, phaseBReadIndex?,
+    phaseAEvidenceEntryAt?_canonical_exact,
+    phaseAObservationIndexEvaluator, phaseATerminalWindowGuardBool,
+    phaseADelimiterOrRegionGuardBool, phaseBAllReads?,
+    phaseBAnyReads?_map_some,
+    patternComptimePositiveObservationBool,
+    observedBoundaryAt?_eq_phaseA,
+    observedImmediatelyAfterTerminalBool_eq_phaseA]
+  cases selected : phaseABoundaryAt? tokens (siteCursor.val + 1) <;>
+    simp
+
+end Chart
+
 end Solcore.Surface.Multi
