@@ -3305,6 +3305,170 @@ private theorem processRawItem?_units_mono
       (attemptCompletionsWith?_units_mono item scanned.payload.rawItems
         scanned result completionEq))
 
+private theorem dequeueRawItem?_units_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : DottedItem tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (selected : dequeueRawItem? current = some result) :
+    result.2.counter.units = current.counter.units + 1 := by
+  unfold dequeueRawItem? at selected
+  cases queueEq : current.payload.itemQueue with
+  | nil => simp [queueEq] at selected
+  | cons item rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_units current _ _ nextEq
+
+private theorem dequeueRawEdge?_units_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : PackedEdge file tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (selected : dequeueRawEdge? current = some result) :
+    result.2.counter.units = current.counter.units + 1 := by
+  unfold dequeueRawEdge? at selected
+  cases queueEq : current.payload.edgeQueue with
+  | nil => simp [queueEq] at selected
+  | cons edge rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_units current _ _ nextEq
+
+private inductive PhaseAQueueReachable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start : CountedState tokens (PhaseAOpen file tokens)) :
+    CountedState tokens (PhaseAOpen file tokens) → Prop where
+  | refl : PhaseAQueueReachable owned start start
+  | item
+      {current after result : CountedState tokens (PhaseAOpen file tokens)}
+      {pivot : DottedItem tokens}
+      (prior : PhaseAQueueReachable owned start current)
+      (dequeued : dequeueRawItem? current = some (pivot, after))
+      (processed : processRawItem? owned pivot after = some result) :
+      PhaseAQueueReachable owned start result
+  | edge
+      {current result : CountedState tokens (PhaseAOpen file tokens)}
+      {edge : PackedEdge file tokens}
+      (prior : PhaseAQueueReachable owned start current)
+      (dequeued : dequeueRawEdge? current = some (edge, result)) :
+      PhaseAQueueReachable owned start result
+
+private def PhaseAQueueBlocked
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  match current.payload.itemQueue with
+  | _ :: _ =>
+      dequeueRawItem? current = none ∨
+        ∃ pivot after,
+          dequeueRawItem? current = some (pivot, after) ∧
+            processRawItem? owned pivot after = none
+  | [] =>
+      match current.payload.edgeQueue with
+      | _ :: _ => dequeueRawEdge? current = none
+      | [] => False
+
+private theorem runPhaseAQueues?_failure_is_operation_blocked
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start : CountedState tokens (PhaseAOpen file tokens)) :
+    ∀ fuel (current : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseAQueueReachable owned start current →
+      chartGBound (tokens.length + 1) < current.counter.units + fuel →
+      runPhaseAQueues? owned fuel current = none →
+      ∃ blocked, PhaseAQueueReachable owned start blocked ∧
+        PhaseAQueueBlocked owned blocked := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current reachable budget selected
+      have bound := current.counter.units_le_chartGBound
+      omega
+  | succ fuel induction =>
+      intro current reachable budget selected
+      rw [runPhaseAQueues?] at selected
+      cases items : current.payload.itemQueue with
+      | nil =>
+          cases edges : current.payload.edgeQueue with
+          | nil => simp [items, edges] at selected
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueRawEdge? current with
+              | none =>
+                  exact ⟨current, reachable, by
+                    simp [PhaseAQueueBlocked, items, edges, dequeued]⟩
+              | some pair =>
+                  rw [dequeued] at selected
+                  have units := dequeueRawEdge?_units_exact current pair dequeued
+                  exact induction pair.2
+                    (.edge reachable dequeued) (by omega) selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueRawItem? current with
+          | none =>
+              exact ⟨current, reachable, by
+                simp [PhaseAQueueBlocked, items, dequeued]⟩
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨pivot, after⟩
+              simp only at selected
+              cases processed : processRawItem? owned pivot after with
+              | none =>
+                  refine ⟨current, reachable, ?_⟩
+                  rw [PhaseAQueueBlocked, items]
+                  exact Or.inr ⟨pivot, after, dequeued, processed⟩
+              | some next =>
+                  rw [processed] at selected
+                  have dequeuedUnits := dequeueRawItem?_units_exact current
+                    (pivot, after) dequeued
+                  have processedUnits := processRawItem?_units_mono owned
+                    pivot after next processed
+                  have nextBudget : chartGBound (tokens.length + 1) <
+                      next.counter.units + fuel := by
+                    simp only at dequeuedUnits
+                    omega
+                  exact induction next (.item reachable dequeued processed)
+                    nextBudget selected
+
+set_option maxRecDepth 2048 in
+private theorem executePhaseA?_failure_boundary
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (failed : executePhaseA? file tokens owned = none) :
+    insertRawSeeds? (rawSeedItems tokens) (beginPhaseA file tokens) = none ∨
+      ∃ seeded blocked,
+        insertRawSeeds? (rawSeedItems tokens) (beginPhaseA file tokens) =
+          some seeded ∧
+        PhaseAQueueReachable owned seeded blocked ∧
+        PhaseAQueueBlocked owned blocked := by
+  unfold executePhaseA? at failed
+  cases seededEq : insertRawSeeds? (rawSeedItems tokens)
+      (beginPhaseA file tokens) with
+  | none => exact Or.inl rfl
+  | some seeded =>
+      rw [seededEq] at failed
+      have units := insertRawSeeds?_units_mono (rawSeedItems tokens)
+        (beginPhaseA file tokens) seeded seededEq
+      have positive : 0 < seeded.counter.units := by
+        rw [beginPhaseA_units] at units
+        omega
+      have budget : chartGBound (tokens.length + 1) <
+          seeded.counter.units + chartGBound (tokens.length + 1) := by
+        simpa only [Nat.add_comm] using
+          (Nat.lt_add_of_pos_right (n := chartGBound (tokens.length + 1))
+            positive)
+      obtain ⟨blocked, reachable, operationBlocked⟩ :=
+        runPhaseAQueues?_failure_is_operation_blocked owned seeded
+          (chartGBound (tokens.length + 1)) seeded .refl
+          budget failed
+      exact Or.inr ⟨seeded, blocked, rfl, reachable, operationBlocked⟩
+
 end Chart
 
 namespace Chart
