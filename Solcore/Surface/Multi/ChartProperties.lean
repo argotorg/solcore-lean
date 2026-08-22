@@ -381,4 +381,221 @@ theorem genericContextClassifiedObservation_exact
     contradiction
 
 
+/-- Checked boundary construction succeeds exactly at its coordinate. -/
+theorem chart_observedBoundaryAt?_eq_some_iff
+    {tokens : List Token} (coordinate : Nat)
+    (boundary : Boundary tokens) :
+    Chart.observedBoundaryAt? tokens coordinate = some boundary ↔
+      boundary.val = coordinate := by
+  unfold Chart.observedBoundaryAt?
+  split
+  · constructor
+    · intro selected
+      exact congrArg Fin.val (Option.some.inj selected.symm)
+    · intro coordinateEq
+      apply congrArg some
+      apply Fin.ext
+      exact coordinateEq.symm
+  · rename_i outOfRange
+    constructor
+    · intro impossible
+      contradiction
+    · intro coordinateEq
+      exact False.elim (outOfRange (coordinateEq ▸ boundary.isLt))
+
+/-- Immediate terminal observation is exactly the two-boundary witness. -/
+theorem chart_observedImmediatelyAfterTerminalBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol)
+    (boundary after : Boundary tokens) :
+    Chart.observedImmediatelyAfterTerminalBool owned
+        terminal boundary after = true ↔
+      ∃ matched : MatchedTerminal file tokens terminal,
+        matched.cursor.beforeBoundary = boundary ∧
+          matched.cursor.afterBoundary = after := by
+  unfold Chart.observedImmediatelyAfterTerminalBool
+  rw [Bool.and_eq_true, decide_eq_true_iff,
+    chart_observedTerminalAtBool_eq_true_iff]
+  constructor
+  · rintro ⟨⟨matched, atBoundary⟩, afterValue⟩
+    refine ⟨matched, atBoundary, ?_⟩
+    apply Fin.ext
+    have beforeValue := congrArg Fin.val atBoundary
+    change matched.cursor.val = boundary.val at beforeValue
+    change matched.cursor.val + 1 = after.val
+    omega
+  · rintro ⟨matched, atBoundary, atAfter⟩
+    refine ⟨⟨matched, atBoundary⟩, ?_⟩
+    have beforeValue := congrArg Fin.val atBoundary
+    have afterValue := congrArg Fin.val atAfter
+    change matched.cursor.val = boundary.val at beforeValue
+    change matched.cursor.val + 1 = after.val at afterValue
+    omega
+
+/-- G06 is exact under the explicit delimiter and greatest-end adequacy
+contracts; all terminal and finite-search behavior is discharged here. -/
+theorem patternComptimePositiveObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (nextDelimiter : Chart.PatternDelimiterObservation tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isPattern : key.guard = .G06_patternComptime)
+    (nextExact : ∀ start limit,
+      nextDelimiter start limit = true ↔
+        NextSameDepthDelimiter tokens start limit {
+          head := .comma
+          tail := [.rightParen, .fatArrow]
+        })
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .expression) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .expression)
+          start upperBound finish) :
+    Chart.patternComptimePositiveObservationBool owned
+        nextDelimiter greatest key = true ↔
+      GuardEvidence file tokens key .positive := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G06_patternComptime at isPattern
+  subst guard
+  unfold Chart.patternComptimePositiveObservationBool
+  cases boundarySelected :
+      Chart.observedBoundaryAt? tokens (siteCursor.val + 1) with
+  | none =>
+      simp only
+      constructor
+      · intro impossible
+        contradiction
+      · intro evidence
+        rcases evidence with
+          ⟨_owned, expressionStart, limit, immediate, _next, _greatest⟩
+        rcases immediate with ⟨matched, atSite, atExpression⟩
+        have expressionValue : expressionStart.val = siteCursor.val + 1 := by
+          have siteValue := congrArg Fin.val atSite
+          have afterValue := congrArg Fin.val atExpression
+          change matched.cursor.val = siteCursor.val at siteValue
+          change matched.cursor.val + 1 = expressionStart.val at afterValue
+          omega
+        have existsBoundary :
+            Chart.observedBoundaryAt? tokens (siteCursor.val + 1) =
+              some expressionStart :=
+          (chart_observedBoundaryAt?_eq_some_iff
+            (siteCursor.val + 1) expressionStart).mpr expressionValue
+        rw [boundarySelected] at existsBoundary
+        contradiction
+  | some expressionStart =>
+      have expressionValue : expressionStart.val = siteCursor.val + 1 :=
+        (chart_observedBoundaryAt?_eq_some_iff
+          (siteCursor.val + 1) expressionStart).mp boundarySelected
+      rw [show GuardEvidence file tokens {
+          guard := .G06_patternComptime
+          contextStart := contextStart
+          siteCursor := siteCursor
+          ordered := ordered
+        } .positive =
+          (TokensOwnedBy file tokens ∧
+            ∃ expressionStart limit,
+              (∃ matched : MatchedTerminal file tokens
+                  (.contextualKeyword .comptimeKw),
+                matched.cursor.beforeBoundary = siteCursor ∧
+                  matched.cursor.afterBoundary = expressionStart) ∧
+              NextSameDepthDelimiter tokens expressionStart limit {
+                head := .comma
+                tail := [.rightParen, .fatArrow]
+              } ∧
+              GreatestUnguardedEnd file tokens (.rule .expression)
+                expressionStart limit limit) by rfl]
+      constructor
+      · intro selected
+        have selectedParts := by
+          simpa only [Bool.and_eq_true] using selected
+        rcases selectedParts with
+          ⟨immediateSelected, limitsSelected⟩
+        have immediate :=
+          (chart_observedImmediatelyAfterTerminalBool_eq_true_iff
+            owned (.contextualKeyword .comptimeKw)
+              siteCursor expressionStart).mp immediateSelected
+        rcases List.any_eq_true.mp limitsSelected with
+          ⟨limit, _inRange, factsSelected⟩
+        have factParts := by
+          simpa only [Bool.and_eq_true] using factsSelected
+        rcases factParts with
+          ⟨nextSelected, greatestSelected⟩
+        refine ⟨owned, expressionStart, limit, immediate,
+          (nextExact expressionStart limit).mp nextSelected,
+          (greatestExact expressionStart limit limit).mp greatestSelected⟩
+      · rintro ⟨_owned, otherStart, limit, immediate, nextEvidence,
+          greatestEvidence⟩
+        rcases immediate with ⟨matched, atSite, atOther⟩
+        have otherValue : otherStart.val = siteCursor.val + 1 := by
+          have siteValue := congrArg Fin.val atSite
+          have afterValue := congrArg Fin.val atOther
+          change matched.cursor.val = siteCursor.val at siteValue
+          change matched.cursor.val + 1 = otherStart.val at afterValue
+          omega
+        have startEq : otherStart = expressionStart := by
+          apply Fin.ext
+          omega
+        have canonicalImmediate :
+            ∃ matched : MatchedTerminal file tokens
+                (.contextualKeyword .comptimeKw),
+              matched.cursor.beforeBoundary = siteCursor ∧
+                matched.cursor.afterBoundary = expressionStart := by
+          refine ⟨matched, atSite, ?_⟩
+          simpa only [startEq] using atOther
+        have canonicalNext :
+            NextSameDepthDelimiter tokens expressionStart limit {
+              head := .comma
+              tail := [.rightParen, .fatArrow]
+            } := by
+          simpa only [startEq] using nextEvidence
+        have canonicalGreatest :
+            GreatestUnguardedEnd file tokens (.rule .expression)
+              expressionStart limit limit := by
+          simpa only [startEq] using greatestEvidence
+        rw [Bool.and_eq_true]
+        refine ⟨(chart_observedImmediatelyAfterTerminalBool_eq_true_iff
+          owned (.contextualKeyword .comptimeKw)
+            siteCursor expressionStart).mpr canonicalImmediate, ?_⟩
+        apply List.any_eq_true.mpr
+        refine ⟨limit, ?_, ?_⟩
+        simp only [List.mem_finRange]
+        rw [Bool.and_eq_true]
+        exact ⟨(nextExact expressionStart limit).mpr canonicalNext,
+          (greatestExact expressionStart limit limit).mpr
+            canonicalGreatest⟩
+
+/-- G06 classification is exact under the same two explicit phase contracts. -/
+theorem patternComptimeClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (nextDelimiter : Chart.PatternDelimiterObservation tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isPattern : key.guard = .G06_patternComptime)
+    (nextExact : ∀ start limit,
+      nextDelimiter start limit = true ↔
+        NextSameDepthDelimiter tokens start limit {
+          head := .comma
+          tail := [.rightParen, .fatArrow]
+        })
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .expression) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .expression)
+          start upperBound finish)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.patternComptimePositiveObservationBool owned
+          nextDelimiter greatest key) false = decision ↔
+      GuardEvidence file tokens key decision := by
+  apply guardEvidence_iff_classified_observation owned key
+    (Chart.patternComptimePositiveObservationBool owned
+      nextDelimiter greatest key) false
+  · exact patternComptimePositiveObservationBool_exact owned nextDelimiter
+      greatest key isPattern nextExact greatestExact
+  · intro impossible
+    rw [isPattern] at impossible
+    contradiction
+
+
 end Solcore.Surface.Multi
