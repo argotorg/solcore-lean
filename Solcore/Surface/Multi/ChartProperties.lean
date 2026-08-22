@@ -3118,3 +3118,56 @@ theorem saturatedStatementRegionObservation_eq_semantic
     semanticStatementRegionObservation_exact owned]
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The complete canonical U01 positive bit agrees guard-by-guard with the
+constructive semantic positive bit. -/
+theorem saturatedGuardPositiveObservationBool_eq_semantic
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) :
+    Chart.saturatedGuardPositiveObservationBool owned key =
+      semanticGuardPositiveObservationBool owned key := by
+  have matchingEq : Chart.rawMatchingParenthesisObservation tokens =
+      semanticMatchingParenthesisObservation tokens := by
+    funext openCursor closeCursor
+    exact rawMatchingParenthesisObservation_eq_semantic tokens
+      openCursor closeCursor
+  have headerEq : Chart.saturatedMatchArmHeaderObservation tokens =
+      semanticMatchArmHeaderObservation owned := by
+    funext regionStart cursor
+    exact saturatedMatchArmHeaderObservation_eq_semantic owned
+      regionStart cursor
+  have patternEq : Chart.rawPatternDelimiterObservation tokens =
+      semanticPatternDelimiterObservation tokens := by
+    funext start cursor
+    exact rawPatternDelimiterObservation_eq_semantic tokens start cursor
+  have regionEq : Chart.saturatedStatementRegionObservation tokens =
+      semanticStatementRegionObservation owned := by
+    funext regionStart regionEnd
+    exact saturatedStatementRegionObservation_eq_semantic owned
+      regionStart regionEnd
+  have greatestEq : Chart.saturatedRawGreatestEndObservation tokens =
+      semanticGreatestEndObservation owned := by
+    funext symbol start upperBound finish
+    exact saturatedRawGreatestEndObservation_eq_semantic owned symbol
+      start upperBound finish
+  cases guardEq : key.guard <;>
+    simp [Chart.saturatedGuardPositiveObservationBool,
+      semanticGuardPositiveObservationBool, guardEq, matchingEq,
+      headerEq, patternEq, regionEq, greatestEq]
+
+/-- The fully-final canonical U01 memo is the unified semantic memo. -/
+theorem saturatedGuardMemo_eq_semantic
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Chart.saturatedGuardMemo owned = semanticGuardMemo owned := by
+  funext key
+  unfold Chart.saturatedGuardMemo semanticGuardMemo
+  rw [saturatedGuardPositiveObservationBool_eq_semantic owned key]
+
+end Solcore.Surface.Multi
