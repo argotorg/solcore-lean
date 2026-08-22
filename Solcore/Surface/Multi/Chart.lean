@@ -18347,3 +18347,159 @@ theorem saturatedMatchArmHeaderObservation_eq_observed
     observedNextSameDepthDelimiterBool_eq_phaseA]
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Proof-free matching-brace bit used by the statement-region observer. -/
+def observedMatchingBraceBool
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) : Bool :=
+  observedRawSymbolAtBool openCursor .leftBrace &&
+    observedRawSymbolAtBool closeCursor .rightBrace &&
+    match observedBoundaryAt? tokens (openCursor.val + 1) with
+    | none => false
+    | some interiorStart =>
+        decide (observedProtectedDelimiterRun? tokens [.rightBrace]
+          interiorStart closeCursor = some [.rightBrace])
+
+/-- A proof-free brace frame strictly containing one cursor. -/
+def observedContainingBraceFrameBool
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Bool :=
+  decide (openCursor.val < cursor.val) &&
+    decide (cursor.val < closeCursor.val) &&
+    observedMatchingBraceBool tokens openCursor closeCursor
+
+/-- The proof-free containing brace frame with greatest opening cursor. -/
+def observedInnermostContainingBraceFrameBool
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    Bool :=
+  observedContainingBraceFrameBool tokens cursor openCursor closeCursor &&
+    (List.finRange (tokens.length + 2)).all fun otherOpen =>
+      (List.finRange (tokens.length + 2)).all fun otherClose =>
+        !observedContainingBraceFrameBool tokens cursor otherOpen otherClose ||
+          decide (otherOpen.val ≤ openCursor.val)
+
+/-- Public proof-free next-arm-or-close view over canonical raw saturation. -/
+def observedSaturatedNextArmOrCloseBool
+    (tokens : List Token)
+    (regionStart closeCursor regionEnd : Boundary tokens) : Bool :=
+  decide (regionStart.val ≤ regionEnd.val) &&
+    decide (regionEnd.val ≤ closeCursor.val) &&
+    observedSameDelimiterDepthBool tokens regionStart regionEnd &&
+    (decide (regionEnd = closeCursor) ||
+      observedSaturatedMatchArmHeaderObservation tokens
+        regionStart regionEnd) &&
+    (List.finRange (tokens.length + 2)).all fun earlier =>
+      if regionStart.val ≤ earlier.val &&
+          earlier.val < regionEnd.val &&
+          observedSameDelimiterDepthBool tokens regionStart earlier then
+        !(decide (earlier = closeCursor) ||
+          observedSaturatedMatchArmHeaderObservation tokens
+            regionStart earlier)
+      else
+        true
+
+/-- Public proof-free view of the canonical nearest statement-region oracle. -/
+def observedSaturatedStatementRegionObservation
+    (tokens : List Token) : StatementRegionObservation tokens :=
+  fun regionStart regionEnd =>
+    let bracedBody :=
+      (List.finRange (tokens.length + 2)).any fun openCursor =>
+        observedImmediatelyAfterRawSymbolBool .leftBrace openCursor
+            regionStart &&
+          observedMatchingBraceBool tokens openCursor regionEnd
+    let armBody :=
+      (List.finRange (tokens.length + 2)).any fun arrowCursor =>
+        observedImmediatelyAfterRawSymbolBool .fatArrow arrowCursor
+            regionStart &&
+          (List.finRange (tokens.length + 2)).any fun openCursor =>
+            (List.finRange (tokens.length + 2)).any fun closeCursor =>
+              observedInnermostContainingBraceFrameBool tokens arrowCursor
+                  openCursor closeCursor &&
+                observedSaturatedNextArmOrCloseBool tokens regionStart
+                  closeCursor regionEnd
+    bracedBody || armBody
+
+private theorem phaseADelimiterCloser_map_eq_rightBrace_iff
+    (values : PhaseADelimiterStack) :
+    values.map PhaseADelimiterCloser.observed = [.rightBrace] ↔
+      values = [.rightBrace] := by
+  cases values with
+  | nil => simp
+  | cons head tail =>
+      cases head <;> cases tail <;>
+        simp [PhaseADelimiterCloser.observed]
+
+private theorem phaseAMatchingBraceBool_eq_observed
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) :
+    phaseAMatchingDelimiterBool tokens openCursor closeCursor
+        .leftBrace .rightBrace =
+      observedMatchingBraceBool tokens openCursor closeCursor := by
+  unfold phaseAMatchingDelimiterBool phaseADelimiterPair?
+    observedMatchingBraceBool
+  simp only [decide_true, Bool.true_and,
+    observedRawSymbolAtBool_eq_phaseA, observedBoundaryAt?_eq_phaseA]
+  cases boundary : phaseABoundaryAt? tokens (openCursor.val + 1)
+  · rfl
+  · rename_i interiorStart
+    change (phaseASymbolAtBool openCursor .leftBrace &&
+        phaseASymbolAtBool closeCursor .rightBrace &&
+        decide (phaseAProtectedDelimiterRun? tokens [.rightBrace]
+          interiorStart closeCursor = some [.rightBrace])) =
+      (phaseASymbolAtBool openCursor .leftBrace &&
+        phaseASymbolAtBool closeCursor .rightBrace &&
+        decide (observedProtectedDelimiterRun? tokens [.rightBrace]
+          interiorStart closeCursor = some [.rightBrace]))
+    have run := phaseAProtectedDelimiterRun?_observed tokens
+      [.rightBrace] interiorStart closeCursor
+    simp only [PhaseADelimiterCloser.observed, List.map_cons,
+      List.map_nil] at run
+    rw [← run]
+    cases phaseAProtectedDelimiterRun? tokens [.rightBrace]
+      interiorStart closeCursor with
+    | none => simp
+    | some values =>
+        simp only [Option.map_some, Option.some.injEq,
+          phaseADelimiterCloser_map_eq_rightBrace_iff]
+
+private theorem phaseAInnermostContainingBraceFrameBool_eq_observed
+    (tokens : List Token) (cursor openCursor closeCursor : Boundary tokens) :
+    phaseAInnermostContainingBraceFrameBool tokens cursor openCursor
+        closeCursor =
+      observedInnermostContainingBraceFrameBool tokens cursor openCursor
+        closeCursor := by
+  simp only [phaseAInnermostContainingBraceFrameBool,
+    phaseAContainingBraceFrameBool,
+    observedInnermostContainingBraceFrameBool,
+    observedContainingBraceFrameBool,
+    phaseAMatchingBraceBool_eq_observed]
+
+private theorem saturatedNextArmOrCloseBool_eq_observed
+    (tokens : List Token)
+    (regionStart closeCursor regionEnd : Boundary tokens) :
+    saturatedNextArmOrCloseBool tokens regionStart closeCursor regionEnd =
+      observedSaturatedNextArmOrCloseBool tokens regionStart closeCursor
+        regionEnd := by
+  simp only [saturatedNextArmOrCloseBool,
+    observedSaturatedNextArmOrCloseBool,
+    observedSameDelimiterDepthBool_eq_phaseA,
+    saturatedMatchArmHeaderObservation_eq_observed]
+
+/-- The public statement-region view is definitionally faithful to the
+canonical raw-saturation oracle consumed by Phase B. -/
+theorem saturatedStatementRegionObservation_eq_observed
+    (tokens : List Token) (regionStart regionEnd : Boundary tokens) :
+    saturatedStatementRegionObservation tokens regionStart regionEnd =
+      observedSaturatedStatementRegionObservation tokens
+        regionStart regionEnd := by
+  simp only [saturatedStatementRegionObservation,
+    observedSaturatedStatementRegionObservation,
+    observedImmediatelyAfterRawSymbolBool_eq_phaseA,
+    phaseAMatchingBraceBool_eq_observed,
+    phaseAInnermostContainingBraceFrameBool_eq_observed,
+    saturatedNextArmOrCloseBool_eq_observed]
+
+end Solcore.Surface.Multi.Chart
