@@ -3245,6 +3245,65 @@ def enabledProductionInstanceDecision
     (enabledProductionInstance_iff_guardCells
       correct final productionInstance).symm
 
+/-- An enabled production instance has exactly one retained witness for each
+grammar-owned guard cell, and no witnesses for erased or mixed anchors. -/
+theorem chart_guard_witnesses_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens) :
+    EnabledProductionInstance file tokens memo correct final
+        productionInstance ↔
+      ∀ guard polarity,
+        (guard, polarity) ∈ guardOf productionInstance.production →
+          ∃ witnessKey : GuardWitnessKey tokens,
+            (witnessKey.productionInstance = productionInstance ∧
+              witnessKey.guardInstance.guard = guard ∧
+              witnessKey.polarity = polarity ∧
+              GuardWitness file tokens memo correct final witnessKey) ∧
+            ∀ other : GuardWitnessKey tokens,
+              (other.productionInstance = productionInstance ∧
+                other.guardInstance.guard = guard ∧
+                other.polarity = polarity ∧
+                GuardWitness file tokens memo correct final other) →
+              other = witnessKey := by
+  constructor
+  · intro enabled guard polarity member
+    rcases enabled guard polarity member with
+      ⟨witnessKey, productionEq, guardEq, polarityEq, witness⟩
+    refine ⟨witnessKey,
+      ⟨productionEq, guardEq, polarityEq, witness⟩, ?_⟩
+    intro other otherExact
+    rcases otherExact with
+      ⟨otherProductionEq, otherGuardEq, otherPolarityEq, _otherWitness⟩
+    have witnessAnchor := witnessKey.property.2
+    have otherAnchor := other.property.2
+    change GuardAnchor witnessKey.productionInstance
+      (witnessKey.guardInstance.guard, witnessKey.polarity)
+      witnessKey.guardInstance at witnessAnchor
+    change GuardAnchor other.productionInstance
+      (other.guardInstance.guard, other.polarity)
+      other.guardInstance at otherAnchor
+    rw [productionEq, guardEq, polarityEq] at witnessAnchor
+    rw [otherProductionEq, otherGuardEq, otherPolarityEq] at otherAnchor
+    have guardInstanceEq :
+        witnessKey.guardInstance = other.guardInstance :=
+      GuardAnchor.functional witnessAnchor otherAnchor
+    apply Subtype.ext
+    cases witnessKey with
+    | mk witnessRaw witnessValid =>
+        cases other with
+        | mk otherRaw otherValid =>
+            cases witnessRaw
+            cases otherRaw
+            simp_all [GuardWitnessKey.productionInstance,
+              GuardWitnessKey.guardInstance, GuardWitnessKey.polarity]
+  · intro exact guard polarity member
+    rcases exact guard polarity member with
+      ⟨witnessKey, witnessExact, _unique⟩
+    exact ⟨witnessKey, witnessExact⟩
+
 /-- The least Phase-C reachability relation after all guards are finalized. -/
 inductive ContextualReach
     (file : WorkspaceFile)
