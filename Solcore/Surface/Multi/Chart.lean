@@ -9386,4 +9386,91 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_G08
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- A proof-free matching-parenthesis oracle supplied by Phase A. -/
+abbrev MatchingParenthesisObservation (tokens : List Token) :=
+  Boundary tokens → Boundary tokens → Bool
+
+/-- The complete terminal-only part of G01 at fixed structural boundaries. -/
+def statementIfTerminalObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (siteCursor openCursor expressionStart closeCursor : Boundary tokens) :
+    Bool :=
+  match observedBoundaryAt? tokens (closeCursor.val + 1) with
+  | none => false
+  | some afterClose =>
+      observedImmediatelyAfterTerminalBool owned (.hardKeyword .ifKw)
+          siteCursor openCursor &&
+        observedImmediatelyAfterTerminalBool owned (.symbol .leftParen)
+          openCursor expressionStart &&
+        observedImmediatelyAfterTerminalBool owned (.symbol .rightParen)
+          closeCursor afterClose &&
+        observedTerminalAtBool owned (.symbol .leftBrace) afterClose
+
+/-- G01's complete positive observation, parameterized only by the delimiter
+and greatest-end oracles whose semantic adequacy belongs to Phase A. -/
+def statementIfPositiveObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (matching : MatchingParenthesisObservation tokens)
+    (greatest : GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  match observedBoundaryAt? tokens (key.siteCursor.val + 1),
+      observedBoundaryAt? tokens (key.siteCursor.val + 2) with
+  | some openCursor, some expressionStart =>
+      (List.finRange (tokens.length + 2)).any fun closeCursor =>
+        statementIfTerminalObservationBool owned key.siteCursor
+            openCursor expressionStart closeCursor &&
+          (matching openCursor closeCursor &&
+            greatest (.rule .expression)
+              expressionStart closeCursor closeCursor)
+  | _, _ => false
+
+/-- Canonical U01 reads implement G01's public parameterized observation. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_G01
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (key : GuardInstanceKey tokens)
+    (isStatementIf : key.guard = .G01_statementIf) :
+    phaseBGuardObservationFromIndexes?
+        (canonicalEvidenceEntries
+          (phaseAObservationIndexEvaluator owned) phaseA) key =
+      some (statementIfPositiveObservationBool owned
+        (fun openCursor closeCursor =>
+          phaseAMatchingDelimiterBool tokens openCursor closeCursor
+            .leftParen .rightParen)
+        (fun symbol start upperBound finish =>
+          rawGreatestEndBool phaseA symbol start upperBound finish) key,
+        false) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G01_statementIf at isStatementIf
+  subst guard
+  simp [phaseBGuardObservationFromIndexes?, phaseBG01Positive?,
+    phaseBWithBoundary?, phaseBReadTerminalGuard?,
+    phaseBReadDelimiterGuard?, phaseBReadGreatestRule?,
+    phaseBReadIndex?, phaseAEvidenceEntryAt?_canonical_exact,
+    phaseAObservationIndexEvaluator, phaseATerminalWindowGuardBool,
+    phaseADelimiterOrRegionGuardBool, phaseBAllReads?,
+    phaseBAnyReads?_map_some, statementIfPositiveObservationBool,
+    statementIfTerminalObservationBool,
+    observedBoundaryAt?_eq_phaseA,
+    observedImmediatelyAfterTerminalBool_eq_phaseA,
+    observedTerminalAtBool_eq_phaseA]
+  cases openSelected : phaseABoundaryAt? tokens (siteCursor.val + 1) <;>
+    simp
+  cases expressionSelected :
+      phaseABoundaryAt? tokens (siteCursor.val + 2) <;>
+    simp
+  congr 1
+  funext closeCursor
+  cases phaseABoundaryAt? tokens (closeCursor.val + 1) <;> rfl
+
+end Chart
+
 end Solcore.Surface.Multi
