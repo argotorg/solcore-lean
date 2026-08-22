@@ -3229,3 +3229,79 @@ theorem executeObservedContextualWorklist?_phaseBCorrect
   exact semanticGuardMemo_correct owned
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- One successful observed contextual execution is an exact declarative
+correspondence: its item and edge ledgers are sound and complete, and its
+completion backpointer is unique.  Correctness and finality are selected from
+the execution itself rather than required as caller-supplied proofs. -/
+theorem executeObservedContextualWorklist?_correspondence
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    let correct := executeObservedContextualWorklist?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+      file tokens owned result selected
+    (∀ item, item ∈ result.items ↔
+      ContextualReach file tokens result.memo correct final item) ∧
+    (∀ key, (∃ retained, retained ∈ result.edges ∧ retained.val = key) ↔
+      ContextualEdgeReach file tokens result.memo correct final key) ∧
+    CompletionBackpointerUnique file tokens result.memo correct final := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change
+    (∀ item, item ∈ result.items ↔
+      ContextualReach file tokens result.memo correct final item) ∧
+    (∀ key, (∃ retained, retained ∈ result.edges ∧ retained.val = key) ↔
+      ContextualEdgeReach file tokens result.memo correct final key) ∧
+    CompletionBackpointerUnique file tokens result.memo correct final
+  have operational :=
+    Chart.executeObservedContextualWorklist?_operational_sound
+      file tokens owned result selected
+  have closed := Chart.executeObservedContextualWorklist?_operationalClosure
+    file tokens owned result selected
+  have itemSound : ∀ item, item ∈ result.items →
+      ContextualReach file tokens result.memo correct final item := by
+    intro item member
+    exact operationalContextualReach_sound correct final
+      (operational.1 item member)
+  have itemComplete : ∀ item,
+      ContextualReach file tokens result.memo correct final item →
+        item ∈ result.items := by
+    intro item reached
+    exact closed.reach_complete
+      (contextualReach_operational correct final reached)
+  have edgeSound : ∀ retained, retained ∈ result.edges →
+      ContextualEdgeReach file tokens result.memo correct final
+        retained.val := by
+    intro retained member
+    exact operationalContextualEdgeReach_sound correct final
+      (operational.2 retained member)
+  have edgeComplete : ∀ key,
+      ContextualEdgeReach file tokens result.memo correct final key →
+        ∃ retained, retained ∈ result.edges ∧ retained.val = key := by
+    intro key reached
+    exact closed.edge_complete
+      (contextualEdgeReach_operational correct final reached)
+  refine ⟨?_, ?_, ?_⟩
+  · intro item
+    exact ⟨itemSound item, itemComplete item⟩
+  · intro key
+    constructor
+    · rintro ⟨retained, member, rfl⟩
+      exact edgeSound retained member
+    · exact edgeComplete key
+  · exact
+      executeObservedContextualWorklist?_completionBackpointerUnique_of_edge_complete
+        file tokens owned result selected correct final edgeComplete
+
+end Solcore.Surface.Multi
