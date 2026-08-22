@@ -3305,3 +3305,48 @@ theorem executeObservedContextualWorklist?_correspondence
         file tokens owned result selected correct final edgeComplete
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- Auxiliary action execution is accepted by the exact declarative action
+reduction relation at every chart interval. -/
+theorem executeAuxiliaryAction_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId)
+    (auxiliary : AuxiliaryProduction production)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens production.rhs) :
+    ActionReduces file tokens (.actionFor production) origin finish input
+      (executeAuxiliaryAction production auxiliary input) := by
+  cases production with
+  | root rule => contradiction
+  | atom site => exact .atom site origin finish input
+  | seq site => exact .seq site origin finish input
+  | group site => exact .group site origin finish input
+  | choice site branch => exact .choice site branch origin finish input
+  | opt site branch => exact .opt site branch origin finish input
+  | star site branch => exact .star site branch origin finish input
+  | plus site branch => exact .plus site branch origin finish input
+  | list0 site branch => exact .list0 site branch origin finish input
+  | list1 site => exact .list1 site origin finish input
+  | tail site branch => exact .tail site branch origin finish input
+
+/-- The executable auxiliary result is the unique result admitted by the
+action relation. -/
+theorem ActionReduces.eq_executeAuxiliaryAction
+    {file : WorkspaceFile} {tokens : List Token}
+    {production : ProductionId}
+    (auxiliary : AuxiliaryProduction production)
+    {origin finish : Boundary tokens}
+    {input : GrammarSymbolValues file tokens production.rhs}
+    {output : NonterminalValue file tokens production.lhs}
+    (reduces : ActionReduces file tokens (.actionFor production)
+      origin finish input output) :
+    output = executeAuxiliaryAction production auxiliary input :=
+  ActionReduces.functional reduces
+    (executeAuxiliaryAction_reduces production auxiliary origin finish input)
+
+end Solcore.Surface.Multi
