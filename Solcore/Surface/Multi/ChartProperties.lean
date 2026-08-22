@@ -2191,3 +2191,300 @@ theorem rawPatternDelimiterObservation_eq_semantic
     semanticPatternDelimiterObservation_exact]
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+
+private def observedNonemptyToSemantic
+    (values : NonemptyList Chart.ObservedDelimiterCloser) :
+    NonemptyList DelimiterCloser := {
+  head := observedCloserToSemantic values.head
+  tail := values.tail.map observedCloserToSemantic
+}
+
+private def nonemptyValues {alpha : Type}
+    (values : NonemptyList alpha) : List alpha :=
+  values.head :: values.tail
+
+private theorem nonemptyValues_injective {alpha : Type} :
+    Function.Injective (@nonemptyValues alpha) := by
+  rintro ⟨leftHead, leftTail⟩ ⟨rightHead, rightTail⟩ equal
+  simp only [nonemptyValues] at equal
+  cases equal
+  rfl
+
+private theorem observedNonemptyToSemantic_injective :
+    Function.Injective observedNonemptyToSemantic := by
+  intro left right equal
+  apply nonemptyValues_injective
+  apply observedStackToSemantic_injective
+  simpa [observedNonemptyToSemantic, nonemptyValues] using
+    congrArg nonemptyValues equal
+
+private theorem observedNonemptyToSemantic_surjective :
+    Function.Surjective observedNonemptyToSemantic := by
+  rintro ⟨head, tail⟩
+  refine ⟨⟨semanticCloserToObserved head,
+    tail.map semanticCloserToObserved⟩, ?_⟩
+  simp [observedNonemptyToSemantic, List.map_map, Function.comp_def]
+
+private theorem observedProtectedDelimiterStep?_eq_some_iff_base
+    (before after : NonemptyList Chart.ObservedDelimiterCloser)
+    (token : TokenKind) :
+    Chart.observedProtectedDelimiterStep? (nonemptyValues before) token =
+        some (nonemptyValues after) ↔
+      Chart.observedDelimiterStep? (nonemptyValues before) token =
+        some (nonemptyValues after) := by
+  cases before with
+  | mk beforeHead beforeTail =>
+      cases after with
+      | mk afterHead afterTail =>
+          simp only [nonemptyValues]
+          unfold Chart.observedProtectedDelimiterStep?
+          generalize stepEq : Chart.observedDelimiterStep?
+            (beforeHead :: beforeTail) token = result
+          cases result with
+          | none => simp
+          | some stack =>
+              cases stack with
+              | nil => simp
+              | cons head tail => simp
+
+private theorem observedProtectedDelimiterStep?_eq_some_iff
+    (before after : NonemptyList Chart.ObservedDelimiterCloser)
+    (token : TokenKind) :
+    Chart.observedProtectedDelimiterStep? (nonemptyValues before) token =
+        some (nonemptyValues after) ↔
+      DelimiterStep
+        (nonemptyValues (observedNonemptyToSemantic before)) token
+        (nonemptyValues (observedNonemptyToSemantic after)) := by
+  rw [observedProtectedDelimiterStep?_eq_some_iff_base,
+    observedDelimiterStep?_eq_some_iff]
+  rfl
+
+private theorem observedProtectedDelimiterStep?_some_ne_nil
+    (before : NonemptyList Chart.ObservedDelimiterCloser)
+    (token : TokenKind) (after : Chart.ObservedDelimiterStack)
+    (selected : Chart.observedProtectedDelimiterStep?
+      (nonemptyValues before) token =
+      some after) : after ≠ [] := by
+  intro afterNil
+  subst after
+  cases before with
+  | mk head tail =>
+      simp only [nonemptyValues] at selected
+      unfold Chart.observedProtectedDelimiterStep? at selected
+      generalize stepEq : Chart.observedDelimiterStep?
+        (head :: tail) token = result at selected
+      cases result with
+      | none => simp at selected
+      | some stack =>
+          cases stack <;> simp at selected
+
+private theorem protectedDelimiterRun_uncons_for_observed
+    {tokens : List Token}
+    {before after : NonemptyList DelimiterCloser}
+    {start finish : Boundary tokens}
+    (different : start ≠ finish)
+    (run : ProtectedDelimiterRun tokens before start finish after) :
+    ∃ next : NonemptyList DelimiterCloser,
+    ∃ cursor : TerminalCursor tokens,
+    ∃ token : Token,
+      cursor.beforeBoundary = start ∧
+        tokens[cursor.val]? = some token ∧
+        DelimiterStep (nonemptyValues before) token.payload
+          (nonemptyValues next) ∧
+        ProtectedDelimiterRun tokens next cursor.afterBoundary
+          finish after := by
+  cases run with
+  | nil => exact False.elim (different rfl)
+  | cons before next after cursor start finish token atStart lookup
+      step rest =>
+      exact ⟨next, cursor, token, atStart, lookup, step, rest⟩
+
+private theorem protectedDelimiterRun_ordered_for_observed
+    {tokens : List Token}
+    {before after : NonemptyList DelimiterCloser}
+    {start finish : Boundary tokens}
+    (run : ProtectedDelimiterRun tokens before start finish after) :
+    start.val ≤ finish.val := by
+  induction run with
+  | nil => exact Nat.le_refl _
+  | cons before after finish cursor start endCursor token atStart lookup
+      step rest induction =>
+      have atStartValue := congrArg Fin.val atStart
+      have beforeValue : cursor.beforeBoundary.val = cursor.val := rfl
+      have afterValue : cursor.afterBoundary.val = cursor.val + 1 := rfl
+      omega
+
+private theorem protectedDelimiterRun_same_for_observed
+    {tokens : List Token}
+    {before after : NonemptyList DelimiterCloser}
+    {cursor : Boundary tokens}
+    (run : ProtectedDelimiterRun tokens before cursor cursor after) :
+    after = before := by
+  cases run with
+  | nil => rfl
+  | cons before next after terminalCursor start finish token atStart lookup
+      step rest =>
+      have restOrdered := protectedDelimiterRun_ordered_for_observed rest
+      have atStartValue := congrArg Fin.val atStart
+      have beforeValue :
+          terminalCursor.beforeBoundary.val = terminalCursor.val := rfl
+      have afterValue :
+          terminalCursor.afterBoundary.val = terminalCursor.val + 1 := rfl
+      omega
+
+private theorem observedProtectedDelimiterRunFrom?_eq_some_iff
+    {tokens : List Token}
+    (fuel cursor : Nat)
+    (before after : NonemptyList Chart.ObservedDelimiterCloser)
+    (start finish : Boundary tokens)
+    (startEq : start.val = cursor)
+    (finishEq : finish.val = cursor + fuel) :
+    Chart.observedProtectedDelimiterRunFrom? tokens fuel cursor
+        (nonemptyValues before) = some (nonemptyValues after) ↔
+      ProtectedDelimiterRun tokens (observedNonemptyToSemantic before)
+        start finish (observedNonemptyToSemantic after) := by
+  induction fuel generalizing cursor before after start finish with
+  | zero =>
+      have finishStart : finish = start := by
+        apply Fin.ext
+        omega
+      subst finish
+      constructor
+      · intro computed
+        have afterEq : after = before := by
+          apply nonemptyValues_injective
+          simpa only [nonemptyValues,
+            Chart.observedProtectedDelimiterRunFrom?,
+            Option.some.injEq] using computed.symm
+        subst after
+        exact .nil _ _
+      · intro run
+        have mappedEq : observedNonemptyToSemantic after =
+            observedNonemptyToSemantic before :=
+          protectedDelimiterRun_same_for_observed run
+        have afterEq : after = before :=
+          observedNonemptyToSemantic_injective mappedEq
+        subst after
+        rfl
+  | succ fuel induction =>
+      constructor
+      · intro computed
+        unfold Chart.observedProtectedDelimiterRunFrom? at computed
+        split at computed
+        case isFalse => contradiction
+        case isTrue inRange =>
+          generalize stepEq : Chart.observedProtectedDelimiterStep?
+            (nonemptyValues before) tokens[cursor].payload =
+              stepResult at computed
+          cases stepResult with
+          | none => contradiction
+          | some nextStack =>
+              have nextNonempty :=
+                observedProtectedDelimiterStep?_some_ne_nil before
+                  tokens[cursor].payload nextStack stepEq
+              cases nextStack with
+              | nil => contradiction
+              | cons nextHead nextTail =>
+                  let next : NonemptyList Chart.ObservedDelimiterCloser :=
+                    ⟨nextHead, nextTail⟩
+                  let terminalCursor : TerminalCursor tokens :=
+                    ⟨cursor, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+                  let nextStart : Boundary tokens :=
+                    terminalCursor.afterBoundary
+                  have atStart : terminalCursor.beforeBoundary = start := by
+                    apply Fin.ext
+                    exact startEq.symm
+                  have nextStartEq : nextStart.val = cursor + 1 := rfl
+                  have nextFinishEq : finish.val = cursor + 1 + fuel := by
+                    omega
+                  have rest := (induction (cursor + 1) next after
+                    nextStart finish nextStartEq nextFinishEq).mp computed
+                  exact .cons _ _ _ terminalCursor start finish
+                    tokens[cursor] atStart
+                    (List.getElem?_eq_getElem inRange)
+                    ((observedProtectedDelimiterStep?_eq_some_iff
+                      before next _).mp stepEq)
+                    rest
+      · intro run
+        have different : start ≠ finish := by
+          intro equal
+          have values := congrArg Fin.val equal
+          omega
+        obtain ⟨relationAfter, terminalCursor, token, atStart,
+          lookup, step, rest⟩ :=
+          protectedDelimiterRun_uncons_for_observed different run
+        obtain ⟨nextObserved, relationAfterEq⟩ :=
+          observedNonemptyToSemantic_surjective relationAfter
+        subst relationAfter
+        have cursorEq : terminalCursor.val = cursor := by
+          have rawAtStart := congrArg Fin.val atStart
+          change terminalCursor.val = start.val at rawAtStart
+          omega
+        have inRange : cursor < tokens.length := by
+          by_cases candidate : cursor < tokens.length
+          · exact candidate
+          · have outOfRange : tokens.length ≤ terminalCursor.val := by
+              omega
+            rw [List.getElem?_eq_none outOfRange] at lookup
+            contradiction
+        have tokenEq : tokens[cursor] = token := by
+          have canonical := List.getElem?_eq_getElem inRange
+          rw [cursorEq] at lookup
+          exact Option.some.inj (canonical.symm.trans lookup)
+        unfold Chart.observedProtectedDelimiterRunFrom?
+        rw [dif_pos inRange]
+        rw [(observedProtectedDelimiterStep?_eq_some_iff
+          before nextObserved _).mpr (tokenEq ▸ step)]
+        have nextStartEq :
+            terminalCursor.afterBoundary.val = cursor + 1 := by
+          change terminalCursor.val + 1 = cursor + 1
+          omega
+        have nextFinishEq : finish.val = cursor + 1 + fuel := by
+          omega
+        exact (induction (cursor + 1) nextObserved after
+          terminalCursor.afterBoundary finish nextStartEq
+          nextFinishEq).mpr rest
+
+private theorem observedProtectedDelimiterRun?_eq_some_iff
+    (tokens : List Token)
+    (before after : NonemptyList Chart.ObservedDelimiterCloser)
+    (start finish : Boundary tokens) :
+    Chart.observedProtectedDelimiterRun? tokens (nonemptyValues before)
+        start finish = some (nonemptyValues after) ↔
+      ProtectedDelimiterRun tokens (observedNonemptyToSemantic before)
+        start finish (observedNonemptyToSemantic after) := by
+  unfold Chart.observedProtectedDelimiterRun?
+  split
+  case isFalse notOrdered =>
+    constructor
+    · intro impossible
+      contradiction
+    · intro run
+      exact False.elim
+        (notOrdered (protectedDelimiterRun_ordered_for_observed run))
+  case isTrue ordered =>
+    exact observedProtectedDelimiterRunFrom?_eq_some_iff
+      (finish.val - start.val) start.val before after start finish rfl
+        (by omega)
+
+/-- The protected singleton-parenthesis executor is exactly its declarative
+run, so G01 cannot consume the closer that it is meant to match. -/
+theorem observedProtectedRightParenRun_exact
+    (tokens : List Token) (start finish : Boundary tokens) :
+    Chart.observedProtectedDelimiterRun? tokens [.rightParen]
+        start finish = some [.rightParen] ↔
+      ProtectedDelimiterRun tokens
+        { head := .rightParen, tail := [] } start finish
+        { head := .rightParen, tail := [] } := by
+  simpa [nonemptyValues, observedNonemptyToSemantic,
+    observedCloserToSemantic] using
+    observedProtectedDelimiterRun?_eq_some_iff tokens
+      { head := Chart.ObservedDelimiterCloser.rightParen, tail := [] }
+      { head := Chart.ObservedDelimiterCloser.rightParen, tail := [] }
+      start finish
+
+end Solcore.Surface.Multi
