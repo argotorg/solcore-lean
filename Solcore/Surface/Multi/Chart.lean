@@ -17848,6 +17848,171 @@ private theorem processContextualItem?_completion_materializes
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCFairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop :=
+  (contextualRoot tokens ∈ current.payload.phaseC.contextualItems) ∧
+  (∀ waiting, waiting ∈ current.payload.phaseC.contextualItems →
+    ∀ predicted item productionInstance,
+      contextualPredictedItem? waiting predicted =
+        some (item, productionInstance) →
+      MemoEnablesProduction current.payload.phaseC.memo
+        productionInstance →
+      waiting ∈ current.payload.phaseC.itemQueue ∨
+        item ∈ current.payload.phaseC.contextualItems) ∧
+  (∀ before, before ∈ current.payload.phaseC.contextualItems →
+    ∀ after edge,
+      contextualScannedEdge? owned before = some (after, edge) →
+      before ∈ current.payload.phaseC.itemQueue ∨
+        (after ∈ current.payload.phaseC.contextualItems ∧
+          ∃ retained, retained ∈ current.payload.phaseC.contextualEdges ∧
+            retained.val = .scanned edge.before edge.after edge.cursor)) ∧
+  ∀ waiting, waiting ∈ current.payload.phaseC.contextualItems →
+    ∀ finished, finished ∈ current.payload.phaseC.contextualItems →
+    ∀ after edge,
+      contextualCompletedEdge? (file := file) waiting finished =
+        some (after, edge) →
+      waiting ∈ current.payload.phaseC.itemQueue ∨
+      finished ∈ current.payload.phaseC.itemQueue ∨
+        (after ∈ current.payload.phaseC.contextualItems ∧
+          ∃ retained, retained ∈ current.payload.phaseC.contextualEdges ∧
+            retained.val = .completed edge.waiting edge.finished edge.after
+              edge.shared)
+
+private theorem dequeueContextualItem?_fairShape
+    {file : WorkspaceFile} {tokens : List Token}
+    (before current : CountedState tokens (PhaseCWorklist file tokens))
+    (head pivot : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (queue : before.payload.phaseC.itemQueue = head :: rest)
+    (selected : dequeueContextualItem? before = some (pivot, current)) :
+    pivot = head ∧
+      current.payload.phaseC.memo = before.payload.phaseC.memo ∧
+      current.payload.phaseC.contextualItems =
+        before.payload.phaseC.contextualItems ∧
+      current.payload.phaseC.contextualEdges =
+        before.payload.phaseC.contextualEdges ∧
+      current.payload.phaseC.itemQueue = rest := by
+  unfold dequeueContextualItem? at selected
+  simp only [queue, Option.bind_eq_bind,
+    Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq] at output
+  rcases output with ⟨headEq, nextEqual⟩
+  subst pivot
+  subst next
+  rw [runMappedPrimitive?_payload before _ _ nextEq]
+  exact ⟨rfl, rfl, rfl, rfl, rfl⟩
+
+private theorem processContextualItem?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before current result : CountedState tokens (PhaseCWorklist file tokens))
+    (pivot : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (fair : PhaseCFairPending owned before)
+    (beforeQueue : before.payload.phaseC.itemQueue = pivot :: rest)
+    (currentMemo : current.payload.phaseC.memo =
+      before.payload.phaseC.memo)
+    (currentItems : current.payload.phaseC.contextualItems =
+      before.payload.phaseC.contextualItems)
+    (currentEdges : current.payload.phaseC.contextualEdges =
+      before.payload.phaseC.contextualEdges)
+    (currentQueue : current.payload.phaseC.itemQueue = rest)
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (selected : processContextualItem? owned pivot current = some result) :
+    PhaseCFairPending owned result := by
+  have growth := processContextualItem?_contentGrowth owned pivot current result
+    selected
+  have carryItem : ∀ {item},
+      item ∈ before.payload.phaseC.contextualItems →
+      item ∈ result.payload.phaseC.contextualItems := by
+    intro item member
+    exact growth.items (currentItems.symm ▸ member)
+  have carryQueue : ∀ {item}, item ≠ pivot →
+      item ∈ before.payload.phaseC.itemQueue →
+      item ∈ result.payload.phaseC.itemQueue := by
+    intro item different member
+    rw [beforeQueue, List.mem_cons] at member
+    rcases member with equal | member
+    · exact (different equal).elim
+    · exact growth.itemQueue (currentQueue.symm ▸ member)
+  have carryMaterialized : ∀ {item key},
+      item ∈ before.payload.phaseC.contextualItems ∧
+        (∃ retained, retained ∈ before.payload.phaseC.contextualEdges ∧
+          retained.val = key) →
+      item ∈ result.payload.phaseC.contextualItems ∧
+        ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+          retained.val = key := by
+    intro item key materialized
+    obtain ⟨itemMember, retained, edgeMember, same⟩ := materialized
+    exact ⟨carryItem itemMember, retained,
+      growth.edges (currentEdges.symm ▸ edgeMember), same⟩
+  refine ⟨carryItem fair.1, ?_, ?_, ?_⟩
+  · intro waiting waitingMember predicted item productionInstance computed
+      enabled
+    rcases growth.newItemsQueued waiting waitingMember with old | queued
+    · by_cases same : waiting = pivot
+      · subst waiting
+        right
+        apply processContextualItem?_prediction_materializes owned current
+          result pivot ledger predicted item productionInstance computed
+        · rw [← growth.memo]
+          exact enabled
+        · exact selected
+      · rcases fair.2.1 waiting (currentItems ▸ old) predicted item
+          productionInstance computed (by
+            rw [← currentMemo, ← growth.memo]
+            exact enabled) with queued | materialized
+        · exact Or.inl (carryQueue same queued)
+        · exact Or.inr (carryItem materialized)
+    · exact Or.inl queued
+  · intro beforeItem beforeMember after edge computed
+    rcases growth.newItemsQueued beforeItem beforeMember with old | queued
+    · by_cases same : beforeItem = pivot
+      · subst beforeItem
+        exact Or.inr (processContextualItem?_scan_materializes owned current
+          result pivot after edge computed selected)
+      · rcases fair.2.2.1 beforeItem (currentItems ▸ old) after edge computed with
+          queued | materialized
+        · exact Or.inl (carryQueue same queued)
+        · exact Or.inr (carryMaterialized materialized)
+    · exact Or.inl queued
+  · intro waiting waitingMember finished finishedMember after edge computed
+    rcases growth.newItemsQueued waiting waitingMember with
+      waitingOld | waitingQueued
+    · rcases growth.newItemsQueued finished finishedMember with
+        finishedOld | finishedQueued
+      · by_cases waitingSame : waiting = pivot
+        · subst waiting
+          exact Or.inr (Or.inr
+            ((processContextualItem?_completion_materializes owned current
+              result pivot finished finishedOld ledger selected).1
+                after edge computed))
+        · by_cases finishedSame : finished = pivot
+          · subst finished
+            exact Or.inr (Or.inr
+              ((processContextualItem?_completion_materializes owned current
+                result pivot waiting waitingOld ledger selected).2
+                  after edge computed))
+          · rcases fair.2.2.2 waiting (currentItems ▸ waitingOld)
+                finished (currentItems ▸ finishedOld) after edge computed with
+              waitingQueued | finishedQueued | materialized
+            · exact Or.inl (carryQueue waitingSame waitingQueued)
+            · exact Or.inr (Or.inl
+                (carryQueue finishedSame finishedQueued))
+            · exact Or.inr (Or.inr (carryMaterialized materialized))
+      · exact Or.inr (Or.inl finishedQueued)
+    · exact Or.inl waitingQueued
+
+end Chart
+
 end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi.Chart
