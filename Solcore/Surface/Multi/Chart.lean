@@ -14809,4 +14809,135 @@ private theorem contextualCompletedEdge?_complete
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem processGuardCell?_accepted_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : processGuardCell? current productionInstance index =
+      some result)
+    (enabled : ∃ guardInstance decision,
+      GuardAnchor productionInstance
+          ((guardOf productionInstance.production).get index)
+          guardInstance ∧
+        current.payload.memo guardInstance = .final decision ∧
+        decision.allows
+          ((guardOf productionInstance.production).get index).2 = true) :
+    result.2 = true := by
+  unfold processGuardCell? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨inspected, inspectedEq, inserted, insertedEq, resultEq⟩
+  cases resultEq
+  exact (guardWitnessFor?_isSome_iff current.payload.memo
+    productionInstance
+      ((guardOf productionInstance.production).get index)).mpr enabled
+
+private theorem processGuardCells?_accepted_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ∀ (indices : List
+        (Fin (guardOf productionInstance.production).length))
+      (current : CountedState tokens (PhaseCOpen file tokens))
+      (result : CountedState tokens (PhaseCOpen file tokens) × Bool),
+      processGuardCells? productionInstance indices current = some result →
+      (∀ index, index ∈ indices →
+        ∃ guardInstance decision,
+          GuardAnchor productionInstance
+              ((guardOf productionInstance.production).get index)
+              guardInstance ∧
+            current.payload.memo guardInstance = .final decision ∧
+            decision.allows
+              ((guardOf productionInstance.production).get index).2 = true) →
+      result.2 = true := by
+  intro indices
+  induction indices with
+  | nil =>
+      intro current result selected _enabled
+      cases selected
+      rfl
+  | cons head rest induction =>
+      intro current result selected enabled
+      simp only [processGuardCells?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with
+        ⟨processed, processedEq, finished, finishedEq, resultEq⟩
+      cases resultEq
+      have headAccepted := processGuardCell?_accepted_complete current
+        productionInstance head processed processedEq
+          (enabled head (by simp))
+      have carrier := processGuardCell?_reachCarrier current
+        productionInstance head processed processedEq
+      have memoEq := congrArg PhaseCReachCarrier.memo carrier
+      change processed.1.payload.memo = current.payload.memo at memoEq
+      have restEnabled : ∀ index, index ∈ rest →
+          ∃ guardInstance decision,
+            GuardAnchor productionInstance
+                ((guardOf productionInstance.production).get index)
+                guardInstance ∧
+              processed.1.payload.memo guardInstance = .final decision ∧
+              decision.allows
+                ((guardOf productionInstance.production).get index).2 =
+                  true := by
+        intro index member
+        rw [memoEq]
+        exact enabled index (by simp [member])
+      have restAccepted := induction processed.1 finished finishedEq
+        restEnabled
+      exact Bool.and_eq_true_iff.mpr ⟨headAccepted, restAccepted⟩
+
+private theorem activateProduction?_accepted_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : activateProduction? current productionInstance = some result)
+    (enabled : MemoEnablesProduction current.payload.memo
+      productionInstance) :
+    result.2 = true := by
+  unfold activateProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, processedEq⟩
+  apply processGuardCells?_accepted_complete productionInstance
+    (List.ofFn fun index :
+      Fin (guardOf productionInstance.production).length => index)
+    attempted result processedEq
+  intro index _member
+  have attemptedPayload := runMappedPrimitive?_payload current
+    (.production productionInstance) id attemptedEq
+  change attempted.payload = current.payload at attemptedPayload
+  rw [attemptedPayload]
+  rcases cellEq : (guardOf productionInstance.production).get index with
+    ⟨guard, polarity⟩
+  exact enabled guard polarity (by
+    rw [← cellEq]
+    exact List.get_mem _ index)
+
+private theorem activateWorklistProduction?_accepted_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result)
+    (enabled : MemoEnablesProduction current.payload.phaseC.memo
+      productionInstance) :
+    result.2 = true := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  exact activateProduction?_accepted_complete {
+    payload := current.payload.phaseC
+    counter := current.counter
+  } productionInstance activated activatedEq enabled
+
+end Chart
+
 end Solcore.Surface.Multi
