@@ -15174,4 +15174,25 @@ private theorem executeObservedPhaseAB?_total
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The executable Phase-A/Phase-B guard worklist succeeds for every owned
+token stream. -/
+theorem executeObservedGuardWorklist?_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executeObservedGuardWorklist? file tokens owned = some result := by
+  obtain ⟨internal, internalEq⟩ :=
+    executeObservedPhaseAB?_total file tokens owned
+  refine ⟨{ memo := internal.payload.memo }, ?_⟩
+  unfold executeObservedGuardWorklist?
+  rw [internalEq]
+  simp only [Option.bind_eq_bind, Option.bind_some]
+  rfl
+
+end Chart
+
 end Solcore.Surface.Multi
