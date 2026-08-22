@@ -3105,6 +3105,206 @@ private theorem executePhaseA?_membership_eq_of_closed
     (executePhaseA?_rawSound file tokens owned result selected).1
     (closed.rawClosureBool owned result.payload.rawItems)
 
+private theorem insertRawItem?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (selected : insertRawItem? current source item = some result) :
+    current.counter.units ≤ result.counter.units := by
+  unfold insertRawItem? at selected
+  split at selected
+  · cases selected
+    exact Nat.le_refl _
+  · rw [runMappedPrimitive?_units current _ _ selected]
+    omega
+
+private theorem insertRawEdge?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (selected : insertRawEdge? current edge = some result) :
+    current.counter.units ≤ result.counter.units := by
+  unfold insertRawEdge? at selected
+  split at selected
+  · cases selected
+    exact Nat.le_refl _
+  · split at selected <;>
+      rw [runMappedPrimitive?_units current _ _ selected] <;> omega
+
+private theorem insertRawSeeds?_units_mono
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ seeds (current result : CountedState tokens (PhaseAOpen file tokens)),
+      insertRawSeeds? seeds current = some result →
+      current.counter.units ≤ result.counter.units := by
+  intro seeds
+  induction seeds with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact Nat.le_refl _
+  | cons item rest induction =>
+      intro current result selected
+      rw [insertRawSeeds?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, inserted, continued⟩
+      exact Nat.le_trans
+        (insertRawItem?_units_mono current next .seedOrPrediction item inserted)
+        (induction next result continued)
+
+private theorem attemptPrediction?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (predicted : ProductionId)
+    (selected : attemptPrediction? current waiting predicted = some result) :
+    current.counter.units ≤ result.counter.units := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting predicted with
+  | none =>
+      simp only [prediction, Option.some.injEq] at selected
+      cases selected
+      exact Nat.le_refl _
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, insertedEq⟩
+      have inserted := insertRawItem?_units_mono attempted result
+        .seedOrPrediction item insertedEq
+      rw [runMappedPrimitive?_units current _ _ attemptedEq] at inserted
+      omega
+
+private theorem attemptPredictions?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions (current result : CountedState tokens (PhaseAOpen file tokens)),
+      attemptPredictions? waiting productions current = some result →
+      current.counter.units ≤ result.counter.units := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact Nat.le_refl _
+  | cons production rest induction =>
+      intro current result selected
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact Nat.le_trans
+        (attemptPrediction?_units_mono current next waiting production nextEq)
+        (induction next result restEq)
+
+private theorem attemptScan?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens)
+    (selected : attemptScan? owned current before = some result) :
+    current.counter.units ≤ result.counter.units := by
+  unfold attemptScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have first : current.counter.units ≤ attempted.counter.units := by
+      rw [runMappedPrimitive?_units current _ _ attemptedEq]
+      omega
+    cases scanEq : scannedEdge? owned before with
+    | none =>
+        simp only [scanEq, Option.some.injEq] at remainder
+        cases remainder
+        exact first
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scanEq, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        exact Nat.le_trans first (Nat.le_trans
+          (insertRawItem?_units_mono attempted withItem .scan after itemEq)
+          (insertRawEdge?_units_mono withItem result edge edgeEq))
+  next notApplicable =>
+    cases selected
+    exact Nat.le_refl _
+
+private theorem attemptCompletion?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (selected : attemptCompletion? current waiting finished = some result) :
+    current.counter.units ≤ result.counter.units := by
+  unfold attemptCompletion? at selected
+  cases completionEq : completedEdge? (file := file) waiting finished with
+  | none =>
+      simp only [completionEq, Option.some.injEq] at selected
+      cases selected
+      exact Nat.le_refl _
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      next attemptedBefore =>
+        cases selected
+        exact Nat.le_refl _
+      next fresh =>
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨attempted, attemptedEq,
+          withItem, itemEq, edgeEq⟩
+        have first : current.counter.units ≤ attempted.counter.units := by
+          rw [runMappedPrimitive?_units current _ _ attemptedEq]
+          omega
+        exact Nat.le_trans first (Nat.le_trans
+          (insertRawItem?_units_mono attempted withItem .completion after itemEq)
+          (insertRawEdge?_units_mono withItem result edge edgeEq))
+
+private theorem attemptCompletionsWith?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    ∀ others (current result : CountedState tokens (PhaseAOpen file tokens)),
+      attemptCompletionsWith? pivot others current = some result →
+      current.counter.units ≤ result.counter.units := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact Nat.le_refl _
+  | cons other rest induction =>
+      intro current result selected
+      rw [attemptCompletionsWith?] at selected
+      cases forwardEq : attemptCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have first := attemptCompletion?_units_mono current forward
+            pivot other forwardEq
+          split at selected
+          next same => exact Nat.le_trans first (induction forward result selected)
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq : attemptCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact Nat.le_trans first (Nat.le_trans
+                  (attemptCompletion?_units_mono forward reverse
+                    other pivot reverseEq)
+                  (induction reverse result selected))
+
+private theorem processRawItem?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : processRawItem? owned item current = some result) :
+    current.counter.units ≤ result.counter.units := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completionEq⟩
+  exact Nat.le_trans
+    (attemptPredictions?_units_mono item allProductionIds
+      current predicted predictedEq)
+    (Nat.le_trans (attemptScan?_units_mono owned predicted scanned item scannedEq)
+      (attemptCompletionsWith?_units_mono item scanned.payload.rawItems
+        scanned result completionEq))
+
 end Chart
 
 namespace Chart
