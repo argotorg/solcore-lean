@@ -1339,4 +1339,46 @@ theorem semanticGuardMemo_allFinal
     (semanticGuardPositiveObservationBool owned key)
     (Chart.matchArmPipeObservationBool owned key), rfl⟩
 
+/-- Correct fully-final guard tables are extensionally unique. -/
+theorem phaseBCorrect_final_memo_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : GuardMemo tokens}
+    (leftCorrect : PhaseBCorrect file tokens left)
+    (leftFinal : AllGuardsFinal left)
+    (rightCorrect : PhaseBCorrect file tokens right)
+    (rightFinal : AllGuardsFinal right) :
+    left = right := by
+  funext key
+  rcases leftFinal key with ⟨leftDecision, leftState⟩
+  rcases rightFinal key with ⟨rightDecision, rightState⟩
+  have leftEvidence : GuardEvidence file tokens key leftDecision :=
+    (leftCorrect key leftDecision).mp leftState
+  have rightEvidence : GuardEvidence file tokens key rightDecision :=
+    (rightCorrect key rightDecision).mp rightState
+  have decisionEq : leftDecision = rightDecision :=
+    GuardEvidence.functional leftEvidence rightEvidence
+  subst rightDecision
+  exact leftState.trans rightState.symm
+
+/-- For a successful executable guard worklist, declarative correctness is
+equivalent to agreement with the unified semantic table. -/
+theorem executeObservedGuardWorklist?_correct_iff_semanticMemo
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.GuardWorklistResult tokens)
+    (selected : Chart.executeObservedGuardWorklist? file tokens owned =
+      some result) :
+    PhaseBCorrect file tokens result.memo ↔
+      result.memo = semanticGuardMemo owned := by
+  constructor
+  · intro correct
+    exact phaseBCorrect_final_memo_unique correct
+      (Chart.executeObservedGuardWorklist?_allGuardsFinal
+        file tokens owned result selected)
+      (semanticGuardMemo_correct owned)
+      (semanticGuardMemo_allFinal owned)
+  · intro agreement
+    rw [agreement]
+    exact semanticGuardMemo_correct owned
+
 end Solcore.Surface.Multi
