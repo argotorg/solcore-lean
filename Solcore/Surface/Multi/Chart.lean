@@ -11649,4 +11649,139 @@ private theorem attemptContextualCompletion?_operationalInvariant
 end Chart
 
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem attemptContextualCompletionsWith?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ (others : List (ContextualItemKey tokens))
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCOperationalInvariant file tokens current.payload →
+      OperationalContextualReach file tokens
+        current.payload.phaseC.memo pivot →
+      (∀ other, other ∈ others →
+        OperationalContextualReach file tokens
+          current.payload.phaseC.memo other) →
+      attemptContextualCompletionsWith? pivot others current = some result →
+      PhaseCOperationalInvariant file tokens result.payload ∧
+        result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result invariant _ _ selected
+      cases selected
+      exact ⟨invariant, rfl⟩
+  | cons other rest induction =>
+      intro current result invariant pivotReached othersReached selected
+      rw [attemptContextualCompletionsWith?] at selected
+      cases forwardEq : attemptContextualCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have otherReached := othersReached other (by simp)
+          have forwardSound :=
+            attemptContextualCompletion?_operationalInvariant current forward
+              pivot other invariant pivotReached otherReached forwardEq
+          split at selected
+          next same =>
+            have restSound := induction forward result forwardSound.1
+              (by rw [forwardSound.2]; exact pivotReached)
+              (fun item member => by
+                rw [forwardSound.2]
+                exact othersReached item (by simp [member])) selected
+            exact ⟨restSound.1, restSound.2.trans forwardSound.2⟩
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq : attemptContextualCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                have reverseSound :=
+                  attemptContextualCompletion?_operationalInvariant forward
+                    reverse other pivot forwardSound.1
+                    (by rw [forwardSound.2]; exact otherReached)
+                    (by rw [forwardSound.2]; exact pivotReached) reverseEq
+                have restSound := induction reverse result reverseSound.1
+                  (by rw [reverseSound.2, forwardSound.2]; exact pivotReached)
+                  (fun item member => by
+                    rw [reverseSound.2, forwardSound.2]
+                    exact othersReached item (by simp [member])) selected
+                exact ⟨restSound.1,
+                  restSound.2.trans (reverseSound.2.trans forwardSound.2)⟩
+
+private theorem dequeueContextualItem?_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (selected : dequeueContextualItem? current = some result) :
+    result.2.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold dequeueContextualItem? at selected
+  cases queueEq : current.payload.phaseC.itemQueue with
+  | nil => simp [queueEq] at selected
+  | cons item rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      rw [runMappedPrimitive?_payload current _ _ nextEq]
+
+private theorem dequeueContextualEdge?_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (selected : dequeueContextualEdge? current = some result) :
+    result.2.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold dequeueContextualEdge? at selected
+  cases queueEq : current.payload.phaseC.edgeQueue with
+  | nil => simp [queueEq] at selected
+  | cons edge rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      rw [runMappedPrimitive?_payload current _ _ nextEq]
+
+private theorem processContextualItem?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (itemReached : OperationalContextualReach file tokens
+      current.payload.phaseC.memo item)
+    (selected : processContextualItem? owned item current = some result) :
+    PhaseCOperationalInvariant file tokens result.payload ∧
+      result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  unfold processContextualItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
+  have predictedSound :=
+    attemptContextualPredictions?_operationalInvariant item allProductionIds
+      current predicted invariant itemReached predictedEq
+  have itemPredicted : OperationalContextualReach file tokens
+      predicted.payload.phaseC.memo item := by
+    rw [predictedSound.2]
+    exact itemReached
+  have scannedSound := attemptContextualScan?_operationalInvariant owned
+    predicted scanned item predictedSound.1 itemPredicted scannedEq
+  have itemScanned : OperationalContextualReach file tokens
+      scanned.payload.phaseC.memo item := by
+    rw [scannedSound.2, predictedSound.2]
+    exact itemReached
+  have completedSound :=
+    attemptContextualCompletionsWith?_operationalInvariant item
+      scanned.payload.phaseC.contextualItems scanned result scannedSound.1
+      itemScanned scannedSound.1.1 completedEq
+  exact ⟨completedSound.1,
+    completedSound.2.trans (scannedSound.2.trans predictedSound.2)⟩
+
+end Chart
+
+
 end Solcore.Surface.Multi
