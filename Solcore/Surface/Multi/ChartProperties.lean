@@ -2775,3 +2775,47 @@ theorem saturatedMatchArmHeaderObservation_eq_semantic
     semanticMatchArmHeaderObservation_exact owned]
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- A successful observed contextual worklist is semantically complete for
+every declarative Phase-C item and checked edge under the supplied Phase-B
+correctness bridge. -/
+theorem executeObservedContextualWorklist?_complete
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (correct : PhaseBCorrect file tokens result.memo) :
+    ∃ final : AllGuardsFinal result.memo,
+      (∀ item, ContextualReach file tokens result.memo correct final item →
+        item ∈ result.items) ∧
+      (∀ key, ContextualEdgeReach file tokens result.memo correct final key →
+        ∃ retained, retained ∈ result.edges ∧ retained.val = key) := by
+  exact executeObservedContextualWorklist?_complete_of_operationalClosure
+    file tokens owned result selected correct
+      (Chart.executeObservedContextualWorklist?_operationalClosure
+        file tokens owned result selected)
+
+/-- The completion backpointer is unique for all declaratively reachable
+completed edges in every successful observed contextual worklist. -/
+theorem executeObservedContextualWorklist?_completionBackpointerUnique
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (correct : PhaseBCorrect file tokens result.memo) :
+    ∃ final : AllGuardsFinal result.memo,
+      CompletionBackpointerUnique file tokens result.memo correct final := by
+  exact
+    executeObservedContextualWorklist?_completionBackpointerUnique_of_operationalClosure
+      file tokens owned result selected correct
+      (Chart.executeObservedContextualWorklist?_operationalClosure
+        file tokens owned result selected)
+
+end Solcore.Surface.Multi
