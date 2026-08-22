@@ -1743,6 +1743,7 @@ theorem executeObservedContextualWorklist?_completionBackpointerUnique_of_operat
 
 end Solcore.Surface.Multi
 
+
 namespace Solcore.Surface.Multi
 
 open Grammar
@@ -2038,5 +2039,155 @@ theorem observedSameDelimiterDepthBool_exact
   rw [decide_eq_true_iff,
     observedDelimiterRun?_eq_some_iff tokens [] [] start finish]
   rfl
+
+end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+
+private theorem observedSymbolAllowedBool_exact
+    (symbol : Symbol) (allowed : NonemptyList Symbol) :
+    Chart.observedSymbolAllowedBool symbol allowed = true ↔
+      symbol = allowed.head ∨ symbol ∈ allowed.tail := by
+  simp [Chart.observedSymbolAllowedBool, List.any_eq_true]
+
+private theorem observedAllowedSymbolAtBool_exact
+    (tokens : List Token) (cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    Chart.observedAllowedSymbolAtBool cursor allowed = true ↔
+      ∃ symbol : Symbol,
+        (symbol = allowed.head ∨ symbol ∈ allowed.tail) ∧
+        ∃ terminalCursor : TerminalCursor tokens,
+        ∃ token : Token,
+          terminalCursor.beforeBoundary = cursor ∧
+            tokens[terminalCursor.val]? = some token ∧
+            token.payload = .symbol symbol := by
+  constructor
+  · intro accepted
+    unfold Chart.observedAllowedSymbolAtBool at accepted
+    split at accepted
+    case isFalse => simp at accepted
+    case isTrue inRange =>
+      generalize payloadEq : tokens[cursor.val].payload = payload at accepted
+      cases payload <;> simp at accepted
+      case symbol symbol =>
+        have allowedMember :=
+          (observedSymbolAllowedBool_exact symbol allowed).mp accepted
+        let terminalCursor : TerminalCursor tokens :=
+          ⟨cursor.val, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+        exact ⟨symbol, allowedMember, terminalCursor,
+          tokens[cursor.val], by apply Fin.ext; rfl,
+          List.getElem?_eq_getElem inRange, payloadEq⟩
+  · rintro ⟨symbol, allowedMember, terminalCursor, token,
+      atCursor, lookup, payload⟩
+    have cursorEq : terminalCursor.val = cursor.val :=
+      congrArg Fin.val atCursor
+    have inRange : cursor.val < tokens.length := by
+      by_cases candidate : cursor.val < tokens.length
+      · exact candidate
+      · have outOfRange : tokens.length ≤ terminalCursor.val := by
+          omega
+        rw [List.getElem?_eq_none outOfRange] at lookup
+        contradiction
+    have tokenEq : tokens[cursor.val] = token := by
+      have canonical := List.getElem?_eq_getElem inRange
+      rw [cursorEq] at lookup
+      exact Option.some.inj (canonical.symm.trans lookup)
+    have payloadAt : tokens[cursor.val].payload = .symbol symbol :=
+      tokenEq ▸ payload
+    unfold Chart.observedAllowedSymbolAtBool
+    rw [dif_pos inRange, payloadAt]
+    exact (observedSymbolAllowedBool_exact symbol allowed).mpr allowedMember
+
+/-- The public G06 delimiter bit selects exactly the first allowed delimiter
+at the starting depth. -/
+theorem observedPatternDelimiterBool_exact
+    (tokens : List Token) (start cursor : Boundary tokens) :
+    Chart.observedPatternDelimiterBool tokens start cursor = true ↔
+      NextSameDepthDelimiter tokens start cursor {
+        head := .comma
+        tail := [.rightParen, .fatArrow]
+      } := by
+  let allowed : NonemptyList Symbol := {
+    head := .comma
+    tail := [.rightParen, .fatArrow]
+  }
+  change Chart.observedPatternDelimiterBool tokens start cursor = true ↔
+    NextSameDepthDelimiter tokens start cursor allowed
+  unfold Chart.observedPatternDelimiterBool NextSameDepthDelimiter
+  simp only [Bool.and_eq_true]
+  constructor
+  · rintro ⟨⟨sameDepth, allowedAtCursor⟩, earliest⟩
+    refine ⟨
+      (observedSameDelimiterDepthBool_exact tokens start cursor).mp
+        sameDepth,
+      (observedAllowedSymbolAtBool_exact tokens cursor allowed).mp
+        allowedAtCursor,
+      ?_⟩
+    intro earlier startLe earlierLt earlierDepth earlierAllowed
+    rw [List.all_eq_true] at earliest
+    have selected := earliest earlier (List.mem_finRange _)
+    have depthTrue :=
+      (observedSameDelimiterDepthBool_exact tokens start earlier).mpr
+        earlierDepth
+    have allowedTrue :=
+      (observedAllowedSymbolAtBool_exact tokens earlier allowed).mpr
+        earlierAllowed
+    have allowedTrueAtEarlier : Chart.observedAllowedSymbolAtBool earlier {
+        head := .comma
+        tail := [.rightParen, .fatArrow]
+      } = true := by
+      simpa [allowed] using allowedTrue
+    rw [allowedTrueAtEarlier] at selected
+    simp [startLe, earlierLt, depthTrue] at selected
+  · rintro ⟨sameDepth, allowedAtCursor, earliest⟩
+    refine ⟨⟨
+      (observedSameDelimiterDepthBool_exact tokens start cursor).mpr
+        sameDepth,
+      (observedAllowedSymbolAtBool_exact tokens cursor allowed).mpr
+        allowedAtCursor⟩, ?_⟩
+    rw [List.all_eq_true]
+    intro earlier _member
+    by_cases startLe : start.val ≤ earlier.val
+    · by_cases earlierLt : earlier.val < cursor.val
+      · by_cases depth : SameDelimiterDepth tokens start earlier
+        · have notAllowed := earliest earlier startLe earlierLt depth
+          have depthTrue :=
+            (observedSameDelimiterDepthBool_exact tokens start earlier).mpr
+              depth
+          have allowedFalse :
+              Chart.observedAllowedSymbolAtBool earlier allowed = false := by
+            apply Bool.eq_false_iff.mpr
+            intro allowedTrue
+            exact notAllowed
+              ((observedAllowedSymbolAtBool_exact tokens earlier allowed).mp
+                allowedTrue)
+          have allowedFalseAtEarlier :
+              Chart.observedAllowedSymbolAtBool earlier {
+                head := .comma
+                tail := [.rightParen, .fatArrow]
+              } = false := by
+            simpa [allowed] using allowedFalse
+          simpa [startLe, earlierLt, depthTrue] using allowedFalseAtEarlier
+        · have depthFalse :
+              Chart.observedSameDelimiterDepthBool tokens start earlier =
+                false := by
+            exact Bool.eq_false_iff.mpr fun depthTrue => depth
+              ((observedSameDelimiterDepthBool_exact
+                tokens start earlier).mp depthTrue)
+          simp [startLe, earlierLt, depthFalse]
+      · simp [startLe, earlierLt]
+    · simp [startLe]
+
+/-- The canonical U01 G06 bit agrees with the constructive semantic oracle. -/
+theorem rawPatternDelimiterObservation_eq_semantic
+    (tokens : List Token) (start cursor : Boundary tokens) :
+    Chart.rawPatternDelimiterObservation tokens start cursor =
+      semanticPatternDelimiterObservation tokens start cursor := by
+  rw [Chart.rawPatternDelimiterObservation_eq_observed]
+  apply Bool.eq_iff_iff.mpr
+  rw [observedPatternDelimiterBool_exact,
+    semanticPatternDelimiterObservation_exact]
 
 end Solcore.Surface.Multi
