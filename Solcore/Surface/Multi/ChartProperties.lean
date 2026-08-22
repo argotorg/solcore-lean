@@ -1209,4 +1209,134 @@ theorem semanticGenericContextClassifiedObservation_exact
         start upperBound finish) decision
 
 
+/-- The semantic positive bit for every grammar-owned priority guard. -/
+def semanticGuardPositiveObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  match key.guard with
+  | .G01_statementIf =>
+      Chart.statementIfPositiveObservationBool owned
+        (semanticMatchingParenthesisObservation tokens)
+        (semanticGreatestEndObservation owned) key
+  | .G02_matchArmBoundary =>
+      Chart.matchArmHeaderObservationBool
+        (semanticMatchArmHeaderObservation owned) key
+  | .G03_parameterComptime | .G04_letComptime |
+      .G05_typeComptime | .G07_leadingDotArguments =>
+      (Chart.basicGuardPositiveObservation? owned key).getD false
+  | .G06_patternComptime =>
+      Chart.patternComptimePositiveObservationBool owned
+        (semanticPatternDelimiterObservation tokens)
+        (semanticGreatestEndObservation owned) key
+  | .G08_terminalExpression =>
+      Chart.terminalExpressionPositiveObservationBool
+        (semanticStatementRegionObservation owned)
+        (semanticGreatestEndObservation owned) key
+  | .G09_genericContext =>
+      Chart.genericContextPositiveObservationBool owned
+        (semanticGreatestEndObservation owned) key
+
+/-- The unified semantic positive bit denotes positive evidence exactly. -/
+theorem semanticGuardPositiveObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) :
+    semanticGuardPositiveObservationBool owned key = true ↔
+      GuardEvidence file tokens key .positive := by
+  cases guardEq : key.guard with
+  | G01_statementIf =>
+      simpa [semanticGuardPositiveObservationBool, guardEq] using
+        statementIfPositiveObservationBool_exact owned
+          (semanticMatchingParenthesisObservation tokens)
+          (semanticGreatestEndObservation owned) key guardEq
+          (semanticMatchingParenthesisObservation_exact tokens)
+          (fun start upperBound finish =>
+            semanticGreatestEndObservation_exact owned (.rule .expression)
+              start upperBound finish)
+  | G02_matchArmBoundary =>
+      simpa [semanticGuardPositiveObservationBool, guardEq] using
+        matchArmHeaderObservationBool_exact owned
+          (semanticMatchArmHeaderObservation owned) key guardEq
+          (semanticMatchArmHeaderObservation_exact owned)
+  | G03_parameterComptime =>
+      obtain ⟨observed, selected, exact⟩ :=
+        basicGuardPositiveObservation?_exact owned key (Or.inl guardEq)
+      simpa [semanticGuardPositiveObservationBool, guardEq, selected] using
+        exact
+  | G04_letComptime =>
+      obtain ⟨observed, selected, exact⟩ :=
+        basicGuardPositiveObservation?_exact owned key
+          (Or.inr (Or.inl guardEq))
+      simpa [semanticGuardPositiveObservationBool, guardEq, selected] using
+        exact
+  | G05_typeComptime =>
+      obtain ⟨observed, selected, exact⟩ :=
+        basicGuardPositiveObservation?_exact owned key
+          (Or.inr (Or.inr (Or.inl guardEq)))
+      simpa [semanticGuardPositiveObservationBool, guardEq, selected] using
+        exact
+  | G06_patternComptime =>
+      simpa [semanticGuardPositiveObservationBool, guardEq] using
+        patternComptimePositiveObservationBool_exact owned
+          (semanticPatternDelimiterObservation tokens)
+          (semanticGreatestEndObservation owned) key guardEq
+          (semanticPatternDelimiterObservation_exact tokens)
+          (fun start upperBound finish =>
+            semanticGreatestEndObservation_exact owned (.rule .expression)
+              start upperBound finish)
+  | G07_leadingDotArguments =>
+      obtain ⟨observed, selected, exact⟩ :=
+        basicGuardPositiveObservation?_exact owned key
+          (Or.inr (Or.inr (Or.inr guardEq)))
+      simpa [semanticGuardPositiveObservationBool, guardEq, selected] using
+        exact
+  | G08_terminalExpression =>
+      simpa [semanticGuardPositiveObservationBool, guardEq] using
+        terminalExpressionPositiveObservationBool_exact owned
+          (semanticStatementRegionObservation owned)
+          (semanticGreatestEndObservation owned) key guardEq
+          (semanticStatementRegionObservation_exact owned)
+          (fun start upperBound finish =>
+            semanticGreatestEndObservation_exact owned (.rule .expression)
+              start upperBound finish)
+  | G09_genericContext =>
+      simpa [semanticGuardPositiveObservationBool, guardEq] using
+        genericContextPositiveObservationBool_exact owned
+          (semanticGreatestEndObservation owned) key guardEq
+          (fun start upperBound finish =>
+            semanticGreatestEndObservation_exact owned
+              (.rule .predicateList) start upperBound finish)
+
+/-- A public, fully-final semantic guard table in the same normalized shape
+as the executable Phase-B worklist. -/
+def semanticGuardMemo
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) : GuardMemo tokens :=
+  fun key => .final (Chart.classifyGuardObservation key.guard
+    (semanticGuardPositiveObservationBool owned key)
+    (Chart.matchArmPipeObservationBool owned key))
+
+/-- The unified semantic guard table is declaratively correct. -/
+theorem semanticGuardMemo_correct
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    PhaseBCorrect file tokens (semanticGuardMemo owned) := by
+  unfold semanticGuardMemo
+  exact phaseBCorrect_of_exact_guard_observations owned
+    (semanticGuardPositiveObservationBool owned)
+    (Chart.matchArmPipeObservationBool owned)
+    (semanticGuardPositiveObservationBool_exact owned)
+    (fun key _isMatchArm => matchArmPipeObservationBool_exact owned key)
+
+/-- Every entry in the unified semantic guard table is final. -/
+theorem semanticGuardMemo_allFinal
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    AllGuardsFinal (semanticGuardMemo owned) := by
+  intro key
+  exact ⟨Chart.classifyGuardObservation key.guard
+    (semanticGuardPositiveObservationBool owned key)
+    (Chart.matchArmPipeObservationBool owned key), rfl⟩
+
 end Solcore.Surface.Multi
