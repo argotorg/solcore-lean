@@ -17288,4 +17288,241 @@ private theorem executeObservedPhaseAB?_phaseC_entry_total
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem guardCellAddress_injective
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    Function.Injective (guardCellAddress productionInstance) := by
+  intro left right equal
+  apply Fin.ext
+  simpa [guardCellAddress] using congrArg
+    (fun address : GuardAddress tokens => address.1.1.2.val) equal
+
+private theorem preInsertWitnessSlots_nodup :
+    preInsertWitnessSlots.Nodup := by
+  decide
+
+private theorem preInsertWitnessAddresses_nodup
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length) :
+    (preInsertWitnessSlots.map fun slot =>
+      UnitAddress.guardWitness slot
+        (guardCellAddress productionInstance index)).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_map]
+  exact preInsertWitnessSlots_nodup.imp fun different equal =>
+    different (UnitAddress.guardWitness.inj equal).1
+
+private theorem processGuardCell?_total_usedRev
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length)
+    (fresh : ∀ slot, UnitAddress.guardWitness slot
+      (guardCellAddress productionInstance index) ∉
+        current.counter.usedRev) :
+    ∃ result,
+      processGuardCell? current productionInstance index = some result ∧
+      result.1.counter.usedRev =
+        UnitAddress.guardWitness .insertWitness
+            (guardCellAddress productionInstance index) ::
+          (preInsertWitnessSlots.map fun slot =>
+            UnitAddress.guardWitness slot
+              (guardCellAddress productionInstance index)).reverse ++
+            current.counter.usedRev := by
+  let address := guardCellAddress productionInstance index
+  let lookupAddresses := preInsertWitnessSlots.map fun slot =>
+    UnitAddress.guardWitness slot address
+  have lookupFresh : ∀ candidate, candidate ∈ lookupAddresses →
+      candidate ∉ current.counter.usedRev := by
+    intro candidate member
+    simp only [lookupAddresses, List.mem_map] at member
+    rcases member with ⟨slot, _slotMember, rfl⟩
+    exact fresh slot
+  obtain ⟨inspected, inspectedEq, inspectedUsed⟩ :=
+    chargeAddresses?_total_usedRev lookupAddresses current
+      (by simpa [lookupAddresses, address] using
+        preInsertWitnessAddresses_nodup productionInstance index)
+      lookupFresh
+  have insertFresh : UnitAddress.guardWitness .insertWitness address ∉
+      inspected.counter.usedRev := by
+    intro used
+    rw [inspectedUsed, List.mem_append, List.mem_reverse] at used
+    rcases used with lookup | old
+    · simp only [lookupAddresses, List.mem_map] at lookup
+      rcases lookup with ⟨slot, slotMember, equal⟩
+      have sameSlot := (UnitAddress.guardWitness.inj equal).1
+      subst slot
+      simp [preInsertWitnessSlots] at slotMember
+    · exact fresh .insertWitness old
+  let witness := guardWitnessFor? current.payload.memo productionInstance
+    ((guardOf productionInstance.production).get index)
+  let transition := fun (state : PhaseCOpen file tokens) =>
+    match witness with
+    | none => state
+    | some key => { state with guardWitnesses := key :: state.guardWitnesses }
+  let inserted : CountedState tokens (PhaseCOpen file tokens) := {
+    payload := transition inspected.payload
+    counter := inspected.counter.charge
+      (.guardWitness .insertWitness address) insertFresh
+  }
+  have insertedEq : runMappedPrimitive? inspected
+      (.guardWitness .insertWitness address) transition = some inserted := by
+    simp [runMappedPrimitive?, insertFresh, inserted]
+  refine ⟨(inserted, witness.isSome), ?_, ?_⟩
+  · unfold processGuardCell?
+    change (chargeAddresses? current lookupAddresses).bind _ = _
+    rw [inspectedEq]
+    change (runMappedPrimitive? inspected
+      (.guardWitness .insertWitness address) transition).bind _ = _
+    rw [insertedEq]
+    rfl
+  · rw [runMappedPrimitive?_usedRev inspected
+      (.guardWitness .insertWitness address) transition inserted insertedEq,
+      inspectedUsed]
+    rfl
+
+private theorem processGuardCells?_total_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ∀ (indices : List
+        (Fin (guardOf productionInstance.production).length))
+      (current : CountedState tokens (PhaseCOpen file tokens)),
+      indices.Nodup →
+      (∀ index, index ∈ indices → ∀ slot,
+        UnitAddress.guardWitness slot
+          (guardCellAddress productionInstance index) ∉
+            current.counter.usedRev) →
+      ∃ result,
+        processGuardCells? productionInstance indices current =
+          some result := by
+  intro indices
+  induction indices with
+  | nil =>
+      intro current _unique _fresh
+      exact ⟨(current, true), rfl⟩
+  | cons index rest induction =>
+      intro current unique fresh
+      rw [List.nodup_cons] at unique
+      obtain ⟨next, nextEq, nextUsed⟩ :=
+        processGuardCell?_total_usedRev current productionInstance index
+          (fresh index (by simp))
+      have restFresh : ∀ other, other ∈ rest → ∀ slot,
+          UnitAddress.guardWitness slot
+            (guardCellAddress productionInstance other) ∉
+              next.1.counter.usedRev := by
+        intro other member slot used
+        rw [nextUsed] at used
+        rcases List.mem_cons.mp used with inserted | used
+        · have sameAddress :=
+            (UnitAddress.guardWitness.inj inserted).2
+          have sameIndex :=
+            guardCellAddress_injective productionInstance sameAddress
+          exact unique.1 (sameIndex ▸ member)
+        rcases List.mem_append.mp used with lookup | old
+        · rw [List.mem_reverse] at lookup
+          simp only [List.mem_map] at lookup
+          rcases lookup with ⟨headSlot, _slotMember, equal⟩
+          have sameAddress :=
+            (UnitAddress.guardWitness.inj equal).2
+          have sameIndex :=
+            guardCellAddress_injective productionInstance sameAddress
+          exact unique.1 (sameIndex ▸ member)
+        · exact fresh other (by simp [member]) slot old
+      obtain ⟨result, resultEq⟩ :=
+        induction next.1 unique.2 restFresh
+      refine ⟨(result.1, next.2 && result.2), ?_⟩
+      change (processGuardCell? current productionInstance index).bind _ = _
+      rw [nextEq]
+      change (processGuardCells? productionInstance rest next.1).bind _ = _
+      rw [resultEq]
+      rfl
+
+private theorem guardCellIndices_nodup
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    (List.ofFn fun index :
+      Fin (guardOf productionInstance.production).length => index).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_iff_getElem]
+  intro left right _leftBound _rightBound before equal
+  simp only [List.getElem_ofFn] at equal
+  have sameValue : left = right := congrArg Fin.val equal
+  omega
+
+private theorem activateProduction?_total_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (productionFresh : UnitAddress.production productionInstance ∉
+      current.counter.usedRev)
+    (witnessFresh : ∀ index slot,
+      UnitAddress.guardWitness slot
+        (guardCellAddress productionInstance index) ∉
+          current.counter.usedRev) :
+    ∃ result, activateProduction? current productionInstance =
+      some result := by
+  let attempted : CountedState tokens (PhaseCOpen file tokens) := {
+    payload := current.payload
+    counter := current.counter.charge
+      (.production productionInstance) productionFresh
+  }
+  have attemptedEq : runMappedPrimitive? current
+      (.production productionInstance) id = some attempted := by
+    simp [runMappedPrimitive?, productionFresh, attempted]
+  let indices := List.ofFn fun index :
+    Fin (guardOf productionInstance.production).length => index
+  have pending : ∀ index, index ∈ indices → ∀ slot,
+      UnitAddress.guardWitness slot
+        (guardCellAddress productionInstance index) ∉
+          attempted.counter.usedRev := by
+    intro index _member slot used
+    rw [runMappedPrimitive?_usedRev current
+      (.production productionInstance) id attempted attemptedEq,
+      List.mem_cons] at used
+    rcases used with equal | old
+    · cases equal
+    · exact witnessFresh index slot old
+  obtain ⟨result, resultEq⟩ :=
+    processGuardCells?_total_fresh productionInstance indices attempted
+      (by simpa [indices] using
+        guardCellIndices_nodup productionInstance)
+      pending
+  refine ⟨result, ?_⟩
+  unfold activateProduction?
+  change (runMappedPrimitive? current
+    (.production productionInstance) id).bind _ = _
+  rw [attemptedEq]
+  exact resultEq
+
+private theorem activateWorklistProduction?_total_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (productionFresh : UnitAddress.production productionInstance ∉
+      current.counter.usedRev)
+    (witnessFresh : ∀ index slot,
+      UnitAddress.guardWitness slot
+        (guardCellAddress productionInstance index) ∉
+          current.counter.usedRev) :
+    ∃ result, activateWorklistProduction? current productionInstance =
+      some result := by
+  obtain ⟨activated, activatedEq⟩ := activateProduction?_total_fresh {
+      payload := current.payload.phaseC
+      counter := current.counter
+    } productionInstance productionFresh witnessFresh
+  refine ⟨({
+    payload := ⟨activated.1.payload,
+      current.payload.completionBackpointers⟩
+    counter := activated.1.counter
+  }, activated.2), ?_⟩
+  unfold activateWorklistProduction?
+  rw [activatedEq]
+  rfl
+
+end Chart
+
 end Solcore.Surface.Multi
