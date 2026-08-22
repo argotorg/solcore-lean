@@ -6894,6 +6894,96 @@ private theorem dequeueRawEdge?_allSafe
   }
 
 
+private theorem processRawItem?_allSafe_of_selected
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (safe : PhaseAAllSafe current) (work : PhaseAItemWorkFresh current item)
+    (selected : processRawItem? owned item current = some result) :
+    PhaseAAllSafe result := by
+  obtain ⟨computed, computedEq, computedSafe⟩ :=
+    processRawItem?_total_allSafe owned item current safe work
+  rw [selected] at computedEq
+  cases computedEq
+  exact computedSafe
+
+private theorem PhaseAQueueReachable.allSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start current : CountedState tokens (PhaseAOpen file tokens))
+    (reachable : PhaseAQueueReachable owned start current)
+    (safe : PhaseAAllSafe start) : PhaseAAllSafe current := by
+  induction reachable with
+  | refl => exact safe
+  | item prior dequeued processed induction =>
+      obtain ⟨afterSafe, work⟩ := dequeueRawItem?_allSafe _ _ _ induction
+        dequeued
+      exact processRawItem?_allSafe_of_selected owned _ _ _ afterSafe work
+        processed
+  | edge prior dequeued induction =>
+      exact dequeueRawEdge?_allSafe _ _ _ induction dequeued
+
+private theorem PhaseAAllSafe.not_blocked
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (safe : PhaseAAllSafe current) : ¬ PhaseAQueueBlocked owned current := by
+  unfold PhaseAQueueBlocked
+  cases items : current.payload.itemQueue with
+  | nil =>
+      cases edges : current.payload.edgeQueue with
+      | nil => simp
+      | cons edge rest =>
+          intro blocked
+          obtain ⟨after, selected⟩ := dequeueRawEdge?_total current edge rest
+            edges safe.edge
+          rw [selected] at blocked
+          simp at blocked
+  | cons item rest =>
+      intro blocked
+      rcases blocked with dequeueFailed | processFailed
+      · obtain ⟨after, selected⟩ := dequeueRawItem?_total current item rest
+          items safe.item
+        rw [selected] at dequeueFailed
+        simp at dequeueFailed
+      · rcases processFailed with ⟨pivot, after, dequeued, processFailed⟩
+        obtain ⟨afterSafe, work⟩ := dequeueRawItem?_allSafe current after
+          pivot safe dequeued
+        obtain ⟨result, processed, resultSafe⟩ :=
+          processRawItem?_total_allSafe owned pivot after afterSafe work
+        rw [processed] at processFailed
+        simp at processFailed
+
+private theorem executePhaseA?_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executePhaseA? file tokens owned = some result := by
+  obtain ⟨seeded, seededEq, seededSafe⟩ :=
+    insertRawSeeds?_total_allSafe (rawSeedItems tokens)
+      (beginPhaseA file tokens) (beginPhaseA_allSafe file tokens)
+  cases execution : executePhaseA? file tokens owned with
+  | some result => exact ⟨result, rfl⟩
+  | none =>
+      rcases executePhaseA?_failure_boundary file tokens owned execution with
+        seedFailed | ⟨actualSeeded, blocked, actualSeededEq, reachable,
+          operationBlocked⟩
+      · rw [seededEq] at seedFailed
+        simp at seedFailed
+      · rw [seededEq] at actualSeededEq
+        cases actualSeededEq
+        have blockedSafe := PhaseAQueueReachable.allSafe owned seeded blocked
+          reachable seededSafe
+        exact (blockedSafe.not_blocked owned blocked operationBlocked).elim
+
+private theorem executePhaseA?_total_membership_eq
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executePhaseA? file tokens owned = some result ∧
+      ∀ item, item ∈ result.payload.rawItems ↔ item ∈ rawSaturation tokens := by
+  obtain ⟨result, selected⟩ := executePhaseA?_total file tokens owned
+  exact ⟨result, selected,
+    executePhaseA?_membership_eq file tokens owned result selected⟩
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
