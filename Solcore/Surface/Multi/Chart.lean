@@ -16210,4 +16210,184 @@ private theorem executeObservedPhaseAB?_phaseCInitialFresh
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def contextualPredictedItemOfInstance {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ContextualItemKey tokens := {
+  raw := {
+    production := productionInstance.production
+    dot := ⟨0, Nat.zero_lt_succ _⟩
+    origin := productionInstance.origin
+    current := productionInstance.origin
+  }
+  context := productionInstance.context
+}
+
+private theorem contextualPredictedItem?_item_eq_instance
+    {tokens : List Token}
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (item : ContextualItemKey tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (selected : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance)) :
+    item = contextualPredictedItemOfInstance productionInstance := by
+  unfold contextualPredictedItem? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  next sameLhs =>
+    have equal := Option.some.inj selected
+    cases equal
+    rfl
+
+private theorem contextualCompletedEdge?_finished_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge)) :
+    finished.raw.origin = waiting.raw.current ∧
+      finished.context =
+        descendContext waiting finished.raw.production := by
+  unfold contextualCompletedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  next sameCursor =>
+    split at selected <;> try contradiction
+    next sameContext => exact ⟨sameCursor.symm, sameContext⟩
+
+private theorem contextualCompletedEdge?_eq_of_contextualCompletionKey_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (leftWaiting leftFinished leftAfter : ContextualItemKey tokens)
+    (leftEdge : StructurallyValidContextualCompletedEdge file tokens)
+    (rightWaiting rightFinished rightAfter : ContextualItemKey tokens)
+    (rightEdge : StructurallyValidContextualCompletedEdge file tokens)
+    (leftSelected : contextualCompletedEdge? (file := file)
+      leftWaiting leftFinished = some (leftAfter, leftEdge))
+    (rightSelected : contextualCompletedEdge? (file := file)
+      rightWaiting rightFinished = some (rightAfter, rightEdge))
+    (keys : contextualCompletionKey leftWaiting leftFinished =
+      contextualCompletionKey rightWaiting rightFinished) :
+    leftAfter = rightAfter ∧ leftEdge = rightEdge := by
+  have waitingRaw : leftWaiting.raw = rightWaiting.raw :=
+    dottedItem_eq_of_fields
+      (congrArg (fun key => key.waiting.production) keys)
+      (congrArg (fun key => key.waiting.dot.val) keys)
+      (congrArg (fun key => key.origin) keys)
+      (congrArg (fun key => key.shared) keys)
+  have waitingContext : leftWaiting.context = rightWaiting.context := by
+    have source := congrArg ChartCubicKey.source keys
+    simpa only [contextualCompletionKey,
+      ChartSourceTag.contextual.injEq] using source
+  have waitingEq : leftWaiting = rightWaiting :=
+    contextualItem_eq_of_fields waitingRaw waitingContext
+  have leftShape := contextualCompletedEdge?_finished_shape leftWaiting
+    leftFinished leftAfter leftEdge leftSelected
+  have rightShape := contextualCompletedEdge?_finished_shape rightWaiting
+    rightFinished rightAfter rightEdge rightSelected
+  have finishedOrigin : leftFinished.raw.origin =
+      rightFinished.raw.origin := by
+    rw [leftShape.1, rightShape.1, waitingEq]
+  have finishedRaw : leftFinished.raw = rightFinished.raw :=
+    dottedItem_eq_of_fields
+      (congrArg (fun key => key.finished.production) keys)
+      (congrArg (fun key => key.finished.dot.val) keys)
+      finishedOrigin
+      (congrArg (fun key => key.current) keys)
+  have finishedContext : leftFinished.context = rightFinished.context := by
+    rw [leftShape.2, rightShape.2, waitingEq,
+      congrArg DottedItem.production finishedRaw]
+  have finishedEq : leftFinished = rightFinished :=
+    contextualItem_eq_of_fields finishedRaw finishedContext
+  subst rightWaiting
+  subst rightFinished
+  rw [leftSelected] at rightSelected
+  exact Prod.mk.inj (Option.some.inj rightSelected)
+
+private theorem attemptContextualPrediction?_materialization_boundary
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (item : ContextualItemKey tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (computed : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance))
+    (enabled : MemoEnablesProduction current.payload.phaseC.memo
+      productionInstance)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    (UnitAddress.production productionInstance ∈ current.counter.usedRev) ∨
+      item ∈ result.payload.phaseC.contextualItems := by
+  unfold attemptContextualPrediction? at selected
+  rw [computed] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, remainder⟩
+  have attemptedPayload := runMappedPrimitive?_payload current _ id attemptedEq
+  change attempted.payload = current.payload at attemptedPayload
+  split at remainder
+  next used =>
+    have old : UnitAddress.production productionInstance ∈
+        current.counter.usedRev := by
+      rw [runMappedPrimitive?_usedRev current _ id attempted attemptedEq,
+        List.mem_cons] at used
+      rcases used with collision | old
+      · cases collision
+      · exact old
+    cases remainder
+    exact Or.inl old
+  next fresh =>
+    simp only [Option.bind_eq_some_iff] at remainder
+    rcases remainder with ⟨activated, activatedEq, acceptedEq⟩
+    have accepted := activateWorklistProduction?_accepted_complete attempted
+      productionInstance activated activatedEq (by
+        rw [attemptedPayload]
+        exact enabled)
+    cases value : activated.2
+    · simp [value] at accepted
+    · simp only [value] at acceptedEq
+      right
+      exact (insertContextualItem?_coverage activated.1 result .prediction
+        item acceptedEq).2
+
+private theorem attemptContextualCompletion?_materialization_boundary
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (computed : contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge))
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    ((.cubic .U03_completionAttempt
+        (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+      current.counter.usedRev) ∨
+    (after ∈ result.payload.phaseC.contextualItems ∧
+      ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+        retained.val = .completed edge.waiting edge.finished edge.after
+          edge.shared) := by
+  unfold attemptContextualCompletion? at selected
+  rw [computed] at selected
+  simp only at selected
+  split at selected
+  next used =>
+    cases selected
+    exact Or.inl used
+  next fresh =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with
+      ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+    have itemCoverage := insertContextualItem?_coverage attempted withItem
+      .completion after itemEq
+    have edgeCoverage := insertContextualCompletedEdge?_coverage withItem
+      result edge edgeEq
+    exact Or.inr ⟨edgeCoverage.1.items itemCoverage.2, edgeCoverage.2⟩
+
+end Chart
+
 end Solcore.Surface.Multi
