@@ -2188,6 +2188,189 @@ private theorem runPhaseAQueues?_queues_empty
                   rw [processing] at selected
                   exact induction processed result selected
 
+private theorem rawSaturation_rule_closed
+    {tokens : List Token} {item : DottedItem tokens}
+    (selected : rawClosureBool tokens (rawSaturation tokens) item = true) :
+    item ∈ rawSaturation tokens := by
+  rw [← rawSaturation_stable]
+  exact List.mem_filter.mpr ⟨allDottedItems_complete item, selected⟩
+
+private theorem rawSaturation_seed_closed
+    {tokens : List Token} {item : DottedItem tokens}
+    (zero : item.dot.val = 0) (same : item.origin = item.current) :
+    item ∈ rawSaturation tokens := by
+  apply rawSaturation_rule_closed
+  simp [rawClosureBool, rawSeedBool, zero, same]
+
+private theorem rawSaturation_predict_closed
+    {tokens : List Token} {waiting predicted : DottedItem tokens}
+    (waitingMember : waiting ∈ rawSaturation tokens)
+    (next : NextSymbol waiting (.nonterminal predicted.production.lhs))
+    (zero : predicted.dot.val = 0)
+    (origin : predicted.origin = waiting.current)
+    (current : predicted.current = waiting.current) :
+    predicted ∈ rawSaturation tokens := by
+  apply rawSaturation_rule_closed
+  simp only [rawClosureBool, Bool.or_eq_true]
+  apply Or.inl
+  apply Or.inl
+  apply Or.inr
+  rw [rawPredictBool, List.any_eq_true]
+  refine ⟨waiting, waitingMember, ?_⟩
+  rw [next.2]
+  simp [zero, origin, current]
+
+private theorem terminalValueAt?_of_terminalAt
+    {file : WorkspaceFile} {tokens : List Token}
+    {cursor : TerminalCursor tokens} {value : TerminalStreamValue}
+    {span : SourceSpan} (terminalAt : TerminalAt file tokens cursor value span) :
+    terminalValueAt? tokens cursor = some value := by
+  cases terminalAt with
+  | retained token inRange lookup valid =>
+      have tokenEq : tokens[cursor.val] = token :=
+        Option.some.inj
+          ((List.getElem?_eq_getElem inRange).symm.trans lookup)
+      simp [terminalValueAt?, inRange, tokenEq]
+  | endOfFile atEnd =>
+      have outside : ¬ cursor.val < tokens.length := by omega
+      simp [terminalValueAt?, outside]
+
+private theorem rawSaturation_scan_closed
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : DottedItem tokens} {cursor : TerminalCursor tokens}
+    (beforeMember : before ∈ rawSaturation tokens)
+    (valid : PackedEdgeKey.Valid file tokens (.scanned before after cursor)) :
+    after ∈ rawSaturation tokens := by
+  rcases valid with ⟨terminal, value, span, next, atCurrent,
+    terminalAt, matched, advance⟩
+  apply rawSaturation_rule_closed
+  simp only [rawClosureBool, Bool.or_eq_true]
+  apply Or.inl
+  apply Or.inr
+  rw [rawScanBool, List.any_eq_true]
+  refine ⟨before, beforeMember, ?_⟩
+  have inRange : before.current.val < tokens.length + 1 := by
+    rw [← atCurrent]
+    exact cursor.isLt
+  rw [dif_pos inRange]
+  let computed : TerminalCursor tokens := ⟨before.current.val, inRange⟩
+  have computedEq : computed = cursor := by
+    apply Fin.ext
+    exact congrArg Fin.val atCurrent |>.symm
+  rw [next.2]
+  have observed : terminalValueAt? tokens
+      (⟨before.current.val, inRange⟩ : TerminalCursor tokens) = some value := by
+    change terminalValueAt? tokens computed = some value
+    rw [computedEq]
+    exact terminalValueAt?_of_terminalAt terminalAt
+  simp only
+  rw [observed]
+  have accepted : terminalMatchesBool terminal value = true :=
+    (terminalMatchesBool_eq_true_iff terminal value).mpr matched
+  have afterEq : cursor.afterBoundary =
+      TerminalCursor.afterBoundary
+        (⟨before.current.val, inRange⟩ : TerminalCursor tokens) :=
+    congrArg TerminalCursor.afterBoundary computedEq.symm
+  rcases advance with ⟨production, dot, origin, current⟩
+  simp [accepted, production, dot, origin, current, afterEq]
+
+private theorem rawSaturation_complete_closed
+    {tokens : List Token} {waiting finished after : DottedItem tokens}
+    (waitingMember : waiting ∈ rawSaturation tokens)
+    (finishedMember : finished ∈ rawSaturation tokens)
+    (next : NextSymbol waiting
+      (.nonterminal finished.production.lhs))
+    (complete : CompleteItem finished)
+    (same : waiting.current = finished.origin)
+    (advance : AdvanceItem waiting finished.current after) :
+    after ∈ rawSaturation tokens := by
+  apply rawSaturation_rule_closed
+  simp only [rawClosureBool, Bool.or_eq_true]
+  apply Or.inr
+  rw [rawCompleteBool, List.any_eq_true]
+  refine ⟨waiting, waitingMember, ?_⟩
+  rw [List.any_eq_true]
+  refine ⟨finished, finishedMember, ?_⟩
+  unfold CompleteItem at complete
+  rcases advance with ⟨production, dot, origin, current⟩
+  simp [next.2, complete, same, production, dot, origin, current]
+
+private theorem rawMemberBool_true_iff
+    {tokens : List Token} (items : List (DottedItem tokens))
+    (item : DottedItem tokens) :
+    rawMemberBool items item = true ↔ item ∈ items := by
+  rw [rawMemberBool, List.any_eq_true]
+  simp only [decide_eq_true_iff]
+  constructor
+  · rintro ⟨candidate, member, rfl⟩
+    exact member
+  · intro member
+    exact ⟨item, member, rfl⟩
+
+private theorem rawClosureBool_mono
+    {tokens : List Token} {left right : List (DottedItem tokens)}
+    (subset : left ⊆ right) (item : DottedItem tokens)
+    (selected : rawClosureBool tokens left item = true) :
+    rawClosureBool tokens right item = true := by
+  simp only [rawClosureBool, Bool.or_eq_true] at selected ⊢
+  rcases selected with beforeComplete | completed
+  rcases beforeComplete with beforeScan | scanned
+  rcases beforeScan with beforePredict | predicted
+  rcases beforePredict with carried | seeded
+  · exact Or.inl (Or.inl (Or.inl (Or.inl
+      ((rawMemberBool_true_iff right item).mpr
+        (subset ((rawMemberBool_true_iff left item).mp carried))))))
+  · exact Or.inl (Or.inl (Or.inl (Or.inr seeded)))
+  · apply Or.inl
+    apply Or.inl
+    apply Or.inr
+    rw [rawPredictBool, List.any_eq_true] at predicted ⊢
+    rcases predicted with ⟨waiting, member, accepted⟩
+    exact ⟨waiting, subset member, accepted⟩
+  · apply Or.inl
+    apply Or.inr
+    rw [rawScanBool, List.any_eq_true] at scanned ⊢
+    rcases scanned with ⟨before, member, accepted⟩
+    exact ⟨before, subset member, accepted⟩
+  · apply Or.inr
+    rw [rawCompleteBool, List.any_eq_true] at completed ⊢
+    rcases completed with ⟨waiting, waitingMember, accepted⟩
+    refine ⟨waiting, subset waitingMember, ?_⟩
+    rw [List.any_eq_true] at accepted ⊢
+    rcases accepted with ⟨finished, finishedMember, accepted⟩
+    exact ⟨finished, subset finishedMember, accepted⟩
+
+private theorem rawSaturation_subset_of_closed
+    {tokens : List Token} {items : List (DottedItem tokens)}
+    (closed : ∀ item,
+      rawClosureBool tokens items item = true → item ∈ items) :
+    ∀ item, item ∈ rawSaturation tokens → item ∈ items := by
+  have stages : ∀ stage item,
+      item ∈ closureIterate (rawClosureStep tokens) stage →
+        item ∈ items := by
+    intro stage
+    induction stage with
+    | zero =>
+        intro item member
+        simp [closureIterate] at member
+    | succ previous induction =>
+        intro item member
+        rw [closureIterate, rawClosureStep, List.mem_filter] at member
+        apply closed item
+        exact rawClosureBool_mono (fun candidate candidateMember =>
+          induction candidate candidateMember) item member.2
+  intro item member
+  exact stages (allDottedItems tokens).length item member
+
+private theorem rawItems_membership_eq_rawSaturation
+    {tokens : List Token} {items : List (DottedItem tokens)}
+    (sound : ∀ item, item ∈ items → item ∈ rawSaturation tokens)
+    (closed : ∀ item,
+      rawClosureBool tokens items item = true → item ∈ items) :
+    ∀ item, item ∈ items ↔ item ∈ rawSaturation tokens := by
+  intro item
+  exact ⟨sound item, rawSaturation_subset_of_closed closed item⟩
+
 end Chart
 
 namespace Chart
