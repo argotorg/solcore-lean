@@ -3587,6 +3587,216 @@ private theorem attemptCompletion?_materialized_of_ledger
     exact ledger waiting finished after edge computed skipped.1
   · exact materialized
 
+private theorem completedEdge?_finished_origin_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (selected : completedEdge? waiting finished = some (after, edge)) :
+    finished.origin = waiting.current := by
+  obtain ⟨shared, shape⟩ := completedEdge?_shape
+    waiting finished after edge selected
+  have valid : PackedEdgeKey.Valid file tokens
+      (.completed waiting finished after shared) := by
+    rw [← shape]
+    exact edge.property
+  rcases valid with ⟨_, _, _, _, waitingAtShared, finishedAtShared, _⟩
+  exact finishedAtShared.trans waitingAtShared.symm
+
+private theorem completedEdge?_eq_of_rawCompletionKey_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (leftWaiting leftFinished leftAfter : DottedItem tokens)
+    (leftEdge : PackedEdge file tokens)
+    (rightWaiting rightFinished rightAfter : DottedItem tokens)
+    (rightEdge : PackedEdge file tokens)
+    (leftSelected : completedEdge? leftWaiting leftFinished =
+      some (leftAfter, leftEdge))
+    (rightSelected : completedEdge? rightWaiting rightFinished =
+      some (rightAfter, rightEdge))
+    (keys : rawCompletionKey leftWaiting leftFinished =
+      rawCompletionKey rightWaiting rightFinished) :
+    leftAfter = rightAfter ∧ leftEdge = rightEdge := by
+  have waitingEq : leftWaiting = rightWaiting :=
+    dottedItem_eq_of_fields
+      (congrArg (fun key => key.waiting.production) keys)
+      (congrArg (fun key => key.waiting.dot.val) keys)
+      (congrArg (fun key => key.origin) keys)
+      (congrArg (fun key => key.shared) keys)
+  have finishedOrigin : leftFinished.origin = rightFinished.origin := by
+    rw [completedEdge?_finished_origin_eq leftWaiting leftFinished
+      leftAfter leftEdge leftSelected,
+      completedEdge?_finished_origin_eq rightWaiting rightFinished
+        rightAfter rightEdge rightSelected, waitingEq]
+  have finishedEq : leftFinished = rightFinished :=
+    dottedItem_eq_of_fields
+      (congrArg (fun key => key.finished.production) keys)
+      (congrArg (fun key => key.finished.dot.val) keys)
+      finishedOrigin
+      (congrArg (fun key => key.current) keys)
+  subst rightWaiting
+  subst rightFinished
+  rw [leftSelected] at rightSelected
+  exact Prod.mk.inj (Option.some.inj rightSelected)
+
+private def PhaseAContentSubset
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  before.payload.rawItems ⊆ after.payload.rawItems ∧
+    before.payload.rawEdges ⊆ after.payload.rawEdges
+
+private def CompletionAttemptAddressesSubset
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  ∀ waiting finished,
+    (.cubic .U03_completionAttempt
+      (rawCompletionKey waiting finished) : UnitAddress tokens) ∈
+        after.counter.usedRev →
+    (.cubic .U03_completionAttempt
+      (rawCompletionKey waiting finished) : UnitAddress tokens) ∈
+        before.counter.usedRev
+
+private theorem PhaseAContentSubset.refl
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    PhaseAContentSubset current current :=
+  ⟨fun _ => id, fun _ => id⟩
+
+private theorem PhaseAContentSubset.trans
+    {file : WorkspaceFile} {tokens : List Token}
+    {first second third : CountedState tokens (PhaseAOpen file tokens)}
+    (left : PhaseAContentSubset first second)
+    (right : PhaseAContentSubset second third) :
+    PhaseAContentSubset first third :=
+  ⟨fun _ member => right.1 (left.1 member),
+    fun _ member => right.2 (left.2 member)⟩
+
+private theorem CompletionAttemptAddressesSubset.refl
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    CompletionAttemptAddressesSubset current current :=
+  fun _ _ => id
+
+private theorem CompletionAttemptAddressesSubset.trans
+    {file : WorkspaceFile} {tokens : List Token}
+    {first second third : CountedState tokens (PhaseAOpen file tokens)}
+    (left : CompletionAttemptAddressesSubset first second)
+    (right : CompletionAttemptAddressesSubset second third) :
+    CompletionAttemptAddressesSubset first third :=
+  fun waiting finished member => left waiting finished
+    (right waiting finished member)
+
+private theorem CompletionAttemptLedgerMaterialized.mono
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : CountedState tokens (PhaseAOpen file tokens)}
+    (ledger : CompletionAttemptLedgerMaterialized before)
+    (content : PhaseAContentSubset before after)
+    (addresses : CompletionAttemptAddressesSubset before after) :
+    CompletionAttemptLedgerMaterialized after := by
+  intro waiting finished result edge computed used
+  obtain ⟨itemMember, candidate, edgeMember, same⟩ :=
+    ledger waiting finished result edge computed
+      (addresses waiting finished used)
+  exact ⟨content.1 itemMember, candidate, content.2 edgeMember, same⟩
+
+private theorem phaseA_runMappedPrimitive?_usedRev
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (result : CountedState tokens after)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    result.counter.usedRev = address :: current.counter.usedRev := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  next fresh =>
+    cases selected
+    rfl
+  next collision => contradiction
+
+private theorem runMappedPrimitive?_phaseA_subsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (address : UnitAddress tokens)
+    (transition : PhaseAOpen file tokens → PhaseAOpen file tokens)
+    (content : ∀ state,
+      state.rawItems ⊆ (transition state).rawItems ∧
+      state.rawEdges ⊆ (transition state).rawEdges)
+    (notAttempt : ∀ waiting finished,
+      address ≠ (.cubic .U03_completionAttempt
+        (rawCompletionKey waiting finished) : UnitAddress tokens))
+    (selected : runMappedPrimitive? current address transition = some result) :
+    PhaseAContentSubset current result ∧
+      CompletionAttemptAddressesSubset current result := by
+  have payload := phaseA_runMappedPrimitive?_payload current
+    address transition result selected
+  have used := phaseA_runMappedPrimitive?_usedRev current address transition
+    result selected
+  constructor
+  · unfold PhaseAContentSubset
+    rw [payload]
+    exact content current.payload
+  · intro waiting finished member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · exact (notAttempt waiting finished equal.symm).elim
+    · exact old
+
+private theorem insertRawItem?_subsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (selected : insertRawItem? current source item = some result) :
+    PhaseAContentSubset current result ∧
+      CompletionAttemptAddressesSubset current result := by
+  unfold insertRawItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current, .refl current⟩
+  next absent =>
+    apply runMappedPrimitive?_phaseA_subsets current result _ _ _ _ selected
+    · intro state
+      exact ⟨fun candidate member => by simp [member], fun _ => id⟩
+    · intro waiting finished
+      simp
+
+private theorem insertRawItem?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : insertRawItem? current source item = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  have subsets := insertRawItem?_subsets current result source item selected
+  exact ledger.mono subsets.1 subsets.2
+
+private theorem insertRawEdge?_subsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (selected : insertRawEdge? current edge = some result) :
+    PhaseAContentSubset current result ∧
+      CompletionAttemptAddressesSubset current result := by
+  unfold insertRawEdge? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current, .refl current⟩
+  next absent =>
+    split at selected <;>
+      apply runMappedPrimitive?_phaseA_subsets current result _ _ _ _ selected <;>
+      simp
+
+private theorem insertRawEdge?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : insertRawEdge? current edge = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  have subsets := insertRawEdge?_subsets current result edge selected
+  exact ledger.mono subsets.1 subsets.2
+
+
 
 end Chart
 
