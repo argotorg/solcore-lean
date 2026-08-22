@@ -1015,4 +1015,101 @@ theorem statementIfClassifiedObservation_exact
     rw [isStatementIf] at impossible
     contradiction
 
+/-- Erase a constructive decision to the Boolean observation consumed by
+Phase B. -/
+private def semanticDecisionBool {proposition : Prop} :
+    Decidable proposition → Bool
+  | .isTrue _ => true
+  | .isFalse _ => false
+
+private theorem semanticDecisionBool_eq_true_iff
+    {proposition : Prop} (decision : Decidable proposition) :
+    semanticDecisionBool decision = true ↔ proposition := by
+  cases decision with
+  | isTrue evidence => simp [semanticDecisionBool, evidence]
+  | isFalse impossible => simp [semanticDecisionBool, impossible]
+
+/-- The semantic matching-parenthesis decision in Chart's observation shape. -/
+def semanticMatchingParenthesisObservation
+    (tokens : List Token) : Chart.MatchingParenthesisObservation tokens :=
+  fun openCursor closeCursor => semanticDecisionBool
+    (matchingDelimiterDecision tokens openCursor closeCursor
+      .leftParen .rightParen)
+
+theorem semanticMatchingParenthesisObservation_exact
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) :
+    semanticMatchingParenthesisObservation tokens openCursor closeCursor =
+        true ↔
+      MatchingDelimiter tokens openCursor closeCursor
+        .leftParen .rightParen :=
+  semanticDecisionBool_eq_true_iff _
+
+/-- The semantic G06 delimiter decision in Chart's observation shape. -/
+def semanticPatternDelimiterObservation
+    (tokens : List Token) : Chart.PatternDelimiterObservation tokens :=
+  fun start finish => semanticDecisionBool
+    (nextSameDepthDelimiterDecision tokens start finish {
+      head := .comma
+      tail := [.rightParen, .fatArrow]
+    })
+
+theorem semanticPatternDelimiterObservation_exact
+    (tokens : List Token) (start finish : Boundary tokens) :
+    semanticPatternDelimiterObservation tokens start finish = true ↔
+      NextSameDepthDelimiter tokens start finish {
+        head := .comma
+        tail := [.rightParen, .fatArrow]
+      } :=
+  semanticDecisionBool_eq_true_iff _
+
+/-- The semantic greatest-end decision in Chart's observation shape. -/
+def semanticGreatestEndObservation
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Chart.GreatestEndObservation tokens :=
+  fun symbol start upperBound finish => semanticDecisionBool
+    (greatestUnguardedEndDecision owned symbol start upperBound finish)
+
+theorem semanticGreatestEndObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) :
+    semanticGreatestEndObservation owned symbol start upperBound finish =
+        true ↔
+      GreatestUnguardedEnd file tokens symbol start upperBound finish :=
+  semanticDecisionBool_eq_true_iff _
+
+/-- The semantic match-arm header decision in Chart's observation shape. -/
+def semanticMatchArmHeaderObservation
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Chart.MatchArmHeaderObservation tokens :=
+  fun regionStart cursor => semanticDecisionBool
+    (armHeaderAtDecision owned regionStart cursor)
+
+theorem semanticMatchArmHeaderObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart cursor : Boundary tokens) :
+    semanticMatchArmHeaderObservation owned regionStart cursor = true ↔
+      ArmHeaderAt file tokens regionStart cursor :=
+  semanticDecisionBool_eq_true_iff _
+
+/-- The semantic nearest-region decision in Chart's observation shape. -/
+def semanticStatementRegionObservation
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Chart.StatementRegionObservation tokens :=
+  fun regionStart regionEnd => semanticDecisionBool
+    (nearestStatementRegionSemanticDecision owned regionStart regionEnd)
+
+theorem semanticStatementRegionObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart regionEnd : Boundary tokens) :
+    semanticStatementRegionObservation owned regionStart regionEnd = true ↔
+      NearestStatementRegion file tokens regionStart regionEnd :=
+  semanticDecisionBool_eq_true_iff _
+
 end Solcore.Surface.Multi
