@@ -4651,6 +4651,157 @@ private theorem processRawItem?_completion_materializes
     scanned result scannedLedger completedEq other
       (scannedGrowth.1 (predictedGrowth.1 otherMember))
 
+private def PhaseAFairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  (∀ item, item ∈ rawSeedItems tokens →
+      item ∈ current.payload.rawItems) ∧
+  (∀ waiting, waiting ∈ current.payload.rawItems →
+    ∀ production after,
+      predictedItem? waiting production = some after →
+      waiting ∈ current.payload.itemQueue ∨
+        after ∈ current.payload.rawItems) ∧
+  (∀ before, before ∈ current.payload.rawItems →
+    ∀ after (edge : PackedEdge file tokens),
+      scannedEdge? owned before = some (after, edge) →
+      before ∈ current.payload.itemQueue ∨
+        after ∈ current.payload.rawItems) ∧
+  ∀ waiting, waiting ∈ current.payload.rawItems →
+    ∀ finished, finished ∈ current.payload.rawItems →
+    ∀ after (edge : PackedEdge file tokens),
+      completedEdge? waiting finished = some (after, edge) →
+      waiting ∈ current.payload.itemQueue ∨
+      finished ∈ current.payload.itemQueue ∨
+      after ∈ current.payload.rawItems
+
+private def RawItemsQueued
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  current.payload.rawItems ⊆ current.payload.itemQueue
+
+private theorem insertRawItem?_rawItemsQueued
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (invariant : RawItemsQueued current)
+    (selected : insertRawItem? current source item = some result) :
+    RawItemsQueued result := by
+  unfold insertRawItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact invariant
+  next absent =>
+    have payload := phaseA_runMappedPrimitive?_payload current _ _ result
+      selected
+    unfold RawItemsQueued
+    rw [payload]
+    intro candidate member
+    simp only [List.mem_append, List.mem_singleton] at member ⊢
+    exact member.elim (fun old => Or.inl (invariant old)) Or.inr
+
+private theorem insertRawSeeds?_rawItemsQueued
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ seeds (current result : CountedState tokens (PhaseAOpen file tokens)),
+      RawItemsQueued current →
+      insertRawSeeds? seeds current = some result →
+      RawItemsQueued result := by
+  intro seeds
+  induction seeds with
+  | nil =>
+      intro current result invariant selected
+      cases selected
+      exact invariant
+  | cons item rest induction =>
+      intro current result invariant selected
+      rw [insertRawSeeds?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (insertRawItem?_rawItemsQueued current next .seedOrPrediction
+          item invariant nextEq) restEq
+
+private theorem insertRawSeeds?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ seeds (current result : CountedState tokens (PhaseAOpen file tokens)),
+      insertRawSeeds? seeds current = some result →
+      PhaseAItemGrowth current result := by
+  intro seeds
+  induction seeds with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl current
+  | cons item rest induction =>
+      intro current result selected
+      rw [insertRawSeeds?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (insertRawItem?_itemGrowth current next .seedOrPrediction item
+        nextEq).trans (induction next result restEq)
+
+private theorem insertRawSeeds?_materializes
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ seeds (current result : CountedState tokens (PhaseAOpen file tokens)),
+      insertRawSeeds? seeds current = some result →
+      ∀ item, item ∈ seeds → item ∈ result.payload.rawItems := by
+  intro seeds
+  induction seeds with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result selected item member
+      rw [insertRawSeeds?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      rw [List.mem_cons] at member
+      rcases member with equal | member
+      · subst head
+        exact (insertRawSeeds?_itemGrowth rest next result restEq).1
+          (insertRawItem?_coverage current next .seedOrPrediction item
+            nextEq).2.2
+      · exact induction next result restEq item member
+
+private theorem insertRawSeeds?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : insertRawSeeds? (rawSeedItems tokens)
+      (beginPhaseA file tokens) = some result) :
+    PhaseAFairPending owned result := by
+  have queued : RawItemsQueued result :=
+    insertRawSeeds?_rawItemsQueued (rawSeedItems tokens)
+      (beginPhaseA file tokens) result (by simp [RawItemsQueued, beginPhaseA])
+      selected
+  refine ⟨insertRawSeeds?_materializes (rawSeedItems tokens)
+    (beginPhaseA file tokens) result selected, ?_, ?_, ?_⟩
+  · intro waiting member production after computed
+    exact Or.inl (queued member)
+  · intro before member after edge computed
+    exact Or.inl (queued member)
+  · intro waiting waitingMember finished finishedMember after edge computed
+    exact Or.inl (queued waitingMember)
+
+private theorem dequeueRawItem?_raw_queue
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (head pivot : DottedItem tokens) (rest : List (DottedItem tokens))
+    (queue : current.payload.itemQueue = head :: rest)
+    (selected : dequeueRawItem? current = some (pivot, after)) :
+    pivot = head ∧ after.payload.rawItems = current.payload.rawItems ∧
+      after.payload.itemQueue = rest := by
+  unfold dequeueRawItem? at selected
+  simp only [queue, Option.bind_eq_bind,
+    Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq] at output
+  rcases output with ⟨headEq, nextEqual⟩
+  subst pivot
+  subst next
+  rw [phaseA_runMappedPrimitive?_payload current _ _ after nextEq]
+  exact ⟨rfl, rfl, rfl⟩
+
+
 
 
 
