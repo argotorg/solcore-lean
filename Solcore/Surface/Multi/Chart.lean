@@ -5409,6 +5409,192 @@ private theorem chargePrediction_itemSafe
   · simpa [payload] using safe.queueSubset
 
 
+private theorem insertRawItem?_preserves_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (target : UnitAddress tokens)
+    (notInsert : ∀ (candidateSource : RawItemInsertSource)
+      (candidate : DottedItem tokens),
+      target ≠ (.linear candidateSource.unitKind (rawLinearKey candidate) :
+        UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : insertRawItem? current source item = some result) :
+    target ∉ result.counter.usedRev := by
+  unfold insertRawItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact fresh
+  next absent =>
+    rw [phaseA_runMappedPrimitive?_usedRev current _ _ result selected]
+    simp only [List.mem_cons, not_or]
+    exact ⟨notInsert source item, fresh⟩
+
+private theorem attemptPrediction?_total_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (production : ProductionId)
+    (safe : PhaseAItemSafe current)
+    (dequeued : (.linear .L01_itemDequeue (rawLinearKey waiting) :
+      UnitAddress tokens) ∈ current.counter.usedRev)
+    (fresh : (.prediction .R01_predictionAttempt
+      (rawPredictionKey waiting production) : UnitAddress tokens) ∉
+        current.counter.usedRev) :
+    ∃ result, attemptPrediction? current waiting production = some result ∧
+      PhaseAItemSafe result := by
+  unfold attemptPrediction?
+  cases prediction : predictedItem? waiting production with
+  | none => exact ⟨current, rfl, safe⟩
+  | some item =>
+      let attempted : CountedState tokens (PhaseAOpen file tokens) := {
+        payload := current.payload
+        counter := current.counter.charge _ fresh
+      }
+      have attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (rawPredictionKey waiting production)) id = some attempted := by
+        simp [runMappedPrimitive?, fresh, attempted]
+      have attemptedSafe := chargePrediction_itemSafe current attempted
+        waiting production safe dequeued attemptedEq
+      obtain ⟨result, insertedEq⟩ := insertRawItem?_total attempted
+        .seedOrPrediction item attemptedSafe
+      exact ⟨result, by simp [attemptedEq, insertedEq],
+        insertRawItem?_itemSafe attempted result .seedOrPrediction item
+          attemptedSafe insertedEq⟩
+
+private theorem insertRawItem?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (selected : insertRawItem? current source item = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold insertRawItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact fun _ => id
+  next absent =>
+    rw [phaseA_runMappedPrimitive?_usedRev current _ _ result selected]
+    exact fun address member => List.mem_cons_of_mem _ member
+
+private theorem attemptPrediction?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (production : ProductionId)
+    (selected : attemptPrediction? current waiting production = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting production with
+  | none =>
+      simp only [prediction] at selected
+      cases selected
+      exact fun _ => id
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, insertedEq⟩
+      intro address member
+      apply insertRawItem?_used_mono attempted result .seedOrPrediction item
+        insertedEq
+      rw [phaseA_runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+      exact List.mem_cons_of_mem _ member
+
+private theorem attemptPrediction?_preserves_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (production : ProductionId)
+    (target : UnitAddress tokens)
+    (notPrediction : target ≠
+      (.prediction .R01_predictionAttempt
+        (rawPredictionKey waiting production) : UnitAddress tokens))
+    (notInsert : ∀ (source : RawItemInsertSource)
+      (item : DottedItem tokens),
+      target ≠ (.linear source.unitKind (rawLinearKey item) :
+        UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : attemptPrediction? current waiting production = some result) :
+    target ∉ result.counter.usedRev := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting production with
+  | none =>
+      simp only [prediction] at selected
+      cases selected
+      exact fresh
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, insertedEq⟩
+      apply insertRawItem?_preserves_fresh attempted result
+        .seedOrPrediction item target notInsert _ insertedEq
+      rw [phaseA_runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+      simp only [List.mem_cons, not_or]
+      exact ⟨notPrediction, fresh⟩
+
+private theorem attemptPredictions?_total_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions (current : CountedState tokens (PhaseAOpen file tokens)),
+      productions.Nodup →
+      PhaseAItemSafe current →
+      (.linear .L01_itemDequeue (rawLinearKey waiting) :
+        UnitAddress tokens) ∈ current.counter.usedRev →
+      (∀ production, production ∈ productions →
+        (.prediction .R01_predictionAttempt
+          (rawPredictionKey waiting production) : UnitAddress tokens) ∉
+            current.counter.usedRev) →
+      (.linear .L04_scanAttempt (rawLinearKey waiting) :
+        UnitAddress tokens) ∉ current.counter.usedRev →
+      (.linear .L06_scannedEdgeInsert (rawLinearKey waiting) :
+        UnitAddress tokens) ∉ current.counter.usedRev →
+      ∃ result, attemptPredictions? waiting productions current = some result ∧
+        PhaseAItemSafe result ∧
+        (.linear .L01_itemDequeue (rawLinearKey waiting) :
+          UnitAddress tokens) ∈ result.counter.usedRev ∧
+        (.linear .L04_scanAttempt (rawLinearKey waiting) :
+          UnitAddress tokens) ∉ result.counter.usedRev ∧
+        (.linear .L06_scannedEdgeInsert (rawLinearKey waiting) :
+          UnitAddress tokens) ∉ result.counter.usedRev := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current unique safe dequeued predictions scanFresh edgeFresh
+      exact ⟨current, rfl, safe, dequeued, scanFresh, edgeFresh⟩
+  | cons head rest induction =>
+      intro current unique safe dequeued predictions scanFresh edgeFresh
+      rw [List.nodup_cons] at unique
+      obtain ⟨next, nextEq, nextSafe⟩ :=
+        attemptPrediction?_total_itemSafe current waiting head safe dequeued
+          (predictions head (by simp))
+      have nextDequeued := attemptPrediction?_used_mono current next
+        waiting head nextEq dequeued
+      have restFresh : ∀ production, production ∈ rest →
+          (.prediction .R01_predictionAttempt
+            (rawPredictionKey waiting production) : UnitAddress tokens) ∉
+              next.counter.usedRev := by
+        intro production member
+        apply attemptPrediction?_preserves_fresh current next waiting head _
+          _ (by simp) (predictions production (by simp [member])) nextEq
+        intro equal
+        simp only [UnitAddress.prediction.injEq] at equal
+        have productionEq := congrArg ChartPredictionKey.production equal.2
+        change production = head at productionEq
+        exact unique.1 (productionEq ▸ member)
+      have nextScanFresh := attemptPrediction?_preserves_fresh current next
+        waiting head _ (by simp) (by
+          intro source item
+          cases source <;> simp [RawItemInsertSource.unitKind]) scanFresh nextEq
+      have nextEdgeFresh := attemptPrediction?_preserves_fresh current next
+        waiting head _ (by simp) (by
+          intro source item
+          cases source <;> simp [RawItemInsertSource.unitKind]) edgeFresh nextEq
+      obtain ⟨result, restEq, resultSafe, resultDequeued,
+        resultScanFresh, resultEdgeFresh⟩ := induction next unique.2 nextSafe
+          nextDequeued restFresh nextScanFresh nextEdgeFresh
+      exact ⟨result, by simp [attemptPredictions?, nextEq, restEq],
+        resultSafe, resultDequeued, resultScanFresh, resultEdgeFresh⟩
+
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
