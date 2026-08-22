@@ -1381,4 +1381,45 @@ theorem executeObservedGuardWorklist?_correct_iff_semanticMemo
     rw [agreement]
     exact semanticGuardMemo_correct owned
 
+/-- Chart's proof-free raw saturation is exactly the least unguarded parser
+relation on an owned token stream. -/
+theorem saturatedRawItem_iff_unguardedReach
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens) :
+    Chart.SaturatedRawItem tokens item ↔
+      UnguardedReach file tokens item := by
+  constructor
+  · intro member
+    exact Chart.saturatedRawItem_induction owned
+      (UnguardedReach file tokens)
+      (unguardedReachDecision owned)
+      (fun production cursor => .seed production cursor)
+      (fun waiting predicted reached next =>
+        .predict waiting predicted reached next)
+      (fun before after cursor terminal value span reached next atCurrent
+          terminalAt matched advance =>
+        .scan before after cursor terminal value span reached next atCurrent
+          terminalAt matched advance)
+      (fun waiting finished after waitingReached finishedReached next
+          finishedComplete sameCursor advance =>
+        .complete waiting finished after waitingReached finishedReached next
+          finishedComplete sameCursor advance)
+      member
+  · intro reached
+    induction reached with
+    | seed production cursor =>
+        exact Chart.saturatedRawItem_seed production cursor
+    | predict waiting predicted _ next induction =>
+        exact Chart.saturatedRawItem_predict waiting predicted induction next
+    | scan before after cursor terminal value span _ next atCurrent
+        terminalAt matched advance induction =>
+        exact Chart.saturatedRawItem_scan before after cursor terminal value
+          span induction next atCurrent terminalAt matched advance
+    | complete waiting finished after _ _ next finishedComplete sameCursor
+        advance waitingInduction finishedInduction =>
+        exact Chart.saturatedRawItem_complete waiting finished after
+          waitingInduction finishedInduction next finishedComplete sameCursor
+          advance
+
+
 end Solcore.Surface.Multi
