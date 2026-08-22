@@ -5796,6 +5796,226 @@ private theorem attemptScan?_total_itemSafe
   next notApplicable => exact ⟨current, rfl, safe⟩
 
 
+private def PhaseACompletionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  ∀ waiting finished,
+    (.cubic .U04_completedEdgeInsert
+      (rawCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    (.cubic .U03_completionAttempt
+      (rawCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev
+
+private theorem beginPhaseA_completionSafe
+    (file : WorkspaceFile) (tokens : List Token) :
+    PhaseACompletionSafe (beginPhaseA file tokens) := by
+  intro waiting finished member
+  simp [beginPhaseA, Counter.charge, Counter.empty] at member
+
+private theorem runMappedPrimitive?_completionSafe_of_not_insert
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (address : UnitAddress tokens)
+    (transition : PhaseAOpen file tokens → PhaseAOpen file tokens)
+    (safe : PhaseACompletionSafe current)
+    (notInsert : ∀ waiting finished,
+      address ≠ (.cubic .U04_completedEdgeInsert
+        (rawCompletionKey waiting finished) : UnitAddress tokens))
+    (selected : runMappedPrimitive? current address transition = some result) :
+    PhaseACompletionSafe result := by
+  intro waiting finished member
+  rw [phaseA_runMappedPrimitive?_usedRev current address transition result
+    selected] at member ⊢
+  simp only [List.mem_cons] at member ⊢
+  rcases member with equal | old
+  · exact (notInsert waiting finished equal.symm).elim
+  · exact Or.inr (safe waiting finished old)
+
+private theorem insertRawItem?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (safe : PhaseACompletionSafe current)
+    (selected : insertRawItem? current source item = some result) :
+    PhaseACompletionSafe result := by
+  unfold insertRawItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact safe
+  next absent =>
+    exact runMappedPrimitive?_completionSafe_of_not_insert current result _ _
+      safe (by
+        intro waiting finished equal
+        cases source <;> simp [RawItemInsertSource.unitKind] at equal)
+      selected
+
+private theorem chargeCompletion_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens) (safe : PhaseAItemSafe current)
+    (selected : runMappedPrimitive? current
+      (.cubic .U03_completionAttempt (rawCompletionKey waiting finished)) id =
+        some result) :
+    PhaseAItemSafe result := by
+  have payload := phaseA_runMappedPrimitive?_payload current _ id result selected
+  have used := phaseA_runMappedPrimitive?_usedRev current _ id result selected
+  constructor
+  · intro source item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · cases source <;> simp [RawItemInsertSource.unitKind] at equal
+    · simpa [payload] using safe.inserted source item old
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · simpa [payload] using safe.dequeued item old
+  · intro item production member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.predicted item production old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scanned item old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+  · intro item member usedItem
+    rw [payload] at member
+    rw [used] at usedItem
+    simp only [List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · simp at equal
+    · exact safe.queueFresh item member old
+  · simpa [payload] using safe.rawNodup
+  · simpa [payload] using safe.queueNodup
+  · simpa [payload] using safe.queueSubset
+
+private theorem insertCompletedRawEdge?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished after : DottedItem tokens)
+    (shared : Boundary tokens) (edge : PackedEdge file tokens)
+    (shape : edge.val = .completed waiting finished after shared)
+    (safe : PhaseAItemSafe current)
+    (selected : insertRawEdge? current edge = some result) :
+    PhaseAItemSafe result := by
+  unfold insertRawEdge? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact safe
+  next absent =>
+    simp only [shape] at selected
+    have payload := phaseA_runMappedPrimitive?_payload current _ _ result
+      selected
+    have used := phaseA_runMappedPrimitive?_usedRev current _ _ result selected
+    constructor
+    · intro source item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;> simp [RawItemInsertSource.unitKind] at equal
+      · simpa [payload] using safe.inserted source item old
+    · intro item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · simpa [payload] using safe.dequeued item old
+    · intro item production member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.predicted item production old)
+    · intro item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scanned item old)
+    · intro item member
+      rw [used] at member
+      simp only [List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+    · intro item member usedItem
+      rw [payload] at member
+      rw [used] at usedItem
+      simp only [List.mem_cons] at usedItem
+      rcases usedItem with equal | old
+      · simp at equal
+      · exact safe.queueFresh item member old
+    · simpa [payload] using safe.rawNodup
+    · simpa [payload] using safe.queueNodup
+    · simpa [payload] using safe.queueSubset
+
+private theorem insertCompletedRawEdge?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished after : DottedItem tokens)
+    (shared : Boundary tokens) (edge : PackedEdge file tokens)
+    (shape : edge.val = .completed waiting finished after shared)
+    (safe : PhaseACompletionSafe current)
+    (attempted : (.cubic .U03_completionAttempt
+      (rawCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev)
+    (selected : insertRawEdge? current edge = some result) :
+    PhaseACompletionSafe result := by
+  unfold insertRawEdge? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact safe
+  next absent =>
+    simp only [shape] at selected
+    have used := phaseA_runMappedPrimitive?_usedRev current _ _ result selected
+    intro candidateWaiting candidateFinished member
+    rw [used] at member ⊢
+    simp only [List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · simp only [UnitAddress.cubic.injEq] at equal
+      exact Or.inr (by simpa only [equal.2] using attempted)
+    · exact Or.inr (safe candidateWaiting candidateFinished old)
+
+private theorem insertCompletedRawEdge?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished after : DottedItem tokens)
+    (shared : Boundary tokens) (edge : PackedEdge file tokens)
+    (shape : edge.val = .completed waiting finished after shared)
+    (fresh : (.cubic .U04_completedEdgeInsert
+      (rawCompletionKey waiting finished) : UnitAddress tokens) ∉
+        current.counter.usedRev) :
+    ∃ result, insertRawEdge? current edge = some result := by
+  unfold insertRawEdge?
+  split
+  next present => exact ⟨current, rfl⟩
+  next absent =>
+    simp only [shape]
+    simp [runMappedPrimitive?, fresh]
+
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
