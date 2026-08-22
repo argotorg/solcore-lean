@@ -3031,3 +3031,90 @@ theorem observedSaturatedNextArmOrCloseBool_exact
     · simp [earlierStartLe]
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The public canonical statement-region view is exactly the declarative
+nearest braced-body or match-arm region. -/
+theorem observedSaturatedStatementRegionObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart regionEnd : Boundary tokens) :
+    Chart.observedSaturatedStatementRegionObservation tokens
+        regionStart regionEnd = true ↔
+      NearestStatementRegion file tokens regionStart regionEnd := by
+  unfold Chart.observedSaturatedStatementRegionObservation
+    NearestStatementRegion
+  simp only [Bool.or_eq_true]
+  constructor
+  · rintro (braced | arm)
+    · rcases List.any_eq_true.mp braced with
+        ⟨openCursor, _member, facts⟩
+      simp only [Bool.and_eq_true] at facts
+      exact Or.inl ⟨openCursor,
+        (observedImmediatelyAfterRawSymbolBool_exact owned .leftBrace
+          openCursor regionStart).mp facts.1,
+        (observedMatchingBraceBool_exact tokens openCursor regionEnd).mp
+          facts.2⟩
+    · rcases List.any_eq_true.mp arm with
+        ⟨arrowCursor, _arrowMember, arrowFacts⟩
+      simp only [Bool.and_eq_true] at arrowFacts
+      rcases List.any_eq_true.mp arrowFacts.2 with
+        ⟨openCursor, _openMember, openSelected⟩
+      rcases List.any_eq_true.mp openSelected with
+        ⟨closeCursor, _closeMember, frameFacts⟩
+      simp only [Bool.and_eq_true] at frameFacts
+      exact Or.inr ⟨arrowCursor, openCursor, closeCursor,
+        (observedImmediatelyAfterRawSymbolBool_exact owned .fatArrow
+          arrowCursor regionStart).mp arrowFacts.1,
+        (observedInnermostContainingBraceFrameBool_exact tokens arrowCursor
+          openCursor closeCursor).mp frameFacts.1,
+        (observedSaturatedNextArmOrCloseBool_exact owned regionStart
+          closeCursor regionEnd).mp frameFacts.2⟩
+  · rintro (braced | arm)
+    · apply Or.inl
+      apply List.any_eq_true.mpr
+      rcases braced with ⟨openCursor, afterOpen, matching⟩
+      refine ⟨openCursor, List.mem_finRange _, ?_⟩
+      simp only [Bool.and_eq_true]
+      exact ⟨
+        (observedImmediatelyAfterRawSymbolBool_exact owned .leftBrace
+          openCursor regionStart).mpr afterOpen,
+        (observedMatchingBraceBool_exact tokens openCursor regionEnd).mpr
+          matching⟩
+    · apply Or.inr
+      apply List.any_eq_true.mpr
+      rcases arm with ⟨arrowCursor, openCursor, closeCursor,
+        afterArrow, frame, next⟩
+      refine ⟨arrowCursor, List.mem_finRange _, ?_⟩
+      simp only [Bool.and_eq_true]
+      refine ⟨
+        (observedImmediatelyAfterRawSymbolBool_exact owned .fatArrow
+          arrowCursor regionStart).mpr afterArrow, ?_⟩
+      apply List.any_eq_true.mpr
+      refine ⟨openCursor, List.mem_finRange _, ?_⟩
+      apply List.any_eq_true.mpr
+      refine ⟨closeCursor, List.mem_finRange _, ?_⟩
+      simp only [Bool.and_eq_true]
+      exact ⟨
+        (observedInnermostContainingBraceFrameBool_exact tokens arrowCursor
+          openCursor closeCursor).mpr frame,
+        (observedSaturatedNextArmOrCloseBool_exact owned regionStart
+          closeCursor regionEnd).mpr next⟩
+
+/-- The canonical U01 G08 region oracle agrees with its semantic adapter. -/
+theorem saturatedStatementRegionObservation_eq_semantic
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart regionEnd : Boundary tokens) :
+    Chart.saturatedStatementRegionObservation tokens regionStart regionEnd =
+      semanticStatementRegionObservation owned regionStart regionEnd := by
+  rw [Chart.saturatedStatementRegionObservation_eq_observed]
+  apply Bool.eq_iff_iff.mpr
+  rw [observedSaturatedStatementRegionObservation_exact owned,
+    semanticStatementRegionObservation_exact owned]
+
+end Solcore.Surface.Multi
