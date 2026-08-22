@@ -11997,4 +11997,109 @@ theorem executeObservedContextualWorklist?_retainedBackpointersConsistent
 end Chart
 
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The extensional closure that a drained Phase-C worklist must establish.
+It deliberately says nothing about fuel or address freshness: those are the
+operational obligations needed to prove this interface for the executor. -/
+structure OperationalContextualClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (items : List (ContextualItemKey tokens))
+    (edges : List (StructurallyValidContextualPackedEdge file tokens)) :
+    Prop where
+  root_mem :
+    ({
+      raw := {
+        production := .root .module
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := Boundary.start tokens
+        current := Boundary.start tokens
+      }
+      context := .plain
+    } : ContextualItemKey tokens) ∈ items
+  predict_mem :
+    ∀ (waiting : ContextualItemKey tokens) (predicted : ProductionId),
+      waiting ∈ items →
+      ∀ (_next : NextSymbol waiting.raw (.nonterminal predicted.lhs)),
+        MemoEnablesProduction memo {
+          production := predicted
+          origin := waiting.raw.current
+          context := descendContext waiting predicted
+        } →
+        ({
+          raw := {
+            production := predicted
+            dot := ⟨0, Nat.zero_lt_succ _⟩
+            origin := waiting.raw.current
+            current := waiting.raw.current
+          }
+          context := descendContext waiting predicted
+        } : ContextualItemKey tokens) ∈ items
+  scan_closed :
+    ∀ (before after : ContextualItemKey tokens)
+        (cursor : TerminalCursor tokens),
+      before ∈ items →
+      ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.scanned before after cursor) →
+      after ∈ items ∧
+        ∃ retained, retained ∈ edges ∧
+          retained.val = .scanned before after cursor
+  complete_closed :
+    ∀ (waiting finished after : ContextualItemKey tokens)
+        (shared : Boundary tokens),
+      waiting ∈ items → finished ∈ items →
+      ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.completed waiting finished after shared) →
+      after ∈ items ∧
+        ∃ retained, retained ∈ edges ∧
+          retained.val = .completed waiting finished after shared
+
+/-- Extensional closure contains the least operational item relation. -/
+theorem OperationalContextualClosure.reach_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {items : List (ContextualItemKey tokens)}
+    {edges : List (StructurallyValidContextualPackedEdge file tokens)}
+    (closed : OperationalContextualClosure file tokens memo items edges)
+    {item : ContextualItemKey tokens}
+    (reached : OperationalContextualReach file tokens memo item) :
+    item ∈ items := by
+  induction reached with
+  | root => exact closed.root_mem
+  | predict waiting predicted _ next enabled waitingInduction =>
+      exact closed.predict_mem waiting predicted waitingInduction next enabled
+  | scan before after cursor _ structural beforeInduction =>
+      exact (closed.scan_closed before after cursor beforeInduction
+        structural).1
+  | complete waiting finished after shared _ _ structural
+      waitingInduction finishedInduction =>
+      exact (closed.complete_closed waiting finished after shared
+        waitingInduction finishedInduction structural).1
+
+/-- Extensional closure retains every operationally reachable checked edge. -/
+theorem OperationalContextualClosure.edge_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {items : List (ContextualItemKey tokens)}
+    {edges : List (StructurallyValidContextualPackedEdge file tokens)}
+    (closed : OperationalContextualClosure file tokens memo items edges)
+    {key : ContextualPackedEdgeKey tokens}
+    (reached : OperationalContextualEdgeReach file tokens memo key) :
+    ∃ retained, retained ∈ edges ∧ retained.val = key := by
+  rcases reached with ⟨structural, endpoints⟩
+  cases key with
+  | scanned before after cursor =>
+      exact (closed.scan_closed before after cursor
+        (closed.reach_complete endpoints.1) structural).2
+  | completed waiting finished after shared =>
+      exact (closed.complete_closed waiting finished after shared
+        (closed.reach_complete endpoints.1)
+        (closed.reach_complete endpoints.2.1) structural).2
+
+end Chart
+
 end Solcore.Surface.Multi
