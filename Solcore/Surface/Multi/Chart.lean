@@ -4426,6 +4426,232 @@ private theorem attemptScan?_materializes
   rw [(insertRawEdge?_itemPayload withItem result edge edgeEq).1]
   exact itemMember
 
+private theorem attemptCompletion?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (selected : attemptCompletion? current waiting finished = some result) :
+    PhaseAItemGrowth current result := by
+  unfold attemptCompletion? at selected
+  cases completion : completedEdge? (file := file) waiting finished with
+  | none =>
+      simp only [completion] at selected
+      cases selected
+      exact .refl current
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completion] at selected
+      split at selected
+      next used =>
+        cases selected
+        exact .refl current
+      next fresh =>
+        simp only [Option.bind_eq_bind,
+          Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨attempted, attemptedEq,
+          withItem, itemEq, edgeEq⟩
+        exact (runMappedPrimitive?_itemGrowth current attempted _ id
+          (by
+            intro state
+            exact ⟨fun _ => id, fun _ => id,
+              fun _item member => Or.inl member⟩) attemptedEq).trans
+          ((insertRawItem?_itemGrowth attempted withItem .completion
+            after itemEq).trans
+              (insertRawEdge?_itemGrowth withItem result edge edgeEq))
+
+private theorem attemptCompletionsWith?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    ∀ others (current result : CountedState tokens (PhaseAOpen file tokens)),
+      attemptCompletionsWith? pivot others current = some result →
+      PhaseAItemGrowth current result := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl current
+  | cons other rest induction =>
+      intro current result selected
+      rw [attemptCompletionsWith?] at selected
+      cases forwardEq : attemptCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardGrowth := attemptCompletion?_itemGrowth
+            current forward pivot other forwardEq
+          split at selected
+          next same =>
+            exact forwardGrowth.trans (induction forward result selected)
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq : attemptCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact forwardGrowth.trans
+                  ((attemptCompletion?_itemGrowth forward reverse other pivot
+                    reverseEq).trans (induction reverse result selected))
+
+private theorem attemptCompletionsWith?_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    ∀ others (current result : CountedState tokens (PhaseAOpen file tokens)),
+      CompletionAttemptLedgerMaterialized current →
+      attemptCompletionsWith? pivot others current = some result →
+      ∀ other, other ∈ others →
+        (∀ after (edge : PackedEdge file tokens),
+          completedEdge? pivot other = some (after, edge) →
+          after ∈ result.payload.rawItems) ∧
+        (∀ after (edge : PackedEdge file tokens),
+          completedEdge? other pivot = some (after, edge) →
+          after ∈ result.payload.rawItems) := by
+  intro others
+  induction others with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result ledger selected other member
+      rw [attemptCompletionsWith?] at selected
+      cases forwardEq : attemptCompletion? current pivot head with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardLedger := attemptCompletion?_completionLedger
+            current forward pivot head ledger forwardEq
+          have forwardGrowth := attemptCompletion?_itemGrowth
+            current forward pivot head forwardEq
+          split at selected
+          next same =>
+            have restGrowth := attemptCompletionsWith?_itemGrowth pivot rest
+              forward result selected
+            rw [List.mem_cons] at member
+            rcases member with equal | member
+            · subst other
+              constructor
+              · intro after edge computed
+                exact restGrowth.1
+                  (attemptCompletion?_materialized_of_ledger current forward
+                    pivot head after edge ledger computed forwardEq).1
+              · intro after edge computed
+                subst head
+                exact restGrowth.1
+                  (attemptCompletion?_materialized_of_ledger current forward
+                    pivot pivot after edge ledger computed forwardEq).1
+            · exact induction forward result forwardLedger selected
+                other member
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq : attemptCompletion? forward head pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                have reverseLedger := attemptCompletion?_completionLedger
+                  forward reverse head pivot forwardLedger reverseEq
+                have reverseGrowth := attemptCompletion?_itemGrowth
+                  forward reverse head pivot reverseEq
+                have restGrowth := attemptCompletionsWith?_itemGrowth
+                  pivot rest reverse result selected
+                rw [List.mem_cons] at member
+                rcases member with equal | member
+                · subst other
+                  constructor
+                  · intro after edge computed
+                    exact restGrowth.1 (reverseGrowth.1
+                      (attemptCompletion?_materialized_of_ledger current
+                        forward pivot head after edge ledger computed
+                          forwardEq).1)
+                  · intro after edge computed
+                    exact restGrowth.1
+                      (attemptCompletion?_materialized_of_ledger forward
+                        reverse head pivot after edge forwardLedger computed
+                          reverseEq).1
+                · exact induction reverse result reverseLedger selected
+                    other member
+
+private theorem processRawItem?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : processRawItem? owned item current = some result) :
+    PhaseAItemGrowth current result := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completedEq⟩
+  exact (attemptPredictions?_itemGrowth item allProductionIds
+    current predicted predictedEq).trans
+    ((attemptScan?_itemGrowth owned predicted scanned item scannedEq).trans
+      (attemptCompletionsWith?_itemGrowth item scanned.payload.rawItems
+        scanned result completedEq))
+
+private theorem processRawItem?_prediction_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (pivot after : DottedItem tokens) (production : ProductionId)
+    (computed : predictedItem? pivot production = some after)
+    (selected : processRawItem? owned pivot current = some result) :
+    after ∈ result.payload.rawItems := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completedEq⟩
+  have predictedMember := attemptPredictions?_materializes pivot
+    allProductionIds current predicted predictedEq production
+      (Grammar.allProductionIds_complete production) after computed
+  exact (attemptCompletionsWith?_itemGrowth pivot scanned.payload.rawItems
+    scanned result completedEq).1
+      ((attemptScan?_itemGrowth owned predicted scanned pivot scannedEq).1
+        predictedMember)
+
+private theorem processRawItem?_scan_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (pivot after : DottedItem tokens) (edge : PackedEdge file tokens)
+    (computed : scannedEdge? owned pivot = some (after, edge))
+    (selected : processRawItem? owned pivot current = some result) :
+    after ∈ result.payload.rawItems := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completedEq⟩
+  exact (attemptCompletionsWith?_itemGrowth pivot scanned.payload.rawItems
+    scanned result completedEq).1
+      (attemptScan?_materializes owned predicted scanned pivot after edge
+        computed scannedEq)
+
+private theorem processRawItem?_completion_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (pivot other : DottedItem tokens)
+    (otherMember : other ∈ current.payload.rawItems)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : processRawItem? owned pivot current = some result) :
+    (∀ after (edge : PackedEdge file tokens),
+      completedEdge? pivot other = some (after, edge) →
+        after ∈ result.payload.rawItems) ∧
+    (∀ after (edge : PackedEdge file tokens),
+      completedEdge? other pivot = some (after, edge) →
+        after ∈ result.payload.rawItems) := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completedEq⟩
+  have predictedGrowth := attemptPredictions?_itemGrowth pivot
+    allProductionIds current predicted predictedEq
+  have predictedLedger := attemptPredictions?_completionLedger pivot
+    allProductionIds current predicted ledger predictedEq
+  have scannedGrowth := attemptScan?_itemGrowth owned predicted scanned
+    pivot scannedEq
+  have scannedLedger := attemptScan?_completionLedger owned predicted scanned
+    pivot predictedLedger scannedEq
+  exact attemptCompletionsWith?_materializes pivot scanned.payload.rawItems
+    scanned result scannedLedger completedEq other
+      (scannedGrowth.1 (predictedGrowth.1 otherMember))
+
+
 
 
 
