@@ -12354,4 +12354,249 @@ private theorem executeIndexedPhaseB?_memo_from_indexes
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The concrete matching-parenthesis bit computed by U01. -/
+abbrev rawMatchingParenthesisObservation
+    (tokens : List Token) : MatchingParenthesisObservation tokens :=
+  fun openCursor closeCursor =>
+    phaseAMatchingDelimiterBool tokens openCursor closeCursor
+      .leftParen .rightParen
+
+/-- The concrete first same-depth pattern delimiter bit computed by U01. -/
+abbrev rawPatternDelimiterObservation
+    (tokens : List Token) : PatternDelimiterObservation tokens :=
+  fun start limit =>
+    phaseANextSameDepthDelimiterBool tokens start limit {
+      head := .comma
+      tail := [.rightParen, .fatArrow]
+    }
+
+/-- The concrete match-arm header oracle over canonical raw saturation. -/
+def saturatedMatchArmHeaderObservation
+    (tokens : List Token) : MatchArmHeaderObservation tokens :=
+  fun regionStart cursor =>
+    decide (regionStart.val ≤ cursor.val) &&
+      phaseASameDelimiterDepthBool tokens regionStart cursor &&
+      phaseASymbolAtBool cursor .pipe &&
+      match phaseABoundaryAt? tokens (cursor.val + 1) with
+      | none => false
+      | some patternStart =>
+          phaseAImmediatelyAfterSymbolBool .pipe cursor patternStart &&
+            (List.finRange (tokens.length + 2)).any fun arrowCursor =>
+              phaseANextSameDepthDelimiterBool tokens patternStart
+                  arrowCursor ⟨.fatArrow, []⟩ &&
+                saturatedRawGreatestEndObservation tokens
+                  (.aux Grammar.matchArmPatternListSite.site)
+                  patternStart arrowCursor arrowCursor
+
+private def saturatedNextArmOrCloseBool
+    (tokens : List Token)
+    (regionStart closeCursor regionEnd : Boundary tokens) : Bool :=
+  decide (regionStart.val ≤ regionEnd.val) &&
+    decide (regionEnd.val ≤ closeCursor.val) &&
+    phaseASameDelimiterDepthBool tokens regionStart regionEnd &&
+    (decide (regionEnd = closeCursor) ||
+      saturatedMatchArmHeaderObservation tokens regionStart regionEnd) &&
+    (List.finRange (tokens.length + 2)).all fun earlier =>
+      if regionStart.val ≤ earlier.val &&
+          earlier.val < regionEnd.val &&
+          phaseASameDelimiterDepthBool tokens regionStart earlier then
+        !(decide (earlier = closeCursor) ||
+          saturatedMatchArmHeaderObservation tokens regionStart earlier)
+      else
+        true
+
+/-- The concrete nearest statement-region oracle over canonical raw
+saturation. -/
+def saturatedStatementRegionObservation
+    (tokens : List Token) : StatementRegionObservation tokens :=
+  fun regionStart regionEnd =>
+    let bracedBody :=
+      (List.finRange (tokens.length + 2)).any fun openCursor =>
+        phaseAImmediatelyAfterSymbolBool .leftBrace openCursor regionStart &&
+          phaseAMatchingDelimiterBool tokens openCursor regionEnd
+            .leftBrace .rightBrace
+    let armBody :=
+      (List.finRange (tokens.length + 2)).any fun arrowCursor =>
+        phaseAImmediatelyAfterSymbolBool .fatArrow arrowCursor regionStart &&
+          (List.finRange (tokens.length + 2)).any fun openCursor =>
+            (List.finRange (tokens.length + 2)).any fun closeCursor =>
+              phaseAInnermostContainingBraceFrameBool tokens arrowCursor
+                  openCursor closeCursor &&
+                saturatedNextArmOrCloseBool tokens regionStart
+                  closeCursor regionEnd
+    bracedBody || armBody
+
+private theorem phaseAArmHeaderBool_eq_saturated
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (sameMembers : ∀ item,
+      item ∈ phaseA.rawItems ↔ SaturatedRawItem tokens item)
+    (regionStart cursor : Boundary tokens) :
+    phaseAArmHeaderBool phaseA regionStart cursor =
+      saturatedMatchArmHeaderObservation tokens regionStart cursor := by
+  simp only [phaseAArmHeaderBool, saturatedMatchArmHeaderObservation,
+    rawGreatestEndBool_eq_saturated phaseA sameMembers]
+
+private theorem phaseANextArmOrCloseBool_eq_saturated
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (sameMembers : ∀ item,
+      item ∈ phaseA.rawItems ↔ SaturatedRawItem tokens item)
+    (regionStart closeCursor regionEnd : Boundary tokens) :
+    phaseANextArmOrCloseBool phaseA regionStart closeCursor regionEnd =
+      saturatedNextArmOrCloseBool tokens regionStart closeCursor
+        regionEnd := by
+  simp only [phaseANextArmOrCloseBool, saturatedNextArmOrCloseBool,
+    phaseAArmHeaderBool_eq_saturated phaseA sameMembers]
+
+private theorem phaseANearestStatementRegionBool_eq_saturated
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (sameMembers : ∀ item,
+      item ∈ phaseA.rawItems ↔ SaturatedRawItem tokens item)
+    (regionStart regionEnd : Boundary tokens) :
+    phaseANearestStatementRegionBool phaseA regionStart regionEnd =
+      saturatedStatementRegionObservation tokens regionStart regionEnd := by
+  simp only [phaseANearestStatementRegionBool,
+    saturatedStatementRegionObservation,
+    phaseANextArmOrCloseBool_eq_saturated phaseA sameMembers]
+
+/-- The complete positive bit computed from canonical U01 raw observations. -/
+def saturatedGuardPositiveObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  match key.guard with
+  | .G01_statementIf =>
+      statementIfPositiveObservationBool owned
+        (rawMatchingParenthesisObservation tokens)
+        (saturatedRawGreatestEndObservation tokens) key
+  | .G02_matchArmBoundary =>
+      matchArmHeaderObservationBool
+        (saturatedMatchArmHeaderObservation tokens) key
+  | .G03_parameterComptime | .G04_letComptime |
+      .G05_typeComptime | .G07_leadingDotArguments =>
+      (basicGuardPositiveObservation? owned key).getD false
+  | .G06_patternComptime =>
+      patternComptimePositiveObservationBool owned
+        (rawPatternDelimiterObservation tokens)
+        (saturatedRawGreatestEndObservation tokens) key
+  | .G08_terminalExpression =>
+      terminalExpressionPositiveObservationBool
+        (saturatedStatementRegionObservation tokens)
+        (saturatedRawGreatestEndObservation tokens) key
+  | .G09_genericContext =>
+      genericContextPositiveObservationBool owned
+        (saturatedRawGreatestEndObservation tokens) key
+
+private def saturatedGuardPipeObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  match key.guard with
+  | .G02_matchArmBoundary => matchArmPipeObservationBool owned key
+  | _ => false
+
+/-- Canonical U01 materialization reads exactly the canonical saturated raw
+observer, guard by guard. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_saturated
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (sameMembers : ∀ item,
+      item ∈ phaseA.rawItems ↔ SaturatedRawItem tokens item)
+    (key : GuardInstanceKey tokens) :
+    phaseBGuardObservationFromIndexes?
+        (canonicalEvidenceEntries
+          (phaseAObservationIndexEvaluator owned) phaseA) key =
+      some (saturatedGuardPositiveObservationBool owned key,
+        saturatedGuardPipeObservationBool owned key) := by
+  cases guardEq : key.guard with
+  | G01_statementIf =>
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq,
+        rawMatchingParenthesisObservation,
+        rawGreatestEndBool_eq_saturated phaseA sameMembers] using
+        phaseBGuardObservationFromIndexes?_canonical_G01
+          owned phaseA key guardEq
+  | G02_matchArmBoundary =>
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq,
+        phaseAArmHeaderBool_eq_saturated phaseA sameMembers] using
+        phaseBGuardObservationFromIndexes?_canonical_G02
+          owned phaseA key guardEq
+  | G03_parameterComptime =>
+      obtain ⟨observed, selected, basic⟩ :=
+        phaseBGuardObservationFromIndexes?_canonical_basic owned phaseA key
+          (Or.inl guardEq)
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq, basic] using selected
+  | G04_letComptime =>
+      obtain ⟨observed, selected, basic⟩ :=
+        phaseBGuardObservationFromIndexes?_canonical_basic owned phaseA key
+          (Or.inr (Or.inl guardEq))
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq, basic] using selected
+  | G05_typeComptime =>
+      obtain ⟨observed, selected, basic⟩ :=
+        phaseBGuardObservationFromIndexes?_canonical_basic owned phaseA key
+          (Or.inr (Or.inr (Or.inl guardEq)))
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq, basic] using selected
+  | G06_patternComptime =>
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq,
+        rawPatternDelimiterObservation,
+        rawGreatestEndBool_eq_saturated phaseA sameMembers] using
+        phaseBGuardObservationFromIndexes?_canonical_G06
+          owned phaseA key guardEq
+  | G07_leadingDotArguments =>
+      obtain ⟨observed, selected, basic⟩ :=
+        phaseBGuardObservationFromIndexes?_canonical_basic owned phaseA key
+          (Or.inr (Or.inr (Or.inr guardEq)))
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq, basic] using selected
+  | G08_terminalExpression =>
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq,
+        phaseANearestStatementRegionBool_eq_saturated phaseA sameMembers,
+        rawGreatestEndBool_eq_saturated phaseA sameMembers] using
+        phaseBGuardObservationFromIndexes?_canonical_G08
+          owned phaseA key guardEq
+  | G09_genericContext =>
+      simpa [saturatedGuardPositiveObservationBool,
+        saturatedGuardPipeObservationBool, guardEq,
+        rawGreatestEndBool_eq_saturated phaseA sameMembers] using
+        phaseBGuardObservationFromIndexes?_canonical_G09
+          owned phaseA key guardEq
+
+/-- The canonical U01 decision is the public classifier applied to the
+canonical saturated raw observations. -/
+private theorem phaseBGuardDecisionFromIndexes?_canonical_saturated
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (sameMembers : ∀ item,
+      item ∈ phaseA.rawItems ↔ SaturatedRawItem tokens item)
+    (key : GuardInstanceKey tokens) :
+    phaseBGuardDecisionFromIndexes?
+        (canonicalEvidenceEntries
+          (phaseAObservationIndexEvaluator owned) phaseA) key =
+      some (classifyGuardObservation key.guard
+        (saturatedGuardPositiveObservationBool owned key)
+        (matchArmPipeObservationBool owned key)) := by
+  rw [phaseBGuardDecisionFromIndexes?_eq_classifier,
+    phaseBGuardObservationFromIndexes?_canonical_saturated
+      owned phaseA sameMembers key]
+  cases guardEq : key.guard <;>
+    simp [saturatedGuardPipeObservationBool, guardEq,
+      classifyGuardObservation]
+
+end Chart
+
 end Solcore.Surface.Multi
