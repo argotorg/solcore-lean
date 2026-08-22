@@ -16808,4 +16808,180 @@ private theorem attemptContextualCompletion?_phaseCLedgerAddressFlow
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private structure PhaseCAttemptLedgerMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop where
+  prediction : ∀ productionInstance,
+    MemoEnablesProduction current.payload.phaseC.memo productionInstance →
+    UnitAddress.production productionInstance ∈ current.counter.usedRev →
+    contextualPredictedItemOfInstance productionInstance ∈
+      current.payload.phaseC.contextualItems
+  completion : ∀ waiting finished after
+      (edge : StructurallyValidContextualCompletedEdge file tokens),
+    contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge) →
+    (.cubic .U03_completionAttempt
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    after ∈ current.payload.phaseC.contextualItems ∧
+      ∃ retained, retained ∈ current.payload.phaseC.contextualEdges ∧
+        retained.val = .completed edge.waiting edge.finished edge.after
+          edge.shared
+
+private theorem PhaseCAttemptLedgerMaterialized.mono
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : CountedState tokens (PhaseCWorklist file tokens)}
+    (ledger : PhaseCAttemptLedgerMaterialized before)
+    (content : PhaseCContentGrowth before after)
+    (productionAddresses : PhaseCProductionAddressesSubset
+      before.counter after.counter)
+    (completionAddresses : PhaseCCompletionAddressesSubset
+      before.counter after.counter) :
+    PhaseCAttemptLedgerMaterialized after := by
+  constructor
+  · intro productionInstance enabled used
+    have enabledBefore : MemoEnablesProduction
+        before.payload.phaseC.memo productionInstance := by
+      rw [← content.memo]
+      exact enabled
+    exact content.items (ledger.prediction productionInstance enabledBefore
+      (productionAddresses productionInstance used))
+  · intro waiting finished result edge computed used
+    obtain ⟨itemMember, retained, edgeMember, same⟩ :=
+      ledger.completion waiting finished result edge computed
+        (completionAddresses waiting finished used)
+    exact ⟨content.items itemMember, retained,
+      content.edges edgeMember, same⟩
+
+private theorem attemptContextualPrediction?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCAttemptLedgerMaterialized result := by
+  cases computed : contextualPredictedItem? waiting predicted with
+  | none =>
+      unfold attemptContextualPrediction? at selected
+      simp only [computed] at selected
+      cases selected
+      exact ledger
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      have content := attemptContextualPrediction?_contentGrowth current result
+        waiting predicted selected
+      have addressFlow :=
+        attemptContextualPrediction?_phaseCLedgerAddressFlow current result
+          waiting predicted item productionInstance computed selected
+      constructor
+      · intro candidate enabled used
+        have enabledBefore : MemoEnablesProduction
+            current.payload.phaseC.memo candidate := by
+          rw [← content.memo]
+          exact enabled
+        rcases addressFlow.1 candidate used with old | equal
+        · exact content.items
+            (ledger.prediction candidate enabledBefore old)
+        · subst candidate
+          rcases attemptContextualPrediction?_materialization_boundary
+              current result waiting predicted item productionInstance
+              computed enabledBefore selected with old | materialized
+          · exact content.items
+              (ledger.prediction productionInstance enabledBefore old)
+          · rw [← contextualPredictedItem?_item_eq_instance waiting predicted
+              item productionInstance computed]
+            exact materialized
+      · intro candidateWaiting candidateFinished after edge candidateComputed
+          used
+        obtain ⟨itemMember, retained, edgeMember, same⟩ :=
+          ledger.completion candidateWaiting candidateFinished after edge
+            candidateComputed (addressFlow.2 candidateWaiting
+              candidateFinished used)
+        exact ⟨content.items itemMember, retained,
+          content.edges edgeMember, same⟩
+
+private theorem attemptContextualScan?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCAttemptLedgerMaterialized result := by
+  have content := attemptContextualScan?_contentGrowth owned current result
+    before selected
+  have addresses := attemptContextualScan?_phaseCLedgerSubsets owned current
+    result before selected
+  exact ledger.mono content addresses.1 addresses.2
+
+private theorem attemptContextualCompletion?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    PhaseCAttemptLedgerMaterialized result := by
+  cases computed : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      unfold attemptContextualCompletion? at selected
+      simp only [computed] at selected
+      cases selected
+      exact ledger
+  | some pair =>
+      rcases pair with ⟨actualAfter, actualEdge⟩
+      have content := attemptContextualCompletion?_contentGrowth current result
+        waiting finished selected
+      have addressFlow :=
+        attemptContextualCompletion?_phaseCLedgerAddressFlow current result
+          waiting finished actualAfter actualEdge computed selected
+      constructor
+      · intro productionInstance enabled used
+        have enabledBefore : MemoEnablesProduction
+            current.payload.phaseC.memo productionInstance := by
+          rw [← content.memo]
+          exact enabled
+        exact content.items (ledger.prediction productionInstance
+          enabledBefore (addressFlow.1 productionInstance used))
+      · intro candidateWaiting candidateFinished after edge candidateComputed
+          used
+        rcases addressFlow.2 candidateWaiting candidateFinished used with
+          old | sameKey
+        · obtain ⟨itemMember, retained, edgeMember, same⟩ :=
+            ledger.completion candidateWaiting candidateFinished after edge
+              candidateComputed old
+          exact ⟨content.items itemMember, retained,
+            content.edges edgeMember, same⟩
+        · have sameResult :=
+            contextualCompletedEdge?_eq_of_contextualCompletionKey_eq
+              candidateWaiting candidateFinished after edge
+              waiting finished actualAfter actualEdge candidateComputed
+                computed sameKey
+          have actualMaterialized :
+              actualAfter ∈ result.payload.phaseC.contextualItems ∧
+                ∃ retained,
+                  retained ∈ result.payload.phaseC.contextualEdges ∧
+                  retained.val = .completed actualEdge.waiting
+                    actualEdge.finished actualEdge.after actualEdge.shared := by
+            rcases attemptContextualCompletion?_materialization_boundary
+                current result waiting finished actualAfter actualEdge computed
+                selected with old | materialized
+            · obtain ⟨itemMember, retained, edgeMember, same⟩ :=
+                ledger.completion waiting finished actualAfter actualEdge
+                  computed old
+              exact ⟨content.items itemMember, retained,
+                content.edges edgeMember, same⟩
+            · exact materialized
+          rw [sameResult.1, sameResult.2]
+          exact actualMaterialized
+
+end Chart
+
 end Solcore.Surface.Multi
