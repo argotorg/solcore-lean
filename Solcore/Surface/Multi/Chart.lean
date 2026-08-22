@@ -16607,4 +16607,205 @@ private theorem activateWorklistProduction?_phaseCLedgerAddressFlow
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCCompletionAddressesExtendedBy
+    {tokens : List Token} (before after : Counter tokens)
+    (waiting finished : ContextualItemKey tokens) : Prop :=
+  ∀ candidateWaiting candidateFinished,
+    (.cubic .U03_completionAttempt
+      (contextualCompletionKey candidateWaiting candidateFinished) :
+        UnitAddress tokens) ∈ after.usedRev →
+    (.cubic .U03_completionAttempt
+      (contextualCompletionKey candidateWaiting candidateFinished) :
+        UnitAddress tokens) ∈ before.usedRev ∨
+      contextualCompletionKey candidateWaiting candidateFinished =
+        contextualCompletionKey waiting finished
+
+private theorem insertContextualItem?_phaseCLedgerSubsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCProductionAddressesSubset current.counter result.counter ∧
+      PhaseCCompletionAddressesSubset current.counter result.counter := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current.counter, .refl current.counter⟩
+  next absent =>
+    exact runMappedPrimitive?_phaseCLedgerSubsets current _ _ result
+      (by simp) (by simp) selected
+
+private theorem insertContextualScannedEdge?_phaseCLedgerSubsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCProductionAddressesSubset current.counter result.counter ∧
+      PhaseCCompletionAddressesSubset current.counter result.counter := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current.counter, .refl current.counter⟩
+  next absent =>
+    exact runMappedPrimitive?_phaseCLedgerSubsets current _ _ result
+      (by simp) (by simp) selected
+
+private theorem insertContextualCompletedEdge?_phaseCLedgerSubsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCProductionAddressesSubset current.counter result.counter ∧
+      PhaseCCompletionAddressesSubset current.counter result.counter := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current.counter, .refl current.counter⟩
+  next absent =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, _insertedEq, chargedEq⟩
+    exact runMappedPrimitive?_phaseCLedgerSubsets current _ _ result
+      (by simp) (by simp) chargedEq
+
+private theorem attemptContextualPrediction?_phaseCLedgerAddressFlow
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (item : ContextualItemKey tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (computed : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance))
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCProductionAddressesExtendedBy current.counter result.counter
+        productionInstance ∧
+      PhaseCCompletionAddressesSubset current.counter result.counter := by
+  unfold attemptContextualPrediction? at selected
+  rw [computed] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, remainder⟩
+  have first := runMappedPrimitive?_phaseCLedgerSubsets current _ id attempted
+    (by simp) (by simp) attemptedEq
+  split at remainder
+  next used =>
+    cases remainder
+    exact ⟨fun candidate member => Or.inl (first.1 candidate member), first.2⟩
+  next fresh =>
+    simp only [Option.bind_eq_some_iff] at remainder
+    rcases remainder with ⟨activated, activatedEq, acceptedEq⟩
+    have activation := activateWorklistProduction?_phaseCLedgerAddressFlow
+      attempted productionInstance activated activatedEq
+    cases value : activated.2
+    · simp only [value] at acceptedEq
+      cases acceptedEq
+      constructor
+      · intro candidate member
+        rcases activation.1 candidate member with old | equal
+        · exact Or.inl (first.1 candidate old)
+        · exact Or.inr equal
+      · exact first.2.trans activation.2
+    · simp only [value] at acceptedEq
+      have insertion := insertContextualItem?_phaseCLedgerSubsets activated.1
+        result .prediction item acceptedEq
+      constructor
+      · intro candidate member
+        rcases activation.1 candidate (insertion.1 candidate member) with
+          old | equal
+        · exact Or.inl (first.1 candidate old)
+        · exact Or.inr equal
+      · exact first.2.trans (activation.2.trans insertion.2)
+
+private theorem attemptContextualScan?_phaseCLedgerSubsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCProductionAddressesSubset current.counter result.counter ∧
+      PhaseCCompletionAddressesSubset current.counter result.counter := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have first := runMappedPrimitive?_phaseCLedgerSubsets current _ id attempted
+      (by simp) (by simp) attemptedEq
+    cases scanEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scanEq] at remainder
+        cases remainder
+        exact first
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scanEq, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        have itemFlow := insertContextualItem?_phaseCLedgerSubsets attempted
+          withItem .scan after itemEq
+        have edgeFlow := insertContextualScannedEdge?_phaseCLedgerSubsets
+          withItem result edge edgeEq
+        exact ⟨first.1.trans (itemFlow.1.trans edgeFlow.1),
+          first.2.trans (itemFlow.2.trans edgeFlow.2)⟩
+  next notApplicable =>
+    cases selected
+    exact ⟨.refl current.counter, .refl current.counter⟩
+
+private theorem attemptContextualCompletion?_phaseCLedgerAddressFlow
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (computed : contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge))
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    PhaseCProductionAddressesSubset current.counter result.counter ∧
+      PhaseCCompletionAddressesExtendedBy current.counter result.counter
+        waiting finished := by
+  unfold attemptContextualCompletion? at selected
+  rw [computed] at selected
+  simp only at selected
+  split at selected
+  next used =>
+    cases selected
+    exact ⟨.refl current.counter,
+      fun _ _ member => Or.inl member⟩
+  next fresh =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with
+      ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+    have itemFlow := insertContextualItem?_phaseCLedgerSubsets attempted
+      withItem .completion after itemEq
+    have edgeFlow := insertContextualCompletedEdge?_phaseCLedgerSubsets
+      withItem result edge edgeEq
+    have usedRev := runMappedPrimitive?_usedRev current _ id attempted
+      attemptedEq
+    constructor
+    · intro candidate member
+      have attemptedMember := itemFlow.1 candidate (edgeFlow.1 candidate member)
+      rw [usedRev, List.mem_cons] at attemptedMember
+      rcases attemptedMember with collision | old
+      · cases collision
+      · exact old
+    · intro candidateWaiting candidateFinished member
+      have attemptedMember := itemFlow.2 candidateWaiting candidateFinished
+        (edgeFlow.2 candidateWaiting candidateFinished member)
+      rw [usedRev, List.mem_cons] at attemptedMember
+      rcases attemptedMember with equal | old
+      · exact Or.inr (by
+          simpa only [UnitAddress.cubic.injEq, true_and] using equal)
+      · exact Or.inl old
+
+end Chart
+
 end Solcore.Surface.Multi
