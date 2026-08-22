@@ -2585,6 +2585,299 @@ private theorem attemptPrediction?_rawSound
       · exact predictedItem?_saturated waitingSound predictedEq
       · exact insertedEq
 
+private theorem attemptPredictions?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseARawSound current.payload →
+      waiting ∈ rawSaturation tokens →
+      attemptPredictions? waiting productions current = some result →
+      PhaseARawSound result.payload := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result invariant _ selected
+      cases selected
+      exact invariant
+  | cons predicted rest induction =>
+      intro current result invariant waitingSound selected
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPrediction?_rawSound current next waiting predicted
+          invariant waitingSound nextEq) waitingSound restEq
+private theorem scannedEdge?_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (before after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (selected : scannedEdge? owned before = some (after, edge)) :
+    ∃ cursor, edge.val = .scanned before after cursor := by
+  unfold scannedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  simp only at selected
+  split at selected <;> try contradiction
+  next matched matchEq =>
+    cases selected
+    exact ⟨_, rfl⟩
+private theorem completedEdge?_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (selected : completedEdge? waiting finished = some (after, edge)) :
+    ∃ shared, edge.val = .completed waiting finished after shared := by
+  unfold completedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  next sameCursor =>
+    cases selected
+    exact ⟨waiting.current, rfl⟩
+private theorem scannedEdge?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (before after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (beforeSound : before ∈ rawSaturation tokens)
+    (selected : scannedEdge? owned before = some (after, edge)) :
+    after ∈ rawSaturation tokens ∧ RawEdgeSaturated edge := by
+  obtain ⟨cursor, shape⟩ := scannedEdge?_shape owned before after edge selected
+  have valid : PackedEdgeKey.Valid file tokens
+      (.scanned before after cursor) := by
+    rw [← shape]
+    exact edge.property
+  have afterSound := rawSaturation_scan_closed beforeSound valid
+  refine ⟨afterSound, ?_⟩
+  rw [RawEdgeSaturated, shape]
+  exact ⟨beforeSound, afterSound⟩
+private theorem completedEdge?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (waitingSound : waiting ∈ rawSaturation tokens)
+    (finishedSound : finished ∈ rawSaturation tokens)
+    (selected : completedEdge? waiting finished = some (after, edge)) :
+    after ∈ rawSaturation tokens ∧ RawEdgeSaturated edge := by
+  obtain ⟨shared, shape⟩ := completedEdge?_shape
+    waiting finished after edge selected
+  have valid : PackedEdgeKey.Valid file tokens
+      (.completed waiting finished after shared) := by
+    rw [← shape]
+    exact edge.property
+  rcases valid with ⟨symbol, next, complete, lhs,
+    waitingAtShared, finishedAtShared, advance⟩
+  have exactNext : NextSymbol waiting
+      (.nonterminal finished.production.lhs) := by
+    simpa [lhs] using next
+  have same : waiting.current = finished.origin :=
+    waitingAtShared.trans finishedAtShared.symm
+  have afterSound := rawSaturation_complete_closed waitingSound finishedSound
+    exactNext complete same advance
+  refine ⟨afterSound, ?_⟩
+  rw [RawEdgeSaturated, shape]
+  exact ⟨waitingSound, finishedSound, afterSound⟩
+private theorem attemptScan?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens)
+    (invariant : PhaseARawSound current.payload)
+    (beforeSound : before ∈ rawSaturation tokens)
+    (selected : attemptScan? owned current before = some result) :
+    PhaseARawSound result.payload := by
+  unfold attemptScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have attemptedPayload := phaseA_runMappedPrimitive?_payload current
+      (.linear .L04_scanAttempt (rawLinearKey before)) id
+      attempted attemptedEq
+    have attemptedSound : PhaseARawSound attempted.payload := by
+      simpa [attemptedPayload] using invariant
+    cases scanEq : scannedEdge? owned before with
+    | none =>
+        simp only [scanEq, Option.some.injEq] at remainder
+        cases remainder
+        exact attemptedSound
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scanEq, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        have edgeSound := scannedEdge?_rawSound owned before after edge
+          beforeSound scanEq
+        exact insertRawEdge?_rawSound withItem result edge
+          (insertRawItem?_rawSound attempted withItem .scan after
+            attemptedSound edgeSound.1 itemEq) edgeSound.2 edgeEq
+  next notApplicable =>
+    cases selected
+    exact invariant
+private theorem attemptCompletion?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (invariant : PhaseARawSound current.payload)
+    (waitingSound : waiting ∈ rawSaturation tokens)
+    (finishedSound : finished ∈ rawSaturation tokens)
+    (selected : attemptCompletion? current waiting finished = some result) :
+    PhaseARawSound result.payload := by
+  unfold attemptCompletion? at selected
+  cases completionEq : completedEdge? (file := file) waiting finished with
+  | none =>
+      simp only [completionEq, Option.some.injEq] at selected
+      cases selected
+      exact invariant
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      next attemptedBefore =>
+        cases selected
+        exact invariant
+      next fresh =>
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨attempted, attemptedEq,
+          withItem, itemEq, edgeEq⟩
+        have attemptedPayload := phaseA_runMappedPrimitive?_payload current
+          _ id attempted attemptedEq
+        have attemptedSound : PhaseARawSound attempted.payload := by
+          simpa [attemptedPayload] using invariant
+        have edgeSound := completedEdge?_rawSound waiting finished after edge
+          waitingSound finishedSound completionEq
+        exact insertRawEdge?_rawSound withItem result edge
+          (insertRawItem?_rawSound attempted withItem .completion after
+            attemptedSound edgeSound.1 itemEq) edgeSound.2 edgeEq
+private theorem attemptCompletionsWith?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    ∀ others (current result : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseARawSound current.payload →
+      pivot ∈ rawSaturation tokens →
+      (∀ other, other ∈ others → other ∈ rawSaturation tokens) →
+      attemptCompletionsWith? pivot others current = some result →
+      PhaseARawSound result.payload := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result invariant _ _ selected
+      cases selected
+      exact invariant
+  | cons other rest induction =>
+      intro current result invariant pivotSound othersSound selected
+      rw [attemptCompletionsWith?] at selected
+      cases forwardEq : attemptCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have otherSound := othersSound other (by simp)
+          have forwardSound := attemptCompletion?_rawSound
+            current forward pivot other invariant pivotSound otherSound
+              forwardEq
+          split at selected
+          next same =>
+            exact induction forward result forwardSound pivotSound
+              (fun item member => othersSound item (by simp [member]))
+              selected
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq : attemptCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact induction reverse result
+                  (attemptCompletion?_rawSound forward reverse other pivot
+                    forwardSound otherSound pivotSound reverseEq)
+                  pivotSound
+                  (fun item member => othersSound item (by simp [member]))
+                  selected
+private theorem processRawItem?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (invariant : PhaseARawSound current.payload)
+    (itemSound : item ∈ rawSaturation tokens)
+    (selected : processRawItem? owned item current = some result) :
+    PhaseARawSound result.payload := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completionEq⟩
+  have predictedSound := attemptPredictions?_rawSound item
+    allProductionIds current predicted invariant itemSound predictedEq
+  have scannedSound := attemptScan?_rawSound owned predicted scanned item
+    predictedSound itemSound scannedEq
+  exact attemptCompletionsWith?_rawSound item scanned.payload.rawItems
+    scanned result scannedSound itemSound scannedSound.1 completionEq
+private theorem runPhaseAQueues?_rawSound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result : CountedState tokens (PhaseAOpen file tokens)),
+      PhaseARawSound current.payload →
+      runPhaseAQueues? owned fuel current = some result →
+      PhaseARawSound result.payload := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result invariant selected
+      rw [runPhaseAQueues?] at selected
+      split at selected <;> try contradiction
+      cases selected
+      exact invariant
+  | succ fuel induction =>
+      intro current result invariant selected
+      rw [runPhaseAQueues?] at selected
+      cases items : current.payload.itemQueue with
+      | nil =>
+          cases edges : current.payload.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact invariant
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueRawEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result
+                    (dequeueRawEdge?_rawSound current pair invariant dequeued)
+                    selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueRawItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨pivot, afterDequeue⟩
+              simp only at selected
+              cases processed : processRawItem? owned pivot afterDequeue with
+              | none => simp [processed] at selected
+              | some next =>
+                  rw [processed] at selected
+                  have dequeuedSound := dequeueRawItem?_rawSound current
+                    (pivot, afterDequeue) invariant dequeued
+                  exact induction next result
+                    (processRawItem?_rawSound owned pivot afterDequeue next
+                      dequeuedSound.2 dequeuedSound.1 processed) selected
+private theorem executePhaseA?_rawSound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result) :
+    PhaseARawSound result.payload := by
+  unfold executePhaseA? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨seeded, seededEq, runEq⟩
+  have seededSound := insertRawSeeds?_rawSound
+    (rawSeedItems tokens) (beginPhaseA file tokens) seeded
+    (fun item member => rawSeedItems_saturated member)
+    (beginPhaseA_rawSound file tokens) seededEq
+  exact runPhaseAQueues?_rawSound owned _ seeded result seededSound runEq
+
 end Chart
 
 namespace Chart
