@@ -2603,3 +2603,175 @@ theorem rawMatchingParenthesisObservation_eq_semantic
     semanticMatchingParenthesisObservation_exact]
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The generalized public delimiter view selects exactly the first allowed
+symbol at the starting delimiter depth. -/
+theorem observedNextSameDepthDelimiterBool_exact
+    (tokens : List Token) (start cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    Chart.observedNextSameDepthDelimiterBool tokens start cursor allowed =
+        true ↔
+      NextSameDepthDelimiter tokens start cursor allowed := by
+  unfold Chart.observedNextSameDepthDelimiterBool NextSameDepthDelimiter
+  simp only [Bool.and_eq_true]
+  constructor
+  · rintro ⟨⟨sameDepth, allowedAtCursor⟩, earliest⟩
+    refine ⟨
+      (observedSameDelimiterDepthBool_exact tokens start cursor).mp
+        sameDepth,
+      (observedAllowedSymbolAtBool_exact tokens cursor allowed).mp
+        allowedAtCursor,
+      ?_⟩
+    intro earlier startLe earlierLt earlierDepth earlierAllowed
+    rw [List.all_eq_true] at earliest
+    have selected := earliest earlier (List.mem_finRange _)
+    have depthTrue :=
+      (observedSameDelimiterDepthBool_exact tokens start earlier).mpr
+        earlierDepth
+    have allowedTrue :=
+      (observedAllowedSymbolAtBool_exact tokens earlier allowed).mpr
+        earlierAllowed
+    rw [allowedTrue] at selected
+    simp [startLe, earlierLt, depthTrue] at selected
+  · rintro ⟨sameDepth, allowedAtCursor, earliest⟩
+    refine ⟨⟨
+      (observedSameDelimiterDepthBool_exact tokens start cursor).mpr
+        sameDepth,
+      (observedAllowedSymbolAtBool_exact tokens cursor allowed).mpr
+        allowedAtCursor⟩, ?_⟩
+    rw [List.all_eq_true]
+    intro earlier _member
+    by_cases startLe : start.val ≤ earlier.val
+    · by_cases earlierLt : earlier.val < cursor.val
+      · by_cases depth : SameDelimiterDepth tokens start earlier
+        · have notAllowed := earliest earlier startLe earlierLt depth
+          have depthTrue :=
+            (observedSameDelimiterDepthBool_exact tokens start earlier).mpr
+              depth
+          have allowedFalse :
+              Chart.observedAllowedSymbolAtBool earlier allowed = false := by
+            apply Bool.eq_false_iff.mpr
+            intro allowedTrue
+            exact notAllowed
+              ((observedAllowedSymbolAtBool_exact tokens earlier allowed).mp
+                allowedTrue)
+          simpa [startLe, earlierLt, depthTrue] using allowedFalse
+        · have depthFalse :
+              Chart.observedSameDelimiterDepthBool tokens start earlier =
+                false := by
+            exact Bool.eq_false_iff.mpr fun depthTrue => depth
+              ((observedSameDelimiterDepthBool_exact
+                tokens start earlier).mp depthTrue)
+          simp [startLe, earlierLt, depthFalse]
+      · simp [startLe, earlierLt]
+    · simp [startLe]
+
+private theorem observedRawSymbolAtBool_owned_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (cursor : Boundary tokens) (symbol : Symbol) :
+    Chart.observedRawSymbolAtBool cursor symbol = true ↔
+      SymbolAtBoundary file tokens cursor symbol := by
+  change symbolAtBoundaryBool tokens cursor symbol = true ↔ _
+  exact symbolAtBoundaryBool_eq_true_iff owned cursor symbol
+
+private theorem observedImmediatelyAfterRawSymbolBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (symbol : Symbol)
+    (cursor after : Boundary tokens) :
+    Chart.observedImmediatelyAfterRawSymbolBool symbol cursor after = true ↔
+      ImmediatelyAfterSymbol file tokens symbol cursor after := by
+  change immediatelyAfterSymbolBool tokens symbol cursor after = true ↔ _
+  exact immediatelyAfterSymbolBool_eq_true_iff owned symbol cursor after
+
+/-- The proof-free canonical G02 header view is exactly the declarative
+match-arm header judgment. -/
+theorem observedSaturatedMatchArmHeaderObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart cursor : Boundary tokens) :
+    Chart.observedSaturatedMatchArmHeaderObservation tokens
+        regionStart cursor = true ↔
+      ArmHeaderAt file tokens regionStart cursor := by
+  unfold Chart.observedSaturatedMatchArmHeaderObservation ArmHeaderAt
+  simp only [Bool.and_eq_true, decide_eq_true_iff]
+  constructor
+  · rintro ⟨⟨⟨ordered, sameDepth⟩, pipeObserved⟩, remainder⟩
+    generalize boundaryEq : Chart.observedBoundaryAt? tokens
+      (cursor.val + 1) = result at remainder
+    cases result with
+    | none => simp at remainder
+    | some patternStart =>
+        simp only [Bool.and_eq_true] at remainder
+        rcases remainder with ⟨afterPipe, arrowSelected⟩
+        rcases List.any_eq_true.mp arrowSelected with
+          ⟨arrowCursor, _member, arrowFacts⟩
+        simp only [Bool.and_eq_true] at arrowFacts
+        rcases arrowFacts with ⟨delimiter, greatest⟩
+        exact ⟨ordered,
+          (observedSameDelimiterDepthBool_exact tokens regionStart
+            cursor).mp sameDepth,
+          (observedRawSymbolAtBool_owned_exact owned cursor .pipe).mp
+            pipeObserved,
+          patternStart, arrowCursor,
+          (observedImmediatelyAfterRawSymbolBool_exact owned .pipe cursor
+            patternStart).mp afterPipe,
+          (observedNextSameDepthDelimiterBool_exact tokens patternStart
+            arrowCursor ⟨.fatArrow, []⟩).mp delimiter,
+          (saturatedRawGreatestEndObservation_exact owned
+            (.aux Grammar.matchArmPatternListSite.site) patternStart
+            arrowCursor arrowCursor).mp greatest⟩
+  · rintro ⟨ordered, sameDepth, pipeObserved, patternStart,
+      arrowCursor, afterPipe, delimiter, greatest⟩
+    rcases afterPipe with
+      ⟨terminalCursor, token, atCursor, atPattern, terminalAt, payload⟩
+    have patternValue : patternStart.val = cursor.val + 1 := by
+      have cursorValue := congrArg Fin.val atCursor
+      have patternCursorValue := congrArg Fin.val atPattern
+      change terminalCursor.val = cursor.val at cursorValue
+      change terminalCursor.val + 1 = patternStart.val at patternCursorValue
+      omega
+    have boundaryEq : Chart.observedBoundaryAt? tokens
+        (cursor.val + 1) = some patternStart :=
+      (chart_observedBoundaryAt?_eq_some_iff
+        (cursor.val + 1) patternStart).mpr patternValue
+    refine ⟨⟨⟨ordered,
+      (observedSameDelimiterDepthBool_exact tokens regionStart cursor).mpr
+        sameDepth⟩,
+      (observedRawSymbolAtBool_owned_exact owned cursor .pipe).mpr
+        pipeObserved⟩, ?_⟩
+    rw [boundaryEq]
+    simp only [Bool.and_eq_true]
+    refine ⟨
+      (observedImmediatelyAfterRawSymbolBool_exact owned .pipe cursor
+        patternStart).mpr
+          ⟨terminalCursor, token, atCursor, atPattern, terminalAt, payload⟩,
+      ?_⟩
+    apply List.any_eq_true.mpr
+    refine ⟨arrowCursor, List.mem_finRange _, ?_⟩
+    simp only [Bool.and_eq_true]
+    exact ⟨
+      (observedNextSameDepthDelimiterBool_exact tokens patternStart
+        arrowCursor ⟨.fatArrow, []⟩).mpr delimiter,
+      (saturatedRawGreatestEndObservation_exact owned
+        (.aux Grammar.matchArmPatternListSite.site) patternStart
+        arrowCursor arrowCursor).mpr greatest⟩
+
+/-- The canonical U01 G02 header oracle agrees with its semantic adapter. -/
+theorem saturatedMatchArmHeaderObservation_eq_semantic
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart cursor : Boundary tokens) :
+    Chart.saturatedMatchArmHeaderObservation tokens regionStart cursor =
+      semanticMatchArmHeaderObservation owned regionStart cursor := by
+  rw [Chart.saturatedMatchArmHeaderObservation_eq_observed]
+  apply Bool.eq_iff_iff.mpr
+  rw [observedSaturatedMatchArmHeaderObservation_exact owned,
+    semanticMatchArmHeaderObservation_exact owned]
+
+end Solcore.Surface.Multi
