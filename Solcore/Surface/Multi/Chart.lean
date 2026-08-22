@@ -18743,3 +18743,43 @@ private theorem insertContextualItem?_total
     simp [runMappedPrimitive?, fresh]
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Phase C preserves the exact canonical guard memo produced by the
+successful observed Phase-A/Phase-B prefix. -/
+theorem executeObservedContextualWorklist?_memo_eq_saturated
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    result.memo = saturatedGuardMemo owned := by
+  unfold executeObservedContextualWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  unfold executeObservedPhaseABCWorklist? at internalEq
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at internalEq
+  rcases internalEq with ⟨phaseB, phaseBEq, phaseCEq⟩
+  have memoPreserved :=
+    (executePhaseCWorklist?_operationalInvariant owned phaseB internal
+      phaseCEq).2
+  let guardResult : GuardWorklistResult tokens := {
+    memo := phaseB.payload.memo
+  }
+  have guardSelected :
+      executeObservedGuardWorklist? file tokens owned =
+        some guardResult := by
+    unfold executeObservedGuardWorklist?
+    rw [phaseBEq]
+    rfl
+  have canonical := executeObservedGuardWorklist?_memo_eq_saturated
+    file tokens owned guardResult guardSelected
+  change internal.payload.phaseC.memo = saturatedGuardMemo owned
+  exact memoPreserved.trans (by simpa [guardResult] using canonical)
+
+end Solcore.Surface.Multi.Chart
