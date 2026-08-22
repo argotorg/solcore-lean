@@ -793,4 +793,226 @@ theorem statementIfTerminalObservationBool_exact
 
 
 
+/-- G01 is exact once matching-parenthesis and raw greatest-expression
+observations are exact; all terminal and boundary behavior is closed here. -/
+theorem statementIfPositiveObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (matching : Chart.MatchingParenthesisObservation tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isStatementIf : key.guard = .G01_statementIf)
+    (matchingExact : ∀ openCursor closeCursor,
+      matching openCursor closeCursor = true ↔
+        MatchingDelimiter tokens openCursor closeCursor
+          .leftParen .rightParen)
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .expression) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .expression)
+          start upperBound finish) :
+    Chart.statementIfPositiveObservationBool owned matching greatest key =
+        true ↔
+      GuardEvidence file tokens key .positive := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G01_statementIf at isStatementIf
+  subst guard
+  unfold Chart.statementIfPositiveObservationBool
+  rw [show GuardEvidence file tokens {
+      guard := .G01_statementIf
+      contextStart := contextStart
+      siteCursor := siteCursor
+      ordered := ordered
+    } .positive =
+      (TokensOwnedBy file tokens ∧
+        ∃ openCursor expressionStart closeCursor afterClose,
+          (∃ matched : MatchedTerminal file tokens (.hardKeyword .ifKw),
+            matched.cursor.beforeBoundary = siteCursor ∧
+              matched.cursor.afterBoundary = openCursor) ∧
+          (∃ matched : MatchedTerminal file tokens (.symbol .leftParen),
+            matched.cursor.beforeBoundary = openCursor ∧
+              matched.cursor.afterBoundary = expressionStart) ∧
+          MatchingDelimiter tokens openCursor closeCursor
+            .leftParen .rightParen ∧
+          UnguardedRecognizes file tokens (.rule .expression)
+            expressionStart closeCursor ∧
+          (∃ matched : MatchedTerminal file tokens (.symbol .rightParen),
+            matched.cursor.beforeBoundary = closeCursor ∧
+              matched.cursor.afterBoundary = afterClose) ∧
+          (∃ matched : MatchedTerminal file tokens (.symbol .leftBrace),
+            matched.cursor.beforeBoundary = afterClose)) by rfl]
+  cases openSelected :
+      Chart.observedBoundaryAt? tokens (siteCursor.val + 1) with
+  | none =>
+      simp only
+      constructor
+      · intro impossible
+        contradiction
+      · rintro ⟨_owned, openCursor, expressionStart, closeCursor,
+          afterClose, ifEvidence, _openEvidence, _matchingEvidence,
+          _recognized, _closeEvidence, _braceEvidence⟩
+        rcases ifEvidence with ⟨matched, atSite, atOpen⟩
+        have openValue : openCursor.val = siteCursor.val + 1 := by
+          have siteValue := congrArg Fin.val atSite
+          have afterValue := congrArg Fin.val atOpen
+          change matched.cursor.val = siteCursor.val at siteValue
+          change matched.cursor.val + 1 = openCursor.val at afterValue
+          omega
+        have existsBoundary :
+            Chart.observedBoundaryAt? tokens (siteCursor.val + 1) =
+              some openCursor :=
+          (chart_observedBoundaryAt?_eq_some_iff
+            (siteCursor.val + 1) openCursor).mpr openValue
+        rw [openSelected] at existsBoundary
+        contradiction
+  | some openCursor =>
+      have openValue : openCursor.val = siteCursor.val + 1 :=
+        (chart_observedBoundaryAt?_eq_some_iff
+          (siteCursor.val + 1) openCursor).mp openSelected
+      cases expressionSelected :
+          Chart.observedBoundaryAt? tokens (siteCursor.val + 2) with
+      | none =>
+          simp only
+          constructor
+          · intro impossible
+            contradiction
+          · rintro ⟨_owned, otherOpen, expressionStart, closeCursor,
+              afterClose, ifEvidence, openEvidence, _matchingEvidence,
+              _recognized, _closeEvidence, _braceEvidence⟩
+            rcases ifEvidence with ⟨ifMatched, atSite, atOtherOpen⟩
+            rcases openEvidence with
+              ⟨openMatched, atOpen, atExpression⟩
+            have expressionValue :
+                expressionStart.val = siteCursor.val + 2 := by
+              have siteValue := congrArg Fin.val atSite
+              have otherOpenValue := congrArg Fin.val atOtherOpen
+              have atOpenValue := congrArg Fin.val atOpen
+              have afterValue := congrArg Fin.val atExpression
+              change ifMatched.cursor.val = siteCursor.val at siteValue
+              change ifMatched.cursor.val + 1 = otherOpen.val at otherOpenValue
+              change openMatched.cursor.val = otherOpen.val at atOpenValue
+              change openMatched.cursor.val + 1 = expressionStart.val at afterValue
+              omega
+            have existsBoundary :
+                Chart.observedBoundaryAt? tokens (siteCursor.val + 2) =
+                  some expressionStart :=
+              (chart_observedBoundaryAt?_eq_some_iff
+                (siteCursor.val + 2) expressionStart).mpr expressionValue
+            rw [expressionSelected] at existsBoundary
+            contradiction
+      | some expressionStart =>
+          have expressionValue :
+              expressionStart.val = siteCursor.val + 2 :=
+            (chart_observedBoundaryAt?_eq_some_iff
+              (siteCursor.val + 2) expressionStart).mp expressionSelected
+          constructor
+          · intro selected
+            rcases List.any_eq_true.mp selected with
+              ⟨closeCursor, _inRange, factsSelected⟩
+            simp only [Bool.and_eq_true] at factsSelected
+            rcases factsSelected with
+              ⟨terminalSelected, matchingSelected, greatestSelected⟩
+            rcases (statementIfTerminalObservationBool_exact owned
+              siteCursor openCursor expressionStart closeCursor).mp
+                terminalSelected with
+              ⟨afterClose, ifEvidence, openEvidence, closeEvidence,
+                braceEvidence⟩
+            exact ⟨owned, openCursor, expressionStart, closeCursor,
+              afterClose, ifEvidence, openEvidence,
+              (matchingExact openCursor closeCursor).mp matchingSelected,
+              (greatestUnguardedEnd_at_finish_iff
+                (.rule .expression) expressionStart closeCursor).mp
+                  ((greatestExact expressionStart closeCursor
+                    closeCursor).mp greatestSelected),
+              closeEvidence, braceEvidence⟩
+          · rintro ⟨_owned, otherOpen, otherStart, closeCursor,
+              afterClose, ifEvidence, openEvidence, matchingEvidence,
+              recognized, closeEvidence, braceEvidence⟩
+            rcases ifEvidence with ⟨ifMatched, atSite, atOtherOpen⟩
+            rcases openEvidence with
+              ⟨openMatched, atOpen, atOtherStart⟩
+            have otherOpenValue : otherOpen.val = siteCursor.val + 1 := by
+              have siteValue := congrArg Fin.val atSite
+              have afterValue := congrArg Fin.val atOtherOpen
+              change ifMatched.cursor.val = siteCursor.val at siteValue
+              change ifMatched.cursor.val + 1 = otherOpen.val at afterValue
+              omega
+            have otherStartValue : otherStart.val = siteCursor.val + 2 := by
+              have beforeValue := congrArg Fin.val atOpen
+              have afterValue := congrArg Fin.val atOtherStart
+              change openMatched.cursor.val = otherOpen.val at beforeValue
+              change openMatched.cursor.val + 1 = otherStart.val at afterValue
+              omega
+            have openEq : otherOpen = openCursor := by
+              apply Fin.ext
+              omega
+            have startEq : otherStart = expressionStart := by
+              apply Fin.ext
+              omega
+            have canonicalIf :
+                ∃ matched : MatchedTerminal file tokens
+                    (.hardKeyword .ifKw),
+                  matched.cursor.beforeBoundary = siteCursor ∧
+                    matched.cursor.afterBoundary = openCursor := by
+              refine ⟨ifMatched, atSite, ?_⟩
+              simpa only [openEq] using atOtherOpen
+            have canonicalOpen :
+                ∃ matched : MatchedTerminal file tokens
+                    (.symbol .leftParen),
+                  matched.cursor.beforeBoundary = openCursor ∧
+                    matched.cursor.afterBoundary = expressionStart := by
+              refine ⟨openMatched, ?_, ?_⟩
+              · simpa only [openEq] using atOpen
+              · simpa only [startEq] using atOtherStart
+            have canonicalMatching :
+                MatchingDelimiter tokens openCursor closeCursor
+                  .leftParen .rightParen := by
+              simpa only [openEq] using matchingEvidence
+            have canonicalRecognized :
+                UnguardedRecognizes file tokens (.rule .expression)
+                  expressionStart closeCursor := by
+              simpa only [startEq] using recognized
+            apply List.any_eq_true.mpr
+            refine ⟨closeCursor, ?_, ?_⟩
+            · simp only [List.mem_finRange]
+            · simp only [Bool.and_eq_true]
+              exact ⟨(statementIfTerminalObservationBool_exact owned
+                  siteCursor openCursor expressionStart closeCursor).mpr
+                    ⟨afterClose, canonicalIf, canonicalOpen,
+                      closeEvidence, braceEvidence⟩,
+                (matchingExact openCursor closeCursor).mpr canonicalMatching,
+                (greatestExact expressionStart closeCursor closeCursor).mpr
+                  ((greatestUnguardedEnd_at_finish_iff
+                    (.rule .expression) expressionStart closeCursor).mpr
+                      canonicalRecognized)⟩
+
+/-- G01 classification is exact under the same two explicit phase contracts. -/
+theorem statementIfClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (matching : Chart.MatchingParenthesisObservation tokens)
+    (greatest : Chart.GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens)
+    (isStatementIf : key.guard = .G01_statementIf)
+    (matchingExact : ∀ openCursor closeCursor,
+      matching openCursor closeCursor = true ↔
+        MatchingDelimiter tokens openCursor closeCursor
+          .leftParen .rightParen)
+    (greatestExact : ∀ start upperBound finish,
+      greatest (.rule .expression) start upperBound finish = true ↔
+        GreatestUnguardedEnd file tokens (.rule .expression)
+          start upperBound finish)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.statementIfPositiveObservationBool
+          owned matching greatest key) false = decision ↔
+      GuardEvidence file tokens key decision := by
+  apply guardEvidence_iff_classified_observation owned key
+    (Chart.statementIfPositiveObservationBool owned matching greatest key)
+      false
+  · exact statementIfPositiveObservationBool_exact owned matching greatest
+      key isStatementIf matchingExact greatestExact
+  · intro impossible
+    rw [isStatementIf] at impossible
+    contradiction
+
 end Solcore.Surface.Multi
