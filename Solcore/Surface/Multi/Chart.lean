@@ -8516,4 +8516,64 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_matchArmPipe
 
 end Chart
 
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- A proof-free greatest-end oracle supplied by saturated Phase A. -/
+abbrev GreatestEndObservation (tokens : List Token) :=
+  NonterminalSymbol → Boundary tokens → Boundary tokens →
+    Boundary tokens → Bool
+
+/-- G09's complete positive observation, parameterized only by the raw
+greatest-end oracle whose semantic adequacy belongs to Phase A. -/
+def genericContextPositiveObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (greatest : GreatestEndObservation tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  (List.finRange (tokens.length + 2)).any fun arrowCursor =>
+    observedTerminalAtBool owned (.symbol .fatArrow) arrowCursor &&
+      greatest (.rule .predicateList)
+        key.siteCursor arrowCursor arrowCursor
+
+private theorem phaseBAnyReads?_map_some
+    {alpha : Type} (values : List alpha) (select : alpha → Bool) :
+    phaseBAnyReads? (values.map fun value => some (select value)) =
+      some (values.any select) := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [phaseBAnyReads?, induction]
+
+/-- Canonical U01 reads implement G09's public parameterized observation with
+the concrete raw Phase-A greatest-end oracle. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_G09
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (key : GuardInstanceKey tokens)
+    (isGeneric : key.guard = .G09_genericContext) :
+    phaseBGuardObservationFromIndexes?
+        (canonicalEvidenceEntries
+          (phaseAObservationIndexEvaluator owned) phaseA) key =
+      some (genericContextPositiveObservationBool owned
+        (fun symbol start upperBound finish =>
+          rawGreatestEndBool phaseA symbol start upperBound finish) key,
+        false) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G09_genericContext at isGeneric
+  subst guard
+  simp [phaseBGuardObservationFromIndexes?, phaseBG09Positive?,
+    phaseBReadTerminalGuard?, phaseBReadGreatestRule?,
+    phaseBReadIndex?, phaseAEvidenceEntryAt?_canonical_exact,
+    phaseAObservationIndexEvaluator, phaseATerminalWindowGuardBool,
+    phaseBAllReads?, phaseBAnyReads?_map_some,
+    genericContextPositiveObservationBool,
+    observedTerminalAtBool_eq_phaseA]
+
+end Chart
+
 end Solcore.Surface.Multi
