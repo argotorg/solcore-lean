@@ -19203,4 +19203,13 @@ theorem chart_repeated_nonassoc_overrides
   intro span found expected unexpected
   exact parse_diagnostic_constructors_exclusive unexpected applies
 
+/-- Public constructive decision for the exact nearest statement region. -/
+def nearestStatementRegionSemanticDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart regionEnd : Boundary tokens) :
+    Decidable
+      (NearestStatementRegion file tokens regionStart regionEnd) :=
+  nearestStatementRegionDecision owned regionStart regionEnd
+
 end Solcore.Surface.Multi
