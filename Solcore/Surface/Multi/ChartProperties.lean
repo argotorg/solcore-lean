@@ -2958,3 +2958,76 @@ theorem observedInnermostContainingBraceFrameBool_exact
       simp [containingFalse]
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The canonical proof-free next-arm-or-close selector is exactly the first
+same-frame header or the containing close brace. -/
+theorem observedSaturatedNextArmOrCloseBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (regionStart closeCursor regionEnd : Boundary tokens) :
+    Chart.observedSaturatedNextArmOrCloseBool tokens regionStart
+        closeCursor regionEnd = true ↔
+      NextArmOrClose file tokens regionStart closeCursor regionEnd := by
+  unfold Chart.observedSaturatedNextArmOrCloseBool NextArmOrClose
+  simp only [Bool.and_eq_true, Bool.or_eq_true, decide_eq_true_iff,
+    observedSameDelimiterDepthBool_exact,
+    observedSaturatedMatchArmHeaderObservation_exact owned]
+  constructor
+  · rintro ⟨⟨⟨⟨startLe, endLe⟩, sameDepth⟩, selectedEnd⟩,
+      earliest⟩
+    refine ⟨startLe, endLe, sameDepth, selectedEnd, ?_⟩
+    intro earlier earlierStartLe earlierLt earlierDepth earlierSelected
+    rw [List.all_eq_true] at earliest
+    have selected := earliest earlier (List.mem_finRange _)
+    have depthTrue :=
+      (observedSameDelimiterDepthBool_exact tokens regionStart earlier).mpr
+        earlierDepth
+    rcases earlierSelected with earlierEq | earlierHeader
+    · have earlierValue := congrArg Fin.val earlierEq
+      omega
+    · have headerTrue :=
+        (observedSaturatedMatchArmHeaderObservation_exact owned
+          regionStart earlier).mpr earlierHeader
+      simp [earlierStartLe, earlierLt, depthTrue, headerTrue] at selected
+  · rintro ⟨startLe, endLe, sameDepth, selectedEnd, earliest⟩
+    refine ⟨⟨⟨⟨startLe, endLe⟩, sameDepth⟩, selectedEnd⟩, ?_⟩
+    rw [List.all_eq_true]
+    intro earlier _member
+    by_cases earlierStartLe : regionStart.val ≤ earlier.val
+    · by_cases earlierLt : earlier.val < regionEnd.val
+      · by_cases earlierDepth :
+          SameDelimiterDepth tokens regionStart earlier
+        · have notSelected :=
+            earliest earlier earlierStartLe earlierLt earlierDepth
+          have depthTrue :=
+            (observedSameDelimiterDepthBool_exact tokens regionStart
+              earlier).mpr earlierDepth
+          have notClose : earlier ≠ closeCursor :=
+            fun equal => notSelected (Or.inl equal)
+          have notHeader :
+              ¬ ArmHeaderAt file tokens regionStart earlier :=
+            fun header => notSelected (Or.inr header)
+          have headerFalse :
+              Chart.observedSaturatedMatchArmHeaderObservation tokens
+                  regionStart earlier = false := by
+            exact Bool.eq_false_iff.mpr fun headerTrue => notHeader
+              ((observedSaturatedMatchArmHeaderObservation_exact owned
+                regionStart earlier).mp headerTrue)
+          simp [earlierStartLe, earlierLt, depthTrue, notClose,
+            headerFalse]
+        · have depthFalse :
+              Chart.observedSameDelimiterDepthBool tokens regionStart
+                earlier = false := by
+            exact Bool.eq_false_iff.mpr fun depthTrue => earlierDepth
+              ((observedSameDelimiterDepthBool_exact tokens regionStart
+                earlier).mp depthTrue)
+          simp [earlierStartLe, earlierLt, depthFalse]
+      · simp [earlierStartLe, earlierLt]
+    · simp [earlierStartLe]
+
+end Solcore.Surface.Multi
