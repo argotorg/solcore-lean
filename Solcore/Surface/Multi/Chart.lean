@@ -16984,4 +16984,90 @@ private theorem attemptContextualCompletion?_attemptLedger
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem attemptContextualPredictions?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAttemptLedgerMaterialized current →
+      attemptContextualPredictions? waiting productions current =
+        some result →
+      PhaseCAttemptLedgerMaterialized result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result ledger selected
+      cases selected
+      exact ledger
+  | cons predicted rest induction =>
+      intro current result ledger selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, continued⟩
+      exact induction next result
+        (attemptContextualPrediction?_attemptLedger current next waiting
+          predicted ledger nextEq) continued
+
+private theorem attemptContextualCompletionsWith?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ others
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAttemptLedgerMaterialized current →
+      attemptContextualCompletionsWith? pivot others current = some result →
+      PhaseCAttemptLedgerMaterialized result := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result ledger selected
+      cases selected
+      exact ledger
+  | cons other rest induction =>
+      intro current result ledger selected
+      rw [attemptContextualCompletionsWith?] at selected
+      cases forwardEq : attemptContextualCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardLedger := attemptContextualCompletion?_attemptLedger
+            current forward pivot other ledger forwardEq
+          split at selected
+          next same =>
+            exact induction forward result forwardLedger selected
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq :
+                attemptContextualCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact induction reverse result
+                  (attemptContextualCompletion?_attemptLedger forward reverse
+                    other pivot forwardLedger reverseEq) selected
+
+private theorem processContextualItem?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (selected : processContextualItem? owned item current = some result) :
+    PhaseCAttemptLedgerMaterialized result := by
+  unfold processContextualItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
+  exact attemptContextualCompletionsWith?_attemptLedger item
+    scanned.payload.phaseC.contextualItems scanned result
+    (attemptContextualScan?_attemptLedger owned predicted scanned item
+      (attemptContextualPredictions?_attemptLedger item allProductionIds
+        current predicted ledger predictedEq) scannedEq) completedEq
+
+end Chart
+
 end Solcore.Surface.Multi
