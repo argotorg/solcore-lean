@@ -15150,4 +15150,28 @@ private theorem insertContextualCompletedEdge?_coverage
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem observedPhaseABPrerequisites_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ObservedPhaseABPrerequisites file tokens owned := by
+  obtain ⟨phaseA, executed, sameMembers⟩ :=
+    executePhaseA?_total_membership_eq file tokens owned
+  exact ⟨phaseA, executed,
+    (canonicalRawItems_eq_iff phaseA.payload.rawItems
+      (rawSaturation tokens)).mpr sameMembers⟩
+
+private theorem executeObservedPhaseAB?_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executeObservedPhaseAB? file tokens owned = some result :=
+  (executeObservedPhaseAB?_total_iff_prerequisites file tokens owned).mpr
+    (observedPhaseABPrerequisites_total file tokens owned)
+
+end Chart
+
 end Solcore.Surface.Multi
