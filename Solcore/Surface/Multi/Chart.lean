@@ -15195,4 +15195,32 @@ theorem executeObservedGuardWorklist?_total
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem beginPhaseCWorklist?_total_iff_root_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens)) :
+    (∃ result, beginPhaseCWorklist? current = some result) ↔
+      (.linear .L03_itemInsert
+        (contextualLinearKey (contextualRoot tokens)) : UnitAddress tokens) ∉
+          current.counter.usedRev := by
+  constructor
+  · rintro ⟨result, selected⟩
+    unfold beginPhaseCWorklist? at selected
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨entered, enteredEq, resultEq⟩
+    unfold enterPhaseC? runMappedPrimitive? at enteredEq
+    dsimp only at enteredEq
+    split at enteredEq
+    next fresh => exact fresh
+    next used => contradiction
+  · intro fresh
+    unfold beginPhaseCWorklist? enterPhaseC?
+    simp [runMappedPrimitive?, fresh]
+
+end Chart
+
 end Solcore.Surface.Multi
