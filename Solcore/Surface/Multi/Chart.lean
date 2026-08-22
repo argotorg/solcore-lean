@@ -6758,4 +6758,67 @@ private theorem executeObservedPhaseABCWorklist?_backpointerInvariant
 
 end Chart
 
+
+namespace Chart
+
+/-- Classify one normalized Phase-B observation.  Every guard is binary
+except G02, whose failed header is negative at a pipe and neutral elsewhere. -/
+def classifyGuardObservation
+    (guard : PriorityGuardId) (positive pipeAtSite : Bool) :
+    GuardDecision :=
+  if positive then
+    .positive
+  else
+    match guard with
+    | .G02_matchArmBoundary =>
+        if pipeAtSite then .negative else .neutral
+    | _ => .negative
+
+/-- Normalize the private U01 table reads to the two semantic bits consumed
+by the public Phase-B classifier. -/
+private def phaseBGuardObservationFromIndexes?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) : Option (Bool × Bool) :=
+  match key.guard with
+  | .G01_statementIf => do
+      let positive ← phaseBG01Positive? entries key
+      pure (positive, false)
+  | .G02_matchArmBoundary =>
+      phaseBG02Observations? entries key
+  | .G03_parameterComptime | .G04_letComptime |
+      .G05_typeComptime => do
+      let positive ← phaseBComptimeAtSitePositive? entries key
+      pure (positive, false)
+  | .G06_patternComptime => do
+      let positive ← phaseBG06Positive? entries key
+      pure (positive, false)
+  | .G07_leadingDotArguments => do
+      let positive ← phaseBG07Positive? entries key
+      pure (positive, false)
+  | .G08_terminalExpression => do
+      let positive ← phaseBG08Positive? entries key
+      pure (positive, false)
+  | .G09_genericContext => do
+      let positive ← phaseBG09Positive? entries key
+      pure (positive, false)
+
+/-- The U01-backed Phase-B evaluator factors exactly through the public
+two-bit classifier; it has no further decision semantics of its own. -/
+private theorem phaseBGuardDecisionFromIndexes?_eq_classifier
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) :
+    phaseBGuardDecisionFromIndexes? entries key = (do
+      let observation ← phaseBGuardObservationFromIndexes? entries key
+      pure (classifyGuardObservation key.guard
+        observation.1 observation.2)) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  cases guard <;>
+    simp [phaseBGuardDecisionFromIndexes?,
+      phaseBGuardObservationFromIndexes?, classifyGuardObservation,
+      Option.bind_assoc]
+
+end Chart
+
 end Solcore.Surface.Multi
