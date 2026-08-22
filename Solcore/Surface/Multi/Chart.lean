@@ -11018,4 +11018,234 @@ private theorem activateWorklistProduction?_reachCarrier
 end Chart
 
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCOperationalInvariant
+    (file : WorkspaceFile) (tokens : List Token)
+    (state : PhaseCWorklist file tokens) : Prop :=
+  (∀ item, item ∈ state.phaseC.contextualItems →
+    OperationalContextualReach file tokens state.phaseC.memo item) ∧
+  (∀ item, item ∈ state.phaseC.itemQueue →
+    OperationalContextualReach file tokens state.phaseC.memo item) ∧
+  (∀ edge, edge ∈ state.phaseC.contextualEdges →
+    OperationalContextualEdgeReach file tokens state.phaseC.memo edge.val) ∧
+  (∀ edge, edge ∈ state.phaseC.edgeQueue →
+    OperationalContextualEdgeReach file tokens state.phaseC.memo edge.val)
+
+private theorem PhaseCOperationalInvariant.of_reachCarrier_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : PhaseCWorklist file tokens}
+    (equal : after.phaseC.reachCarrier = before.phaseC.reachCarrier)
+    (invariant : PhaseCOperationalInvariant file tokens before) :
+    PhaseCOperationalInvariant file tokens after := by
+  have memoEq := congrArg PhaseCReachCarrier.memo equal
+  have itemsEq := congrArg PhaseCReachCarrier.items equal
+  have itemQueueEq := congrArg PhaseCReachCarrier.itemQueue equal
+  have edgesEq := congrArg PhaseCReachCarrier.edges equal
+  have edgeQueueEq := congrArg PhaseCReachCarrier.edgeQueue equal
+  change after.phaseC.memo = before.phaseC.memo at memoEq
+  change after.phaseC.contextualItems =
+    before.phaseC.contextualItems at itemsEq
+  change after.phaseC.itemQueue = before.phaseC.itemQueue at itemQueueEq
+  change after.phaseC.contextualEdges =
+    before.phaseC.contextualEdges at edgesEq
+  change after.phaseC.edgeQueue = before.phaseC.edgeQueue at edgeQueueEq
+  simpa only [PhaseCOperationalInvariant, memoEq, itemsEq, itemQueueEq,
+    edgesEq, edgeQueueEq] using invariant
+
+private theorem beginPhaseCWorklist?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCOperationalInvariant file tokens result.payload := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  have payload := runMappedPrimitive?_payload current
+    (.linear .L03_itemInsert (contextualLinearKey (contextualRoot tokens))) _
+    enteredEq
+  rw [payload]
+  constructor
+  · intro item member
+    simp only [List.mem_singleton] at member
+    subst item
+    exact OperationalContextualReach.root
+  · constructor
+    · intro item member
+      simp only [List.mem_singleton] at member
+      subst item
+      exact OperationalContextualReach.root
+    · simp
+
+private theorem activateWorklistProduction?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCOperationalInvariant file tokens result.1.payload :=
+  invariant.of_reachCarrier_eq
+    (activateWorklistProduction?_reachCarrier current productionInstance
+      result selected)
+
+private theorem insertContextualItem?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (reached : OperationalContextualReach file tokens
+      current.payload.phaseC.memo item)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCOperationalInvariant file tokens result.payload := by
+  unfold insertContextualItem? at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · rw [runMappedPrimitive?_payload current _ _ selected]
+    rcases invariant with ⟨items, queue, edges, edgeQueue⟩
+    constructor
+    · intro candidate member
+      rw [List.mem_append, List.mem_singleton] at member
+      rcases member with old | equal
+      · exact items candidate old
+      · subst candidate
+        exact reached
+    · constructor
+      · intro candidate member
+        rw [List.mem_append, List.mem_singleton] at member
+        rcases member with old | equal
+        · exact queue candidate old
+        · subst candidate
+          exact reached
+      · exact ⟨edges, edgeQueue⟩
+
+private theorem insertContextualScannedEdge?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (reached : OperationalContextualEdgeReach file tokens
+      current.payload.phaseC.memo
+      (.scanned edge.before edge.after edge.cursor))
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCOperationalInvariant file tokens result.payload := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · rw [runMappedPrimitive?_payload current _ _ selected]
+    rcases invariant with ⟨items, queue, edges, edgeQueue⟩
+    refine ⟨items, queue, ?_, ?_⟩
+    · intro candidate member
+      rw [List.mem_append, List.mem_singleton] at member
+      rcases member with old | equal
+      · exact edges candidate old
+      · subst candidate
+        exact reached
+    · intro candidate member
+      rw [List.mem_append, List.mem_singleton] at member
+      rcases member with old | equal
+      · exact edgeQueue candidate old
+      · subst candidate
+        exact reached
+
+private theorem insertContextualCompletedEdge?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (reached : OperationalContextualEdgeReach file tokens
+      current.payload.phaseC.memo
+      (.completed edge.waiting edge.finished edge.after edge.shared))
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCOperationalInvariant file tokens result.payload := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact invariant
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, insertedEq, chargedEq⟩
+    rw [runMappedPrimitive?_payload current _ _ chargedEq]
+    unfold CompletionBackpointerLedger.insertCompleted? at insertedEq
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at insertedEq
+    rcases insertedEq with ⟨ledger, ledgerEq, pairEq⟩
+    cases pairEq
+    rcases invariant with ⟨items, queue, edges, edgeQueue⟩
+    refine ⟨items, queue, ?_, ?_⟩
+    · intro candidate member
+      rw [List.mem_append, List.mem_singleton] at member
+      rcases member with old | equal
+      · exact edges candidate old
+      · subst candidate
+        exact reached
+    · intro candidate member
+      rw [List.mem_append, List.mem_singleton] at member
+      rcases member with old | equal
+      · exact edgeQueue candidate old
+      · subst candidate
+        exact reached
+
+private theorem dequeueContextualItem?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (selected : dequeueContextualItem? current = some result) :
+    OperationalContextualReach file tokens
+        current.payload.phaseC.memo result.1 ∧
+      PhaseCOperationalInvariant file tokens result.2.payload := by
+  unfold dequeueContextualItem? at selected
+  cases queueEq : current.payload.phaseC.itemQueue with
+  | nil => simp [queueEq] at selected
+  | cons item rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      have payload := runMappedPrimitive?_payload current
+        (.linear .L01_itemDequeue (contextualLinearKey item)) _ nextEq
+      constructor
+      · exact invariant.2.1 item (by simp [queueEq])
+      · rw [payload]
+        refine ⟨invariant.1, ?_, invariant.2.2.1, ?_⟩
+        · intro candidate member
+          exact invariant.2.1 candidate (by simp [queueEq, member])
+        · exact invariant.2.2.2
+
+private theorem dequeueContextualEdge?_operationalInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCOperationalInvariant file tokens result.2.payload := by
+  unfold dequeueContextualEdge? at selected
+  cases queueEq : current.payload.phaseC.edgeQueue with
+  | nil => simp [queueEq] at selected
+  | cons edge rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      rw [payload]
+      refine ⟨invariant.1, invariant.2.1, invariant.2.2.1, ?_⟩
+      intro candidate member
+      exact invariant.2.2.2 candidate (by simp [queueEq, member])
+
+end Chart
+
 end Solcore.Surface.Multi
