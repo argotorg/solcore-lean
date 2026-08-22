@@ -18783,3 +18783,145 @@ theorem executeObservedContextualWorklist?_memo_eq_saturated
   exact memoPreserved.trans (by simpa [guardResult] using canonical)
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem dequeueContextualItem?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCItemSafe current)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCItemSafe result.2 := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons head rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      have used := runMappedPrimitive?_usedRev current _ _ next nextEq
+      have unique : head ∉ rest ∧ rest.Nodup := by
+        have queueNodup := safe.queueNodup
+        rw [queue, List.nodup_cons] at queueNodup
+        exact queueNodup
+      constructor
+      · intro source item member
+        rw [used, List.mem_cons] at member
+        rcases member with equal | old
+        · cases source <;>
+            simp [ContextualItemInsertSource.unitKind] at equal
+        · rw [payload]
+          exact safe.inserted source item old
+      · intro item member
+        rw [used, List.mem_cons] at member
+        rcases member with equal | old
+        · simp only [UnitAddress.linear.injEq] at equal
+          rw [contextualLinearKey_injective equal.2, payload]
+          exact safe.queueSubset (by simp [queue])
+        · rw [payload]
+          exact safe.dequeued item old
+      · intro item production member
+        rw [used, List.mem_cons] at member
+        rcases member with equal | old
+        · simp at equal
+        · rw [used]
+          exact List.mem_cons_of_mem _ (safe.predicted item production old)
+      · intro item member
+        rw [used, List.mem_cons] at member
+        rcases member with equal | old
+        · simp at equal
+        · rw [used]
+          exact List.mem_cons_of_mem _ (safe.scanned item old)
+      · intro item member
+        rw [used, List.mem_cons] at member
+        rcases member with equal | old
+        · simp at equal
+        · rw [used]
+          exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+      · intro item member usedItem
+        rw [payload] at member
+        rw [used, List.mem_cons] at usedItem
+        rcases usedItem with collision | old
+        · simp only [UnitAddress.linear.injEq] at collision
+          have same := contextualLinearKey_injective collision.2
+          exact unique.1 (same ▸ member)
+        · exact safe.queueFresh item (by simp [queue, member]) old
+      · simpa [payload] using safe.itemsNodup
+      · simpa [payload] using unique.2
+      · intro item member
+        rw [payload] at member ⊢
+        exact safe.queueSubset (by simp [queue, member])
+
+private structure PhaseCItemWorkFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (item : ContextualItemKey tokens) : Prop where
+  dequeued : (.linear .L01_itemDequeue (contextualLinearKey item) :
+    UnitAddress tokens) ∈ current.counter.usedRev
+  predictions : ∀ production,
+    (.prediction .R01_predictionAttempt
+      (contextualPredictionKey item production) : UnitAddress tokens) ∉
+        current.counter.usedRev
+  scan : (.linear .L04_scanAttempt (contextualLinearKey item) :
+    UnitAddress tokens) ∉ current.counter.usedRev
+  scannedEdge : (.linear .L06_scannedEdgeInsert
+    (contextualLinearKey item) : UnitAddress tokens) ∉
+      current.counter.usedRev
+
+private theorem dequeueContextualItem?_workFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseCWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (queue : current.payload.phaseC.itemQueue = item :: rest)
+    (safe : PhaseCItemSafe current)
+    (selected : dequeueContextualItem? current = some (item, after)) :
+    PhaseCItemWorkFresh after item := by
+  unfold dequeueContextualItem? at selected
+  simp only [queue, Option.bind_eq_bind,
+    Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  have used := runMappedPrimitive?_usedRev current _ _ after nextEq
+  have dequeueFresh := safe.queueFresh item (by simp [queue])
+  constructor
+  · rw [used]
+    simp
+  · intro production member
+    rw [used, List.mem_cons] at member
+    rcases member with collision | old
+    · simp at collision
+    · exact dequeueFresh (safe.predicted item production old)
+  · intro member
+    rw [used, List.mem_cons] at member
+    rcases member with collision | old
+    · simp at collision
+    · exact dequeueFresh (safe.scanned item old)
+  · intro member
+    rw [used, List.mem_cons] at member
+    rcases member with collision | old
+    · simp at collision
+    · exact dequeueFresh (safe.scannedEdge item old)
+
+private theorem dequeueContextualItem?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (queue : current.payload.phaseC.itemQueue = item :: rest)
+    (safe : PhaseCItemSafe current) :
+    ∃ after, dequeueContextualItem? current = some (item, after) := by
+  have fresh := safe.queueFresh item (by simp [queue])
+  unfold dequeueContextualItem?
+  rw [queue]
+  simp [runMappedPrimitive?, fresh]
+
+end Solcore.Surface.Multi.Chart
