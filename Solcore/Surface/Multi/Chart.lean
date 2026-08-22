@@ -14555,4 +14555,101 @@ private theorem phaseBGuardDecisionFromIndexes?_canonical_saturated
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem indexSaturatedPhaseAWith?_entries_eq_canonical
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : CountedState tokens (PhaseAIndexed file tokens))
+    (selected : indexSaturatedPhaseAWith? evaluate current = some result) :
+    result.payload.entries =
+      canonicalEvidenceEntries evaluate current.payload := by
+  unfold indexSaturatedPhaseAWith? at selected
+  split at selected
+  next itemsDone =>
+    split at selected
+    next edgesDone =>
+      split at selected
+      next saturated =>
+        exact materializeAllPhaseAIndexes?_entries_eq_canonical
+          evaluate current result selected
+      next notSaturated => contradiction
+    next edgesRemain => contradiction
+  next itemsRemain => contradiction
+
+private theorem indexSaturatedPhaseACanonicalWith?_entries_eq_canonical
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : CountedState tokens (PhaseAIndexed file tokens))
+    (selected : indexSaturatedPhaseACanonicalWith? evaluate current =
+      some result) :
+    ∃ sameMembers :
+        canonicalRawItems tokens current.payload.rawItems =
+          canonicalRawItems tokens (rawSaturation tokens),
+      result.payload.entries = canonicalEvidenceEntries evaluate
+        (normalizePhaseARawItems current sameMembers).payload := by
+  unfold indexSaturatedPhaseACanonicalWith? at selected
+  split at selected
+  next sameMembers =>
+    exact ⟨sameMembers,
+      indexSaturatedPhaseAWith?_entries_eq_canonical evaluate
+        (normalizePhaseARawItems current sameMembers) result selected⟩
+  next differentMembers => contradiction
+
+/-- The fully-final memo computed from canonical raw U01 observations. -/
+def saturatedGuardMemo
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) : GuardMemo tokens :=
+  fun key => .final (classifyGuardObservation key.guard
+    (saturatedGuardPositiveObservationBool owned key)
+    (matchArmPipeObservationBool owned key))
+
+/-- Every successful executable guard worklist returns exactly the canonical
+raw-saturation guard memo. -/
+theorem executeObservedGuardWorklist?_memo_eq_saturated
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : GuardWorklistResult tokens)
+    (selected : executeObservedGuardWorklist? file tokens owned =
+      some result) :
+    result.memo = saturatedGuardMemo owned := by
+  unfold executeObservedGuardWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  unfold executeObservedPhaseAB? at internalEq
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at internalEq
+  rcases internalEq with ⟨phaseA, phaseAEq,
+    indexed, indexedEq, phaseBEq⟩
+  obtain ⟨sameMembers, entriesEq⟩ :=
+    indexSaturatedPhaseACanonicalWith?_entries_eq_canonical
+      (phaseAObservationIndexEvaluator owned) phaseA indexed indexedEq
+  have normalizedMembers : ∀ item,
+      item ∈ (normalizePhaseARawItems phaseA sameMembers).payload.rawItems ↔
+        SaturatedRawItem tokens item := by
+    intro item
+    rfl
+  funext key
+  obtain ⟨decision, decisionEq, memoEq⟩ :=
+    executeIndexedPhaseB?_memo_from_indexes indexed internal phaseBEq key
+  rw [entriesEq] at decisionEq
+  have canonicalEq :=
+    phaseBGuardDecisionFromIndexes?_canonical_saturated owned
+      (normalizePhaseARawItems phaseA sameMembers).payload
+      normalizedMembers key
+  have decided : decision = classifyGuardObservation key.guard
+      (saturatedGuardPositiveObservationBool owned key)
+      (matchArmPipeObservationBool owned key) := by
+    exact Option.some.inj (decisionEq.symm.trans canonicalEq)
+  change internal.payload.memo key = saturatedGuardMemo owned key
+  rw [memoEq, decided]
+  rfl
+
+end Chart
+
 end Solcore.Surface.Multi
