@@ -695,5 +695,102 @@ theorem terminalExpressionClassifiedObservation_exact
     rw [isTerminalExpression] at impossible
     contradiction
 
+/-- At its own upper bound, greatest-end evidence is exactly recognition. -/
+theorem greatestUnguardedEnd_at_finish_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    GreatestUnguardedEnd file tokens symbol start finish finish ↔
+      UnguardedRecognizes file tokens symbol start finish := by
+  constructor
+  · exact fun greatest => greatest.1
+  · intro recognized
+    exact ⟨recognized, Nat.le_refl _, fun other _ bounded => bounded⟩
+
+/-- G01's terminal-only observation is exact without a saturation contract. -/
+theorem statementIfTerminalObservationBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (siteCursor openCursor expressionStart closeCursor : Boundary tokens) :
+    Chart.statementIfTerminalObservationBool owned siteCursor openCursor
+        expressionStart closeCursor = true ↔
+      ∃ afterClose : Boundary tokens,
+        (∃ matched : MatchedTerminal file tokens (.hardKeyword .ifKw),
+          matched.cursor.beforeBoundary = siteCursor ∧
+            matched.cursor.afterBoundary = openCursor) ∧
+        (∃ matched : MatchedTerminal file tokens (.symbol .leftParen),
+          matched.cursor.beforeBoundary = openCursor ∧
+            matched.cursor.afterBoundary = expressionStart) ∧
+        (∃ matched : MatchedTerminal file tokens (.symbol .rightParen),
+          matched.cursor.beforeBoundary = closeCursor ∧
+            matched.cursor.afterBoundary = afterClose) ∧
+        (∃ matched : MatchedTerminal file tokens (.symbol .leftBrace),
+          matched.cursor.beforeBoundary = afterClose) := by
+  unfold Chart.statementIfTerminalObservationBool
+  cases boundarySelected :
+      Chart.observedBoundaryAt? tokens (closeCursor.val + 1) with
+  | none =>
+      simp only
+      constructor
+      · intro impossible
+        contradiction
+      · rintro ⟨afterClose, _ifEvidence, _openEvidence,
+          closeEvidence, _braceEvidence⟩
+        rcases closeEvidence with ⟨matched, atClose, atAfter⟩
+        have afterValue : afterClose.val = closeCursor.val + 1 := by
+          have closeValue := congrArg Fin.val atClose
+          have successorValue := congrArg Fin.val atAfter
+          change matched.cursor.val = closeCursor.val at closeValue
+          change matched.cursor.val + 1 = afterClose.val at successorValue
+          omega
+        have existsBoundary :
+            Chart.observedBoundaryAt? tokens (closeCursor.val + 1) =
+              some afterClose :=
+          (chart_observedBoundaryAt?_eq_some_iff
+            (closeCursor.val + 1) afterClose).mpr afterValue
+        rw [boundarySelected] at existsBoundary
+        contradiction
+  | some afterClose =>
+      constructor
+      · intro selected
+        simp only [Bool.and_eq_true,
+          chart_observedImmediatelyAfterTerminalBool_eq_true_iff,
+          chart_observedTerminalAtBool_eq_true_iff] at selected
+        rcases selected with
+          ⟨⟨⟨ifEvidence, openEvidence⟩, closeEvidence⟩, braceEvidence⟩
+        exact ⟨afterClose, ifEvidence, openEvidence, closeEvidence,
+          braceEvidence⟩
+      · rintro ⟨otherAfter, ifEvidence, openEvidence,
+          closeEvidence, braceEvidence⟩
+        rcases closeEvidence with ⟨matched, atClose, atOtherAfter⟩
+        have otherValue : otherAfter.val = closeCursor.val + 1 := by
+          have closeValue := congrArg Fin.val atClose
+          have afterValue := congrArg Fin.val atOtherAfter
+          change matched.cursor.val = closeCursor.val at closeValue
+          change matched.cursor.val + 1 = otherAfter.val at afterValue
+          omega
+        have selectedValue : afterClose.val = closeCursor.val + 1 :=
+          (chart_observedBoundaryAt?_eq_some_iff
+            (closeCursor.val + 1) afterClose).mp boundarySelected
+        have afterEq : otherAfter = afterClose := by
+          apply Fin.ext
+          omega
+        have canonicalClose :
+            ∃ matched : MatchedTerminal file tokens (.symbol .rightParen),
+              matched.cursor.beforeBoundary = closeCursor ∧
+                matched.cursor.afterBoundary = afterClose := by
+          refine ⟨matched, atClose, ?_⟩
+          simpa only [afterEq] using atOtherAfter
+        have canonicalBrace :
+            ∃ matched : MatchedTerminal file tokens (.symbol .leftBrace),
+              matched.cursor.beforeBoundary = afterClose := by
+          simpa only [afterEq] using braceEvidence
+        have parts :=
+          And.intro (And.intro (And.intro ifEvidence openEvidence)
+            canonicalClose) canonicalBrace
+        simpa only [Bool.and_eq_true,
+          chart_observedImmediatelyAfterTerminalBool_eq_true_iff,
+          chart_observedTerminalAtBool_eq_true_iff] using parts
+
+
 
 end Solcore.Surface.Multi
