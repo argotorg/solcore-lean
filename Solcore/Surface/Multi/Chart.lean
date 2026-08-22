@@ -15306,4 +15306,221 @@ private theorem executeObservedPhaseABCWorklist?_total_iff_prerequisites
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem phaseC_runMappedPrimitive?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (address : UnitAddress tokens)
+    (selected : runMappedPrimitive? current address id = some result) :
+    PhaseCContentGrowth current result := by
+  have payload := runMappedPrimitive?_payload current address id selected
+  change result.payload = current.payload at payload
+  exact PhaseCContentGrowth.of_reachCarrier_eq current result
+    (by rw [payload])
+
+private theorem activateWorklistProduction?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCContentGrowth current result.1 :=
+  PhaseCContentGrowth.of_reachCarrier_eq current result.1
+    (activateWorklistProduction?_reachCarrier current productionInstance
+      result selected)
+
+private theorem attemptContextualPrediction?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCContentGrowth current result := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq] at selected
+      cases selected
+      exact .refl current
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedGrowth := phaseC_runMappedPrimitive?_contentGrowth
+            current attempted _ attemptedEq
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedGrowth
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedGrowth :=
+                  activateWorklistProduction?_contentGrowth attempted
+                    productionInstance activated activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  cases selected
+                  exact attemptedGrowth.trans activatedGrowth
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  exact attemptedGrowth.trans (activatedGrowth.trans
+                    (insertContextualItem?_coverage activated.1 result
+                      .prediction item selected).1)
+
+private theorem attemptContextualPredictions?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      attemptContextualPredictions? waiting productions current =
+        some result →
+      PhaseCContentGrowth current result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl current
+  | cons predicted rest induction =>
+      intro current result selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, continued⟩
+      exact (attemptContextualPrediction?_contentGrowth current next waiting
+        predicted nextEq).trans (induction next result continued)
+
+private theorem attemptContextualScan?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCContentGrowth current result := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have attemptedGrowth := phaseC_runMappedPrimitive?_contentGrowth
+      current attempted _ attemptedEq
+    cases scanEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scanEq] at remainder
+        cases remainder
+        exact attemptedGrowth
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scanEq, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        exact attemptedGrowth.trans
+          ((insertContextualItem?_coverage attempted withItem .scan after
+            itemEq).1.trans
+          (insertContextualScannedEdge?_coverage withItem result edge
+            edgeEq).1)
+  next notApplicable =>
+    cases selected
+    exact .refl current
+
+private theorem attemptContextualCompletion?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    PhaseCContentGrowth current result := by
+  unfold attemptContextualCompletion? at selected
+  cases completionEq : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completionEq] at selected
+      cases selected
+      exact .refl current
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      next used =>
+        cases selected
+        exact .refl current
+      next fresh =>
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        exact (phaseC_runMappedPrimitive?_contentGrowth current attempted _
+          attemptedEq).trans
+          ((insertContextualItem?_coverage attempted withItem .completion
+            after itemEq).1.trans
+          (insertContextualCompletedEdge?_coverage withItem result edge
+            edgeEq).1)
+
+private theorem attemptContextualCompletionsWith?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ others
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      attemptContextualCompletionsWith? pivot others current = some result →
+      PhaseCContentGrowth current result := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl current
+  | cons other rest induction =>
+      intro current result selected
+      rw [attemptContextualCompletionsWith?] at selected
+      cases forwardEq : attemptContextualCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardGrowth := attemptContextualCompletion?_contentGrowth
+            current forward pivot other forwardEq
+          split at selected
+          next same =>
+            exact forwardGrowth.trans (induction forward result selected)
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq :
+                attemptContextualCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact forwardGrowth.trans
+                  ((attemptContextualCompletion?_contentGrowth forward reverse
+                    other pivot reverseEq).trans
+                  (induction reverse result selected))
+
+private theorem processContextualItem?_contentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : processContextualItem? owned item current = some result) :
+    PhaseCContentGrowth current result := by
+  unfold processContextualItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
+  exact (attemptContextualPredictions?_contentGrowth item allProductionIds
+    current predicted predictedEq).trans
+    ((attemptContextualScan?_contentGrowth owned predicted scanned item
+      scannedEq).trans
+    (attemptContextualCompletionsWith?_contentGrowth item
+      scanned.payload.phaseC.contextualItems scanned result completedEq))
+
+end Chart
+
 end Solcore.Surface.Multi
