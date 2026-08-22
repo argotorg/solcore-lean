@@ -17070,4 +17070,203 @@ private theorem processContextualItem?_attemptLedger
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem PhaseCAttemptLedgerMaterialized.monoCore
+    {file : WorkspaceFile} {tokens : List Token}
+    {before after : CountedState tokens (PhaseCWorklist file tokens)}
+    (ledger : PhaseCAttemptLedgerMaterialized before)
+    (memo : after.payload.phaseC.memo = before.payload.phaseC.memo)
+    (items : before.payload.phaseC.contextualItems ⊆
+      after.payload.phaseC.contextualItems)
+    (edges : before.payload.phaseC.contextualEdges ⊆
+      after.payload.phaseC.contextualEdges)
+    (productionAddresses : PhaseCProductionAddressesSubset
+      before.counter after.counter)
+    (completionAddresses : PhaseCCompletionAddressesSubset
+      before.counter after.counter) :
+    PhaseCAttemptLedgerMaterialized after := by
+  constructor
+  · intro productionInstance enabled used
+    have enabledBefore : MemoEnablesProduction
+        before.payload.phaseC.memo productionInstance := by
+      rw [← memo]
+      exact enabled
+    exact items (ledger.prediction productionInstance enabledBefore
+      (productionAddresses productionInstance used))
+  · intro waiting finished result edge computed used
+    obtain ⟨itemMember, retained, edgeMember, same⟩ :=
+      ledger.completion waiting finished result edge computed
+        (completionAddresses waiting finished used)
+    exact ⟨items itemMember, retained, edges edgeMember, same⟩
+
+private theorem dequeueContextualItem?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCAttemptLedgerMaterialized result.2 := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      have addresses := runMappedPrimitive?_phaseCLedgerSubsets current _ _
+        next (by simp) (by simp) nextEq
+      exact ledger.monoCore
+        (by rw [payload])
+        (fun candidate member => by rw [payload]; exact member)
+        (fun candidate member => by rw [payload]; exact member)
+        addresses.1 addresses.2
+
+private theorem dequeueContextualEdge?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCAttemptLedgerMaterialized result.2 := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      have addresses := runMappedPrimitive?_phaseCLedgerSubsets current _ _
+        next (by cases edge.val <;> simp)
+        (by cases edge.val <;> simp) nextEq
+      exact ledger.monoCore
+        (by rw [payload])
+        (fun candidate member => by rw [payload]; exact member)
+        (fun candidate member => by rw [payload]; exact member)
+        addresses.1 addresses.2
+
+private theorem beginPhaseCWorklist?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCAttemptLedgerMaterialized result := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  have usedRev := runMappedPrimitive?_usedRev current _ _ entered enteredEq
+  constructor
+  · intro productionInstance _enabled used
+    exfalso
+    rw [usedRev, List.mem_cons] at used
+    rcases used with collision | old
+    · cases collision
+    · exact fresh (.production productionInstance)
+        (by simp [phaseCInitialAddress]) old
+  · intro waiting finished after edge _computed used
+    exfalso
+    rw [usedRev, List.mem_cons] at used
+    rcases used with collision | old
+    · cases collision
+    · exact fresh (.cubic .U03_completionAttempt
+          (contextualCompletionKey waiting finished))
+        (by simp [phaseCInitialAddress, contextualCompletionKey]) old
+
+private theorem runPhaseCQueues?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAttemptLedgerMaterialized current →
+      runPhaseCQueues? owned fuel current = some result →
+      PhaseCAttemptLedgerMaterialized result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result ledger selected
+      rw [runPhaseCQueues?] at selected
+      split at selected <;> try contradiction
+      cases selected
+      exact ledger
+  | succ fuel induction =>
+      intro current result ledger selected
+      rw [runPhaseCQueues?] at selected
+      cases items : current.payload.phaseC.itemQueue with
+      | nil =>
+          cases edges : current.payload.phaseC.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact ledger
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueContextualEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result
+                    (dequeueContextualEdge?_attemptLedger current pair ledger
+                      dequeued) selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueContextualItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨pivot, afterDequeue⟩
+              simp only at selected
+              cases processed :
+                  processContextualItem? owned pivot afterDequeue with
+              | none => simp [processed] at selected
+              | some next =>
+                  rw [processed] at selected
+                  exact induction next result
+                    (processContextualItem?_attemptLedger owned pivot
+                      afterDequeue next
+                      (dequeueContextualItem?_attemptLedger current
+                        (pivot, afterDequeue) ledger dequeued) processed)
+                    selected
+
+private theorem executePhaseCWorklist?_attemptLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : executePhaseCWorklist? owned current = some result) :
+    PhaseCAttemptLedgerMaterialized result := by
+  unfold executePhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueues?_attemptLedger owned _ entered result
+    (beginPhaseCWorklist?_attemptLedger current entered fresh enteredEq) runEq
+
+private theorem executeObservedPhaseABCWorklist?_attemptLedger
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklist? file tokens owned =
+      some result) :
+    PhaseCAttemptLedgerMaterialized result := by
+  unfold executeObservedPhaseABCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklist?_attemptLedger owned phaseB result
+    (executeObservedPhaseAB?_phaseCInitialFresh file tokens owned phaseB
+      phaseBEq) phaseCEq
+
+end Chart
+
 end Solcore.Surface.Multi
