@@ -15776,4 +15776,133 @@ private theorem phaseADelimiterCloser_map_eq_rightParen_iff
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Raw retained-symbol observation independent of file ownership. -/
+def observedRawSymbolAtBool
+    {tokens : List Token} (cursor : Boundary tokens)
+    (symbol : Symbol) : Bool :=
+  if inRange : cursor.val < tokens.length then
+    decide (tokens[cursor.val].payload = .symbol symbol)
+  else
+    false
+
+/-- Membership in one fixed nonempty symbol family. -/
+def observedSymbolAllowedBool
+    (symbol : Symbol) (allowed : NonemptyList Symbol) : Bool :=
+  decide (symbol = allowed.head) ||
+    allowed.tail.any fun candidate => decide (symbol = candidate)
+
+/-- Raw allowed-symbol observation independent of file ownership. -/
+def observedAllowedSymbolAtBool
+    {tokens : List Token} (cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) : Bool :=
+  if inRange : cursor.val < tokens.length then
+    match tokens[cursor.val].payload with
+    | .symbol symbol => observedSymbolAllowedBool symbol allowed
+    | _ => false
+  else
+    false
+
+private theorem observedRawSymbolAtBool_eq_phaseA
+    {tokens : List Token} (cursor : Boundary tokens) (symbol : Symbol) :
+    observedRawSymbolAtBool cursor symbol =
+      phaseASymbolAtBool cursor symbol := rfl
+
+private theorem observedAllowedSymbolAtBool_eq_phaseA
+    {tokens : List Token} (cursor : Boundary tokens)
+    (allowed : NonemptyList Symbol) :
+    observedAllowedSymbolAtBool cursor allowed =
+      phaseAAllowedSymbolAtBool cursor allowed := by
+  unfold observedAllowedSymbolAtBool phaseAAllowedSymbolAtBool
+    observedSymbolAllowedBool phaseASymbolAllowedBool
+  rfl
+
+/-- Equal-depth bit computed through the public delimiter executor. -/
+def observedSameDelimiterDepthBool
+    (tokens : List Token) (start finish : Boundary tokens) : Bool :=
+  decide (observedDelimiterRun? tokens [] start finish = some [])
+
+/-- Matching-parenthesis bit computed through the public delimiter executor. -/
+def observedMatchingParenthesisBool
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) : Bool :=
+  observedRawSymbolAtBool openCursor .leftParen &&
+    observedRawSymbolAtBool closeCursor .rightParen &&
+    match observedBoundaryAt? tokens (openCursor.val + 1) with
+    | none => false
+    | some interiorStart =>
+        decide (observedProtectedDelimiterRun? tokens [.rightParen]
+          interiorStart closeCursor = some [.rightParen])
+
+/-- G06 delimiter bit computed through the public delimiter executor. -/
+def observedPatternDelimiterBool
+    (tokens : List Token) (start cursor : Boundary tokens) : Bool :=
+  observedSameDelimiterDepthBool tokens start cursor &&
+    observedAllowedSymbolAtBool cursor {
+      head := .comma
+      tail := [.rightParen, .fatArrow]
+    } &&
+    (List.finRange (tokens.length + 2)).all fun earlier =>
+      if start.val ≤ earlier.val && earlier.val < cursor.val &&
+          observedSameDelimiterDepthBool tokens start earlier then
+        !observedAllowedSymbolAtBool earlier {
+          head := .comma
+          tail := [.rightParen, .fatArrow]
+        }
+      else
+        true
+
+theorem rawMatchingParenthesisObservation_eq_observed
+    (tokens : List Token) (openCursor closeCursor : Boundary tokens) :
+    rawMatchingParenthesisObservation tokens openCursor closeCursor =
+      observedMatchingParenthesisBool tokens openCursor closeCursor := by
+  unfold rawMatchingParenthesisObservation phaseAMatchingDelimiterBool
+    phaseADelimiterPair? observedMatchingParenthesisBool
+  simp only [decide_true, Bool.true_and,
+    observedRawSymbolAtBool_eq_phaseA, observedBoundaryAt?_eq_phaseA]
+  cases boundary : phaseABoundaryAt? tokens (openCursor.val + 1)
+  · rfl
+  · rename_i interiorStart
+    change (phaseASymbolAtBool openCursor .leftParen &&
+        phaseASymbolAtBool closeCursor .rightParen &&
+        decide (phaseAProtectedDelimiterRun? tokens [.rightParen]
+          interiorStart closeCursor = some [.rightParen])) =
+      (phaseASymbolAtBool openCursor .leftParen &&
+        phaseASymbolAtBool closeCursor .rightParen &&
+        decide (observedProtectedDelimiterRun? tokens [.rightParen]
+          interiorStart closeCursor = some [.rightParen]))
+    have run := phaseAProtectedDelimiterRun?_observed tokens
+      [.rightParen] interiorStart closeCursor
+    simp only [PhaseADelimiterCloser.observed, List.map_cons,
+      List.map_nil] at run
+    rw [← run]
+    cases phaseAProtectedDelimiterRun? tokens [.rightParen]
+      interiorStart closeCursor with
+    | none => simp
+    | some values =>
+        simp only [Option.map_some, Option.some.injEq,
+          phaseADelimiterCloser_map_eq_rightParen_iff]
+
+theorem rawPatternDelimiterObservation_eq_observed
+    (tokens : List Token) (start cursor : Boundary tokens) :
+    rawPatternDelimiterObservation tokens start cursor =
+      observedPatternDelimiterBool tokens start cursor := by
+  have sameDepth : ∀ finish,
+      phaseASameDelimiterDepthBool tokens start finish =
+        observedSameDelimiterDepthBool tokens start finish := by
+    intro finish
+    unfold phaseASameDelimiterDepthBool observedSameDelimiterDepthBool
+    have run := phaseADelimiterRun?_observed tokens [] start finish
+    simp only [List.map_nil] at run
+    rw [← run]
+    cases phaseADelimiterRun? tokens [] start finish <;> simp
+  simp only [rawPatternDelimiterObservation,
+    phaseANextSameDepthDelimiterBool, observedPatternDelimiterBool,
+    observedAllowedSymbolAtBool_eq_phaseA, sameDepth]
+
+end Chart
+
 end Solcore.Surface.Multi
