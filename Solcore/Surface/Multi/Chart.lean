@@ -15223,4 +15223,49 @@ private theorem beginPhaseCWorklist?_total_iff_root_fresh
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCWorklistPrerequisites
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens)) : Prop :=
+  (.linear .L03_itemInsert
+    (contextualLinearKey (contextualRoot tokens)) : UnitAddress tokens) ∉
+      current.counter.usedRev ∧
+  ∀ entered, beginPhaseCWorklist? current = some entered →
+    ∃ result, runPhaseCQueues? owned (chartGBound (tokens.length + 1))
+      entered = some result
+
+set_option maxRecDepth 2048 in
+private theorem executePhaseCWorklist?_total_iff_prerequisites
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens)) :
+    (∃ result, executePhaseCWorklist? owned current = some result) ↔
+      PhaseCWorklistPrerequisites owned current := by
+  constructor
+  · rintro ⟨result, selected⟩
+    unfold executePhaseCWorklist? at selected
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨entered, enteredEq, runEq⟩
+    refine ⟨(beginPhaseCWorklist?_total_iff_root_fresh current).mp
+      ⟨entered, enteredEq⟩, ?_⟩
+    intro candidate candidateEq
+    rw [enteredEq] at candidateEq
+    cases candidateEq
+    exact ⟨result, runEq⟩
+  · rintro ⟨rootFresh, drainable⟩
+    obtain ⟨entered, enteredEq⟩ :=
+      (beginPhaseCWorklist?_total_iff_root_fresh current).mpr rootFresh
+    obtain ⟨result, runEq⟩ := drainable entered enteredEq
+    exact ⟨result, by
+      unfold executePhaseCWorklist?
+      rw [enteredEq]
+      exact runEq⟩
+
+end Chart
+
 end Solcore.Surface.Multi
