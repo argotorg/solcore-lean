@@ -18162,6 +18162,101 @@ private theorem executeObservedPhaseABCWorklist?_fairPending
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem executePhaseCWorklist?_queues_empty
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executePhaseCWorklist? owned current = some result) :
+    result.payload.phaseC.itemQueue = [] ∧
+      result.payload.phaseC.edgeQueue = [] := by
+  unfold executePhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueues?_queues_empty owned _ entered result runEq
+
+private theorem executeObservedPhaseABCWorklist?_operationalClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklist? file tokens owned =
+      some result) :
+    OperationalContextualClosure file tokens result.payload.phaseC.memo
+      result.payload.phaseC.contextualItems
+      result.payload.phaseC.contextualEdges := by
+  have fair := executeObservedPhaseABCWorklist?_fairPending file tokens owned
+    result selected
+  unfold executeObservedPhaseABCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  have empty := executePhaseCWorklist?_queues_empty owned phaseB result phaseCEq
+  refine ⟨by simpa [contextualRoot] using fair.1, ?_, ?_, ?_⟩
+  · intro waiting predicted waitingMember next enabled
+    let item : ContextualItemKey tokens := {
+      raw := {
+        production := predicted
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := waiting.raw.current
+        current := waiting.raw.current
+      }
+      context := descendContext waiting predicted
+    }
+    let productionInstance : ProductionInstanceKey tokens := {
+      production := predicted
+      origin := waiting.raw.current
+      context := descendContext waiting predicted
+    }
+    have computed : contextualPredictedItem? waiting predicted =
+        some (item, productionInstance) := by
+      simpa [item, productionInstance] using
+        contextualPredictedItem?_complete waiting predicted next
+    rcases fair.2.1 waiting waitingMember predicted item productionInstance
+        computed enabled with queued | materialized
+    · simp [empty.1] at queued
+    · exact materialized
+  · intro before after cursor beforeMember structural
+    obtain ⟨edge, computed, beforeEq, afterEq, cursorEq⟩ :=
+      contextualScannedEdge?_complete owned before after cursor structural
+    rcases fair.2.2.1 before beforeMember after edge computed with
+      queued | materialized
+    · simp [empty.1] at queued
+    · refine ⟨materialized.1, ?_⟩
+      simpa [beforeEq, afterEq, cursorEq] using materialized.2
+  · intro waiting finished after shared waitingMember finishedMember structural
+    obtain ⟨edge, computed, waitingEq, finishedEq, afterEq, sharedEq⟩ :=
+      contextualCompletedEdge?_complete waiting finished after shared structural
+    rcases fair.2.2.2 waiting waitingMember finished finishedMember after edge
+        computed with queued | queued | materialized
+    · simp [empty.1] at queued
+    · simp [empty.1] at queued
+    · refine ⟨materialized.1, ?_⟩
+      simpa [waitingEq, finishedEq, afterEq, sharedEq] using materialized.2
+
+/-- Every successful observed contextual worklist is extensionally closed
+under all enabled predictions and all structurally valid scan/completion
+steps. -/
+theorem executeObservedContextualWorklist?_operationalClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    OperationalContextualClosure file tokens result.memo
+      result.items result.edges := by
+  unfold executeObservedContextualWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCWorklist?_operationalClosure file tokens owned
+    internal internalEq
+
+end Chart
+
 end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi.Chart
