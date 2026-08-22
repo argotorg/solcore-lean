@@ -10291,4 +10291,38 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_G01
 
 end Chart
 
+namespace Chart
+
+open Solcore.Workspace
+
+/-- Public result of the executable Phase-A/Phase-B guard worklist. -/
+structure GuardWorklistResult (tokens : List Token) where
+  memo : GuardMemo tokens
+
+/-- Execute raw saturation, materialize its observations, and finalize every
+grammar-owned guard cell. -/
+def executeObservedGuardWorklist?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (GuardWorklistResult tokens) := do
+  let result ← executeObservedPhaseAB? file tokens owned
+  pure { memo := result.payload.memo }
+
+/-- Every guard cell returned by the executable worklist is final. -/
+theorem executeObservedGuardWorklist?_allGuardsFinal
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : GuardWorklistResult tokens)
+    (selected : executeObservedGuardWorklist? file tokens owned =
+      some result) :
+    AllGuardsFinal result.memo := by
+  unfold executeObservedGuardWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseAB?_allFinal file tokens owned internal
+    internalEq
+
+end Chart
+
 end Solcore.Surface.Multi
