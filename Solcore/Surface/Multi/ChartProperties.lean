@@ -1422,4 +1422,89 @@ theorem saturatedRawItem_iff_unguardedReach
           advance
 
 
+/-- Recognition over Chart's canonical raw saturation is exactly declarative
+unguarded recognition. -/
+theorem saturatedRawRecognizesBool_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    Chart.saturatedRawRecognizesBool tokens symbol start finish = true ↔
+      UnguardedRecognizes file tokens symbol start finish := by
+  rw [Chart.saturatedRawRecognizesBool_eq_true_iff]
+  unfold UnguardedRecognizes
+  constructor
+  · rintro ⟨item, saturated, complete, lhs, origin, current⟩
+    exact ⟨item,
+      (saturatedRawItem_iff_unguardedReach owned item).mp saturated,
+      complete, lhs, origin, current⟩
+  · rintro ⟨item, reached, complete, lhs, origin, current⟩
+    exact ⟨item,
+      (saturatedRawItem_iff_unguardedReach owned item).mpr reached,
+      complete, lhs, origin, current⟩
+
+/-- Greatest-end over canonical raw saturation is semantically exact. -/
+theorem saturatedRawGreatestEndObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) :
+    Chart.saturatedRawGreatestEndObservation tokens symbol start
+        upperBound finish = true ↔
+      GreatestUnguardedEnd file tokens symbol start upperBound finish := by
+  unfold Chart.saturatedRawGreatestEndObservation
+  simp only [Bool.and_eq_true, decide_eq_true_iff,
+    saturatedRawRecognizesBool_exact owned]
+  rw [show GreatestUnguardedEnd file tokens symbol start upperBound finish =
+      (UnguardedRecognizes file tokens symbol start finish ∧
+        finish.val ≤ upperBound.val ∧
+        ∀ other : Boundary tokens,
+          UnguardedRecognizes file tokens symbol start other →
+          other.val ≤ upperBound.val →
+          other.val ≤ finish.val) by rfl]
+  constructor
+  · rintro ⟨⟨recognized, bounded⟩, maximalSelected⟩
+    refine ⟨recognized, bounded, ?_⟩
+    intro other otherRecognized otherBounded
+    rw [List.all_eq_true] at maximalSelected
+    have selected := maximalSelected other (List.mem_finRange _)
+    have recognizedSelected :
+        Chart.saturatedRawRecognizesBool tokens symbol start other = true :=
+      (saturatedRawRecognizesBool_exact owned symbol start other).mpr
+        otherRecognized
+    simp only [if_pos otherBounded, recognizedSelected, Bool.not_true,
+      Bool.false_or, decide_eq_true_iff] at selected
+    exact selected
+  · rintro ⟨recognized, bounded, maximal⟩
+    refine ⟨⟨recognized, bounded⟩, ?_⟩
+    rw [List.all_eq_true]
+    intro other _member
+    by_cases otherBounded : other.val ≤ upperBound.val
+    · by_cases recognizedSelected :
+          Chart.saturatedRawRecognizesBool tokens symbol start other = true
+      · have otherRecognized :=
+          (saturatedRawRecognizesBool_exact owned symbol start other).mp
+            recognizedSelected
+        have otherLe := maximal other otherRecognized otherBounded
+        simp [otherBounded, recognizedSelected, otherLe]
+      · have recognizedFalse :
+            Chart.saturatedRawRecognizesBool tokens symbol start other =
+              false := Bool.eq_false_iff.mpr recognizedSelected
+        simp [otherBounded, recognizedFalse]
+    · simp [otherBounded]
+
+/-- The canonical saturated observer and the constructive semantic observer
+compute the same greatest-end bit. -/
+theorem saturatedRawGreatestEndObservation_eq_semantic
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) :
+    Chart.saturatedRawGreatestEndObservation tokens symbol start
+        upperBound finish =
+      semanticGreatestEndObservation owned symbol start upperBound finish := by
+  apply Bool.eq_iff_iff.mpr
+  rw [saturatedRawGreatestEndObservation_exact owned,
+    semanticGreatestEndObservation_exact owned]
+
+
 end Solcore.Surface.Multi
