@@ -18925,3 +18925,198 @@ private theorem dequeueContextualItem?_total
   simp [runMappedPrimitive?, fresh]
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCActivationSafe {tokens : List Token}
+    (counter : Counter tokens) : Prop :=
+  ∀ productionInstance index slot,
+    UnitAddress.guardWitness slot
+      (guardCellAddress productionInstance index) ∈ counter.usedRev →
+    UnitAddress.production productionInstance ∈ counter.usedRev
+
+private theorem productionInstance_eq_of_guardCellAddress_eq
+    {tokens : List Token}
+    {left right : ProductionInstanceKey tokens}
+    {leftIndex : Fin (guardOf left.production).length}
+    {rightIndex : Fin (guardOf right.production).length}
+    (equal : guardCellAddress left leftIndex =
+      guardCellAddress right rightIndex) :
+    left = right := by
+  cases left
+  cases right
+  simp only [guardCellAddress, Prod.mk.injEq] at equal
+  simp_all
+
+private theorem chargeAddresses?_usedRev
+    {tokens : List Token} {state : Type} :
+    ∀ addresses (current result : CountedState tokens state),
+      chargeAddresses? current addresses = some result →
+      result.counter.usedRev =
+        addresses.reverse ++ current.counter.usedRev := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current result selected
+      cases selected
+      simp
+  | cons address rest induction =>
+      intro current result selected
+      rw [chargeAddresses?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, continued⟩
+      rw [induction next result continued,
+        runMappedPrimitive?_usedRev current address id next nextEq]
+      simp [List.reverse_cons, List.append_assoc]
+
+private theorem runMappedPrimitive?_activationSafe_of_not_witness
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (result : CountedState tokens after)
+    (safe : PhaseCActivationSafe current.counter)
+    (notWitness : ∀ productionInstance index slot,
+      address ≠ UnitAddress.guardWitness slot
+        (guardCellAddress productionInstance index))
+    (selected : runMappedPrimitive? current address transition =
+      some result) :
+    PhaseCActivationSafe result.counter := by
+  intro productionInstance index slot member
+  rw [runMappedPrimitive?_usedRev current address transition result selected,
+    List.mem_cons] at member ⊢
+  rcases member with equal | old
+  · exact (notWitness productionInstance index slot equal.symm).elim
+  · exact Or.inr (safe productionInstance index slot old)
+
+private theorem PhaseCInitialFresh.activationSafe
+    {tokens : List Token} {counter : Counter tokens}
+    (fresh : PhaseCInitialFresh counter) :
+    PhaseCActivationSafe counter := by
+  intro productionInstance index slot member
+  exact (fresh (.guardWitness slot
+    (guardCellAddress productionInstance index))
+      (by simp [phaseCInitialAddress])).elim member
+
+private theorem processGuardCell?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (safe : PhaseCActivationSafe current.counter)
+    (activated : UnitAddress.production productionInstance ∈
+      current.counter.usedRev)
+    (selected : processGuardCell? current productionInstance index =
+      some result) :
+    PhaseCActivationSafe result.1.counter ∧
+      UnitAddress.production productionInstance ∈
+        result.1.counter.usedRev := by
+  unfold processGuardCell? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨inspected, inspectedEq, inserted, insertedEq, resultEq⟩
+  cases resultEq
+  have inspectedUsed := chargeAddresses?_usedRev _ current inspected
+    inspectedEq
+  have insertedUsed := runMappedPrimitive?_usedRev inspected _ _ inserted
+    insertedEq
+  have oldSubset : current.counter.usedRev ⊆ inserted.counter.usedRev := by
+    intro address member
+    rw [insertedUsed, inspectedUsed]
+    simp [member]
+  have activatedResult := oldSubset activated
+  refine ⟨?_, activatedResult⟩
+  intro candidate candidateIndex slot member
+  rw [insertedUsed, List.mem_cons] at member
+  rcases member with insertedMember | inspectedMember
+  · have sameAddress :=
+      (UnitAddress.guardWitness.inj insertedMember).2
+    have sameProduction := productionInstance_eq_of_guardCellAddress_eq
+      sameAddress
+    subst candidate
+    exact activatedResult
+  · rw [inspectedUsed, List.mem_append, List.mem_reverse] at inspectedMember
+    rcases inspectedMember with lookup | old
+    · simp only [List.mem_map] at lookup
+      rcases lookup with ⟨headSlot, _slotMember, equal⟩
+      have sameAddress := (UnitAddress.guardWitness.inj equal).2
+      have sameProduction := productionInstance_eq_of_guardCellAddress_eq
+        sameAddress
+      subst candidate
+      exact activatedResult
+    · exact oldSubset (safe candidate candidateIndex slot old)
+
+private theorem processGuardCells?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ∀ indices
+      (current : CountedState tokens (PhaseCOpen file tokens))
+      (result : CountedState tokens (PhaseCOpen file tokens) × Bool),
+      PhaseCActivationSafe current.counter →
+      UnitAddress.production productionInstance ∈
+        current.counter.usedRev →
+      processGuardCells? productionInstance indices current = some result →
+      PhaseCActivationSafe result.1.counter ∧
+        UnitAddress.production productionInstance ∈
+          result.1.counter.usedRev := by
+  intro indices
+  induction indices with
+  | nil =>
+      intro current result safe activated selected
+      cases selected
+      exact ⟨safe, activated⟩
+  | cons index rest induction =>
+      intro current result safe activated selected
+      simp only [processGuardCells?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with
+        ⟨next, nextEq, finished, finishedEq, resultEq⟩
+      cases resultEq
+      have nextSafe := processGuardCell?_activationSafe current
+        productionInstance index next safe activated nextEq
+      exact induction next.1 finished nextSafe.1 nextSafe.2 finishedEq
+
+private theorem activateProduction?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (safe : PhaseCActivationSafe current.counter)
+    (selected : activateProduction? current productionInstance = some result) :
+    PhaseCActivationSafe result.1.counter := by
+  unfold activateProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, processedEq⟩
+  have attemptedSafe :=
+    runMappedPrimitive?_activationSafe_of_not_witness current
+      (.production productionInstance) id attempted safe (by simp)
+        attemptedEq
+  have activated : UnitAddress.production productionInstance ∈
+      attempted.counter.usedRev := by
+    rw [runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+    simp
+  exact (processGuardCells?_activationSafe productionInstance _ attempted
+    result attemptedSafe activated processedEq).1
+
+private theorem activateWorklistProduction?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (safe : PhaseCActivationSafe current.counter)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCActivationSafe result.1.counter := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  exact activateProduction?_activationSafe {
+    payload := current.payload.phaseC
+    counter := current.counter
+  } productionInstance activated safe activatedEq
+
+end Solcore.Surface.Multi.Chart
