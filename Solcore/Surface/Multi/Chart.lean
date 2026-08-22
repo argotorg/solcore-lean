@@ -3796,6 +3796,174 @@ private theorem insertRawEdge?_completionLedger
   have subsets := insertRawEdge?_subsets current result edge selected
   exact ledger.mono subsets.1 subsets.2
 
+private theorem dequeueRawItem?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : DottedItem tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : dequeueRawItem? current = some result) :
+    CompletionAttemptLedgerMaterialized result.2 := by
+  unfold dequeueRawItem? at selected
+  cases queue : current.payload.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, stepped, output⟩
+      cases output
+      apply ledger.mono
+      · exact (runMappedPrimitive?_phaseA_subsets current next _ _
+          (by simp) (by simp) stepped).1
+      · exact (runMappedPrimitive?_phaseA_subsets current next _ _
+          (by simp) (by simp) stepped).2
+
+private theorem dequeueRawEdge?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : PackedEdge file tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : dequeueRawEdge? current = some result) :
+    CompletionAttemptLedgerMaterialized result.2 := by
+  unfold dequeueRawEdge? at selected
+  cases queue : current.payload.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, stepped, output⟩
+      cases output
+      have noAttempt : ∀ waiting finished,
+          (match edge.val with
+          | .scanned before _ _ =>
+              .linear .L02_scannedEdgeDequeue (rawLinearKey before)
+          | .completed waiting finished _ _ =>
+              .cubic .U02_completedEdgeDequeue
+                (rawCompletionKey waiting finished)) ≠
+            (.cubic .U03_completionAttempt
+              (rawCompletionKey waiting finished) : UnitAddress tokens) := by
+        intro waiting finished
+        cases edge.val <;> simp
+      have subsets := runMappedPrimitive?_phaseA_subsets current next _ _
+        (by simp) noAttempt stepped
+      exact ledger.mono subsets.1 subsets.2
+
+private theorem attemptPrediction?_subsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (predicted : ProductionId)
+    (selected : attemptPrediction? current waiting predicted = some result) :
+    PhaseAContentSubset current result ∧
+      CompletionAttemptAddressesSubset current result := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting predicted with
+  | none =>
+      simp only [prediction] at selected
+      cases selected
+      exact ⟨.refl current, .refl current⟩
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, insertedEq⟩
+      have attemptedSubset := runMappedPrimitive?_phaseA_subsets current attempted
+        _ id (by simp) (by simp) attemptedEq
+      have inserted := insertRawItem?_subsets attempted result
+        .seedOrPrediction item insertedEq
+      exact ⟨attemptedSubset.1.trans inserted.1,
+        attemptedSubset.2.trans inserted.2⟩
+
+private theorem attemptPrediction?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (predicted : ProductionId)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : attemptPrediction? current waiting predicted = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  have subsets := attemptPrediction?_subsets current result
+    waiting predicted selected
+  exact ledger.mono subsets.1 subsets.2
+
+private theorem attemptPredictions?_subsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions (current result :
+      CountedState tokens (PhaseAOpen file tokens)),
+      attemptPredictions? waiting productions current = some result →
+      PhaseAContentSubset current result ∧
+        CompletionAttemptAddressesSubset current result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact ⟨.refl current, .refl current⟩
+  | cons production rest induction =>
+      intro current result selected
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      have first := attemptPrediction?_subsets current next
+        waiting production nextEq
+      have remaining := induction next result restEq
+      exact ⟨first.1.trans remaining.1, first.2.trans remaining.2⟩
+
+private theorem attemptPredictions?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) (productions : List ProductionId)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : attemptPredictions? waiting productions current = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  have subsets := attemptPredictions?_subsets waiting productions
+    current result selected
+  exact ledger.mono subsets.1 subsets.2
+
+private theorem attemptScan?_subsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens)
+    (selected : attemptScan? owned current before = some result) :
+    PhaseAContentSubset current result ∧
+      CompletionAttemptAddressesSubset current result := by
+  unfold attemptScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have first := runMappedPrimitive?_phaseA_subsets current attempted
+      _ id (by simp) (by simp) attemptedEq
+    cases scan : scannedEdge? owned before with
+    | none =>
+        simp only [scan] at remainder
+        cases remainder
+        exact first
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scan, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        have itemSubset := insertRawItem?_subsets attempted withItem
+          .scan after itemEq
+        have edgeSubset := insertRawEdge?_subsets withItem result edge edgeEq
+        exact ⟨first.1.trans (itemSubset.1.trans edgeSubset.1),
+          first.2.trans (itemSubset.2.trans edgeSubset.2)⟩
+  next notApplicable =>
+    cases selected
+    exact ⟨.refl current, .refl current⟩
+
+private theorem attemptScan?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : attemptScan? owned current before = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  have subsets := attemptScan?_subsets owned current result before selected
+  exact ledger.mono subsets.1 subsets.2
+
+
 
 
 end Chart
