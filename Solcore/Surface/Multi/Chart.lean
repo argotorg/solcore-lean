@@ -15268,4 +15268,42 @@ private theorem executePhaseCWorklist?_total_iff_prerequisites
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def ObservedPhaseCPrerequisites
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) : Prop :=
+  ∀ phaseB, executeObservedPhaseAB? file tokens owned = some phaseB →
+    PhaseCWorklistPrerequisites owned phaseB
+
+private theorem executeObservedPhaseABCWorklist?_total_iff_prerequisites
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    (∃ result, executeObservedPhaseABCWorklist? file tokens owned =
+      some result) ↔ ObservedPhaseCPrerequisites file tokens owned := by
+  constructor
+  · rintro ⟨result, selected⟩ phaseB phaseBEq
+    unfold executeObservedPhaseABCWorklist? at selected
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨actualPhaseB, actualPhaseBEq, phaseCEq⟩
+    rw [phaseBEq] at actualPhaseBEq
+    cases actualPhaseBEq
+    exact (executePhaseCWorklist?_total_iff_prerequisites owned phaseB).mp
+      ⟨result, phaseCEq⟩
+  · intro prerequisites
+    obtain ⟨phaseB, phaseBEq⟩ := executeObservedPhaseAB?_total
+      file tokens owned
+    obtain ⟨result, phaseCEq⟩ :=
+      (executePhaseCWorklist?_total_iff_prerequisites owned phaseB).mpr
+        (prerequisites phaseB phaseBEq)
+    exact ⟨result, by
+      unfold executeObservedPhaseABCWorklist?
+      rw [phaseBEq]
+      exact phaseCEq⟩
+
+end Chart
+
 end Solcore.Surface.Multi
