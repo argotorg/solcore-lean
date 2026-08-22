@@ -4199,6 +4199,234 @@ private theorem executePhaseA?_completionLedger
       (beginPhaseA file tokens) seeded
       (beginPhaseA_completionLedger file tokens) seededEq) runEq
 
+private def PhaseAItemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : CountedState tokens (PhaseAOpen file tokens)) : Prop :=
+  before.payload.rawItems ⊆ after.payload.rawItems ∧
+  before.payload.itemQueue ⊆ after.payload.itemQueue ∧
+  ∀ item, item ∈ after.payload.rawItems →
+    item ∈ before.payload.rawItems ∨ item ∈ after.payload.itemQueue
+
+private theorem PhaseAItemGrowth.refl
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    PhaseAItemGrowth current current :=
+  ⟨fun _ => id, fun _ => id, fun _item member => Or.inl member⟩
+
+private theorem PhaseAItemGrowth.trans
+    {file : WorkspaceFile} {tokens : List Token}
+    {first second third : CountedState tokens (PhaseAOpen file tokens)}
+    (left : PhaseAItemGrowth first second)
+    (right : PhaseAItemGrowth second third) :
+    PhaseAItemGrowth first third := by
+  refine ⟨fun item member => right.1 (left.1 member),
+    fun item member => right.2.1 (left.2.1 member), ?_⟩
+  intro item member
+  rcases right.2.2 item member with middle | queued
+  · rcases left.2.2 item middle with old | queued
+    · exact Or.inl old
+    · exact Or.inr (right.2.1 queued)
+  · exact Or.inr queued
+
+private theorem runMappedPrimitive?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (address : UnitAddress tokens)
+    (transition : PhaseAOpen file tokens → PhaseAOpen file tokens)
+    (growth : ∀ state,
+      state.rawItems ⊆ (transition state).rawItems ∧
+      state.itemQueue ⊆ (transition state).itemQueue ∧
+      ∀ item, item ∈ (transition state).rawItems →
+        item ∈ state.rawItems ∨ item ∈ (transition state).itemQueue)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    PhaseAItemGrowth current result := by
+  unfold PhaseAItemGrowth
+  rw [phaseA_runMappedPrimitive?_payload current address transition
+    result selected]
+  exact growth current.payload
+
+private theorem insertRawItem?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens)
+    (selected : insertRawItem? current source item = some result) :
+    PhaseAItemGrowth current result := by
+  unfold insertRawItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact .refl current
+  next absent =>
+    apply runMappedPrimitive?_itemGrowth current result _ _ _ selected
+    intro state
+    refine ⟨fun candidate member => by simp [member],
+      fun candidate member => by simp [member], ?_⟩
+    intro candidate member
+    simp only [List.mem_append, List.mem_singleton] at member ⊢
+    exact member.elim Or.inl (fun equal => Or.inr (Or.inr equal))
+
+private theorem insertRawEdge?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens)
+    (selected : insertRawEdge? current edge = some result) :
+    PhaseAItemGrowth current result := by
+  have payload := insertRawEdge?_itemPayload current result edge selected
+  unfold PhaseAItemGrowth
+  rw [payload.1, payload.2]
+  exact ⟨fun _ => id, fun _ => id, fun item member => Or.inl member⟩
+
+private theorem attemptPrediction?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (production : ProductionId)
+    (selected : attemptPrediction? current waiting production = some result) :
+    PhaseAItemGrowth current result := by
+  unfold attemptPrediction? at selected
+  cases prediction : predictedItem? waiting production with
+  | none =>
+      simp only [prediction] at selected
+      cases selected
+      exact .refl current
+  | some item =>
+      simp only [prediction, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, insertedEq⟩
+      exact (runMappedPrimitive?_itemGrowth current attempted _ id
+        (by
+          intro state
+          exact ⟨fun _ => id, fun _ => id,
+            fun _item member => Or.inl member⟩) attemptedEq).trans
+          (insertRawItem?_itemGrowth attempted result
+            .seedOrPrediction item insertedEq)
+
+private theorem attemptPrediction?_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (waiting item : DottedItem tokens) (production : ProductionId)
+    (computed : predictedItem? waiting production = some item)
+    (selected : attemptPrediction? current waiting production = some result) :
+    item ∈ result.payload.rawItems := by
+  unfold attemptPrediction? at selected
+  rw [computed] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, insertedEq⟩
+  exact (insertRawItem?_coverage attempted result
+    .seedOrPrediction item insertedEq).2.2
+
+private theorem attemptPredictions?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions (current result :
+      CountedState tokens (PhaseAOpen file tokens)),
+      attemptPredictions? waiting productions current = some result →
+      PhaseAItemGrowth current result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl current
+  | cons production rest induction =>
+      intro current result selected
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (attemptPrediction?_itemGrowth current next waiting production
+        nextEq).trans (induction next result restEq)
+
+private theorem attemptPredictions?_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ productions (current result :
+      CountedState tokens (PhaseAOpen file tokens)),
+      attemptPredictions? waiting productions current = some result →
+      ∀ production, production ∈ productions →
+      ∀ item, predictedItem? waiting production = some item →
+        item ∈ result.payload.rawItems := by
+  intro productions
+  induction productions with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result selected production member item computed
+      rw [attemptPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      rw [List.mem_cons] at member
+      rcases member with equal | member
+      · subst head
+        exact (attemptPredictions?_itemGrowth waiting rest next result
+          restEq).1 (attemptPrediction?_materializes current next waiting
+            item production computed nextEq)
+      · exact induction next result restEq production member item computed
+
+private theorem attemptScan?_itemGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before : DottedItem tokens)
+    (selected : attemptScan? owned current before = some result) :
+    PhaseAItemGrowth current result := by
+  unfold attemptScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainder⟩
+    have first := runMappedPrimitive?_itemGrowth current attempted _ id
+      (by
+        intro state
+        exact ⟨fun _ => id, fun _ => id,
+          fun _item member => Or.inl member⟩) attemptedEq
+    cases scan : scannedEdge? owned before with
+    | none =>
+        simp only [scan] at remainder
+        cases remainder
+        exact first
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scan, Option.bind_eq_some_iff] at remainder
+        rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+        exact first.trans ((insertRawItem?_itemGrowth attempted withItem
+          .scan after itemEq).trans
+            (insertRawEdge?_itemGrowth withItem result edge edgeEq))
+  next notApplicable =>
+    cases selected
+    exact .refl current
+
+private theorem attemptScan?_materializes
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (before after : DottedItem tokens) (edge : PackedEdge file tokens)
+    (computed : scannedEdge? owned before = some (after, edge))
+    (selected : attemptScan? owned current before = some result) :
+    after ∈ result.payload.rawItems := by
+  unfold attemptScan? at selected
+  have applicable : rawScanApplicable before = true := by
+    unfold scannedEdge? at computed
+    split at computed
+    next nextInRange =>
+      split at computed <;> try contradiction
+      next terminal =>
+        split at computed
+        next currentInRange =>
+          unfold rawScanApplicable
+          rw [List.getElem?_eq_getElem nextInRange]
+          simp_all
+        next currentOutside => contradiction
+    next nextOutside => contradiction
+  rw [if_pos applicable] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, remainder⟩
+  rw [computed] at remainder
+  simp only [Option.bind_eq_some_iff] at remainder
+  rcases remainder with ⟨withItem, itemEq, edgeEq⟩
+  have itemMember := (insertRawItem?_coverage attempted withItem
+    .scan after itemEq).2.2
+  rw [(insertRawEdge?_itemPayload withItem result edge edgeEq).1]
+  exact itemMember
+
+
 
 
 
