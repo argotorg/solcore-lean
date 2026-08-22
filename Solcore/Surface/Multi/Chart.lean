@@ -2878,6 +2878,233 @@ private theorem executePhaseA?_rawSound
     (beginPhaseA_rawSound file tokens) seededEq
   exact runPhaseAQueues?_rawSound owned _ seeded result seededSound runEq
 
+private theorem dottedItem_eq_of_fields
+    {tokens : List Token} {left right : DottedItem tokens}
+    (production : left.production = right.production)
+    (dot : left.dot.val = right.dot.val)
+    (origin : left.origin = right.origin)
+    (current : left.current = right.current) : left = right := by
+  cases left
+  cases right
+  simp only at production dot origin current
+  subst_vars
+  congr
+  exact Fin.ext dot
+
+private theorem terminalValueAt?_terminalAt
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (cursor : TerminalCursor tokens)
+    {value : TerminalStreamValue}
+    (selected : terminalValueAt? tokens cursor = some value) :
+    ∃ span, TerminalAt file tokens cursor value span := by
+  unfold terminalValueAt? at selected
+  split at selected
+  next inRange =>
+    cases selected
+    exact ⟨tokens[cursor.val].span, .retained cursor tokens[cursor.val]
+      inRange (List.getElem?_eq_getElem inRange)
+      (owned tokens[cursor.val] (List.getElem_mem inRange))⟩
+  next outside =>
+    cases selected
+    have atEnd : cursor.val = tokens.length := by omega
+    exact ⟨{
+      source := file.id
+      startByte := file.content.utf8ByteSize
+      endByte := file.content.utf8ByteSize
+    }, .endOfFile cursor atEnd⟩
+
+private theorem rawPredictBool_witness
+    {tokens : List Token} (known : List (DottedItem tokens))
+    (predicted : DottedItem tokens)
+    (selected : rawPredictBool known predicted = true) :
+    ∃ waiting, waiting ∈ known ∧
+      predictedItem? waiting predicted.production = some predicted := by
+  rw [rawPredictBool, List.any_eq_true] at selected
+  rcases selected with ⟨waiting, member, accepted⟩
+  cases nextEq : waiting.production.rhs[waiting.dot.val]? with
+  | none => simp [nextEq] at accepted
+  | some symbol =>
+      cases symbol with
+      | terminal terminal => simp [nextEq] at accepted
+      | nonterminal symbol =>
+          simp only [nextEq, Bool.and_eq_true, beq_iff_eq] at accepted
+          rcases accepted with
+            ⟨⟨⟨zero, origin⟩, current⟩, sameLhs⟩
+          let expected : DottedItem tokens := {
+            production := predicted.production
+            dot := ⟨0, Nat.zero_lt_succ _⟩
+            origin := waiting.current
+            current := waiting.current
+          }
+          have expectedEq : expected = predicted :=
+            dottedItem_eq_of_fields rfl zero.symm origin.symm current.symm
+          refine ⟨waiting, member, ?_⟩
+          unfold predictedItem?
+          rw [nextEq]
+          simp only
+          rw [dif_pos sameLhs]
+          exact congrArg some expectedEq
+
+private theorem rawCompleteBool_witness
+    {file : WorkspaceFile} {tokens : List Token}
+    (known : List (DottedItem tokens)) (after : DottedItem tokens)
+    (selected : rawCompleteBool known after = true) :
+    ∃ waiting, waiting ∈ known ∧ ∃ finished, finished ∈ known ∧
+      ∃ edge : PackedEdge file tokens,
+        completedEdge? waiting finished = some (after, edge) := by
+  rw [rawCompleteBool, List.any_eq_true] at selected
+  rcases selected with ⟨waiting, waitingMember, selected⟩
+  rw [List.any_eq_true] at selected
+  rcases selected with ⟨finished, finishedMember, accepted⟩
+  cases nextEq : waiting.production.rhs[waiting.dot.val]? with
+  | none => simp [nextEq] at accepted
+  | some symbol =>
+      cases symbol with
+      | terminal terminal => simp [nextEq] at accepted
+      | nonterminal symbol =>
+          simp only [nextEq, Bool.and_eq_true, beq_iff_eq] at accepted
+          rcases accepted with
+            ⟨⟨⟨⟨⟨⟨sameLhs, complete⟩, sameCursor⟩,
+              production⟩, dot⟩, origin⟩, current⟩
+          rcases List.getElem?_eq_some_iff.mp nextEq with
+            ⟨nextInRange, nextGet⟩
+          let expected : DottedItem tokens := {
+            production := waiting.production
+            dot := ⟨waiting.dot.val + 1, by omega⟩
+            origin := waiting.origin
+            current := finished.current
+          }
+          have expectedEq : expected = after :=
+            dottedItem_eq_of_fields production.symm dot.symm
+              origin.symm current.symm
+          refine ⟨waiting, waitingMember, finished, finishedMember, ?_⟩
+          rw [← expectedEq]
+          unfold completedEdge?
+          rw [dif_pos nextInRange]
+          split <;> simp_all [expected]
+
+private theorem rawScanBool_witness
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (known : List (DottedItem tokens)) (after : DottedItem tokens)
+    (selected : rawScanBool known after = true) :
+    ∃ before, before ∈ known ∧ ∃ edge : PackedEdge file tokens,
+      scannedEdge? owned before = some (after, edge) := by
+  rw [rawScanBool, List.any_eq_true] at selected
+  rcases selected with ⟨before, beforeMember, accepted⟩
+  split at accepted
+  next currentInRange =>
+    let cursor : TerminalCursor tokens :=
+      ⟨before.current.val, currentInRange⟩
+    cases nextEq : before.production.rhs[before.dot.val]? with
+    | none => simp [nextEq] at accepted
+    | some symbol =>
+        cases symbol with
+        | nonterminal symbol => simp [nextEq] at accepted
+        | terminal terminal =>
+            cases valueEq : terminalValueAt? tokens cursor with
+            | none => simp [nextEq, cursor, valueEq] at accepted
+            | some value =>
+                simp only [nextEq, cursor, valueEq, Bool.and_eq_true,
+                  beq_iff_eq] at accepted
+                rcases accepted with
+                  ⟨⟨⟨⟨matched, production⟩, dot⟩, origin⟩, current⟩
+                rcases List.getElem?_eq_some_iff.mp nextEq with
+                  ⟨nextInRange, nextGet⟩
+                obtain ⟨span, terminalAt⟩ :=
+                  terminalValueAt?_terminalAt owned cursor valueEq
+                have terminalMatches : TerminalMatches terminal value :=
+                  (terminalMatchesBool_eq_true_iff terminal value).mp matched
+                obtain ⟨matchedResult, matchedEq⟩ :=
+                  MatchedTerminal.atCursor?_complete owned terminal cursor
+                    terminalAt terminalMatches
+                let expected : DottedItem tokens := {
+                  production := before.production
+                  dot := ⟨before.dot.val + 1, by omega⟩
+                  origin := before.origin
+                  current := cursor.afterBoundary
+                }
+                have expectedEq : expected = after :=
+                  dottedItem_eq_of_fields production.symm dot.symm
+                    origin.symm current.symm
+                have valid : PackedEdgeKey.Valid file tokens
+                    (.scanned before after cursor) :=
+                  packedEdge_scanned_valid_iff.mpr ⟨{
+                    terminal := terminal
+                    matched := matchedResult.val
+                    sameCursor := matchedResult.property
+                    next := ⟨nextInRange, nextEq⟩
+                    atCurrent := Fin.ext rfl
+                    advance := ⟨production, dot, origin, by
+                      rw [matchedResult.property]
+                      exact current⟩
+                  }⟩
+                refine ⟨before, beforeMember, ?_⟩
+                rw [← expectedEq]
+                unfold scannedEdge?
+                rw [dif_pos nextInRange]
+                split <;> simp_all [expected, cursor]
+                all_goals
+                  subst_vars
+                  rw [matchedEq]
+                  simp
+                  simpa [cursor] using valid
+  next outside => contradiction
+private def ExecutableRawClosed
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (items : List (DottedItem tokens)) : Prop :=
+  (∀ item, item ∈ rawSeedItems tokens → item ∈ items) ∧
+  (∀ waiting, waiting ∈ items → ∀ production result,
+    predictedItem? waiting production = some result → result ∈ items) ∧
+  (∀ before, before ∈ items → ∀ after (edge : PackedEdge file tokens),
+    scannedEdge? owned before = some (after, edge) → after ∈ items) ∧
+  ∀ waiting, waiting ∈ items → ∀ finished, finished ∈ items →
+    ∀ after (edge : PackedEdge file tokens),
+      completedEdge? waiting finished = some (after, edge) →
+      after ∈ items
+
+private theorem ExecutableRawClosed.rawClosureBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (items : List (DottedItem tokens))
+    (closed : ExecutableRawClosed owned items) :
+    ∀ item, rawClosureBool tokens items item = true → item ∈ items := by
+  intro item selected
+  unfold Chart.rawClosureBool at selected
+  simp only [Bool.or_eq_true] at selected
+  rcases selected with beforeComplete | completed
+  rcases beforeComplete with beforeScan | scanned
+  rcases beforeScan with beforePredict | predicted
+  rcases beforePredict with carried | seeded
+  · exact (rawMemberBool_true_iff items item).mp carried
+  · apply closed.1 item
+    rw [rawSeedItems, List.mem_filter]
+    exact ⟨allDottedItems_complete item, seeded⟩
+  · obtain ⟨waiting, waitingMember, computed⟩ :=
+      rawPredictBool_witness items item predicted
+    exact closed.2.1 waiting waitingMember item.production item computed
+  · obtain ⟨before, beforeMember, edge, computed⟩ :=
+      rawScanBool_witness owned items item scanned
+    exact closed.2.2.1 before beforeMember item edge computed
+  · obtain ⟨waiting, waitingMember, finished, finishedMember,
+      edge, computed⟩ := rawCompleteBool_witness
+        (file := file) items item completed
+    exact closed.2.2.2 waiting waitingMember finished finishedMember
+      item edge computed
+
+private theorem executePhaseA?_membership_eq_of_closed
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result)
+    (closed : ExecutableRawClosed owned result.payload.rawItems) :
+    ∀ item, item ∈ result.payload.rawItems ↔
+      item ∈ rawSaturation tokens := by
+  exact rawItems_membership_eq_rawSaturation
+    (executePhaseA?_rawSound file tokens owned result selected).1
+    (closed.rawClosureBool owned result.payload.rawItems)
+
 end Chart
 
 namespace Chart
