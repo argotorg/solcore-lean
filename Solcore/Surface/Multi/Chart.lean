@@ -4801,6 +4801,219 @@ private theorem dequeueRawItem?_raw_queue
   rw [phaseA_runMappedPrimitive?_payload current _ _ after nextEq]
   exact ⟨rfl, rfl, rfl⟩
 
+private theorem processRawItem?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before current result : CountedState tokens (PhaseAOpen file tokens))
+    (pivot : DottedItem tokens) (rest : List (DottedItem tokens))
+    (fair : PhaseAFairPending owned before)
+    (beforeQueue : before.payload.itemQueue = pivot :: rest)
+    (currentRaw : current.payload.rawItems = before.payload.rawItems)
+    (currentQueue : current.payload.itemQueue = rest)
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : processRawItem? owned pivot current = some result) :
+    PhaseAFairPending owned result := by
+  have growth := processRawItem?_itemGrowth owned pivot current result selected
+  have carryRaw : ∀ {item}, item ∈ before.payload.rawItems →
+      item ∈ result.payload.rawItems := by
+    intro item member
+    exact growth.1 (currentRaw.symm ▸ member)
+  have carryQueue : ∀ {item}, item ≠ pivot →
+      item ∈ before.payload.itemQueue →
+      item ∈ result.payload.itemQueue := by
+    intro item different member
+    rw [beforeQueue, List.mem_cons] at member
+    rcases member with equal | member
+    · exact (different equal).elim
+    · exact growth.2.1 (currentQueue.symm ▸ member)
+  refine ⟨fun item member => carryRaw (fair.1 item member), ?_, ?_, ?_⟩
+  · intro waiting waitingMember production after computed
+    rcases growth.2.2 waiting waitingMember with old | queued
+    · by_cases same : waiting = pivot
+      · subst waiting
+        exact Or.inr (processRawItem?_prediction_materializes owned
+          current result pivot after production computed selected)
+      · rcases fair.2.1 waiting (currentRaw ▸ old)
+          production after computed with waitingQueued | materialized
+        · exact Or.inl (carryQueue same waitingQueued)
+        · exact Or.inr (carryRaw materialized)
+    · exact Or.inl queued
+  · intro waiting waitingMember after edge computed
+    rcases growth.2.2 waiting waitingMember with old | queued
+    · by_cases same : waiting = pivot
+      · subst waiting
+        exact Or.inr (processRawItem?_scan_materializes owned
+          current result pivot after edge computed selected)
+      · rcases fair.2.2.1 waiting (currentRaw ▸ old)
+          after edge computed with waitingQueued | materialized
+        · exact Or.inl (carryQueue same waitingQueued)
+        · exact Or.inr (carryRaw materialized)
+    · exact Or.inl queued
+  · intro waiting waitingMember finished finishedMember after edge computed
+    rcases growth.2.2 waiting waitingMember with waitingOld | waitingQueued
+    · rcases growth.2.2 finished finishedMember with
+        finishedOld | finishedQueued
+      · by_cases waitingSame : waiting = pivot
+        · subst waiting
+          exact Or.inr (Or.inr
+            ((processRawItem?_completion_materializes owned current result
+              pivot finished finishedOld ledger selected).1
+                after edge computed))
+        · by_cases finishedSame : finished = pivot
+          · subst finished
+            exact Or.inr (Or.inr
+              ((processRawItem?_completion_materializes owned current result
+                pivot waiting waitingOld ledger selected).2
+                  after edge computed))
+          · rcases fair.2.2.2 waiting (currentRaw ▸ waitingOld)
+                finished (currentRaw ▸ finishedOld) after edge computed with
+              waitingQueued | finishedQueued | materialized
+            · exact Or.inl (carryQueue waitingSame waitingQueued)
+            · exact Or.inr (Or.inl
+                (carryQueue finishedSame finishedQueued))
+            · exact Or.inr (Or.inr (carryRaw materialized))
+      · exact Or.inr (Or.inl finishedQueued)
+    · exact Or.inl waitingQueued
+
+private theorem dequeueRawEdge?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (result : PackedEdge file tokens ×
+      CountedState tokens (PhaseAOpen file tokens))
+    (fair : PhaseAFairPending owned current)
+    (selected : dequeueRawEdge? current = some result) :
+    PhaseAFairPending owned result.2 := by
+  unfold dequeueRawEdge? at selected
+  cases queue : current.payload.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      change PhaseAFairPending owned next
+      have payload := phaseA_runMappedPrimitive?_payload current _ _ next nextEq
+      unfold PhaseAFairPending at fair ⊢
+      rw [payload]
+      exact fair
+
+private theorem runPhaseAQueues?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result : CountedState tokens (PhaseAOpen file tokens)),
+      CompletionAttemptLedgerMaterialized current →
+      PhaseAFairPending owned current →
+      runPhaseAQueues? owned fuel current = some result →
+      PhaseAFairPending owned result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result ledger fair selected
+      rw [runPhaseAQueues?] at selected
+      split at selected <;> try contradiction
+      cases selected
+      exact fair
+  | succ fuel induction =>
+      intro current result ledger fair selected
+      rw [runPhaseAQueues?] at selected
+      cases items : current.payload.itemQueue with
+      | nil =>
+          cases edges : current.payload.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact fair
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueRawEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result
+                    (dequeueRawEdge?_completionLedger current pair ledger
+                      dequeued)
+                    (dequeueRawEdge?_fairPending owned current pair fair
+                      dequeued) selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueRawItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨pivot, afterDequeue⟩
+              simp only at selected
+              cases processed : processRawItem? owned pivot afterDequeue with
+              | none => simp [processed] at selected
+              | some next =>
+                  rw [processed] at selected
+                  have afterLedger := dequeueRawItem?_completionLedger current
+                    (pivot, afterDequeue) ledger dequeued
+                  have contents := dequeueRawItem?_raw_queue current
+                    afterDequeue item pivot rest items dequeued
+                  have pivotEq := contents.1
+                  subst item
+                  exact induction next result
+                    (processRawItem?_completionLedger owned pivot
+                      afterDequeue next afterLedger processed)
+                    (processRawItem?_fairPending owned current afterDequeue
+                      next pivot rest fair items contents.2.1 contents.2.2
+                      afterLedger processed) selected
+
+private theorem executePhaseA?_fairPending
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result) :
+    PhaseAFairPending owned result := by
+  unfold executePhaseA? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨seeded, seededEq, runEq⟩
+  have seededLedger := insertRawSeeds?_completionLedger
+    (rawSeedItems tokens) (beginPhaseA file tokens) seeded
+    (beginPhaseA_completionLedger file tokens) seededEq
+  exact runPhaseAQueues?_fairPending owned _ seeded result seededLedger
+    (insertRawSeeds?_fairPending owned seeded seededEq) runEq
+
+private theorem executePhaseA?_executableRawClosed
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result) :
+    ExecutableRawClosed owned result.payload.rawItems := by
+  have fair := executePhaseA?_fairPending file tokens owned result selected
+  unfold executePhaseA? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨seeded, seededEq, runEq⟩
+  have empty := runPhaseAQueues?_queues_empty owned _ seeded result runEq
+  refine ⟨fair.1, ?_, ?_, ?_⟩
+  · intro waiting waitingMember production after computed
+    rcases fair.2.1 waiting waitingMember production after computed with
+      queued | materialized
+    · simp [empty.1] at queued
+    · exact materialized
+  · intro before beforeMember after edge computed
+    rcases fair.2.2.1 before beforeMember after edge computed with
+      queued | materialized
+    · simp [empty.1] at queued
+    · exact materialized
+  · intro waiting waitingMember finished finishedMember after edge computed
+    rcases fair.2.2.2 waiting waitingMember finished finishedMember
+        after edge computed with queued | queued | materialized
+    · simp [empty.1] at queued
+    · simp [empty.1] at queued
+    · exact materialized
+
+private theorem executePhaseA?_membership_eq
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result) :
+    ∀ item, item ∈ result.payload.rawItems ↔
+      item ∈ rawSaturation tokens := by
+  exact executePhaseA?_membership_eq_of_closed file tokens owned result selected
+    (executePhaseA?_executableRawClosed file tokens owned result selected)
+
 
 
 
