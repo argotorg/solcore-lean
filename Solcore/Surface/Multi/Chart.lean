@@ -16390,4 +16390,221 @@ private theorem attemptContextualCompletion?_materialization_boundary
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCProductionAddressesSubset {tokens : List Token}
+    (before after : Counter tokens) : Prop :=
+  ∀ productionInstance,
+    UnitAddress.production productionInstance ∈ after.usedRev →
+      UnitAddress.production productionInstance ∈ before.usedRev
+
+private def PhaseCCompletionAddressesSubset {tokens : List Token}
+    (before after : Counter tokens) : Prop :=
+  ∀ waiting finished,
+    (.cubic .U03_completionAttempt
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        after.usedRev →
+      (.cubic .U03_completionAttempt
+        (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+          before.usedRev
+
+private def PhaseCProductionAddressesExtendedBy {tokens : List Token}
+    (before after : Counter tokens)
+    (productionInstance : ProductionInstanceKey tokens) : Prop :=
+  ∀ candidate,
+    UnitAddress.production candidate ∈ after.usedRev →
+      UnitAddress.production candidate ∈ before.usedRev ∨
+        candidate = productionInstance
+
+private theorem PhaseCProductionAddressesSubset.refl
+    {tokens : List Token} (counter : Counter tokens) :
+    PhaseCProductionAddressesSubset counter counter :=
+  fun _ => id
+
+private theorem PhaseCProductionAddressesSubset.trans
+    {tokens : List Token} {first second third : Counter tokens}
+    (left : PhaseCProductionAddressesSubset first second)
+    (right : PhaseCProductionAddressesSubset second third) :
+    PhaseCProductionAddressesSubset first third :=
+  fun candidate member => left candidate (right candidate member)
+
+private theorem PhaseCCompletionAddressesSubset.refl
+    {tokens : List Token} (counter : Counter tokens) :
+    PhaseCCompletionAddressesSubset counter counter :=
+  fun _ _ => id
+
+private theorem PhaseCCompletionAddressesSubset.trans
+    {tokens : List Token} {first second third : Counter tokens}
+    (left : PhaseCCompletionAddressesSubset first second)
+    (right : PhaseCCompletionAddressesSubset second third) :
+    PhaseCCompletionAddressesSubset first third :=
+  fun waiting finished member =>
+    left waiting finished (right waiting finished member)
+
+private theorem runMappedPrimitive?_phaseCLedgerSubsets
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (result : CountedState tokens after)
+    (notProduction : ∀ productionInstance,
+      address ≠ UnitAddress.production productionInstance)
+    (notCompletion : ∀ waiting finished,
+      address ≠ (.cubic .U03_completionAttempt
+        (contextualCompletionKey waiting finished) : UnitAddress tokens))
+    (selected : runMappedPrimitive? current address transition =
+      some result) :
+    PhaseCProductionAddressesSubset current.counter result.counter ∧
+      PhaseCCompletionAddressesSubset current.counter result.counter := by
+  have used := runMappedPrimitive?_usedRev current address transition result
+    selected
+  constructor
+  · intro productionInstance member
+    rw [used, List.mem_cons] at member
+    exact member.elim (fun equal => (notProduction productionInstance
+      equal.symm).elim) id
+  · intro waiting finished member
+    rw [used, List.mem_cons] at member
+    exact member.elim (fun equal =>
+      (notCompletion waiting finished equal.symm).elim) id
+
+private theorem chargeAddresses?_phaseCLedgerSubsets
+    {tokens : List Token} {state : Type} :
+    ∀ addresses (current result : CountedState tokens state),
+      (∀ address, address ∈ addresses →
+        (∀ productionInstance,
+          address ≠ UnitAddress.production productionInstance) ∧
+        ∀ waiting finished,
+          address ≠ (.cubic .U03_completionAttempt
+            (contextualCompletionKey waiting finished) :
+              UnitAddress tokens)) →
+      chargeAddresses? current addresses = some result →
+      PhaseCProductionAddressesSubset current.counter result.counter ∧
+        PhaseCCompletionAddressesSubset current.counter result.counter := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current result _available selected
+      cases selected
+      exact ⟨.refl current.counter, .refl current.counter⟩
+  | cons address rest induction =>
+      intro current result available selected
+      rw [chargeAddresses?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, continued⟩
+      have first := runMappedPrimitive?_phaseCLedgerSubsets current address id
+        next (available address (by simp)).1
+        (available address (by simp)).2 nextEq
+      have later := induction next result
+        (fun candidate member => available candidate (by simp [member]))
+        continued
+      exact ⟨first.1.trans later.1, first.2.trans later.2⟩
+
+private theorem processGuardCell?_phaseCLedgerSubsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (index : Fin (guardOf productionInstance.production).length)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : processGuardCell? current productionInstance index =
+      some result) :
+    PhaseCProductionAddressesSubset current.counter result.1.counter ∧
+      PhaseCCompletionAddressesSubset current.counter result.1.counter := by
+  unfold processGuardCell? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨inspected, inspectedEq, inserted, insertedEq, resultEq⟩
+  cases resultEq
+  have inspectedSubsets := chargeAddresses?_phaseCLedgerSubsets
+    (preInsertWitnessSlots.map fun slot =>
+      UnitAddress.guardWitness slot
+        (guardCellAddress productionInstance index)) current inspected
+      (by simp) inspectedEq
+  have insertedSubsets := runMappedPrimitive?_phaseCLedgerSubsets inspected
+    (.guardWitness .insertWitness
+      (guardCellAddress productionInstance index)) _ inserted
+      (by simp) (by simp) insertedEq
+  exact ⟨inspectedSubsets.1.trans insertedSubsets.1,
+    inspectedSubsets.2.trans insertedSubsets.2⟩
+
+private theorem processGuardCells?_phaseCLedgerSubsets
+    {file : WorkspaceFile} {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens) :
+    ∀ indices (current : CountedState tokens (PhaseCOpen file tokens))
+      (result : CountedState tokens (PhaseCOpen file tokens) × Bool),
+      processGuardCells? productionInstance indices current = some result →
+      PhaseCProductionAddressesSubset current.counter result.1.counter ∧
+        PhaseCCompletionAddressesSubset current.counter result.1.counter := by
+  intro indices
+  induction indices with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact ⟨.refl current.counter, .refl current.counter⟩
+  | cons index rest induction =>
+      intro current result selected
+      simp only [processGuardCells?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with
+        ⟨next, nextEq, finished, finishedEq, resultEq⟩
+      cases resultEq
+      have first := processGuardCell?_phaseCLedgerSubsets current
+        productionInstance index next nextEq
+      have later := induction next.1 finished finishedEq
+      exact ⟨first.1.trans later.1, first.2.trans later.2⟩
+
+private theorem activateProduction?_phaseCLedgerAddressFlow
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCOpen file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCOpen file tokens) × Bool)
+    (selected : activateProduction? current productionInstance =
+      some result) :
+    PhaseCProductionAddressesExtendedBy current.counter result.1.counter
+        productionInstance ∧
+      PhaseCCompletionAddressesSubset current.counter result.1.counter := by
+  unfold activateProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, processedEq⟩
+  have processed := processGuardCells?_phaseCLedgerSubsets
+    productionInstance _ attempted result processedEq
+  have used := runMappedPrimitive?_usedRev current
+    (.production productionInstance) id attempted attemptedEq
+  constructor
+  · intro candidate member
+    have attemptedMember := processed.1 candidate member
+    rw [used, List.mem_cons] at attemptedMember
+    rcases attemptedMember with equal | old
+    · exact Or.inr (UnitAddress.production.inj equal)
+    · exact Or.inl old
+  · intro waiting finished member
+    have attemptedMember := processed.2 waiting finished member
+    rw [used, List.mem_cons] at attemptedMember
+    rcases attemptedMember with equal | old
+    · cases equal
+    · exact old
+
+private theorem activateWorklistProduction?_phaseCLedgerAddressFlow
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCProductionAddressesExtendedBy current.counter result.1.counter
+        productionInstance ∧
+      PhaseCCompletionAddressesSubset current.counter result.1.counter := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  exact activateProduction?_phaseCLedgerAddressFlow {
+    payload := current.payload.phaseC
+    counter := current.counter
+  } productionInstance activated activatedEq
+
+end Chart
+
 end Solcore.Surface.Multi
