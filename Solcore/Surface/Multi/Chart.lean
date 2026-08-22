@@ -14940,4 +14940,214 @@ private theorem activateWorklistProduction?_accepted_complete
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem phaseCItemMemberBool_true_iff
+    {tokens : List Token} (items : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) :
+    phaseCItemMemberBool items item = true ↔ item ∈ items := by
+  simp [phaseCItemMemberBool, List.any_eq_true]
+
+private theorem phaseCEdgeMemberBool_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens) :
+    phaseCEdgeMemberBool edges edge = true ↔
+      ∃ candidate, candidate ∈ edges ∧ candidate.val = edge.val := by
+  simp [phaseCEdgeMemberBool, List.any_eq_true]
+
+/-- Content grows monotonically between item-processing steps.  Newly
+discovered items remain queued until a later dequeue. -/
+private structure PhaseCContentGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : CountedState tokens (PhaseCWorklist file tokens)) : Prop where
+  memo : after.payload.phaseC.memo = before.payload.phaseC.memo
+  items : before.payload.phaseC.contextualItems ⊆
+    after.payload.phaseC.contextualItems
+  itemQueue : before.payload.phaseC.itemQueue ⊆
+    after.payload.phaseC.itemQueue
+  edges : before.payload.phaseC.contextualEdges ⊆
+    after.payload.phaseC.contextualEdges
+  newItemsQueued : ∀ item,
+    item ∈ after.payload.phaseC.contextualItems →
+      item ∈ before.payload.phaseC.contextualItems ∨
+        item ∈ after.payload.phaseC.itemQueue
+
+private theorem PhaseCContentGrowth.refl
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    PhaseCContentGrowth current current := {
+  memo := rfl
+  items := fun _ => id
+  itemQueue := fun _ => id
+  edges := fun _ => id
+  newItemsQueued := fun _ member => Or.inl member
+}
+
+private theorem PhaseCContentGrowth.trans
+    {file : WorkspaceFile} {tokens : List Token}
+    {first second third : CountedState tokens (PhaseCWorklist file tokens)}
+    (left : PhaseCContentGrowth first second)
+    (right : PhaseCContentGrowth second third) :
+    PhaseCContentGrowth first third := by
+  refine {
+    memo := right.memo.trans left.memo
+    items := fun item member => right.items (left.items member)
+    itemQueue := fun item member => right.itemQueue (left.itemQueue member)
+    edges := fun edge member => right.edges (left.edges member)
+    newItemsQueued := ?_
+  }
+  intro item member
+  rcases right.newItemsQueued item member with middle | queued
+  · rcases left.newItemsQueued item middle with old | queued
+    · exact Or.inl old
+    · exact Or.inr (right.itemQueue queued)
+  · exact Or.inr queued
+
+private theorem PhaseCContentGrowth.of_reachCarrier_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : CountedState tokens (PhaseCWorklist file tokens))
+    (equal : after.payload.phaseC.reachCarrier =
+      before.payload.phaseC.reachCarrier) :
+    PhaseCContentGrowth before after := by
+  have memo := congrArg PhaseCReachCarrier.memo equal
+  have items := congrArg PhaseCReachCarrier.items equal
+  have itemQueue := congrArg PhaseCReachCarrier.itemQueue equal
+  have edges := congrArg PhaseCReachCarrier.edges equal
+  change after.payload.phaseC.memo = before.payload.phaseC.memo at memo
+  change after.payload.phaseC.contextualItems =
+    before.payload.phaseC.contextualItems at items
+  change after.payload.phaseC.itemQueue =
+    before.payload.phaseC.itemQueue at itemQueue
+  change after.payload.phaseC.contextualEdges =
+    before.payload.phaseC.contextualEdges at edges
+  refine {
+    memo := memo
+    items := ?_
+    itemQueue := ?_
+    edges := ?_
+    newItemsQueued := ?_
+  }
+  · intro item member
+    rw [items]
+    exact member
+  · intro item member
+    rw [itemQueue]
+    exact member
+  · intro edge member
+    rw [edges]
+    exact member
+  · intro item member
+    left
+    rw [← items]
+    exact member
+
+private theorem insertContextualItem?_coverage
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCContentGrowth current result ∧
+      item ∈ result.payload.phaseC.contextualItems := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current,
+      (phaseCItemMemberBool_true_iff _ _).mp present⟩
+  next absent =>
+    have payload := runMappedPrimitive?_payload current _ _ selected
+    constructor
+    · refine {
+        memo := by rw [payload]
+        items := fun candidate member => by rw [payload]; simp [member]
+        itemQueue := fun candidate member => by rw [payload]; simp [member]
+        edges := fun candidate member => by rw [payload]; exact member
+        newItemsQueued := ?_
+      }
+      intro candidate member
+      rw [payload] at member ⊢
+      simp only [List.mem_append, List.mem_singleton] at member ⊢
+      exact member.elim Or.inl (fun equal => Or.inr (Or.inr equal))
+    · rw [payload]
+      simp
+
+private theorem insertContextualScannedEdge?_coverage
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCContentGrowth current result ∧
+      ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+        retained.val = .scanned edge.before edge.after edge.cursor := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current,
+      (phaseCEdgeMemberBool_true_iff _ _).mp present⟩
+  next absent =>
+    have payload := runMappedPrimitive?_payload current _ _ selected
+    constructor
+    · exact {
+        memo := by rw [payload]
+        items := fun _ member => by rw [payload]; exact member
+        itemQueue := fun _ member => by rw [payload]; exact member
+        edges := fun candidate member => by rw [payload]; simp [member]
+        newItemsQueued := fun _ member => by
+          left
+          rw [payload] at member
+          exact member
+      }
+    · rw [payload]
+      exact ⟨CompletionBackpointerLedger.packScanned edge,
+        by simp [CompletionBackpointerLedger.packScanned]⟩
+
+private theorem insertContextualCompletedEdge?_coverage
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCContentGrowth current result ∧
+      ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+        retained.val = .completed edge.waiting edge.finished edge.after
+          edge.shared := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  next present =>
+    cases selected
+    exact ⟨.refl current,
+      (phaseCEdgeMemberBool_true_iff _ _).mp present⟩
+  next absent =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, insertedEq, steppedEq⟩
+    rcases pair with ⟨nextLedger, nextEdges⟩
+    unfold CompletionBackpointerLedger.insertCompleted? at insertedEq
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at insertedEq
+    rcases insertedEq with ⟨ledger, _ledgerEq, pairEq⟩
+    cases pairEq
+    have payload := runMappedPrimitive?_payload current _ _ steppedEq
+    constructor
+    · exact {
+        memo := by rw [payload]
+        items := fun _ member => by rw [payload]; exact member
+        itemQueue := fun _ member => by rw [payload]; exact member
+        edges := fun candidate member => by rw [payload]; simp [member]
+        newItemsQueued := fun _ member => by
+          left
+          rw [payload] at member
+          exact member
+      }
+    · rw [payload]
+      exact ⟨CompletionBackpointerLedger.packCompleted edge,
+        by simp [CompletionBackpointerLedger.packCompleted]⟩
+
+end Chart
+
 end Solcore.Surface.Multi
