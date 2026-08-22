@@ -8102,4 +8102,266 @@ private theorem phaseBGuardDecisionFromIndexes?_eq_classifier
 
 end Chart
 
+
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Proof-free terminal observation at one exact chart boundary. -/
+def observedTerminalAtBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) : Bool :=
+  if inRange : boundary.val < tokens.length + 1 then
+    let cursor : TerminalCursor tokens := ⟨boundary.val, inRange⟩
+    (MatchedTerminal.atCursor? file tokens owned terminal cursor).isSome
+  else
+    false
+
+/-- Proof-free exact retained-terminal slice. -/
+def observedExactSliceBool
+    (tokens : List Token) (start finish : Boundary tokens)
+    (classes : List TerminalSymbol) : Bool :=
+  decide (finish.val = start.val + classes.length) &&
+    (List.ofFn fun index : Fin classes.length =>
+      if inRange : start.val + index.val < tokens.length then
+        terminalMatchesBool (classes.get index)
+          (.retained tokens[start.val + index.val])
+      else
+        false).all id
+
+/-- Positive observations that do not depend on raw saturation. -/
+def basicGuardPositiveObservation?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  match key.guard with
+  | .G03_parameterComptime | .G04_letComptime |
+      .G05_typeComptime =>
+      some (observedTerminalAtBool owned
+        (.contextualKeyword .comptimeKw) key.siteCursor)
+  | .G07_leadingDotArguments =>
+      some (observedExactSliceBool tokens
+          key.contextStart key.siteCursor [
+            .symbol .dot,
+            .category .identifier
+          ] &&
+        observedTerminalAtBool owned
+          (.symbol .leftParen) key.siteCursor)
+  | _ => none
+
+/-- The independent raw-pipe bit used by G02's three-way classifier. -/
+def matchArmPipeObservationBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  observedTerminalAtBool owned (.symbol .pipe) key.siteCursor
+
+private theorem observedTerminalAtBool_eq_phaseA
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) :
+    observedTerminalAtBool owned terminal boundary =
+      phaseATerminalAtBool owned terminal boundary :=
+  rfl
+
+private theorem observedExactSliceBool_eq_phaseA
+    (tokens : List Token) (start finish : Boundary tokens)
+    (classes : List TerminalSymbol) :
+    observedExactSliceBool tokens start finish classes =
+      phaseAExactSliceBool tokens start finish classes :=
+  rfl
+
+private instance : LawfulBEq EvidenceIndexKind where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq PriorityGuardId where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq (PriorityGuardId ⊕ GrammarRuleId) where
+  rfl := by
+    intro value
+    cases value with
+    | inl guard => exact beq_self_eq_true guard
+    | inr rule => exact beq_self_eq_true rule
+  eq_of_beq := by
+    intro left right equal
+    cases left with
+    | inl leftGuard =>
+        cases right with
+        | inl rightGuard =>
+            congr
+            exact LawfulBEq.eq_of_beq equal
+        | inr rightRule => contradiction
+    | inr leftRule =>
+        cases right with
+        | inl rightGuard => contradiction
+        | inr rightRule =>
+            congr
+            exact LawfulBEq.eq_of_beq equal
+
+private theorem phaseAEvidenceAddressEqBool_eq_true_iff
+    {tokens : List Token}
+    (left right : EvidenceIndexAddress tokens) :
+    phaseAEvidenceAddressEqBool left right = true ↔ left = right := by
+  cases left
+  cases right
+  simp [phaseAEvidenceAddressEqBool, beq_iff_eq, and_assoc]
+
+private theorem phaseAEvidenceEntryAt?_map_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (phaseA : PhaseAOpen file tokens) :
+    ∀ (addresses : List (EvidenceIndexAddress tokens)),
+      addresses.Nodup →
+      ∀ address, address ∈ addresses →
+        phaseAEvidenceEntryAt?
+          (addresses.map fun candidate => ({
+            address := candidate
+            selected := evaluate phaseA candidate
+          } : PhaseAEvidenceEntry tokens)) address =
+            some (evaluate phaseA address) := by
+  intro addresses
+  induction addresses with
+  | nil => simp
+  | cons head tail induction =>
+      intro unique address member
+      rw [List.nodup_cons] at unique
+      rw [List.mem_cons] at member
+      rcases member with equal | member
+      · subst head
+        simp [phaseAEvidenceEntryAt?,
+          phaseAEvidenceAddressEqBool_self]
+      · have different : head ≠ address := by
+          intro equal
+          exact unique.1 (equal ▸ member)
+        have comparison :
+            phaseAEvidenceAddressEqBool head address = false := by
+          apply Bool.eq_false_iff.mpr
+          intro selected
+          exact different
+            ((phaseAEvidenceAddressEqBool_eq_true_iff head address).mp
+              selected)
+        simp [phaseAEvidenceEntryAt?, comparison,
+          induction unique.2 address member]
+
+private theorem phaseAEvidenceEntryAt?_canonical_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (address : EvidenceIndexAddress tokens) :
+    phaseAEvidenceEntryAt? (canonicalEvidenceEntries evaluate phaseA)
+        address = some (evaluate phaseA address) := by
+  exact phaseAEvidenceEntryAt?_map_exact evaluate phaseA
+    (allEvidenceIndexAddresses tokens)
+      (allEvidenceIndexAddresses_nodup tokens) address
+      (allEvidenceIndexAddresses_complete address)
+
+private theorem phaseAImmediateSuccessorObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) :
+    (match phaseABoundaryAt? tokens (boundary.val + 1) with
+      | none => false
+      | some after =>
+          phaseAImmediatelyAfterTerminalBool owned terminal boundary after) =
+        phaseATerminalAtBool owned terminal boundary := by
+  by_cases successorIn : boundary.val + 1 < tokens.length + 2
+  · rw [show phaseABoundaryAt? tokens (boundary.val + 1) =
+        some ⟨boundary.val + 1, successorIn⟩ by
+      simp [phaseABoundaryAt?, successorIn]]
+    simp [phaseAImmediatelyAfterTerminalBool]
+  · rw [show phaseABoundaryAt? tokens (boundary.val + 1) = none by
+      simp [phaseABoundaryAt?, successorIn]]
+    have terminalOutOfRange : ¬ boundary.val < tokens.length + 1 := by
+      omega
+    simp [phaseATerminalAtBool, terminalOutOfRange]
+
+private theorem phaseAImmediateSuccessorOption_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens) :
+    (match phaseABoundaryAt? tokens (boundary.val + 1) with
+      | none => some false
+      | some after =>
+          some (phaseAImmediatelyAfterTerminalBool
+            owned terminal boundary after)) =
+        some (phaseATerminalAtBool owned terminal boundary) := by
+  have exact :=
+    phaseAImmediateSuccessorObservation_exact owned terminal boundary
+  cases selected : phaseABoundaryAt? tokens (boundary.val + 1) with
+  | none =>
+      rw [selected] at exact
+      simp only at exact
+      rw [← exact]
+  | some after =>
+      rw [selected] at exact
+      simp only at exact
+      rw [← exact]
+
+private theorem phaseAImmediateSuccessorAndOption_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (terminal : TerminalSymbol) (boundary : Boundary tokens)
+    (leading : Bool) :
+    (match phaseABoundaryAt? tokens (boundary.val + 1) with
+      | none => some false
+      | some after => some (leading &&
+          phaseAImmediatelyAfterTerminalBool
+            owned terminal boundary after)) =
+        some (leading && phaseATerminalAtBool owned terminal boundary) := by
+  have exact :=
+    phaseAImmediateSuccessorObservation_exact owned terminal boundary
+  cases selected : phaseABoundaryAt? tokens (boundary.val + 1) with
+  | none =>
+      rw [selected] at exact
+      simp only at exact
+      rw [← exact]
+      simp
+  | some after =>
+      rw [selected] at exact
+      simp only at exact
+      rw [← exact]
+
+/-- On canonical U01 materialization, the saturation-independent guards read
+exactly the public basic observations. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_basic
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (key : GuardInstanceKey tokens)
+    (supported :
+      key.guard = .G03_parameterComptime ∨
+      key.guard = .G04_letComptime ∨
+      key.guard = .G05_typeComptime ∨
+      key.guard = .G07_leadingDotArguments) :
+    ∃ observed,
+      phaseBGuardObservationFromIndexes?
+          (canonicalEvidenceEntries
+            (phaseAObservationIndexEvaluator owned) phaseA) key =
+        some (observed, false) ∧
+      basicGuardPositiveObservation? owned key = some observed := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  cases guard <;>
+    simp_all [phaseBGuardObservationFromIndexes?,
+      basicGuardPositiveObservation?, phaseBComptimeAtSitePositive?,
+      phaseBG07Positive?, phaseBWithBoundary?, phaseBAllReads?,
+      phaseBReadTerminalGuard?, phaseBReadExactSliceGuard?,
+      phaseBReadIndex?, phaseAEvidenceEntryAt?_canonical_exact,
+      phaseAObservationIndexEvaluator, phaseATerminalWindowGuardBool,
+      phaseAExactSliceGuardBool,
+      phaseAImmediateSuccessorOption_exact,
+      phaseAImmediateSuccessorAndOption_exact,
+      observedTerminalAtBool_eq_phaseA,
+      observedExactSliceBool_eq_phaseA]
+
+end Chart
+
 end Solcore.Surface.Multi
