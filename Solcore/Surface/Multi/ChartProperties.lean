@@ -1742,3 +1742,301 @@ theorem executeObservedContextualWorklist?_completionBackpointerUnique_of_operat
     (contextualEdgeReach_operational correct final reached)
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+
+private def observedCloserToSemantic :
+    Chart.ObservedDelimiterCloser → DelimiterCloser
+  | .rightParen => .rightParen
+  | .rightBracket => .rightBracket
+  | .rightBrace => .rightBrace
+
+private def semanticCloserToObserved :
+    DelimiterCloser → Chart.ObservedDelimiterCloser
+  | .rightParen => .rightParen
+  | .rightBracket => .rightBracket
+  | .rightBrace => .rightBrace
+
+@[simp] private theorem observedCloser_roundTrip
+    (closer : Chart.ObservedDelimiterCloser) :
+    semanticCloserToObserved (observedCloserToSemantic closer) = closer := by
+  cases closer <;> rfl
+
+@[simp] private theorem semanticCloser_roundTrip
+    (closer : DelimiterCloser) :
+    observedCloserToSemantic (semanticCloserToObserved closer) = closer := by
+  cases closer <;> rfl
+
+private theorem observedStackToSemantic_injective :
+    Function.Injective (List.map observedCloserToSemantic) := by
+  have roundTrip : ∀ values : List Chart.ObservedDelimiterCloser,
+      (values.map observedCloserToSemantic).map
+          semanticCloserToObserved = values := by
+    intro values
+    induction values with
+    | nil => rfl
+    | cons head tail induction =>
+        simp [observedCloser_roundTrip, induction]
+  intro left right equal
+  calc
+    left = (left.map observedCloserToSemantic).map
+        semanticCloserToObserved := (roundTrip left).symm
+    _ = (right.map observedCloserToSemantic).map
+        semanticCloserToObserved := congrArg _ equal
+    _ = right := roundTrip right
+
+private theorem observedStackToSemantic_surjective :
+    Function.Surjective (List.map observedCloserToSemantic) := by
+  intro values
+  refine ⟨values.map semanticCloserToObserved, ?_⟩
+  simp [List.map_map, Function.comp_def]
+
+set_option linter.unusedSimpArgs false in
+private theorem observedDelimiterStep?_eq_some_iff
+    (before after : Chart.ObservedDelimiterStack)
+    (token : TokenKind) :
+    Chart.observedDelimiterStep? before token = some after ↔
+      DelimiterStep (before.map observedCloserToSemantic) token
+        (after.map observedCloserToSemantic) := by
+  have mappedEq : ∀ left right : Chart.ObservedDelimiterStack,
+      left.map observedCloserToSemantic =
+          right.map observedCloserToSemantic ↔ left = right :=
+    fun left right => ⟨fun equal =>
+        observedStackToSemantic_injective equal,
+      congrArg (List.map observedCloserToSemantic)⟩
+  have mappedConsEq : ∀ head tail values,
+      values.map observedCloserToSemantic =
+          observedCloserToSemantic head ::
+            tail.map observedCloserToSemantic ↔
+        values = head :: tail := by
+    intro head tail values
+    simpa only [List.map_cons] using mappedEq values (head :: tail)
+  have mappedConsEqRev : ∀ head tail values,
+      observedCloserToSemantic head ::
+          tail.map observedCloserToSemantic =
+        values.map observedCloserToSemantic ↔
+      head :: tail = values := by
+    intro head tail values
+    simpa only [List.map_cons] using mappedEq (head :: tail) values
+  have valuesEqCons_iff_consMapEq : ∀ head tail values,
+      values = head :: tail ↔
+        observedCloserToSemantic head ::
+            tail.map observedCloserToSemantic =
+          values.map observedCloserToSemantic := by
+    intro head tail values
+    constructor
+    · rintro rfl
+      rfl
+    · intro equal
+      apply observedStackToSemantic_injective
+      simpa only [List.map_cons] using equal.symm
+  have consEqValues_iff_mapEqCons : ∀ head tail values,
+      head :: tail = values ↔
+        values.map observedCloserToSemantic =
+          observedCloserToSemantic head ::
+            tail.map observedCloserToSemantic := by
+    intro head tail values
+    constructor
+    · rintro rfl
+      rfl
+    · intro equal
+      apply observedStackToSemantic_injective
+      simpa only [List.map_cons] using equal.symm
+  cases token <;>
+    simp [Chart.observedDelimiterStep?, DelimiterStep, mappedEq,
+      mappedConsEq, mappedConsEqRev, observedCloserToSemantic, eq_comm]
+  case symbol symbol =>
+    cases symbol <;>
+      simp [Chart.observedDelimiterStep?, DelimiterStep, mappedEq,
+        mappedConsEq, mappedConsEqRev, observedCloserToSemantic, eq_comm]
+    all_goals
+      cases before with
+      | nil =>
+          cases after with
+          | nil => simp [Chart.observedDelimiterStep?, DelimiterStep,
+              mappedEq, mappedConsEq, mappedConsEqRev,
+              valuesEqCons_iff_consMapEq, consEqValues_iff_mapEqCons,
+              observedCloserToSemantic, eq_comm]
+          | cons afterHead afterTail =>
+              cases afterHead <;>
+                simp [Chart.observedDelimiterStep?, DelimiterStep,
+                  mappedEq, mappedConsEq, mappedConsEqRev,
+                  valuesEqCons_iff_consMapEq, consEqValues_iff_mapEqCons,
+                  observedCloserToSemantic, eq_comm]
+      | cons head tail =>
+          cases head <;> cases after with
+          | nil => simp [Chart.observedDelimiterStep?, DelimiterStep,
+              mappedEq, mappedConsEq, mappedConsEqRev,
+              valuesEqCons_iff_consMapEq, consEqValues_iff_mapEqCons,
+              eq_comm, observedCloserToSemantic]
+          | cons afterHead afterTail =>
+              cases afterHead <;>
+                simp [Chart.observedDelimiterStep?, DelimiterStep,
+                  mappedEq, mappedConsEq, mappedConsEqRev,
+                  valuesEqCons_iff_consMapEq, consEqValues_iff_mapEqCons,
+                  eq_comm, observedCloserToSemantic]
+
+private theorem delimiterRun_uncons
+    {tokens : List Token} {before after : DelimiterStack}
+    {start finish : Boundary tokens}
+    (different : start ≠ finish)
+    (run : DelimiterRun tokens before start finish after) :
+    ∃ next : DelimiterStack,
+    ∃ cursor : TerminalCursor tokens,
+    ∃ token : Token,
+      cursor.beforeBoundary = start ∧
+        tokens[cursor.val]? = some token ∧
+        DelimiterStep before token.payload next ∧
+        DelimiterRun tokens next cursor.afterBoundary finish after := by
+  cases run with
+  | nil => exact False.elim (different rfl)
+  | cons before next after cursor start finish token atStart lookup step rest =>
+      exact ⟨next, cursor, token, atStart, lookup, step, rest⟩
+
+private theorem observedDelimiterRunFrom?_eq_some_iff
+    {tokens : List Token}
+    (fuel cursor : Nat)
+    (before after : Chart.ObservedDelimiterStack)
+    (start finish : Boundary tokens)
+    (startEq : start.val = cursor)
+    (finishEq : finish.val = cursor + fuel) :
+    Chart.observedDelimiterRunFrom? tokens fuel cursor before =
+        some after ↔
+      DelimiterRun tokens (before.map observedCloserToSemantic)
+        start finish (after.map observedCloserToSemantic) := by
+  induction fuel generalizing cursor before after start finish with
+  | zero =>
+      have finishStart : finish = start := by
+        apply Fin.ext
+        omega
+      subst finish
+      constructor
+      · intro computed
+        have afterEq : after = before := by
+          simpa only [Chart.observedDelimiterRunFrom?,
+            Option.some.injEq] using computed.symm
+        have mappedAfterEq :=
+          congrArg (List.map observedCloserToSemantic) afterEq
+        exact Eq.mpr (congrArg (fun final =>
+          DelimiterRun tokens (before.map observedCloserToSemantic)
+            start start final) mappedAfterEq) (.nil _ _)
+      · intro run
+        have mappedEq := delimiterRun_functional run
+          (.nil (before.map observedCloserToSemantic) start)
+        have afterEq : after = before :=
+          observedStackToSemantic_injective mappedEq
+        change some before = some after
+        exact congrArg some afterEq.symm
+  | succ fuel induction =>
+      constructor
+      · intro computed
+        unfold Chart.observedDelimiterRunFrom? at computed
+        split at computed
+        case isFalse => contradiction
+        case isTrue inRange =>
+          generalize stepEq : Chart.observedDelimiterStep?
+            before tokens[cursor].payload = stepResult at computed
+          cases stepResult with
+          | none => contradiction
+          | some next =>
+              let terminalCursor : TerminalCursor tokens :=
+                ⟨cursor, Nat.lt_trans inRange (Nat.lt_succ_self _)⟩
+              let nextStart : Boundary tokens :=
+                terminalCursor.afterBoundary
+              have atStart : terminalCursor.beforeBoundary = start := by
+                apply Fin.ext
+                exact startEq.symm
+              have nextStartEq : nextStart.val = cursor + 1 := rfl
+              have nextFinishEq : finish.val = cursor + 1 + fuel := by
+                omega
+              have rest := (induction (cursor + 1) next after
+                nextStart finish nextStartEq nextFinishEq).mp computed
+              exact .cons _ _ _ terminalCursor start finish
+                tokens[cursor] atStart
+                (List.getElem?_eq_getElem inRange)
+                ((observedDelimiterStep?_eq_some_iff _ _ _).mp stepEq)
+                rest
+      · intro run
+        have different : start ≠ finish := by
+          intro equal
+          have values := congrArg Fin.val equal
+          omega
+        obtain ⟨relationAfter, terminalCursor, token, atStart,
+          lookup, step, rest⟩ := delimiterRun_uncons different run
+        have cursorEq : terminalCursor.val = cursor := by
+          have rawAtStart := congrArg Fin.val atStart
+          change terminalCursor.val = start.val at rawAtStart
+          omega
+        have inRange : cursor < tokens.length := by
+          by_cases candidate : cursor < tokens.length
+          · exact candidate
+          · have outOfRange : tokens.length ≤ terminalCursor.val := by
+              omega
+            rw [List.getElem?_eq_none outOfRange] at lookup
+            contradiction
+        have tokenEq : tokens[cursor] = token := by
+          have canonical := List.getElem?_eq_getElem inRange
+          rw [cursorEq] at lookup
+          exact Option.some.inj (canonical.symm.trans lookup)
+        obtain ⟨nextObserved, rfl⟩ :=
+          observedStackToSemantic_surjective relationAfter
+        unfold Chart.observedDelimiterRunFrom?
+        rw [dif_pos inRange]
+        rw [(observedDelimiterStep?_eq_some_iff
+          before nextObserved _).mpr (tokenEq ▸ step)]
+        have nextStartEq :
+            terminalCursor.afterBoundary.val = cursor + 1 := by
+          change terminalCursor.val + 1 = cursor + 1
+          omega
+        have nextFinishEq : finish.val = cursor + 1 + fuel := by
+          omega
+        exact (induction (cursor + 1) nextObserved after
+          terminalCursor.afterBoundary finish nextStartEq
+          nextFinishEq).mpr rest
+
+private theorem delimiterRun_ordered_for_observed
+    {tokens : List Token} {before after : DelimiterStack}
+    {start finish : Boundary tokens}
+    (run : DelimiterRun tokens before start finish after) :
+    start.val ≤ finish.val := by
+  induction run with
+  | nil => exact Nat.le_refl _
+  | cons before after finish cursor start endCursor token atStart lookup
+      step rest induction =>
+      have atStartValue := congrArg Fin.val atStart
+      have beforeValue : cursor.beforeBoundary.val = cursor.val := rfl
+      have afterValue : cursor.afterBoundary.val = cursor.val + 1 := rfl
+      omega
+
+private theorem observedDelimiterRun?_eq_some_iff
+    (tokens : List Token)
+    (before after : Chart.ObservedDelimiterStack)
+    (start finish : Boundary tokens) :
+    Chart.observedDelimiterRun? tokens before start finish = some after ↔
+      DelimiterRun tokens (before.map observedCloserToSemantic)
+        start finish (after.map observedCloserToSemantic) := by
+  unfold Chart.observedDelimiterRun?
+  split
+  case isFalse notOrdered =>
+    constructor
+    · intro impossible
+      contradiction
+    · intro run
+      exact False.elim (notOrdered (delimiterRun_ordered_for_observed run))
+  case isTrue ordered =>
+    exact observedDelimiterRunFrom?_eq_some_iff
+      (finish.val - start.val) start.val before after start finish rfl
+        (by omega)
+
+theorem observedSameDelimiterDepthBool_exact
+    (tokens : List Token) (start finish : Boundary tokens) :
+    Chart.observedSameDelimiterDepthBool tokens start finish = true ↔
+      SameDelimiterDepth tokens start finish := by
+  unfold Chart.observedSameDelimiterDepthBool SameDelimiterDepth
+  rw [decide_eq_true_iff,
+    observedDelimiterRun?_eq_some_iff tokens [] [] start finish]
+  rfl
+
+end Solcore.Surface.Multi
