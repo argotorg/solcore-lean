@@ -1112,4 +1112,101 @@ theorem semanticStatementRegionObservation_exact
       NearestStatementRegion file tokens regionStart regionEnd :=
   semanticDecisionBool_eq_true_iff _
 
+/-- G01 classification using the declarative decision adapters is exact
+without further observation hypotheses. -/
+theorem semanticStatementIfClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (isStatementIf : key.guard = .G01_statementIf)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.statementIfPositiveObservationBool owned
+          (semanticMatchingParenthesisObservation tokens)
+          (semanticGreatestEndObservation owned) key) false = decision ↔
+      GuardEvidence file tokens key decision := by
+  exact statementIfClassifiedObservation_exact owned
+    (semanticMatchingParenthesisObservation tokens)
+    (semanticGreatestEndObservation owned) key isStatementIf
+    (semanticMatchingParenthesisObservation_exact tokens)
+    (fun start upperBound finish =>
+      semanticGreatestEndObservation_exact owned (.rule .expression)
+        start upperBound finish) decision
+
+/-- G02 classification using the declarative header adapter is exact. -/
+theorem semanticMatchArmClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (isMatchArm : key.guard = .G02_matchArmBoundary)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.matchArmHeaderObservationBool
+          (semanticMatchArmHeaderObservation owned) key)
+        (Chart.matchArmPipeObservationBool owned key) = decision ↔
+      GuardEvidence file tokens key decision := by
+  exact matchArmClassifiedObservation_exact owned
+    (semanticMatchArmHeaderObservation owned) key isMatchArm
+    (semanticMatchArmHeaderObservation_exact owned) decision
+
+/-- G06 classification using the declarative delimiter and greatest-end
+adapters is exact. -/
+theorem semanticPatternComptimeClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (isPattern : key.guard = .G06_patternComptime)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.patternComptimePositiveObservationBool owned
+          (semanticPatternDelimiterObservation tokens)
+          (semanticGreatestEndObservation owned) key) false = decision ↔
+      GuardEvidence file tokens key decision := by
+  exact patternComptimeClassifiedObservation_exact owned
+    (semanticPatternDelimiterObservation tokens)
+    (semanticGreatestEndObservation owned) key isPattern
+    (semanticPatternDelimiterObservation_exact tokens)
+    (fun start upperBound finish =>
+      semanticGreatestEndObservation_exact owned (.rule .expression)
+        start upperBound finish) decision
+
+/-- G08 classification using the declarative nearest-region and greatest-end
+adapters is exact. -/
+theorem semanticTerminalExpressionClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (isTerminalExpression : key.guard = .G08_terminalExpression)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.terminalExpressionPositiveObservationBool
+          (semanticStatementRegionObservation owned)
+          (semanticGreatestEndObservation owned) key) false = decision ↔
+      GuardEvidence file tokens key decision := by
+  exact terminalExpressionClassifiedObservation_exact owned
+    (semanticStatementRegionObservation owned)
+    (semanticGreatestEndObservation owned) key isTerminalExpression
+    (semanticStatementRegionObservation_exact owned)
+    (fun start upperBound finish =>
+      semanticGreatestEndObservation_exact owned (.rule .expression)
+        start upperBound finish) decision
+
+/-- G09 classification using the declarative greatest-end adapter is exact. -/
+theorem semanticGenericContextClassifiedObservation_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (key : GuardInstanceKey tokens)
+    (isGeneric : key.guard = .G09_genericContext)
+    (decision : GuardDecision) :
+    Chart.classifyGuardObservation key.guard
+        (Chart.genericContextPositiveObservationBool owned
+          (semanticGreatestEndObservation owned) key) false = decision ↔
+      GuardEvidence file tokens key decision := by
+  exact genericContextClassifiedObservation_exact owned
+    (semanticGreatestEndObservation owned) key isGeneric
+    (fun start upperBound finish =>
+      semanticGreatestEndObservation_exact owned (.rule .predicateList)
+        start upperBound finish) decision
+
+
 end Solcore.Surface.Multi
