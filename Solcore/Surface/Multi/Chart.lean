@@ -15523,4 +15523,257 @@ private theorem processContextualItem?_contentGrowth
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Public proof-free delimiter closer used at the Chart/Properties boundary. -/
+inductive ObservedDelimiterCloser where
+  | rightParen
+  | rightBracket
+  | rightBrace
+  deriving Repr, BEq, DecidableEq
+
+abbrev ObservedDelimiterStack := List ObservedDelimiterCloser
+
+def observedDelimiterStep? :
+    ObservedDelimiterStack → TokenKind → Option ObservedDelimiterStack
+  | before, .symbol .leftParen => some (.rightParen :: before)
+  | before, .symbol .leftBracket => some (.rightBracket :: before)
+  | before, .symbol .leftBrace => some (.rightBrace :: before)
+  | .rightParen :: rest, .symbol .rightParen => some rest
+  | .rightBracket :: rest, .symbol .rightBracket => some rest
+  | .rightBrace :: rest, .symbol .rightBrace => some rest
+  | _, .symbol .rightParen => none
+  | _, .symbol .rightBracket => none
+  | _, .symbol .rightBrace => none
+  | before, _ => some before
+
+def observedDelimiterRunFrom?
+    (tokens : List Token) : Nat → Nat → ObservedDelimiterStack →
+      Option ObservedDelimiterStack
+  | 0, _, before => some before
+  | fuel + 1, cursor, before =>
+      if inRange : cursor < tokens.length then
+        match observedDelimiterStep? before tokens[cursor].payload with
+        | some after =>
+            observedDelimiterRunFrom? tokens fuel (cursor + 1) after
+        | none => none
+      else
+        none
+
+def observedDelimiterRun?
+    (tokens : List Token) (before : ObservedDelimiterStack)
+    (start finish : Boundary tokens) : Option ObservedDelimiterStack :=
+  if _ordered : start.val ≤ finish.val then
+    observedDelimiterRunFrom? tokens (finish.val - start.val)
+      start.val before
+  else
+    none
+
+def observedProtectedDelimiterStep?
+    (before : ObservedDelimiterStack) (token : TokenKind) :
+    Option ObservedDelimiterStack :=
+  match before with
+  | [] => none
+  | _ :: _ =>
+      match observedDelimiterStep? before token with
+      | some after@(_ :: _) => some after
+      | _ => none
+
+def observedProtectedDelimiterRunFrom?
+    (tokens : List Token) : Nat → Nat → ObservedDelimiterStack →
+      Option ObservedDelimiterStack
+  | 0, _, [] => none
+  | 0, _, before@(_ :: _) => some before
+  | fuel + 1, cursor, before =>
+      if inRange : cursor < tokens.length then
+        match observedProtectedDelimiterStep?
+            before tokens[cursor].payload with
+        | some after =>
+            observedProtectedDelimiterRunFrom? tokens fuel
+              (cursor + 1) after
+        | none => none
+      else
+        none
+
+def observedProtectedDelimiterRun?
+    (tokens : List Token) (before : ObservedDelimiterStack)
+    (start finish : Boundary tokens) : Option ObservedDelimiterStack :=
+  if _ordered : start.val ≤ finish.val then
+    observedProtectedDelimiterRunFrom? tokens
+      (finish.val - start.val) start.val before
+  else
+    none
+
+private def PhaseADelimiterCloser.observed :
+    PhaseADelimiterCloser → ObservedDelimiterCloser
+  | .rightParen => .rightParen
+  | .rightBracket => .rightBracket
+  | .rightBrace => .rightBrace
+
+private theorem phaseADelimiterStep?_observed
+    (before : PhaseADelimiterStack) (token : TokenKind) :
+    Option.map (List.map PhaseADelimiterCloser.observed)
+        (phaseADelimiterStep? before token) =
+      observedDelimiterStep?
+        (before.map PhaseADelimiterCloser.observed) token := by
+  cases token <;> try rfl
+  case symbol symbol =>
+    cases symbol <;> try rfl
+    all_goals
+      cases before with
+      | nil => rfl
+      | cons head tail =>
+          cases head <;> rfl
+
+private theorem phaseADelimiterRunFrom?_observed
+    (tokens : List Token) : ∀ fuel cursor before,
+    Option.map (List.map PhaseADelimiterCloser.observed)
+        (phaseADelimiterRunFrom? tokens fuel cursor before) =
+      observedDelimiterRunFrom? tokens fuel cursor
+        (before.map PhaseADelimiterCloser.observed) := by
+  intro fuel
+  induction fuel with
+  | zero => intro cursor before; simp [phaseADelimiterRunFrom?,
+      observedDelimiterRunFrom?]
+  | succ fuel induction =>
+      intro cursor before
+      rw [phaseADelimiterRunFrom?, observedDelimiterRunFrom?]
+      split
+      next inRange =>
+        have step := phaseADelimiterStep?_observed before
+          tokens[cursor].payload
+        cases selected : phaseADelimiterStep? before tokens[cursor].payload
+        <;> rw [selected] at step
+        · have observedNone : observedDelimiterStep?
+              (List.map PhaseADelimiterCloser.observed before)
+              tokens[cursor].payload = none := by simpa using step.symm
+          rw [observedNone]
+          rfl
+        · rename_i after
+          have observedSome : observedDelimiterStep?
+              (List.map PhaseADelimiterCloser.observed before)
+              tokens[cursor].payload =
+                some (after.map PhaseADelimiterCloser.observed) := by
+            simpa using step.symm
+          rw [observedSome]
+          exact induction (cursor + 1) after
+      next outOfRange => rfl
+
+private theorem phaseADelimiterRun?_observed
+    (tokens : List Token) (before : PhaseADelimiterStack)
+    (start finish : Boundary tokens) :
+    Option.map (List.map PhaseADelimiterCloser.observed)
+        (phaseADelimiterRun? tokens before start finish) =
+      observedDelimiterRun? tokens
+        (before.map PhaseADelimiterCloser.observed) start finish := by
+  unfold phaseADelimiterRun? observedDelimiterRun?
+  split
+  · exact phaseADelimiterRunFrom?_observed tokens _ _ before
+  · rfl
+
+private theorem phaseAProtectedDelimiterStep?_observed
+    (before : PhaseADelimiterStack) (token : TokenKind) :
+    Option.map (List.map PhaseADelimiterCloser.observed)
+        (phaseAProtectedDelimiterStep? before token) =
+      observedProtectedDelimiterStep?
+        (before.map PhaseADelimiterCloser.observed) token := by
+  cases before with
+  | nil => rfl
+  | cons head tail =>
+      have step := phaseADelimiterStep?_observed (head :: tail) token
+      cases selected : phaseADelimiterStep? (head :: tail) token
+      <;> rw [selected] at step
+      · have observedNone : observedDelimiterStep?
+            ((head :: tail).map PhaseADelimiterCloser.observed) token =
+              none := by simpa using step.symm
+        simp only [List.map_cons] at observedNone
+        simp only [phaseAProtectedDelimiterStep?, selected, Option.map_none,
+          observedProtectedDelimiterStep?, List.map_cons]
+        rw [observedNone]
+      · rename_i after
+        have observedSome : observedDelimiterStep?
+            ((head :: tail).map PhaseADelimiterCloser.observed) token =
+              some (after.map PhaseADelimiterCloser.observed) := by
+          simpa using step.symm
+        simp only [List.map_cons] at observedSome
+        cases after with
+        | nil =>
+            simp only [phaseAProtectedDelimiterStep?, selected,
+              observedProtectedDelimiterStep?, List.map_cons,
+              Option.map_none]
+            rw [observedSome]
+            rfl
+        | cons afterHead afterTail =>
+            simp only [phaseAProtectedDelimiterStep?, selected,
+              observedProtectedDelimiterStep?, List.map_cons,
+              Option.map_some]
+            rw [observedSome]
+            rfl
+
+private theorem phaseAProtectedDelimiterRunFrom?_observed
+    (tokens : List Token) : ∀ fuel cursor before,
+    Option.map (List.map PhaseADelimiterCloser.observed)
+        (phaseAProtectedDelimiterRunFrom? tokens fuel cursor before) =
+      observedProtectedDelimiterRunFrom? tokens fuel cursor
+        (before.map PhaseADelimiterCloser.observed) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro cursor before
+      cases before <;> simp [phaseAProtectedDelimiterRunFrom?,
+        observedProtectedDelimiterRunFrom?]
+  | succ fuel induction =>
+      intro cursor before
+      rw [phaseAProtectedDelimiterRunFrom?,
+        observedProtectedDelimiterRunFrom?]
+      split
+      next inRange =>
+        have step := phaseAProtectedDelimiterStep?_observed before
+          tokens[cursor].payload
+        cases selected : phaseAProtectedDelimiterStep?
+            before tokens[cursor].payload
+        <;> rw [selected] at step
+        · have observedNone : observedProtectedDelimiterStep?
+              (before.map PhaseADelimiterCloser.observed)
+              tokens[cursor].payload = none := by simpa using step.symm
+          rw [observedNone]
+          rfl
+        · rename_i after
+          have observedSome : observedProtectedDelimiterStep?
+              (before.map PhaseADelimiterCloser.observed)
+              tokens[cursor].payload =
+                some (after.map PhaseADelimiterCloser.observed) := by
+            simpa using step.symm
+          rw [observedSome]
+          exact induction (cursor + 1) after
+      next outOfRange => rfl
+
+private theorem phaseAProtectedDelimiterRun?_observed
+    (tokens : List Token) (before : PhaseADelimiterStack)
+    (start finish : Boundary tokens) :
+    Option.map (List.map PhaseADelimiterCloser.observed)
+        (phaseAProtectedDelimiterRun? tokens before start finish) =
+      observedProtectedDelimiterRun? tokens
+        (before.map PhaseADelimiterCloser.observed) start finish := by
+  unfold phaseAProtectedDelimiterRun? observedProtectedDelimiterRun?
+  split
+  · exact phaseAProtectedDelimiterRunFrom?_observed tokens _ _ before
+  · rfl
+
+private theorem phaseADelimiterCloser_map_eq_rightParen_iff
+    (values : PhaseADelimiterStack) :
+    values.map PhaseADelimiterCloser.observed =
+        [.rightParen] ↔
+      values = [.rightParen] := by
+  cases values with
+  | nil => simp
+  | cons head tail =>
+      cases head <;> cases tail <;>
+        simp [PhaseADelimiterCloser.observed]
+
+end Chart
+
 end Solcore.Surface.Multi
