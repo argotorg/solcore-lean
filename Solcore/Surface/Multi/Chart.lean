@@ -4054,6 +4054,151 @@ private theorem attemptCompletion?_completionLedger
     rw [sameResult.1, sameResult.2]
     exact ⟨actualItem, candidate, candidateMember, candidateSame⟩
 
+private theorem attemptCompletionsWith?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    ∀ others (current result : CountedState tokens (PhaseAOpen file tokens)),
+      CompletionAttemptLedgerMaterialized current →
+      attemptCompletionsWith? pivot others current = some result →
+      CompletionAttemptLedgerMaterialized result := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result ledger selected
+      cases selected
+      exact ledger
+  | cons other rest induction =>
+      intro current result ledger selected
+      rw [attemptCompletionsWith?] at selected
+      cases forwardEq : attemptCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardLedger := attemptCompletion?_completionLedger
+            current forward pivot other ledger forwardEq
+          split at selected
+          next same => exact induction forward result forwardLedger selected
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq : attemptCompletion? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact induction reverse result
+                  (attemptCompletion?_completionLedger forward reverse
+                    other pivot forwardLedger reverseEq) selected
+
+private theorem processRawItem?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : DottedItem tokens)
+    (current result : CountedState tokens (PhaseAOpen file tokens))
+    (ledger : CompletionAttemptLedgerMaterialized current)
+    (selected : processRawItem? owned item current = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  unfold processRawItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq,
+    scanned, scannedEq, completedEq⟩
+  exact attemptCompletionsWith?_completionLedger item
+    scanned.payload.rawItems scanned result
+    (attemptScan?_completionLedger owned predicted scanned item
+      (attemptPredictions?_completionLedger item allProductionIds
+        current predicted ledger predictedEq) scannedEq) completedEq
+
+private theorem insertRawSeeds?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ seeds (current result : CountedState tokens (PhaseAOpen file tokens)),
+      CompletionAttemptLedgerMaterialized current →
+      insertRawSeeds? seeds current = some result →
+      CompletionAttemptLedgerMaterialized result := by
+  intro seeds
+  induction seeds with
+  | nil =>
+      intro current result ledger selected
+      cases selected
+      exact ledger
+  | cons item rest induction =>
+      intro current result ledger selected
+      rw [insertRawSeeds?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (insertRawItem?_completionLedger current next .seedOrPrediction item
+          ledger nextEq) restEq
+
+private theorem beginPhaseA_completionLedger
+    (file : WorkspaceFile) (tokens : List Token) :
+    CompletionAttemptLedgerMaterialized (beginPhaseA file tokens) := by
+  intro waiting finished after edge _ used
+  simp [beginPhaseA, Counter.charge, Counter.empty] at used
+
+private theorem runPhaseAQueues?_completionLedger
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result : CountedState tokens (PhaseAOpen file tokens)),
+      CompletionAttemptLedgerMaterialized current →
+      runPhaseAQueues? owned fuel current = some result →
+      CompletionAttemptLedgerMaterialized result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result ledger selected
+      rw [runPhaseAQueues?] at selected
+      split at selected <;> try contradiction
+      cases selected
+      exact ledger
+  | succ fuel induction =>
+      intro current result ledger selected
+      rw [runPhaseAQueues?] at selected
+      cases items : current.payload.itemQueue with
+      | nil =>
+          cases edges : current.payload.edgeQueue with
+          | nil =>
+              simp only [items, edges] at selected
+              cases selected
+              exact ledger
+          | cons edge rest =>
+              simp only [items, edges] at selected
+              cases dequeued : dequeueRawEdge? current with
+              | none => simp [dequeued] at selected
+              | some pair =>
+                  rw [dequeued] at selected
+                  exact induction pair.2 result
+                    (dequeueRawEdge?_completionLedger current pair ledger
+                      dequeued) selected
+      | cons item rest =>
+          simp only [items] at selected
+          cases dequeued : dequeueRawItem? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              rcases pair with ⟨pivot, afterDequeue⟩
+              simp only at selected
+              cases processed : processRawItem? owned pivot afterDequeue with
+              | none => simp [processed] at selected
+              | some next =>
+                  rw [processed] at selected
+                  exact induction next result
+                    (processRawItem?_completionLedger owned pivot
+                      afterDequeue next
+                      (dequeueRawItem?_completionLedger current
+                        (pivot, afterDequeue) ledger dequeued) processed)
+                    selected
+
+private theorem executePhaseA?_completionLedger
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result) :
+    CompletionAttemptLedgerMaterialized result := by
+  unfold executePhaseA? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨seeded, seededEq, runEq⟩
+  exact runPhaseAQueues?_completionLedger owned _ seeded result
+    (insertRawSeeds?_completionLedger (rawSeedItems tokens)
+      (beginPhaseA file tokens) seeded
+      (beginPhaseA_completionLedger file tokens) seededEq) runEq
+
 
 
 
