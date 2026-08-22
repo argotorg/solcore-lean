@@ -6379,6 +6379,166 @@ private theorem attemptCompletionsWith?_total_allSafe
           resultItemSafe, resultCompletionSafe, resultEdgeSafe⟩
 
 
+private theorem dequeueRawEdge?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens) (rest : List (PackedEdge file tokens))
+    (queue : current.payload.edgeQueue = edge :: rest)
+    (safe : PhaseAEdgeSafe current) :
+    ∃ after, dequeueRawEdge? current = some (edge, after) := by
+  have fresh := safe.queueFresh edge (by simp [queue])
+  unfold dequeueRawEdge?
+  rw [queue]
+  change ∃ after, (do
+    let next ← runMappedPrimitive? current (rawEdgeDequeueAddress edge)
+      (fun state => { state with edgeQueue := rest })
+    pure (edge, next)) = some (edge, after)
+  simp [runMappedPrimitive?, fresh]
+
+private theorem dequeueRawEdge?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens) (rest : List (PackedEdge file tokens))
+    (queue : current.payload.edgeQueue = edge :: rest)
+    (safe : PhaseAItemSafe current)
+    (selected : dequeueRawEdge? current = some (edge, after)) :
+    PhaseAItemSafe after := by
+  unfold dequeueRawEdge? at selected
+  rw [queue] at selected
+  change (do
+    let next ← runMappedPrimitive? current (rawEdgeDequeueAddress edge)
+      (fun state => { state with edgeQueue := rest })
+    pure (edge, next)) = some (edge, after) at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  have payload := phaseA_runMappedPrimitive?_payload current _ _ after nextEq
+  have used := phaseA_runMappedPrimitive?_usedRev current _ _ after nextEq
+  constructor
+  · intro source item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases source <;> cases edge <;>
+        simp [RawItemInsertSource.unitKind, rawEdgeDequeueAddress] at equal
+    · simpa [payload] using safe.inserted source item old
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [rawEdgeDequeueAddress] at equal
+    · simpa [payload] using safe.dequeued item old
+  · intro item production member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [rawEdgeDequeueAddress] at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.predicted item production old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [rawEdgeDequeueAddress] at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scanned item old)
+  · intro item member
+    rw [used] at member
+    simp only [List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [rawEdgeDequeueAddress] at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+  · intro item member usedItem
+    rw [payload] at member
+    rw [used] at usedItem
+    simp only [List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [rawEdgeDequeueAddress] at equal
+    · exact safe.queueFresh item member old
+  · simpa [payload] using safe.rawNodup
+  · simpa [payload] using safe.queueNodup
+  · simpa [payload] using safe.queueSubset
+
+private theorem dequeueRawEdge?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens) (rest : List (PackedEdge file tokens))
+    (queue : current.payload.edgeQueue = edge :: rest)
+    (safe : PhaseACompletionSafe current)
+    (selected : dequeueRawEdge? current = some (edge, after)) :
+    PhaseACompletionSafe after := by
+  unfold dequeueRawEdge? at selected
+  rw [queue] at selected
+  change (do
+    let next ← runMappedPrimitive? current (rawEdgeDequeueAddress edge)
+      (fun state => { state with edgeQueue := rest })
+    pure (edge, next)) = some (edge, after) at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  apply runMappedPrimitive?_completionSafe_of_not_insert current after _ _ safe
+    _ nextEq
+  intro waiting finished equal
+  rcases edge with ⟨edge, valid⟩
+  cases edge <;> simp [rawEdgeDequeueAddress] at equal
+
+private theorem dequeueRawEdge?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseAOpen file tokens))
+    (edge : PackedEdge file tokens) (rest : List (PackedEdge file tokens))
+    (queue : current.payload.edgeQueue = edge :: rest)
+    (safe : PhaseAEdgeSafe current)
+    (selected : dequeueRawEdge? current = some (edge, after)) :
+    PhaseAEdgeSafe after := by
+  unfold dequeueRawEdge? at selected
+  rw [queue] at selected
+  change (do
+    let next ← runMappedPrimitive? current (rawEdgeDequeueAddress edge)
+      (fun state => { state with edgeQueue := rest })
+    pure (edge, next)) = some (edge, after) at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  have payload := phaseA_runMappedPrimitive?_payload current _ _ after nextEq
+  have used := phaseA_runMappedPrimitive?_usedRev current _ _ after nextEq
+  have queueUnique := safe.queueAddressNodup
+  rw [queue, List.map_cons, List.nodup_cons] at queueUnique
+  have payloadQueue : after.payload.edgeQueue = rest := by simp [payload]
+  constructor
+  · intro candidate member
+    rw [payloadQueue] at member
+    rw [used]
+    exact List.mem_cons_of_mem _ (safe.inserted candidate (by simp [queue, member]))
+  · intro candidate member
+    rw [used] at member ⊢
+    simp only [List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · have insertEqual := rawEdgeInsertAddress_eq_of_dequeueAddress_eq
+          candidate edge equal
+      apply Or.inr
+      simpa only [insertEqual] using safe.inserted edge (by simp [queue])
+    · exact Or.inr (safe.causal candidate old)
+  · intro candidate member usedCandidate
+    rw [payloadQueue] at member
+    rw [used] at usedCandidate
+    simp only [List.mem_cons] at usedCandidate
+    rcases usedCandidate with equal | old
+    · apply queueUnique.1
+      exact List.mem_map.mpr ⟨candidate, member, equal⟩
+    · exact safe.queueFresh candidate (by simp [queue, member]) old
+  · simpa [payloadQueue] using queueUnique.2
+
+
 private def allEvidenceIndexKinds : List EvidenceIndexKind := [
   .terminalWindow,
   .exactSlice,
