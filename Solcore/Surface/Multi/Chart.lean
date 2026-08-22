@@ -14652,4 +14652,161 @@ theorem executeObservedGuardWorklist?_memo_eq_saturated
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem contextualItem_eq_of_fields
+    {tokens : List Token} {left right : ContextualItemKey tokens}
+    (raw : left.raw = right.raw)
+    (context : left.context = right.context) : left = right := by
+  cases left
+  cases right
+  simp only at raw context
+  cases raw
+  cases context
+  rfl
+
+/-- A declarative next-symbol premise computes the exact contextual
+prediction cell consumed by the worklist. -/
+private theorem contextualPredictedItem?_complete
+    {tokens : List Token}
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (next : NextSymbol waiting.raw (.nonterminal predicted.lhs)) :
+    contextualPredictedItem? waiting predicted = some (({
+      raw := {
+        production := predicted
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := waiting.raw.current
+        current := waiting.raw.current
+      }
+      context := descendContext waiting predicted
+    } : ContextualItemKey tokens), {
+      production := predicted
+      origin := waiting.raw.current
+      context := descendContext waiting predicted
+    }) := by
+  unfold contextualPredictedItem?
+  rw [next.2]
+  simp
+
+/-- Every structurally valid contextual scan is reconstructed by the exact
+checked scan builder, including its requested endpoint and cursor. -/
+private theorem contextualScannedEdge?_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : ContextualItemKey tokens)
+    (cursor : TerminalCursor tokens)
+    (structural : ContextualPackedEdgeKey.StructurallyValid file tokens
+      (.scanned before after cursor)) :
+    ∃ edge, contextualScannedEdge? owned before = some (after, edge) ∧
+      edge.before = before ∧ edge.after = after ∧ edge.cursor = cursor := by
+  obtain ⟨witness⟩ := packedEdge_scanned_valid_iff.mp structural.1
+  rcases witness with
+    ⟨terminal, matched, sameCursor, next, atCurrent, advance⟩
+  change before.raw.dot.val < before.raw.production.rhs.length ∧
+    before.raw.production.rhs[before.raw.dot.val]? =
+      some (.terminal terminal) at next
+  have cursorVal : cursor.val = before.raw.current.val :=
+    congrArg Fin.val atCurrent
+  have currentInRange : before.raw.current.val < tokens.length + 1 := by
+    rw [← cursorVal]
+    exact cursor.isLt
+  let computedCursor : TerminalCursor tokens :=
+    ⟨before.raw.current.val, currentInRange⟩
+  have cursorEq : computedCursor = cursor := Fin.ext cursorVal.symm
+  have nextGet :
+      before.raw.production.rhs[before.raw.dot.val] = .terminal terminal := by
+    exact Option.some.inj
+      ((List.getElem?_eq_getElem next.1).symm.trans next.2)
+  have terminalAt : TerminalAt file tokens computedCursor
+      matched.value matched.span := by
+    rw [cursorEq, ← sameCursor]
+    exact matched.at
+  obtain ⟨computedMatched, matchedEq⟩ :=
+    MatchedTerminal.atCursor?_complete owned terminal computedCursor
+      terminalAt matched.matches
+  let expectedRaw : DottedItem tokens := {
+    production := before.raw.production
+    dot := ⟨before.raw.dot.val + 1, by omega⟩
+    origin := before.raw.origin
+    current := computedCursor.afterBoundary
+  }
+  have requestedAdvance : AdvanceItem before.raw
+      computedCursor.afterBoundary after.raw := by
+    rw [cursorEq, ← sameCursor]
+    exact advance
+  have expectedRawEq : expectedRaw = after.raw :=
+    dottedItem_eq_of_fields
+      (by simpa [expectedRaw] using requestedAdvance.1.symm)
+      (by simpa [expectedRaw] using requestedAdvance.2.1.symm)
+      (by simpa [expectedRaw] using requestedAdvance.2.2.1.symm)
+      (by simpa [expectedRaw] using requestedAdvance.2.2.2.symm)
+  let expected : ContextualItemKey tokens := {
+    raw := expectedRaw
+    context := before.context
+  }
+  have expectedEq : expected = after :=
+    contextualItem_eq_of_fields expectedRawEq structural.2
+  rw [← expectedEq]
+  unfold contextualScannedEdge?
+  rw [dif_pos next.1]
+  split <;> simp_all [expected, expectedRaw, computedCursor]
+  all_goals
+    subst_vars
+    rw [matchedEq]
+    simp
+
+/-- Every structurally valid contextual completion is reconstructed by the
+exact checked completion builder, including its erased shared coordinate. -/
+private theorem contextualCompletedEdge?_complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens)
+    (shared : Boundary tokens)
+    (structural : ContextualPackedEdgeKey.StructurallyValid file tokens
+      (.completed waiting finished after shared)) :
+    ∃ edge, contextualCompletedEdge? (file := file) waiting finished =
+        some (after, edge) ∧
+      edge.waiting = waiting ∧ edge.finished = finished ∧
+        edge.after = after ∧ edge.shared = shared := by
+  obtain ⟨witness⟩ := packedEdge_completed_valid_iff.mp structural.1
+  rcases witness with
+    ⟨next, complete, waitingAtShared, finishedAtShared, advance⟩
+  change waiting.raw.dot.val < waiting.raw.production.rhs.length ∧
+    waiting.raw.production.rhs[waiting.raw.dot.val]? =
+      some (.nonterminal finished.raw.production.lhs) at next
+  change finished.raw.dot.val = finished.raw.production.rhs.length at complete
+  have nextGet : waiting.raw.production.rhs[waiting.raw.dot.val] =
+      .nonterminal finished.raw.production.lhs := by
+    exact Option.some.inj
+      ((List.getElem?_eq_getElem next.1).symm.trans next.2)
+  have sameCursor : waiting.raw.current = finished.raw.origin :=
+    waitingAtShared.trans finishedAtShared.symm
+  let expectedRaw : DottedItem tokens := {
+    production := waiting.raw.production
+    dot := ⟨waiting.raw.dot.val + 1, by omega⟩
+    origin := waiting.raw.origin
+    current := finished.raw.current
+  }
+  have expectedRawEq : expectedRaw = after.raw :=
+    dottedItem_eq_of_fields
+      (by simpa [expectedRaw] using advance.1.symm)
+      (by simpa [expectedRaw] using advance.2.1.symm)
+      (by simpa [expectedRaw] using advance.2.2.1.symm)
+      (by simpa [expectedRaw] using advance.2.2.2.symm)
+  let expected : ContextualItemKey tokens := {
+    raw := expectedRaw
+    context := waiting.context
+  }
+  have expectedEq : expected = after :=
+    contextualItem_eq_of_fields expectedRawEq structural.2.2.symm
+  rw [← expectedEq]
+  unfold contextualCompletedEdge?
+  rw [dif_pos next.1]
+  split <;> simp_all [expected, expectedRaw]
+  exact ⟨_, ⟨structural.2.1, rfl⟩, rfl, rfl, rfl, rfl⟩
+
+end Chart
+
 end Solcore.Surface.Multi
