@@ -8676,4 +8676,50 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_G06
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- A proof-free match-arm header oracle supplied by saturated Phase A. -/
+abbrev MatchArmHeaderObservation (tokens : List Token) :=
+  Boundary tokens → Boundary tokens → Bool
+
+/-- G02's positive header bit, kept separate from its exact pipe bit. -/
+def matchArmHeaderObservationBool
+    {tokens : List Token}
+    (header : MatchArmHeaderObservation tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  header key.contextStart key.siteCursor
+
+/-- Canonical U01 reads implement G02's public parameterized header together
+with the already-exact pipe observation. -/
+private theorem phaseBGuardObservationFromIndexes?_canonical_G02
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (key : GuardInstanceKey tokens)
+    (isMatchArm : key.guard = .G02_matchArmBoundary) :
+    phaseBGuardObservationFromIndexes?
+        (canonicalEvidenceEntries
+          (phaseAObservationIndexEvaluator owned) phaseA) key =
+      some (matchArmHeaderObservationBool
+          (fun regionStart cursor =>
+            phaseAArmHeaderBool phaseA regionStart cursor) key,
+        matchArmPipeObservationBool owned key) := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  change guard = .G02_matchArmBoundary at isMatchArm
+  subst guard
+  simp [phaseBGuardObservationFromIndexes?, phaseBG02Observations?,
+    phaseBReadDelimiterGuard?, phaseBReadTerminalGuard?,
+    phaseBWithBoundary?, phaseBReadIndex?,
+    phaseAEvidenceEntryAt?_canonical_exact,
+    phaseAObservationIndexEvaluator, phaseATerminalWindowGuardBool,
+    phaseADelimiterOrRegionGuardBool,
+    phaseAImmediateSuccessorOption_exact,
+    matchArmHeaderObservationBool, matchArmPipeObservationBool,
+    observedTerminalAtBool_eq_phaseA]
+
+end Chart
+
 end Solcore.Surface.Multi
