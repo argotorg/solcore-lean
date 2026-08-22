@@ -17269,4 +17269,23 @@ private theorem executeObservedPhaseABCWorklist?_attemptLedger
 
 end Chart
 
+namespace Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem executeObservedPhaseAB?_phaseC_entry_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (phaseB : CountedState tokens (PhaseBSealed file tokens))
+    (selected : executeObservedPhaseAB? file tokens owned = some phaseB) :
+    ∃ entered, beginPhaseCWorklist? phaseB = some entered := by
+  apply (beginPhaseCWorklist?_total_iff_root_fresh phaseB).mpr
+  exact executeObservedPhaseAB?_phaseCInitialFresh file tokens owned phaseB
+    selected (.linear .L03_itemInsert
+      (contextualLinearKey (contextualRoot tokens)))
+      (by simp [phaseCInitialAddress, contextualLinearKey])
+
+end Chart
+
 end Solcore.Surface.Multi
