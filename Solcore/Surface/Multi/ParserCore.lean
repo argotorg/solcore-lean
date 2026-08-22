@@ -5126,3 +5126,214 @@ def executeAuxiliaryAction
   | .tail site branch => ListSite.pack site branch input
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+namespace EbnfValue
+
+/-- View a terminal atom as its exact checked terminal match. -/
+def terminalView
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol)
+    (input : EbnfValue file tokens (.atom (.terminal terminal))) :
+    MatchedTerminal file tokens terminal :=
+  Eq.mp (ebnfValue_atom_terminal_eq terminal) input
+
+/-- Rebuilding a viewed terminal atom recovers the original value. -/
+theorem terminal_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol)
+    (input : EbnfValue file tokens (.atom (.terminal terminal))) :
+    terminalAtom terminal (terminalView terminal input) = input := by
+  simp [terminalView, terminalAtom]
+
+/-- View a source-rule atom as its exact rule-indexed value. -/
+def ruleView
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.atom (.nonterminal rule))) :
+    RuleValue rule :=
+  Eq.mp (ebnfValue_atom_nonterminal_eq rule) input
+
+/-- Rebuilding a viewed source-rule atom recovers the original value. -/
+theorem rule_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (input : EbnfValue file tokens (.atom (.nonterminal rule))) :
+    ruleAtom rule (ruleView rule input) = input := by
+  simp [ruleView, ruleAtom]
+
+/-- View a sequence as its exact heterogeneous child tuple. -/
+def sequenceView
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    EbnfValues file tokens children :=
+  Eq.mp (ebnfValue_sequence_eq children) input
+
+/-- Rebuilding a viewed sequence recovers the original value. -/
+theorem sequence_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    sequence children (sequenceView children input) = input := by
+  simp [sequenceView, sequence]
+
+/-- View a group as its exact child value. -/
+def groupView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.group child)) :
+    EbnfValue file tokens child :=
+  Eq.mp (ebnfValue_group_eq child) input
+
+/-- Rebuilding a viewed group recovers the original value. -/
+theorem group_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.group child)) :
+    group child (groupView child input) = input := by
+  simp [groupView, group]
+
+/-- View a choice as its exact dependent branch and child value. -/
+def choiceView
+    {file : WorkspaceFile} {tokens : List Token}
+    (branches : List EbnfExpr)
+    (input : EbnfValue file tokens (.choice branches)) :
+    (branch : Fin branches.length) ×
+      EbnfValue file tokens (branches.get branch) :=
+  Eq.mp (ebnfValue_choice_eq branches) input
+
+/-- Rebuilding a viewed choice recovers the original value. -/
+theorem choice_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (branches : List EbnfExpr)
+    (input : EbnfValue file tokens (.choice branches)) :
+    choice branches (choiceView branches input) = input := by
+  simp [choiceView, choice]
+
+/-- View an optional expression as its exact optional child. -/
+def optionalView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.optional child)) :
+    Option (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_optional_eq child) input
+
+/-- Rebuilding a viewed optional expression recovers the original value. -/
+theorem optional_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.optional child)) :
+    optional child (optionalView child input) = input := by
+  simp [optionalView, optional]
+
+/-- View a star expression as its exact ordered child list. -/
+def starView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.star child)) :
+    List (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_star_eq child) input
+
+/-- Rebuilding a viewed star expression recovers the original value. -/
+theorem star_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.star child)) :
+    star child (starView child input) = input := by
+  simp [starView, star]
+
+/-- View a plus expression as its exact nonempty child list. -/
+def plusView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.plus child)) :
+    NonemptyList (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_plus_eq child) input
+
+/-- Rebuilding a viewed plus expression recovers the original value. -/
+theorem plus_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.plus child)) :
+    plus child (plusView child input) = input := by
+  simp [plusView, plus]
+
+/-- View a list-zero expression as its exact ordered child list. -/
+def list0View
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.list0 child)) :
+    List (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_list0_eq child) input
+
+/-- Rebuilding a viewed list-zero expression recovers the original value. -/
+theorem list0_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.list0 child)) :
+    list0 child (list0View child input) = input := by
+  simp [list0View, list0]
+
+/-- View a list-one expression as its exact nonempty child list. -/
+def list1View
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.list1 child)) :
+    NonemptyList (EbnfValue file tokens child) :=
+  Eq.mp (ebnfValue_list1_eq child) input
+
+/-- Rebuilding a viewed list-one expression recovers the original value. -/
+theorem list1_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr)
+    (input : EbnfValue file tokens (.list1 child)) :
+    list1 child (list1View child input) = input := by
+  simp [list1View, list1]
+
+end EbnfValue
+
+namespace EbnfValues
+
+private theorem eqMp_rebuild
+    {alpha beta : Sort _} (typeEq : alpha = beta) (input : alpha) :
+    Eq.mp typeEq.symm (Eq.mp typeEq input) = input := by
+  cases typeEq
+  rfl
+
+/-- View a nonempty heterogeneous sequence as its exact head and tail. -/
+def consView
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (rest : List EbnfExpr)
+    (input : EbnfValues file tokens (child :: rest)) :
+    EbnfValue file tokens child × EbnfValues file tokens rest :=
+  Eq.mp (ebnfValues_cons_eq child rest) input
+
+/-- Rebuilding a viewed heterogeneous sequence recovers the original value. -/
+theorem cons_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (child : EbnfExpr) (rest : List EbnfExpr)
+    (input : EbnfValues file tokens (child :: rest)) :
+    cons child rest (consView child rest input).1
+        (consView child rest input).2 = input := by
+  exact eqMp_rebuild (ebnfValues_cons_eq child rest) input
+
+/-- The empty heterogeneous sequence has exactly its canonical value. -/
+theorem nil_unique
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValues file tokens []) :
+    nil = input := by
+  unfold nil
+  have viewed :
+      Eq.mp (ebnfValues_nil_eq (file := file) (tokens := tokens)) input = () :=
+    Subsingleton.elim _ _
+  rw [← viewed]
+  simp
+
+end EbnfValues
+
+end Solcore.Surface.Multi
