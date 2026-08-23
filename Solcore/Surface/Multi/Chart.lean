@@ -20631,6 +20631,35 @@ end ObservedFrontier
 
 namespace ContextualWorklistResult
 
+/-- Decide whether the retained item ledger contains the canonical completed
+module root spanning the entire logical token stream. -/
+def containsCompleteModuleRootItem
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) : Bool :=
+  result.items.any fun item => decide
+    (item = CanonicalCompleteRootItem tokens .module
+      (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)
+
+/-- The completed-module-root bit is exact finite-list membership. -/
+theorem containsCompleteModuleRootItem_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    result.containsCompleteModuleRootItem = true ↔
+      CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain ∈
+          result.items := by
+  let root := CanonicalCompleteRootItem tokens .module
+    (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain
+  change (result.items.any fun item => decide (item = root)) = true ↔
+    root ∈ result.items
+  rw [List.any_eq_true]
+  constructor
+  · rintro ⟨item, member, same⟩
+    have equality : item = root := of_decide_eq_true same
+    simpa only [equality] using member
+  · intro member
+    exact ⟨root, member, by simp⟩
+
 /-- Compute the ordinary unexpected-token diagnostic candidate from the
 greatest observed frontier.  Applicability premises such as root absence and
 nonassociative exclusion remain deliberately external. -/
