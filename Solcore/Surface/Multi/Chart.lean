@@ -21739,3 +21739,208 @@ private theorem PhaseCCompletionInsertReady.of_ledgerExact
         by simp only [storedPairEq, if_pos]⟩
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem phaseC_runMappedPrimitive?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (address : UnitAddress tokens)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : runMappedPrimitive? current address id = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  have payload := runMappedPrimitive?_payload current address id selected
+  change result.payload = current.payload at payload
+  exact exact.mono current result
+    (congrArg PhaseCWorklist.completionBackpointers payload)
+    (phaseC_runMappedPrimitive?_contentGrowth current result address selected)
+
+private theorem attemptContextualPrediction?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none => simp only [predictedEq] at selected; cases selected; exact exact
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedExact := phaseC_runMappedPrimitive?_ledgerExact
+            current attempted _ exact attemptedEq
+          by_cases used : UnitAddress.production productionInstance ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedExact
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedExact :=
+                  activateWorklistProduction?_ledgerExact attempted
+                    productionInstance activated attemptedExact activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  cases selected
+                  exact activatedExact
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  exact insertContextualItem?_ledgerExact activated.1 result
+                    .prediction item activatedExact selected
+
+private theorem attemptContextualPredictions?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCBackpointerLedgerExact current →
+      attemptContextualPredictions? waiting productions current = some result →
+      PhaseCBackpointerLedgerExact result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result exact selected
+      cases selected
+      exact exact
+  | cons predicted rest induction =>
+      intro current result exact selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptContextualPrediction?_ledgerExact current next waiting
+          predicted exact nextEq) restEq
+
+private theorem attemptContextualScan?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedExact := phaseC_runMappedPrimitive?_ledgerExact
+      current attempted _ exact attemptedEq
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq] at remainderEq
+        cases remainderEq
+        exact attemptedExact
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        exact insertContextualScannedEdge?_ledgerExact withItem result edge
+          (insertContextualItem?_ledgerExact attempted withItem .scan after
+            attemptedExact itemEq) edgeEq
+  · cases selected
+    exact exact
+
+private theorem attemptContextualCompletion?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold attemptContextualCompletion? at selected
+  cases completionEq : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none => simp only [completionEq] at selected; cases selected; exact exact
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      · cases selected
+        exact exact
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        have attemptedExact := phaseC_runMappedPrimitive?_ledgerExact
+          current attempted _ exact attemptedEq
+        exact insertContextualCompletedEdge?_ledgerExact withItem result edge
+          (insertContextualItem?_ledgerExact attempted withItem .completion
+            after attemptedExact itemEq) edgeEq
+
+private theorem attemptContextualCompletionsWith?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ others (current result :
+      CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCBackpointerLedgerExact current →
+      attemptContextualCompletionsWith? pivot others current = some result →
+      PhaseCBackpointerLedgerExact result := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result exact selected
+      cases selected
+      exact exact
+  | cons other rest induction =>
+      intro current result exact selected
+      rw [attemptContextualCompletionsWith?] at selected
+      cases forwardEq : attemptContextualCompletion? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          have remainderEq := selected
+          simp only [forwardEq] at remainderEq
+          change (if other = pivot then
+              attemptContextualCompletionsWith? pivot rest forward
+            else
+              (attemptContextualCompletion? forward other pivot).bind
+                (attemptContextualCompletionsWith? pivot rest)) =
+            some result at remainderEq
+          have forwardExact := attemptContextualCompletion?_ledgerExact
+            current forward pivot other exact forwardEq
+          by_cases same : other = pivot
+          · rw [if_pos same] at remainderEq
+            exact induction forward result forwardExact remainderEq
+          · rw [if_neg same] at remainderEq
+            cases reverseEq :
+                attemptContextualCompletion? forward other pivot with
+            | none => simp [reverseEq] at remainderEq
+            | some reverse =>
+                rw [reverseEq] at remainderEq
+                exact induction reverse result
+                  (attemptContextualCompletion?_ledgerExact forward reverse
+                    other pivot forwardExact reverseEq) remainderEq
+
+private theorem processContextualItem?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : processContextualItem? owned item current = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold processContextualItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
+  have predictedExact := attemptContextualPredictions?_ledgerExact item
+    allProductionIds current predicted exact predictedEq
+  have scannedExact := attemptContextualScan?_ledgerExact owned predicted
+    scanned item predictedExact scannedEq
+  exact attemptContextualCompletionsWith?_ledgerExact item
+    scanned.payload.phaseC.contextualItems scanned result scannedExact
+      completedEq
+
+end Solcore.Surface.Multi.Chart
