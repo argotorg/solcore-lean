@@ -5758,6 +5758,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | bitOr : ExecutableRootRule .bitOr
   | bitXor : ExecutableRootRule .bitXor
   | bitAnd : ExecutableRootRule .bitAnd
+  | additive : ExecutableRootRule .additive
   | prefix : ExecutableRootRule .prefix
   | postfixExpr : ExecutableRootRule .postfix
   | postfixPart : ExecutableRootRule .postfixPart
@@ -7560,6 +7561,96 @@ theorem fixedInfixRootValue_of_view
   rw [operandEq, tailsEq, starEq]
   exact sequenceEq
 
+/-- The grouped `+` or `-` tail of the additive level. -/
+def additiveTailExpr : EbnfExpr :=
+  .group (.sequence [
+    .group (.choice [
+      .atom (.terminal (.symbol .plus)),
+      .atom (.terminal (.symbol .minus))]),
+    .atom (.nonterminal .multiplicative)])
+
+/-- Decode one additive tail into its selected operator and right operand. -/
+def additiveTailView
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens additiveTailExpr) :
+    Sum
+      (MatchedTerminal file tokens (.symbol .plus))
+      (MatchedTerminal file tokens (.symbol .minus)) × Expression :=
+  let plusAtom : EbnfExpr := .atom (.terminal (.symbol .plus))
+  let minusAtom : EbnfExpr := .atom (.terminal (.symbol .minus))
+  let operatorExpr : EbnfExpr := .group (.choice [plusAtom, minusAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .multiplicative)
+  let rawSequence := groupView (.sequence [operatorExpr, operandAtom]) input
+  let viewed := sequence2View operatorExpr operandAtom rawSequence
+  let rawChoice := groupView (.choice [plusAtom, minusAtom]) viewed.1
+  let operator := match choice2View plusAtom minusAtom rawChoice with
+    | .inl raw => Sum.inl (terminalView (.symbol .plus) raw)
+    | .inr raw => Sum.inr (terminalView (.symbol .minus) raw)
+  (operator, ruleView .multiplicative viewed.2)
+
+/-- Rebuild one additive tail from its semantic view. -/
+def additiveTailValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : Sum
+      (MatchedTerminal file tokens (.symbol .plus))
+      (MatchedTerminal file tokens (.symbol .minus)) × Expression) :
+    EbnfValue file tokens additiveTailExpr :=
+  let plusAtom : EbnfExpr := .atom (.terminal (.symbol .plus))
+  let minusAtom : EbnfExpr := .atom (.terminal (.symbol .minus))
+  let operatorExpr : EbnfExpr := .group (.choice [plusAtom, minusAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .multiplicative)
+  group (.sequence [operatorExpr, operandAtom])
+    (sequence [operatorExpr, operandAtom]
+      (EbnfValues.cons operatorExpr [operandAtom]
+        (group (.choice [plusAtom, minusAtom])
+          (match value.1 with
+          | .inl plus => choice [plusAtom, minusAtom]
+              ⟨0, terminalAtom (.symbol .plus) plus⟩
+          | .inr minus => choice [plusAtom, minusAtom]
+              ⟨1, terminalAtom (.symbol .minus) minus⟩))
+        (EbnfValues.cons operandAtom []
+          (ruleAtom .multiplicative value.2) EbnfValues.nil)))
+
+/-- Rebuilding a decoded additive tail recovers its typed input. -/
+theorem additiveTailValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens additiveTailExpr) :
+    additiveTailValue (additiveTailView input) = input := by
+  let plusAtom : EbnfExpr := .atom (.terminal (.symbol .plus))
+  let minusAtom : EbnfExpr := .atom (.terminal (.symbol .minus))
+  let operatorExpr : EbnfExpr := .group (.choice [plusAtom, minusAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .multiplicative)
+  let rawSequence := groupView (.sequence [operatorExpr, operandAtom]) input
+  let viewed := sequence2View operatorExpr operandAtom rawSequence
+  let rawChoice := groupView (.choice [plusAtom, minusAtom]) viewed.1
+  generalize choiceEq : choice2View plusAtom minusAtom rawChoice = selected
+  have choiceValueEq := choice2_of_view plusAtom minusAtom rawChoice
+  rw [choiceEq] at choiceValueEq
+  have operatorEq := group_of_view (.choice [plusAtom, minusAtom]) viewed.1
+  have operandEq := rule_of_view .multiplicative viewed.2
+  have sequenceEq := sequence2_of_view operatorExpr operandAtom rawSequence
+  have outerGroupEq := group_of_view
+    (.sequence [operatorExpr, operandAtom]) input
+  cases selected with
+  | inl raw =>
+      have terminalEq := terminal_of_view (.symbol .plus) raw
+      have choiceRebuildEq : choice [plusAtom, minusAtom]
+          ⟨(0 : Fin 2), raw⟩ = rawChoice := by
+        simpa using choiceValueEq
+      simp only [additiveTailValue, additiveTailView, plusAtom, minusAtom,
+        operatorExpr, operandAtom, rawSequence, viewed, rawChoice, choiceEq]
+      rw [terminalEq, choiceRebuildEq, operatorEq, operandEq, sequenceEq]
+      exact outerGroupEq
+  | inr raw =>
+      have terminalEq := terminal_of_view (.symbol .minus) raw
+      have choiceRebuildEq : choice [plusAtom, minusAtom]
+          ⟨(1 : Fin 2), raw⟩ = rawChoice := by
+        simpa using choiceValueEq
+      simp only [additiveTailValue, additiveTailView, plusAtom, minusAtom,
+        operatorExpr, operandAtom, rawSequence, viewed, rawChoice, choiceEq]
+      rw [terminalEq, choiceRebuildEq, operatorEq, operandEq, sequenceEq]
+      exact outerGroupEq
+
 end EbnfValue
 
 /-- Locate a payload at the exact span of a matched terminal. -/
@@ -7931,6 +8022,21 @@ def executeBitAndRoot
     (input : EbnfValue file tokens (m2cV1.rhs .bitAnd)) : Expression :=
   executeFixedInfixRoot file (.symbol .amp) .additive id .bitAnd input
 
+/-- Execute an additive root from its left operand and ordered mixed tails. -/
+def executeAdditiveRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .additive)) : Expression :=
+  let operandAtom : EbnfExpr := .atom (.nonterminal .multiplicative)
+  let tail := EbnfValue.additiveTailExpr
+  let viewed := EbnfValue.sequence2View operandAtom (.star tail) input
+  let left := EbnfValue.ruleView .multiplicative viewed.1
+  let rest := (EbnfValue.starView tail viewed.2).map
+    EbnfValue.additiveTailView
+  executeInfixLeft file left (rest.map fun value =>
+    ((match value.1 with
+      | .inl plus => executableTerminalLoc plus .add
+      | .inr minus => executableTerminalLoc minus .subtract), value.2))
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -8027,6 +8133,7 @@ def executeRootRule
   | .bitOr => executeBitOrRoot file input
   | .bitXor => executeBitXorRoot file input
   | .bitAnd => executeBitAndRoot file input
+  | .additive => executeAdditiveRoot file input
   | .prefix =>
       executePrefixRoot file tokens origin finish owned ordered input
   | .postfixExpr => executePostfixRoot file input
