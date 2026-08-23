@@ -6331,6 +6331,73 @@ theorem executeLogicalAndRoot_reduces
   rw [resultEq, ← inputEq]
   exact .logicalAnd origin finish left rest
 
+/-- The equality executor realizes its exact nonassociative reduction. -/
+theorem executeEqualityRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .equality origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .equality)) :
+    RuleReduction file tokens .equality origin finish input
+      (executeEqualityRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let operandAtom : EbnfExpr := .atom (.nonterminal .relational)
+  let tail := EbnfValue.equalityTailExpr
+  change EbnfValue file tokens
+    (.sequence [operandAtom, .optional tail]) at input
+  let viewed := EbnfValue.sequence2View operandAtom (.optional tail) input
+  let left := EbnfValue.ruleView .relational viewed.1
+  generalize optionalEq : EbnfValue.optionalView tail viewed.2 = selected
+  have operandEq := EbnfValue.rule_of_view .relational viewed.1
+  have inputEq := EbnfValue.sequence2_of_view
+    operandAtom (.optional tail) input
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  cases selected with
+  | none =>
+      have optionalValueEq : EbnfValue.optional tail none = viewed.2 := by
+        calc
+          _ = EbnfValue.optional tail
+              (EbnfValue.optionalView tail viewed.2) := by rw [optionalEq]
+          _ = viewed.2 := EbnfValue.optional_of_view tail viewed.2
+      have resultEq : executeEqualityRoot file tokens origin finish
+          ready.1 ready.2.1 input = left := by
+        simp [executeEqualityRoot, optionalEq, operandAtom, tail, viewed, left]
+      rw [resultEq, ← inputEq, ← operandEq, ← optionalValueEq]
+      exact .equalityNone origin finish left
+  | some rawTail =>
+      generalize tailEq : EbnfValue.equalityTailView rawTail = decoded
+      rcases decoded with ⟨operator, right⟩
+      have tailValueEq : EbnfValue.equalityTailValue
+          (operator, right) = rawTail := by
+        rw [← tailEq]
+        exact EbnfValue.equalityTailValue_of_view rawTail
+      have optionalValueEq : EbnfValue.optional tail (some rawTail) =
+          viewed.2 := by
+        calc
+          _ = EbnfValue.optional tail
+              (EbnfValue.optionalView tail viewed.2) := by rw [optionalEq]
+          _ = viewed.2 := EbnfValue.optional_of_view tail viewed.2
+      cases operator with
+      | inl equal =>
+          have resultEq : executeEqualityRoot file tokens origin finish
+              ready.1 ready.2.1 input = sourceLoc witness
+                (.infix (executableTerminalLoc equal .equal) left right) := by
+            simp [executeEqualityRoot, optionalEq, tailEq, operandAtom,
+              tail, viewed, left, witness]
+          rw [resultEq, ← inputEq, ← operandEq, ← optionalValueEq,
+            ← tailValueEq]
+          exact .equalityEqual origin finish left equal right witness
+      | inr notEqual =>
+          have resultEq : executeEqualityRoot file tokens origin finish
+              ready.1 ready.2.1 input = sourceLoc witness
+                (.infix (executableTerminalLoc notEqual .notEqual)
+                  left right) := by
+            simp [executeEqualityRoot, optionalEq, tailEq, operandAtom,
+              tail, viewed, left, witness]
+          rw [resultEq, ← inputEq, ← operandEq, ← optionalValueEq,
+            ← tailValueEq]
+          exact .equalityNotEqual origin finish left notEqual right witness
+
 /-- The bitwise-or executor realizes its exact fixed-infix reduction. -/
 theorem executeBitOrRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -9320,6 +9387,7 @@ theorem executeRootRule_reduces
       exact executeAssignmentOperatorRoot_reduces origin finish ready input
   | logicalOr => exact executeLogicalOrRoot_reduces origin finish ready input
   | logicalAnd => exact executeLogicalAndRoot_reduces origin finish ready input
+  | equality => exact executeEqualityRoot_reduces origin finish ready input
   | bitOr => exact executeBitOrRoot_reduces origin finish ready input
   | bitXor => exact executeBitXorRoot_reduces origin finish ready input
   | bitAnd => exact executeBitAndRoot_reduces origin finish ready input
