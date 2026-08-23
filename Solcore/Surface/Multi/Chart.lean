@@ -18348,6 +18348,7 @@ theorem saturatedMatchArmHeaderObservation_eq_observed
 
 end Solcore.Surface.Multi.Chart
 
+
 namespace Solcore.Surface.Multi.Chart
 
 open Grammar
@@ -19854,5 +19855,138 @@ private theorem attemptAllContextualPredictions?_total_safe
       workFresh.dequeued
       (fun production _member => workFresh.predictions production)
       workFresh.scan workFresh.scannedEdge
+
+end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Every contextual completed-edge insertion is preceded by the exact
+completion attempt that justified it. -/
+private def PhaseCCompletionSafe {tokens : List Token}
+    (counter : Counter tokens) : Prop :=
+  ∀ waiting finished,
+    (.cubic .U04_completedEdgeInsert
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        counter.usedRev →
+    (.cubic .U03_completionAttempt
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        counter.usedRev
+
+private theorem PhaseCInitialFresh.completionSafe
+    {tokens : List Token} {counter : Counter tokens}
+    (fresh : PhaseCInitialFresh counter) :
+    PhaseCCompletionSafe counter := by
+  intro waiting finished member
+  exact (fresh _ (by
+    simp [phaseCInitialAddress, contextualCompletionKey])).elim member
+
+private theorem runMappedPrimitive?_phaseCCompletionSafe_of_not_insert
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (result : CountedState tokens after)
+    (safe : PhaseCCompletionSafe current.counter)
+    (notInsert : ∀ waiting finished,
+      address ≠ (.cubic .U04_completedEdgeInsert
+        (contextualCompletionKey waiting finished) : UnitAddress tokens))
+    (selected : runMappedPrimitive? current address transition =
+      some result) :
+    PhaseCCompletionSafe result.counter := by
+  intro waiting finished member
+  rw [runMappedPrimitive?_usedRev current address transition result selected,
+    List.mem_cons] at member ⊢
+  rcases member with equal | old
+  · exact (notInsert waiting finished equal.symm).elim
+  · exact Or.inr (safe waiting finished old)
+
+private theorem beginPhaseCWorklist?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCCompletionSafe result.counter := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  exact runMappedPrimitive?_phaseCCompletionSafe_of_not_insert current _ _ entered
+    fresh.completionSafe (by simp) enteredEq
+
+private theorem activateWorklistProduction?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (safe : PhaseCCompletionSafe current.counter)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCCompletionSafe result.1.counter := by
+  have usedMono := activateWorklistProduction?_used_mono current
+    productionInstance result selected
+  intro waiting finished member
+  apply usedMono
+  apply safe waiting finished
+  exact activateWorklistProduction?_nonActivationAddress current
+    productionInstance result _ (by simp) (by simp) selected member
+
+private theorem insertContextualItem?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (safe : PhaseCCompletionSafe current.counter)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCCompletionSafe result.counter := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present => cases selected; exact safe
+  next absent =>
+    exact runMappedPrimitive?_phaseCCompletionSafe_of_not_insert current _ _ result
+      safe (by simp) selected
+
+private theorem insertContextualScannedEdge?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (safe : PhaseCCompletionSafe current.counter)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCCompletionSafe result.counter := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  next present => cases selected; exact safe
+  next absent =>
+    exact runMappedPrimitive?_phaseCCompletionSafe_of_not_insert current _ _ result
+      safe (by simp) selected
+
+private theorem insertContextualCompletedEdge?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (safe : PhaseCCompletionSafe current.counter)
+    (attempted : (.cubic .U03_completionAttempt
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ current.counter.usedRev)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCCompletionSafe result.counter := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  next present => cases selected; exact safe
+  next absent =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, _ledgerEq, steppedEq⟩
+    rcases pair with ⟨nextLedger, nextEdges⟩
+    have used := runMappedPrimitive?_usedRev current _ _ result steppedEq
+    intro waiting finished member
+    rw [used, List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · simp only [UnitAddress.cubic.injEq] at equal
+      exact Or.inr (by simpa only [equal.2] using attempted)
+    · exact Or.inr (safe waiting finished old)
 
 end Solcore.Surface.Multi.Chart
