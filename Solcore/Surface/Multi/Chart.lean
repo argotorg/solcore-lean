@@ -23978,3 +23978,230 @@ private theorem insertContextualCompletedEdgeMulti?_edgeSafe
         CompletionBackpointerLedger.packCompleted] using fresh
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem attemptContextualPrediction?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (safe : PhaseCEdgeSafe current)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCEdgeSafe result := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq] at selected
+      cases selected
+      exact safe
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedSafe :=
+            phaseC_runMappedPrimitive?_edgeSafe_of_queue_eq current attempted
+              _ id safe (by intro state; rfl) (by
+                intro edge equal
+                rcases edge with ⟨edge, valid⟩
+                cases edge <;>
+                  simp [contextualEdgeDequeueAddress] at equal) attemptedEq
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedSafe
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedSafe := activateWorklistProduction?_edgeSafe
+                  attempted productionInstance activated attemptedSafe
+                    activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq] at selected
+                  cases selected
+                  exact activatedSafe
+                · simp [attemptedEq, used, activatedEq, acceptedEq] at selected
+                  exact insertContextualItem?_edgeSafe activated.1 result
+                    .prediction item activatedSafe selected
+
+private theorem attemptContextualPredictions?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCEdgeSafe current →
+      attemptContextualPredictions? waiting productions current = some result →
+      PhaseCEdgeSafe result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result safe selected
+      cases selected
+      exact safe
+  | cons predicted rest induction =>
+      intro current result safe selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptContextualPrediction?_edgeSafe current next waiting predicted
+          safe nextEq) restEq
+
+private theorem attemptContextualScan?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (safe : PhaseCEdgeSafe current)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCEdgeSafe result := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedSafe := phaseC_runMappedPrimitive?_edgeSafe_of_queue_eq
+      current attempted _ id safe (by intro state; rfl) (by
+        intro edge equal
+        rcases edge with ⟨edge, valid⟩
+        cases edge <;> simp [contextualEdgeDequeueAddress] at equal) attemptedEq
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq] at remainderEq
+        cases remainderEq
+        exact attemptedSafe
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        have itemSafe := insertContextualItem?_edgeSafe attempted withItem
+          .scan after attemptedSafe itemEq
+        exact insertContextualScannedEdge?_edgeSafe withItem result edge
+          itemSafe edgeEq
+  · cases selected
+    exact safe
+
+private theorem attemptContextualCompletionMulti?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (safe : PhaseCEdgeSafe current)
+    (selected : attemptContextualCompletionMulti? current waiting finished =
+      some result) :
+    PhaseCEdgeSafe result := by
+  unfold attemptContextualCompletionMulti? at selected
+  cases completionEq : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completionEq] at selected
+      cases selected
+      exact safe
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      · cases selected
+        exact safe
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        have attemptedSafe :=
+          phaseC_runMappedPrimitive?_edgeSafe_of_queue_eq current attempted
+            _ id safe (by intro state; rfl) (by
+              intro candidate equal
+              rcases candidate with ⟨candidate, valid⟩
+              cases candidate <;>
+                simp [contextualEdgeDequeueAddress] at equal) attemptedEq
+        have itemSafe := insertContextualItem?_edgeSafe attempted withItem
+          .completion after attemptedSafe itemEq
+        exact insertContextualCompletedEdgeMulti?_edgeSafe withItem result
+          edge itemSafe edgeEq
+
+private theorem attemptContextualCompletionsWithMulti?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ others (current result :
+      CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCEdgeSafe current →
+      attemptContextualCompletionsWithMulti? pivot others current =
+        some result →
+      PhaseCEdgeSafe result := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result safe selected
+      cases selected
+      exact safe
+  | cons other rest induction =>
+      intro current result safe selected
+      rw [attemptContextualCompletionsWithMulti?] at selected
+      cases forwardEq :
+          attemptContextualCompletionMulti? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardSafe := attemptContextualCompletionMulti?_edgeSafe
+            current forward pivot other safe forwardEq
+          split at selected
+          · exact induction forward result forwardSafe selected
+          · simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq :
+                attemptContextualCompletionMulti? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact induction reverse result
+                  (attemptContextualCompletionMulti?_edgeSafe forward reverse
+                    other pivot forwardSafe reverseEq) selected
+
+private theorem processContextualItemMulti?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCEdgeSafe current)
+    (selected : processContextualItemMulti? owned item current = some result) :
+    PhaseCEdgeSafe result := by
+  unfold processContextualItemMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
+  have predictedSafe := attemptContextualPredictions?_edgeSafe item
+    allProductionIds current predicted safe predictedEq
+  have scannedSafe := attemptContextualScan?_edgeSafe owned predicted scanned
+    item predictedSafe scannedEq
+  exact attemptContextualCompletionsWithMulti?_edgeSafe item
+    scanned.payload.phaseC.contextualItems scanned result scannedSafe
+      completedEq
+
+private theorem processContextualItemMulti?_total_with_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (workFresh : PhaseCItemWorkFresh current item)
+    (safe : PhaseCAllSafe current)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (edgeSafe : PhaseCEdgeSafe current) :
+    ∃ result, processContextualItemMulti? owned item current = some result ∧
+      PhaseCAllSafe result ∧
+      PhaseCMultiBackpointerInvariant result ∧
+      PhaseCBackpointerLedgerExact result ∧
+      PhaseCEdgeSafe result := by
+  obtain ⟨result, selected, resultSafe, resultCovers, resultExact⟩ :=
+    processContextualItemMulti?_total_allSafe_backpointers owned item current
+      workFresh safe covers exact
+  exact ⟨result, selected, resultSafe, resultCovers, resultExact,
+    processContextualItemMulti?_edgeSafe owned item current result edgeSafe
+      selected⟩
+
+end Solcore.Surface.Multi.Chart
