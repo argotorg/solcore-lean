@@ -19213,3 +19213,255 @@ def nearestStatementRegionSemanticDecision
   nearestStatementRegionDecision owned regionStart regionEnd
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The operand rule immediately below one nonassociative level. -/
+def NonAssociativeLevel.operandRule : NonAssociativeLevel → GrammarRuleId
+  | .relational => .bitOr
+  | .equality => .relational
+
+/-- The optional operator/right-operand suffix at one nonassociative level. -/
+def NonAssociativeLevel.tailExpr : NonAssociativeLevel → EbnfExpr
+  | .relational => .sequence [
+      .group (.choice [
+        .atom (.terminal (.symbol .less)),
+        .atom (.terminal (.symbol .greater)),
+        .atom (.terminal (.symbol .lessEqual)),
+        .atom (.terminal (.symbol .greaterEqual))]),
+      .atom (.nonterminal .bitOr)]
+  | .equality => .sequence [
+      .group (.choice [
+        .atom (.terminal (.symbol .equalEqual)),
+        .atom (.terminal (.symbol .notEqual))]),
+      .atom (.nonterminal .relational)]
+
+/-- The outer optional of one nonassociative root input is present. -/
+def NonAssociativeInputPresent
+    {file : WorkspaceFile} {tokens : List Token}
+    (level : NonAssociativeLevel)
+    (input : EbnfValue file tokens (m2cV1.rhs level.rule)) : Prop :=
+  match level with
+  | .relational =>
+      ∃ (left : EbnfValue file tokens (.atom (.nonterminal .bitOr)))
+          (tail : EbnfValue file tokens
+            NonAssociativeLevel.relational.tailExpr),
+        input = EbnfValue.sequence
+          [.atom (.nonterminal .bitOr),
+            .optional NonAssociativeLevel.relational.tailExpr]
+          (EbnfValues.cons (.atom (.nonterminal .bitOr))
+            [.optional NonAssociativeLevel.relational.tailExpr] left
+            (EbnfValues.cons
+              (.optional NonAssociativeLevel.relational.tailExpr) []
+              (EbnfValue.optional
+                NonAssociativeLevel.relational.tailExpr (some tail))
+              EbnfValues.nil))
+  | .equality =>
+      ∃ (left : EbnfValue file tokens (.atom (.nonterminal .relational)))
+          (tail : EbnfValue file tokens
+            NonAssociativeLevel.equality.tailExpr),
+        input = EbnfValue.sequence
+          [.atom (.nonterminal .relational),
+            .optional NonAssociativeLevel.equality.tailExpr]
+          (EbnfValues.cons (.atom (.nonterminal .relational))
+            [.optional NonAssociativeLevel.equality.tailExpr] left
+            (EbnfValues.cons
+              (.optional NonAssociativeLevel.equality.tailExpr) []
+              (EbnfValue.optional
+                NonAssociativeLevel.equality.tailExpr (some tail))
+              EbnfValues.nil))
+
+/-- Direct typed view of the outer optional in a nonassociative root input. -/
+def nonAssociativeOptionalView :
+    {file : WorkspaceFile} → {tokens : List Token} →
+      (level : NonAssociativeLevel) →
+      EbnfValue file tokens (m2cV1.rhs level.rule) →
+        Option (EbnfValue file tokens level.tailExpr)
+  | _, _, .relational, input =>
+      let outer := EbnfValue.sequence2View
+        (.atom (.nonterminal .bitOr))
+        (.optional NonAssociativeLevel.relational.tailExpr) input
+      EbnfValue.optionalView
+        NonAssociativeLevel.relational.tailExpr outer.2
+  | _, _, .equality, input =>
+      let outer := EbnfValue.sequence2View
+        (.atom (.nonterminal .relational))
+        (.optional NonAssociativeLevel.equality.tailExpr) input
+      EbnfValue.optionalView
+        NonAssociativeLevel.equality.tailExpr outer.2
+
+def NonAssociativeOptionalPresent
+    {file : WorkspaceFile} {tokens : List Token}
+    (level : NonAssociativeLevel)
+    (input : EbnfValue file tokens (m2cV1.rhs level.rule)) : Prop :=
+  ∃ value, nonAssociativeOptionalView level input = some value
+
+theorem optionalView_sequence2_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (first child : EbnfExpr)
+    (left : EbnfValue file tokens first)
+    (tail : EbnfValue file tokens child) :
+    let input := EbnfValue.sequence [first, .optional child]
+      (EbnfValues.cons first [.optional child] left
+        (EbnfValues.cons (.optional child) []
+          (EbnfValue.optional child (some tail)) EbnfValues.nil))
+    EbnfValue.optionalView child
+        (EbnfValue.sequence2View first (.optional child) input).2 =
+      some tail := by
+  dsimp only
+  let input := EbnfValue.sequence [first, .optional child]
+    (EbnfValues.cons first [.optional child] left
+      (EbnfValues.cons (.optional child) []
+        (EbnfValue.optional child (some tail)) EbnfValues.nil))
+  let viewed := EbnfValue.sequence2View first (.optional child) input
+  have rebuilt := EbnfValue.sequence2_of_view
+    first (.optional child) input
+  have valuesEq := EbnfValue.sequence_injective _ rebuilt
+  rcases EbnfValues.cons_injective _ _ valuesEq with ⟨_, restEq⟩
+  rcases EbnfValues.cons_injective _ _ restEq with ⟨secondEq, _⟩
+  have optionalEq : EbnfValue.optional child
+      (EbnfValue.optionalView child viewed.2) =
+        EbnfValue.optional child (some tail) :=
+    (EbnfValue.optional_of_view child viewed.2).trans secondEq
+  exact EbnfValue.optional_injective child optionalEq
+
+theorem nonAssociativeInputPresent_iff_optionalPresent
+    {file : WorkspaceFile} {tokens : List Token}
+    (level : NonAssociativeLevel)
+    (input : EbnfValue file tokens (m2cV1.rhs level.rule)) :
+    NonAssociativeInputPresent level input ↔
+      NonAssociativeOptionalPresent level input := by
+  cases level
+  · constructor
+    · rintro ⟨left, tail, rfl⟩
+      exact ⟨tail, optionalView_sequence2_present _ _ left tail⟩
+    · rintro ⟨tail, viewEq⟩
+      let first : EbnfExpr := .atom (.nonterminal .bitOr)
+      let second : EbnfExpr :=
+        .optional NonAssociativeLevel.relational.tailExpr
+      let viewed := EbnfValue.sequence2View first second input
+      change EbnfValue.optionalView
+        NonAssociativeLevel.relational.tailExpr viewed.2 = some tail
+          at viewEq
+      refine ⟨viewed.1, tail, ?_⟩
+      rw [← EbnfValue.sequence2_of_view first second input]
+      change _ = EbnfValue.sequence [first, second] _
+      apply congrArg (EbnfValue.sequence [first, second])
+      apply congrArg (EbnfValues.cons first [second] viewed.1)
+      apply congrArg (fun value =>
+        EbnfValues.cons second [] value EbnfValues.nil)
+      calc
+        viewed.2 = EbnfValue.optional _
+            (EbnfValue.optionalView _ viewed.2) :=
+          (EbnfValue.optional_of_view _ viewed.2).symm
+        _ = EbnfValue.optional _ (some tail) := by
+          rw [viewEq]
+  · constructor
+    · rintro ⟨left, tail, rfl⟩
+      exact ⟨tail, optionalView_sequence2_present _ _ left tail⟩
+    · rintro ⟨tail, viewEq⟩
+      let first : EbnfExpr := .atom (.nonterminal .relational)
+      let second : EbnfExpr :=
+        .optional NonAssociativeLevel.equality.tailExpr
+      let viewed := EbnfValue.sequence2View first second input
+      change EbnfValue.optionalView
+        NonAssociativeLevel.equality.tailExpr viewed.2 = some tail
+          at viewEq
+      refine ⟨viewed.1, tail, ?_⟩
+      rw [← EbnfValue.sequence2_of_view first second input]
+      change _ = EbnfValue.sequence [first, second] _
+      apply congrArg (EbnfValue.sequence [first, second])
+      apply congrArg (EbnfValues.cons first [second] viewed.1)
+      apply congrArg (fun value =>
+        EbnfValues.cons second [] value EbnfValues.nil)
+      calc
+        viewed.2 = EbnfValue.optional _
+            (EbnfValue.optionalView _ viewed.2) :=
+          (EbnfValue.optional_of_view _ viewed.2).symm
+        _ = EbnfValue.optional _ (some tail) := by
+          rw [viewEq]
+
+/-- A rule value exposes a completed operation at its own nonassociative
+level, independently of the surrounding frontier witness. -/
+def CompletedNonAssociativeValue :
+    (level : NonAssociativeLevel) →
+      RuleValue level.rule → Located InfixOperator → Prop
+  | .relational, value, first =>
+      ∃ left right,
+        value.payload = .infix first left right ∧
+        first.payload ∈ [.less, .greater, .lessEqual, .greaterEqual]
+  | .equality, value, first =>
+      ∃ left right,
+        value.payload = .infix first left right ∧
+        first.payload ∈ [.equal, .notEqual]
+
+theorem completedNonAssociative_iff_value
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    (level : NonAssociativeLevel)
+    (candidate : NonAssociativeFrontierValue
+      file tokens memo correct final cursor level)
+    (first : Located InfixOperator) :
+    CompletedNonAssociative level candidate first ↔
+      CompletedNonAssociativeValue level candidate.value first := by
+  cases level <;> rfl
+
+/-- A present outer optional forces a relational/equality source reduction to
+produce the corresponding completed operation. -/
+theorem RuleReduction.nonAssociative_completed_of_input_present
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {level : NonAssociativeLevel}
+    {input : EbnfValue file tokens (m2cV1.rhs level.rule)}
+    {output : RuleValue level.rule}
+    (reduces : RuleReduction file tokens level.rule
+      origin finish input output)
+    (present : NonAssociativeInputPresent level input) :
+    ∃ first, CompletedNonAssociativeValue level output first := by
+  cases level <;> cases reduces
+  case relational.relationalNone =>
+    rcases present with ⟨left, tail, inputEq⟩
+    simp only [NonAssociativeLevel.tailExpr, EbnfExpr.children] at inputEq
+    have outer := EbnfValue.sequence_injective _ inputEq
+    rcases EbnfValues.cons_injective _ _ outer with ⟨_, rest⟩
+    rcases EbnfValues.cons_injective _ _ rest with ⟨optionalEq, _⟩
+    have := EbnfValue.optional_injective _ optionalEq
+    contradiction
+  case equality.equalityNone =>
+    rcases present with ⟨left, tail, inputEq⟩
+    simp only [NonAssociativeLevel.tailExpr, EbnfExpr.children] at inputEq
+    have outer := EbnfValue.sequence_injective _ inputEq
+    rcases EbnfValues.cons_injective _ _ outer with ⟨_, rest⟩
+    rcases EbnfValues.cons_injective _ _ rest with ⟨optionalEq, _⟩
+    have := EbnfValue.optional_injective _ optionalEq
+    contradiction
+  case relational.relationalLess left operator right witness =>
+    exact ⟨RuleReduction.terminalLoc operator .less, left, right, rfl,
+      by change InfixOperator.less ∈ [InfixOperator.less,
+        .greater, .lessEqual, .greaterEqual]; simp⟩
+  case relational.relationalGreater left operator right witness =>
+    exact ⟨RuleReduction.terminalLoc operator .greater, left, right, rfl,
+      by change InfixOperator.greater ∈ [InfixOperator.less,
+        .greater, .lessEqual, .greaterEqual]; simp⟩
+  case relational.relationalLessEqual left operator right witness =>
+    exact ⟨RuleReduction.terminalLoc operator .lessEqual, left, right, rfl,
+      by change InfixOperator.lessEqual ∈ [InfixOperator.less,
+        .greater, .lessEqual, .greaterEqual]; simp⟩
+  case relational.relationalGreaterEqual left operator right witness =>
+    exact ⟨RuleReduction.terminalLoc operator .greaterEqual, left, right, rfl,
+      by change InfixOperator.greaterEqual ∈ [InfixOperator.less,
+        .greater, .lessEqual, .greaterEqual]; simp⟩
+  case equality.equalityEqual left operator right witness =>
+    exact ⟨RuleReduction.terminalLoc operator .equal, left, right, rfl,
+      by change InfixOperator.equal ∈ [InfixOperator.equal, .notEqual]; simp⟩
+  case equality.equalityNotEqual left operator right witness =>
+    exact ⟨RuleReduction.terminalLoc operator .notEqual, left, right, rfl,
+      by change InfixOperator.notEqual ∈ [InfixOperator.equal, .notEqual]; simp⟩
+
+end Solcore.Surface.Multi
