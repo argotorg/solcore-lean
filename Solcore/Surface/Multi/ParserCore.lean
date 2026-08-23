@@ -5678,6 +5678,7 @@ executable from their typed EBNF values. -/
 inductive ExecutableRootRule : GrammarRuleId → Type where
   | module : ExecutableRootRule .module
   | topItem : ExecutableRootRule .topItem
+  | importEntry : ExecutableRootRule .importEntry
   | optionalComma : ExecutableRootRule .optionalComma
   | predicateList : ExecutableRootRule .predicateList
   | instanceMethod : ExecutableRootRule .instanceMethod
@@ -6537,6 +6538,48 @@ def executeConstructorSelectionRoot
             IdentifierOccurrence)
       sourceLoc witness (.named names)
 
+/-- Execute one wildcard, named, or aliased import-selector entry. -/
+def executeImportEntryRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .importEntry)) :
+    ImportSelectorEntry :=
+  let starAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .star))
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .asKw)), identifierAtom]
+  let namedChildren : List EbnfExpr := [
+    identifierAtom, .optional (.sequence aliasChildren)]
+  let branches : List EbnfExpr := [starAtom, .sequence namedChildren]
+  let witness := shallowRootWitness file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let star := EbnfValue.terminalView (.symbol .star) raw
+      sourceLoc witness (.wildcard {
+        span := star.span
+        payload := .wildcard
+      })
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View identifierAtom
+        (.optional (.sequence aliasChildren)) raw
+      let name := EbnfValue.terminalView
+        (.category .identifier) viewed.1
+      let alias := (EbnfValue.optionalView (.sequence aliasChildren)
+        viewed.2).map fun rawAlias =>
+          let aliasViewed := EbnfValue.sequence2View
+            (.atom (.terminal (.hardKeyword .asKw)))
+            identifierAtom rawAlias
+          let aliasName := EbnfValue.terminalView
+            (.category .identifier) aliasViewed.2
+          (⟨aliasName.span, aliasName.identifierProjection.2⟩ :
+            IdentifierOccurrence)
+      sourceLoc witness (.named
+        ⟨name.span, name.identifierProjection.2⟩ alias)
+
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -7232,6 +7275,8 @@ def executeRootRule
   match executable with
   | .module => executeModuleRoot file input
   | .topItem => executeTopItemRoot file tokens origin finish owned ordered input
+  | .importEntry =>
+      executeImportEntryRoot file tokens origin finish owned ordered input
   | .optionalComma => executeOptionalCommaRoot input
   | .predicateList => executePredicateListRoot input
   | .instanceMethod => executeInstanceMethodRoot input
