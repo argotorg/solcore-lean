@@ -7797,6 +7797,46 @@ theorem executeLocalExportEntryRoot_reduces
     exact .localExportEntryAllFrom origin finish reference dot star
       (.wildcardStar star) witness
 
+/-- The remote-export-entry executor realizes its selected root reduction. -/
+theorem executeRemoteExportEntryRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens
+      .remoteExportEntry origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .remoteExportEntry)) :
+    RuleReduction file tokens .remoteExportEntry origin finish input
+      (executeRemoteExportEntryRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let starAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .star))
+  let itemAtom : EbnfExpr :=
+    .atom (.nonterminal .exportItem)
+  change EbnfValue file tokens (.choice [starAtom, itemAtom]) at input
+  generalize viewEq : EbnfValue.choice2View
+    starAtom itemAtom input = viewed
+  have inputEq := EbnfValue.choice2_of_view starAtom itemAtom input
+  rw [viewEq] at inputEq
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases viewed with raw | raw
+  · let star := EbnfValue.terminalView (.symbol .star) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .star) raw
+    have resultEq : executeRemoteExportEntryRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.wildcard (RuleReduction.terminalLoc star .wildcard)) := by
+      rw [executeRemoteExportEntryRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .remoteExportEntryWildcard origin finish star
+      (.wildcardStar star) witness
+  · let item := EbnfValue.ruleView .exportItem raw
+    have rawEq := EbnfValue.rule_of_view .exportItem raw
+    have resultEq : executeRemoteExportEntryRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.item item) := by
+      rw [executeRemoteExportEntryRoot, viewEq]
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .remoteExportEntryItem origin finish item witness
+
 private theorem hidingClauseIdentifierAtoms_of_views
     {file : WorkspaceFile} {tokens : List Token}
     (values : List (EbnfValue file tokens
@@ -7909,6 +7949,8 @@ theorem executeRootRule_reduces
       exact executeImportEntryRoot_reduces origin finish ready input
   | localExportEntry =>
       exact executeLocalExportEntryRoot_reduces origin finish ready input
+  | remoteExportEntry =>
+      exact executeRemoteExportEntryRoot_reduces origin finish ready input
   | optionalComma =>
       exact executeOptionalCommaRoot_reduces origin finish ready input
   | predicateList =>
