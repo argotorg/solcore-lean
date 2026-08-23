@@ -25174,3 +25174,82 @@ private theorem executeObservedPhaseABCWorklistMulti?_total_drained
   exact executePhaseCWorklistMulti?_queues_empty owned phaseB result phaseCEq
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Public proof-free view of the total Phase-C executor.  Internally it uses
+the multi-valued completion ledger, so distinct completed edges targeting the
+same contextual item do not turn execution into failure. -/
+def executeObservedContextualWorklistMulti?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (ContextualWorklistResult file tokens) := do
+  let result ← executeObservedPhaseABCWorklistMulti? file tokens owned
+  pure {
+    memo := result.payload.phaseC.memo
+    items := result.payload.phaseC.contextualItems
+    edges := result.payload.phaseC.contextualEdges
+  }
+
+/-- The public multi-ledger contextual executor succeeds for every owned token
+stream.  Its hidden queues are drained before the public result is exposed. -/
+theorem executeObservedContextualWorklistMulti?_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executeObservedContextualWorklistMulti? file tokens owned =
+      some result := by
+  obtain ⟨internal, internalEq, _itemsEmpty, _edgesEmpty⟩ :=
+    executeObservedPhaseABCWorklistMulti?_total_drained file tokens owned
+  refine ⟨{
+    memo := internal.payload.phaseC.memo
+    items := internal.payload.phaseC.contextualItems
+    edges := internal.payload.phaseC.contextualEdges
+  }, ?_⟩
+  simp [executeObservedContextualWorklistMulti?, internalEq]
+
+private theorem
+    executeObservedPhaseABCWorklistMulti?_operationalInvariant
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    PhaseCOperationalInvariant file tokens result.payload := by
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  obtain ⟨canonical, canonicalEq, _safe, _edgeSafe, _covers, _exact,
+      operational⟩ :=
+    executePhaseCWorklistMulti?_total_invariants owned phaseB
+      (executeObservedPhaseAB?_phaseCInitialFresh file tokens owned phaseB
+        phaseBEq)
+  have same : result = canonical :=
+    Option.some.inj (phaseCEq.symm.trans canonicalEq)
+  cases same
+  exact operational
+
+/-- Every item and checked edge exposed by the total public executor is
+operationally reachable under its returned memo. -/
+theorem executeObservedContextualWorklistMulti?_operational_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklistMulti? file tokens owned =
+      some result) :
+    (∀ item, item ∈ result.items →
+      OperationalContextualReach file tokens result.memo item) ∧
+    (∀ edge, edge ∈ result.edges →
+      OperationalContextualEdgeReach file tokens result.memo edge.val) := by
+  unfold executeObservedContextualWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  have invariant :=
+    executeObservedPhaseABCWorklistMulti?_operationalInvariant
+      file tokens owned internal internalEq
+  exact ⟨invariant.1, invariant.2.2.1⟩
+
+end Solcore.Surface.Multi.Chart
