@@ -5710,6 +5710,7 @@ executable from their typed EBNF values. -/
 inductive ExecutableRootRule : GrammarRuleId → Type where
   | module : ExecutableRootRule .module
   | topItem : ExecutableRootRule .topItem
+  | importDecl : ExecutableRootRule .importDecl
   | importEntry : ExecutableRootRule .importEntry
   | localExportEntry : ExecutableRootRule .localExportEntry
   | remoteExportEntry : ExecutableRootRule .remoteExportEntry
@@ -5826,6 +5827,7 @@ def executeTopItemRoot
       sourceLoc witness (.contractDecl (EbnfValue.ruleView .contractDecl raw))
   | ⟨⟨8, _⟩, raw⟩ =>
       sourceLoc witness (.functionDecl (EbnfValue.ruleView .functionDecl raw))
+
 
 /-- Execute the module source rule by decoding its exact ordered item list. -/
 def executeModuleRoot
@@ -6123,6 +6125,7 @@ theorem sequence_of_flat_view
   rw [sequenceValues_build_view]
   exact sequence_of_view children input
 
+
 /-- A grouped pair of source-rule atoms. -/
 def rulePairTailExpr
     (first second : GrammarRuleId) : EbnfExpr :=
@@ -6183,6 +6186,84 @@ theorem rulePairTailValue_of_view
   exact groupEq
 
 end EbnfValue
+
+/-- Execute all three import-declaration forms. -/
+def executeImportDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .importDecl)) :
+    ImportDecl :=
+  let moduleChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .importKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .semicolon))]
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .importKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.hardKeyword .asKw)),
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .semicolon))]
+  let entryAtom : EbnfExpr := .atom (.nonterminal .importEntry)
+  let hidingAtom : EbnfExpr := .atom (.nonterminal .hidingClause)
+  let itemsChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .importKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 entryAtom,
+    .atom (.terminal (.symbol .rightBrace)), .optional hidingAtom,
+    .atom (.terminal (.symbol .semicolon))]
+  let branches : List EbnfExpr := [.sequence moduleChildren,
+    .sequence aliasChildren, .sequence itemsChildren]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.hardKeyword .importKw)))
+        (.atom (.nonterminal .moduleRef))
+        (.atom (.terminal (.symbol .semicolon))) raw
+      sourceLoc witness {
+        moduleRef := EbnfValue.ruleView .moduleRef viewed.2.1
+        mode := .module none
+      }
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView aliasChildren raw
+      let name := EbnfValue.terminalView
+        (.category .identifier) viewed.2.2.2.1
+      sourceLoc witness {
+        moduleRef := EbnfValue.ruleView .moduleRef viewed.2.1
+        mode := .module (some {
+          span := name.span
+          payload := name.identifierProjection.2
+        })
+      }
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView itemsChildren raw
+      let reference := EbnfValue.ruleView .moduleRef viewed.2.1
+      let openBrace := EbnfValue.terminalView
+        (.symbol .leftBrace) viewed.2.2.2.1
+      let rawEntries := viewed.2.2.2.2.1
+      let entries := (EbnfValue.list0View entryAtom rawEntries).map
+        (EbnfValue.ruleView .importEntry)
+      let closeBrace := EbnfValue.terminalView
+        (.symbol .rightBrace) viewed.2.2.2.2.2.1
+      let hidingValue := (EbnfValue.optionalView hidingAtom
+        viewed.2.2.2.2.2.2.1).map
+          (EbnfValue.ruleView .hidingClause)
+      sourceLoc witness {
+        moduleRef := reference
+        mode := .items
+          ({
+            span := {
+              source := file.id
+              startByte := openBrace.span.startByte
+              endByte := closeBrace.span.endByte
+            }
+            payload := { entries := entries }
+          } : ImportSelection) hidingValue
+      }
 
 private def shallowRootWitness
     (file : WorkspaceFile) (tokens : List Token)
@@ -7758,6 +7839,8 @@ def executeRootRule
   match executable with
   | .module => executeModuleRoot file input
   | .topItem => executeTopItemRoot file tokens origin finish owned ordered input
+  | .importDecl =>
+      executeImportDeclRoot file tokens origin finish owned ordered input
   | .importEntry =>
       executeImportEntryRoot file tokens origin finish owned ordered input
   | .localExportEntry =>
