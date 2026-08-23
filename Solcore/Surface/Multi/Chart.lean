@@ -22716,3 +22716,215 @@ private theorem CoversPackedEdges.retainedConsistent
 end CompletionBackpointerMultiLedger
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCMultiBackpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop :=
+  CompletionBackpointerMultiLedger.CoversPackedEdges file tokens
+    current.payload.completionBackpointers
+    current.payload.phaseC.contextualEdges
+
+/-- Drop-in U04 insertion using total multi-valued storage. -/
+private def insertContextualCompletedEdgeMulti?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  let packed := CompletionBackpointerLedger.packCompleted edge
+  if phaseCEdgeMemberBool current.payload.phaseC.contextualEdges packed then
+    some current
+  else
+    let next := CompletionBackpointerMultiLedger.insertCompleted
+      current.payload.completionBackpointers
+      current.payload.phaseC.contextualEdges edge
+    runMappedPrimitive? current
+      (.cubic .U04_completedEdgeInsert
+        (contextualCompletionKey edge.waiting edge.finished))
+      fun (state : PhaseCWorklist file tokens) => ({
+        phaseC := {
+          state.phaseC with
+          contextualEdges := next.2
+          edgeQueue := state.phaseC.edgeQueue ++ [packed]
+        }
+        completionBackpointers := next.1
+      } : PhaseCWorklist file tokens)
+
+private theorem insertContextualCompletedEdgeMulti?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (fresh : (.cubic .U04_completedEdgeInsert
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∉ current.counter.usedRev) :
+    ∃ result, insertContextualCompletedEdgeMulti? current edge =
+      some result := by
+  unfold insertContextualCompletedEdgeMulti?
+  simp only
+  split
+  · exact ⟨current, rfl⟩
+  · simp [runMappedPrimitive?, fresh]
+
+private theorem insertContextualCompletedEdgeMulti?_coverage
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    PhaseCContentGrowth current result ∧
+      ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
+        retained.val = .completed edge.waiting edge.finished edge.after
+          edge.shared := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact ⟨PhaseCContentGrowth.refl current,
+      (phaseCEdgeMemberBool_true_iff _ _).mp ‹_›⟩
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    constructor
+    · exact {
+        memo := by rw [payload]
+        items := fun _ member => by rw [payload]; exact member
+        itemQueue := fun _ member => by rw [payload]; exact member
+        edges := fun candidate member => by
+          rw [payload]
+          simp [CompletionBackpointerMultiLedger.insertCompleted, member]
+        newItemsQueued := fun _ member => by
+          left
+          rw [payload] at member
+          exact member
+      }
+    · rw [payload]
+      exact ⟨CompletionBackpointerLedger.packCompleted edge,
+        by simp [CompletionBackpointerLedger.packCompleted,
+          CompletionBackpointerMultiLedger.insertCompleted]⟩
+
+private theorem insertContextualCompletedEdgeMulti?_backpointers
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    PhaseCMultiBackpointerInvariant result ∧
+      PhaseCBackpointerLedgerExact result := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact ⟨covers, exact⟩
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    constructor
+    · unfold PhaseCMultiBackpointerInvariant at covers ⊢
+      rw [payload]
+      exact CompletionBackpointerMultiLedger.insertCompleted_coversPackedEdges
+        _ _ edge covers
+    · unfold PhaseCBackpointerLedgerExact at exact ⊢
+      rw [payload]
+      exact CompletionBackpointerMultiLedger.insertCompleted_rowsExact
+        _ _ edge exact
+
+private theorem insertContextualCompletedEdgeMulti?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (safe : PhaseCItemSafe current)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    PhaseCItemSafe result := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact safe
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    have used := runMappedPrimitive?_usedRev current _ _ result selected
+    constructor
+    · intro source item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;>
+          simp [ContextualItemInsertSource.unitKind] at equal
+      · simpa [payload] using safe.inserted source item old
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · simpa [payload] using safe.dequeued item old
+    · intro item production member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.predicted item production old)
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scanned item old)
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+    · intro item member usedItem
+      rw [payload] at member
+      rw [used, List.mem_cons] at usedItem
+      rcases usedItem with equal | old
+      · simp at equal
+      · exact safe.queueFresh item member old
+    · simpa [payload] using safe.itemsNodup
+    · simpa [payload] using safe.queueNodup
+    · intro item member
+      rw [payload] at member ⊢
+      exact safe.queueSubset member
+
+private theorem insertContextualCompletedEdgeMulti?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (safe : PhaseCActivationSafe current.counter)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    PhaseCActivationSafe result.counter := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact safe
+  · exact runMappedPrimitive?_activationSafe_of_not_witness current _ _
+      result safe (by simp) selected
+
+private theorem insertContextualCompletedEdgeMulti?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (safe : PhaseCCompletionSafe current.counter)
+    (attempted : (.cubic .U03_completionAttempt
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ current.counter.usedRev)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    PhaseCCompletionSafe result.counter := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact safe
+  · have used := runMappedPrimitive?_usedRev current _ _ result selected
+    intro waiting finished member
+    rw [used, List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · simp only [UnitAddress.cubic.injEq] at equal
+      exact Or.inr (by simpa only [equal.2] using attempted)
+    · exact Or.inr (safe waiting finished old)
+
+end Solcore.Surface.Multi.Chart
