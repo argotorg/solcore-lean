@@ -21944,3 +21944,136 @@ private theorem processContextualItem?_ledgerExact
       completedEq
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- States reached by successful Phase-C queue steps from one entered chart. -/
+private inductive PhaseCQueueReached
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start : CountedState tokens (PhaseCWorklist file tokens)) :
+    CountedState tokens (PhaseCWorklist file tokens) → Prop where
+  | refl : PhaseCQueueReached owned start start
+  | item
+      {current after result :
+        CountedState tokens (PhaseCWorklist file tokens)}
+      {pivot : ContextualItemKey tokens}
+      (prior : PhaseCQueueReached owned start current)
+      (dequeued : dequeueContextualItem? current = some (pivot, after))
+      (processed : processContextualItem? owned pivot after = some result) :
+      PhaseCQueueReached owned start result
+  | edge
+      {current result : CountedState tokens (PhaseCWorklist file tokens)}
+      {edge : StructurallyValidContextualPackedEdge file tokens}
+      (prior : PhaseCQueueReached owned start current)
+      (dequeued : dequeueContextualEdge? current = some (edge, result)) :
+      PhaseCQueueReached owned start result
+
+private theorem PhaseCQueueReached.ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    {owned : TokensOwnedBy file tokens}
+    {start current : CountedState tokens (PhaseCWorklist file tokens)}
+    (startExact : PhaseCBackpointerLedgerExact start)
+    (reached : PhaseCQueueReached owned start current) :
+    PhaseCBackpointerLedgerExact current := by
+  induction reached with
+  | refl => exact startExact
+  | item prior dequeued processed induction =>
+      have afterExact := dequeueContextualItem?_ledgerExact _ _ induction
+        dequeued
+      exact processContextualItem?_ledgerExact owned _ _ _ afterExact processed
+  | edge prior dequeued induction =>
+      exact dequeueContextualEdge?_ledgerExact _ _ induction dequeued
+
+private theorem runPhaseCQueues?_reached
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (start : CountedState tokens (PhaseCWorklist file tokens)) :
+    ∀ fuel (current result :
+      CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCQueueReached owned start current →
+      runPhaseCQueues? owned fuel current = some result →
+      PhaseCQueueReached owned start result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result reached selected
+      rw [runPhaseCQueues?] at selected
+      split at selected
+      · cases selected
+        exact reached
+      · contradiction
+  | succ previous induction =>
+      intro current result reached selected
+      rw [runPhaseCQueues?] at selected
+      cases itemsEq : current.payload.phaseC.itemQueue with
+      | nil =>
+          cases edgesEq : current.payload.phaseC.edgeQueue with
+          | nil =>
+              simp only [itemsEq, edgesEq] at selected
+              cases selected
+              exact reached
+          | cons edge rest =>
+              simp only [itemsEq, edgesEq] at selected
+              cases dequeuedEq : dequeueContextualEdge? current with
+              | none => simp [dequeuedEq] at selected
+              | some dequeued =>
+                  rw [dequeuedEq] at selected
+                  exact induction dequeued.2 result
+                    (.edge reached dequeuedEq) selected
+      | cons item rest =>
+          simp only [itemsEq] at selected
+          cases dequeuedEq : dequeueContextualItem? current with
+          | none => simp [dequeuedEq] at selected
+          | some dequeued =>
+              rw [dequeuedEq] at selected
+              rcases dequeued with ⟨pivot, after⟩
+              simp only at selected
+              cases processedEq : processContextualItem? owned pivot after with
+              | none => simp [processedEq] at selected
+              | some processed =>
+                  rw [processedEq] at selected
+                  exact induction processed result
+                    (.item reached dequeuedEq processedEq) selected
+
+private theorem runPhaseCQueues?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (fuel : Nat)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : runPhaseCQueues? owned fuel current = some result) :
+    PhaseCBackpointerLedgerExact result :=
+  PhaseCQueueReached.ledgerExact exact
+    (runPhaseCQueues?_reached owned current fuel current result .refl selected)
+
+private theorem executePhaseCWorklist?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executePhaseCWorklist? owned current = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold executePhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueues?_ledgerExact owned (chartGBound (tokens.length + 1))
+    entered result (beginPhaseCWorklist?_ledgerExact current entered enteredEq)
+      runEq
+
+private theorem executeObservedPhaseABCWorklist?_ledgerExact
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklist? file tokens owned =
+      some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold executeObservedPhaseABCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, _phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklist?_ledgerExact owned phaseB result phaseCEq
+
+end Solcore.Surface.Multi.Chart
