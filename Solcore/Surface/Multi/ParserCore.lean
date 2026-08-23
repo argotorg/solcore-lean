@@ -5465,6 +5465,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | bitAnd : ExecutableRootRule .bitAnd
   | prefix : ExecutableRootRule .prefix
   | postfixExpr : ExecutableRootRule .postfix
+  | postfixPart : ExecutableRootRule .postfixPart
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -6246,6 +6247,51 @@ def executePrefixRoot
           (EbnfValue.ruleView .prefix viewed.2))
   | ⟨⟨1, _⟩, raw⟩ => EbnfValue.ruleView .postfix raw
 
+/-- Execute one postfix part from its selected typed branch. -/
+def executePostfixPartRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .postfixPart)) :
+    PostfixPartValue :=
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let branches : List EbnfExpr := [
+    .sequence [
+      .atom (.terminal (.symbol .leftParen)),
+      .list0 expressionAtom,
+      .atom (.terminal (.symbol .rightParen))],
+    .sequence [
+      .atom (.terminal (.symbol .dot)),
+      .atom (.terminal (.category .identifier))],
+    .sequence [
+      .atom (.terminal (.symbol .leftBracket)),
+      expressionAtom,
+      .atom (.terminal (.symbol .rightBracket))]]
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .leftParen))) (.list0 expressionAtom)
+        (.atom (.terminal (.symbol .rightParen))) raw
+      .call
+        (EbnfValue.terminalView (.symbol .leftParen) viewed.1).span
+        ((EbnfValue.list0View expressionAtom viewed.2.1).map
+          (EbnfValue.ruleView .expression))
+        (EbnfValue.terminalView (.symbol .rightParen) viewed.2.2).span
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View
+        (.atom (.terminal (.symbol .dot)))
+        (.atom (.terminal (.category .identifier))) raw
+      let dot := EbnfValue.terminalView (.symbol .dot) viewed.1
+      let field := EbnfValue.terminalView (.category .identifier) viewed.2
+      .select dot.span
+        (executableTerminalLoc field field.identifierProjection.2)
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .leftBracket))) expressionAtom
+        (.atom (.terminal (.symbol .rightBracket))) raw
+      .index
+        (EbnfValue.terminalView (.symbol .leftBracket) viewed.1).span
+        (EbnfValue.ruleView .expression viewed.2.1)
+        (EbnfValue.terminalView (.symbol .rightBracket) viewed.2.2).span
+
 /-- Locate an infix result between its left and right operands. -/
 def executableBetween
     (file : WorkspaceFile) {α : Type}
@@ -6386,6 +6432,7 @@ def executeRootRule
   | .prefix =>
       executePrefixRoot file tokens origin finish owned ordered input
   | .postfixExpr => executePostfixRoot file input
+  | .postfixPart => executePostfixPartRoot input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
