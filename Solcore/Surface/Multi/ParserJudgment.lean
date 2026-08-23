@@ -19465,3 +19465,53 @@ theorem RuleReduction.nonAssociative_completed_of_input_present
       by change InfixOperator.notEqual ∈ [InfixOperator.equal, .notEqual]; simp⟩
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- A lower-precedence value which already has a relational top operator is
+passed through by `relationalNone`; hence the unrestricted reverse implication
+from completed output to present input is false. -/
+theorem relationalNone_passes_completed_counterexample
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (passed : Expression) (first : Located InfixOperator)
+    (completed : CompletedNonAssociativeValue .relational passed first) :
+    ∃ input : EbnfValue file tokens (m2cV1.rhs .relational),
+      RuleReduction file tokens .relational origin finish input passed ∧
+      CompletedNonAssociativeValue .relational passed first ∧
+      ¬ NonAssociativeInputPresent .relational input := by
+  refine ⟨_, RuleReduction.relationalNone origin finish passed,
+    completed, ?_⟩
+  rintro ⟨presentLeft, tail, inputEq⟩
+  simp only [NonAssociativeLevel.tailExpr] at inputEq
+  have outer := EbnfValue.sequence_injective _ inputEq
+  rcases EbnfValues.cons_injective _ _ outer with ⟨_, rest⟩
+  rcases EbnfValues.cons_injective _ _ rest with ⟨optionalEq, _⟩
+  have impossible := EbnfValue.optional_injective _ optionalEq
+  contradiction
+
+/-- The exact additional premise needed at the pass-through branch: a
+coherent lower-precedence result must not already expose this level's operator.
+Without it, no reverse theorem can hold for arbitrary `RuleReduction`. -/
+def RelationalPassThroughSafe (value : Expression) : Prop :=
+  ∀ first, ¬ CompletedNonAssociativeValue .relational value first
+
+theorem relationalNone_reverse_requires_passThroughSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (passed : Expression)
+    (reverse : ∀ (input : EbnfValue file tokens (m2cV1.rhs .relational))
+        (first : Located InfixOperator),
+      RuleReduction file tokens .relational origin finish input passed →
+      CompletedNonAssociativeValue .relational passed first →
+      NonAssociativeInputPresent .relational input) :
+    RelationalPassThroughSafe passed := by
+  intro first completed
+  rcases relationalNone_passes_completed_counterexample
+      origin finish passed first completed with
+    ⟨input, reduces, _, absent⟩
+  exact absent (reverse input first reduces completed)
+
+end Solcore.Surface.Multi
