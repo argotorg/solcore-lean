@@ -5716,6 +5716,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | optionalComma : ExecutableRootRule .optionalComma
   | predicateList : ExecutableRootRule .predicateList
   | predicate : ExecutableRootRule .predicate
+  | functionSignature : ExecutableRootRule .functionSignature
   | instanceMethod : ExecutableRootRule .instanceMethod
   | armStatement : ExecutableRootRule .armStatement
   | statement : ExecutableRootRule .statement
@@ -6218,6 +6219,58 @@ def executePredicateRoot
       main := EbnfValue.ruleView .typeAtom viewed.1
       className := EbnfValue.ruleView .qualifiedName viewed.2.2.1
       parameters := parameters
+    }
+
+/-- Execute a function signature and its optional modifiers and return type. -/
+def executeFunctionSignatureRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .functionSignature)) :
+    FunctionSignature :=
+  let genericAtom : EbnfExpr := .atom (.nonterminal .genericPrefix)
+  let publicAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .publicKw))
+  let payableAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .payableKw))
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let returnChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .arrow)), .atom (.nonterminal .type)]
+  let children : List EbnfExpr := [.optional genericAtom,
+    .optional publicAtom, .optional payableAtom,
+    .atom (.terminal (.hardKeyword .functionKw)),
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .leftParen)), .list0 parameterAtom,
+    .atom (.terminal (.symbol .rightParen)), .optional returnChild]
+  let ⟨rawGeneric, rawPublic, rawPayable, _, rawName, _, rawParameters,
+    _, rawReturn, ⟨⟩⟩ := EbnfValue.sequenceFlatView children input
+  let genericPrefix := (EbnfValue.optionalView genericAtom rawGeneric).map
+    (EbnfValue.ruleView .genericPrefix)
+  let publicToken := (EbnfValue.optionalView publicAtom rawPublic).map
+    (EbnfValue.terminalView (.hardKeyword .publicKw))
+  let payableToken := (EbnfValue.optionalView payableAtom rawPayable).map
+    (EbnfValue.terminalView (.hardKeyword .payableKw))
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let parameters := (EbnfValue.list0View parameterAtom rawParameters).map
+    (EbnfValue.ruleView .parameter)
+  let returnValue := (EbnfValue.optionalView returnChild rawReturn).map
+    fun raw =>
+      let pair := EbnfValue.sequence2View
+        (.atom (.terminal (.symbol .arrow)))
+        (.atom (.nonterminal .type)) raw
+      (EbnfValue.terminalView (.symbol .arrow) pair.1,
+        EbnfValue.ruleView .type pair.2, ())
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      genericPrefix := genericPrefix
+      «public» := publicToken.map fun terminal =>
+        { span := terminal.span, payload := .publicModifier }
+      payable := payableToken.map fun terminal =>
+        { span := terminal.span, payload := .payableModifier }
+      name := { span := name.span, payload := name.identifierProjection.2 }
+      parameters := parameters
+      returnType := returnValue.map fun value => value.2.1
     }
 
 /-- Execute a block-statement root from its body value. -/
@@ -7672,6 +7725,8 @@ def executeRootRule
   | .predicateList => executePredicateListRoot input
   | .predicate =>
       executePredicateRoot file tokens origin finish owned ordered input
+  | .functionSignature =>
+      executeFunctionSignatureRoot file tokens origin finish owned ordered input
   | .instanceMethod => executeInstanceMethodRoot input
   | .armStatement => executeArmStatementRoot input
   | .statement => executeStatementRoot input
