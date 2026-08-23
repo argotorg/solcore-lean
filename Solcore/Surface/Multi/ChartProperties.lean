@@ -7293,6 +7293,107 @@ theorem executePragmaDeclRoot_reduces
     rw [executePragmaTargets_eq_targetData] at resultEq
     exact resultEq.symm ▸ reduces
 
+/-- The generic-prefix executor realizes its exact source-rule reduction. -/
+theorem executeGenericPrefixRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .genericPrefix origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .genericPrefix)) :
+    RuleReduction file tokens .genericPrefix origin finish input
+      (executeGenericPrefixRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let contextChildren : List EbnfExpr := [
+    .atom (.nonterminal .predicateList),
+    .atom (.terminal (.symbol .fatArrow))]
+  let children : List EbnfExpr := [
+    .atom (.nonterminal .forallClause),
+    .optional (.sequence contextChildren)]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize rootEq : EbnfValue.sequenceFlatView children input = root
+  rcases root with ⟨rawForall, rawOptional, ⟨⟩⟩
+  let forallClause := EbnfValue.ruleView .forallClause rawForall
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  generalize optionalEq : EbnfValue.optionalView
+    (.sequence contextChildren) rawOptional = viewed
+  cases viewed with
+  | none =>
+      have inputEq : EbnfValue.sequence children
+          (EbnfValues.cons _ _
+            (EbnfValue.ruleAtom .forallClause forallClause)
+            (EbnfValues.cons _ _
+              (EbnfValue.optional (.sequence contextChildren) none)
+              EbnfValues.nil)) = input := by
+        rw [EbnfValue.rule_of_view .forallClause rawForall]
+        have rebuild := EbnfValue.optional_of_view
+          (.sequence contextChildren) rawOptional
+        rw [optionalEq] at rebuild
+        rw [rebuild]
+        have rootRebuild := EbnfValue.sequence_of_flat_view children input
+        rw [rootEq] at rootRebuild
+        exact rootRebuild
+      have resultEq : executeGenericPrefixRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness {
+            forallClause := forallClause
+            context := none
+          } := by
+        simp [executeGenericPrefixRoot, children, contextChildren,
+          rootEq, optionalEq, forallClause, witness]
+        rfl
+      rw [resultEq, ← inputEq]
+      exact .genericPrefixBare origin finish forallClause witness
+  | some rawContext =>
+      generalize contextEq : EbnfValue.sequenceFlatView
+        contextChildren rawContext = context
+      rcases context with ⟨rawPredicates, rawArrow, ⟨⟩⟩
+      let predicates := EbnfValue.ruleView .predicateList rawPredicates
+      let fatArrow := EbnfValue.terminalView (.symbol .fatArrow) rawArrow
+      have contextInputEq : EbnfValue.sequence contextChildren
+          (EbnfValues.cons _ _
+            (EbnfValue.ruleAtom .predicateList predicates)
+            (EbnfValues.cons _ _
+              (EbnfValue.terminalAtom (.symbol .fatArrow) fatArrow)
+              EbnfValues.nil)) = rawContext := by
+        rw [EbnfValue.rule_of_view .predicateList rawPredicates]
+        rw [EbnfValue.terminal_of_view (.symbol .fatArrow) rawArrow]
+        have contextRebuild := EbnfValue.sequence_of_flat_view
+          contextChildren rawContext
+        rw [contextEq] at contextRebuild
+        exact contextRebuild
+      have inputEq : EbnfValue.sequence children
+          (EbnfValues.cons _ _
+            (EbnfValue.ruleAtom .forallClause forallClause)
+            (EbnfValues.cons _ _
+              (EbnfValue.optional (.sequence contextChildren)
+                (some (EbnfValue.sequence contextChildren
+                  (EbnfValues.cons _ _
+                    (EbnfValue.ruleAtom .predicateList predicates)
+                    (EbnfValues.cons _ _
+                      (EbnfValue.terminalAtom (.symbol .fatArrow) fatArrow)
+                      EbnfValues.nil)))))
+              EbnfValues.nil)) = input := by
+        rw [contextInputEq]
+        rw [EbnfValue.rule_of_view .forallClause rawForall]
+        have optionalRebuild := EbnfValue.optional_of_view
+          (.sequence contextChildren) rawOptional
+        rw [optionalEq] at optionalRebuild
+        rw [optionalRebuild]
+        have rootRebuild := EbnfValue.sequence_of_flat_view children input
+        rw [rootEq] at rootRebuild
+        exact rootRebuild
+      have resultEq : executeGenericPrefixRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness {
+            forallClause := forallClause
+            context := some predicates
+          } := by
+        simp [executeGenericPrefixRoot, children, contextChildren,
+          rootEq, optionalEq, contextEq, forallClause, predicates,
+          witness]
+        rfl
+      rw [resultEq, ← inputEq]
+      exact .genericPrefixContext origin finish forallClause
+        predicates fatArrow witness
+
 /-- The export-item executor realizes its exact root reduction. -/
 theorem executeExportItemRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -7851,6 +7952,8 @@ theorem executeRootRule_reduces
   | fallbackDecl =>
       exact executeFallbackDeclRoot_reduces origin finish ready input
   | pragmaDecl => exact executePragmaDeclRoot_reduces origin finish ready input
+  | genericPrefix =>
+      exact executeGenericPrefixRoot_reduces origin finish ready input
   | exportItem =>
       exact executeExportItemRoot_reduces origin finish ready input
   | constructorSelection =>
