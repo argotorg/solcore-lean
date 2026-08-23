@@ -5453,6 +5453,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | body : ExecutableRootRule .body
+  | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
   | forPostItem : ExecutableRootRule .forPostItem
   | expressionStatement : ExecutableRootRule .expressionStatement
@@ -6054,6 +6055,66 @@ def executeContractMemberRoot
 
 namespace EbnfValue
 
+/-- A grouped pair of fixed grammar terminals. -/
+def terminalPairTailExpr
+    (first second : TerminalSymbol) : EbnfExpr :=
+  .group (.sequence [
+    .atom (.terminal first), .atom (.terminal second)])
+
+/-- Decode one grouped pair of fixed grammar terminals. -/
+def terminalPairTailView
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : TerminalSymbol)
+    (input : EbnfValue file tokens (terminalPairTailExpr first second)) :
+    MatchedTerminal file tokens first × MatchedTerminal file tokens second :=
+  let firstAtom : EbnfExpr := .atom (.terminal first)
+  let secondAtom : EbnfExpr := .atom (.terminal second)
+  let rawSequence := groupView (.sequence [firstAtom, secondAtom]) input
+  let viewed := sequence2View firstAtom secondAtom rawSequence
+  (terminalView first viewed.1, terminalView second viewed.2)
+
+/-- Rebuild one grouped pair of fixed grammar terminals. -/
+def terminalPairTailValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : TerminalSymbol)
+    (value : MatchedTerminal file tokens first ×
+      MatchedTerminal file tokens second) :
+    EbnfValue file tokens (terminalPairTailExpr first second) :=
+  let firstAtom : EbnfExpr := .atom (.terminal first)
+  let secondAtom : EbnfExpr := .atom (.terminal second)
+  group (.sequence [firstAtom, secondAtom])
+    (sequence [firstAtom, secondAtom]
+      (EbnfValues.cons firstAtom [secondAtom]
+        (terminalAtom first value.1)
+        (EbnfValues.cons secondAtom [] (terminalAtom second value.2)
+          EbnfValues.nil)))
+
+/-- Rebuilding a viewed terminal pair recovers its original value. -/
+theorem terminalPairTailValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : TerminalSymbol)
+    (input : EbnfValue file tokens (terminalPairTailExpr first second)) :
+    terminalPairTailValue first second
+      (terminalPairTailView first second input) = input := by
+  let firstAtom : EbnfExpr := .atom (.terminal first)
+  let secondAtom : EbnfExpr := .atom (.terminal second)
+  let rawSequence := groupView (.sequence [firstAtom, secondAtom]) input
+  let viewed := sequence2View firstAtom secondAtom rawSequence
+  have firstEq := terminal_of_view first viewed.1
+  have secondEq := terminal_of_view second viewed.2
+  have sequenceEq := sequence2_of_view firstAtom secondAtom rawSequence
+  have groupEq := group_of_view
+    (.sequence [firstAtom, secondAtom]) input
+  change group (.sequence [firstAtom, secondAtom])
+    (sequence [firstAtom, secondAtom]
+      (EbnfValues.cons firstAtom [secondAtom]
+        (terminalAtom first (terminalView first viewed.1))
+        (EbnfValues.cons secondAtom []
+          (terminalAtom second (terminalView second viewed.2))
+          EbnfValues.nil))) = input
+  rw [firstEq, secondEq, sequenceEq]
+  exact groupEq
+
 /-- The common grouped tail of a fixed-operator infix level. -/
 def fixedInfixTailExpr
     (terminal : TerminalSymbol) (operand : GrammarRuleId) : EbnfExpr :=
@@ -6292,6 +6353,31 @@ def executePostfixPartRoot
         (EbnfValue.ruleView .expression viewed.2.1)
         (EbnfValue.terminalView (.symbol .rightBracket) viewed.2.2).span
 
+/-- Execute a qualified name from its first and dotted identifier matches. -/
+def executeQualifiedNameRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .qualifiedName)) :
+    QualifiedName :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let tail := EbnfValue.terminalPairTailExpr
+    (.symbol .dot) (.category .identifier)
+  let viewed := EbnfValue.sequence2View identifierAtom (.star tail) input
+  let first := EbnfValue.terminalView (.category .identifier) viewed.1
+  let rest := (EbnfValue.starView tail viewed.2).map
+    (EbnfValue.terminalPairTailView
+      (.symbol .dot) (.category .identifier))
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    components := {
+      head := executableTerminalLoc first first.identifierProjection.2
+      tail := rest.map fun entry =>
+        executableTerminalLoc entry.2 entry.2.identifierProjection.2
+    }
+  }
+
 /-- Locate an infix result between its left and right operands. -/
 def executableBetween
     (file : WorkspaceFile) {α : Type}
@@ -6415,6 +6501,8 @@ def executeRootRule
   | .assignmentStatement =>
       executeAssignmentStatementRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
+  | .qualifiedName =>
+      executeQualifiedNameRoot file tokens origin finish owned ordered input
   | .forInitItem =>
       executeForInitItemRoot file tokens origin finish owned ordered input
   | .forPostItem =>
