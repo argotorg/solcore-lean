@@ -4801,6 +4801,73 @@ theorem executeQualifiedNameRoot_reduces
   exact .qualifiedName origin finish firstData restData
     firstProjects restProjects witness
 
+/-- The literal executor realizes its selected source-token projection. -/
+theorem executeLiteralRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .literal origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .literal)) :
+    RuleReduction file tokens .literal origin finish input
+      (executeLiteralRoot input) := by
+  let branches : List EbnfExpr := [
+    .atom (.terminal (.category .decimalLiteral)),
+    .atom (.terminal (.category .hexadecimalLiteral)),
+    .atom (.terminal (.category .stringLiteral))]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have lengthEq : branches.length = 3 := by rfl
+    have bound : branch.val < 3 := by simpa [lengthEq] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  rcases branchCases with rfl | rfl | rfl
+  · let terminal := EbnfValue.terminalView
+      (.category .decimalLiteral) raw
+    let payload := terminal.literalProjection .decimalLiteral (by simp)
+    have rawEq := EbnfValue.terminal_of_view
+      (.category .decimalLiteral) raw
+    have resultEq : executeLiteralRoot input =
+        RuleReduction.terminalLoc terminal payload := by
+      rw [executeLiteralRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .literalDecimal origin finish terminal payload
+      (terminal.literalProjection_projects .decimalLiteral (by simp))
+  · let terminal := EbnfValue.terminalView
+      (.category .hexadecimalLiteral) raw
+    let payload := terminal.literalProjection .hexadecimalLiteral (by simp)
+    have rawEq := EbnfValue.terminal_of_view
+      (.category .hexadecimalLiteral) raw
+    have resultEq : executeLiteralRoot input =
+        RuleReduction.terminalLoc terminal payload := by
+      rw [executeLiteralRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .literalHexadecimal origin finish terminal payload
+      (terminal.literalProjection_projects .hexadecimalLiteral (by simp))
+  · let terminal := EbnfValue.terminalView
+      (.category .stringLiteral) raw
+    let payload := terminal.literalProjection .stringLiteral (by simp)
+    have rawEq := EbnfValue.terminal_of_view
+      (.category .stringLiteral) raw
+    have resultEq : executeLiteralRoot input =
+        RuleReduction.terminalLoc terminal payload := by
+      rw [executeLiteralRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .literalString origin finish terminal payload
+      (terminal.literalProjection_projects .stringLiteral (by simp))
+
 /-- The executable infix fold is the declarative semantic fold. -/
 private theorem executeInfixLeft_eq_foldInfixLeft
     (file : WorkspaceFile) (left : Expression)
@@ -5107,6 +5174,7 @@ theorem executeRootRule_reduces
   | postfixExpr => exact executePostfixRoot_reduces origin finish ready input
   | postfixPart =>
       exact executePostfixPartRoot_reduces origin finish ready input
+  | literalValue => exact executeLiteralRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
