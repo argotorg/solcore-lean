@@ -5788,6 +5788,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | assignmentOperator : ExecutableRootRule .assignmentOperator
   | logicalOr : ExecutableRootRule .logicalOr
   | logicalAnd : ExecutableRootRule .logicalAnd
+  | equality : ExecutableRootRule .equality
   | bitOr : ExecutableRootRule .bitOr
   | bitXor : ExecutableRootRule .bitXor
   | bitAnd : ExecutableRootRule .bitAnd
@@ -7832,6 +7833,103 @@ theorem multiplicativeTailValue_of_view
             rawSequence, viewed, rawChoice, choiceEq]
           rw [terminalEq, choiceRebuildEq, operatorEq, operandEq, sequenceEq]
           exact outerGroupEq
+
+/-- The optional `==` or `!=` tail of the equality level. -/
+def equalityTailExpr : EbnfExpr :=
+  .sequence [
+    .group (.choice [
+      .atom (.terminal (.symbol .equalEqual)),
+      .atom (.terminal (.symbol .notEqual))]),
+    .atom (.nonterminal .relational)]
+
+/-- Decode an equality tail into its selected operator and right operand. -/
+def equalityTailView
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens equalityTailExpr) :
+    Sum
+      (MatchedTerminal file tokens (.symbol .equalEqual))
+      (MatchedTerminal file tokens (.symbol .notEqual)) × Expression :=
+  let equalAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .equalEqual))
+  let notEqualAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .notEqual))
+  let operatorExpr : EbnfExpr :=
+    .group (.choice [equalAtom, notEqualAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .relational)
+  let viewed := sequence2View operatorExpr operandAtom input
+  let rawChoice := groupView
+    (.choice [equalAtom, notEqualAtom]) viewed.1
+  let operator := match choice2View equalAtom notEqualAtom rawChoice with
+    | .inl raw => Sum.inl (terminalView (.symbol .equalEqual) raw)
+    | .inr raw => Sum.inr (terminalView (.symbol .notEqual) raw)
+  (operator, ruleView .relational viewed.2)
+
+/-- Rebuild one equality tail from its semantic view. -/
+def equalityTailValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : Sum
+      (MatchedTerminal file tokens (.symbol .equalEqual))
+      (MatchedTerminal file tokens (.symbol .notEqual)) × Expression) :
+    EbnfValue file tokens equalityTailExpr :=
+  let equalAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .equalEqual))
+  let notEqualAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .notEqual))
+  let operatorExpr : EbnfExpr :=
+    .group (.choice [equalAtom, notEqualAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .relational)
+  sequence [operatorExpr, operandAtom]
+    (EbnfValues.cons operatorExpr [operandAtom]
+      (group (.choice [equalAtom, notEqualAtom])
+        (match value.1 with
+        | .inl equal => choice [equalAtom, notEqualAtom]
+            ⟨0, terminalAtom (.symbol .equalEqual) equal⟩
+        | .inr notEqual => choice [equalAtom, notEqualAtom]
+            ⟨1, terminalAtom (.symbol .notEqual) notEqual⟩))
+      (EbnfValues.cons operandAtom []
+        (ruleAtom .relational value.2) EbnfValues.nil))
+
+/-- Rebuilding a decoded equality tail recovers its typed input. -/
+theorem equalityTailValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens equalityTailExpr) :
+    equalityTailValue (equalityTailView input) = input := by
+  let equalAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .equalEqual))
+  let notEqualAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .notEqual))
+  let operatorExpr : EbnfExpr :=
+    .group (.choice [equalAtom, notEqualAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .relational)
+  let viewed := sequence2View operatorExpr operandAtom input
+  let rawChoice := groupView
+    (.choice [equalAtom, notEqualAtom]) viewed.1
+  generalize choiceEq : choice2View equalAtom notEqualAtom rawChoice = selected
+  have choiceValueEq := choice2_of_view equalAtom notEqualAtom rawChoice
+  rw [choiceEq] at choiceValueEq
+  have operatorEq := group_of_view
+    (.choice [equalAtom, notEqualAtom]) viewed.1
+  have operandEq := rule_of_view .relational viewed.2
+  have sequenceEq := sequence2_of_view operatorExpr operandAtom input
+  cases selected with
+  | inl raw =>
+      have terminalEq := terminal_of_view (.symbol .equalEqual) raw
+      have choiceRebuildEq : choice [equalAtom, notEqualAtom]
+          ⟨(0 : Fin 2), raw⟩ = rawChoice := by
+        simpa using choiceValueEq
+      simp only [equalityTailValue, equalityTailView, equalAtom,
+        notEqualAtom, operatorExpr, operandAtom, viewed, rawChoice, choiceEq]
+      rw [terminalEq, choiceRebuildEq, operatorEq, operandEq]
+      exact sequenceEq
+  | inr raw =>
+      have terminalEq := terminal_of_view (.symbol .notEqual) raw
+      have choiceRebuildEq : choice [equalAtom, notEqualAtom]
+          ⟨(1 : Fin 2), raw⟩ = rawChoice := by
+        simpa using choiceValueEq
+      simp only [equalityTailValue, equalityTailView, equalAtom,
+        notEqualAtom, operatorExpr, operandAtom, viewed, rawChoice, choiceEq]
+      rw [terminalEq, choiceRebuildEq, operatorEq, operandEq]
+      exact sequenceEq
 end EbnfValue
 
 /-- Locate a payload at the exact span of a matched terminal. -/
@@ -8188,6 +8286,29 @@ def executeLogicalAndRoot
     (input : EbnfValue file tokens (m2cV1.rhs .logicalAnd)) : Expression :=
   executeFixedInfixRoot file (.symbol .logicalAnd) .equality id .logicalAnd input
 
+/-- Execute an equality root with no operator or one selected operator. -/
+def executeEqualityRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .equality)) : Expression :=
+  let operandAtom : EbnfExpr := .atom (.nonterminal .relational)
+  let tail := EbnfValue.equalityTailExpr
+  let viewed := EbnfValue.sequence2View
+    operandAtom (.optional tail) input
+  let left := EbnfValue.ruleView .relational viewed.1
+  match EbnfValue.optionalView tail viewed.2 with
+  | none => left
+  | some rawTail =>
+      let decoded := EbnfValue.equalityTailView rawTail
+      let operator := match decoded.1 with
+        | .inl equal => executableTerminalLoc equal .equal
+        | .inr notEqual => executableTerminalLoc notEqual .notEqual
+      sourceLoc
+        (ConsumedSpanWitness.compute file tokens origin finish owned ordered)
+        (.infix operator left decoded.2)
+
 def executeBitOrRoot
     (file : WorkspaceFile) {tokens : List Token}
     (input : EbnfValue file tokens (m2cV1.rhs .bitOr)) : Expression :=
@@ -8328,6 +8449,8 @@ def executeRootRule
   | .assignmentOperator => executeAssignmentOperatorRoot input
   | .logicalOr => executeLogicalOrRoot file input
   | .logicalAnd => executeLogicalAndRoot file input
+  | .equality =>
+      executeEqualityRoot file tokens origin finish owned ordered input
   | .bitOr => executeBitOrRoot file input
   | .bitXor => executeBitXorRoot file input
   | .bitAnd => executeBitAndRoot file input
