@@ -4708,6 +4708,224 @@ private theorem shortRuleAtoms_of_views
   | cons head tail induction =>
       simp [EbnfValue.rule_of_view, induction]
 
+private theorem functionSignature_marker_fields_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (genericPrefix : Option GenericPrefix)
+    (publicToken : Option (MatchedTerminal file tokens
+      (.hardKeyword .publicKw)))
+    (payableToken : Option (MatchedTerminal file tokens
+      (.hardKeyword .payableKw)))
+    (name : MatchedTerminal file tokens (.category .identifier))
+    (parameters : List Parameter) (returnType : Option TypeExpr)
+    (publicProjects : ∀ matched, publicToken = some matched →
+      RuleReduction.MarkerProjects file tokens matched .publicModifier)
+    (payableProjects : ∀ matched, payableToken = some matched →
+      RuleReduction.MarkerProjects file tokens matched .payableModifier)
+    (witness : ConsumedSpanWitness file tokens origin finish) :
+    sourceLoc witness ({
+      genericPrefix := genericPrefix
+      «public» := match publicToken with
+        | none => none
+        | some terminal => some (RuleReduction.marker terminal
+            (publicProjects terminal rfl))
+      payable := match payableToken with
+        | none => none
+        | some terminal => some (RuleReduction.marker terminal
+            (payableProjects terminal rfl))
+      name := RuleReduction.terminalLoc name name.identifierProjection.2
+      parameters := parameters
+      returnType := returnType
+    } : FunctionSignaturePayload) = sourceLoc witness ({
+      genericPrefix := genericPrefix
+      «public» := publicToken.map fun terminal =>
+        RuleReduction.terminalLoc terminal .publicModifier
+      payable := payableToken.map fun terminal =>
+        RuleReduction.terminalLoc terminal .payableModifier
+      name := RuleReduction.terminalLoc name name.identifierProjection.2
+      parameters := parameters
+      returnType := returnType
+    } : FunctionSignaturePayload) := by
+  cases publicToken <;> cases payableToken <;> rfl
+
+/-- The function-signature executor realizes its exact root reduction. -/
+theorem executeFunctionSignatureRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .functionSignature origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .functionSignature)) :
+    RuleReduction file tokens .functionSignature origin finish input
+      (executeFunctionSignatureRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let genericAtom : EbnfExpr := .atom (.nonterminal .genericPrefix)
+  let publicAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .publicKw))
+  let payableAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .payableKw))
+  let functionAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .functionKw))
+  let nameAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let returnChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .arrow)), .atom (.nonterminal .type)]
+  let children : List EbnfExpr := [.optional genericAtom,
+    .optional publicAtom, .optional payableAtom, functionAtom, nameAtom,
+    openAtom, .list0 parameterAtom, closeAtom, .optional returnChild]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : EbnfValue.sequenceFlatView children input = values
+  rcases values with ⟨rawGeneric, rawPublic, rawPayable, rawFunction,
+    rawName, rawOpen, rawParameters, rawClose, rawReturn, ⟨⟩⟩
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  rw [sequenceEq] at inputEq
+  let rawGenericValue := EbnfValue.optionalView genericAtom rawGeneric
+  let genericPrefix := rawGenericValue.map
+    (EbnfValue.ruleView .genericPrefix)
+  let rawPublicValue := EbnfValue.optionalView publicAtom rawPublic
+  let publicToken := rawPublicValue.map
+    (EbnfValue.terminalView (.hardKeyword .publicKw))
+  let rawPayableValue := EbnfValue.optionalView payableAtom rawPayable
+  let payableToken := rawPayableValue.map
+    (EbnfValue.terminalView (.hardKeyword .payableKw))
+  let functionKw := EbnfValue.terminalView
+    (.hardKeyword .functionKw) rawFunction
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let openParen := EbnfValue.terminalView (.symbol .leftParen) rawOpen
+  let rawParameterValues := EbnfValue.list0View parameterAtom rawParameters
+  let parameters := rawParameterValues.map (EbnfValue.ruleView .parameter)
+  let closeParen := EbnfValue.terminalView (.symbol .rightParen) rawClose
+  let rawReturnValue := EbnfValue.optionalView returnChild rawReturn
+  let returnValue := rawReturnValue.map fun raw =>
+    let pair := EbnfValue.sequence2View
+      (.atom (.terminal (.symbol .arrow)))
+      (.atom (.nonterminal .type)) raw
+    (EbnfValue.terminalView (.symbol .arrow) pair.1,
+      EbnfValue.ruleView .type pair.2, ())
+  have genericEq : EbnfValue.optional genericAtom
+      (genericPrefix.map (EbnfValue.ruleAtom .genericPrefix)) =
+        rawGeneric := by
+    calc
+      _ = EbnfValue.optional genericAtom rawGenericValue := by
+        congr 1
+        cases selected : rawGenericValue with
+        | none => simp [genericPrefix, selected]
+        | some raw => simp [genericPrefix, selected,
+            EbnfValue.rule_of_view]
+      _ = rawGeneric := EbnfValue.optional_of_view genericAtom rawGeneric
+  have publicEq : EbnfValue.optional publicAtom
+      (publicToken.map (EbnfValue.terminalAtom
+        (.hardKeyword .publicKw))) = rawPublic := by
+    calc
+      _ = EbnfValue.optional publicAtom rawPublicValue := by
+        congr 1
+        cases selected : rawPublicValue with
+        | none => simp [publicToken, selected]
+        | some raw => simp [publicToken, selected,
+            EbnfValue.terminal_of_view]
+      _ = rawPublic := EbnfValue.optional_of_view publicAtom rawPublic
+  have payableEq : EbnfValue.optional payableAtom
+      (payableToken.map (EbnfValue.terminalAtom
+        (.hardKeyword .payableKw))) = rawPayable := by
+    calc
+      _ = EbnfValue.optional payableAtom rawPayableValue := by
+        congr 1
+        cases selected : rawPayableValue with
+        | none => simp [payableToken, selected]
+        | some raw => simp [payableToken, selected,
+            EbnfValue.terminal_of_view]
+      _ = rawPayable := EbnfValue.optional_of_view payableAtom rawPayable
+  have parameterMapEq : parameters.map
+      (EbnfValue.ruleAtom .parameter) = rawParameterValues :=
+    shortRuleAtoms_of_views .parameter rawParameterValues
+  have parametersEq : EbnfValue.list0 parameterAtom
+      (parameters.map (EbnfValue.ruleAtom .parameter)) = rawParameters := by
+    rw [parameterMapEq]
+    exact EbnfValue.list0_of_view parameterAtom rawParameters
+  have returnValuesEq : (returnValue.map fun value =>
+      EbnfValue.sequence [
+          .atom (.terminal (.symbol .arrow)),
+          .atom (.nonterminal .type)]
+        (EbnfValues.cons (.atom (.terminal (.symbol .arrow)))
+          [.atom (.nonterminal .type)]
+          (EbnfValue.terminalAtom (.symbol .arrow) value.1)
+          (EbnfValues.cons (.atom (.nonterminal .type)) []
+            (EbnfValue.ruleAtom .type value.2.1) EbnfValues.nil))) =
+        rawReturnValue := by
+    cases selected : rawReturnValue with
+    | none => simp [returnValue, selected]
+    | some raw =>
+        let pair := EbnfValue.sequence2View
+          (.atom (.terminal (.symbol .arrow)))
+          (.atom (.nonterminal .type)) raw
+        simp only [returnValue, selected, Option.map]
+        apply congrArg some
+        rw [EbnfValue.terminal_of_view (.symbol .arrow) pair.1,
+          EbnfValue.rule_of_view .type pair.2]
+        exact EbnfValue.sequence2_of_view
+          (.atom (.terminal (.symbol .arrow)))
+          (.atom (.nonterminal .type)) raw
+  have returnEq : EbnfValue.optional returnChild
+      (returnValue.map fun value =>
+        EbnfValue.sequence [
+            .atom (.terminal (.symbol .arrow)),
+            .atom (.nonterminal .type)]
+          (EbnfValues.cons (.atom (.terminal (.symbol .arrow)))
+            [.atom (.nonterminal .type)]
+            (EbnfValue.terminalAtom (.symbol .arrow) value.1)
+            (EbnfValues.cons (.atom (.nonterminal .type)) []
+              (EbnfValue.ruleAtom .type value.2.1) EbnfValues.nil))) =
+        rawReturn := by
+    rw [returnValuesEq]
+    exact EbnfValue.optional_of_view returnChild rawReturn
+  let publicProjects : ∀ terminal, publicToken = some terminal →
+      RuleReduction.MarkerProjects file tokens terminal
+        .publicModifier := fun terminal _ => .publicModifier terminal
+  let payableProjects : ∀ terminal, payableToken = some terminal →
+      RuleReduction.MarkerProjects file tokens terminal
+        .payableModifier := fun terminal _ => .payableModifier terminal
+  let nameData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := name
+    spelling := name.identifierProjection.1
+    parsed := name.identifierProjection.2
+  }
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have resultEq : executeFunctionSignatureRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        genericPrefix := genericPrefix
+        «public» := publicToken.map fun terminal =>
+          RuleReduction.terminalLoc terminal .publicModifier
+        payable := payableToken.map fun terminal =>
+          RuleReduction.terminalLoc terminal .payableModifier
+        name := RuleReduction.terminalLoc name name.identifierProjection.2
+        parameters := parameters
+        returnType := returnValue.map fun value => value.2.1
+      } := by
+    have sequenceEq' := sequenceEq
+    simp only [children, genericAtom, publicAtom, payableAtom, functionAtom,
+      nameAtom, openAtom, parameterAtom, closeAtom, returnChild] at sequenceEq'
+    simp [executeFunctionSignatureRoot, sequenceEq', genericPrefix,
+      publicToken, payableToken, name, parameters, returnValue, witness]
+    rfl
+  rw [resultEq, ← inputEq, ← genericEq, ← publicEq, ← payableEq,
+    ← EbnfValue.terminal_of_view (.hardKeyword .functionKw) rawFunction,
+    ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+    ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+    ← parametersEq,
+    ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose,
+    ← returnEq]
+  have reduces := RuleReduction.functionSignature origin finish
+    genericPrefix publicToken payableToken functionKw nameData openParen
+    parameters closeParen returnValue publicProjects payableProjects
+    name.identifierProjection_projects witness
+  have outputEq := functionSignature_marker_fields_eq genericPrefix
+    publicToken payableToken name parameters
+    (returnValue.map fun value => value.2.1) publicProjects payableProjects
+    witness
+  exact outputEq ▸ reduces
+
 /-- The return-statement executor realizes its exact root reduction. -/
 theorem executeReturnStatementRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -8171,6 +8389,8 @@ theorem executeRootRule_reduces
       exact executePredicateListRoot_reduces origin finish ready input
   | predicate =>
       exact executePredicateRoot_reduces origin finish ready input
+  | functionSignature =>
+      exact executeFunctionSignatureRoot_reduces origin finish ready input
   | instanceMethod =>
       exact executeInstanceMethodRoot_reduces origin finish ready input
   | armStatement =>
