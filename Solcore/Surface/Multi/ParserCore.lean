@@ -2862,6 +2862,27 @@ def transport
       GrammarSymbolValues file tokens right :=
   Eq.mp (congrArg (GrammarSymbolValues file tokens) equality)
 
+theorem transport_trans
+    {file : WorkspaceFile} {tokens : List Token}
+    {first second third : List GrammarSymbol}
+    (left : first = second) (right : second = third)
+    (value : GrammarSymbolValues file tokens first) :
+    transport right (transport left value) =
+      transport (left.trans right) value := by
+  cases left
+  cases right
+  rfl
+
+theorem transport_self
+    {file : WorkspaceFile} {tokens : List Token}
+    {symbols : List GrammarSymbol}
+    (equality : symbols = symbols)
+    (value : GrammarSymbolValues file tokens symbols) :
+    transport equality value = value := by
+  have exactEquality : equality = rfl := Subsingleton.elim _ _
+  rw [exactEquality]
+  rfl
+
 end GrammarSymbolValues
 
 /-- Semantic values for the already consumed prefix of one item. -/
@@ -2927,6 +2948,27 @@ def fullValue
     GrammarSymbolValues file tokens item.raw.production.rhs :=
   GrammarSymbolValues.transport
     (prefix_full_layout item.raw complete) prior
+
+/-- Completing a prefix and then viewing a complete item is one transport of
+the prior tuple with its child appended. -/
+theorem fullValue_completeValue_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens)
+    (next : NextSymbol waiting.raw
+      (.nonterminal finished.raw.production.lhs))
+    (advance : AdvanceItem waiting.raw finished.raw.current after.raw)
+    (complete : CompleteItem after.raw)
+    (prior : PrefixValues file tokens waiting)
+    (child : NonterminalValue file tokens
+      finished.raw.production.lhs) :
+    fullValue after complete
+        (completeValue waiting finished after next advance prior child) =
+      GrammarSymbolValues.transport
+        ((prefix_complete_layout waiting.raw finished.raw after.raw
+          next advance).trans (prefix_full_layout after.raw complete))
+        (GrammarSymbolValues.append prior (child, ())) := by
+  unfold fullValue completeValue
+  exact GrammarSymbolValues.transport_trans _ _ _
 
 end PrefixValues
 
