@@ -24541,3 +24541,90 @@ private theorem dequeueContextualEdge?_total_with_invariants
     selected, backpointers.1, backpointers.2⟩
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- One total Phase-C queue step.  Item work retains priority over checked
+edge dequeue, exactly as in the existing bounded runner. -/
+private def phaseCQueueStepMulti?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  match current.payload.phaseC.itemQueue with
+  | _ :: _ =>
+      match dequeueContextualItem? current with
+      | none => none
+      | some (item, afterDequeue) =>
+          processContextualItemMulti? owned item afterDequeue
+  | [] =>
+      match current.payload.phaseC.edgeQueue with
+      | _ :: _ =>
+          match dequeueContextualEdge? current with
+          | none => none
+          | some (_, afterDequeue) => some afterDequeue
+      | [] => some current
+
+/-- Every one-step queue selection is total and jointly preserves operational
+soundness, address safety, and both multi-ledger coverage directions. -/
+private theorem phaseCQueueStepMulti?_total_invariants
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCAllSafe current)
+    (edgeSafe : PhaseCEdgeSafe current)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (operational : PhaseCOperationalInvariant file tokens current.payload) :
+    ∃ result, phaseCQueueStepMulti? owned current = some result ∧
+      PhaseCAllSafe result ∧
+      PhaseCEdgeSafe result ∧
+      PhaseCMultiBackpointerInvariant result ∧
+      PhaseCBackpointerLedgerExact result ∧
+      PhaseCOperationalInvariant file tokens result.payload := by
+  cases items : current.payload.phaseC.itemQueue with
+  | nil =>
+      cases edges : current.payload.phaseC.edgeQueue with
+      | nil =>
+          exact ⟨current, by simp [phaseCQueueStepMulti?, items, edges],
+            safe, edgeSafe, covers, exact, operational⟩
+      | cons edge rest =>
+          obtain ⟨after, dequeued, afterSafe, afterEdgeSafe,
+              afterCovers, afterExact⟩ :=
+            dequeueContextualEdge?_total_with_invariants current edge rest
+              edges safe edgeSafe covers exact
+          have afterOperational :=
+            dequeueContextualEdge?_operationalInvariant current (edge, after)
+              operational dequeued
+          exact ⟨after, by
+            simp [phaseCQueueStepMulti?, items, edges, dequeued],
+            afterSafe, afterEdgeSafe, afterCovers, afterExact,
+            afterOperational⟩
+  | cons item rest =>
+      obtain ⟨after, dequeued, afterSafe, workFresh, afterEdgeSafe,
+          afterCovers, afterExact⟩ :=
+        dequeueContextualItem?_total_with_invariants current item rest items
+          safe edgeSafe covers exact
+      obtain ⟨result, processed, resultSafe, resultCovers, resultExact,
+          resultEdgeSafe⟩ :=
+        processContextualItemMulti?_total_with_edgeSafe owned item after
+          workFresh afterSafe afterCovers afterExact afterEdgeSafe
+      have afterOperational :=
+        dequeueContextualItem?_operationalInvariant current (item, after)
+          operational dequeued
+      have itemAfter : OperationalContextualReach file tokens
+          after.payload.phaseC.memo item := by
+        rw [dequeueContextualItem?_memo current (item, after) dequeued]
+        exact afterOperational.1
+      have resultOperational :=
+        (processContextualItemMulti?_operationalInvariant owned item after
+          result afterOperational.2 itemAfter processed).1
+      exact ⟨result, by
+        simp [phaseCQueueStepMulti?, items, dequeued, processed],
+        resultSafe, resultEdgeSafe, resultCovers, resultExact,
+        resultOperational⟩
+
+end Solcore.Surface.Multi.Chart
