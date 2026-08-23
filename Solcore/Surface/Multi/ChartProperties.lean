@@ -7447,6 +7447,167 @@ theorem executeForallClauseRoot_reduces
   rw [resultEq, ← inputEq, ← forallEq, ← firstEq, ← restEq, ← dotEq]
   exact .forallClause origin finish forallKw first rest dot witness
 
+private theorem forallBinderRuleNonemptyAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (inputs : NonemptyList
+      (EbnfValue file tokens (.atom (.nonterminal .type)))) :
+    (inputs.map (EbnfValue.ruleView .type)).map
+        (EbnfValue.ruleAtom .type) = inputs := by
+  cases inputs with
+  | mk head tail =>
+      simp only [NonemptyList.map, NonemptyList.mk.injEq]
+      constructor
+      · exact EbnfValue.rule_of_view .type head
+      · induction tail with
+        | nil => rfl
+        | cons next rest induction =>
+            simp [EbnfValue.rule_of_view, induction]
+
+/-- The universal-binder executor realizes its exact root reduction. -/
+theorem executeForallBinderRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .forallBinder origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .forallBinder)) :
+    RuleReduction file tokens .forallBinder origin finish input
+      (executeForallBinderRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let identifierAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let typesAtom : EbnfExpr := .list1 typeAtom
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  let argumentChildren : List EbnfExpr :=
+    [openAtom, typesAtom, closeAtom]
+  let argumentChild : EbnfExpr := .sequence argumentChildren
+  let colonAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .colon))
+  let classAtom : EbnfExpr := .atom (.nonterminal .qualifiedName)
+  let boundedChildren : List EbnfExpr :=
+    [identifierAtom, colonAtom, classAtom, .optional argumentChild]
+  change EbnfValue file tokens
+    (.choice [identifierAtom, .sequence boundedChildren]) at input
+  generalize choiceEq : EbnfValue.choice2View identifierAtom
+    (.sequence boundedChildren) input = selected
+  have inputEq := EbnfValue.choice2_of_view
+    identifierAtom (.sequence boundedChildren) input
+  rw [choiceEq] at inputEq
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases selected with rawName | rawBounded
+  · let name := EbnfValue.terminalView
+      (.category .identifier) rawName
+    let nameData : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier := {
+      matched := name
+      spelling := name.identifierProjection.1
+      parsed := name.identifierProjection.2
+    }
+    have resultEq : executeForallBinderRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.bare
+          (executableTerminalLoc name name.identifierProjection.2)) := by
+      rw [executeForallBinderRoot, choiceEq]
+      rfl
+    rw [resultEq, ← inputEq,
+      ← EbnfValue.terminal_of_view (.category .identifier) rawName]
+    exact .forallBinderBare origin finish nameData
+      name.identifierProjection_projects witness
+  · generalize boundedEq : EbnfValue.sequenceFlatView
+      boundedChildren rawBounded = bounded
+    rcases bounded with ⟨rawName, rawColon, rawClass, rawOptional, ⟨⟩⟩
+    let name := EbnfValue.terminalView
+      (.category .identifier) rawName
+    let nameData : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier := {
+      matched := name
+      spelling := name.identifierProjection.1
+      parsed := name.identifierProjection.2
+    }
+    let colon := EbnfValue.terminalView (.symbol .colon) rawColon
+    let className := EbnfValue.ruleView .qualifiedName rawClass
+    generalize optionalEq : EbnfValue.optionalView
+      argumentChild rawOptional = arguments
+    cases arguments with
+    | none =>
+        have resultEq : executeForallBinderRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.bounded
+              (executableTerminalLoc name name.identifierProjection.2)
+              className none) := by
+          simp [executeForallBinderRoot, choiceEq, boundedEq, optionalEq,
+            identifierAtom, typeAtom, openAtom, typesAtom, closeAtom,
+            argumentChildren, argumentChild, colonAtom, classAtom,
+            boundedChildren, name, className, witness]
+          rfl
+        have rawOptionalEq : EbnfValue.optional argumentChild none =
+            rawOptional := by
+          calc
+            _ = EbnfValue.optional argumentChild
+                (EbnfValue.optionalView argumentChild rawOptional) := by
+                  rw [optionalEq]
+            _ = rawOptional := EbnfValue.optional_of_view
+              argumentChild rawOptional
+        rw [resultEq, ← inputEq,
+          ← EbnfValue.sequence_of_flat_view boundedChildren rawBounded,
+          boundedEq,
+          ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+          ← EbnfValue.terminal_of_view (.symbol .colon) rawColon,
+          ← EbnfValue.rule_of_view .qualifiedName rawClass,
+          ← rawOptionalEq]
+        exact .forallBinderBoundedWithoutArguments origin finish
+          nameData colon className name.identifierProjection_projects witness
+    | some rawArguments =>
+        generalize argumentsEq : EbnfValue.sequenceFlatView
+          argumentChildren rawArguments = argumentValues
+        rcases argumentValues with ⟨rawOpen, rawTypes, rawClose, ⟨⟩⟩
+        let openParen := EbnfValue.terminalView
+          (.symbol .leftParen) rawOpen
+        let rawTypeValues := EbnfValue.list1View typeAtom rawTypes
+        let parameters := rawTypeValues.map (EbnfValue.ruleView .type)
+        let closeParen := EbnfValue.terminalView
+          (.symbol .rightParen) rawClose
+        have parametersMapEq : parameters.map
+            (EbnfValue.ruleAtom .type) = rawTypeValues :=
+          forallBinderRuleNonemptyAtoms_of_views rawTypeValues
+        have parametersEq : EbnfValue.list1 typeAtom
+            (parameters.map (EbnfValue.ruleAtom .type)) = rawTypes := by
+          rw [parametersMapEq]
+          exact EbnfValue.list1_of_view typeAtom rawTypes
+        have resultEq : executeForallBinderRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.bounded
+              (executableTerminalLoc name name.identifierProjection.2)
+              className (some parameters)) := by
+          simp [executeForallBinderRoot, choiceEq, boundedEq, optionalEq,
+            argumentsEq, identifierAtom, typeAtom, openAtom, typesAtom,
+            closeAtom, argumentChildren, argumentChild, colonAtom, classAtom,
+            boundedChildren, name, className, rawTypeValues, parameters,
+            witness]
+          rfl
+        have rawOptionalEq : EbnfValue.optional argumentChild
+            (some rawArguments) = rawOptional := by
+          calc
+            _ = EbnfValue.optional argumentChild
+                (EbnfValue.optionalView argumentChild rawOptional) := by
+                  rw [optionalEq]
+            _ = rawOptional := EbnfValue.optional_of_view
+              argumentChild rawOptional
+        rw [resultEq, ← inputEq,
+          ← EbnfValue.sequence_of_flat_view boundedChildren rawBounded,
+          boundedEq,
+          ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+          ← EbnfValue.terminal_of_view (.symbol .colon) rawColon,
+          ← EbnfValue.rule_of_view .qualifiedName rawClass,
+          ← rawOptionalEq,
+          ← EbnfValue.sequence_of_flat_view argumentChildren rawArguments,
+          argumentsEq,
+          ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+          ← parametersEq,
+          ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose]
+        exact .forallBinderBoundedWithArguments origin finish nameData colon
+          className openParen parameters closeParen
+          name.identifierProjection_projects witness
+
 /-- The export-item executor realizes its exact root reduction. -/
 theorem executeExportItemRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -8051,6 +8212,8 @@ theorem executeRootRule_reduces
       exact executeGenericPrefixRoot_reduces origin finish ready input
   | forallClause =>
       exact executeForallClauseRoot_reduces origin finish ready input
+  | forallBinder =>
+      exact executeForallBinderRoot_reduces origin finish ready input
   | exportItem =>
       exact executeExportItemRoot_reduces origin finish ready input
   | constructorSelection =>
