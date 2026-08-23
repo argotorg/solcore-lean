@@ -5415,6 +5415,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | bitXor : ExecutableRootRule .bitXor
   | bitAnd : ExecutableRootRule .bitAnd
   | prefix : ExecutableRootRule .prefix
+  | postfixExpr : ExecutableRootRule .postfix
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -6218,6 +6219,34 @@ def executeInfixLeft
         (executableBetween file left.span right.span
           (.infix operator left right)) rest
 
+/-- Fold source-ordered postfix pieces over their receiver. -/
+def executePostfixLeft
+    (file : WorkspaceFile) : Expression → List PostfixPartValue → Expression
+  | receiver, [] => receiver
+  | receiver, part :: rest =>
+      let next := match part with
+        | .call _ arguments closeParen =>
+            executableBetween file receiver.span closeParen
+              (.call receiver arguments)
+        | .select _ field =>
+            executableBetween file receiver.span field.span
+              (.select receiver field)
+        | .index _ index closeBracket =>
+            executableBetween file receiver.span closeBracket
+              (.index receiver index)
+      executePostfixLeft file next rest
+
+/-- Execute a postfix root from its atom and ordered postfix pieces. -/
+def executePostfixRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .postfix)) : Expression :=
+  let atomExpr : EbnfExpr := .atom (.nonterminal .atom)
+  let partExpr : EbnfExpr := .atom (.nonterminal .postfixPart)
+  let viewed := EbnfValue.sequence2View atomExpr (.star partExpr) input
+  executePostfixLeft file (EbnfValue.ruleView .atom viewed.1)
+    ((EbnfValue.starView partExpr viewed.2).map
+      (EbnfValue.ruleView .postfixPart))
+
 /-- Execute any fixed-operator infix root from its typed EBNF value. -/
 def executeFixedInfixRoot
     (file : WorkspaceFile) {tokens : List Token}
@@ -6307,6 +6336,7 @@ def executeRootRule
   | .bitAnd => executeBitAndRoot file input
   | .prefix =>
       executePrefixRoot file tokens origin finish owned ordered input
+  | .postfixExpr => executePostfixRoot file input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
