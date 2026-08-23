@@ -5711,6 +5711,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | module : ExecutableRootRule .module
   | topItem : ExecutableRootRule .topItem
   | importEntry : ExecutableRootRule .importEntry
+  | localExportEntry : ExecutableRootRule .localExportEntry
   | optionalComma : ExecutableRootRule .optionalComma
   | predicateList : ExecutableRootRule .predicateList
   | predicate : ExecutableRootRule .predicate
@@ -6749,6 +6750,41 @@ def executeImportEntryRoot
       sourceLoc witness (.named
         ⟨name.span, name.identifierProjection.2⟩ alias)
 
+/-- Execute one wildcard, item, or module-wildcard local export entry. -/
+def executeLocalExportEntryRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .localExportEntry)) :
+    ExportEntry :=
+  let starAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .star))
+  let allChildren : List EbnfExpr := [
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .dot)), starAtom]
+  let branches : List EbnfExpr := [
+    starAtom, .atom (.nonterminal .exportItem), .sequence allChildren]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let star := EbnfValue.terminalView (.symbol .star) raw
+      sourceLoc witness (.wildcard {
+        span := star.span
+        payload := .wildcard
+      })
+  | ⟨⟨1, _⟩, raw⟩ =>
+      sourceLoc witness (.item (EbnfValue.ruleView .exportItem raw))
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView allChildren raw
+      let reference := EbnfValue.ruleView .moduleRef viewed.1
+      let star := EbnfValue.terminalView (.symbol .star) viewed.2.2.1
+      sourceLoc witness (.allFrom reference {
+        span := star.span
+        payload := .wildcard
+      })
+
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -7446,6 +7482,8 @@ def executeRootRule
   | .topItem => executeTopItemRoot file tokens origin finish owned ordered input
   | .importEntry =>
       executeImportEntryRoot file tokens origin finish owned ordered input
+  | .localExportEntry =>
+      executeLocalExportEntryRoot file tokens origin finish owned ordered input
   | .optionalComma => executeOptionalCommaRoot input
   | .predicateList => executePredicateListRoot input
   | .predicate =>
