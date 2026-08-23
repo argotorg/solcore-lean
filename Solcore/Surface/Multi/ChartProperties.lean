@@ -3501,3 +3501,283 @@ theorem executeObservedContextualWorklist?_greatestCurrent?_ne_none
   contradiction
 
 end Solcore.Surface.Multi
+
+set_option autoImplicit false
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- The optional-comma executor realizes the exact source-rule reduction. -/
+theorem executeOptionalCommaRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .optionalComma origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .optionalComma)) :
+    RuleReduction file tokens .optionalComma origin finish input
+      (executeOptionalCommaRoot input) := by
+  change EbnfValue file tokens
+    (.optional (.atom (.terminal (.symbol .comma)))) at input
+  generalize viewEq : EbnfValue.optionalView
+    (.atom (.terminal (.symbol .comma))) input = viewed
+  cases viewed with
+  | none =>
+      have inputEq : EbnfValue.optional
+          (.atom (.terminal (.symbol .comma))) none = input := by
+        calc
+          _ = EbnfValue.optional _
+              (EbnfValue.optionalView _ input) := by rw [viewEq]
+          _ = input := EbnfValue.optional_of_view _ input
+      have resultEq : executeOptionalCommaRoot input = .absent := by
+        simp [executeOptionalCommaRoot, viewEq]
+      rw [resultEq, ← inputEq]
+      exact .optionalCommaAbsent origin finish
+  | some rawComma =>
+      let comma := EbnfValue.terminalView (.symbol .comma) rawComma
+      have rawCommaEq : EbnfValue.terminalAtom (.symbol .comma) comma =
+          rawComma := EbnfValue.terminal_of_view _ rawComma
+      have inputEq : EbnfValue.optional
+          (.atom (.terminal (.symbol .comma)))
+          (some (EbnfValue.terminalAtom (.symbol .comma) comma)) = input := by
+        calc
+          _ = EbnfValue.optional _ (some rawComma) := by rw [rawCommaEq]
+          _ = EbnfValue.optional _
+              (EbnfValue.optionalView _ input) := by rw [viewEq]
+          _ = input := EbnfValue.optional_of_view _ input
+      have resultEq : executeOptionalCommaRoot input = .present comma.span := by
+        simp [executeOptionalCommaRoot, viewEq, comma]
+      rw [resultEq, ← inputEq]
+      exact .optionalCommaPresent origin finish comma
+
+/-- The top-item executor realizes the exact source-rule reduction. -/
+theorem executeTopItemRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .topItem origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .topItem)) :
+    RuleReduction file tokens .topItem origin finish input
+      (executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .importDecl), .atom (.nonterminal .exportDecl),
+    .atom (.nonterminal .pragmaDecl), .atom (.nonterminal .dataDecl),
+    .atom (.nonterminal .typeAliasDecl), .atom (.nonterminal .classDecl),
+    .atom (.nonterminal .instanceDecl), .atom (.nonterminal .contractDecl),
+    .atom (.nonterminal .functionDecl)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 ∨ branch = 5 ∨ branch = 6 ∨
+      branch = 7 ∨ branch = 8 := by
+    have branchesLength : branches.length = 9 := by rfl
+    have bound : branch.val < 9 := by
+      calc
+        branch.val < branches.length := branch.isLt
+        _ = 9 := branchesLength
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 ∨
+        branch.val = 5 ∨ branch.val = 6 ∨ branch.val = 7 ∨
+        branch.val = 8 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq |
+      valueEq | valueEq | valueEq | valueEq | valueEq
+    all_goals first
+      | exact Or.inl (Fin.ext valueEq)
+      | exact Or.inr (Or.inl (Fin.ext valueEq))
+      | exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+      | exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inl (Fin.ext valueEq))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Fin.ext valueEq))))))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  · let declaration := EbnfValue.ruleView .importDecl raw
+    have rawEq := EbnfValue.rule_of_view .importDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.importDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemImport origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .exportDecl raw
+    have rawEq := EbnfValue.rule_of_view .exportDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.exportDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemExport origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .pragmaDecl raw
+    have rawEq := EbnfValue.rule_of_view .pragmaDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.pragmaDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemPragma origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .dataDecl raw
+    have rawEq := EbnfValue.rule_of_view .dataDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.dataDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemData origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .typeAliasDecl raw
+    have rawEq := EbnfValue.rule_of_view .typeAliasDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.typeAliasDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemTypeAlias origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .classDecl raw
+    have rawEq := EbnfValue.rule_of_view .classDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.classDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemClass origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .instanceDecl raw
+    have rawEq := EbnfValue.rule_of_view .instanceDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.instanceDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemInstance origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .contractDecl raw
+    have rawEq := EbnfValue.rule_of_view .contractDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.contractDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemContract origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .functionDecl raw
+    have rawEq := EbnfValue.rule_of_view .functionDecl raw
+    have resultEq : executeTopItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.functionDecl declaration) := by
+      rw [executeTopItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .topItemFunction origin finish declaration witness
+
+private theorem ruleAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (inputs : List
+      (EbnfValue file tokens (.atom (.nonterminal rule)))) :
+    (inputs.map (EbnfValue.ruleView rule)).map
+        (EbnfValue.ruleAtom rule) = inputs := by
+  induction inputs with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [EbnfValue.rule_of_view, induction]
+
+/-- The module executor realizes the exact complete-file source-rule
+reduction. -/
+theorem executeModuleRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .module origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .module)) :
+    RuleReduction file tokens .module origin finish input
+      (executeModuleRoot file input) := by
+  let itemAtom : EbnfExpr := .atom (.nonterminal .topItem)
+  let eofAtom : EbnfExpr := .atom (.terminal .endOfFile)
+  let children : List EbnfExpr := [.star itemAtom, eofAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  let values := EbnfValue.sequenceView children input
+  let first := EbnfValues.consView (.star itemAtom) [eofAtom] values
+  let rawStar := first.1
+  let tail := first.2
+  let second := EbnfValues.consView eofAtom [] tail
+  let rawEof := second.1
+  let nilTail := second.2
+  let rawItems := EbnfValue.starView itemAtom rawStar
+  let items := rawItems.map (EbnfValue.ruleView .topItem)
+  let eof := EbnfValue.terminalView .endOfFile rawEof
+  have itemsEq : items.map (EbnfValue.ruleAtom .topItem) = rawItems :=
+    ruleAtoms_of_views .topItem rawItems
+  have rawStarEq : EbnfValue.star itemAtom rawItems = rawStar :=
+    EbnfValue.star_of_view itemAtom rawStar
+  have rawEofEq : EbnfValue.terminalAtom .endOfFile eof = rawEof :=
+    EbnfValue.terminal_of_view .endOfFile rawEof
+  have nilEq : EbnfValues.nil = nilTail :=
+    EbnfValues.nil_unique nilTail
+  have tailEq : EbnfValues.cons eofAtom []
+      (EbnfValue.terminalAtom .endOfFile eof) EbnfValues.nil = tail := by
+    calc
+      _ = EbnfValues.cons eofAtom [] rawEof nilTail := by
+        rw [rawEofEq, nilEq]
+      _ = EbnfValues.cons eofAtom [] second.1 second.2 := rfl
+      _ = tail := EbnfValues.cons_of_view eofAtom [] tail
+  have valuesEq : EbnfValues.cons (.star itemAtom) [eofAtom]
+      (EbnfValue.star itemAtom
+        (items.map (EbnfValue.ruleAtom .topItem)))
+      (EbnfValues.cons eofAtom []
+        (EbnfValue.terminalAtom .endOfFile eof) EbnfValues.nil) = values := by
+    calc
+      _ = EbnfValues.cons (.star itemAtom) [eofAtom] rawStar tail := by
+        rw [itemsEq, rawStarEq, tailEq]
+      _ = EbnfValues.cons (.star itemAtom) [eofAtom] first.1 first.2 := rfl
+      _ = values := EbnfValues.cons_of_view (.star itemAtom) [eofAtom] values
+  have inputEq : EbnfValue.sequence children
+      (EbnfValues.cons (.star itemAtom) [eofAtom]
+        (EbnfValue.star itemAtom
+          (items.map (EbnfValue.ruleAtom .topItem)))
+        (EbnfValues.cons eofAtom []
+          (EbnfValue.terminalAtom .endOfFile eof) EbnfValues.nil)) = input := by
+    calc
+      _ = EbnfValue.sequence children values := by rw [valuesEq]
+      _ = input := EbnfValue.sequence_of_view children input
+  have resultEq : executeModuleRoot file input =
+      executableModuleValue file items := by rfl
+  have endpoints := ready.2.2 rfl
+  rw [resultEq, ← inputEq]
+  exact .module origin finish items eof endpoints.1 endpoints.2
+    (matchedTerminal_eof_empty_span eof).2.1
+
+/-- Every supported root executor realizes its exact source-rule reduction. -/
+theorem executeRootRule_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (executable : ExecutableRootRule rule)
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens rule origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs rule)) :
+    RuleReduction file tokens rule origin finish input
+      (executeRootRule file tokens origin finish rule executable
+        ready.1 ready.2.1 input) := by
+  cases executable with
+  | module => exact executeModuleRoot_reduces origin finish ready input
+  | topItem => exact executeTopItemRoot_reduces origin finish ready input
+  | optionalComma =>
+      exact executeOptionalCommaRoot_reduces origin finish ready input
+
+end Solcore.Surface.Multi
