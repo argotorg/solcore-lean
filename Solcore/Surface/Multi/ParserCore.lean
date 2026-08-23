@@ -5712,6 +5712,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | topItem : ExecutableRootRule .topItem
   | importEntry : ExecutableRootRule .importEntry
   | localExportEntry : ExecutableRootRule .localExportEntry
+  | remoteExportEntry : ExecutableRootRule .remoteExportEntry
   | optionalComma : ExecutableRootRule .optionalComma
   | predicateList : ExecutableRootRule .predicateList
   | predicate : ExecutableRootRule .predicate
@@ -6812,6 +6813,30 @@ def executeLocalExportEntryRoot
         payload := .wildcard
       })
 
+/-- Execute one remote export selector entry. -/
+def executeRemoteExportEntryRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .remoteExportEntry)) :
+    RemoteExportEntry :=
+  let starAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .star))
+  let itemAtom : EbnfExpr :=
+    .atom (.nonterminal .exportItem)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choice2View starAtom itemAtom input with
+  | .inl raw =>
+      let star := EbnfValue.terminalView (.symbol .star) raw
+      sourceLoc witness (.wildcard {
+        span := star.span
+        payload := .wildcard
+      })
+  | .inr raw =>
+      sourceLoc witness (.item (EbnfValue.ruleView .exportItem raw))
+
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -7511,6 +7536,8 @@ def executeRootRule
       executeImportEntryRoot file tokens origin finish owned ordered input
   | .localExportEntry =>
       executeLocalExportEntryRoot file tokens origin finish owned ordered input
+  | .remoteExportEntry =>
+      executeRemoteExportEntryRoot file tokens origin finish owned ordered input
   | .optionalComma => executeOptionalCommaRoot input
   | .predicateList => executePredicateListRoot input
   | .predicate =>
