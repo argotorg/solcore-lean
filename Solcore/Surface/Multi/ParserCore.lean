@@ -5507,6 +5507,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | predicateList : ExecutableRootRule .predicateList
   | instanceMethod : ExecutableRootRule .instanceMethod
   | armStatement : ExecutableRootRule .armStatement
+  | statement : ExecutableRootRule .statement
   | terminalExpression : ExecutableRootRule .terminalExpression
   | expression : ExecutableRootRule .expression
   | blockStatement : ExecutableRootRule .blockStatement
@@ -5630,6 +5631,34 @@ def executeArmStatementRoot
     {file : WorkspaceFile} {tokens : List Token}
     (input : EbnfValue file tokens (m2cV1.rhs .armStatement)) : Statement :=
   EbnfValue.ruleView .statement input
+
+/-- Execute a statement root by decoding its selected statement subtype. -/
+def executeStatementRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .statement)) : Statement :=
+  match EbnfValue.choiceView [
+      .atom (.nonterminal .letStatement),
+      .atom (.nonterminal .returnStatement),
+      .atom (.nonterminal .matchStatement),
+      .atom (.nonterminal .ifStatement),
+      .atom (.nonterminal .forStatement),
+      .atom (.nonterminal .assemblyStatement),
+      .atom (.nonterminal .blockStatement),
+      .atom (.nonterminal .breakStatement),
+      .atom (.nonterminal .continueStatement),
+      .atom (.nonterminal .assignmentStatement),
+      .atom (.nonterminal .expressionStatement)] input with
+  | ⟨⟨0, _⟩, raw⟩ => EbnfValue.ruleView .letStatement raw
+  | ⟨⟨1, _⟩, raw⟩ => EbnfValue.ruleView .returnStatement raw
+  | ⟨⟨2, _⟩, raw⟩ => EbnfValue.ruleView .matchStatement raw
+  | ⟨⟨3, _⟩, raw⟩ => EbnfValue.ruleView .ifStatement raw
+  | ⟨⟨4, _⟩, raw⟩ => EbnfValue.ruleView .forStatement raw
+  | ⟨⟨5, _⟩, raw⟩ => EbnfValue.ruleView .assemblyStatement raw
+  | ⟨⟨6, _⟩, raw⟩ => EbnfValue.ruleView .blockStatement raw
+  | ⟨⟨7, _⟩, raw⟩ => EbnfValue.ruleView .breakStatement raw
+  | ⟨⟨8, _⟩, raw⟩ => EbnfValue.ruleView .continueStatement raw
+  | ⟨⟨9, _⟩, raw⟩ => EbnfValue.ruleView .assignmentStatement raw
+  | ⟨⟨10, _⟩, raw⟩ => EbnfValue.ruleView .expressionStatement raw
 
 /-- Decode a terminal-expression root without changing its expression. -/
 def executeTerminalExpressionRoot
@@ -6603,6 +6632,7 @@ def executeRootRule
   | .predicateList => executePredicateListRoot input
   | .instanceMethod => executeInstanceMethodRoot input
   | .armStatement => executeArmStatementRoot input
+  | .statement => executeStatementRoot input
   | .terminalExpression => executeTerminalExpressionRoot input
   | .expression => executeExpressionRoot input
   | .blockStatement =>
