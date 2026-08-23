@@ -23111,3 +23111,105 @@ private theorem attemptContextualCompletionMulti?_total_allSafe_backpointers
   exact ⟨result, selected, resultSafe, resultCovers, resultExact⟩
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Every state covered by the old lookup-based invariant is covered by the
+multi-valued row invariant.  This is the migration bridge for entered charts
+and for all old successful executions. -/
+private theorem PhaseCBackpointerInvariant.toMulti
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCBackpointerInvariant file tokens current.payload) :
+    PhaseCMultiBackpointerInvariant current := by
+  unfold PhaseCBackpointerInvariant at invariant
+  unfold PhaseCMultiBackpointerInvariant
+  intro edge member
+  have covered := invariant edge member
+  cases key : edge.val with
+  | scanned before after cursor => trivial
+  | completed waiting finished after shared =>
+      simp only [key] at covered ⊢
+      unfold CompletionBackpointerLedger.CoversCompleted at covered
+      obtain ⟨entry, entryMember, entryAfter, entryCoordinates⟩ :=
+        CompletionBackpointerLedger.lookup?_some_entry after
+          (shared, finished.raw.production)
+          current.payload.completionBackpointers covered
+      exact ⟨entry, entryMember, entryAfter, entryCoordinates⟩
+
+private theorem beginPhaseCWorklist?_multiBackpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCMultiBackpointerInvariant result :=
+  PhaseCBackpointerInvariant.toMulti result
+    (beginPhaseCWorklist?_backpointerInvariant current result selected)
+
+/-- Pairwise completion saturation using the total multi-valued ledger. -/
+private def attemptContextualCompletionsWithMulti?
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    List (ContextualItemKey tokens) →
+      CountedState tokens (PhaseCWorklist file tokens) →
+      Option (CountedState tokens (PhaseCWorklist file tokens))
+  | [], current => some current
+  | other :: rest, current => do
+      let forward ← attemptContextualCompletionMulti? current pivot other
+      let reverse ←
+        if other = pivot then
+          some forward
+        else
+          attemptContextualCompletionMulti? forward other pivot
+      attemptContextualCompletionsWithMulti? pivot rest reverse
+
+/-- The list lift is total and preserves every Phase-C safety and
+multi-ledger invariant. -/
+private theorem attemptContextualCompletionsWithMulti?_total_allSafe_backpointers
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ (others : List (ContextualItemKey tokens))
+      (current : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAllSafe current →
+      PhaseCMultiBackpointerInvariant current →
+      PhaseCBackpointerLedgerExact current →
+      ∃ result,
+        attemptContextualCompletionsWithMulti? pivot others current =
+          some result ∧
+        PhaseCAllSafe result ∧
+        PhaseCMultiBackpointerInvariant result ∧
+        PhaseCBackpointerLedgerExact result := by
+  intro others
+  induction others with
+  | nil =>
+      intro current safe covers exact
+      exact ⟨current, rfl, safe, covers, exact⟩
+  | cons other rest induction =>
+      intro current safe covers exact
+      obtain ⟨forward, forwardEq, forwardSafe, forwardCovers,
+          forwardExact⟩ :=
+        attemptContextualCompletionMulti?_total_allSafe_backpointers
+          current pivot other safe covers exact
+      by_cases same : other = pivot
+      · subst other
+        obtain ⟨result, resultEq, resultSafe, resultCovers,
+            resultExact⟩ :=
+          induction forward forwardSafe forwardCovers forwardExact
+        exact ⟨result, by
+          simp [attemptContextualCompletionsWithMulti?, forwardEq, resultEq],
+          resultSafe, resultCovers, resultExact⟩
+      · obtain ⟨reverse, reverseEq, reverseSafe, reverseCovers,
+            reverseExact⟩ :=
+          attemptContextualCompletionMulti?_total_allSafe_backpointers
+            forward other pivot forwardSafe forwardCovers forwardExact
+        obtain ⟨result, resultEq, resultSafe, resultCovers,
+            resultExact⟩ :=
+          induction reverse reverseSafe reverseCovers reverseExact
+        exact ⟨result, by
+          simp [attemptContextualCompletionsWithMulti?, forwardEq, same,
+            reverseEq, resultEq], resultSafe, resultCovers, resultExact⟩
+
+end Solcore.Surface.Multi.Chart
