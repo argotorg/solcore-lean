@@ -4458,3 +4458,148 @@ theorem executeObservedContextualWorklist?_observedFrontier?_eq_some_iff
       rfl
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+
+private theorem canonicalExpected_list_eq_values
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (expected : NonemptyList Expected)
+    (canonical : CanonicalExpected
+      file tokens memo correct final cursor expected) :
+    expected.head :: expected.tail =
+      canonicalExpectedValues owned correct final cursor greatest := by
+  cases selected : canonicalExpectedValues
+      owned correct final cursor greatest with
+  | nil =>
+      have headMember : ExpectedMember
+          file tokens memo correct final cursor expected.head :=
+        (canonical.1 expected.head).mp (by simp)
+      have selectedMember :=
+        (chart_expected_is_frontier_union
+          owned correct final cursor greatest expected.head).mpr headMember
+      rw [selected] at selectedMember
+      contradiction
+  | cons head tail =>
+      let other : NonemptyList Expected := { head := head, tail := tail }
+      have valuesNodup :
+          (canonicalExpectedValues
+            owned correct final cursor greatest).Nodup := by
+        unfold canonicalExpectedValues
+        exact List.Pairwise.filter _ allExpected_nodup
+      have valuesSorted :
+          (canonicalExpectedValues owned correct final cursor greatest).Pairwise
+            (fun left right => Expected.compare left right = .lt) := by
+        unfold canonicalExpectedValues
+        exact List.Pairwise.filter _ allExpected_sorted
+      have otherCanonical : CanonicalExpected
+          file tokens memo correct final cursor other := by
+        unfold CanonicalExpected
+        constructor
+        · intro candidate
+          have exact := chart_expected_is_frontier_union
+            owned correct final cursor greatest candidate
+          simpa only [other, selected] using exact
+        · constructor
+          · simpa only [other, selected] using valuesNodup
+          · simpa only [other, selected] using valuesSorted
+      have same := canonicalExpected_sorted_nodup_unique
+        canonical otherCanonical
+      have listSame := congrArg
+        (fun values : NonemptyList Expected => values.head :: values.tail)
+        same
+      simpa only [other, selected] using listSame
+
+/-- The executable unexpected-token candidate is exactly a greatest cursor
+with canonical nonempty expectations and the declarative found observation.
+Root absence and repeated-nonassociative exclusion remain later premises. -/
+theorem executeObservedContextualWorklist?_unexpectedDiagnosticCandidate?_eq_some_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (span : SourceSpan) (found : Found)
+    (expected : NonemptyList Expected) :
+    result.unexpectedDiagnosticCandidate? file =
+        some (.unexpected span found expected) ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      ∃ cursor : Boundary tokens,
+        GreatestReachableCursor
+            file tokens result.memo correct final cursor ∧
+          CanonicalExpected
+            file tokens result.memo correct final cursor expected ∧
+          FoundAt file tokens cursor span found := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change result.unexpectedDiagnosticCandidate? file =
+      some (.unexpected span found expected) ↔
+    ∃ cursor : Boundary tokens,
+      GreatestReachableCursor
+          file tokens result.memo correct final cursor ∧
+        CanonicalExpected
+          file tokens result.memo correct final cursor expected ∧
+        FoundAt file tokens cursor span found
+  unfold Chart.ContextualWorklistResult.unexpectedDiagnosticCandidate?
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨frontier, frontierEq, unexpectedEq⟩
+    rcases (Chart.ObservedFrontier.unexpected?_eq_some_iff
+      frontier span found expected).mp unexpectedEq with
+      ⟨spanEq, foundEq, expectedEq⟩
+    rcases
+        (executeObservedContextualWorklist?_observedFrontier?_eq_some_iff
+          file tokens owned result selected frontier).mp frontierEq with
+      ⟨greatest, canonicalValuesEq, foundAt⟩
+    have listEq : expected.head :: expected.tail =
+        canonicalExpectedValues owned correct final frontier.cursor greatest :=
+      expectedEq.symm.trans canonicalValuesEq
+    have canonical : CanonicalExpected file tokens result.memo correct final
+        frontier.cursor expected := by
+      unfold CanonicalExpected
+      constructor
+      · intro candidate
+        have exact := chart_expected_is_frontier_union
+          owned correct final frontier.cursor greatest candidate
+        rw [← listEq] at exact
+        exact exact
+      · constructor
+        · rw [listEq]
+          unfold canonicalExpectedValues
+          exact List.Pairwise.filter _ allExpected_nodup
+        · rw [listEq]
+          unfold canonicalExpectedValues
+          exact List.Pairwise.filter _ allExpected_sorted
+    refine ⟨frontier.cursor, greatest, canonical, ?_⟩
+    simpa only [spanEq, foundEq] using foundAt
+  · rintro ⟨cursor, greatest, canonical, foundAt⟩
+    have expectedEq := canonicalExpected_list_eq_values
+      owned correct final cursor greatest expected canonical
+    let frontier : Chart.ObservedFrontier tokens := {
+      cursor := cursor
+      span := span
+      found := found
+      expected := expected.head :: expected.tail
+    }
+    refine ⟨frontier, ?_, ?_⟩
+    · exact
+        (executeObservedContextualWorklist?_observedFrontier?_eq_some_iff
+          file tokens owned result selected frontier).mpr
+            ⟨greatest, by simpa only [frontier] using expectedEq, by
+              simpa only [frontier] using foundAt⟩
+    · exact (Chart.ObservedFrontier.unexpected?_eq_some_iff
+        frontier span found expected).mpr (by simp [frontier])
+
+end Solcore.Surface.Multi
