@@ -5049,3 +5049,246 @@ theorem executeObservedContextualWorklist?_rootlessUnexpectedDiagnosticCandidate
         notRepeated
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- Chart's raw nonassociative-operator observation is exactly the
+declarative matched-terminal relation. -/
+theorem chart_observedNonAssociativeOperatorAt?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (boundary : Boundary tokens)
+    (observation : Chart.NonAssociativeOperatorObservation) :
+    Chart.observedNonAssociativeOperatorAt? file tokens boundary =
+        some observation ↔
+      FoundNonAssociativeOperatorAt file tokens boundary
+        observation.level observation.operator := by
+  rcases observation with ⟨observedLevel, observedOperator⟩
+  unfold Chart.observedNonAssociativeOperatorAt?
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨found, foundEq, classified⟩
+    unfold Chart.observedFoundAt? at foundEq
+    split at foundEq <;> rename_i inRange
+    · simp only [Option.some.injEq] at foundEq
+      cases foundEq
+      let cursor : TerminalCursor tokens := ⟨boundary.val, by omega⟩
+      have atBoundary : cursor.beforeBoundary = boundary := Fin.ext rfl
+      let token := tokens[boundary.val]
+      have terminalAt : TerminalAt file tokens cursor (.retained token)
+          token.span := .retained cursor token inRange
+            (List.getElem?_eq_getElem inRange)
+            (owned token (List.getElem_mem inRange))
+      cases payloadEq : token.payload
+      all_goals simp only [token] at payloadEq
+      all_goals rw [payloadEq] at classified
+      all_goals try simp at classified
+      next symbol =>
+        cases symbol <;> simp at classified
+        all_goals
+          rcases classified with ⟨rfl, rfl⟩
+          first
+          | exact FoundNonAssociativeOperatorAt.less {
+              cursor := cursor
+              value := .retained token
+              span := token.span
+              «at» := terminalAt
+              «matches» := by
+                simpa only [TerminalMatches] using payloadEq
+            } atBoundary
+          | exact FoundNonAssociativeOperatorAt.greater {
+              cursor := cursor
+              value := .retained token
+              span := token.span
+              «at» := terminalAt
+              «matches» := by
+                simpa only [TerminalMatches] using payloadEq
+            } atBoundary
+          | exact FoundNonAssociativeOperatorAt.lessEqual {
+              cursor := cursor
+              value := .retained token
+              span := token.span
+              «at» := terminalAt
+              «matches» := by
+                simpa only [TerminalMatches] using payloadEq
+            } atBoundary
+          | exact FoundNonAssociativeOperatorAt.greaterEqual {
+              cursor := cursor
+              value := .retained token
+              span := token.span
+              «at» := terminalAt
+              «matches» := by
+                simpa only [TerminalMatches] using payloadEq
+            } atBoundary
+          | exact FoundNonAssociativeOperatorAt.equal {
+              cursor := cursor
+              value := .retained token
+              span := token.span
+              «at» := terminalAt
+              «matches» := by
+                simpa only [TerminalMatches] using payloadEq
+            } atBoundary
+          | exact FoundNonAssociativeOperatorAt.notEqual {
+              cursor := cursor
+              value := .retained token
+              span := token.span
+              «at» := terminalAt
+              «matches» := by
+                simpa only [TerminalMatches] using payloadEq
+            } atBoundary
+    · split at foundEq
+      · simp only [Option.some.injEq] at foundEq
+        cases foundEq
+        simp at classified
+      · contradiction
+  · intro found
+    cases found with
+    | less terminal atCursor =>
+        cases terminal with
+        | mk cursor value span terminalAt matchedEvidence =>
+            cases value with
+            | retained token =>
+                have payloadEq : token.payload = .symbol .less :=
+                  matchedEvidence
+                cases terminalAt with
+                | retained _ retainedInRange lookup valid =>
+                  have rebuilt : TerminalAt file tokens cursor
+                      (.retained token) token.span :=
+                    .retained cursor token retainedInRange lookup valid
+                  have foundAt : FoundAt file tokens boundary token.span
+                    (.token (.symbol .less)) := by
+                    simpa only [payloadEq] using
+                      FoundAt.retained cursor boundary token atCursor rebuilt
+                  have observed := (chart_observedFoundAt?_eq_some_iff
+                    owned boundary {
+                      span := token.span
+                      found := .token (.symbol .less)
+                    }).mpr foundAt
+                  exact ⟨_, observed, by
+                    simp [RuleReduction.terminalLoc]⟩
+            | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | greater terminal atCursor =>
+        cases terminal with
+        | mk cursor value span terminalAt matchedEvidence =>
+            cases value with
+            | retained token =>
+                have payloadEq : token.payload = .symbol .greater :=
+                  matchedEvidence
+                cases terminalAt with
+                | retained _ retainedInRange lookup valid =>
+                  have rebuilt : TerminalAt file tokens cursor
+                      (.retained token) token.span :=
+                    .retained cursor token retainedInRange lookup valid
+                  have foundAt : FoundAt file tokens boundary token.span
+                    (.token (.symbol .greater)) := by
+                    simpa only [payloadEq] using
+                      FoundAt.retained cursor boundary token atCursor rebuilt
+                  have observed := (chart_observedFoundAt?_eq_some_iff
+                    owned boundary {
+                      span := token.span
+                      found := .token (.symbol .greater)
+                    }).mpr foundAt
+                  exact ⟨_, observed, by
+                    simp [RuleReduction.terminalLoc]⟩
+            | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | lessEqual terminal atCursor =>
+        cases terminal with
+        | mk cursor value span terminalAt matchedEvidence =>
+            cases value with
+            | retained token =>
+                have payloadEq : token.payload = .symbol .lessEqual :=
+                  matchedEvidence
+                cases terminalAt with
+                | retained _ retainedInRange lookup valid =>
+                  have rebuilt : TerminalAt file tokens cursor
+                      (.retained token) token.span :=
+                    .retained cursor token retainedInRange lookup valid
+                  have foundAt : FoundAt file tokens boundary token.span
+                    (.token (.symbol .lessEqual)) := by
+                    simpa only [payloadEq] using
+                      FoundAt.retained cursor boundary token atCursor rebuilt
+                  have observed := (chart_observedFoundAt?_eq_some_iff
+                    owned boundary {
+                      span := token.span
+                      found := .token (.symbol .lessEqual)
+                    }).mpr foundAt
+                  exact ⟨_, observed, by
+                    simp [RuleReduction.terminalLoc]⟩
+            | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | greaterEqual terminal atCursor =>
+        cases terminal with
+        | mk cursor value span terminalAt matchedEvidence =>
+            cases value with
+            | retained token =>
+                have payloadEq : token.payload = .symbol .greaterEqual :=
+                  matchedEvidence
+                cases terminalAt with
+                | retained _ retainedInRange lookup valid =>
+                  have rebuilt : TerminalAt file tokens cursor
+                      (.retained token) token.span :=
+                    .retained cursor token retainedInRange lookup valid
+                  have foundAt : FoundAt file tokens boundary token.span
+                    (.token (.symbol .greaterEqual)) := by
+                    simpa only [payloadEq] using
+                      FoundAt.retained cursor boundary token atCursor rebuilt
+                  have observed := (chart_observedFoundAt?_eq_some_iff
+                    owned boundary {
+                      span := token.span
+                      found := .token (.symbol .greaterEqual)
+                    }).mpr foundAt
+                  exact ⟨_, observed, by
+                    simp [RuleReduction.terminalLoc]⟩
+            | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | equal terminal atCursor =>
+        cases terminal with
+        | mk cursor value span terminalAt matchedEvidence =>
+            cases value with
+            | retained token =>
+                have payloadEq : token.payload = .symbol .equalEqual :=
+                  matchedEvidence
+                cases terminalAt with
+                | retained _ retainedInRange lookup valid =>
+                  have rebuilt : TerminalAt file tokens cursor
+                      (.retained token) token.span :=
+                    .retained cursor token retainedInRange lookup valid
+                  have foundAt : FoundAt file tokens boundary token.span
+                    (.token (.symbol .equalEqual)) := by
+                    simpa only [payloadEq] using
+                      FoundAt.retained cursor boundary token atCursor rebuilt
+                  have observed := (chart_observedFoundAt?_eq_some_iff
+                    owned boundary {
+                      span := token.span
+                      found := .token (.symbol .equalEqual)
+                    }).mpr foundAt
+                  exact ⟨_, observed, by
+                    simp [RuleReduction.terminalLoc]⟩
+            | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | notEqual terminal atCursor =>
+        cases terminal with
+        | mk cursor value span terminalAt matchedEvidence =>
+            cases value with
+            | retained token =>
+                have payloadEq : token.payload = .symbol .notEqual :=
+                  matchedEvidence
+                cases terminalAt with
+                | retained _ retainedInRange lookup valid =>
+                  have rebuilt : TerminalAt file tokens cursor
+                      (.retained token) token.span :=
+                    .retained cursor token retainedInRange lookup valid
+                  have foundAt : FoundAt file tokens boundary token.span
+                    (.token (.symbol .notEqual)) := by
+                    simpa only [payloadEq] using
+                      FoundAt.retained cursor boundary token atCursor rebuilt
+                  have observed := (chart_observedFoundAt?_eq_some_iff
+                    owned boundary {
+                      span := token.span
+                      found := .token (.symbol .notEqual)
+                    }).mpr foundAt
+                  exact ⟨_, observed, by
+                    simp [RuleReduction.terminalLoc]⟩
+            | endOfFile => simp [TerminalMatches] at matchedEvidence
+
+
+end Solcore.Surface.Multi
