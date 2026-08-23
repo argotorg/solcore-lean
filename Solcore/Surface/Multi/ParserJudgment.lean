@@ -17414,6 +17414,117 @@ def CompletionBackpointerUnique
       leftShared = rightShared ∧
         leftFinished.raw.production = rightFinished.raw.production
 
+theorem g10DottedItem_eq_of_fields
+    {tokens : List Token} {left right : DottedItem tokens}
+    (productionEq : left.production = right.production)
+    (dotEq : left.dot.val = right.dot.val)
+    (originEq : left.origin = right.origin)
+    (currentEq : left.current = right.current) :
+    left = right := by
+  cases left
+  cases right
+  simp only at productionEq dotEq originEq currentEq ⊢
+  subst_vars
+  congr
+  exact Fin.ext dotEq
+
+theorem g10ContextualItem_eq_of_fields
+    {tokens : List Token} {left right : ContextualItemKey tokens}
+    (rawEq : left.raw = right.raw)
+    (contextEq : left.context = right.context) :
+    left = right := by
+  cases left
+  cases right
+  simp only at rawEq contextEq ⊢
+  subst_vars
+  rfl
+
+/-- Backpointer uniqueness upgrades two completions with a common target to
+equality of their complete child items. -/
+theorem g10CompletedEdge_finished_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (backpointer : CompletionBackpointerUnique
+      file tokens memo correct final)
+    {after leftWaiting leftFinished rightWaiting rightFinished :
+      ContextualItemKey tokens}
+    {leftShared rightShared : Boundary tokens}
+    (leftEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed leftWaiting leftFinished after leftShared))
+    (rightEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed rightWaiting rightFinished after rightShared)) :
+    leftFinished = rightFinished := by
+  rcases backpointer leftEdge rightEdge with
+    ⟨sharedEq, finishedProductionEq⟩
+  rcases leftEdge.1.1 with
+    ⟨_, _, leftComplete, _, leftWaitingAt, leftFinishedAt, leftAdvance⟩
+  rcases rightEdge.1.1 with
+    ⟨_, _, rightComplete, _, rightWaitingAt, rightFinishedAt, rightAdvance⟩
+  rcases leftAdvance with
+    ⟨leftWaitingProduction, leftWaitingDot, leftWaitingOrigin,
+      leftFinishedCurrent⟩
+  rcases rightAdvance with
+    ⟨rightWaitingProduction, rightWaitingDot, rightWaitingOrigin,
+      rightFinishedCurrent⟩
+  have waitingRawEq : leftWaiting.raw = rightWaiting.raw := by
+    apply g10DottedItem_eq_of_fields
+    · exact leftWaitingProduction.symm.trans rightWaitingProduction
+    · omega
+    · exact leftWaitingOrigin.symm.trans rightWaitingOrigin
+    · exact leftWaitingAt.trans (sharedEq.trans rightWaitingAt.symm)
+  have waitingContextEq : leftWaiting.context = rightWaiting.context :=
+    leftEdge.1.2.2.symm.trans rightEdge.1.2.2
+  have waitingEq : leftWaiting = rightWaiting :=
+    g10ContextualItem_eq_of_fields waitingRawEq waitingContextEq
+  have finishedRawEq : leftFinished.raw = rightFinished.raw := by
+    apply g10DottedItem_eq_of_fields finishedProductionEq
+    · unfold CompleteItem at leftComplete rightComplete
+      rw [leftComplete, rightComplete, finishedProductionEq]
+    · exact leftFinishedAt.trans (sharedEq.trans rightFinishedAt.symm)
+    · exact leftFinishedCurrent.symm.trans rightFinishedCurrent
+  have finishedContextEq :
+      leftFinished.context = rightFinished.context := by
+    rw [leftEdge.1.2.1, rightEdge.1.2.1, waitingEq, finishedRawEq]
+  exact g10ContextualItem_eq_of_fields finishedRawEq finishedContextEq
+
+/-- A scan and completion cannot have the same advanced item. -/
+theorem g10ScannedCompleted_false
+    {file : WorkspaceFile} {tokens : List Token}
+    {before waiting finished after : ContextualItemKey tokens}
+    {cursor : TerminalCursor tokens} {shared : Boundary tokens}
+    (scanned : ScannedEdgeWitness file tokens before.raw after.raw cursor)
+    (completed : PackedEdgeKey.Valid file tokens
+      (.completed waiting.raw finished.raw after.raw shared)) : False := by
+  rcases completed with
+    ⟨_, completedNext, _, finishedLhs, _, _, completedAdvance⟩
+  rcases scanned.advance with
+    ⟨scanProduction, scanDot, _, _⟩
+  rcases completedAdvance with
+    ⟨completedProduction, completedDot, _, _⟩
+  have productionEq : before.raw.production = waiting.raw.production :=
+    scanProduction.symm.trans completedProduction
+  have dotEq : before.raw.dot.val = waiting.raw.dot.val := by omega
+  have exactCompletedNext : NextSymbol waiting.raw
+      (.nonterminal finished.raw.production.lhs) := by
+    rw [finishedLhs]
+    exact completedNext
+  let index : Nat := before.raw.dot.val
+  have waitingIndex : waiting.raw.dot.val = index := dotEq.symm
+  have impossible :
+      some (GrammarSymbol.terminal scanned.terminal) =
+        some (GrammarSymbol.nonterminal finished.raw.production.lhs) := by
+    calc
+      _ = before.raw.production.rhs[index]? := scanned.next.2.symm
+      _ = waiting.raw.production.rhs[index]? :=
+        congrArg (fun production : ProductionId =>
+          production.rhs[index]?) productionEq
+      _ = waiting.raw.production.rhs[waiting.raw.dot.val]? := by
+        rw [waitingIndex]
+      _ = _ := exactCompletedNext.2
+  exact GrammarSymbol.noConfusion (Option.some.inj impossible)
+
 private theorem coherentDottedItem_eq_of_fields
     {tokens : List Token} {left right : DottedItem tokens}
     (productionEq : left.production = right.production)
