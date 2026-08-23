@@ -21243,3 +21243,184 @@ private theorem attemptContextualCompletion?_total_allSafe_of_insertReady
           }⟩
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The source rule belonging to one diagnostic nonassociative level. -/
+def nonAssociativeRootRule : NonAssociativeLevel → GrammarRuleId
+  | .relational => .relational
+  | .equality => .equality
+
+/-- Decide whether one contextual item is the canonical completed root of a
+nonassociative level at the displayed boundary. -/
+def isNonAssociativeRootItemAt
+    {tokens : List Token}
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel)
+    (item : ContextualItemKey tokens) : Bool :=
+  decide (item = CanonicalCompleteRootItem tokens
+    (nonAssociativeRootRule level) item.raw.origin cursor item.context)
+
+namespace ContextualWorklistResult
+
+/-- Proof-free membership in one retained contextual item ledger. -/
+def containsRetainedContextualItem
+    {tokens : List Token} (items : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) : Bool :=
+  items.any fun candidate => decide (candidate = item)
+
+/-- The membership bit is exact. -/
+theorem containsRetainedContextualItem_eq_true_iff
+    {tokens : List Token} (items : List (ContextualItemKey tokens))
+    (item : ContextualItemKey tokens) :
+    containsRetainedContextualItem items item = true ↔ item ∈ items := by
+  unfold containsRetainedContextualItem
+  rw [List.any_eq_true]
+  constructor
+  · rintro ⟨candidate, member, same⟩
+    have equality : candidate = item := of_decide_eq_true same
+    simpa only [equality] using member
+  · intro member
+    exact ⟨item, member, by simp⟩
+
+/-- Canonically ordered retained complete-root coordinates for one
+nonassociative level at one boundary. -/
+def nonAssociativeRootItemsAt
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel) : List (ContextualItemKey tokens) :=
+  (allContextualItems tokens).filter fun item =>
+    containsRetainedContextualItem result.items item &&
+      isNonAssociativeRootItemAt cursor level item
+
+/-- Membership is exactly retention of the displayed canonical complete-root
+coordinate. -/
+theorem nonAssociativeRootItemsAt_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel)
+    (item : ContextualItemKey tokens) :
+    item ∈ result.nonAssociativeRootItemsAt cursor level ↔
+      item ∈ result.items ∧
+        item = CanonicalCompleteRootItem tokens
+          (nonAssociativeRootRule level) item.raw.origin cursor item.context := by
+  simp [nonAssociativeRootItemsAt, isNonAssociativeRootItemAt,
+    allContextualItems_complete,
+    containsRetainedContextualItem_eq_true_iff]
+
+/-- Canonical enumeration makes every level-specific candidate list
+duplicate-free, independently of result insertion order. -/
+theorem nonAssociativeRootItemsAt_nodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel) :
+    (result.nonAssociativeRootItemsAt cursor level).Nodup := by
+  exact List.Pairwise.filter _ (allContextualItems_nodup tokens)
+
+end ContextualWorklistResult
+
+/-- Proof-free classification of one retained frontier token as a
+nonassociative operator. -/
+structure NonAssociativeOperatorObservation where
+  level : NonAssociativeLevel
+  operator : Located InfixOperator
+  deriving Repr, BEq, DecidableEq
+
+/-- Classify the retained token at one boundary as one of the six
+nonassociative operators. -/
+def observedNonAssociativeOperatorAt?
+    (file : WorkspaceFile) (tokens : List Token)
+    (boundary : Boundary tokens) :
+    Option NonAssociativeOperatorObservation := do
+  let observation ← observedFoundAt? file tokens boundary
+  match observation.found with
+  | .token (.symbol .less) => some {
+      level := .relational
+      operator := { span := observation.span, payload := .less }
+    }
+  | .token (.symbol .greater) => some {
+      level := .relational
+      operator := { span := observation.span, payload := .greater }
+    }
+  | .token (.symbol .lessEqual) => some {
+      level := .relational
+      operator := { span := observation.span, payload := .lessEqual }
+    }
+  | .token (.symbol .greaterEqual) => some {
+      level := .relational
+      operator := { span := observation.span, payload := .greaterEqual }
+    }
+  | .token (.symbol .equalEqual) => some {
+      level := .equality
+      operator := { span := observation.span, payload := .equal }
+    }
+  | .token (.symbol .notEqual) => some {
+      level := .equality
+      operator := { span := observation.span, payload := .notEqual }
+    }
+  | _ => none
+
+/-- The proof-free structural input to G10: the greatest cursor, the next
+same-level operator, and every retained complete-root coordinate at that
+level.  Semantic completed/group tests deliberately remain external. -/
+structure NonAssociativeFrontierCandidates (tokens : List Token) where
+  cursor : Boundary tokens
+  level : NonAssociativeLevel
+  operator : Located InfixOperator
+  roots : List (ContextualItemKey tokens)
+  deriving Repr, BEq, DecidableEq
+
+namespace ContextualWorklistResult
+
+/-- Select the greatest frontier when its next retained token is a
+nonassociative operator, then attach the canonical candidate root list. -/
+def nonAssociativeFrontierCandidates?
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    Option (NonAssociativeFrontierCandidates tokens) := do
+  let cursor ← result.greatestCurrent?
+  let found ← observedNonAssociativeOperatorAt? file tokens cursor
+  pure {
+    cursor := cursor
+    level := found.level
+    operator := found.operator
+    roots := result.nonAssociativeRootItemsAt cursor found.level
+  }
+
+/-- Exact projection equations for a selected structural G10 frontier. -/
+theorem nonAssociativeFrontierCandidates?_eq_some_iff
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (frontier : NonAssociativeFrontierCandidates tokens) :
+    result.nonAssociativeFrontierCandidates? file = some frontier ↔
+      result.greatestCurrent? = some frontier.cursor ∧
+      observedNonAssociativeOperatorAt? file tokens frontier.cursor = some {
+        level := frontier.level
+        operator := frontier.operator
+      } ∧
+      frontier.roots = result.nonAssociativeRootItemsAt
+        frontier.cursor frontier.level := by
+  unfold nonAssociativeFrontierCandidates?
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨cursor, cursorEq, found, foundEq, frontierEq⟩
+    cases frontierEq
+    exact ⟨cursorEq, foundEq, rfl⟩
+  · rintro ⟨cursorEq, foundEq, rootsEq⟩
+    refine ⟨frontier.cursor, cursorEq, {
+      level := frontier.level
+      operator := frontier.operator
+    }, foundEq, ?_⟩
+    cases frontier
+    simp only at rootsEq ⊢
+    cases rootsEq
+    rfl
+
+end ContextualWorklistResult
+
+end Solcore.Surface.Multi.Chart
