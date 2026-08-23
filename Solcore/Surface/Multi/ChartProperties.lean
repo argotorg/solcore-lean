@@ -6361,6 +6361,61 @@ theorem executeBitAndRoot_reduces
   rw [resultEq, ← inputEq]
   exact .bitAnd origin finish left rest
 
+/-- The additive executor realizes the exact mixed-operator reduction. -/
+theorem executeAdditiveRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .additive origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .additive)) :
+    RuleReduction file tokens .additive origin finish input
+      (executeAdditiveRoot file input) := by
+  let operandAtom : EbnfExpr := .atom (.nonterminal .multiplicative)
+  let tail := EbnfValue.additiveTailExpr
+  change EbnfValue file tokens
+    (.sequence [operandAtom, .star tail]) at input
+  let viewed := EbnfValue.sequence2View operandAtom (.star tail) input
+  let left : Expression := EbnfValue.ruleView .multiplicative viewed.1
+  let rawRest := EbnfValue.starView tail viewed.2
+  let rest := rawRest.map EbnfValue.additiveTailView
+  have leftEq := EbnfValue.rule_of_view .multiplicative viewed.1
+  have restValuesEq : rest.map EbnfValue.additiveTailValue = rawRest := by
+    dsimp only [rest]
+    induction rawRest with
+    | nil => rfl
+    | cons head remaining induction =>
+        simp only [List.map_cons]
+        rw [EbnfValue.additiveTailValue_of_view, induction]
+  have starEq := EbnfValue.star_of_view tail viewed.2
+  have inputEq := EbnfValue.sequence2_of_view
+    operandAtom (.star tail) input
+  have rebuiltEq : EbnfValue.sequence [operandAtom, .star tail]
+      (EbnfValues.cons operandAtom [.star tail]
+        (EbnfValue.ruleAtom .multiplicative left)
+        (EbnfValues.cons (.star tail) []
+          (EbnfValue.star tail
+            (rest.map EbnfValue.additiveTailValue)) EbnfValues.nil)) = input := by
+    rw [restValuesEq, leftEq, starEq]
+    exact inputEq
+  have resultEq : executeAdditiveRoot file input =
+      RuleReduction.foldInfixLeft file left
+        (rest.map fun value =>
+          ((match value.1 with
+            | .inl plus =>
+                RuleReduction.infixOperator plus (.add plus)
+            | .inr minus =>
+                RuleReduction.infixOperator minus (.subtract minus)),
+            value.2)) := by
+    change executeInfixLeft file left
+      (rest.map fun value =>
+        ((match value.1 with
+          | .inl plus => executableTerminalLoc plus .add
+          | .inr minus => executableTerminalLoc minus .subtract),
+          value.2)) = _
+    rw [executeInfixLeft_eq_foldInfixLeft]
+    rfl
+  rw [resultEq, ← rebuiltEq]
+  exact .additive origin finish left rest
+
 /-- The executable postfix fold is the declarative semantic fold. -/
 private theorem executePostfixLeft_eq_foldPostfix
     (file : WorkspaceFile) (receiver : Expression)
@@ -9148,6 +9203,7 @@ theorem executeRootRule_reduces
   | bitOr => exact executeBitOrRoot_reduces origin finish ready input
   | bitXor => exact executeBitXorRoot_reduces origin finish ready input
   | bitAnd => exact executeBitAndRoot_reduces origin finish ready input
+  | additive => exact executeAdditiveRoot_reduces origin finish ready input
   | «prefix» => exact executePrefixRoot_reduces origin finish ready input
   | postfixExpr => exact executePostfixRoot_reduces origin finish ready input
   | postfixPart =>
