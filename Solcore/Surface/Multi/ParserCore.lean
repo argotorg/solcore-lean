@@ -5395,6 +5395,12 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | armStatement : ExecutableRootRule .armStatement
   | terminalExpression : ExecutableRootRule .terminalExpression
   | expression : ExecutableRootRule .expression
+  | blockStatement : ExecutableRootRule .blockStatement
+  | functionDecl : ExecutableRootRule .functionDecl
+  | classMethod : ExecutableRootRule .classMethod
+  | letStatement : ExecutableRootRule .letStatement
+  | breakStatement : ExecutableRootRule .breakStatement
+  | continueStatement : ExecutableRootRule .continueStatement
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -5505,6 +5511,138 @@ def executeExpressionRoot
     (input : EbnfValue file tokens (m2cV1.rhs .expression)) : Expression :=
   EbnfValue.ruleView .annotation input
 
+namespace EbnfValue
+
+/-- View an exact two-child sequence as its two typed child values. -/
+def sequence2View
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : EbnfExpr)
+    (input : EbnfValue file tokens (.sequence [first, second])) :
+    EbnfValue file tokens first × EbnfValue file tokens second :=
+  let values := sequenceView [first, second] input
+  let firstView := EbnfValues.consView first [second] values
+  let secondView := EbnfValues.consView second [] firstView.2
+  (firstView.1, secondView.1)
+
+/-- Rebuilding a viewed two-child sequence recovers the original value. -/
+theorem sequence2_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : EbnfExpr)
+    (input : EbnfValue file tokens (.sequence [first, second])) :
+    sequence [first, second]
+      (EbnfValues.cons first [second] (sequence2View first second input).1
+        (EbnfValues.cons second [] (sequence2View first second input).2
+          EbnfValues.nil)) = input := by
+  let values := sequenceView [first, second] input
+  let firstView := EbnfValues.consView first [second] values
+  let secondView := EbnfValues.consView second [] firstView.2
+  have nilEq : EbnfValues.nil = secondView.2 :=
+    EbnfValues.nil_unique secondView.2
+  have tailEq : EbnfValues.cons second [] secondView.1 EbnfValues.nil =
+      firstView.2 := by
+    rw [nilEq]
+    exact EbnfValues.cons_of_view second [] firstView.2
+  have valuesEq : EbnfValues.cons first [second] firstView.1
+      (EbnfValues.cons second [] secondView.1 EbnfValues.nil) = values := by
+    rw [tailEq]
+    exact EbnfValues.cons_of_view first [second] values
+  change sequence [first, second]
+    (EbnfValues.cons first [second] firstView.1
+      (EbnfValues.cons second [] secondView.1 EbnfValues.nil)) = input
+  rw [valuesEq]
+  exact sequence_of_view [first, second] input
+
+end EbnfValue
+
+private def shallowRootWitness
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val) :
+    ConsumedSpanWitness file tokens origin finish :=
+  ConsumedSpanWitness.compute file tokens origin finish owned ordered
+
+/-- Execute a block-statement root from its body value. -/
+def executeBlockStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .blockStatement)) : Statement :=
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.block (EbnfValue.ruleView .body input))
+
+/-- Execute a function declaration from its signature and body. -/
+def executeFunctionDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .functionDecl)) : FunctionDecl :=
+  let viewed := EbnfValue.sequence2View
+    (.atom (.nonterminal .functionSignature))
+    (.atom (.nonterminal .body)) input
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    signature := EbnfValue.ruleView .functionSignature viewed.1
+    body := EbnfValue.ruleView .body viewed.2
+  }
+
+/-- Execute a declaration-only class method. -/
+def executeClassMethodRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .classMethod)) :
+    ClassMethodDecl :=
+  let viewed := EbnfValue.sequence2View
+    (.atom (.nonterminal .functionSignature))
+    (.atom (.terminal (.symbol .semicolon))) input
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    signature := EbnfValue.ruleView .functionSignature viewed.1
+    terminator :=
+      (EbnfValue.terminalView (.symbol .semicolon) viewed.2).span
+  }
+
+/-- Execute a let statement from its binding and checked terminator. -/
+def executeLetStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .letStatement)) : Statement :=
+  let viewed := EbnfValue.sequence2View
+    (.atom (.nonterminal .letBinding))
+    (.atom (.terminal (.symbol .semicolon))) input
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.letBinding (EbnfValue.ruleView .letBinding viewed.1))
+
+/-- Execute a break statement, retaining its terminator span. -/
+def executeBreakStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .breakStatement)) : Statement :=
+  let viewed := EbnfValue.sequence2View
+    (.atom (.terminal (.hardKeyword .breakKw)))
+    (.atom (.terminal (.symbol .semicolon))) input
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.break (EbnfValue.terminalView (.symbol .semicolon) viewed.2).span)
+
+/-- Execute a continue statement, retaining its terminator span. -/
+def executeContinueStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .continueStatement)) : Statement :=
+  let viewed := EbnfValue.sequence2View
+    (.atom (.terminal (.hardKeyword .continueKw)))
+    (.atom (.terminal (.symbol .semicolon))) input
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.continue (EbnfValue.terminalView (.symbol .semicolon) viewed.2).span)
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -5523,6 +5661,18 @@ def executeRootRule
   | .armStatement => executeArmStatementRoot input
   | .terminalExpression => executeTerminalExpressionRoot input
   | .expression => executeExpressionRoot input
+  | .blockStatement =>
+      executeBlockStatementRoot file tokens origin finish owned ordered input
+  | .functionDecl =>
+      executeFunctionDeclRoot file tokens origin finish owned ordered input
+  | .classMethod =>
+      executeClassMethodRoot file tokens origin finish owned ordered input
+  | .letStatement =>
+      executeLetStatementRoot file tokens origin finish owned ordered input
+  | .breakStatement =>
+      executeBreakStatementRoot file tokens origin finish owned ordered input
+  | .continueStatement =>
+      executeContinueStatementRoot file tokens origin finish owned ordered input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
