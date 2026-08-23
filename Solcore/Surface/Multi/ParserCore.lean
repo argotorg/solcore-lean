@@ -5697,6 +5697,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | parameter : ExecutableRootRule .parameter
   | dataConstructor : ExecutableRootRule .dataConstructor
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
+  | fieldDecl : ExecutableRootRule .fieldDecl
   | body : ExecutableRootRule .body
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
@@ -6317,6 +6318,38 @@ def executeTypeAliasDeclRoot
       parameters := parameters
       body := EbnfValue.ruleView .type rawBody
     }
+
+/-- Execute one contract field declaration and its optional initializer. -/
+def executeFieldDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .fieldDecl)) : FieldDecl :=
+  let nameAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let equalAtom : EbnfExpr := .atom (.terminal (.symbol .equal))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let initializerChild : EbnfExpr :=
+    .sequence [equalAtom, expressionAtom]
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  let children : List EbnfExpr := [nameAtom, colonAtom, typeAtom,
+    .optional initializerChild, semicolonAtom]
+  let viewed := EbnfValue.sequenceFlatView children input
+  let name := EbnfValue.terminalView (.category .identifier) viewed.1
+  let typeValue := EbnfValue.ruleView .type viewed.2.2.1
+  let initializer := (EbnfValue.optionalView initializerChild
+    viewed.2.2.2.1).map fun raw =>
+      let pair := EbnfValue.sequence2View equalAtom expressionAtom raw
+      (EbnfValue.terminalView (.symbol .equal) pair.1,
+        EbnfValue.ruleView .expression pair.2, ())
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    name := { span := name.span, payload := name.identifierProjection.2 }
+    type := typeValue
+    initializer := initializer.map fun value => value.2.1
+  }
 
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
@@ -7044,6 +7077,8 @@ def executeRootRule
       executeDataConstructorRoot file tokens origin finish owned ordered input
   | .typeAliasDecl =>
       executeTypeAliasDeclRoot file tokens origin finish owned ordered input
+  | .fieldDecl =>
+      executeFieldDeclRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
