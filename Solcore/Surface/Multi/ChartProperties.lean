@@ -5018,4 +5018,34 @@ theorem executeObservedContextualWorklist?_unexpectedDiagnosticCandidate?_applie
       file tokens owned result selected absent)
     greatest canonical foundAt (notRepeated cursor)
 
+/-- The rootless ordinary branch supplies root absence itself; only exclusion
+of a repeated non-associative candidate remains to certify its result. -/
+theorem executeObservedContextualWorklist?_rootlessUnexpectedDiagnosticCandidate?_applies
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (span : SourceSpan) (found : Found)
+    (expected : NonemptyList Expected)
+    (candidate : result.rootlessUnexpectedDiagnosticCandidate? file =
+      some (.unexpected span found expected))
+    (notRepeated : ∀ cursor level operator,
+      ¬ RepeatedNonAssociativeAt file tokens result.memo
+        (executeObservedContextualWorklist?_phaseBCorrect
+          file tokens owned result selected)
+        (Chart.executeObservedContextualWorklist?_allGuardsFinal
+          file tokens owned result selected)
+        cursor level operator) :
+    ParseDiagnostic.Applies file tokens
+      (.unexpected span found expected) := by
+  rcases
+      (Chart.ContextualWorklistResult.rootlessUnexpectedDiagnosticCandidate?_eq_some_iff
+        file result (.unexpected span found expected)).mp candidate with
+    ⟨absent, ordinary⟩
+  exact
+    executeObservedContextualWorklist?_unexpectedDiagnosticCandidate?_applies_of_completeModuleRootItem_eq_false
+      file tokens owned result selected span found expected ordinary absent
+        notRepeated
+
 end Solcore.Surface.Multi
