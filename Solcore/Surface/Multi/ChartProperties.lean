@@ -5292,3 +5292,259 @@ theorem chart_observedNonAssociativeOperatorAt?_eq_some_iff
 
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- At a selected greatest cursor, the canonical retained root list is
+exactly the declarative nonassociative root frontier. -/
+theorem executeObservedContextualWorklist?_nonAssociativeRootItemsAt_mem_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (cursor : Boundary tokens)
+    (greatestSelected : result.greatestCurrent? = some cursor)
+    (level : NonAssociativeLevel)
+    (item : ContextualItemKey tokens) :
+    item ∈ result.nonAssociativeRootItemsAt cursor level ↔
+      item = CanonicalCompleteRootItem tokens
+          (Chart.nonAssociativeRootRule level)
+          item.raw.origin cursor item.context ∧
+        let correct := executeObservedContextualWorklist?_phaseBCorrect
+          file tokens owned result selected
+        let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+          file tokens owned result selected
+        FrontierReach file tokens result.memo correct final cursor item := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change item ∈ result.nonAssociativeRootItemsAt cursor level ↔
+    item = CanonicalCompleteRootItem tokens
+        (Chart.nonAssociativeRootRule level)
+        item.raw.origin cursor item.context ∧
+      FrontierReach file tokens result.memo correct final cursor item
+  have greatest : GreatestReachableCursor
+      file tokens result.memo correct final cursor :=
+    (executeObservedContextualWorklist?_greatestCurrent?_eq_some_iff
+      file tokens owned result selected cursor).mp greatestSelected
+  have correspondence := executeObservedContextualWorklist?_correspondence
+    file tokens owned result selected
+  change
+    (∀ candidate, candidate ∈ result.items ↔
+      ContextualReach file tokens result.memo correct final candidate) ∧ _
+      at correspondence
+  rw [Chart.ContextualWorklistResult.nonAssociativeRootItemsAt_mem_iff]
+  constructor
+  · rintro ⟨member, rootEq⟩
+    exact ⟨rootEq, greatest,
+      (correspondence.1 item).mp member,
+      congrArg (fun candidate => candidate.raw.current) rootEq⟩
+  · rintro ⟨rootEq, frontier⟩
+    exact ⟨(correspondence.1 item).mpr frontier.2.1, rootEq⟩
+
+/-- Stable declarative enumeration of all reached canonical complete roots at
+one nonassociative level. -/
+def canonicalNonAssociativeRootItems
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel) : List (ContextualItemKey tokens) :=
+  (allContextualItems tokens).filter fun item =>
+    @decide (ContextualReach file tokens memo correct final item)
+        (contextualReachDecision owned correct final item) &&
+      Chart.isNonAssociativeRootItemAt cursor level item
+
+/-- Membership in the canonical declarative list is exactly one reached
+canonical complete-root coordinate. -/
+theorem canonicalNonAssociativeRootItems_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel)
+    (item : ContextualItemKey tokens) :
+    item ∈ canonicalNonAssociativeRootItems
+        owned correct final cursor level ↔
+      ContextualReach file tokens memo correct final item ∧
+        item = CanonicalCompleteRootItem tokens
+          (Chart.nonAssociativeRootRule level)
+          item.raw.origin cursor item.context := by
+  simp [canonicalNonAssociativeRootItems,
+    Chart.isNonAssociativeRootItemAt, allContextualItems_complete]
+
+/-- Successful execution computes exactly the stable declarative root list at
+its selected greatest cursor. -/
+theorem executeObservedContextualWorklist?_nonAssociativeRootItemsAt_eq_canonical
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel) :
+    result.nonAssociativeRootItemsAt cursor level =
+      canonicalNonAssociativeRootItems owned
+        (executeObservedContextualWorklist?_phaseBCorrect
+          file tokens owned result selected)
+        (Chart.executeObservedContextualWorklist?_allGuardsFinal
+          file tokens owned result selected)
+        cursor level := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change result.nonAssociativeRootItemsAt cursor level =
+    canonicalNonAssociativeRootItems owned correct final cursor level
+  have correspondence := executeObservedContextualWorklist?_correspondence
+    file tokens owned result selected
+  change
+    (∀ item, item ∈ result.items ↔
+      ContextualReach file tokens result.memo correct final item) ∧ _
+      at correspondence
+  unfold Chart.ContextualWorklistResult.nonAssociativeRootItemsAt
+  unfold canonicalNonAssociativeRootItems
+  apply List.filter_congr
+  intro item _member
+  apply Bool.eq_iff_iff.mpr
+  simp only [Bool.and_eq_true,
+    Chart.ContextualWorklistResult.containsRetainedContextualItem_eq_true_iff,
+    decide_eq_true_iff]
+  exact and_congr (correspondence.1 item) Iff.rfl
+
+/-- The selected structural G10 frontier is exactly the greatest declarative
+cursor, its matched nonassociative operator, and the canonical reached root
+list for that same level. -/
+theorem executeObservedContextualWorklist?_nonAssociativeFrontierCandidates?_eq_some_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (frontier : Chart.NonAssociativeFrontierCandidates tokens) :
+    result.nonAssociativeFrontierCandidates? file = some frontier ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      GreatestReachableCursor
+          file tokens result.memo correct final frontier.cursor ∧
+        FoundNonAssociativeOperatorAt file tokens frontier.cursor
+          frontier.level frontier.operator ∧
+        frontier.roots = canonicalNonAssociativeRootItems
+          owned correct final frontier.cursor frontier.level := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change result.nonAssociativeFrontierCandidates? file = some frontier ↔
+    GreatestReachableCursor
+        file tokens result.memo correct final frontier.cursor ∧
+      FoundNonAssociativeOperatorAt file tokens frontier.cursor
+        frontier.level frontier.operator ∧
+      frontier.roots = canonicalNonAssociativeRootItems
+        owned correct final frontier.cursor frontier.level
+  rw [Chart.ContextualWorklistResult.nonAssociativeFrontierCandidates?_eq_some_iff]
+  rw [executeObservedContextualWorklist?_greatestCurrent?_eq_some_iff
+    file tokens owned result selected frontier.cursor]
+  rw [chart_observedNonAssociativeOperatorAt?_eq_some_iff
+    owned frontier.cursor]
+  rw [executeObservedContextualWorklist?_nonAssociativeRootItemsAt_eq_canonical
+      file tokens owned result selected frontier.cursor frontier.level]
+
+/-- Exact factorization of the declarative G10 witness through the proof-free
+structural frontier.  Only the semantic completed/group tests remain carried
+by the declarative candidate until executable root values land. -/
+theorem executeObservedContextualWorklist?_repeatedNonAssociativeAt_iff_frontierCandidates
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (cursor : Boundary tokens)
+    (level : NonAssociativeLevel)
+    (operator : Located InfixOperator) :
+    let correct := executeObservedContextualWorklist?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+      file tokens owned result selected
+    RepeatedNonAssociativeAt file tokens result.memo correct final
+        cursor level operator ↔
+      ∃ frontier : Chart.NonAssociativeFrontierCandidates tokens,
+        result.nonAssociativeFrontierCandidates? file = some frontier ∧
+        frontier.cursor = cursor ∧
+        frontier.level = level ∧
+        frontier.operator = operator ∧
+        ∃ candidate : NonAssociativeFrontierValue
+            file tokens result.memo correct final cursor level,
+          CanonicalCompleteRootItem tokens
+              (Chart.nonAssociativeRootRule level)
+              candidate.origin cursor candidate.context ∈ frontier.roots ∧
+          ∃ first : Located InfixOperator,
+            CompletedNonAssociative level candidate first ∧
+            ¬ ExplicitGroupBoundary level candidate := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change RepeatedNonAssociativeAt file tokens result.memo correct final
+      cursor level operator ↔
+    ∃ frontier : Chart.NonAssociativeFrontierCandidates tokens,
+      result.nonAssociativeFrontierCandidates? file = some frontier ∧
+      frontier.cursor = cursor ∧
+      frontier.level = level ∧
+      frontier.operator = operator ∧
+      ∃ candidate : NonAssociativeFrontierValue
+          file tokens result.memo correct final cursor level,
+        CanonicalCompleteRootItem tokens
+            (Chart.nonAssociativeRootRule level)
+            candidate.origin cursor candidate.context ∈ frontier.roots ∧
+        ∃ first : Located InfixOperator,
+          CompletedNonAssociative level candidate first ∧
+          ¬ ExplicitGroupBoundary level candidate
+  constructor
+  · rintro ⟨candidate, first, completed, ungrouped, found⟩
+    let frontier : Chart.NonAssociativeFrontierCandidates tokens := {
+      cursor := cursor
+      level := level
+      operator := operator
+      roots := canonicalNonAssociativeRootItems
+        owned correct final cursor level
+    }
+    have frontierEq : result.nonAssociativeFrontierCandidates? file =
+        some frontier :=
+      (executeObservedContextualWorklist?_nonAssociativeFrontierCandidates?_eq_some_iff
+          file tokens owned result selected frontier).mpr
+        ⟨candidate.frontier.1, found, rfl⟩
+    have rootMember : CanonicalCompleteRootItem tokens
+        (Chart.nonAssociativeRootRule level)
+        candidate.origin cursor candidate.context ∈ frontier.roots := by
+      change CanonicalCompleteRootItem tokens
+          (Chart.nonAssociativeRootRule level)
+          candidate.origin cursor candidate.context ∈
+        canonicalNonAssociativeRootItems
+          owned correct final cursor level
+      apply (canonicalNonAssociativeRootItems_mem_iff
+        owned correct final cursor level _).mpr
+      exact ⟨candidate.root.1, rfl⟩
+    exact ⟨frontier, frontierEq, rfl, rfl, rfl,
+      candidate, rootMember, first, completed, ungrouped⟩
+  · rintro ⟨frontier, frontierEq, cursorEq, levelEq, operatorEq,
+      candidate, _rootMember, first, completed, ungrouped⟩
+    have exactFrontier :=
+      (executeObservedContextualWorklist?_nonAssociativeFrontierCandidates?_eq_some_iff
+          file tokens owned result selected frontier).mp frontierEq
+    have found : FoundNonAssociativeOperatorAt
+        file tokens cursor level operator := by
+      simpa only [cursorEq, levelEq, operatorEq] using exactFrontier.2.1
+    exact ⟨candidate, first, completed, ungrouped, found⟩
+
+end Solcore.Surface.Multi
