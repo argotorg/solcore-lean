@@ -5390,6 +5390,11 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | module : ExecutableRootRule .module
   | topItem : ExecutableRootRule .topItem
   | optionalComma : ExecutableRootRule .optionalComma
+  | predicateList : ExecutableRootRule .predicateList
+  | instanceMethod : ExecutableRootRule .instanceMethod
+  | armStatement : ExecutableRootRule .armStatement
+  | terminalExpression : ExecutableRootRule .terminalExpression
+  | expression : ExecutableRootRule .expression
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -5466,6 +5471,40 @@ def executeModuleRoot
   let rawItems := EbnfValue.starView itemAtom first.1
   executableModuleValue file (rawItems.map (EbnfValue.ruleView .topItem))
 
+/-- Decode a nonempty predicate list from its typed EBNF root value. -/
+def executePredicateListRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .predicateList)) :
+    NonemptyList Predicate :=
+  (EbnfValue.list1View (.atom (.nonterminal .predicate)) input).map
+    (EbnfValue.ruleView .predicate)
+
+/-- Decode an instance method's transparent function-declaration root. -/
+def executeInstanceMethodRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .instanceMethod)) :
+    FunctionDecl :=
+  EbnfValue.ruleView .functionDecl input
+
+/-- Decode an arm statement's transparent statement root. -/
+def executeArmStatementRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .armStatement)) : Statement :=
+  EbnfValue.ruleView .statement input
+
+/-- Decode a terminal-expression root without changing its expression. -/
+def executeTerminalExpressionRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .terminalExpression)) :
+    Expression :=
+  EbnfValue.ruleView .expression input
+
+/-- Decode the expression root's transparent annotation value. -/
+def executeExpressionRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .expression)) : Expression :=
+  EbnfValue.ruleView .annotation input
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -5479,6 +5518,11 @@ def executeRootRule
   | .module => executeModuleRoot file input
   | .topItem => executeTopItemRoot file tokens origin finish owned ordered input
   | .optionalComma => executeOptionalCommaRoot input
+  | .predicateList => executePredicateListRoot input
+  | .instanceMethod => executeInstanceMethodRoot input
+  | .armStatement => executeArmStatementRoot input
+  | .terminalExpression => executeTerminalExpressionRoot input
+  | .expression => executeExpressionRoot input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
