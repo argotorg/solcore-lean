@@ -20644,3 +20644,167 @@ def unexpectedDiagnosticCandidate?
 end ContextualWorklistResult
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private structure PhaseCAllSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop where
+  item : PhaseCItemSafe current
+  activation : PhaseCActivationSafe current.counter
+  completion : PhaseCCompletionSafe current.counter
+
+private theorem attemptContextualPrediction?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (safe : PhaseCCompletionSafe current.counter)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCCompletionSafe result.counter := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact safe
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedSafe :=
+            runMappedPrimitive?_phaseCCompletionSafe_of_not_insert current _
+              id attempted safe (by simp) attemptedEq
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedSafe
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedSafe :=
+                  activateWorklistProduction?_completionSafe attempted
+                    productionInstance activated attemptedSafe activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  cases selected
+                  exact activatedSafe
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  exact insertContextualItem?_completionSafe activated.1 result
+                    .prediction item activatedSafe selected
+
+private theorem attemptContextualPredictions?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCCompletionSafe current.counter →
+      attemptContextualPredictions? waiting productions current =
+        some result →
+      PhaseCCompletionSafe result.counter := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result safe selected
+      cases selected
+      exact safe
+  | cons predicted rest induction =>
+      intro current result safe selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptContextualPrediction?_completionSafe current next waiting
+          predicted safe nextEq) restEq
+
+private theorem attemptContextualScan?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (safe : PhaseCCompletionSafe current.counter)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCCompletionSafe result.counter := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedSafe :=
+      runMappedPrimitive?_phaseCCompletionSafe_of_not_insert current _ id
+        attempted safe (by simp) attemptedEq
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq, Option.some.injEq] at remainderEq
+        cases remainderEq
+        exact attemptedSafe
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        exact insertContextualScannedEdge?_completionSafe withItem result edge
+          (insertContextualItem?_completionSafe attempted withItem .scan after
+            attemptedSafe itemEq) edgeEq
+  next notApplicable =>
+    cases selected
+    exact safe
+
+private theorem attemptAllContextualPredictions?_total_allSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCAllSafe current)
+    (workFresh : PhaseCItemWorkFresh current waiting) :
+    ∃ result,
+      attemptContextualPredictions? waiting allProductionIds current =
+        some result ∧
+      PhaseCAllSafe result ∧
+      (.linear .L01_itemDequeue (contextualLinearKey waiting) :
+        UnitAddress tokens) ∈ result.counter.usedRev ∧
+      (.linear .L04_scanAttempt (contextualLinearKey waiting) :
+        UnitAddress tokens) ∉ result.counter.usedRev ∧
+      (.linear .L06_scannedEdgeInsert (contextualLinearKey waiting) :
+        UnitAddress tokens) ∉ result.counter.usedRev := by
+  obtain ⟨result, selected, itemSafe, activationSafe, dequeued,
+    scanFresh, edgeFresh⟩ := attemptAllContextualPredictions?_total_safe
+      waiting current safe.item safe.activation workFresh
+  exact ⟨result, selected, ⟨itemSafe, activationSafe,
+      attemptContextualPredictions?_completionSafe waiting allProductionIds
+        current result safe.completion selected⟩,
+    dequeued, scanFresh, edgeFresh⟩
+
+private theorem attemptContextualScan?_total_allSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (safe : PhaseCAllSafe current)
+    (dequeued : (.linear .L01_itemDequeue
+      (contextualLinearKey before) : UnitAddress tokens) ∈
+        current.counter.usedRev)
+    (scanFresh : (.linear .L04_scanAttempt
+      (contextualLinearKey before) : UnitAddress tokens) ∉
+        current.counter.usedRev)
+    (edgeFresh : (.linear .L06_scannedEdgeInsert
+      (contextualLinearKey before) : UnitAddress tokens) ∉
+        current.counter.usedRev) :
+    ∃ result, attemptContextualScan? owned current before = some result ∧
+      PhaseCAllSafe result := by
+  obtain ⟨result, selected, itemSafe, activationSafe⟩ :=
+    attemptContextualScan?_total_safe owned current before safe.item
+      safe.activation dequeued scanFresh edgeFresh
+  exact ⟨result, selected, ⟨itemSafe, activationSafe,
+    attemptContextualScan?_completionSafe owned current result before
+      safe.completion selected⟩⟩
+
+end Solcore.Surface.Multi.Chart
