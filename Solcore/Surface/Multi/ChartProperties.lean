@@ -4598,6 +4598,116 @@ theorem executePrefixRoot_reduces
     rw [resultEq, ← inputEq, ← rawEq]
     exact .prefixPostfix origin finish expression
 
+/-- The postfix-part executor realizes its selected structural root. -/
+theorem executePostfixPartRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .postfixPart origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .postfixPart)) :
+    RuleReduction file tokens .postfixPart origin finish input
+      (executePostfixPartRoot input) := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let branches : List EbnfExpr := [
+    .sequence [
+      .atom (.terminal (.symbol .leftParen)),
+      .list0 expressionAtom,
+      .atom (.terminal (.symbol .rightParen))],
+    .sequence [
+      .atom (.terminal (.symbol .dot)),
+      .atom (.terminal (.category .identifier))],
+    .sequence [
+      .atom (.terminal (.symbol .leftBracket)),
+      expressionAtom,
+      .atom (.terminal (.symbol .rightBracket))]]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have lengthEq : branches.length = 3 := by rfl
+    have bound : branch.val < 3 := by simpa [lengthEq] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  rcases branchCases with rfl | rfl | rfl
+  · let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+    let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+    let viewed := EbnfValue.sequence3View
+      openAtom (.list0 expressionAtom) closeAtom raw
+    let openParen := EbnfValue.terminalView (.symbol .leftParen) viewed.1
+    let rawArguments := EbnfValue.list0View expressionAtom viewed.2.1
+    let arguments := rawArguments.map (EbnfValue.ruleView .expression)
+    let closeParen := EbnfValue.terminalView
+      (.symbol .rightParen) viewed.2.2
+    have rawEq := EbnfValue.sequence3_of_view
+      openAtom (.list0 expressionAtom) closeAtom raw
+    have openEq := EbnfValue.terminal_of_view
+      (.symbol .leftParen) viewed.1
+    have argumentsMapEq :
+        arguments.map (EbnfValue.ruleAtom .expression) = rawArguments :=
+      shortRuleAtoms_of_views .expression rawArguments
+    have argumentsEq : EbnfValue.list0 expressionAtom
+        (arguments.map (EbnfValue.ruleAtom .expression)) = viewed.2.1 := by
+      rw [argumentsMapEq]
+      exact EbnfValue.list0_of_view expressionAtom viewed.2.1
+    have closeEq := EbnfValue.terminal_of_view
+      (.symbol .rightParen) viewed.2.2
+    have resultEq : executePostfixPartRoot input =
+        .call openParen.span arguments closeParen.span := by
+      rw [executePostfixPartRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← openEq, ← argumentsEq,
+      ← closeEq]
+    exact .postfixPartCall origin finish openParen arguments closeParen
+  · let dotAtom : EbnfExpr := .atom (.terminal (.symbol .dot))
+    let fieldAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+    let viewed := EbnfValue.sequence2View dotAtom fieldAtom raw
+    let dot := EbnfValue.terminalView (.symbol .dot) viewed.1
+    let field := EbnfValue.terminalView (.category .identifier) viewed.2
+    let projection := field.identifierProjection
+    have rawEq := EbnfValue.sequence2_of_view dotAtom fieldAtom raw
+    have dotEq := EbnfValue.terminal_of_view (.symbol .dot) viewed.1
+    have fieldEq := EbnfValue.terminal_of_view
+      (.category .identifier) viewed.2
+    have resultEq : executePostfixPartRoot input =
+        .select dot.span
+          (RuleReduction.terminalLoc field projection.2) := by
+      rw [executePostfixPartRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← dotEq, ← fieldEq]
+    exact .postfixPartSelect origin finish dot field projection.1 projection.2
+      field.identifierProjection_projects
+  · let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftBracket))
+    let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightBracket))
+    let viewed := EbnfValue.sequence3View
+      openAtom expressionAtom closeAtom raw
+    let openBracket := EbnfValue.terminalView
+      (.symbol .leftBracket) viewed.1
+    let index := EbnfValue.ruleView .expression viewed.2.1
+    let closeBracket := EbnfValue.terminalView
+      (.symbol .rightBracket) viewed.2.2
+    have rawEq := EbnfValue.sequence3_of_view
+      openAtom expressionAtom closeAtom raw
+    have openEq := EbnfValue.terminal_of_view
+      (.symbol .leftBracket) viewed.1
+    have indexEq := EbnfValue.rule_of_view .expression viewed.2.1
+    have closeEq := EbnfValue.terminal_of_view
+      (.symbol .rightBracket) viewed.2.2
+    have resultEq : executePostfixPartRoot input =
+        .index openBracket.span index closeBracket.span := by
+      rw [executePostfixPartRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← openEq, ← indexEq,
+      ← closeEq]
+    exact .postfixPartIndex origin finish openBracket index closeBracket
+
 /-- The executable infix fold is the declarative semantic fold. -/
 private theorem executeInfixLeft_eq_foldInfixLeft
     (file : WorkspaceFile) (left : Expression)
@@ -4900,6 +5010,8 @@ theorem executeRootRule_reduces
   | bitAnd => exact executeBitAndRoot_reduces origin finish ready input
   | «prefix» => exact executePrefixRoot_reduces origin finish ready input
   | postfixExpr => exact executePostfixRoot_reduces origin finish ready input
+  | postfixPart =>
+      exact executePostfixPartRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
