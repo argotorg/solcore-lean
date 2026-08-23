@@ -3864,6 +3864,161 @@ theorem executeExpressionRoot_reduces
   rw [resultEq, ← inputEq]
   exact .expression origin finish expression
 
+/-- The block-statement executor realizes its exact root reduction. -/
+theorem executeBlockStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .blockStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .blockStatement)) :
+    RuleReduction file tokens .blockStatement origin finish input
+      (executeBlockStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  change EbnfValue file tokens (.atom (.nonterminal .body)) at input
+  let body := EbnfValue.ruleView .body input
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.rule_of_view .body input
+  have resultEq : executeBlockStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness (.block body) := by rfl
+  rw [resultEq, ← inputEq]
+  exact .blockStatement origin finish body witness
+
+/-- The function-declaration executor realizes its exact root reduction. -/
+theorem executeFunctionDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .functionDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .functionDecl)) :
+    RuleReduction file tokens .functionDecl origin finish input
+      (executeFunctionDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let signatureAtom : EbnfExpr := .atom (.nonterminal .functionSignature)
+  let bodyAtom : EbnfExpr := .atom (.nonterminal .body)
+  change EbnfValue file tokens (.sequence [signatureAtom, bodyAtom]) at input
+  let viewed := EbnfValue.sequence2View signatureAtom bodyAtom input
+  let signature := EbnfValue.ruleView .functionSignature viewed.1
+  let body := EbnfValue.ruleView .body viewed.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view signatureAtom bodyAtom input
+  have signatureEq := EbnfValue.rule_of_view .functionSignature viewed.1
+  have bodyEq := EbnfValue.rule_of_view .body viewed.2
+  have resultEq : executeFunctionDeclRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        signature := signature
+        body := body
+      } := by rfl
+  rw [resultEq, ← inputEq, ← signatureEq, ← bodyEq]
+  exact .functionDecl origin finish signature body witness
+
+/-- The class-method executor realizes its exact root reduction. -/
+theorem executeClassMethodRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .classMethod origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .classMethod)) :
+    RuleReduction file tokens .classMethod origin finish input
+      (executeClassMethodRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let signatureAtom : EbnfExpr := .atom (.nonterminal .functionSignature)
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  change EbnfValue file tokens
+    (.sequence [signatureAtom, semicolonAtom]) at input
+  let viewed := EbnfValue.sequence2View signatureAtom semicolonAtom input
+  let signature := EbnfValue.ruleView .functionSignature viewed.1
+  let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view signatureAtom semicolonAtom input
+  have signatureEq := EbnfValue.rule_of_view .functionSignature viewed.1
+  have semicolonEq := EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2
+  have resultEq : executeClassMethodRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        signature := signature
+        terminator := semicolon.span
+      } := by rfl
+  rw [resultEq, ← inputEq, ← signatureEq, ← semicolonEq]
+  exact .classMethod origin finish signature semicolon witness
+
+/-- The let-statement executor realizes its exact root reduction. -/
+theorem executeLetStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .letStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .letStatement)) :
+    RuleReduction file tokens .letStatement origin finish input
+      (executeLetStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let bindingAtom : EbnfExpr := .atom (.nonterminal .letBinding)
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  change EbnfValue file tokens (.sequence [bindingAtom, semicolonAtom]) at input
+  let viewed := EbnfValue.sequence2View bindingAtom semicolonAtom input
+  let binding := EbnfValue.ruleView .letBinding viewed.1
+  let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view bindingAtom semicolonAtom input
+  have bindingEq := EbnfValue.rule_of_view .letBinding viewed.1
+  have semicolonEq := EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2
+  have resultEq : executeLetStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness (.letBinding binding) := by
+    rfl
+  rw [resultEq, ← inputEq, ← bindingEq, ← semicolonEq]
+  exact .letStatement origin finish binding semicolon witness
+
+/-- The break-statement executor realizes its exact root reduction. -/
+theorem executeBreakStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .breakStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .breakStatement)) :
+    RuleReduction file tokens .breakStatement origin finish input
+      (executeBreakStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let keywordAtom : EbnfExpr := .atom (.terminal (.hardKeyword .breakKw))
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  change EbnfValue file tokens (.sequence [keywordAtom, semicolonAtom]) at input
+  let viewed := EbnfValue.sequence2View keywordAtom semicolonAtom input
+  let keyword := EbnfValue.terminalView (.hardKeyword .breakKw) viewed.1
+  let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view keywordAtom semicolonAtom input
+  have keywordEq := EbnfValue.terminal_of_view (.hardKeyword .breakKw) viewed.1
+  have semicolonEq := EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2
+  have resultEq : executeBreakStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness (.break semicolon.span) := by
+    rfl
+  rw [resultEq, ← inputEq, ← keywordEq, ← semicolonEq]
+  exact .breakStatement origin finish keyword semicolon witness
+
+/-- The continue-statement executor realizes its exact root reduction. -/
+theorem executeContinueStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .continueStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .continueStatement)) :
+    RuleReduction file tokens .continueStatement origin finish input
+      (executeContinueStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let keywordAtom : EbnfExpr := .atom (.terminal (.hardKeyword .continueKw))
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  change EbnfValue file tokens (.sequence [keywordAtom, semicolonAtom]) at input
+  let viewed := EbnfValue.sequence2View keywordAtom semicolonAtom input
+  let keyword := EbnfValue.terminalView (.hardKeyword .continueKw) viewed.1
+  let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view keywordAtom semicolonAtom input
+  have keywordEq :=
+    EbnfValue.terminal_of_view (.hardKeyword .continueKw) viewed.1
+  have semicolonEq := EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2
+  have resultEq : executeContinueStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness (.continue semicolon.span) := by
+    rfl
+  rw [resultEq, ← inputEq, ← keywordEq, ← semicolonEq]
+  exact .continueStatement origin finish keyword semicolon witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -3890,6 +4045,18 @@ theorem executeRootRule_reduces
       exact executeTerminalExpressionRoot_reduces origin finish ready input
   | expression =>
       exact executeExpressionRoot_reduces origin finish ready input
+  | blockStatement =>
+      exact executeBlockStatementRoot_reduces origin finish ready input
+  | functionDecl =>
+      exact executeFunctionDeclRoot_reduces origin finish ready input
+  | classMethod =>
+      exact executeClassMethodRoot_reduces origin finish ready input
+  | letStatement =>
+      exact executeLetStatementRoot_reduces origin finish ready input
+  | breakStatement =>
+      exact executeBreakStatementRoot_reduces origin finish ready input
+  | continueStatement =>
+      exact executeContinueStatementRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
