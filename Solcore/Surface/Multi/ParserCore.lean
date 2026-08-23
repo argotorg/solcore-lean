@@ -5698,6 +5698,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | dataConstructor : ExecutableRootRule .dataConstructor
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
+  | pragmaDecl : ExecutableRootRule .pragmaDecl
   | body : ExecutableRootRule .body
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
@@ -6350,6 +6351,151 @@ def executeFieldDeclRoot
     type := typeValue
     initializer := initializer.map fun value => value.2.1
   }
+
+/-- Decode the optional nonempty matched identifier targets of one pragma. -/
+def pragmaTargetTerminals
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.optional (.list1
+      (.atom (.terminal (.category .identifier)))))) :
+    Option (NonemptyList (MatchedTerminal file tokens
+      (.category .identifier))) :=
+  (EbnfValue.optionalView (.list1
+    (.atom (.terminal (.category .identifier)))) input).map fun raw =>
+      (EbnfValue.list1View
+        (.atom (.terminal (.category .identifier))) raw).map
+          (EbnfValue.terminalView (.category .identifier))
+
+/-- Rebuilding computed pragma target terminals recovers their exact input. -/
+theorem pragmaTargetTerminals_rebuild
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.optional (.list1
+      (.atom (.terminal (.category .identifier)))))) :
+    EbnfValue.optional (.list1
+      (.atom (.terminal (.category .identifier))))
+      ((pragmaTargetTerminals input).map fun terminals =>
+        EbnfValue.list1 (.atom (.terminal (.category .identifier)))
+          (terminals.map (EbnfValue.terminalAtom
+            (.category .identifier)))) = input := by
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let child : EbnfExpr := .list1 identifierAtom
+  unfold pragmaTargetTerminals
+  generalize selectedEq : EbnfValue.optionalView child input = selected
+  cases selected with
+  | none =>
+      simp only [Option.map]
+      calc
+        _ = EbnfValue.optional child
+            (EbnfValue.optionalView child input) := by rw [selectedEq]
+        _ = input := EbnfValue.optional_of_view child input
+  | some raw =>
+      let values := EbnfValue.list1View identifierAtom raw
+      have valuesEq : (values.map (EbnfValue.terminalView
+          (.category .identifier))).map (EbnfValue.terminalAtom
+            (.category .identifier)) = values := by
+        cases values with
+        | mk head tail =>
+            simp only [NonemptyList.map, NonemptyList.mk.injEq]
+            constructor
+            · exact EbnfValue.terminal_of_view
+                (.category .identifier) head
+            · induction tail with
+              | nil => rfl
+              | cons next rest induction =>
+                  simp [EbnfValue.terminal_of_view, induction]
+      have rawEq : EbnfValue.list1 identifierAtom
+          ((values.map (EbnfValue.terminalView
+            (.category .identifier))).map (EbnfValue.terminalAtom
+              (.category .identifier))) = raw := by
+        rw [valuesEq]
+        exact EbnfValue.list1_of_view identifierAtom raw
+      simp only [Option.map]
+      calc
+        _ = EbnfValue.optional child (some raw) := by rw [rawEq]
+        _ = EbnfValue.optional child
+            (EbnfValue.optionalView child input) := by rw [selectedEq]
+        _ = input := EbnfValue.optional_of_view child input
+
+/-- Locate the computed pragma targets in source order. -/
+def executePragmaTargets
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.optional (.list1
+      (.atom (.terminal (.category .identifier)))))) :
+    List IdentifierOccurrence :=
+  (pragmaTargetTerminals input).elim [] fun terminals =>
+    let targets := terminals.map fun terminal =>
+      { span := terminal.span, payload := terminal.identifierProjection.2 }
+    targets.head :: targets.tail
+
+/-- Execute one of the four fixed pragma declarations. -/
+def executePragmaDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .pragmaDecl)) : PragmaDecl :=
+  let targetsAtom : EbnfExpr := .optional (.list1
+    (.atom (.terminal (.category .identifier))))
+  let branches : List EbnfExpr := [
+    .sequence [.atom (.terminal (.hardKeyword .pragmaKw)),
+      .atom (.terminal (.pragmaName .noCoverageCondition)), targetsAtom,
+      .atom (.terminal (.symbol .semicolon))],
+    .sequence [.atom (.terminal (.hardKeyword .pragmaKw)),
+      .atom (.terminal (.pragmaName .noPattersonCondition)), targetsAtom,
+      .atom (.terminal (.symbol .semicolon))],
+    .sequence [.atom (.terminal (.hardKeyword .pragmaKw)),
+      .atom (.terminal (.pragmaName .noBoundedVariableCondition)), targetsAtom,
+      .atom (.terminal (.symbol .semicolon))],
+    .sequence [.atom (.terminal (.hardKeyword .pragmaKw)),
+      .atom (.terminal (.pragmaName .noGenericInstanceFor)), targetsAtom,
+      .atom (.terminal (.symbol .semicolon))]]
+  let witness := shallowRootWitness file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence4View
+        (.atom (.terminal (.hardKeyword .pragmaKw)))
+        (.atom (.terminal (.pragmaName .noCoverageCondition))) targetsAtom
+        (.atom (.terminal (.symbol .semicolon))) raw
+      let kindToken := EbnfValue.terminalView
+        (.pragmaName .noCoverageCondition) viewed.2.1
+      sourceLoc witness {
+        kind := { span := kindToken.span, payload := .noCoverageCondition }
+        targets := executePragmaTargets viewed.2.2.1
+      }
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence4View
+        (.atom (.terminal (.hardKeyword .pragmaKw)))
+        (.atom (.terminal (.pragmaName .noPattersonCondition))) targetsAtom
+        (.atom (.terminal (.symbol .semicolon))) raw
+      let kindToken := EbnfValue.terminalView
+        (.pragmaName .noPattersonCondition) viewed.2.1
+      sourceLoc witness {
+        kind := { span := kindToken.span, payload := .noPattersonCondition }
+        targets := executePragmaTargets viewed.2.2.1
+      }
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence4View
+        (.atom (.terminal (.hardKeyword .pragmaKw)))
+        (.atom (.terminal (.pragmaName .noBoundedVariableCondition)))
+        targetsAtom (.atom (.terminal (.symbol .semicolon))) raw
+      let kindToken := EbnfValue.terminalView
+        (.pragmaName .noBoundedVariableCondition) viewed.2.1
+      sourceLoc witness {
+        kind := {
+          span := kindToken.span, payload := .noBoundedVariableCondition }
+        targets := executePragmaTargets viewed.2.2.1
+      }
+  | ⟨⟨3, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence4View
+        (.atom (.terminal (.hardKeyword .pragmaKw)))
+        (.atom (.terminal (.pragmaName .noGenericInstanceFor))) targetsAtom
+        (.atom (.terminal (.symbol .semicolon))) raw
+      let kindToken := EbnfValue.terminalView
+        (.pragmaName .noGenericInstanceFor) viewed.2.1
+      sourceLoc witness {
+        kind := { span := kindToken.span, payload := .noGenericInstanceFor }
+        targets := executePragmaTargets viewed.2.2.1
+      }
 
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
@@ -7079,6 +7225,8 @@ def executeRootRule
       executeTypeAliasDeclRoot file tokens origin finish owned ordered input
   | .fieldDecl =>
       executeFieldDeclRoot file tokens origin finish owned ordered input
+  | .pragmaDecl =>
+      executePragmaDeclRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
