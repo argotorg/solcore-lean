@@ -23213,3 +23213,225 @@ private theorem attemptContextualCompletionsWithMulti?_total_allSafe_backpointer
             reverseEq, resultEq], resultSafe, resultCovers, resultExact⟩
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+namespace CompletionBackpointerMultiLedger
+
+private theorem CoversPackedEdges.cons_scanned
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger : CompletionBackpointerMultiLedger tokens}
+    {edges : List (StructurallyValidContextualPackedEdge file tokens)}
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (covers : CoversPackedEdges file tokens ledger edges) :
+    CoversPackedEdges file tokens ledger
+      (edges ++ [CompletionBackpointerLedger.packScanned edge]) := by
+  intro candidate member
+  rw [List.mem_append] at member
+  rcases member with oldMember | inserted
+  · exact covers candidate oldMember
+  · simp only [List.mem_singleton] at inserted
+    subst candidate
+    trivial
+
+end CompletionBackpointerMultiLedger
+
+private theorem activateWorklistProduction?_multiBackpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCMultiBackpointerInvariant result.1 := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  unfold PhaseCMultiBackpointerInvariant at covers ⊢
+  rw [activateProduction?_contextualEdges
+    { payload := current.payload.phaseC, counter := current.counter }
+    productionInstance activated activatedEq]
+  exact covers
+
+private theorem attemptContextualPrediction?_multiBackpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCMultiBackpointerInvariant result := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq] at selected
+      cases selected
+      exact covers
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedCovers : PhaseCMultiBackpointerInvariant attempted := by
+            unfold PhaseCMultiBackpointerInvariant at covers ⊢
+            rw [runMappedPrimitive?_payload current _ id attemptedEq]
+            exact covers
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedCovers
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedCovers :=
+                  activateWorklistProduction?_multiBackpointerInvariant
+                    attempted productionInstance activated attemptedCovers
+                      activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq] at selected
+                  cases selected
+                  exact activatedCovers
+                · simp [attemptedEq, used, activatedEq, acceptedEq] at selected
+                  have storage := insertContextualItem?_completionStorage
+                    activated.1 result .prediction item selected
+                  unfold PhaseCMultiBackpointerInvariant at activatedCovers ⊢
+                  rw [storage.1, storage.2]
+                  exact activatedCovers
+
+private theorem attemptContextualPredictions?_multiBackpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ (productions : List ProductionId)
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCMultiBackpointerInvariant current →
+      attemptContextualPredictions? waiting productions current = some result →
+      PhaseCMultiBackpointerInvariant result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result covers selected
+      cases selected
+      exact covers
+  | cons predicted rest induction =>
+      intro current result covers selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptContextualPrediction?_multiBackpointerInvariant current next
+          waiting predicted covers nextEq) restEq
+
+private theorem insertContextualScannedEdge?_multiBackpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCMultiBackpointerInvariant result := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact covers
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    unfold PhaseCMultiBackpointerInvariant at covers ⊢
+    rw [payload]
+    exact CompletionBackpointerMultiLedger.CoversPackedEdges.cons_scanned
+      edge covers
+
+private theorem attemptContextualScan?_multiBackpointerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCMultiBackpointerInvariant result := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedCovers : PhaseCMultiBackpointerInvariant attempted := by
+      unfold PhaseCMultiBackpointerInvariant at covers ⊢
+      rw [runMappedPrimitive?_payload current _ id attemptedEq]
+      exact covers
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq] at remainderEq
+        cases remainderEq
+        exact attemptedCovers
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        have storage := insertContextualItem?_completionStorage attempted
+          withItem .scan after itemEq
+        have withItemCovers : PhaseCMultiBackpointerInvariant withItem := by
+          unfold PhaseCMultiBackpointerInvariant at attemptedCovers ⊢
+          rw [storage.1, storage.2]
+          exact attemptedCovers
+        exact insertContextualScannedEdge?_multiBackpointerInvariant withItem
+          result edge withItemCovers edgeEq
+  · cases selected
+    exact covers
+
+/-- Item processing with the total completion list lift. -/
+private def processContextualItemMulti?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) := do
+  let predicted ←
+    attemptContextualPredictions? item allProductionIds current
+  let scanned ← attemptContextualScan? owned predicted item
+  attemptContextualCompletionsWithMulti? item
+    scanned.payload.phaseC.contextualItems scanned
+
+private theorem processContextualItemMulti?_total_allSafe_backpointers
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (workFresh : PhaseCItemWorkFresh current item)
+    (safe : PhaseCAllSafe current)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current) :
+    ∃ result, processContextualItemMulti? owned item current = some result ∧
+      PhaseCAllSafe result ∧
+      PhaseCMultiBackpointerInvariant result ∧
+      PhaseCBackpointerLedgerExact result := by
+  obtain ⟨predicted, predictedEq, predictedSafe, dequeued,
+      scanFresh, edgeFresh⟩ :=
+    attemptAllContextualPredictions?_total_allSafe item current safe workFresh
+  have predictedCovers :=
+    attemptContextualPredictions?_multiBackpointerInvariant item
+      allProductionIds current predicted covers predictedEq
+  have predictedExact := attemptContextualPredictions?_ledgerExact item
+    allProductionIds current predicted exact predictedEq
+  obtain ⟨scanned, scannedEq, scannedSafe⟩ :=
+    attemptContextualScan?_total_allSafe owned predicted item predictedSafe
+      dequeued scanFresh edgeFresh
+  have scannedCovers := attemptContextualScan?_multiBackpointerInvariant owned
+    predicted scanned item predictedCovers scannedEq
+  have scannedExact := attemptContextualScan?_ledgerExact owned predicted
+    scanned item predictedExact scannedEq
+  obtain ⟨result, completedEq, resultSafe, resultCovers, resultExact⟩ :=
+    attemptContextualCompletionsWithMulti?_total_allSafe_backpointers item
+      scanned.payload.phaseC.contextualItems scanned scannedSafe scannedCovers
+        scannedExact
+  exact ⟨result, by
+    simp [processContextualItemMulti?, predictedEq, scannedEq, completedEq],
+    resultSafe, resultCovers, resultExact⟩
+
+end Solcore.Surface.Multi.Chart
