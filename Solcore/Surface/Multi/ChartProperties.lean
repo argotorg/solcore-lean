@@ -6917,6 +6917,154 @@ theorem executePragmaDeclRoot_reduces
     rw [executePragmaTargets_eq_targetData] at resultEq
     exact resultEq.symm ▸ reduces
 
+private theorem constructorSelectionIdentifierAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (values : NonemptyList (EbnfValue file tokens
+      (.atom (.terminal (.category .identifier))))) :
+    values.map (fun raw => EbnfValue.terminalAtom
+      (.category .identifier) (EbnfValue.terminalView
+        (.category .identifier) raw)) = values := by
+  cases values with
+  | mk head tail =>
+      simp [NonemptyList.map, EbnfValue.terminal_of_view]
+
+/-- The constructor-selection executor realizes its root reduction. -/
+theorem executeConstructorSelectionRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens
+      .constructorSelection origin finish)
+    (input : EbnfValue file tokens
+      (m2cV1.rhs .constructorSelection)) :
+    RuleReduction file tokens .constructorSelection origin finish input
+      (executeConstructorSelectionRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let allChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)),
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .rightParen))]
+  let namedChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let branches : List EbnfExpr :=
+    [.sequence allChildren, .sequence namedChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have branchesLength : branches.length = 2 := by rfl
+    have bound : branch.val < 2 := by
+      calc
+        branch.val < branches.length := branch.isLt
+        _ = 2 := branchesLength
+    have values : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases values with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · let values := EbnfValue.sequenceFlatView allChildren raw
+    let rawOpen := values.1
+    let rawStar := values.2.1
+    let rawClose := values.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view allChildren raw
+    let openParen := EbnfValue.terminalView
+      (.symbol .leftParen) rawOpen
+    let star := EbnfValue.terminalView (.symbol .star) rawStar
+    let closeParen := EbnfValue.terminalView
+      (.symbol .rightParen) rawClose
+    have rawEq' : EbnfValue.sequence allChildren
+        (EbnfValue.sequenceValuesBuild allChildren
+          ⟨rawOpen, rawStar, rawClose, ⟨⟩⟩) = raw := rawEq
+    have resultEq : executeConstructorSelectionRoot file tokens
+        origin finish ready.1 ready.2.1 input = sourceLoc witness
+          (.all (executableTerminalLoc star .wildcard)) := by
+      rw [executeConstructorSelectionRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+      ← EbnfValue.terminal_of_view (.symbol .star) rawStar,
+      ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose]
+    exact .constructorSelectionAll origin finish openParen star closeParen
+      (.wildcardStar star) witness
+  · let values := EbnfValue.sequenceFlatView namedChildren raw
+    let rawOpen := values.1
+    let rawNames := values.2.1
+    let rawClose := values.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view namedChildren raw
+    let openParen := EbnfValue.terminalView
+      (.symbol .leftParen) rawOpen
+    let closeParen := EbnfValue.terminalView
+      (.symbol .rightParen) rawClose
+    have rawEq' : EbnfValue.sequence namedChildren
+        (EbnfValue.sequenceValuesBuild namedChildren
+          ⟨rawOpen, rawNames, rawClose, ⟨⟩⟩) = raw := rawEq
+    generalize rawNameValuesEq : EbnfValue.list1View
+      identifierAtom rawNames = rawNameValues
+    let names : NonemptyList (RuleReduction.SpelledTerminalData
+        file tokens (.category .identifier) Identifier) :=
+      rawNameValues.map fun rawName =>
+        let name := EbnfValue.terminalView
+          (.category .identifier) rawName
+        ({
+          matched := name
+          spelling := name.identifierProjection.1
+          parsed := name.identifierProjection.2
+        } : RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)
+    let executableNames := (EbnfValue.list1View identifierAtom rawNames).map
+      fun rawName =>
+        let name := EbnfValue.terminalView
+          (.category .identifier) rawName
+        ({ span := name.span, payload := name.identifierProjection.2 } :
+          IdentifierOccurrence)
+    have namesEq : EbnfValue.list1 identifierAtom
+        (names.map fun value => EbnfValue.terminalAtom
+          (.category .identifier) value.matched) = rawNames := by
+      have mappedEq : names.map (fun value => EbnfValue.terminalAtom
+          (.category .identifier) value.matched) = rawNameValues := by
+        cases rawNameValues
+        simp [names, NonemptyList.map, List.map_map, Function.comp_def,
+          EbnfValue.terminal_of_view]
+      rw [mappedEq, ← rawNameValuesEq]
+      exact EbnfValue.list1_of_view identifierAtom rawNames
+    have resultEq : executeConstructorSelectionRoot file tokens
+        origin finish ready.1 ready.2.1 input = sourceLoc witness
+          (.named executableNames) := by
+      rw [executeConstructorSelectionRoot, viewEq]
+      rfl
+    have executableNamesEq : executableNames = names.map fun name =>
+        executableTerminalLoc name.matched name.parsed := by
+      unfold executableNames
+      rw [rawNameValuesEq]
+      cases rawNameValues
+      simp [names, NonemptyList.map, List.map_map,
+        executableTerminalLoc]
+    rw [resultEq, executableNamesEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+      ← namesEq,
+      ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose]
+    exact .constructorSelectionNamed origin finish openParen names closeParen
+      (by
+        simpa [names, NonemptyList.map] using
+          (EbnfValue.terminalView (.category .identifier)
+            rawNameValues.head).identifierProjection_projects)
+      (by
+        intro name nameMem
+        simp only [names, NonemptyList.map] at nameMem
+        rcases List.mem_map.mp nameMem with ⟨rawName, _rawMem, rfl⟩
+        exact (EbnfValue.terminalView (.category .identifier)
+          rawName).identifierProjection_projects)
+      witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -6970,6 +7118,8 @@ theorem executeRootRule_reduces
       exact executeTypeAliasDeclRoot_reduces origin finish ready input
   | fieldDecl => exact executeFieldDeclRoot_reduces origin finish ready input
   | pragmaDecl => exact executePragmaDeclRoot_reduces origin finish ready input
+  | constructorSelection =>
+      exact executeConstructorSelectionRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
