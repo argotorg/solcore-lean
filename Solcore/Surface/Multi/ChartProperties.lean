@@ -4544,6 +4544,60 @@ theorem executeAssignmentOperatorRoot_reduces
     rw [resultEq, ← inputEq, ← rawEq]
     exact .assignmentOperatorModuloEqual origin finish terminal
 
+/-- The prefix executor realizes its selected recursive root. -/
+theorem executePrefixRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .prefix origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .prefix)) :
+    RuleReduction file tokens .prefix origin finish input
+      (executePrefixRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let bangAtom : EbnfExpr := .atom (.terminal (.symbol .bang))
+  let prefixAtom : EbnfExpr := .atom (.nonterminal .prefix)
+  let branches : List EbnfExpr := [
+    .sequence [bangAtom, prefixAtom],
+    .atom (.nonterminal .postfix)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have lengthEq : branches.length = 2 := by rfl
+    have bound : branch.val < 2 := by simpa [lengthEq] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · let viewed := EbnfValue.sequence2View bangAtom prefixAtom raw
+    let bang := EbnfValue.terminalView (.symbol .bang) viewed.1
+    let operand := EbnfValue.ruleView .prefix viewed.2
+    have rawEq := EbnfValue.sequence2_of_view bangAtom prefixAtom raw
+    have bangEq := EbnfValue.terminal_of_view (.symbol .bang) viewed.1
+    have operandEq := EbnfValue.rule_of_view .prefix viewed.2
+    have resultEq : executePrefixRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.prefix (RuleReduction.prefixOperator bang) operand) := by
+      rw [executePrefixRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← bangEq, ← operandEq]
+    exact .prefixLogicalNot origin finish bang operand witness
+  · let expression := EbnfValue.ruleView .postfix raw
+    have rawEq := EbnfValue.rule_of_view .postfix raw
+    have resultEq : executePrefixRoot file tokens origin finish
+        ready.1 ready.2.1 input = expression := by
+      rw [executePrefixRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .prefixPostfix origin finish expression
+
 /-- The executable infix fold is the declarative semantic fold. -/
 private theorem executeInfixLeft_eq_foldInfixLeft
     (file : WorkspaceFile) (left : Expression)
@@ -4773,6 +4827,7 @@ theorem executeRootRule_reduces
   | bitOr => exact executeBitOrRoot_reduces origin finish ready input
   | bitXor => exact executeBitXorRoot_reduces origin finish ready input
   | bitAnd => exact executeBitAndRoot_reduces origin finish ready input
+  | «prefix» => exact executePrefixRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
