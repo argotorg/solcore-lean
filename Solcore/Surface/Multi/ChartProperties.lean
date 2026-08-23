@@ -7240,6 +7240,209 @@ theorem executeFallbackDeclRoot_reduces
       }) := constructorInputEq ▸ normalizedReduces
   exact resultEq.symm ▸ inputReduces
 
+private theorem contractConstructorRuleAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (inputs : List (EbnfValue file tokens
+      (.atom (.nonterminal .parameter)))) :
+    (inputs.map (EbnfValue.ruleView .parameter)).map
+        (EbnfValue.ruleAtom .parameter) = inputs := by
+  induction inputs with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [EbnfValue.rule_of_view, induction]
+
+private theorem contractConstructorDecl_marker_fields_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (publicToken : Option (MatchedTerminal file tokens
+      (.hardKeyword .publicKw)))
+    (payableToken : Option (MatchedTerminal file tokens
+      (.hardKeyword .payableKw)))
+    (constructorKw : MatchedTerminal file tokens
+      (.hardKeyword .constructorKw))
+    (parameters : List Parameter) (body : Body)
+    (publicProjects : ∀ matched, publicToken = some matched →
+      RuleReduction.MarkerProjects file tokens matched .publicModifier)
+    (payableProjects : ∀ matched, payableToken = some matched →
+      RuleReduction.MarkerProjects file tokens matched .payableModifier)
+    (witness : ConsumedSpanWitness file tokens origin finish) :
+    sourceLoc witness ({
+      «public» := match publicToken, publicProjects with
+        | none, _ => none
+        | some terminal, evidence => some (RuleReduction.marker terminal
+            (evidence terminal rfl))
+      payable := match payableToken, payableProjects with
+        | none, _ => none
+        | some terminal, evidence => some (RuleReduction.marker terminal
+            (evidence terminal rfl))
+      marker := RuleReduction.marker constructorKw
+        (.contractConstructorName constructorKw)
+      parameters := parameters
+      body := body
+    } : ContractConstructorDeclPayload) = sourceLoc witness ({
+      «public» := publicToken.map fun terminal =>
+        RuleReduction.terminalLoc terminal .publicModifier
+      payable := payableToken.map fun terminal =>
+        RuleReduction.terminalLoc terminal .payableModifier
+      marker := RuleReduction.terminalLoc constructorKw
+        .contractConstructorName
+      parameters := parameters
+      body := body
+    } : ContractConstructorDeclPayload) := by
+  cases publicToken <;> cases payableToken <;> rfl
+
+/-- The contract-constructor executor realizes its exact root reduction. -/
+theorem executeContractConstructorDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .contractConstructorDecl
+      origin finish)
+    (input : EbnfValue file tokens
+      (m2cV1.rhs .contractConstructorDecl)) :
+    RuleReduction file tokens .contractConstructorDecl origin finish input
+      (executeContractConstructorDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let publicAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .publicKw))
+  let payableAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .payableKw))
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let children : List EbnfExpr := [.optional publicAtom,
+    .optional payableAtom,
+    .atom (.terminal (.hardKeyword .constructorKw)),
+    .atom (.terminal (.symbol .leftParen)), .list0 parameterAtom,
+    .atom (.terminal (.symbol .rightParen)),
+    .atom (.nonterminal .body)]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : EbnfValue.sequenceFlatView children input = values
+  rcases values with ⟨rawPublic, rawPayable, rawConstructor, rawOpen,
+    rawParameters, rawClose, rawBody, ⟨⟩⟩
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  rw [sequenceEq] at inputEq
+  let rawPublicValue := EbnfValue.optionalView publicAtom rawPublic
+  let publicToken := rawPublicValue.map
+    (EbnfValue.terminalView (.hardKeyword .publicKw))
+  let rawPayableValue := EbnfValue.optionalView payableAtom rawPayable
+  let payableToken := rawPayableValue.map
+    (EbnfValue.terminalView (.hardKeyword .payableKw))
+  let constructorKw := EbnfValue.terminalView
+    (.hardKeyword .constructorKw) rawConstructor
+  let openParen := EbnfValue.terminalView (.symbol .leftParen) rawOpen
+  let rawParameterValues := EbnfValue.list0View
+    parameterAtom rawParameters
+  let parameters := rawParameterValues.map (EbnfValue.ruleView .parameter)
+  let closeParen := EbnfValue.terminalView (.symbol .rightParen) rawClose
+  let body := EbnfValue.ruleView .body rawBody
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have publicEq : EbnfValue.optional publicAtom
+      (publicToken.map (EbnfValue.terminalAtom
+        (.hardKeyword .publicKw))) = rawPublic := by
+    calc
+      _ = EbnfValue.optional publicAtom rawPublicValue := by
+        congr 1
+        cases selected : rawPublicValue with
+        | none => simp [publicToken, selected]
+        | some raw => simp [publicToken, selected,
+            EbnfValue.terminal_of_view]
+      _ = rawPublic := EbnfValue.optional_of_view publicAtom rawPublic
+  have payableEq : EbnfValue.optional payableAtom
+      (payableToken.map (EbnfValue.terminalAtom
+        (.hardKeyword .payableKw))) = rawPayable := by
+    calc
+      _ = EbnfValue.optional payableAtom rawPayableValue := by
+        congr 1
+        cases selected : rawPayableValue with
+        | none => simp [payableToken, selected]
+        | some raw => simp [payableToken, selected,
+            EbnfValue.terminal_of_view]
+      _ = rawPayable := EbnfValue.optional_of_view payableAtom rawPayable
+  have parameterMapEq : parameters.map
+      (EbnfValue.ruleAtom .parameter) = rawParameterValues :=
+    contractConstructorRuleAtoms_of_views rawParameterValues
+  have parametersEq : EbnfValue.list0 parameterAtom
+      (parameters.map (EbnfValue.ruleAtom .parameter)) = rawParameters := by
+    rw [parameterMapEq]
+    exact EbnfValue.list0_of_view parameterAtom rawParameters
+  let publicProjects : ∀ terminal, publicToken = some terminal →
+      RuleReduction.MarkerProjects file tokens terminal
+        .publicModifier := fun terminal _ => .publicModifier terminal
+  let payableProjects : ∀ terminal, payableToken = some terminal →
+      RuleReduction.MarkerProjects file tokens terminal
+        .payableModifier := fun terminal _ => .payableModifier terminal
+  let rebuilt : EbnfValue file tokens (.sequence children) :=
+    EbnfValue.sequence children (EbnfValue.sequenceValuesBuild children
+      (EbnfValue.optional publicAtom
+          (publicToken.map (EbnfValue.terminalAtom
+            (.hardKeyword .publicKw))),
+        EbnfValue.optional payableAtom
+          (payableToken.map (EbnfValue.terminalAtom
+            (.hardKeyword .payableKw))),
+        EbnfValue.terminalAtom (.hardKeyword .constructorKw) constructorKw,
+        EbnfValue.terminalAtom (.symbol .leftParen) openParen,
+        EbnfValue.list0 parameterAtom
+          (parameters.map (EbnfValue.ruleAtom .parameter)),
+        EbnfValue.terminalAtom (.symbol .rightParen) closeParen,
+        EbnfValue.ruleAtom .body body, ()))
+  have rebuiltEq : rebuilt = input := by
+    dsimp only [rebuilt]
+    rw [publicEq, payableEq,
+      EbnfValue.terminal_of_view (.hardKeyword .constructorKw)
+        rawConstructor,
+      EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+      parametersEq,
+      EbnfValue.terminal_of_view (.symbol .rightParen) rawClose,
+      EbnfValue.rule_of_view .body rawBody]
+    exact inputEq
+  have transportSelf
+      (value : EbnfValue file tokens (.sequence children))
+      (shape : (.sequence children) =
+        m2cV1.rhs .contractConstructorDecl) :
+      EbnfValue.transport shape value = value := by
+    rw [show shape = (by rfl) from Subsingleton.elim _ _]
+    rfl
+  have reduces := RuleReduction.contractConstructorDecl origin finish
+    publicToken payableToken constructorKw openParen parameters closeParen
+    body publicProjects payableProjects
+    (.contractConstructorName constructorKw) witness
+  have outputEq := contractConstructorDecl_marker_fields_eq publicToken
+    payableToken constructorKw parameters body publicProjects
+    payableProjects witness
+  have normalizedReduces := outputEq ▸ reduces
+  rw [transportSelf] at normalizedReduces
+  have resultEq : executeContractConstructorDeclRoot file tokens
+      origin finish ready.1 ready.2.1 input = sourceLoc witness {
+        «public» := publicToken.map fun terminal =>
+          RuleReduction.terminalLoc terminal .publicModifier
+        payable := payableToken.map fun terminal =>
+          RuleReduction.terminalLoc terminal .payableModifier
+        marker := RuleReduction.terminalLoc constructorKw
+          .contractConstructorName
+        parameters := parameters
+        body := body
+      } := by
+    have sequenceEq' := sequenceEq
+    simp only [children, publicAtom, payableAtom, parameterAtom]
+      at sequenceEq'
+    simp [executeContractConstructorDeclRoot, sequenceEq', publicToken,
+      payableToken, constructorKw, parameters, body, witness]
+    rfl
+  have constructorInputEq := rebuiltEq
+  simp only [rebuilt, children, publicAtom, payableAtom, parameterAtom,
+    EbnfValue.sequenceValuesBuild] at constructorInputEq
+  have inputReduces : RuleReduction file tokens
+      .contractConstructorDecl origin finish input (sourceLoc witness {
+        «public» := publicToken.map fun terminal =>
+          RuleReduction.terminalLoc terminal .publicModifier
+        payable := payableToken.map fun terminal =>
+          RuleReduction.terminalLoc terminal .payableModifier
+        marker := RuleReduction.terminalLoc constructorKw
+          .contractConstructorName
+        parameters := parameters
+        body := body
+      }) := constructorInputEq ▸ normalizedReduces
+  exact resultEq.symm ▸ inputReduces
+
 
 private def pragmaTargetData
     {file : WorkspaceFile} {tokens : List Token}
@@ -8427,6 +8630,9 @@ theorem executeRootRule_reduces
   | fieldDecl => exact executeFieldDeclRoot_reduces origin finish ready input
   | fallbackDecl =>
       exact executeFallbackDeclRoot_reduces origin finish ready input
+  | contractConstructorDecl =>
+      exact executeContractConstructorDeclRoot_reduces
+        origin finish ready input
   | pragmaDecl => exact executePragmaDeclRoot_reduces origin finish ready input
   | genericPrefix =>
       exact executeGenericPrefixRoot_reduces origin finish ready input
