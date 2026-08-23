@@ -5888,6 +5888,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | constructorSelection : ExecutableRootRule .constructorSelection
   | hidingClause : ExecutableRootRule .hidingClause
   | body : ExecutableRootRule .body
+  | type : ExecutableRootRule .type
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
   | forPostItem : ExecutableRootRule .forPostItem
@@ -7436,6 +7437,44 @@ def executeBodyRoot
     statements := statements
   }
 
+/-- Execute a type root, including recursive compile-time and arrow types. -/
+def executeTypeRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .type)) : TypeExpr :=
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let atomAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let arrowAtom : EbnfExpr := .atom (.terminal (.symbol .arrow))
+  let arrowSeq : EbnfExpr := .sequence [arrowAtom, typeAtom]
+  let comptimeBranch : EbnfExpr := .sequence [comptimeAtom, typeAtom]
+  let plainBranch : EbnfExpr :=
+    .sequence [atomAtom, .optional arrowSeq]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choice2View comptimeBranch plainBranch input with
+  | .inl raw =>
+      let viewed := EbnfValue.sequence2View comptimeAtom typeAtom raw
+      let comptime := EbnfValue.terminalView
+        (.contextualKeyword .comptimeKw) viewed.1
+      let inner := EbnfValue.ruleView .type viewed.2
+      sourceLoc witness (.comptime
+        { span := comptime.span, payload := .comptimeModifier } inner)
+  | .inr raw =>
+      let viewed := EbnfValue.sequence2View
+        atomAtom (.optional arrowSeq) raw
+      let domain := EbnfValue.ruleView .typeAtom viewed.1
+      match EbnfValue.optionalView arrowSeq viewed.2 with
+      | none => domain
+      | some rawArrow =>
+          let arrowViewed := EbnfValue.sequence2View
+            arrowAtom typeAtom rawArrow
+          let codomain := EbnfValue.ruleView .type arrowViewed.2
+          sourceLoc witness (.function domain codomain)
+
 /-- Execute a `for` initializer from its selected typed alternative. -/
 def executeForInitItemRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -8666,6 +8705,7 @@ def executeRootRule
   | .hidingClause =>
       executeHidingClauseRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
+  | .type => executeTypeRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
   | .forInitItem =>
