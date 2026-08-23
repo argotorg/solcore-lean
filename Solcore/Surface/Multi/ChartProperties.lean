@@ -3421,3 +3421,83 @@ theorem executeAuxiliaryAction?_sound
         origin finish input
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- The greatest retained current boundary of a successful observed contextual
+execution is exactly the greatest cursor of the saturated declarative reach
+relation selected by that execution. -/
+theorem executeObservedContextualWorklist?_greatestCurrent?_eq_some_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (cursor : Boundary tokens) :
+    result.greatestCurrent? = some cursor ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      GreatestReachableCursor file tokens result.memo correct final cursor := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change result.greatestCurrent? = some cursor ↔
+    GreatestReachableCursor file tokens result.memo correct final cursor
+  rw [Chart.ContextualWorklistResult.greatestCurrent?_eq_some_iff]
+  have correspondence :=
+    executeObservedContextualWorklist?_correspondence
+      file tokens owned result selected
+  change
+    (∀ item, item ∈ result.items ↔
+      ContextualReach file tokens result.memo correct final item) ∧ _ ∧ _
+      at correspondence
+  constructor
+  · rintro ⟨⟨item, member, currentEq⟩, greatest⟩
+    refine ⟨⟨item, (correspondence.1 item).mp member, currentEq⟩, ?_⟩
+    intro other reached
+    exact greatest other ((correspondence.1 other).mpr reached)
+  · rintro ⟨⟨item, reached, currentEq⟩, greatest⟩
+    refine ⟨⟨item, (correspondence.1 item).mpr reached, currentEq⟩, ?_⟩
+    intro other member
+    exact greatest other ((correspondence.1 other).mp member)
+
+/-- Successful observed contextual execution always exposes a greatest
+retained current boundary. -/
+theorem executeObservedContextualWorklist?_greatestCurrent?_exists
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    ∃ cursor, result.greatestCurrent? = some cursor := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  rcases chart_greatest_cursor_exists owned correct final with
+    ⟨cursor, greatest⟩
+  exact ⟨cursor,
+    (executeObservedContextualWorklist?_greatestCurrent?_eq_some_iff
+      file tokens owned result selected cursor).mpr greatest⟩
+
+/-- The empty-ledger branch of greatest-boundary selection is unreachable for
+a successful observed contextual execution. -/
+theorem executeObservedContextualWorklist?_greatestCurrent?_ne_none
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    result.greatestCurrent? ≠ none := by
+  rcases executeObservedContextualWorklist?_greatestCurrent?_exists
+    file tokens owned result selected with ⟨cursor, cursorEq⟩
+  intro noneEq
+  rw [noneEq] at cursorEq
+  contradiction
+
+end Solcore.Surface.Multi

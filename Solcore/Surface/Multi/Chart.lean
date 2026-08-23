@@ -19363,3 +19363,85 @@ private theorem insertContextualItem?_activationSafe
       safe (by simp) selected
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Solcore.Workspace
+
+namespace ContextualWorklistResult
+
+/-- Select the greatest current boundary retained by a successful contextual
+worklist result.  The finite list order makes selection deterministic, while
+an empty retained item ledger remains explicit. -/
+def greatestCurrent?
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    Option (Boundary tokens) :=
+  match result.items with
+  | [] => none
+  | head :: tail =>
+      some ((head :: tail).maxOn
+        (fun item => item.raw.current.val) (by simp)).raw.current
+
+/-- A contextual worklist result has no selectable current boundary exactly
+when its retained item ledger is empty. -/
+@[simp] theorem greatestCurrent?_eq_none_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    result.greatestCurrent? = none ↔ result.items = [] := by
+  cases itemsEq : result.items with
+  | nil => simp [greatestCurrent?, itemsEq]
+  | cons head tail => simp [greatestCurrent?, itemsEq]
+
+/-- Exact finite-order characterization of the selected current boundary. -/
+theorem greatestCurrent?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) :
+    result.greatestCurrent? = some cursor ↔
+      (∃ item, item ∈ result.items ∧ item.raw.current = cursor) ∧
+      ∀ item, item ∈ result.items →
+        item.raw.current.val ≤ cursor.val := by
+  cases itemsEq : result.items with
+  | nil => simp [greatestCurrent?, itemsEq]
+  | cons head tail =>
+      let greatest := (head :: tail).maxOn
+        (fun item => item.raw.current.val) (by simp)
+      have greatestMember : greatest ∈ head :: tail := by
+        exact List.maxOn_mem
+      constructor
+      · intro selected
+        have currentEq : greatest.raw.current = cursor := by
+          exact Option.some.inj (by
+            simpa only [greatestCurrent?, itemsEq] using selected)
+        refine ⟨⟨greatest, ?_, currentEq⟩, ?_⟩
+        · simpa only [itemsEq] using greatestMember
+        · intro item member
+          have itemMember : item ∈ head :: tail := by
+            simpa only [itemsEq] using member
+          have bound := List.le_apply_maxOn_of_mem
+            (β := Nat) (α := ContextualItemKey tokens)
+            (xs := head :: tail)
+            (f := fun candidate => candidate.raw.current.val)
+            itemMember
+          simpa only [greatest, currentEq] using bound
+      · rintro ⟨⟨item, member, currentEq⟩, upperBound⟩
+        have itemMember : item ∈ head :: tail := by
+          simpa only [itemsEq] using member
+        have itemBound := List.le_apply_maxOn_of_mem
+          (β := Nat) (α := ContextualItemKey tokens)
+          (xs := head :: tail)
+          (f := fun candidate => candidate.raw.current.val)
+          itemMember
+        have greatestBound : greatest.raw.current.val ≤ cursor.val :=
+          upperBound greatest (by
+            simpa only [itemsEq] using greatestMember)
+        have cursorBound : cursor.val ≤ greatest.raw.current.val := by
+          simpa only [greatest, currentEq] using itemBound
+        have greatestEq : greatest.raw.current = cursor := by
+          exact Fin.ext (Nat.le_antisymm greatestBound cursorBound)
+        simpa only [greatestCurrent?, itemsEq, greatest] using
+          congrArg some greatestEq
+
+end ContextualWorklistResult
+
+end Solcore.Surface.Multi.Chart
