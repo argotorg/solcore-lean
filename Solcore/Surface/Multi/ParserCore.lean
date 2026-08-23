@@ -5564,6 +5564,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | assemblyStatement : ExecutableRootRule .assemblyStatement
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
+  | parameter : ExecutableRootRule .parameter
   | body : ExecutableRootRule .body
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
@@ -6085,6 +6086,37 @@ def executeAssignmentStatementRoot
       (EbnfValue.ruleView .assignmentOperator viewed.2.1)
       (EbnfValue.ruleView .expression viewed.1)
       (EbnfValue.ruleView .expression viewed.2.2.1))
+
+/-- Execute one parameter from its optional modifier and type. -/
+def executeParameterRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .parameter)) : Parameter :=
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let nameAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let typeChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .colon)),
+    .atom (.nonterminal .type)]
+  let viewed := EbnfValue.sequence3View
+    (.optional comptimeAtom) nameAtom (.optional typeChild) input
+  let comptime := (EbnfValue.optionalView comptimeAtom viewed.1).map
+    (EbnfValue.terminalView (.contextualKeyword .comptimeKw))
+  let name := EbnfValue.terminalView (.category .identifier) viewed.2.1
+  let typeValue := (EbnfValue.optionalView typeChild viewed.2.2).map fun raw =>
+    let pair := EbnfValue.sequence2View
+      (.atom (.terminal (.symbol .colon)))
+      (.atom (.nonterminal .type)) raw
+    (EbnfValue.terminalView (.symbol .colon) pair.1,
+      EbnfValue.ruleView .type pair.2, ())
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    comptime := comptime.map fun terminal =>
+      { span := terminal.span, payload := .comptimeModifier }
+    name := { span := name.span, payload := name.identifierProjection.2 }
+    type := typeValue.map fun value => value.2.1
+  }
 
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
@@ -6806,6 +6838,8 @@ def executeRootRule
       executeReturnStatementRoot file tokens origin finish owned ordered input
   | .assignmentStatement =>
       executeAssignmentStatementRoot file tokens origin finish owned ordered input
+  | .parameter =>
+      executeParameterRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
