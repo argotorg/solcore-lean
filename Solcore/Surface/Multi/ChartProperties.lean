@@ -5981,6 +5981,180 @@ theorem executeDataConstructorRoot_reduces
       exact .dataConstructorWithArguments origin finish nameData
         openParen fields closeParen name.identifierProjection_projects witness
 
+private theorem identifierAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (values : NonemptyList (EbnfValue file tokens
+      (.atom (.terminal (.category .identifier))))) :
+    values.map (fun raw => EbnfValue.terminalAtom
+      (.category .identifier) (EbnfValue.terminalView
+        (.category .identifier) raw)) = values := by
+  cases values with
+  | mk head tail =>
+      simp [NonemptyList.map, EbnfValue.terminal_of_view]
+
+/-- The type-alias executor realizes its exact root reduction. -/
+theorem executeTypeAliasDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .typeAliasDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .typeAliasDecl)) :
+    RuleReduction file tokens .typeAliasDecl origin finish input
+      (executeTypeAliasDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let parameterChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .typeKw)), identifierAtom,
+    .optional parameterChild, .atom (.terminal (.symbol .equal)),
+    .atom (.nonterminal .type),
+    .atom (.terminal (.symbol .semicolon))]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : EbnfValue.sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawTypeKw, rawName, rawOptional,
+    rawEqual, rawBody, rawSemicolon, ⟨⟩⟩
+  have rawEq := EbnfValue.sequence_of_flat_view children input
+  rw [sequenceEq] at rawEq
+  let typeKw := EbnfValue.terminalView
+    (.hardKeyword .typeKw) rawTypeKw
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let equal := EbnfValue.terminalView (.symbol .equal) rawEqual
+  let body := EbnfValue.ruleView .type rawBody
+  let semicolon := EbnfValue.terminalView
+    (.symbol .semicolon) rawSemicolon
+  let nameData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := name
+    spelling := name.identifierProjection.1
+    parsed := name.identifierProjection.2
+  }
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  cases selected : EbnfValue.optionalView parameterChild rawOptional with
+  | none =>
+      have optionalEq : EbnfValue.optional parameterChild none =
+          rawOptional := by
+        rw [← selected]
+        exact EbnfValue.optional_of_view parameterChild rawOptional
+      have resultEq : executeTypeAliasDeclRoot file tokens
+          origin finish ready.1 ready.2.1 input = sourceLoc witness {
+            name := executableTerminalLoc name
+              name.identifierProjection.2
+            parameters := none
+            body := body
+          } := by
+        have sequenceEq' := sequenceEq
+        have selected' := selected
+        simp only [children, parameterChild, identifierAtom] at sequenceEq'
+        simp only [parameterChild, identifierAtom] at selected'
+        simp only [executeTypeAliasDeclRoot, sequenceEq',
+          selected', Option.map]
+        rfl
+      rw [resultEq, ← rawEq,
+        ← EbnfValue.terminal_of_view (.hardKeyword .typeKw) rawTypeKw,
+        ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+        ← optionalEq,
+        ← EbnfValue.terminal_of_view (.symbol .equal) rawEqual,
+        ← EbnfValue.rule_of_view .type rawBody,
+        ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+      exact .typeAliasDecl origin finish typeKw nameData none equal body
+        semicolon name.identifierProjection_projects (by simp) witness
+  | some rawParameters =>
+      have optionalEq : EbnfValue.optional parameterChild
+          (some rawParameters) = rawOptional := by
+        rw [← selected]
+        exact EbnfValue.optional_of_view parameterChild rawOptional
+      let parameterChildren : List EbnfExpr := [
+        .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+        .atom (.terminal (.symbol .rightParen))]
+      generalize parameterSequenceEq : EbnfValue.sequenceFlatView
+        parameterChildren rawParameters = parameterViewed
+      rcases parameterViewed with ⟨rawOpen, rawNames, rawClose, ⟨⟩⟩
+      have parametersRawEq := EbnfValue.sequence_of_flat_view
+        parameterChildren rawParameters
+      rw [parameterSequenceEq] at parametersRawEq
+      let openParen := EbnfValue.terminalView
+        (.symbol .leftParen) rawOpen
+      generalize rawNameValuesEq : EbnfValue.list1View
+        identifierAtom rawNames = rawNameValues
+      let names : NonemptyList (RuleReduction.SpelledTerminalData
+          file tokens (.category .identifier) Identifier) :=
+        rawNameValues.map fun raw =>
+        let parameter := EbnfValue.terminalView
+          (.category .identifier) raw
+        let projection := parameter.identifierProjection
+        ({
+          matched := parameter
+          spelling := projection.1
+          parsed := projection.2
+        } : RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)
+      let closeParen := EbnfValue.terminalView
+        (.symbol .rightParen) rawClose
+      let parameters := some (openParen, names, closeParen, ())
+      have namesEq : EbnfValue.list1 identifierAtom
+          (names.map fun value => EbnfValue.terminalAtom
+            (.category .identifier) value.matched) = rawNames := by
+        have mappedEq : names.map (fun value => EbnfValue.terminalAtom
+            (.category .identifier) value.matched) = rawNameValues := by
+          cases rawNameValues
+          simp [names, NonemptyList.map, List.map_map,
+            Function.comp_def, EbnfValue.terminal_of_view]
+        rw [mappedEq]
+        rw [← rawNameValuesEq]
+        exact EbnfValue.list1_of_view identifierAtom rawNames
+      have resultEq : executeTypeAliasDeclRoot file tokens
+          origin finish ready.1 ready.2.1 input = sourceLoc witness {
+            name := executableTerminalLoc name
+              name.identifierProjection.2
+            parameters := some (names.map fun parameter =>
+              executableTerminalLoc parameter.matched parameter.parsed)
+            body := body
+          } := by
+        have sequenceEq' := sequenceEq
+        have selected' := selected
+        have parameterSequenceEq' := parameterSequenceEq
+        have rawNameValuesEq' := rawNameValuesEq
+        simp only [children, parameterChild, identifierAtom] at sequenceEq'
+        simp only [parameterChild, identifierAtom] at selected'
+        simp only [parameterChildren, identifierAtom] at parameterSequenceEq'
+        simp only [identifierAtom] at rawNameValuesEq'
+        simp only [executeTypeAliasDeclRoot, sequenceEq', selected',
+          Option.map, parameterSequenceEq', rawNameValuesEq']
+        cases rawNameValues
+        simp [names, NonemptyList.map, List.map_map]
+        rfl
+      rw [resultEq, ← rawEq,
+        ← EbnfValue.terminal_of_view (.hardKeyword .typeKw) rawTypeKw,
+        ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+        ← optionalEq, ← parametersRawEq,
+        ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+        ← namesEq,
+        ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose,
+        ← EbnfValue.terminal_of_view (.symbol .equal) rawEqual,
+        ← EbnfValue.rule_of_view .type rawBody,
+        ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+      exact .typeAliasDecl origin finish typeKw nameData parameters equal body
+        semicolon name.identifierProjection_projects (by
+          intro value valueEq
+          have valueEq' : value = (openParen, names, closeParen, ()) := by
+            apply Option.some.inj
+            simpa [parameters] using valueEq.symm
+          subst value
+          constructor
+          · simpa [names, NonemptyList.map] using
+              (EbnfValue.terminalView (.category .identifier)
+                rawNameValues.head).identifierProjection_projects
+          · intro parameter parameterMem
+            simp only [names, NonemptyList.map] at parameterMem
+            rcases List.mem_map.mp parameterMem with
+              ⟨raw, _rawMem, rfl⟩
+            exact (EbnfValue.terminalView (.category .identifier)
+              raw).identifierProjection_projects)
+        witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -6030,6 +6204,8 @@ theorem executeRootRule_reduces
   | parameter => exact executeParameterRoot_reduces origin finish ready input
   | dataConstructor =>
       exact executeDataConstructorRoot_reduces origin finish ready input
+  | typeAliasDecl =>
+      exact executeTypeAliasDeclRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
