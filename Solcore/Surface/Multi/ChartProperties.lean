@@ -3350,3 +3350,74 @@ theorem ActionReduces.eq_executeAuxiliaryAction
     (executeAuxiliaryAction_reduces production auxiliary origin finish input)
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- Every value returned by the optional auxiliary executor satisfies the
+exact declarative action relation at any chart interval. -/
+theorem executeAuxiliaryAction?_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId)
+    (origin finish : Boundary tokens)
+    (input : GrammarSymbolValues file tokens production.rhs)
+    (output : NonterminalValue file tokens production.lhs)
+    (selected : executeAuxiliaryAction? production input = some output) :
+    ActionReduces file tokens (.actionFor production) origin finish input
+      output := by
+  cases production with
+  | root rule => simp [executeAuxiliaryAction?] at selected
+  | atom site =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.atom site) trivial
+        origin finish input
+  | seq site =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.seq site) trivial
+        origin finish input
+  | group site =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.group site) trivial
+        origin finish input
+  | choice site branch =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.choice site branch) trivial
+        origin finish input
+  | opt site branch =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.opt site branch) trivial
+        origin finish input
+  | star site branch =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.star site branch) trivial
+        origin finish input
+  | plus site branch =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.plus site branch) trivial
+        origin finish input
+  | list0 site branch =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.list0 site branch) trivial
+        origin finish input
+  | list1 site =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.list1 site) trivial
+        origin finish input
+  | tail site branch =>
+      simp only [executeAuxiliaryAction?] at selected
+      cases selected
+      exact executeAuxiliaryAction_reduces (.tail site branch) trivial
+        origin finish input
+
+end Solcore.Surface.Multi
