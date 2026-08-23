@@ -5414,6 +5414,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | bitOr : ExecutableRootRule .bitOr
   | bitXor : ExecutableRootRule .bitXor
   | bitAnd : ExecutableRootRule .bitAnd
+  | prefix : ExecutableRootRule .prefix
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -6172,6 +6173,29 @@ def executeAssignmentOperatorRoot
       executableTerminalLoc
         (EbnfValue.terminalView (.symbol .percentEqual) raw) .moduloEqual
 
+/-- Execute a prefix expression from its recursive or postfix branch. -/
+def executePrefixRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .prefix)) : Expression :=
+  let branches : List EbnfExpr := [
+    .sequence [
+      .atom (.terminal (.symbol .bang)),
+      .atom (.nonterminal .prefix)],
+    .atom (.nonterminal .postfix)]
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View
+        (.atom (.terminal (.symbol .bang)))
+        (.atom (.nonterminal .prefix)) raw
+      let operator := EbnfValue.terminalView (.symbol .bang) viewed.1
+      sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+        (.prefix (executableTerminalLoc operator .logicalNot)
+          (EbnfValue.ruleView .prefix viewed.2))
+  | ⟨⟨1, _⟩, raw⟩ => EbnfValue.ruleView .postfix raw
+
 /-- Locate an infix result between its left and right operands. -/
 def executableBetween
     (file : WorkspaceFile) {α : Type}
@@ -6281,6 +6305,8 @@ def executeRootRule
   | .bitOr => executeBitOrRoot file input
   | .bitXor => executeBitXorRoot file input
   | .bitAnd => executeBitAndRoot file input
+  | .prefix =>
+      executePrefixRoot file tokens origin finish owned ordered input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
