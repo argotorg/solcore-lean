@@ -5408,6 +5408,11 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | forPostItem : ExecutableRootRule .forPostItem
   | expressionStatement : ExecutableRootRule .expressionStatement
   | contractMember : ExecutableRootRule .contractMember
+  | logicalOr : ExecutableRootRule .logicalOr
+  | logicalAnd : ExecutableRootRule .logicalAnd
+  | bitOr : ExecutableRootRule .bitOr
+  | bitXor : ExecutableRootRule .bitXor
+  | bitAnd : ExecutableRootRule .bitAnd
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -5994,6 +5999,203 @@ def executeContractMemberRoot
   | ⟨⟨5, _⟩, raw⟩ => sourceLoc witness
       (.constructor (EbnfValue.ruleView .contractConstructorDecl raw))
 
+namespace EbnfValue
+
+/-- The common grouped tail of a fixed-operator infix level. -/
+def fixedInfixTailExpr
+    (terminal : TerminalSymbol) (operand : GrammarRuleId) : EbnfExpr :=
+  .group (.sequence [
+    .atom (.terminal terminal), .atom (.nonterminal operand)])
+
+/-- Decode one fixed-operator infix tail. -/
+def fixedInfixTailView
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (input : EbnfValue file tokens (fixedInfixTailExpr terminal operand)) :
+    MatchedTerminal file tokens terminal × RuleValue operand :=
+  let terminalAtom : EbnfExpr := .atom (.terminal terminal)
+  let operandAtom : EbnfExpr := .atom (.nonterminal operand)
+  let rawSequence := groupView (.sequence [terminalAtom, operandAtom]) input
+  let viewed := sequence2View terminalAtom operandAtom rawSequence
+  (terminalView terminal viewed.1, ruleView operand viewed.2)
+
+/-- Rebuild one fixed-operator infix tail from its semantic view. -/
+def fixedInfixTailValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (value : MatchedTerminal file tokens terminal × RuleValue operand) :
+    EbnfValue file tokens (fixedInfixTailExpr terminal operand) :=
+  let terminalAtom : EbnfExpr := .atom (.terminal terminal)
+  let operandAtom : EbnfExpr := .atom (.nonterminal operand)
+  group (.sequence [terminalAtom, operandAtom])
+    (sequence [terminalAtom, operandAtom]
+      (EbnfValues.cons terminalAtom [operandAtom]
+        (EbnfValue.terminalAtom terminal value.1)
+        (EbnfValues.cons operandAtom [] (ruleAtom operand value.2)
+          EbnfValues.nil)))
+
+/-- Rebuilding a fixed-operator tail view recovers the original value. -/
+theorem fixedInfixTailValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (input : EbnfValue file tokens (fixedInfixTailExpr terminal operand)) :
+    fixedInfixTailValue terminal operand
+      (fixedInfixTailView terminal operand input) = input := by
+  let terminalAtom : EbnfExpr := .atom (.terminal terminal)
+  let operandAtom : EbnfExpr := .atom (.nonterminal operand)
+  let rawSequence := groupView (.sequence [terminalAtom, operandAtom]) input
+  let viewed := sequence2View terminalAtom operandAtom rawSequence
+  have terminalEq := terminal_of_view terminal viewed.1
+  have operandEq := rule_of_view operand viewed.2
+  have sequenceEq := sequence2_of_view
+    terminalAtom operandAtom rawSequence
+  have groupEq := group_of_view
+    (.sequence [terminalAtom, operandAtom]) input
+  change group (.sequence [terminalAtom, operandAtom])
+    (sequence [terminalAtom, operandAtom]
+      (EbnfValues.cons terminalAtom [operandAtom]
+        (EbnfValue.terminalAtom terminal (terminalView terminal viewed.1))
+        (EbnfValues.cons operandAtom []
+          (ruleAtom operand (ruleView operand viewed.2)) EbnfValues.nil))) = input
+  rw [terminalEq, operandEq, sequenceEq]
+  exact groupEq
+
+/-- The common source-rule EBNF shape of a fixed-operator infix level. -/
+def fixedInfixRootExpr
+    (terminal : TerminalSymbol) (operand : GrammarRuleId) : EbnfExpr :=
+  .sequence [
+    .atom (.nonterminal operand), .star (fixedInfixTailExpr terminal operand)]
+
+/-- Decode a complete fixed-operator infix level. -/
+def fixedInfixRootView
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (input : EbnfValue file tokens (fixedInfixRootExpr terminal operand)) :
+    RuleValue operand ×
+      List (MatchedTerminal file tokens terminal × RuleValue operand) :=
+  let operandAtom : EbnfExpr := .atom (.nonterminal operand)
+  let tail := fixedInfixTailExpr terminal operand
+  let viewed := sequence2View operandAtom (.star tail) input
+  (ruleView operand viewed.1,
+    (starView tail viewed.2).map (fixedInfixTailView terminal operand))
+
+/-- Rebuild a complete fixed-operator infix level from its semantic view. -/
+def fixedInfixRootValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (value : RuleValue operand ×
+      List (MatchedTerminal file tokens terminal × RuleValue operand)) :
+    EbnfValue file tokens (fixedInfixRootExpr terminal operand) :=
+  let operandAtom : EbnfExpr := .atom (.nonterminal operand)
+  let tail := fixedInfixTailExpr terminal operand
+  sequence [operandAtom, .star tail]
+    (EbnfValues.cons operandAtom [.star tail]
+      (ruleAtom operand value.1)
+      (EbnfValues.cons (.star tail) []
+        (star tail (value.2.map (fixedInfixTailValue terminal operand)))
+        EbnfValues.nil))
+
+/-- Rebuilding a fixed-operator root view recovers the original value. -/
+theorem fixedInfixRootValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (input : EbnfValue file tokens (fixedInfixRootExpr terminal operand)) :
+    fixedInfixRootValue terminal operand
+      (fixedInfixRootView terminal operand input) = input := by
+  let operandAtom : EbnfExpr := .atom (.nonterminal operand)
+  let tail := fixedInfixTailExpr terminal operand
+  let viewed := sequence2View operandAtom (.star tail) input
+  let rawTails := starView tail viewed.2
+  have operandEq := rule_of_view operand viewed.1
+  have tailsEq :
+      (rawTails.map (fixedInfixTailView terminal operand)).map
+          (fixedInfixTailValue terminal operand) = rawTails := by
+    induction rawTails with
+    | nil => rfl
+    | cons head rest induction =>
+        simp [fixedInfixTailValue_of_view, induction]
+  have starEq := star_of_view tail viewed.2
+  have sequenceEq := sequence2_of_view operandAtom (.star tail) input
+  change sequence [operandAtom, .star tail]
+    (EbnfValues.cons operandAtom [.star tail]
+      (ruleAtom operand (ruleView operand viewed.1))
+      (EbnfValues.cons (.star tail) []
+        (star tail
+          ((rawTails.map (fixedInfixTailView terminal operand)).map
+            (fixedInfixTailValue terminal operand))) EbnfValues.nil)) = input
+  rw [operandEq, tailsEq, starEq]
+  exact sequenceEq
+
+end EbnfValue
+
+/-- Locate a payload at the exact span of a matched terminal. -/
+def executableTerminalLoc
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol} {α : Type}
+    (matched : MatchedTerminal file tokens terminal) (payload : α) :
+    Located α :=
+  { span := matched.span, payload := payload }
+
+/-- Locate an infix result between its left and right operands. -/
+def executableBetween
+    (file : WorkspaceFile) {α : Type}
+    (firstSpan lastSpan : SourceSpan) (payload : α) : Located α := {
+  span := {
+    source := file.id
+    startByte := firstSpan.startByte
+    endByte := lastSpan.endByte
+  }
+  payload := payload
+}
+
+/-- Fold already decoded infix operations in source order. -/
+def executeInfixLeft
+    (file : WorkspaceFile) :
+    Expression → List (Located InfixOperator × Expression) → Expression
+  | left, [] => left
+  | left, (operator, right) :: rest =>
+      executeInfixLeft file
+        (executableBetween file left.span right.span
+          (.infix operator left right)) rest
+
+/-- Execute any fixed-operator infix root from its typed EBNF value. -/
+def executeFixedInfixRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (asExpression : RuleValue operand → Expression)
+    (operator : InfixOperator)
+    (input : EbnfValue file tokens
+      (EbnfValue.fixedInfixRootExpr terminal operand)) : Expression :=
+  let viewed := EbnfValue.fixedInfixRootView terminal operand input
+  executeInfixLeft file (asExpression viewed.1)
+    (viewed.2.map fun value =>
+      (executableTerminalLoc value.1 operator, asExpression value.2))
+
+def executeLogicalOrRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .logicalOr)) : Expression :=
+  executeFixedInfixRoot file (.symbol .logicalOr) .logicalAnd id .logicalOr input
+
+def executeLogicalAndRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .logicalAnd)) : Expression :=
+  executeFixedInfixRoot file (.symbol .logicalAnd) .equality id .logicalAnd input
+
+def executeBitOrRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .bitOr)) : Expression :=
+  executeFixedInfixRoot file (.symbol .pipe) .bitXor id .bitOr input
+
+def executeBitXorRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .bitXor)) : Expression :=
+  executeFixedInfixRoot file (.symbol .caret) .bitAnd id .bitXor input
+
+def executeBitAndRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .bitAnd)) : Expression :=
+  executeFixedInfixRoot file (.symbol .amp) .additive id .bitAnd input
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -6037,6 +6239,11 @@ def executeRootRule
       executeExpressionStatementRoot file tokens origin finish owned ordered input
   | .contractMember =>
       executeContractMemberRoot file tokens origin finish owned ordered input
+  | .logicalOr => executeLogicalOrRoot file input
+  | .logicalAnd => executeLogicalAndRoot file input
+  | .bitOr => executeBitOrRoot file input
+  | .bitXor => executeBitXorRoot file input
+  | .bitAnd => executeBitAndRoot file input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
