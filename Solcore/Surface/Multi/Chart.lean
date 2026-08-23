@@ -20880,6 +20880,7 @@ theorem expectedFrontier?_eq_some_iff
 end ContextualWorklistResult
 
 end Solcore.Surface.Multi.Chart
+
 namespace Solcore.Surface.Multi.Chart
 
 open Solcore.Workspace
@@ -22342,5 +22343,85 @@ theorem repeatedNonAssociativeDiagnosticCandidate?_eq_some_iff
         ⟨accepted, constructorEq⟩⟩
 
 end ContextualWorklistResult
+
+end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- The exact shape rejected by the current single-valued ledger: the target
+already selects coordinates different from the prospective completion. -/
+private def CompletionBackpointerLedger.Conflict
+    {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (entry : CompletionBackpointerEntry tokens) : Prop :=
+  ∃ stored, CompletionBackpointerLedger.lookup? entry.after ledger =
+    some stored ∧ stored ≠ entry.coordinates
+
+private theorem CompletionBackpointerLedger.insert?_eq_none_iff_conflict
+    {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (entry : CompletionBackpointerEntry tokens) :
+    CompletionBackpointerLedger.insert? ledger entry = none ↔
+      CompletionBackpointerLedger.Conflict ledger entry := by
+  unfold CompletionBackpointerLedger.Conflict
+  unfold CompletionBackpointerLedger.insert?
+  cases lookupEq : CompletionBackpointerLedger.lookup? entry.after ledger with
+  | none => simp
+  | some stored =>
+      by_cases same : stored = entry.coordinates
+      · simp [same]
+      · simp [same]
+
+/-- Reverse coverage does not eliminate a conflict.  It identifies the old
+retained completion whose coordinates disagree with the new entry. -/
+private theorem PhaseCBackpointerLedgerExact.conflictWitness
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (exact : PhaseCBackpointerLedgerExact current)
+    (entry : CompletionBackpointerEntry tokens)
+    (conflict : CompletionBackpointerLedger.Conflict
+      current.payload.completionBackpointers entry) :
+    ∃ retained waiting finished after shared,
+      retained ∈ current.payload.phaseC.contextualEdges ∧
+      retained.val = .completed waiting finished after shared ∧
+      after = entry.after ∧
+      (shared, finished.raw.production) ≠ entry.coordinates := by
+  rcases conflict with ⟨stored, lookupEq, different⟩
+  obtain ⟨oldEntry, oldMember, oldAfter, oldCoordinates⟩ :=
+    CompletionBackpointerLedger.lookup?_some_entry entry.after stored
+      current.payload.completionBackpointers lookupEq
+  obtain ⟨retained, waiting, finished, after, shared,
+    retainedMember, retainedShape, exactAfter, exactCoordinates⟩ :=
+      exact oldEntry oldMember
+  refine ⟨retained, waiting, finished, after, shared,
+    retainedMember, retainedShape, ?_, ?_⟩
+  · exact exactAfter.symm.trans oldAfter
+  · intro equal
+    apply different
+    exact oldCoordinates.symm.trans (exactCoordinates.trans equal)
+
+/-- One checked prospective completion of the conflict shape is a concrete
+counterexample to unconditional `PhaseCCompletionInsertReady`. -/
+private theorem PhaseCCompletionInsertReady.not_of_conflict
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (computed : contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge))
+    (conflict : CompletionBackpointerLedger.Conflict
+      current.payload.completionBackpointers
+        (CompletionBackpointerEntry.ofCompleted edge)) :
+    ¬ PhaseCCompletionInsertReady current waiting finished := by
+  intro ready
+  obtain ⟨nextLedger, selected⟩ := ready after edge computed
+  have rejected :=
+    (CompletionBackpointerLedger.insert?_eq_none_iff_conflict _ _).mpr
+      conflict
+  rw [rejected] at selected
+  contradiction
 
 end Solcore.Surface.Multi.Chart
