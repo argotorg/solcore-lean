@@ -24379,3 +24379,165 @@ private theorem dequeueContextualEdge?_edgeSafe
   · simpa [payloadQueue] using queueUnique.2
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem dequeueContextualItem?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCActivationSafe current.counter)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCActivationSafe result.2.counter := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      exact runMappedPrimitive?_activationSafe_of_not_witness current _ _ next
+        safe (by simp) nextEq
+
+private theorem dequeueContextualEdge?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCActivationSafe current.counter)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCActivationSafe result.2.counter := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      apply runMappedPrimitive?_activationSafe_of_not_witness current _ _ next
+        safe _ nextEq
+      intro productionInstance index slot equal
+      rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp at equal
+
+private theorem dequeueContextualItem?_multiBackpointers
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCMultiBackpointerInvariant result.2 ∧
+      PhaseCBackpointerLedgerExact result.2 := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      constructor
+      · unfold PhaseCMultiBackpointerInvariant at covers ⊢
+        rw [payload]
+        exact covers
+      · unfold PhaseCBackpointerLedgerExact at exact ⊢
+        rw [payload]
+        exact exact
+
+private theorem dequeueContextualEdge?_multiBackpointers
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCMultiBackpointerInvariant result.2 ∧
+      PhaseCBackpointerLedgerExact result.2 := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      constructor
+      · unfold PhaseCMultiBackpointerInvariant at covers ⊢
+        rw [payload]
+        exact covers
+      · unfold PhaseCBackpointerLedgerExact at exact ⊢
+        rw [payload]
+        exact exact
+
+private theorem dequeueContextualItem?_total_with_invariants
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (queue : current.payload.phaseC.itemQueue = item :: rest)
+    (safe : PhaseCAllSafe current)
+    (edgeSafe : PhaseCEdgeSafe current)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current) :
+    ∃ after, dequeueContextualItem? current = some (item, after) ∧
+      PhaseCAllSafe after ∧
+      PhaseCItemWorkFresh after item ∧
+      PhaseCEdgeSafe after ∧
+      PhaseCMultiBackpointerInvariant after ∧
+      PhaseCBackpointerLedgerExact after := by
+  obtain ⟨after, selected⟩ :=
+    dequeueContextualItem?_total current item rest queue safe.item
+  have backpointers := dequeueContextualItem?_multiBackpointers current
+    (item, after) covers exact selected
+  exact ⟨after, selected, {
+    item := dequeueContextualItem?_itemSafe current (item, after) safe.item
+      selected
+    activation := dequeueContextualItem?_activationSafe current (item, after)
+      safe.activation selected
+    completion := dequeueContextualItem?_completionSafe current (item, after)
+      safe.completion selected
+  }, dequeueContextualItem?_workFresh current after item rest queue safe.item
+    selected, dequeueContextualItem?_edgeSafe current (item, after) edgeSafe
+      selected, backpointers.1, backpointers.2⟩
+
+private theorem dequeueContextualEdge?_total_with_invariants
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens)
+    (rest : List (StructurallyValidContextualPackedEdge file tokens))
+    (queue : current.payload.phaseC.edgeQueue = edge :: rest)
+    (safe : PhaseCAllSafe current)
+    (edgeSafe : PhaseCEdgeSafe current)
+    (covers : PhaseCMultiBackpointerInvariant current)
+    (exact : PhaseCBackpointerLedgerExact current) :
+    ∃ after, dequeueContextualEdge? current = some (edge, after) ∧
+      PhaseCAllSafe after ∧
+      PhaseCEdgeSafe after ∧
+      PhaseCMultiBackpointerInvariant after ∧
+      PhaseCBackpointerLedgerExact after := by
+  obtain ⟨after, selected⟩ :=
+    dequeueContextualEdge?_total current edge rest queue edgeSafe
+  have backpointers := dequeueContextualEdge?_multiBackpointers current
+    (edge, after) covers exact selected
+  exact ⟨after, selected, {
+    item := dequeueContextualEdge?_itemSafe current after edge rest queue
+      safe.item selected
+    activation := dequeueContextualEdge?_activationSafe current (edge, after)
+      safe.activation selected
+    completion := dequeueContextualEdge?_completionSafe current (edge, after)
+      safe.completion selected
+  }, dequeueContextualEdge?_edgeSafe current after edge rest queue edgeSafe
+    selected, backpointers.1, backpointers.2⟩
+
+end Solcore.Surface.Multi.Chart
