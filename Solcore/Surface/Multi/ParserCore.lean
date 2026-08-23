@@ -5735,6 +5735,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | fieldDecl : ExecutableRootRule .fieldDecl
   | fallbackDecl : ExecutableRootRule .fallbackDecl
   | pragmaDecl : ExecutableRootRule .pragmaDecl
+  | genericPrefix : ExecutableRootRule .genericPrefix
   | exportItem : ExecutableRootRule .exportItem
   | constructorSelection : ExecutableRootRule .constructorSelection
   | hidingClause : ExecutableRootRule .hidingClause
@@ -6619,6 +6620,32 @@ def executePragmaDeclRoot
         kind := { span := kindToken.span, payload := .noGenericInstanceFor }
         targets := executePragmaTargets viewed.2.2.1
       }
+
+/-- Execute a universal clause with its optional predicate context. -/
+def executeGenericPrefixRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .genericPrefix)) :
+    GenericPrefix :=
+  let contextChildren : List EbnfExpr := [
+    .atom (.nonterminal .predicateList),
+    .atom (.terminal (.symbol .fatArrow))]
+  let children : List EbnfExpr := [
+    .atom (.nonterminal .forallClause),
+    .optional (.sequence contextChildren)]
+  let viewed := EbnfValue.sequenceFlatView children input
+  let forallClause := EbnfValue.ruleView .forallClause viewed.1
+  let context := (EbnfValue.optionalView
+    (.sequence contextChildren) viewed.2.1).map fun raw =>
+      let pair := EbnfValue.sequenceFlatView contextChildren raw
+      EbnfValue.ruleView .predicateList pair.1
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      forallClause := forallClause
+      context := context
+    }
 
 /-- Execute one exported item and its optional constructor selection. -/
 def executeExportItemRoot
@@ -7523,6 +7550,8 @@ def executeRootRule
       executeFallbackDeclRoot file tokens origin finish owned ordered input
   | .pragmaDecl =>
       executePragmaDeclRoot file tokens origin finish owned ordered input
+  | .genericPrefix =>
+      executeGenericPrefixRoot file tokens origin finish owned ordered input
   | .exportItem =>
       executeExportItemRoot file tokens origin finish owned ordered input
   | .constructorSelection =>
