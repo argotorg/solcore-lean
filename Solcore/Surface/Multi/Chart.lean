@@ -22631,3 +22631,88 @@ private theorem insert_retains_conflicting_coordinates
 end CompletionBackpointerMultiLedger
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+namespace CompletionBackpointerMultiLedger
+
+/-- The optional property needed only by consumers that demand one
+backpointer coordinate per target.  Total storage itself does not require it. -/
+private def ConflictFree
+    {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens) : Prop :=
+  ∀ left, left ∈ ledger → ∀ right, right ∈ ledger →
+    left.after = right.after → left.coordinates = right.coordinates
+
+private theorem ConflictFree.insert_of_compatible
+    {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (entry : CompletionBackpointerEntry tokens)
+    (conflictFree : ConflictFree ledger)
+    (compatible : ∀ old, old ∈ ledger →
+      entry.after = old.after → entry.coordinates = old.coordinates) :
+    ConflictFree (insert ledger entry) := by
+  intro left leftMember right rightMember sameAfter
+  simp only [insert, List.mem_cons] at leftMember rightMember
+  rcases leftMember with leftHead | leftOld
+  · subst left
+    rcases rightMember with rightHead | rightOld
+    · subst right
+      rfl
+    · exact compatible right rightOld sameAfter
+  · rcases rightMember with rightHead | rightOld
+    · subst right
+      exact (compatible left leftOld sameAfter.symm).symm
+    · exact conflictFree left leftOld right rightOld sameAfter
+
+/-- A rejected single-valued insertion becomes an explicit witness that the
+total ledger is not conflict-free; it is no longer executor failure. -/
+private theorem not_conflictFree_insert_of_conflict
+    {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (entry : CompletionBackpointerEntry tokens)
+    (conflict : CompletionBackpointerLedger.Conflict ledger entry) :
+    ¬ ConflictFree (insert ledger entry) := by
+  rcases conflict with ⟨stored, lookupEq, different⟩
+  obtain ⟨old, oldMember, oldAfter, oldCoordinates⟩ :=
+    CompletionBackpointerLedger.lookup?_some_entry entry.after stored ledger
+      lookupEq
+  intro conflictFree
+  have same := conflictFree entry (by simp [insert]) old
+    (old_mem_insert ledger entry old oldMember) oldAfter.symm
+  exact different (oldCoordinates.symm.trans same.symm)
+
+/-- Multi-valued coverage recovers the old retained-edge consistency theorem
+whenever the separately tracked conflict-free property holds. -/
+private theorem CoversPackedEdges.retainedConsistent
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger : CompletionBackpointerMultiLedger tokens}
+    {edges : List (StructurallyValidContextualPackedEdge file tokens)}
+    (covers : CoversPackedEdges file tokens ledger edges)
+    (conflictFree : ConflictFree ledger) :
+    RetainedCompletionBackpointersConsistent edges := by
+  intro left leftMember right rightMember
+  have leftCovered := covers left leftMember
+  have rightCovered := covers right rightMember
+  cases leftKey : left.val <;> cases rightKey : right.val
+  all_goals
+    simp only [leftKey, rightKey] at leftCovered rightCovered ⊢
+  intro afterEq
+  obtain ⟨leftEntry, leftEntryMember, leftAfter, leftCoordinates⟩ :=
+    leftCovered
+  obtain ⟨rightEntry, rightEntryMember, rightAfter, rightCoordinates⟩ :=
+    rightCovered
+  have entryAfter : leftEntry.after = rightEntry.after :=
+    leftAfter.trans (afterEq.trans rightAfter.symm)
+  have entryCoordinates := conflictFree leftEntry leftEntryMember rightEntry
+    rightEntryMember entryAfter
+  have coordinates := leftCoordinates.symm.trans
+    (entryCoordinates.trans rightCoordinates)
+  exact ⟨congrArg Prod.fst coordinates, congrArg Prod.snd coordinates⟩
+
+end CompletionBackpointerMultiLedger
+
+end Solcore.Surface.Multi.Chart
