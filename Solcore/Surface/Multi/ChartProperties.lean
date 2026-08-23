@@ -4708,6 +4708,99 @@ theorem executePostfixPartRoot_reduces
       ← closeEq]
     exact .postfixPartIndex origin finish openBracket index closeBracket
 
+/-- The qualified-name executor realizes its dotted identifier root. -/
+theorem executeQualifiedNameRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .qualifiedName origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .qualifiedName)) :
+    RuleReduction file tokens .qualifiedName origin finish input
+      (executeQualifiedNameRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let tail := EbnfValue.terminalPairTailExpr
+    (.symbol .dot) (.category .identifier)
+  change EbnfValue file tokens
+    (.sequence [identifierAtom, .star tail]) at input
+  let viewed := EbnfValue.sequence2View identifierAtom (.star tail) input
+  let first := EbnfValue.terminalView (.category .identifier) viewed.1
+  let rawRest := EbnfValue.starView tail viewed.2
+  let firstData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := first
+    spelling := first.identifierProjection.1
+    parsed := first.identifierProjection.2
+  }
+  let restData : List
+      (MatchedTerminal file tokens (.symbol .dot) ×
+        RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier) :=
+    rawRest.map fun raw =>
+      let pair := EbnfValue.terminalPairTailView
+        (.symbol .dot) (.category .identifier) raw
+      (pair.1, {
+        matched := pair.2
+        spelling := pair.2.identifierProjection.1
+        parsed := pair.2.identifierProjection.2
+      })
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view
+    identifierAtom (.star tail) input
+  have firstEq := EbnfValue.terminal_of_view
+    (.category .identifier) viewed.1
+  have restValuesEq :
+      (restData.map fun entry =>
+        EbnfValue.terminalPairTailValue
+          (.symbol .dot) (.category .identifier)
+          (entry.1, entry.2.matched)) = rawRest := by
+    simp only [restData, List.map_map]
+    induction rawRest with
+    | nil => rfl
+    | cons head rest induction =>
+        simp only [List.map_cons, List.cons.injEq]
+        constructor
+        · change EbnfValue.terminalPairTailValue
+              (.symbol .dot) (.category .identifier)
+              (EbnfValue.terminalPairTailView
+                (.symbol .dot) (.category .identifier) head) = head
+          exact EbnfValue.terminalPairTailValue_of_view
+            (.symbol .dot) (.category .identifier) head
+        · exact induction
+  have restEq : EbnfValue.star tail
+      (restData.map fun entry =>
+        EbnfValue.terminalPairTailValue
+          (.symbol .dot) (.category .identifier)
+          (entry.1, entry.2.matched)) = viewed.2 := by
+    rw [restValuesEq]
+    exact EbnfValue.star_of_view tail viewed.2
+  have firstProjects : IdentifierProjects firstData.matched
+      firstData.spelling firstData.parsed :=
+    first.identifierProjection_projects
+  have restProjects : ∀ entry, entry ∈ restData →
+      IdentifierProjects entry.2.matched
+        entry.2.spelling entry.2.parsed := by
+    intro entry member
+    simp only [restData, List.mem_map] at member
+    rcases member with ⟨raw, _rawMember, rfl⟩
+    exact (EbnfValue.terminalPairTailView
+      (.symbol .dot) (.category .identifier) raw).2
+        |>.identifierProjection_projects
+  have resultEq : executeQualifiedNameRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        components := {
+          head := RuleReduction.terminalLoc firstData.matched firstData.parsed
+          tail := restData.map fun entry =>
+            RuleReduction.terminalLoc entry.2.matched entry.2.parsed
+        }
+      } := by
+    simp only [executeQualifiedNameRoot, firstData, restData, List.map_map]
+    rfl
+  rw [resultEq, ← inputEq, ← firstEq, ← restEq]
+  exact .qualifiedName origin finish firstData restData
+    firstProjects restProjects witness
+
 /-- The executable infix fold is the declarative semantic fold. -/
 private theorem executeInfixLeft_eq_foldInfixLeft
     (file : WorkspaceFile) (left : Expression)
@@ -4993,6 +5086,8 @@ theorem executeRootRule_reduces
   | assignmentStatement =>
       exact executeAssignmentStatementRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
+  | qualifiedName =>
+      exact executeQualifiedNameRoot_reduces origin finish ready input
   | forInitItem =>
       exact executeForInitItemRoot_reduces origin finish ready input
   | forPostItem =>
