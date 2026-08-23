@@ -4746,3 +4746,85 @@ theorem executeObservedContextualWorklist?_unexpectedDiagnosticCandidate?_eq_som
         frontier span found expected).mpr (by simp [frontier])
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+
+/-- Absence of the canonical completed module item in a successful executable
+chart rules out every declarative source-backed root. -/
+theorem executeObservedContextualWorklist?_noSourceBackedRoot_of_completeModuleRootItem_eq_false
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (absent : result.containsCompleteModuleRootItem = false) :
+    ¬ ∃ module, SourceBackedRoot file tokens module := by
+  intro sourceRoot
+  rcases sourceRoot with
+    ⟨_module, memo, correct, final, reached, _complete, _coherent⟩
+  let resultCorrect := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let resultFinal := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  have memoEq : memo = result.memo :=
+    phaseBCorrect_final_memo_unique
+      correct final resultCorrect resultFinal
+  subst memo
+  have reachedResult : ContextualReach file tokens result.memo
+      resultCorrect resultFinal
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain) :=
+    reached
+  have correspondence :=
+    executeObservedContextualWorklist?_correspondence
+      file tokens owned result selected
+  have rootMember : CanonicalCompleteRootItem tokens .module
+      (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain ∈
+        result.items :=
+    (correspondence.1 _).mpr reachedResult
+  have present :=
+    (Chart.ContextualWorklistResult.containsCompleteModuleRootItem_eq_true_iff
+      result).mpr rootMember
+  rw [absent] at present
+  contradiction
+
+/-- Once the completed module root is absent, an executable ordinary
+diagnostic candidate needs only the G10 exclusion premise to become a fully
+certified parser diagnostic. -/
+theorem executeObservedContextualWorklist?_unexpectedDiagnosticCandidate?_applies_of_completeModuleRootItem_eq_false
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (span : SourceSpan) (found : Found)
+    (expected : NonemptyList Expected)
+    (candidate : result.unexpectedDiagnosticCandidate? file =
+      some (.unexpected span found expected))
+    (absent : result.containsCompleteModuleRootItem = false)
+    (notRepeated : ∀ cursor level operator,
+      ¬ RepeatedNonAssociativeAt file tokens result.memo
+        (executeObservedContextualWorklist?_phaseBCorrect
+          file tokens owned result selected)
+        (Chart.executeObservedContextualWorklist?_allGuardsFinal
+          file tokens owned result selected)
+        cursor level operator) :
+    ParseDiagnostic.Applies file tokens
+      (.unexpected span found expected) := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  rcases
+      (executeObservedContextualWorklist?_unexpectedDiagnosticCandidate?_eq_some_iff
+        file tokens owned result selected span found expected).mp candidate with
+    ⟨cursor, greatest, canonical, foundAt⟩
+  exact .unexpected file tokens result.memo correct final cursor span found
+    expected
+    (executeObservedContextualWorklist?_noSourceBackedRoot_of_completeModuleRootItem_eq_false
+      file tokens owned result selected absent)
+    greatest canonical foundAt (notRepeated cursor)
+
+end Solcore.Surface.Multi
