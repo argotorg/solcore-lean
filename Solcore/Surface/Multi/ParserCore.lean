@@ -5376,3 +5376,122 @@ theorem executeAuxiliaryAction?_eq_some
   cases production <;> first | contradiction | rfl
 
 end Solcore.Surface.Multi
+
+set_option autoImplicit false
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- The first source-rule roots whose semantic reductions are directly
+executable from their typed EBNF values. -/
+inductive ExecutableRootRule : GrammarRuleId → Type where
+  | module : ExecutableRootRule .module
+  | topItem : ExecutableRootRule .topItem
+  | optionalComma : ExecutableRootRule .optionalComma
+
+/-- Build the complete source-located module value from its ordered items. -/
+def executableModuleValue
+    (file : WorkspaceFile) (items : List TopItem) : ParsedModuleV1 := {
+  span := {
+    source := file.id
+    startByte := 0
+    endByte := file.content.utf8ByteSize
+  }
+  payload := {
+    source := file.id
+    items := items
+  }
+}
+
+/-- Execute the optional-comma source rule. -/
+def executeOptionalCommaRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .optionalComma)) :
+    OptionalCommaValue :=
+  match EbnfValue.optionalView
+      (.atom (.terminal (.symbol .comma))) input with
+  | none => .absent
+  | some rawComma =>
+      .present (EbnfValue.terminalView (.symbol .comma) rawComma).span
+
+/-- Execute the top-item source rule, locating the selected declaration at
+the completed chart interval. -/
+def executeTopItemRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .topItem)) : TopItem :=
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choiceView [
+      .atom (.nonterminal .importDecl),
+      .atom (.nonterminal .exportDecl),
+      .atom (.nonterminal .pragmaDecl),
+      .atom (.nonterminal .dataDecl),
+      .atom (.nonterminal .typeAliasDecl),
+      .atom (.nonterminal .classDecl),
+      .atom (.nonterminal .instanceDecl),
+      .atom (.nonterminal .contractDecl),
+      .atom (.nonterminal .functionDecl)] input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      sourceLoc witness (.importDecl (EbnfValue.ruleView .importDecl raw))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      sourceLoc witness (.exportDecl (EbnfValue.ruleView .exportDecl raw))
+  | ⟨⟨2, _⟩, raw⟩ =>
+      sourceLoc witness (.pragmaDecl (EbnfValue.ruleView .pragmaDecl raw))
+  | ⟨⟨3, _⟩, raw⟩ =>
+      sourceLoc witness (.dataDecl (EbnfValue.ruleView .dataDecl raw))
+  | ⟨⟨4, _⟩, raw⟩ =>
+      sourceLoc witness (.typeAliasDecl (EbnfValue.ruleView .typeAliasDecl raw))
+  | ⟨⟨5, _⟩, raw⟩ =>
+      sourceLoc witness (.classDecl (EbnfValue.ruleView .classDecl raw))
+  | ⟨⟨6, _⟩, raw⟩ =>
+      sourceLoc witness (.instanceDecl (EbnfValue.ruleView .instanceDecl raw))
+  | ⟨⟨7, _⟩, raw⟩ =>
+      sourceLoc witness (.contractDecl (EbnfValue.ruleView .contractDecl raw))
+  | ⟨⟨8, _⟩, raw⟩ =>
+      sourceLoc witness (.functionDecl (EbnfValue.ruleView .functionDecl raw))
+
+/-- Execute the module source rule by decoding its exact ordered item list. -/
+def executeModuleRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .module)) : ParsedModuleV1 :=
+  let itemAtom : EbnfExpr := .atom (.nonterminal .topItem)
+  let eofAtom : EbnfExpr := .atom (.terminal .endOfFile)
+  let values := EbnfValue.sequenceView [.star itemAtom, eofAtom] input
+  let first := EbnfValues.consView (.star itemAtom) [eofAtom] values
+  let rawItems := EbnfValue.starView itemAtom first.1
+  executableModuleValue file (rawItems.map (EbnfValue.ruleView .topItem))
+
+/-- Execute one currently supported source-rule root. -/
+def executeRootRule
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (rule : GrammarRuleId)
+    (executable : ExecutableRootRule rule)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs rule)) : RuleValue rule :=
+  match executable with
+  | .module => executeModuleRoot file input
+  | .topItem => executeTopItemRoot file tokens origin finish owned ordered input
+  | .optionalComma => executeOptionalCommaRoot input
+
+/-- Execute one supported root production directly from its chart action
+tuple. -/
+def executeRootAction
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (rule : GrammarRuleId)
+    (executable : ExecutableRootRule rule)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : GrammarSymbolValues file tokens (ProductionId.root rule).rhs) :
+    NonterminalValue file tokens (ProductionId.root rule).lhs :=
+  executeRootRule file tokens origin finish rule executable owned ordered
+    (RootAction.unpack rule input)
+
+end Solcore.Surface.Multi
