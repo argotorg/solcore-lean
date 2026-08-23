@@ -5407,6 +5407,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | forInitItem : ExecutableRootRule .forInitItem
   | forPostItem : ExecutableRootRule .forPostItem
   | expressionStatement : ExecutableRootRule .expressionStatement
+  | contractMember : ExecutableRootRule .contractMember
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -5964,6 +5965,35 @@ def executeExpressionStatementRoot
       sourceLoc witness (.expression
         (EbnfValue.ruleView .terminalExpression raw) none)
 
+/-- Execute a contract member from its selected declaration alternative. -/
+def executeContractMemberRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .contractMember)) :
+    ContractMember :=
+  let witness := shallowRootWitness file tokens origin finish owned ordered
+  match EbnfValue.choiceView [
+      .atom (.nonterminal .dataDecl),
+      .atom (.nonterminal .typeAliasDecl),
+      .atom (.nonterminal .fieldDecl),
+      .atom (.nonterminal .functionDecl),
+      .atom (.nonterminal .fallbackDecl),
+      .atom (.nonterminal .contractConstructorDecl)] input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      sourceLoc witness (.dataDecl (EbnfValue.ruleView .dataDecl raw))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      sourceLoc witness (.typeAlias (EbnfValue.ruleView .typeAliasDecl raw))
+  | ⟨⟨2, _⟩, raw⟩ =>
+      sourceLoc witness (.field (EbnfValue.ruleView .fieldDecl raw))
+  | ⟨⟨3, _⟩, raw⟩ =>
+      sourceLoc witness (.function (EbnfValue.ruleView .functionDecl raw))
+  | ⟨⟨4, _⟩, raw⟩ =>
+      sourceLoc witness (.fallback (EbnfValue.ruleView .fallbackDecl raw))
+  | ⟨⟨5, _⟩, raw⟩ => sourceLoc witness
+      (.constructor (EbnfValue.ruleView .contractConstructorDecl raw))
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -6005,6 +6035,8 @@ def executeRootRule
       executeForPostItemRoot file tokens origin finish owned ordered input
   | .expressionStatement =>
       executeExpressionStatementRoot file tokens origin finish owned ordered input
+  | .contractMember =>
+      executeContractMemberRoot file tokens origin finish owned ordered input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
