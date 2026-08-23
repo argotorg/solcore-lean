@@ -6155,6 +6155,101 @@ theorem executeTypeAliasDeclRoot_reduces
               raw).identifierProjection_projects)
         witness
 
+/-- The field-declaration executor realizes its exact root reduction. -/
+theorem executeFieldDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .fieldDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .fieldDecl)) :
+    RuleReduction file tokens .fieldDecl origin finish input
+      (executeFieldDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let nameAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let equalAtom : EbnfExpr := .atom (.terminal (.symbol .equal))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let initializerChild : EbnfExpr :=
+    .sequence [equalAtom, expressionAtom]
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  let children : List EbnfExpr := [nameAtom, colonAtom, typeAtom,
+    .optional initializerChild, semicolonAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : EbnfValue.sequenceFlatView children input = values
+  rcases values with
+    ⟨rawName, rawColon, rawType, rawOptional, rawSemicolon, ⟨⟩⟩
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  rw [sequenceEq] at inputEq
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let colon := EbnfValue.terminalView (.symbol .colon) rawColon
+  let typeValue := EbnfValue.ruleView .type rawType
+  let rawInitializer := EbnfValue.optionalView initializerChild
+    rawOptional
+  let initializer := rawInitializer.map fun raw =>
+    let pair := EbnfValue.sequence2View equalAtom expressionAtom raw
+    (EbnfValue.terminalView (.symbol .equal) pair.1,
+      EbnfValue.ruleView .expression pair.2, ())
+  let semicolon := EbnfValue.terminalView
+    (.symbol .semicolon) rawSemicolon
+  let nameData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := name
+    spelling := name.identifierProjection.1
+    parsed := name.identifierProjection.2
+  }
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have nameEq := EbnfValue.terminal_of_view
+    (.category .identifier) rawName
+  have colonEq := EbnfValue.terminal_of_view
+    (.symbol .colon) rawColon
+  have typeEq := EbnfValue.rule_of_view .type rawType
+  have initializerEq : EbnfValue.optional initializerChild
+      (initializer.map fun value =>
+        EbnfValue.sequence [equalAtom, expressionAtom]
+          (EbnfValues.cons equalAtom [expressionAtom]
+            (EbnfValue.terminalAtom (.symbol .equal) value.1)
+            (EbnfValues.cons expressionAtom []
+              (EbnfValue.ruleAtom .expression value.2.1)
+              EbnfValues.nil))) = rawOptional := by
+    calc
+      _ = EbnfValue.optional initializerChild rawInitializer := by
+        congr 1
+        cases selected : rawInitializer with
+        | none => simp only [initializer, selected, Option.map]
+        | some raw =>
+            simp only [initializer, selected, Option.map]
+            apply congrArg some
+            let pair := EbnfValue.sequence2View
+              equalAtom expressionAtom raw
+            have rawEq := EbnfValue.sequence2_of_view
+              equalAtom expressionAtom raw
+            have equalEq := EbnfValue.terminal_of_view
+              (.symbol .equal) pair.1
+            have expressionEq := EbnfValue.rule_of_view
+              .expression pair.2
+            rw [equalEq, expressionEq]
+            exact rawEq
+      _ = rawOptional :=
+        EbnfValue.optional_of_view initializerChild rawOptional
+  have semicolonEq := EbnfValue.terminal_of_view
+    (.symbol .semicolon) rawSemicolon
+  have resultEq : executeFieldDeclRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+    name := RuleReduction.terminalLoc name name.identifierProjection.2
+    type := typeValue
+    initializer := initializer.map fun value => value.2.1
+  } := by
+    simp [executeFieldDeclRoot, children, sequenceEq, nameAtom, colonAtom,
+      typeAtom, equalAtom, expressionAtom, initializerChild, semicolonAtom,
+      initializer, rawInitializer, name, typeValue, witness]
+    rfl
+  rw [resultEq, ← inputEq, ← nameEq, ← colonEq, ← typeEq,
+    ← initializerEq, ← semicolonEq]
+  exact .fieldDecl origin finish nameData colon typeValue initializer
+    semicolon name.identifierProjection_projects witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -6206,6 +6301,7 @@ theorem executeRootRule_reduces
       exact executeDataConstructorRoot_reduces origin finish ready input
   | typeAliasDecl =>
       exact executeTypeAliasDeclRoot_reduces origin finish ready input
+  | fieldDecl => exact executeFieldDeclRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
