@@ -7293,6 +7293,63 @@ theorem executePragmaDeclRoot_reduces
     rw [executePragmaTargets_eq_targetData] at resultEq
     exact resultEq.symm ▸ reduces
 
+/-- The export-item executor realizes its exact root reduction. -/
+theorem executeExportItemRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .exportItem origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .exportItem)) :
+    RuleReduction file tokens .exportItem origin finish input
+      (executeExportItemRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let selectionAtom : EbnfExpr :=
+    .atom (.nonterminal .constructorSelection)
+  change EbnfValue file tokens
+    (.sequence [identifierAtom, .optional selectionAtom]) at input
+  let viewed := EbnfValue.sequence2View
+    identifierAtom (.optional selectionAtom) input
+  let name := EbnfValue.terminalView
+    (.category .identifier) viewed.1
+  let nameData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := name
+    spelling := name.identifierProjection.1
+    parsed := name.identifierProjection.2
+  }
+  let selection := (EbnfValue.optionalView selectionAtom viewed.2).map
+    (EbnfValue.ruleView .constructorSelection)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view
+    identifierAtom (.optional selectionAtom) input
+  have nameEq := EbnfValue.terminal_of_view
+    (.category .identifier) viewed.1
+  have selectionEq : EbnfValue.optional selectionAtom
+      (selection.map (EbnfValue.ruleAtom .constructorSelection)) =
+      viewed.2 := by
+    let rawSelection := EbnfValue.optionalView selectionAtom viewed.2
+    calc
+      _ = EbnfValue.optional selectionAtom rawSelection := by
+        congr 1
+        cases selected : rawSelection with
+        | none => simp [selection, rawSelection, selected]
+        | some raw =>
+            simp only [selection, rawSelection, selected, Option.map]
+            exact congrArg some
+              (EbnfValue.rule_of_view .constructorSelection raw)
+      _ = viewed.2 := EbnfValue.optional_of_view selectionAtom viewed.2
+  have resultEq : executeExportItemRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        name := RuleReduction.terminalLoc name name.identifierProjection.2
+        constructors := selection
+      } := by
+    rfl
+  rw [resultEq, ← inputEq, ← nameEq, ← selectionEq]
+  exact .exportItem origin finish nameData selection
+    name.identifierProjection_projects witness
+
 private theorem constructorSelectionIdentifierAtoms_of_views
     {file : WorkspaceFile} {tokens : List Token}
     (values : NonemptyList (EbnfValue file tokens
@@ -7710,6 +7767,8 @@ theorem executeRootRule_reduces
   | fallbackDecl =>
       exact executeFallbackDeclRoot_reduces origin finish ready input
   | pragmaDecl => exact executePragmaDeclRoot_reduces origin finish ready input
+  | exportItem =>
+      exact executeExportItemRoot_reduces origin finish ready input
   | constructorSelection =>
       exact executeConstructorSelectionRoot_reduces origin finish ready input
   | hidingClause =>
