@@ -5737,6 +5737,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | fallbackDecl : ExecutableRootRule .fallbackDecl
   | pragmaDecl : ExecutableRootRule .pragmaDecl
   | genericPrefix : ExecutableRootRule .genericPrefix
+  | forallClause : ExecutableRootRule .forallClause
   | exportItem : ExecutableRootRule .exportItem
   | constructorSelection : ExecutableRootRule .constructorSelection
   | hidingClause : ExecutableRootRule .hidingClause
@@ -6118,6 +6119,65 @@ theorem sequence_of_flat_view
   unfold sequenceFlatView
   rw [sequenceValues_build_view]
   exact sequence_of_view children input
+
+/-- A grouped pair of source-rule atoms. -/
+def rulePairTailExpr
+    (first second : GrammarRuleId) : EbnfExpr :=
+  .group (.sequence [
+    .atom (.nonterminal first), .atom (.nonterminal second)])
+
+/-- Decode one grouped pair of source-rule values. -/
+def rulePairTailView
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : GrammarRuleId)
+    (input : EbnfValue file tokens (rulePairTailExpr first second)) :
+    RuleValue first × RuleValue second :=
+  let firstAtom : EbnfExpr := .atom (.nonterminal first)
+  let secondAtom : EbnfExpr := .atom (.nonterminal second)
+  let rawSequence := groupView (.sequence [firstAtom, secondAtom]) input
+  let viewed := sequence2View firstAtom secondAtom rawSequence
+  (ruleView first viewed.1, ruleView second viewed.2)
+
+/-- Rebuild one grouped pair of source-rule values. -/
+def rulePairTailValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : GrammarRuleId)
+    (value : RuleValue first × RuleValue second) :
+    EbnfValue file tokens (rulePairTailExpr first second) :=
+  let firstAtom : EbnfExpr := .atom (.nonterminal first)
+  let secondAtom : EbnfExpr := .atom (.nonterminal second)
+  group (.sequence [firstAtom, secondAtom])
+    (sequence [firstAtom, secondAtom]
+      (EbnfValues.cons firstAtom [secondAtom]
+        (ruleAtom first value.1)
+        (EbnfValues.cons secondAtom [] (ruleAtom second value.2)
+          EbnfValues.nil)))
+
+/-- Rebuilding a viewed source-rule pair recovers its original value. -/
+theorem rulePairTailValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : GrammarRuleId)
+    (input : EbnfValue file tokens (rulePairTailExpr first second)) :
+    rulePairTailValue first second
+      (rulePairTailView first second input) = input := by
+  let firstAtom : EbnfExpr := .atom (.nonterminal first)
+  let secondAtom : EbnfExpr := .atom (.nonterminal second)
+  let rawSequence := groupView (.sequence [firstAtom, secondAtom]) input
+  let viewed := sequence2View firstAtom secondAtom rawSequence
+  have firstEq := rule_of_view first viewed.1
+  have secondEq := rule_of_view second viewed.2
+  have sequenceEq := sequence2_of_view firstAtom secondAtom rawSequence
+  have groupEq := group_of_view
+    (.sequence [firstAtom, secondAtom]) input
+  change group (.sequence [firstAtom, secondAtom])
+    (sequence [firstAtom, secondAtom]
+      (EbnfValues.cons firstAtom [secondAtom]
+        (ruleAtom first (ruleView first viewed.1))
+        (EbnfValues.cons secondAtom []
+          (ruleAtom second (ruleView second viewed.2)) EbnfValues.nil))) =
+    input
+  rw [firstEq, secondEq, sequenceEq]
+  exact groupEq
 
 end EbnfValue
 
@@ -6646,6 +6706,30 @@ def executeGenericPrefixRoot
     (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
       forallClause := forallClause
       context := context
+    }
+
+/-- Execute a universal clause from its nonempty ordered binder sequence. -/
+def executeForallClauseRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .forallClause)) :
+    ForallClause :=
+  let tail := EbnfValue.rulePairTailExpr .optionalComma .forallBinder
+  let viewed := EbnfValue.sequence4View
+    (.atom (.terminal (.hardKeyword .forallKw)))
+    (.atom (.nonterminal .forallBinder)) (.star tail)
+    (.atom (.terminal (.symbol .dot))) input
+  let first := EbnfValue.ruleView .forallBinder viewed.2.1
+  let rest := (EbnfValue.starView tail viewed.2.2.1).map
+    (EbnfValue.rulePairTailView .optionalComma .forallBinder)
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      binders := {
+        head := first
+        tail := rest.map Prod.snd
+      }
     }
 
 /-- Execute one exported item and its optional constructor selection. -/
@@ -7579,6 +7663,8 @@ def executeRootRule
       executePragmaDeclRoot file tokens origin finish owned ordered input
   | .genericPrefix =>
       executeGenericPrefixRoot file tokens origin finish owned ordered input
+  | .forallClause =>
+      executeForallClauseRoot file tokens origin finish owned ordered input
   | .exportItem =>
       executeExportItemRoot file tokens origin finish owned ordered input
   | .constructorSelection =>
