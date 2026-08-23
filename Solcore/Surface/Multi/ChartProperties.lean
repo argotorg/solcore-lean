@@ -7614,6 +7614,88 @@ theorem executeImportEntryRoot_reduces
           name.identifierProjection_projects
           aliasName.identifierProjection_projects witness
 
+/-- The local-export-entry executor realizes its selected root reduction. -/
+theorem executeLocalExportEntryRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .localExportEntry origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .localExportEntry)) :
+    RuleReduction file tokens .localExportEntry origin finish input
+      (executeLocalExportEntryRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let starAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .star))
+  let allChildren : List EbnfExpr := [
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .dot)), starAtom]
+  let branches : List EbnfExpr := [
+    starAtom, .atom (.nonterminal .exportItem), .sequence allChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have branchesLength : branches.length = 3 := by rfl
+    have bound : branch.val < 3 := by
+      calc
+        branch.val < branches.length := branch.isLt
+        _ = 3 := branchesLength
+    have values : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases values with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl
+  · let star := EbnfValue.terminalView (.symbol .star) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .star) raw
+    have resultEq : executeLocalExportEntryRoot file tokens
+        origin finish ready.1 ready.2.1 input = sourceLoc witness
+          (.wildcard (RuleReduction.terminalLoc star .wildcard)) := by
+      rw [executeLocalExportEntryRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .localExportEntryWildcard origin finish star
+      (.wildcardStar star) witness
+  · let item := EbnfValue.ruleView .exportItem raw
+    have rawEq := EbnfValue.rule_of_view .exportItem raw
+    have resultEq : executeLocalExportEntryRoot file tokens
+        origin finish ready.1 ready.2.1 input =
+          sourceLoc witness (.item item) := by
+      rw [executeLocalExportEntryRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .localExportEntryItem origin finish item witness
+  · let values := EbnfValue.sequenceFlatView allChildren raw
+    let rawReference := values.1
+    let rawDot := values.2.1
+    let rawStar := values.2.2.1
+    let reference := EbnfValue.ruleView .moduleRef rawReference
+    let dot := EbnfValue.terminalView (.symbol .dot) rawDot
+    let star := EbnfValue.terminalView (.symbol .star) rawStar
+    have rawEq := EbnfValue.sequence_of_flat_view allChildren raw
+    have rawEq' : EbnfValue.sequence allChildren
+        (EbnfValue.sequenceValuesBuild allChildren
+          ⟨rawReference, rawDot, rawStar, ⟨⟩⟩) = raw := rawEq
+    have resultEq : executeLocalExportEntryRoot file tokens
+        origin finish ready.1 ready.2.1 input = sourceLoc witness
+          (.allFrom reference
+            (RuleReduction.terminalLoc star .wildcard)) := by
+      rw [executeLocalExportEntryRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.rule_of_view .moduleRef rawReference,
+      ← EbnfValue.terminal_of_view (.symbol .dot) rawDot,
+      ← EbnfValue.terminal_of_view (.symbol .star) rawStar]
+    exact .localExportEntryAllFrom origin finish reference dot star
+      (.wildcardStar star) witness
+
 private theorem hidingClauseIdentifierAtoms_of_views
     {file : WorkspaceFile} {tokens : List Token}
     (values : List (EbnfValue file tokens
@@ -7724,6 +7806,8 @@ theorem executeRootRule_reduces
   | topItem => exact executeTopItemRoot_reduces origin finish ready input
   | importEntry =>
       exact executeImportEntryRoot_reduces origin finish ready input
+  | localExportEntry =>
+      exact executeLocalExportEntryRoot_reduces origin finish ready input
   | optionalComma =>
       exact executeOptionalCommaRoot_reduces origin finish ready input
   | predicateList =>
