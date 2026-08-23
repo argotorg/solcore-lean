@@ -5536,6 +5536,38 @@ theorem choice2_of_view
     rw [selectedEq] at rebuild
     exact rebuild
 
+/-- View a ternary choice without exposing its dependent finite index. -/
+def choice3View
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third : EbnfExpr)
+    (input : EbnfValue file tokens (.choice [first, second, third])) :
+    Sum (EbnfValue file tokens first)
+      (Sum (EbnfValue file tokens second) (EbnfValue file tokens third)) :=
+  match choiceView [first, second, third] input with
+  | ⟨⟨0, _⟩, raw⟩ => .inl raw
+  | ⟨⟨1, _⟩, raw⟩ => .inr (.inl raw)
+  | ⟨⟨2, _⟩, raw⟩ => .inr (.inr raw)
+
+/-- Rebuilding a viewed ternary choice recovers the original value. -/
+theorem choice3_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third : EbnfExpr)
+    (input : EbnfValue file tokens (.choice [first, second, third])) :
+    (match choice3View first second third input with
+      | .inl raw => choice [first, second, third] ⟨0, raw⟩
+      | .inr (.inl raw) => choice [first, second, third] ⟨1, raw⟩
+      | .inr (.inr raw) => choice [first, second, third] ⟨2, raw⟩) = input := by
+  unfold choice3View
+  generalize selectedEq : choiceView [first, second, third] input = selected
+  rcases selected with ⟨⟨branch, bound⟩, raw⟩
+  have values : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have : branch < 3 := by simpa using bound
+    omega
+  rcases values with rfl | rfl | rfl
+  all_goals
+    have rebuild := choice_of_view [first, second, third] input
+    rw [selectedEq] at rebuild
+    exact rebuild
 /-- View an optional expression as its exact optional child. -/
 def optionalView
     {file : WorkspaceFile} {tokens : List Token}
@@ -5759,6 +5791,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | bitXor : ExecutableRootRule .bitXor
   | bitAnd : ExecutableRootRule .bitAnd
   | additive : ExecutableRootRule .additive
+  | multiplicative : ExecutableRootRule .multiplicative
   | prefix : ExecutableRootRule .prefix
   | postfixExpr : ExecutableRootRule .postfix
   | postfixPart : ExecutableRootRule .postfixPart
@@ -7651,6 +7684,130 @@ theorem additiveTailValue_of_view
       rw [terminalEq, choiceRebuildEq, operatorEq, operandEq, sequenceEq]
       exact outerGroupEq
 
+/-- The grouped `*`, `/`, or `%` tail of the multiplicative level. -/
+def multiplicativeTailExpr : EbnfExpr :=
+  .group (.sequence [
+    .group (.choice [
+      .atom (.terminal (.symbol .star)),
+      .atom (.terminal (.symbol .slash)),
+      .atom (.terminal (.symbol .percent))]),
+    .atom (.nonterminal .prefix)])
+
+/-- Decode one multiplicative tail into its operator and right operand. -/
+def multiplicativeTailView
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens multiplicativeTailExpr) :
+    Sum
+      (MatchedTerminal file tokens (.symbol .star))
+      (Sum
+        (MatchedTerminal file tokens (.symbol .slash))
+        (MatchedTerminal file tokens (.symbol .percent))) × Expression :=
+  let starAtom : EbnfExpr := .atom (.terminal (.symbol .star))
+  let slashAtom : EbnfExpr := .atom (.terminal (.symbol .slash))
+  let percentAtom : EbnfExpr := .atom (.terminal (.symbol .percent))
+  let operatorExpr : EbnfExpr :=
+    .group (.choice [starAtom, slashAtom, percentAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .prefix)
+  let rawSequence := groupView (.sequence [operatorExpr, operandAtom]) input
+  let viewed := sequence2View operatorExpr operandAtom rawSequence
+  let rawChoice := groupView
+    (.choice [starAtom, slashAtom, percentAtom]) viewed.1
+  let operator := match choice3View starAtom slashAtom percentAtom rawChoice with
+    | .inl raw => Sum.inl (terminalView (.symbol .star) raw)
+    | .inr (.inl raw) =>
+        Sum.inr (Sum.inl (terminalView (.symbol .slash) raw))
+    | .inr (.inr raw) =>
+        Sum.inr (Sum.inr (terminalView (.symbol .percent) raw))
+  (operator, ruleView .prefix viewed.2)
+
+/-- Rebuild one multiplicative tail from its semantic view. -/
+def multiplicativeTailValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : Sum
+      (MatchedTerminal file tokens (.symbol .star))
+      (Sum
+        (MatchedTerminal file tokens (.symbol .slash))
+        (MatchedTerminal file tokens (.symbol .percent))) × Expression) :
+    EbnfValue file tokens multiplicativeTailExpr :=
+  let starAtom : EbnfExpr := .atom (.terminal (.symbol .star))
+  let slashAtom : EbnfExpr := .atom (.terminal (.symbol .slash))
+  let percentAtom : EbnfExpr := .atom (.terminal (.symbol .percent))
+  let operatorExpr : EbnfExpr :=
+    .group (.choice [starAtom, slashAtom, percentAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .prefix)
+  group (.sequence [operatorExpr, operandAtom])
+    (sequence [operatorExpr, operandAtom]
+      (EbnfValues.cons operatorExpr [operandAtom]
+        (group (.choice [starAtom, slashAtom, percentAtom])
+          (match value.1 with
+          | .inl star => choice [starAtom, slashAtom, percentAtom]
+              ⟨0, terminalAtom (.symbol .star) star⟩
+          | .inr (.inl slash) => choice [starAtom, slashAtom, percentAtom]
+              ⟨1, terminalAtom (.symbol .slash) slash⟩
+          | .inr (.inr percent) => choice [starAtom, slashAtom, percentAtom]
+              ⟨2, terminalAtom (.symbol .percent) percent⟩))
+        (EbnfValues.cons operandAtom []
+          (ruleAtom .prefix value.2) EbnfValues.nil)))
+
+/-- Rebuilding a decoded multiplicative tail recovers its typed input. -/
+theorem multiplicativeTailValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens multiplicativeTailExpr) :
+    multiplicativeTailValue (multiplicativeTailView input) = input := by
+  let starAtom : EbnfExpr := .atom (.terminal (.symbol .star))
+  let slashAtom : EbnfExpr := .atom (.terminal (.symbol .slash))
+  let percentAtom : EbnfExpr := .atom (.terminal (.symbol .percent))
+  let operatorExpr : EbnfExpr :=
+    .group (.choice [starAtom, slashAtom, percentAtom])
+  let operandAtom : EbnfExpr := .atom (.nonterminal .prefix)
+  let rawSequence := groupView (.sequence [operatorExpr, operandAtom]) input
+  let viewed := sequence2View operatorExpr operandAtom rawSequence
+  let rawChoice := groupView
+    (.choice [starAtom, slashAtom, percentAtom]) viewed.1
+  generalize choiceEq : choice3View starAtom slashAtom percentAtom rawChoice =
+    selected
+  have choiceValueEq := choice3_of_view
+    starAtom slashAtom percentAtom rawChoice
+  rw [choiceEq] at choiceValueEq
+  have operatorEq := group_of_view
+    (.choice [starAtom, slashAtom, percentAtom]) viewed.1
+  have operandEq := rule_of_view .prefix viewed.2
+  have sequenceEq := sequence2_of_view operatorExpr operandAtom rawSequence
+  have outerGroupEq := group_of_view
+    (.sequence [operatorExpr, operandAtom]) input
+  cases selected with
+  | inl raw =>
+      have terminalEq := terminal_of_view (.symbol .star) raw
+      have choiceRebuildEq : choice [starAtom, slashAtom, percentAtom]
+          ⟨(0 : Fin 3), raw⟩ = rawChoice := by
+        simpa using choiceValueEq
+      simp only [multiplicativeTailValue, multiplicativeTailView,
+        starAtom, slashAtom, percentAtom, operatorExpr, operandAtom,
+        rawSequence, viewed, rawChoice, choiceEq]
+      rw [terminalEq, choiceRebuildEq, operatorEq, operandEq, sequenceEq]
+      exact outerGroupEq
+  | inr rest =>
+      cases rest with
+      | inl raw =>
+          have terminalEq := terminal_of_view (.symbol .slash) raw
+          have choiceRebuildEq : choice [starAtom, slashAtom, percentAtom]
+              ⟨(1 : Fin 3), raw⟩ = rawChoice := by
+            simpa using choiceValueEq
+          simp only [multiplicativeTailValue, multiplicativeTailView,
+            starAtom, slashAtom, percentAtom, operatorExpr, operandAtom,
+            rawSequence, viewed, rawChoice, choiceEq]
+          rw [terminalEq, choiceRebuildEq, operatorEq, operandEq, sequenceEq]
+          exact outerGroupEq
+      | inr raw =>
+          have terminalEq := terminal_of_view (.symbol .percent) raw
+          have choiceRebuildEq : choice [starAtom, slashAtom, percentAtom]
+              ⟨(2 : Fin 3), raw⟩ = rawChoice := by
+            simpa using choiceValueEq
+          simp only [multiplicativeTailValue, multiplicativeTailView,
+            starAtom, slashAtom, percentAtom, operatorExpr, operandAtom,
+            rawSequence, viewed, rawChoice, choiceEq]
+          rw [terminalEq, choiceRebuildEq, operatorEq, operandEq, sequenceEq]
+          exact outerGroupEq
 end EbnfValue
 
 /-- Locate a payload at the exact span of a matched terminal. -/
@@ -8037,6 +8194,21 @@ def executeAdditiveRoot
       | .inl plus => executableTerminalLoc plus .add
       | .inr minus => executableTerminalLoc minus .subtract), value.2))
 
+/-- Execute a multiplicative root from its left operand and mixed tails. -/
+def executeMultiplicativeRoot
+    (file : WorkspaceFile) {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .multiplicative)) : Expression :=
+  let operandAtom : EbnfExpr := .atom (.nonterminal .prefix)
+  let tail := EbnfValue.multiplicativeTailExpr
+  let viewed := EbnfValue.sequence2View operandAtom (.star tail) input
+  let left := EbnfValue.ruleView .prefix viewed.1
+  let rest := (EbnfValue.starView tail viewed.2).map
+    EbnfValue.multiplicativeTailView
+  executeInfixLeft file left (rest.map fun value =>
+    ((match value.1 with
+      | .inl star => executableTerminalLoc star .multiply
+      | .inr (.inl slash) => executableTerminalLoc slash .divide
+      | .inr (.inr percent) => executableTerminalLoc percent .modulo), value.2))
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -8134,6 +8306,7 @@ def executeRootRule
   | .bitXor => executeBitXorRoot file input
   | .bitAnd => executeBitAndRoot file input
   | .additive => executeAdditiveRoot file input
+  | .multiplicative => executeMultiplicativeRoot file input
   | .prefix =>
       executePrefixRoot file tokens origin finish owned ordered input
   | .postfixExpr => executePostfixRoot file input
