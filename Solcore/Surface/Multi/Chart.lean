@@ -20670,6 +20670,26 @@ def unexpectedDiagnosticCandidate?
   let frontier ← result.observedFrontier? file
   frontier.unexpected?
 
+/-- Suppress the ordinary unexpected-token branch whenever the executable
+chart already contains its complete module root. -/
+def rootlessUnexpectedDiagnosticCandidate?
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    Option ParseDiagnostic :=
+  if result.containsCompleteModuleRootItem then none
+  else result.unexpectedDiagnosticCandidate? file
+
+/-- Exact executable premises for the rootless ordinary-diagnostic branch. -/
+theorem rootlessUnexpectedDiagnosticCandidate?_eq_some_iff
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (diagnostic : ParseDiagnostic) :
+    result.rootlessUnexpectedDiagnosticCandidate? file = some diagnostic ↔
+      result.containsCompleteModuleRootItem = false ∧
+        result.unexpectedDiagnosticCandidate? file = some diagnostic := by
+  unfold rootlessUnexpectedDiagnosticCandidate?
+  cases result.containsCompleteModuleRootItem <;> simp
+
 end ContextualWorklistResult
 
 end Solcore.Surface.Multi.Chart
