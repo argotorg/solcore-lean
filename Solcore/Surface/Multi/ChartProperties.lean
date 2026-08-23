@@ -7181,6 +7181,100 @@ theorem executeImportEntryRoot_reduces
           name.identifierProjection_projects
           aliasName.identifierProjection_projects witness
 
+private theorem hidingClauseIdentifierAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (values : List (EbnfValue file tokens
+      (.atom (.terminal (.category .identifier))))) :
+    values.map (fun raw => EbnfValue.terminalAtom
+      (.category .identifier) (EbnfValue.terminalView
+        (.category .identifier) raw)) = values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [EbnfValue.terminal_of_view]
+
+/-- The hiding-clause executor realizes its exact root reduction. -/
+theorem executeHidingClauseRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .hidingClause origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .hidingClause)) :
+    RuleReduction file tokens .hidingClause origin finish input
+      (executeHidingClauseRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let keywordAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .hidingKw))
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftBrace))
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let namesAtom : EbnfExpr := .list0 identifierAtom
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightBrace))
+  change EbnfValue file tokens
+    (.sequence [keywordAtom, openAtom, namesAtom, closeAtom]) at input
+  let viewed := EbnfValue.sequence4View
+    keywordAtom openAtom namesAtom closeAtom input
+  let keyword := EbnfValue.terminalView
+    (.hardKeyword .hidingKw) viewed.1
+  let openBrace := EbnfValue.terminalView
+    (.symbol .leftBrace) viewed.2.1
+  let rawNames := EbnfValue.list0View identifierAtom viewed.2.2.1
+  let closeBrace := EbnfValue.terminalView
+    (.symbol .rightBrace) viewed.2.2.2
+  let names : List (RuleReduction.SpelledTerminalData
+      file tokens (.category .identifier) Identifier) :=
+    rawNames.map fun rawName =>
+      let name := EbnfValue.terminalView
+        (.category .identifier) rawName
+      ({
+        matched := name
+        spelling := name.identifierProjection.1
+        parsed := name.identifierProjection.2
+      } : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+  let executableNames : List IdentifierOccurrence :=
+    rawNames.map fun rawName =>
+      let name := EbnfValue.terminalView
+        (.category .identifier) rawName
+      ({ span := name.span, payload := name.identifierProjection.2 } :
+        IdentifierOccurrence)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have namesEq : EbnfValue.list0 identifierAtom
+      (names.map fun value => EbnfValue.terminalAtom
+        (.category .identifier) value.matched) = viewed.2.2.1 := by
+    have mappedEq : names.map (fun value => EbnfValue.terminalAtom
+        (.category .identifier) value.matched) = rawNames := by
+      simpa [names, rawNames, List.map_map, Function.comp_def] using
+        hidingClauseIdentifierAtoms_of_views rawNames
+    rw [mappedEq]
+    exact EbnfValue.list0_of_view identifierAtom viewed.2.2.1
+  have executableNamesEq : executableNames = names.map fun name =>
+      RuleReduction.terminalLoc name.matched name.parsed := by
+    simp [executableNames, names, List.map_map,
+      RuleReduction.terminalLoc]
+  have resultEq : executeHidingClauseRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        names := executableNames
+      } := by
+    rfl
+  rw [resultEq, executableNamesEq,
+    ← EbnfValue.sequence4_of_view keywordAtom openAtom namesAtom
+      closeAtom input,
+    ← EbnfValue.terminal_of_view (.hardKeyword .hidingKw) viewed.1,
+    ← EbnfValue.terminal_of_view (.symbol .leftBrace) viewed.2.1,
+    ← namesEq,
+    ← EbnfValue.terminal_of_view (.symbol .rightBrace) viewed.2.2.2]
+  exact .hidingClause origin finish keyword openBrace names closeBrace
+    (by
+      intro name nameMem
+      simp only [names, List.mem_map] at nameMem
+      rcases nameMem with ⟨rawName, _rawMem, rfl⟩
+      exact (EbnfValue.terminalView (.category .identifier)
+        rawName).identifierProjection_projects)
+    witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -7238,6 +7332,8 @@ theorem executeRootRule_reduces
   | pragmaDecl => exact executePragmaDeclRoot_reduces origin finish ready input
   | constructorSelection =>
       exact executeConstructorSelectionRoot_reduces origin finish ready input
+  | hidingClause =>
+      exact executeHidingClauseRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
