@@ -18348,6 +18348,233 @@ theorem saturatedMatchArmHeaderObservation_eq_observed
 
 end Solcore.Surface.Multi.Chart
 
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Every executable backpointer row is witnessed by the exact retained
+completed edge that introduced its coordinates. -/
+private def PhaseCBackpointerLedgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop :=
+  ∀ entry, entry ∈ current.payload.completionBackpointers →
+    ∃ retained waiting finished after shared,
+      retained ∈ current.payload.phaseC.contextualEdges ∧
+      retained.val = .completed waiting finished after shared ∧
+      entry.after = after ∧
+      entry.coordinates = (shared, finished.raw.production)
+
+private def CompletionBackpointerLedger.RowsExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens)) : Prop :=
+  ∀ entry, entry ∈ ledger →
+    ∃ retained waiting finished after shared,
+      retained ∈ edges ∧
+      retained.val = .completed waiting finished after shared ∧
+      entry.after = after ∧
+      entry.coordinates = (shared, finished.raw.production)
+
+private theorem CompletionBackpointerLedger.RowsExact.edges_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger : CompletionBackpointerLedger tokens}
+    {before after :
+      List (StructurallyValidContextualPackedEdge file tokens)}
+    (exact : CompletionBackpointerLedger.RowsExact ledger before)
+    (subset : before ⊆ after) :
+    CompletionBackpointerLedger.RowsExact ledger after := by
+  intro entry member
+  obtain ⟨retained, waiting, finished, target, shared,
+    retainedMember, shape, entryAfter, coordinates⟩ := exact entry member
+  exact ⟨retained, waiting, finished, target, shared,
+    subset retainedMember, shape, entryAfter, coordinates⟩
+
+private theorem CompletionBackpointerLedger.insertCompleted?_rowsExact
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger resultLedger : CompletionBackpointerLedger tokens}
+    {edges resultEdges :
+      List (StructurallyValidContextualPackedEdge file tokens)}
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (exact : CompletionBackpointerLedger.RowsExact ledger edges)
+    (selected : CompletionBackpointerLedger.insertCompleted?
+      ledger edges edge = some (resultLedger, resultEdges)) :
+    CompletionBackpointerLedger.RowsExact resultLedger resultEdges := by
+  unfold CompletionBackpointerLedger.insertCompleted? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨nextLedger, inserted, pairEq⟩
+  cases pairEq
+  unfold CompletionBackpointerLedger.insert? at inserted
+  split at inserted
+  next absent =>
+    cases inserted
+    intro entry member
+    simp only [List.mem_cons] at member
+    rcases member with head | oldMember
+    · subst entry
+      exact ⟨CompletionBackpointerLedger.packCompleted edge,
+        edge.waiting, edge.finished, edge.after, edge.shared,
+        by simp [CompletionBackpointerLedger.packCompleted],
+        rfl, rfl, rfl⟩
+    · obtain ⟨retained, waiting, finished, target, shared,
+        retainedMember, shape, entryAfter, coordinates⟩ :=
+          exact entry oldMember
+      exact ⟨retained, waiting, finished, target, shared,
+        by simp [retainedMember], shape, entryAfter, coordinates⟩
+  next present =>
+    split at inserted
+    next agreeing =>
+      cases inserted
+      exact exact.edges_mono (by
+        intro retained retainedMember
+        simp [retainedMember])
+    next conflicting => contradiction
+
+private theorem PhaseCBackpointerLedgerExact.mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (exact : PhaseCBackpointerLedgerExact current)
+    (ledgerEq : result.payload.completionBackpointers =
+      current.payload.completionBackpointers)
+    (growth : PhaseCContentGrowth current result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold PhaseCBackpointerLedgerExact at exact ⊢
+  rw [ledgerEq]
+  exact CompletionBackpointerLedger.RowsExact.edges_mono exact growth.edges
+
+private theorem beginPhaseCWorklist?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  intro entry member
+  simp at member
+
+private theorem activateWorklistProduction?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCBackpointerLedgerExact result.1 := by
+  unfold activateWorklistProduction? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨activated, activatedEq, resultEq⟩
+  cases resultEq
+  unfold PhaseCBackpointerLedgerExact at exact ⊢
+  dsimp only
+  rw [activateProduction?_contextualEdges
+    { payload := current.payload.phaseC, counter := current.counter }
+    productionInstance activated activatedEq]
+  exact exact
+
+private theorem insertContextualItem?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  have growth := (insertContextualItem?_coverage current result source item
+    selected).1
+  unfold insertContextualItem? at selected
+  split at selected
+  · cases selected
+    exact exact
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    exact exact.mono current result (by rw [payload]) growth
+
+private theorem insertContextualScannedEdge?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  have growth := (insertContextualScannedEdge?_coverage current result edge
+    selected).1
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact exact
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    exact exact.mono current result (by rw [payload]) growth
+
+private theorem insertContextualCompletedEdge?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCBackpointerLedgerExact result := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact exact
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, insertedEq, steppedEq⟩
+    rcases pair with ⟨nextLedger, nextEdges⟩
+    have nextExact := CompletionBackpointerLedger.insertCompleted?_rowsExact
+      edge exact insertedEq
+    have payload := runMappedPrimitive?_payload current _ _ steppedEq
+    unfold PhaseCBackpointerLedgerExact
+    rw [payload]
+    exact nextExact
+
+private theorem dequeueContextualItem?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCBackpointerLedgerExact result.2 := by
+  unfold dequeueContextualItem? at selected
+  cases queueEq : current.payload.phaseC.itemQueue with
+  | nil => simp [queueEq] at selected
+  | cons item rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      unfold PhaseCBackpointerLedgerExact at exact ⊢
+      rw [payload]
+      exact exact
+
+private theorem dequeueContextualEdge?_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (exact : PhaseCBackpointerLedgerExact current)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCBackpointerLedgerExact result.2 := by
+  unfold dequeueContextualEdge? at selected
+  cases queueEq : current.payload.phaseC.edgeQueue with
+  | nil => simp [queueEq] at selected
+  | cons edge rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      have payload := runMappedPrimitive?_payload current _ _ nextEq
+      unfold PhaseCBackpointerLedgerExact at exact ⊢
+      rw [payload]
+      exact exact
+
+end Solcore.Surface.Multi.Chart
+
 
 
 namespace Solcore.Surface.Multi.Chart
@@ -21452,18 +21679,6 @@ private theorem CompletionBackpointerLedger.lookup?_some_entry
         obtain ⟨entry, member, afterEq, coordinatesEq⟩ :=
           induction selected
         exact ⟨entry, by simp [member], afterEq, coordinatesEq⟩
-
-/-- Every executable backpointer row is witnessed by the exact retained
-completed edge that introduced its coordinates. -/
-private def PhaseCBackpointerLedgerExact
-    {file : WorkspaceFile} {tokens : List Token}
-    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop :=
-  ∀ entry, entry ∈ current.payload.completionBackpointers →
-    ∃ retained waiting finished after shared,
-      retained ∈ current.payload.phaseC.contextualEdges ∧
-      retained.val = .completed waiting finished after shared ∧
-      entry.after = after ∧
-      entry.coordinates = (shared, finished.raw.production)
 
 /-- The prospective semantic condition needed when a newly checked
 completion shares its target with an already retained completion. -/
