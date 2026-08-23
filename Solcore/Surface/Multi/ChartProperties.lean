@@ -6398,6 +6398,119 @@ theorem executeEqualityRoot_reduces
             ← tailValueEq]
           exact .equalityNotEqual origin finish left notEqual right witness
 
+/-- The relational executor realizes its exact declarative reduction. -/
+theorem executeRelationalRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .relational origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .relational)) :
+    RuleReduction file tokens .relational origin finish input
+      (executeRelationalRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let operand : EbnfExpr := .atom (.nonterminal .bitOr)
+  let lessAtom : EbnfExpr := .atom (.terminal (.symbol .less))
+  let greaterAtom : EbnfExpr := .atom (.terminal (.symbol .greater))
+  let lessEqualAtom : EbnfExpr := .atom (.terminal (.symbol .lessEqual))
+  let greaterEqualAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .greaterEqual))
+  let choiceExpr : EbnfExpr := .choice [lessAtom, greaterAtom,
+    lessEqualAtom, greaterEqualAtom]
+  let operatorExpr : EbnfExpr := .group choiceExpr
+  let tail : EbnfExpr := .sequence [operatorExpr, operand]
+  change EbnfValue file tokens (.sequence [operand, .optional tail]) at input
+  let outer := EbnfValue.sequence2View operand (.optional tail) input
+  let left := EbnfValue.ruleView .bitOr outer.1
+  have inputEq := EbnfValue.sequence2_of_view
+    operand (.optional tail) input
+  have leftEq := EbnfValue.rule_of_view .bitOr outer.1
+  have optionalEq := EbnfValue.optional_of_view tail outer.2
+  generalize optionEq : EbnfValue.optionalView tail outer.2 = viewed
+  cases viewed with
+  | none =>
+      have resultEq : executeRelationalRoot file tokens origin finish
+          ready.1 ready.2.1 input = left := by
+        simp only [executeRelationalRoot, operand, lessAtom, greaterAtom,
+          lessEqualAtom, greaterEqualAtom, choiceExpr, operatorExpr, tail,
+          outer, left, optionEq]
+      have optionalEq' : EbnfValue.optional tail none = outer.2 := by
+        rw [← optionEq]
+        exact optionalEq
+      rw [resultEq, ← inputEq, ← leftEq, ← optionalEq']
+      exact .relationalNone origin finish left
+  | some rawTail =>
+      let inner := EbnfValue.sequence2View operatorExpr operand rawTail
+      let rawChoice := EbnfValue.groupView choiceExpr inner.1
+      generalize choiceEq : EbnfValue.choice4View lessAtom greaterAtom
+        lessEqualAtom greaterEqualAtom rawChoice = chosen
+      have choiceRebuildEq := EbnfValue.choice4_of_view lessAtom
+        greaterAtom lessEqualAtom greaterEqualAtom rawChoice
+      rw [choiceEq] at choiceRebuildEq
+      let right := EbnfValue.ruleView .bitOr inner.2
+      have optionalEq' : EbnfValue.optional tail (some rawTail) = outer.2 := by
+        rw [← optionEq]
+        exact optionalEq
+      have tailEq := EbnfValue.sequence2_of_view
+        operatorExpr operand rawTail
+      have groupEq : EbnfValue.group choiceExpr rawChoice = inner.1 := by
+        exact EbnfValue.group_of_view choiceExpr inner.1
+      have rightEq := EbnfValue.rule_of_view .bitOr inner.2
+      let witness := ConsumedSpanWitness.compute
+        file tokens origin finish ready.1 ready.2.1
+      rcases chosen with raw | raw | raw | raw
+      · let operator := EbnfValue.terminalView (.symbol .less) raw
+        have operatorEq := EbnfValue.terminal_of_view (.symbol .less) raw
+        have resultEq : executeRelationalRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.infix
+              (executableTerminalLoc operator .less) left right) := by
+          simp only [executeRelationalRoot, operand, lessAtom, greaterAtom,
+            lessEqualAtom, greaterEqualAtom, choiceExpr, operatorExpr, tail,
+            outer, left, optionEq, inner, right, rawChoice, choiceEq,
+            operator, witness]
+        rw [resultEq, ← inputEq, ← leftEq, ← optionalEq',
+          ← tailEq, ← groupEq, ← choiceRebuildEq,
+          ← operatorEq, ← rightEq]
+        exact .relationalLess origin finish left operator right witness
+      · let operator := EbnfValue.terminalView (.symbol .greater) raw
+        have operatorEq := EbnfValue.terminal_of_view (.symbol .greater) raw
+        have resultEq : executeRelationalRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.infix
+              (executableTerminalLoc operator .greater) left right) := by
+          simp only [executeRelationalRoot, operand, lessAtom, greaterAtom,
+            lessEqualAtom, greaterEqualAtom, choiceExpr, operatorExpr, tail,
+            outer, left, optionEq, inner, right, rawChoice, choiceEq,
+            operator, witness]
+        rw [resultEq, ← inputEq, ← leftEq, ← optionalEq',
+          ← tailEq, ← groupEq, ← choiceRebuildEq,
+          ← operatorEq, ← rightEq]
+        exact .relationalGreater origin finish left operator right witness
+      · let operator := EbnfValue.terminalView (.symbol .lessEqual) raw
+        have operatorEq := EbnfValue.terminal_of_view (.symbol .lessEqual) raw
+        have resultEq : executeRelationalRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.infix
+              (executableTerminalLoc operator .lessEqual) left right) := by
+          simp only [executeRelationalRoot, operand, lessAtom, greaterAtom,
+            lessEqualAtom, greaterEqualAtom, choiceExpr, operatorExpr, tail,
+            outer, left, optionEq, inner, right, rawChoice, choiceEq,
+            operator, witness]
+        rw [resultEq, ← inputEq, ← leftEq, ← optionalEq',
+          ← tailEq, ← groupEq, ← choiceRebuildEq,
+          ← operatorEq, ← rightEq]
+        exact .relationalLessEqual origin finish left operator right witness
+      · let operator := EbnfValue.terminalView (.symbol .greaterEqual) raw
+        have operatorEq := EbnfValue.terminal_of_view
+          (.symbol .greaterEqual) raw
+        have resultEq : executeRelationalRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.infix
+              (executableTerminalLoc operator .greaterEqual) left right) := by
+          simp only [executeRelationalRoot, operand, lessAtom, greaterAtom,
+            lessEqualAtom, greaterEqualAtom, choiceExpr, operatorExpr, tail,
+            outer, left, optionEq, inner, right, rawChoice, choiceEq,
+            operator, witness]
+        rw [resultEq, ← inputEq, ← leftEq, ← optionalEq',
+          ← tailEq, ← groupEq, ← choiceRebuildEq,
+          ← operatorEq, ← rightEq]
+        exact .relationalGreaterEqual origin finish left operator right witness
+
 /-- The bitwise-or executor realizes its exact fixed-infix reduction. -/
 theorem executeBitOrRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -9729,6 +9842,7 @@ theorem executeRootRule_reduces
   | logicalOr => exact executeLogicalOrRoot_reduces origin finish ready input
   | logicalAnd => exact executeLogicalAndRoot_reduces origin finish ready input
   | equality => exact executeEqualityRoot_reduces origin finish ready input
+  | relational => exact executeRelationalRoot_reduces origin finish ready input
   | bitOr => exact executeBitOrRoot_reduces origin finish ready input
   | bitXor => exact executeBitXorRoot_reduces origin finish ready input
   | bitAnd => exact executeBitAndRoot_reduces origin finish ready input
