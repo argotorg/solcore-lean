@@ -26039,3 +26039,193 @@ private theorem processContextualItemMulti?_fairPending
     · exact Or.inl waitingQueued
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem phaseCQueueStepMulti?_attemptLedger_fair
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (ledger : PhaseCAttemptLedgerMaterialized current)
+    (fair : PhaseCFairPending owned current)
+    (selected : phaseCQueueStepMulti? owned current = some result) :
+    PhaseCAttemptLedgerMaterialized result ∧
+      PhaseCFairPending owned result := by
+  cases items : current.payload.phaseC.itemQueue with
+  | nil =>
+      cases edges : current.payload.phaseC.edgeQueue with
+      | nil =>
+          simp only [phaseCQueueStepMulti?, items, edges,
+            Option.some.injEq] at selected
+          subst result
+          exact ⟨ledger, fair⟩
+      | cons edge rest =>
+          simp only [phaseCQueueStepMulti?, items, edges] at selected
+          cases dequeued : dequeueContextualEdge? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              simp only [Option.some.injEq] at selected
+              subst result
+              exact
+                ⟨dequeueContextualEdge?_attemptLedger current pair ledger
+                    dequeued,
+                  dequeueContextualEdge?_fairPending owned current pair fair
+                    dequeued⟩
+  | cons item rest =>
+      simp only [phaseCQueueStepMulti?, items] at selected
+      cases dequeued : dequeueContextualItem? current with
+      | none => simp [dequeued] at selected
+      | some pair =>
+          rw [dequeued] at selected
+          rcases pair with ⟨pivot, afterDequeue⟩
+          simp only at selected
+          have afterLedger := dequeueContextualItem?_attemptLedger current
+            (pivot, afterDequeue) ledger dequeued
+          have shape := dequeueContextualItem?_fairShape current afterDequeue
+            item pivot rest items dequeued
+          have pivotEq := shape.1
+          subst item
+          exact
+            ⟨processContextualItemMulti?_attemptLedger owned pivot
+                afterDequeue result afterLedger selected,
+              processContextualItemMulti?_fairPending owned current
+                afterDequeue result pivot rest fair items shape.2.1
+                shape.2.2.1 shape.2.2.2.1 shape.2.2.2.2 afterLedger
+                selected⟩
+
+private theorem runPhaseCQueueStepsMulti?_attemptLedger_fair
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAttemptLedgerMaterialized current →
+      PhaseCFairPending owned current →
+      runPhaseCQueueStepsMulti? owned fuel current = some result →
+      PhaseCAttemptLedgerMaterialized result ∧
+        PhaseCFairPending owned result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result ledger fair selected
+      cases selected
+      exact ⟨ledger, fair⟩
+  | succ fuel induction =>
+      intro current result ledger fair selected
+      rw [runPhaseCQueueStepsMulti?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, runEq⟩
+      obtain ⟨nextLedger, nextFair⟩ :=
+        phaseCQueueStepMulti?_attemptLedger_fair owned current next ledger fair
+          nextEq
+      exact induction next result nextLedger nextFair runEq
+
+private theorem executePhaseCWorklistMulti?_fairPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : executePhaseCWorklistMulti? owned current = some result) :
+    PhaseCFairPending owned result := by
+  unfold executePhaseCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact (runPhaseCQueueStepsMulti?_attemptLedger_fair owned _ entered result
+    (beginPhaseCWorklist?_attemptLedger current entered fresh enteredEq)
+    (beginPhaseCWorklist?_fairPending owned current entered enteredEq)
+      runEq).2
+
+private theorem executeObservedPhaseABCWorklistMulti?_fairPending
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    PhaseCFairPending owned result := by
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklistMulti?_fairPending owned phaseB result
+    (executeObservedPhaseAB?_phaseCInitialFresh file tokens owned phaseB
+      phaseBEq) phaseCEq
+
+private theorem executeObservedPhaseABCWorklistMulti?_operationalClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    OperationalContextualClosure file tokens result.payload.phaseC.memo
+      result.payload.phaseC.contextualItems
+      result.payload.phaseC.contextualEdges := by
+  have fair :=
+    executeObservedPhaseABCWorklistMulti?_fairPending file tokens owned result
+      selected
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  have empty :=
+    executePhaseCWorklistMulti?_queues_empty owned phaseB result phaseCEq
+  refine ⟨by simpa [contextualRoot] using fair.1, ?_, ?_, ?_⟩
+  · intro waiting predicted waitingMember next enabled
+    let item : ContextualItemKey tokens := {
+      raw := {
+        production := predicted
+        dot := ⟨0, Nat.zero_lt_succ _⟩
+        origin := waiting.raw.current
+        current := waiting.raw.current
+      }
+      context := descendContext waiting predicted
+    }
+    let productionInstance : ProductionInstanceKey tokens := {
+      production := predicted
+      origin := waiting.raw.current
+      context := descendContext waiting predicted
+    }
+    have computed : contextualPredictedItem? waiting predicted =
+        some (item, productionInstance) := by
+      simpa [item, productionInstance] using
+        contextualPredictedItem?_complete waiting predicted next
+    rcases fair.2.1 waiting waitingMember predicted item productionInstance
+        computed enabled with queued | materialized
+    · simp [empty.1] at queued
+    · exact materialized
+  · intro before after cursor beforeMember structural
+    obtain ⟨edge, computed, beforeEq, afterEq, cursorEq⟩ :=
+      contextualScannedEdge?_complete owned before after cursor structural
+    rcases fair.2.2.1 before beforeMember after edge computed with
+      queued | materialized
+    · simp [empty.1] at queued
+    · refine ⟨materialized.1, ?_⟩
+      simpa [beforeEq, afterEq, cursorEq] using materialized.2
+  · intro waiting finished after shared waitingMember finishedMember structural
+    obtain ⟨edge, computed, waitingEq, finishedEq, afterEq, sharedEq⟩ :=
+      contextualCompletedEdge?_complete waiting finished after shared structural
+    rcases fair.2.2.2 waiting waitingMember finished finishedMember after edge
+        computed with queued | queued | materialized
+    · simp [empty.1] at queued
+    · simp [empty.1] at queued
+    · refine ⟨materialized.1, ?_⟩
+      simpa [waitingEq, finishedEq, afterEq, sharedEq] using materialized.2
+
+/-- The total multi-ledger executor returns a chart closed under every enabled
+prediction and every structurally valid contextual scan/completion step. -/
+theorem executeObservedContextualWorklistMulti?_operationalClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklistMulti? file tokens owned =
+      some result) :
+    OperationalContextualClosure file tokens result.memo
+      result.items result.edges := by
+  unfold executeObservedContextualWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCWorklistMulti?_operationalClosure
+    file tokens owned internal internalEq
+
+end Solcore.Surface.Multi.Chart
