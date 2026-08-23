@@ -20808,3 +20808,198 @@ private theorem attemptContextualScan?_total_allSafe
       safe.completion selected⟩⟩
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem chargeContextualCompletion_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCItemSafe current)
+    (address : ChartCubicKey tokens)
+    (selected : runMappedPrimitive? current
+      (.cubic .U03_completionAttempt address) id = some result) :
+    PhaseCItemSafe result := by
+  have payload := runMappedPrimitive?_payload current _ id selected
+  have used := runMappedPrimitive?_usedRev current _ id result selected
+  constructor
+  · intro source item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · cases source <;>
+        simp [ContextualItemInsertSource.unitKind] at equal
+    · simpa [payload] using safe.inserted source item old
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · simpa [payload] using safe.dequeued item old
+  · intro item production member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.predicted item production old)
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scanned item old)
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+  · intro item member usedItem
+    rw [payload] at member
+    rw [used, List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · simp at equal
+    · exact safe.queueFresh item member old
+  · simpa [payload] using safe.itemsNodup
+  · simpa [payload] using safe.queueNodup
+  · intro item member
+    rw [payload] at member ⊢
+    exact safe.queueSubset member
+
+private theorem insertContextualCompletedEdge?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (safe : PhaseCItemSafe current)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCItemSafe result := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  next present => cases selected; exact safe
+  next absent =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, _ledgerEq, steppedEq⟩
+    rcases pair with ⟨nextLedger, nextEdges⟩
+    have payload := runMappedPrimitive?_payload current _ _ steppedEq
+    have used := runMappedPrimitive?_usedRev current _ _ result steppedEq
+    constructor
+    · intro source item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;>
+          simp [ContextualItemInsertSource.unitKind] at equal
+      · simpa [payload] using safe.inserted source item old
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · simpa [payload] using safe.dequeued item old
+    · intro item production member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.predicted item production old)
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scanned item old)
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+    · intro item member usedItem
+      rw [payload] at member
+      rw [used, List.mem_cons] at usedItem
+      rcases usedItem with equal | old
+      · simp at equal
+      · exact safe.queueFresh item member old
+    · simpa [payload] using safe.itemsNodup
+    · simpa [payload] using safe.queueNodup
+    · intro item member
+      rw [payload] at member ⊢
+      exact safe.queueSubset member
+
+private theorem insertContextualCompletedEdge?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (safe : PhaseCActivationSafe current.counter)
+    (selected : insertContextualCompletedEdge? current edge = some result) :
+    PhaseCActivationSafe result.counter := by
+  unfold insertContextualCompletedEdge? at selected
+  simp only at selected
+  split at selected
+  next present => cases selected; exact safe
+  next absent =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨pair, _ledgerEq, steppedEq⟩
+    exact runMappedPrimitive?_activationSafe_of_not_witness current _ _ result
+      safe (by simp) steppedEq
+
+private theorem insertContextualCompletedEdge?_total_of_ledgerReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (ledgerReady : ∃ pair,
+      CompletionBackpointerLedger.insertCompleted?
+        current.payload.completionBackpointers
+        current.payload.phaseC.contextualEdges edge = some pair)
+    (fresh : (.cubic .U04_completedEdgeInsert
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∉ current.counter.usedRev) :
+    ∃ result, insertContextualCompletedEdge? current edge = some result := by
+  unfold insertContextualCompletedEdge?
+  simp only
+  split
+  next present => exact ⟨current, rfl⟩
+  next absent =>
+    rcases ledgerReady with ⟨pair, ledgerEq⟩
+    rw [ledgerEq]
+    rcases pair with ⟨nextLedger, nextEdges⟩
+    simp [runMappedPrimitive?, fresh]
+
+private theorem insertContextualItem?_completionStorage
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (selected : insertContextualItem? current source item = some result) :
+    result.payload.completionBackpointers =
+        current.payload.completionBackpointers ∧
+      result.payload.phaseC.contextualEdges =
+        current.payload.phaseC.contextualEdges := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present => cases selected; exact ⟨rfl, rfl⟩
+  next absent =>
+    have payload := runMappedPrimitive?_payload current _ _ selected
+    constructor <;> rw [payload]
+
+private theorem contextualCompletedEdge?_edge_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge)) :
+    edge.waiting = waiting ∧ edge.finished = finished := by
+  unfold contextualCompletedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  next sameContext =>
+    have pairEq := Option.some.inj selected
+    have waitingEq : waiting = edge.waiting := by
+      simpa only using congrArg (fun pair => pair.2.waiting) pairEq
+    have finishedEq : finished = edge.finished := by
+      simpa only using congrArg (fun pair => pair.2.finished) pairEq
+    exact ⟨waitingEq.symm, finishedEq.symm⟩
+
+end Solcore.Surface.Multi.Chart
