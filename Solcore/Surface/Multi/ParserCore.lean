@@ -5533,6 +5533,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | postfixExpr : ExecutableRootRule .postfix
   | postfixPart : ExecutableRootRule .postfixPart
   | literalValue : ExecutableRootRule .literal
+  | lambdaExpr : ExecutableRootRule .lambda
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -6466,6 +6467,38 @@ def executeLiteralRoot
       executableTerminalLoc terminal
         (terminal.literalProjection .stringLiteral (by simp))
 
+/-- Execute a lambda from its arbitrary-length typed sequence view. -/
+def executeLambdaRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .lambda)) : Expression :=
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let returnExpr : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .arrow)),
+    .atom (.nonterminal .type)]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .lamKw)),
+    .atom (.terminal (.symbol .leftParen)),
+    .list0 parameterAtom,
+    .atom (.terminal (.symbol .rightParen)),
+    .optional returnExpr,
+    .atom (.nonterminal .body)]
+  let viewed := EbnfValue.sequenceFlatView children input
+  let parameters := (EbnfValue.list0View parameterAtom viewed.2.2.1).map
+    (EbnfValue.ruleView .parameter)
+  let returnType := (EbnfValue.optionalView returnExpr
+    viewed.2.2.2.2.1).map fun raw =>
+      let returnViewed := EbnfValue.sequence2View
+        (.atom (.terminal (.symbol .arrow)))
+        (.atom (.nonterminal .type)) raw
+      (EbnfValue.terminalView (.symbol .arrow) returnViewed.1,
+        EbnfValue.ruleView .type returnViewed.2)
+  let body := EbnfValue.ruleView .body viewed.2.2.2.2.2.1
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.lambda parameters (returnType.map Prod.snd) body)
+
 /-- Locate an infix result between its left and right operands. -/
 def executableBetween
     (file : WorkspaceFile) {α : Type}
@@ -6610,6 +6643,8 @@ def executeRootRule
   | .postfixExpr => executePostfixRoot file input
   | .postfixPart => executePostfixPartRoot input
   | .literalValue => executeLiteralRoot input
+  | .lambdaExpr =>
+      executeLambdaRoot file tokens origin finish owned ordered input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
