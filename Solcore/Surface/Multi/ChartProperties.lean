@@ -7065,6 +7065,122 @@ theorem executeConstructorSelectionRoot_reduces
           rawName).identifierProjection_projects)
       witness
 
+/-- The import-entry executor realizes its selected root reduction. -/
+theorem executeImportEntryRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .importEntry origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .importEntry)) :
+    RuleReduction file tokens .importEntry origin finish input
+      (executeImportEntryRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let starAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .star))
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .asKw)), identifierAtom]
+  let namedChildren : List EbnfExpr := [
+    identifierAtom, .optional (.sequence aliasChildren)]
+  change EbnfValue file tokens
+    (.choice [starAtom, .sequence namedChildren]) at input
+  generalize viewEq : EbnfValue.choice2View
+    starAtom (.sequence namedChildren) input = viewed
+  have inputEq := EbnfValue.choice2_of_view
+    starAtom (.sequence namedChildren) input
+  rw [viewEq] at inputEq
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases viewed with raw | raw
+  · let star := EbnfValue.terminalView (.symbol .star) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .star) raw
+    have resultEq : executeImportEntryRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.wildcard (RuleReduction.terminalLoc star .wildcard)) := by
+      rw [executeImportEntryRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .importEntryWildcard origin finish star (.wildcardStar star) witness
+  · let viewed := EbnfValue.sequence2View
+      identifierAtom (.optional (.sequence aliasChildren)) raw
+    let name := EbnfValue.terminalView
+      (.category .identifier) viewed.1
+    let nameData : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier := {
+      matched := name
+      spelling := name.identifierProjection.1
+      parsed := name.identifierProjection.2
+    }
+    have rawEq := EbnfValue.sequence2_of_view
+      identifierAtom (.optional (.sequence aliasChildren)) raw
+    have nameEq := EbnfValue.terminal_of_view
+      (.category .identifier) viewed.1
+    generalize optionalEq : EbnfValue.optionalView (.sequence aliasChildren)
+      viewed.2 = aliasValue
+    simp only [viewed, identifierAtom, aliasChildren] at optionalEq
+    cases aliasValue with
+    | none =>
+        have rawOptionalEq : EbnfValue.optional (.sequence aliasChildren)
+            none = viewed.2 := by
+          calc
+            _ = EbnfValue.optional (.sequence aliasChildren)
+                (EbnfValue.optionalView (.sequence aliasChildren)
+                  viewed.2) := by rw [optionalEq]
+            _ = viewed.2 := EbnfValue.optional_of_view
+              (.sequence aliasChildren) viewed.2
+        have resultEq : executeImportEntryRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.named
+              (RuleReduction.terminalLoc name name.identifierProjection.2)
+              none) := by
+          rw [executeImportEntryRoot, viewEq]
+          simp only
+          rw [optionalEq]
+          rfl
+        rw [resultEq, ← inputEq, ← rawEq, ← nameEq, ← rawOptionalEq]
+        exact .importEntryNamed origin finish nameData
+          name.identifierProjection_projects witness
+    | some rawAlias =>
+        let aliasViewed := EbnfValue.sequence2View
+          (.atom (.terminal (.hardKeyword .asKw))) identifierAtom rawAlias
+        let asKw := EbnfValue.terminalView
+          (.hardKeyword .asKw) aliasViewed.1
+        let aliasName := EbnfValue.terminalView
+          (.category .identifier) aliasViewed.2
+        let aliasData : RuleReduction.SpelledTerminalData file tokens
+            (.category .identifier) Identifier := {
+          matched := aliasName
+          spelling := aliasName.identifierProjection.1
+          parsed := aliasName.identifierProjection.2
+        }
+        have rawOptionalEq : EbnfValue.optional (.sequence aliasChildren)
+            (some rawAlias) = viewed.2 := by
+          calc
+            _ = EbnfValue.optional (.sequence aliasChildren)
+                (EbnfValue.optionalView (.sequence aliasChildren)
+                  viewed.2) := by rw [optionalEq]
+            _ = viewed.2 := EbnfValue.optional_of_view
+              (.sequence aliasChildren) viewed.2
+        have rawAliasEq := EbnfValue.sequence2_of_view
+          (.atom (.terminal (.hardKeyword .asKw))) identifierAtom rawAlias
+        have asEq := EbnfValue.terminal_of_view
+          (.hardKeyword .asKw) aliasViewed.1
+        have aliasNameEq := EbnfValue.terminal_of_view
+          (.category .identifier) aliasViewed.2
+        have resultEq : executeImportEntryRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.named
+              (RuleReduction.terminalLoc name name.identifierProjection.2)
+              (some (RuleReduction.terminalLoc aliasName
+                aliasName.identifierProjection.2))) := by
+          rw [executeImportEntryRoot, viewEq]
+          simp only
+          rw [optionalEq]
+          rfl
+        rw [resultEq, ← inputEq, ← rawEq, ← nameEq, ← rawOptionalEq,
+          ← rawAliasEq, ← asEq, ← aliasNameEq]
+        exact .importEntryAliased origin finish nameData aliasData asKw
+          name.identifierProjection_projects
+          aliasName.identifierProjection_projects witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -7079,6 +7195,8 @@ theorem executeRootRule_reduces
   cases executable with
   | module => exact executeModuleRoot_reduces origin finish ready input
   | topItem => exact executeTopItemRoot_reduces origin finish ready input
+  | importEntry =>
+      exact executeImportEntryRoot_reduces origin finish ready input
   | optionalComma =>
       exact executeOptionalCommaRoot_reduces origin finish ready input
   | predicateList =>
