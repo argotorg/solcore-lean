@@ -19982,3 +19982,300 @@ theorem g10NonAssociativeInputPresent_of_auxiliary_pair_some
       NonAssociativeLevel.operandRule] using sequencePresent
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+open Grammar Solcore.Workspace
+/-- Two reached present-optional completions force the aligned canonical
+nonassociative root reduction to expose a completed source operation. -/
+theorem g10CompletedValue_of_presentCompletionEdges
+    {file : WorkspaceFile} {tokens : List Token} {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo} {final : AllGuardsFinal memo}
+    (backpointer : CompletionBackpointerUnique file tokens memo correct final)
+    {cursor : Boundary tokens} {level : NonAssociativeLevel}
+    {origin : Boundary tokens} {context : GuardContext tokens}
+    {output : RuleValue level.rule}
+    (rootReduction : CoherentReduction file tokens memo correct final
+      (CanonicalCompleteRootItem tokens level.rule origin cursor context) output)
+    {rootWaiting sequence : ContextualItemKey tokens} {rootShared : Boundary tokens}
+    (rootReached : ContextualEdgeReach file tokens memo correct final
+      (.completed rootWaiting sequence (CanonicalCompleteRootItem tokens
+        level.rule origin cursor context) rootShared))
+    {sequenceWaiting optional : ContextualItemKey tokens}
+    {optionalShared : Boundary tokens} {site : OptionalSite}
+    (optionalReached : ContextualEdgeReach file tokens memo correct final
+      (.completed sequenceWaiting optional sequence optionalShared))
+    (optionalProduction : optional.raw.production = .opt site .some) :
+    ∃ first, CompletedNonAssociativeValue level output first := by
+  cases rootReduction with
+  | reduce _ rootValues _ _ rootComplete rootCoherent rootAction =>
+    cases rootCoherent with
+    | zero _ _ zero =>
+        change 1 = 0 at zero
+        omega
+    | scan _ _ _ _ witness _ _ => exact False.elim (g10ScannedCompleted_false
+        witness rootReached.1.1)
+    | complete semanticRootWaiting semanticSequence _ semanticRootShared
+        rootPriorValues sequenceValue rootWitness semanticRootEdge
+        rootPrior sequenceReduction =>
+      have sequenceEq : semanticSequence = sequence := g10CompletedEdge_finished_eq
+        backpointer semanticRootEdge rootReached
+      subst semanticSequence
+      cases sequenceReduction with
+      | reduce _ sequenceValues _ _ sequenceComplete sequenceCoherent
+          sequenceAction =>
+        cases sequenceCoherent with
+        | zero _ _ zero =>
+            rcases optionalReached.1.1 with ⟨_, _, _, _, _, _, advance⟩
+            rcases advance with ⟨_, dot, _, _⟩
+            omega
+        | scan _ _ _ _ witness _ _ => exact False.elim (g10ScannedCompleted_false
+            witness optionalReached.1.1)
+        | complete semanticSequenceWaiting semanticOptional _
+            semanticOptionalShared sequencePriorValues optionalValue
+            optionalWitness semanticOptionalEdge sequencePrior
+            optionalReduction =>
+          have optionalEq : semanticOptional = optional :=
+            g10CompletedEdge_finished_eq backpointer semanticOptionalEdge
+              optionalReached
+          subst semanticOptional
+          cases optionalReduction with
+          | reduce _ optionalValues _ _ optionalComplete optionalCoherent
+              optionalAction =>
+            rcases optional with ⟨⟨optionalProductionId, optionalDot,
+              optionalOrigin, optionalCurrent⟩, optionalContext⟩
+            simp only at optionalProduction
+            subst optionalProductionId
+            cases optionalAction
+            have sequenceLhs : sequence.raw.production.lhs =
+                .aux (GrammarSite.root level.rule) := by
+              rcases rootReached.1.1 with
+                ⟨_, rootNext, _, finishedLhs, _, _, rootAdvance⟩
+              rcases rootAdvance with ⟨waitingProduction, waitingDot, _, _⟩
+              have waitingProductionEq : rootWaiting.raw.production =
+                  .root level.rule := by
+                have exactEq := waitingProduction.symm
+                simpa [CanonicalCompleteRootItem] using exactEq
+              have waitingDotEq : rootWaiting.raw.dot.val = 0 := by
+                change 1 = rootWaiting.raw.dot.val + 1 at waitingDot
+                omega
+              have exactRootNext : NextSymbol rootWaiting.raw (.nonterminal
+                  sequence.raw.production.lhs) := by
+                rw [finishedLhs]
+                exact rootNext
+              let index : Nat := rootWaiting.raw.dot.val
+              have indexZero : index = 0 := waitingDotEq
+              have selectedSymbol : some (GrammarSymbol.nonterminal
+                  sequence.raw.production.lhs) = some (GrammarSymbol.nonterminal
+                    (.aux (GrammarSite.root level.rule))) := by
+                calc
+                  _ = rootWaiting.raw.production.rhs[index]? :=
+                    exactRootNext.2.symm
+                  _ = (ProductionId.root level.rule).rhs[index]? := congrArg
+                    (fun production : ProductionId => production.rhs[index]?)
+                      waitingProductionEq
+                  _ = _ := by simp [indexZero, ProductionId.rhs]
+              exact GrammarSymbol.nonterminal.inj (Option.some.inj selectedSymbol)
+            obtain ⟨sequenceSite, sequenceProduction⟩ :=
+              g10NonAssociativeRootChild_isSequence level sequence.raw.production
+                sequenceLhs
+            rcases sequence with ⟨⟨sequenceProductionId, sequenceDot,
+              sequenceOrigin, sequenceCurrent⟩, sequenceContext⟩
+            simp only at sequenceProduction
+            subst sequenceProductionId
+            cases sequenceAction
+            cases rootAction with
+            | root _ _ _ _ _ reduces =>
+              have sequenceSiteRoot : sequenceSite.site = GrammarSite.root
+                  level.rule :=
+                NonterminalSymbol.aux.inj sequenceLhs
+              have childrenExpressions :=
+                SequenceSite.children_expression sequenceSite
+              rw [sequenceSiteRoot, GrammarSite.root_expression,
+                g10NonAssociative_rhs_eq] at childrenExpressions
+              simp only [EbnfExpr.children] at childrenExpressions
+              have childrenLength : sequenceSite.children.length = 2 := by
+                have exactLength := congrArg List.length childrenExpressions
+                simpa using exactLength
+              obtain ⟨firstSite, secondSite, childrenEq⟩ :=
+                g10List_eq_pair_of_length_two sequenceSite.children childrenLength
+              have childExpressions : firstSite.expression =
+                    .atom (.nonterminal level.operandRule) ∧
+                  secondSite.expression = .optional level.tailExpr := by
+                simpa [childrenEq] using childrenExpressions
+              have sequenceDotValue : sequenceDot.val = 2 := by
+                unfold CompleteItem at sequenceComplete
+                simpa only [ProductionId.rhs_seq, List.length_map,
+                  childrenLength] using sequenceComplete
+              have sequenceWaitingProduction : semanticSequenceWaiting.raw.production
+                  = .seq sequenceSite := optionalWitness.advance.1.symm
+              have sequenceWaitingDot :
+                  semanticSequenceWaiting.raw.dot.val = 1 := by
+                have advanced := optionalWitness.advance.2.1
+                change sequenceDot.val =
+                  semanticSequenceWaiting.raw.dot.val + 1 at advanced
+                omega
+              have secondSiteEq : secondSite = site.site := by
+                have rhsEq : semanticSequenceWaiting.raw.production.rhs =
+                    (ProductionId.seq sequenceSite).rhs :=
+                  congrArg ProductionId.rhs sequenceWaitingProduction
+                have nextLookup : (ProductionId.seq sequenceSite).rhs[1]? =
+                    some (GrammarSymbol.nonterminal (.aux site.site)) := by
+                  calc
+                    _ = semanticSequenceWaiting.raw.production.rhs[1]? := congrArg
+                      (fun rhs : List GrammarSymbol => rhs[1]?) rhsEq.symm
+                    _ = semanticSequenceWaiting.raw.production.rhs[
+                          semanticSequenceWaiting.raw.dot.val]? := by
+                      rw [sequenceWaitingDot]
+                    _ = _ := optionalWitness.next.2
+                simp only [ProductionId.rhs_seq, childrenEq] at nextLookup
+                exact NonterminalSymbol.aux.inj (GrammarSymbol.nonterminal.inj
+                  (Option.some.inj nextLookup))
+              subst secondSite
+              have rootWaitingProduction : semanticRootWaiting.raw.production =
+                  .root level.rule :=
+                rootWitness.advance.1.symm
+              have rootWaitingDot :
+                  semanticRootWaiting.raw.dot.val = 0 := by
+                have advanced := rootWitness.advance.2.1
+                change 1 = semanticRootWaiting.raw.dot.val + 1 at advanced
+                omega
+              rcases semanticRootWaiting with ⟨⟨semanticRootProduction,
+                semanticRootDot, semanticRootOrigin, semanticRootCurrent⟩,
+                semanticRootContext⟩
+              simp only at rootWaitingProduction rootWaitingDot ⊢
+              subst semanticRootProduction
+              let exactRootDot : Fin
+                  ((ProductionId.root level.rule).rhs.length + 1) :=
+                ⟨0, by simp [ProductionId.rhs]⟩
+              have semanticRootDotEq : semanticRootDot = exactRootDot :=
+                Fin.ext rootWaitingDot
+              subst semanticRootDot
+              rcases semanticSequenceWaiting with ⟨⟨semanticWaitingProduction,
+                semanticWaitingDot, semanticWaitingOrigin,
+                semanticWaitingCurrent⟩, semanticWaitingContext⟩
+              simp only at sequenceWaitingProduction sequenceWaitingDot ⊢
+              subst semanticWaitingProduction
+              rcases semanticWaitingDot with
+                ⟨semanticWaitingDotValue, semanticWaitingDotBound⟩
+              simp only at sequenceWaitingDot ⊢
+              subst semanticWaitingDotValue
+              dsimp only [exactRootDot] at rootPriorValues reduces
+              change Unit at rootPriorValues
+              rcases rootPriorValues with ⟨⟩
+              have sequencePriorLayout : (ProductionId.seq sequenceSite).rhs.take
+                  1 = [GrammarSymbol.nonterminal (.aux firstSite)] := by
+                simp [ProductionId.rhs_seq, childrenEq]
+              generalize canonicalEq :
+                  GrammarSymbolValues.transport sequencePriorLayout
+                    sequencePriorValues = canonicalSequencePrior
+              rcases canonicalSequencePrior with
+                ⟨firstValue, sequencePriorTail⟩
+              rcases sequencePriorTail with ⟨⟩
+              have sequencePriorRecover :
+                  GrammarSymbolValues.transport sequencePriorLayout.symm
+                      (firstValue, ()) = sequencePriorValues := by
+                rw [← canonicalEq,
+                  GrammarSymbolValues.transport_trans]
+                exact GrammarSymbolValues.transport_self _ _
+              rw [← sequencePriorRecover] at reduces
+              let sequenceBefore : ContextualItemKey tokens :=
+                ⟨⟨.seq sequenceSite, ⟨1, semanticWaitingDotBound⟩,
+                  semanticWaitingOrigin, semanticWaitingCurrent⟩,
+                  semanticWaitingContext⟩
+              let optionalItem : ContextualItemKey tokens :=
+                ⟨⟨.opt site .some, optionalDot, optionalOrigin,
+                  optionalCurrent⟩, optionalContext⟩
+              let sequenceAfter : ContextualItemKey tokens :=
+                ⟨⟨.seq sequenceSite, sequenceDot, sequenceOrigin,
+                  sequenceCurrent⟩, sequenceContext⟩
+              rw [PrefixValues.fullValue_completeValue_eq] at reduces
+              rw [PrefixValues.fullValue_completeValue_eq] at reduces
+              have sequenceTargetLayout :
+                  sequenceSite.children.map (fun child =>
+                      GrammarSymbol.nonterminal (.aux child)) =
+                    [GrammarSymbol.nonterminal (.aux firstSite),
+                      GrammarSymbol.nonterminal (.aux site.site)] := by
+                rw [childrenEq]
+                rfl
+              have rootSymbolLayout :
+                  GrammarSymbol.nonterminal (.aux sequenceSite.site) =
+                    GrammarSymbol.nonterminal
+                      (.aux (GrammarSite.root level.rule)) :=
+                congrArg (fun child =>
+                  GrammarSymbol.nonterminal (.aux child)) sequenceSiteRoot
+              let optionalPacked := OptionalSite.pack site .some
+                (PrefixValues.fullValue optionalItem optionalComplete
+                  optionalValues)
+              have sequenceTupleEq :
+                  GrammarSymbolValues.view
+                      (ProductionId.rhs_seq sequenceSite)
+                      (GrammarSymbolValues.transport
+                        ((prefix_complete_layout sequenceBefore.raw
+                          optionalItem.raw sequenceAfter.raw
+                          optionalWitness.next optionalWitness.advance).trans
+                          (prefix_full_layout sequenceAfter.raw
+                            sequenceComplete))
+                        (GrammarSymbolValues.append
+                          (GrammarSymbolValues.transport
+                            sequencePriorLayout.symm (firstValue, ()))
+                          (optionalPacked, ()))) =
+                    GrammarSymbolValues.transport
+                      sequenceTargetLayout.symm
+                      (firstValue, (optionalPacked, ())) := by
+                exact GrammarSymbolValues.transport_append_pair_to
+                  sequencePriorLayout _ _ sequenceTargetLayout
+                    firstValue optionalPacked
+              dsimp only [sequenceBefore, optionalItem, sequenceAfter,
+                optionalPacked] at sequenceTupleEq
+              simp only [RootAction.unpack, SequenceSite.pack] at reduces
+              conv at reduces in
+                  (EbnfValues.ofAuxiliaries _
+                    (GrammarSymbolValues.view _ _)) =>
+                rw [sequenceTupleEq]
+              let rootBefore : ContextualItemKey tokens :=
+                ⟨⟨.root level.rule, exactRootDot, semanticRootOrigin,
+                  semanticRootCurrent⟩, semanticRootContext⟩
+              let sequencePacked := EbnfValue.ofShape
+                sequenceSite.expression_eq_sequence
+                (EbnfValue.sequence
+                  (sequenceSite.children.map GrammarSite.expression)
+                  (EbnfValues.ofAuxiliaries sequenceSite.children
+                    (GrammarSymbolValues.transport
+                      sequenceTargetLayout.symm
+                      (firstValue, (optionalPacked, ())))))
+              have rootTupleEq :
+                  GrammarSymbolValues.view
+                      (ProductionId.rhs_root level.rule)
+                      (GrammarSymbolValues.transport
+                        ((prefix_complete_layout rootBefore.raw
+                          sequenceAfter.raw
+                          (CanonicalCompleteRootItem tokens level.rule
+                            origin cursor context).raw rootWitness.next
+                            rootWitness.advance).trans
+                          (prefix_full_layout
+                            (CanonicalCompleteRootItem tokens level.rule
+                              origin cursor context).raw rootComplete))
+                        (GrammarSymbolValues.append (left := []) ()
+                          (sequencePacked, ()))) =
+                    (Eq.mp (congrArg
+                      (GrammarSymbolValue file tokens) rootSymbolLayout)
+                      sequencePacked, ()) := by
+                exact GrammarSymbolValues.transport_append_single_to
+                  _ _ rootSymbolLayout sequencePacked
+              dsimp only [rootBefore, sequenceAfter, sequencePacked,
+                optionalPacked, optionalItem] at rootTupleEq
+              generalize rootValuesEq : GrammarSymbolValues.view
+                  (ProductionId.rhs_root level.rule) _ = rootValues at reduces
+              have rootValuesCanonical : rootValues =
+                  (Eq.mp (congrArg
+                    (GrammarSymbolValue file tokens) rootSymbolLayout)
+                    sequencePacked, ()) :=
+                rootValuesEq.symm.trans rootTupleEq
+              rw [rootValuesCanonical] at reduces
+              apply reduces.nonAssociative_completed_of_input_present
+              exact g10NonAssociativeInputPresent_of_auxiliary_pair_some
+                level sequenceSite site firstSite sequenceSiteRoot childrenEq
+                childExpressions.1 childExpressions.2 sequenceTargetLayout
+                childrenExpressions firstValue
+                (PrefixValues.fullValue optionalItem optionalComplete
+                  optionalValues)
+end Solcore.Surface.Multi
