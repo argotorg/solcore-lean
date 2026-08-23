@@ -19990,3 +19990,257 @@ private theorem insertContextualCompletedEdge?_completionSafe
     · exact Or.inr (safe waiting finished old)
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem chargeContextualScan_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (safe : PhaseCItemSafe current)
+    (dequeued : (.linear .L01_itemDequeue
+      (contextualLinearKey before) : UnitAddress tokens) ∈
+        current.counter.usedRev)
+    (selected : runMappedPrimitive? current
+      (.linear .L04_scanAttempt (contextualLinearKey before)) id =
+        some result) :
+    PhaseCItemSafe result := by
+  have payload := runMappedPrimitive?_payload current _ id selected
+  have used := runMappedPrimitive?_usedRev current _ id result selected
+  constructor
+  · intro source item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · cases source <;>
+        simp [ContextualItemInsertSource.unitKind] at equal
+    · simpa [payload] using safe.inserted source item old
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · simpa [payload] using safe.dequeued item old
+  · intro item production member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.predicted item production old)
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp only [UnitAddress.linear.injEq] at equal
+      have itemEq := contextualLinearKey_injective equal.2
+      rw [itemEq, used]
+      exact List.mem_cons_of_mem _ dequeued
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scanned item old)
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · simp at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+  · intro item member usedItem
+    rw [payload] at member
+    rw [used, List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · simp at equal
+    · exact safe.queueFresh item member old
+  · simpa [payload] using safe.itemsNodup
+  · simpa [payload] using safe.queueNodup
+  · intro item member
+    rw [payload] at member ⊢
+    exact safe.queueSubset member
+
+private theorem insertContextualScannedEdge?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (fresh : (.linear .L06_scannedEdgeInsert
+      (contextualLinearKey edge.before) : UnitAddress tokens) ∉
+        current.counter.usedRev) :
+    ∃ result, insertContextualScannedEdge? current edge = some result := by
+  unfold insertContextualScannedEdge?
+  simp only
+  split
+  next present => exact ⟨current, rfl⟩
+  next absent => simp [runMappedPrimitive?, fresh]
+
+private theorem insertContextualScannedEdge?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (safe : PhaseCItemSafe current)
+    (dequeued : (.linear .L01_itemDequeue
+      (contextualLinearKey edge.before) : UnitAddress tokens) ∈
+        current.counter.usedRev)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCItemSafe result := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  next present => cases selected; exact safe
+  next absent =>
+    have payload := runMappedPrimitive?_payload current _ _ selected
+    have used := runMappedPrimitive?_usedRev current _ _ result selected
+    constructor
+    · intro source item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · cases source <;>
+          simp [ContextualItemInsertSource.unitKind] at equal
+      · simpa [payload] using safe.inserted source item old
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · simpa [payload] using safe.dequeued item old
+    · intro item production member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.predicted item production old)
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp at equal
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scanned item old)
+    · intro item member
+      rw [used, List.mem_cons] at member
+      rcases member with equal | old
+      · simp only [UnitAddress.linear.injEq] at equal
+        have itemEq := contextualLinearKey_injective equal.2
+        rw [itemEq, used]
+        exact List.mem_cons_of_mem _ dequeued
+      · rw [used]
+        exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+    · intro item member usedItem
+      rw [payload] at member
+      rw [used, List.mem_cons] at usedItem
+      rcases usedItem with equal | old
+      · simp at equal
+      · exact safe.queueFresh item member old
+    · simpa [payload] using safe.itemsNodup
+    · simpa [payload] using safe.queueNodup
+    · intro item member
+      rw [payload] at member ⊢
+      exact safe.queueSubset member
+
+private theorem insertContextualScannedEdge?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (safe : PhaseCActivationSafe current.counter)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCActivationSafe result.counter := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  next present => cases selected; exact safe
+  next absent =>
+    exact runMappedPrimitive?_activationSafe_of_not_witness current _ _ result
+      safe (by simp) selected
+
+private theorem contextualScannedEdge?_before_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (selected : contextualScannedEdge? owned before = some (after, edge)) :
+    edge.before = before := by
+  unfold contextualScannedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  simp only at selected
+  split at selected <;> try contradiction
+  next matched matchEq =>
+    have pairEq := Option.some.inj selected
+    have beforeEq : before = edge.before := by
+      simpa only using congrArg (fun pair => pair.2.before) pairEq
+    exact beforeEq.symm
+
+private theorem attemptContextualScan?_total_safe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (itemSafe : PhaseCItemSafe current)
+    (activationSafe : PhaseCActivationSafe current.counter)
+    (dequeued : (.linear .L01_itemDequeue
+      (contextualLinearKey before) : UnitAddress tokens) ∈
+        current.counter.usedRev)
+    (scanFresh : (.linear .L04_scanAttempt
+      (contextualLinearKey before) : UnitAddress tokens) ∉
+        current.counter.usedRev)
+    (edgeFresh : (.linear .L06_scannedEdgeInsert
+      (contextualLinearKey before) : UnitAddress tokens) ∉
+        current.counter.usedRev) :
+    ∃ result, attemptContextualScan? owned current before = some result ∧
+      PhaseCItemSafe result ∧ PhaseCActivationSafe result.counter := by
+  unfold attemptContextualScan?
+  by_cases applicable : contextualScanApplicable before = true
+  · rw [if_pos applicable]
+    let attempted : CountedState tokens (PhaseCWorklist file tokens) := {
+      payload := current.payload
+      counter := current.counter.charge
+        (.linear .L04_scanAttempt (contextualLinearKey before)) scanFresh
+    }
+    have attemptedEq : runMappedPrimitive? current
+        (.linear .L04_scanAttempt (contextualLinearKey before)) id =
+          some attempted := by
+      simp [runMappedPrimitive?, scanFresh, attempted]
+    have attemptedItemSafe := chargeContextualScan_itemSafe current attempted
+      before itemSafe dequeued attemptedEq
+    have attemptedActivationSafe :=
+      runMappedPrimitive?_activationSafe_of_not_witness current _ id attempted
+        activationSafe (by simp) attemptedEq
+    have attemptedEdgeFresh : (.linear .L06_scannedEdgeInsert
+        (contextualLinearKey before) : UnitAddress tokens) ∉
+          attempted.counter.usedRev := by
+      rw [runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+      simp [edgeFresh]
+    have attemptedDequeued : (.linear .L01_itemDequeue
+        (contextualLinearKey before) : UnitAddress tokens) ∈
+          attempted.counter.usedRev := by
+      rw [runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+      exact List.mem_cons_of_mem _ dequeued
+    rw [attemptedEq]
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none => exact ⟨attempted, rfl, attemptedItemSafe,
+        attemptedActivationSafe⟩
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        obtain ⟨withItem, itemEq⟩ := insertContextualItem?_total attempted
+          .scan after attemptedItemSafe
+        have withItemSafe := insertContextualItem?_itemSafe attempted withItem
+          .scan after attemptedItemSafe itemEq
+        have withItemActivationSafe := insertContextualItem?_activationSafe
+          attempted withItem .scan after attemptedActivationSafe itemEq
+        have edgeBefore := contextualScannedEdge?_before_eq owned before after
+          edge scannedEq
+        have withItemEdgeFresh : (.linear .L06_scannedEdgeInsert
+            (contextualLinearKey edge.before) : UnitAddress tokens) ∉
+              withItem.counter.usedRev := by
+          rw [edgeBefore]
+          exact insertContextualItem?_preserves_fresh attempted withItem .scan
+            after _ (by simp [ContextualItemInsertSource.unitKind])
+              attemptedEdgeFresh itemEq
+        obtain ⟨result, edgeEq⟩ := insertContextualScannedEdge?_total withItem
+          edge withItemEdgeFresh
+        exact ⟨result, by simp [itemEq, edgeEq],
+          insertContextualScannedEdge?_itemSafe withItem result edge
+            withItemSafe (by
+              rw [edgeBefore]
+              exact insertContextualItem?_used_mono attempted withItem .scan
+                after itemEq attemptedDequeued) edgeEq,
+          insertContextualScannedEdge?_activationSafe withItem result edge
+            withItemActivationSafe edgeEq⟩
+  · rw [if_neg (by simpa using applicable)]
+    exact ⟨current, rfl, itemSafe, activationSafe⟩
+
+end Solcore.Surface.Multi.Chart
