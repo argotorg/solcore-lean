@@ -1999,6 +1999,71 @@ theorem matchedTerminal_literal_projection_exact
                   literalPayload = .string spelling decoded)) :=
   Iff.rfl
 
+/-- Compute a source-preserving literal payload from one stream value. -/
+def executableLiteralProjection? :
+    TerminalCategory → TerminalStreamValue → Option LiteralPayload
+  | .decimalLiteral, .retained token =>
+      match token.payload with
+      | .decimalLiteral spelling digits => some (.decimal spelling digits)
+      | _ => none
+  | .hexadecimalLiteral, .retained token =>
+      match token.payload with
+      | .hexadecimalLiteral spelling digits =>
+          some (.hexadecimal spelling digits)
+      | _ => none
+  | .stringLiteral, .retained token =>
+      match token.payload with
+      | .stringLiteral spelling decoded => some (.string spelling decoded)
+      | _ => none
+  | _, _ => none
+
+/-- Every checked literal value has a computed payload. -/
+theorem executableLiteralProjection?_isSome_of_matches
+    (category : TerminalCategory) (value : TerminalStreamValue)
+    (literalCategory : category = .decimalLiteral ∨
+      category = .hexadecimalLiteral ∨ category = .stringLiteral)
+    (matchedEvidence : TerminalMatches (.category category) value) :
+    (executableLiteralProjection? category value).isSome = true := by
+  rcases literalCategory with rfl | rfl | rfl <;>
+    cases value with
+    | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | retained token =>
+        rcases matchedEvidence with ⟨spelling, payload, payloadEq⟩
+        simp [executableLiteralProjection?, payloadEq]
+
+/-- Constructively project one checked literal terminal. -/
+def MatchedTerminal.literalProjection
+    {file : WorkspaceFile} {tokens : List Token}
+    (category : TerminalCategory)
+    (literalCategory : category = .decimalLiteral ∨
+      category = .hexadecimalLiteral ∨ category = .stringLiteral)
+    (matched : MatchedTerminal file tokens (.category category)) :
+    LiteralPayload :=
+  (executableLiteralProjection? category matched.value).get (by
+    exact executableLiteralProjection?_isSome_of_matches category
+      matched.value literalCategory matched.matches)
+
+/-- The computed literal payload satisfies the declarative projection. -/
+theorem MatchedTerminal.literalProjection_projects
+    {file : WorkspaceFile} {tokens : List Token}
+    (category : TerminalCategory)
+    (literalCategory : category = .decimalLiteral ∨
+      category = .hexadecimalLiteral ∨ category = .stringLiteral)
+    (matched : MatchedTerminal file tokens (.category category)) :
+    LiteralProjects matched
+      (matched.literalProjection category literalCategory) := by
+  rcases literalCategory with rfl | rfl | rfl <;>
+    rcases matched with
+      ⟨cursor, value, span, terminalAt, matchedEvidence⟩ <;>
+    cases value with
+    | endOfFile => simp [TerminalMatches] at matchedEvidence
+    | retained token =>
+        rcases matchedEvidence with ⟨spelling, payload, payloadEq⟩
+        unfold LiteralProjects
+        simp only [MatchedTerminal.literalProjection,
+          executableLiteralProjection?, payloadEq, Option.get_some]
+        simp [payloadEq]
+
 /-- Exact opaque assembly slice projected from one assembly terminal. -/
 def AssemblySliceProjects
     {file : WorkspaceFile} {tokens : List Token}
@@ -5467,6 +5532,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | prefix : ExecutableRootRule .prefix
   | postfixExpr : ExecutableRootRule .postfix
   | postfixPart : ExecutableRootRule .postfixPart
+  | literalValue : ExecutableRootRule .literal
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -6378,6 +6444,28 @@ def executeQualifiedNameRoot
     }
   }
 
+/-- Execute a literal from its selected source token category. -/
+def executeLiteralRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .literal)) : Literal :=
+  match EbnfValue.choiceView [
+      .atom (.terminal (.category .decimalLiteral)),
+      .atom (.terminal (.category .hexadecimalLiteral)),
+      .atom (.terminal (.category .stringLiteral))] input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let terminal := EbnfValue.terminalView (.category .decimalLiteral) raw
+      executableTerminalLoc terminal
+        (terminal.literalProjection .decimalLiteral (by simp))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let terminal := EbnfValue.terminalView
+        (.category .hexadecimalLiteral) raw
+      executableTerminalLoc terminal
+        (terminal.literalProjection .hexadecimalLiteral (by simp))
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let terminal := EbnfValue.terminalView (.category .stringLiteral) raw
+      executableTerminalLoc terminal
+        (terminal.literalProjection .stringLiteral (by simp))
+
 /-- Locate an infix result between its left and right operands. -/
 def executableBetween
     (file : WorkspaceFile) {α : Type}
@@ -6521,6 +6609,7 @@ def executeRootRule
       executePrefixRoot file tokens origin finish owned ordered input
   | .postfixExpr => executePostfixRoot file input
   | .postfixPart => executePostfixPartRoot input
+  | .literalValue => executeLiteralRoot input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
