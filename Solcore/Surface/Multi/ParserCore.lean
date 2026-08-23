@@ -5734,6 +5734,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | fieldDecl : ExecutableRootRule .fieldDecl
   | fallbackDecl : ExecutableRootRule .fallbackDecl
   | pragmaDecl : ExecutableRootRule .pragmaDecl
+  | exportItem : ExecutableRootRule .exportItem
   | constructorSelection : ExecutableRootRule .constructorSelection
   | hidingClause : ExecutableRootRule .hidingClause
   | body : ExecutableRootRule .body
@@ -6618,6 +6619,30 @@ def executePragmaDeclRoot
         targets := executePragmaTargets viewed.2.2.1
       }
 
+/-- Execute one exported item and its optional constructor selection. -/
+def executeExportItemRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .exportItem)) :
+    ExportItem :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let selectionAtom : EbnfExpr :=
+    .atom (.nonterminal .constructorSelection)
+  let viewed := EbnfValue.sequence2View
+    identifierAtom (.optional selectionAtom) input
+  let name := EbnfValue.terminalView
+    (.category .identifier) viewed.1
+  let selection := (EbnfValue.optionalView selectionAtom viewed.2).map
+    (EbnfValue.ruleView .constructorSelection)
+  sourceLoc
+      (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+    name := { span := name.span, payload := name.identifierProjection.2 }
+    constructors := selection
+  }
+
 /-- Execute constructor selections attached to exported items. -/
 def executeConstructorSelectionRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -7460,6 +7485,8 @@ def executeRootRule
       executeFallbackDeclRoot file tokens origin finish owned ordered input
   | .pragmaDecl =>
       executePragmaDeclRoot file tokens origin finish owned ordered input
+  | .exportItem =>
+      executeExportItemRoot file tokens origin finish owned ordered input
   | .constructorSelection =>
       executeConstructorSelectionRoot file tokens origin finish
         owned ordered input
