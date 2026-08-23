@@ -2084,6 +2084,51 @@ theorem matchedTerminal_assembly_projection_exact
           token.payload = .assemblyBlock slice :=
   Iff.rfl
 
+/-- Compute the opaque assembly slice carried by one stream value. -/
+def executableAssemblyProjection? :
+    TerminalStreamValue → Option AssemblySlice
+  | .retained token =>
+      match token.payload with
+      | .assemblyBlock slice => some slice
+      | _ => none
+  | .endOfFile => none
+
+/-- Every value checked as an assembly block has a computed slice. -/
+theorem executableAssemblyProjection?_isSome_of_matches
+    (value : TerminalStreamValue)
+    (matchedEvidence : TerminalMatches (.category .assemblyBlock) value) :
+    (executableAssemblyProjection? value).isSome = true := by
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with ⟨slice, payloadEq⟩
+      simp [executableAssemblyProjection?, payloadEq]
+
+/-- Constructively project one checked assembly-block terminal. -/
+def MatchedTerminal.assemblyProjection
+    {file : WorkspaceFile} {tokens : List Token}
+    (matched : MatchedTerminal file tokens (.category .assemblyBlock)) :
+    AssemblySlice :=
+  (executableAssemblyProjection? matched.value).get (by
+    exact executableAssemblyProjection?_isSome_of_matches
+      matched.value matched.matches)
+
+/-- The computed assembly slice satisfies the declarative projection. -/
+theorem MatchedTerminal.assemblyProjection_projects
+    {file : WorkspaceFile} {tokens : List Token}
+    (matched : MatchedTerminal file tokens (.category .assemblyBlock)) :
+    AssemblySliceProjects matched matched.assemblyProjection := by
+  rcases matched with
+    ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with ⟨slice, payloadEq⟩
+      unfold AssemblySliceProjects
+      simp only [MatchedTerminal.assemblyProjection,
+        executableAssemblyProjection?, payloadEq, Option.get_some]
+      exact ⟨token, rfl, payloadEq⟩
+
 private theorem projectedPathSpelling_functional
     {token : Token} {left right : String}
     (leftShape : token.payload = .identifier left ∨
