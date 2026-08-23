@@ -19686,3 +19686,213 @@ theorem g10List_eq_pair_of_length_two
       | cons third tail => simp at length
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+theorem transport_sequence_pair_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {firstSource secondSource firstTarget secondTarget : EbnfExpr}
+    (firstEq : firstSource = firstTarget)
+    (secondEq : secondSource = secondTarget)
+    (layout : [firstSource, secondSource] =
+      [firstTarget, secondTarget])
+    (firstValue : EbnfValue file tokens firstSource)
+    (secondValue : EbnfValue file tokens secondSource) :
+    EbnfValue.transport (congrArg EbnfExpr.sequence layout)
+        (EbnfValue.sequence [firstSource, secondSource]
+          (EbnfValues.cons firstSource [secondSource] firstValue
+            (EbnfValues.cons secondSource [] secondValue
+              EbnfValues.nil))) =
+      EbnfValue.sequence [firstTarget, secondTarget]
+        (EbnfValues.cons firstTarget [secondTarget]
+          (EbnfValue.transport firstEq firstValue)
+          (EbnfValues.cons secondTarget []
+            (EbnfValue.transport secondEq secondValue)
+            EbnfValues.nil)) := by
+  cases firstEq
+  cases secondEq
+  have exactLayout : layout = rfl := Subsingleton.elim _ _
+  rw [exactLayout]
+  simp only [EbnfValue.transport_self]
+
+theorem sequence2View_transport_pair_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {firstSource secondSource firstTarget secondTarget : EbnfExpr}
+    (firstEq : firstSource = firstTarget)
+    (secondEq : secondSource = secondTarget)
+    (layout : [firstSource, secondSource] =
+      [firstTarget, secondTarget])
+    (values : EbnfValues file tokens [firstSource, secondSource]) :
+    EbnfValue.sequence2View firstTarget secondTarget
+        (EbnfValue.transport (congrArg EbnfExpr.sequence layout)
+          (EbnfValue.sequence [firstSource, secondSource] values)) =
+      (EbnfValue.transport firstEq
+          (EbnfValues.consView firstSource [secondSource] values).1,
+        EbnfValue.transport secondEq
+          (EbnfValues.consView secondSource []
+            (EbnfValues.consView firstSource [secondSource] values).2).1) := by
+  cases firstEq
+  cases secondEq
+  have exactLayout : layout = rfl := Subsingleton.elim _ _
+  rw [exactLayout]
+  simp [EbnfValue.sequence2View, EbnfValue.sequenceView,
+    EbnfValue.sequence, EbnfValue.transport_self]
+
+theorem transport_optional_some_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {source target : EbnfExpr} (shape : source = target)
+    (value : EbnfValue file tokens source) :
+    EbnfValue.transport (congrArg EbnfExpr.optional shape)
+        (EbnfValue.optional source (some value)) =
+      EbnfValue.optional target
+        (some (EbnfValue.transport shape value)) := by
+  cases shape
+  simp only [EbnfValue.transport_self]
+
+theorem optionalView_atShape_pack_some_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (site : OptionalSite) {target : EbnfExpr}
+    (shape : site.site.expression = .optional target)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.opt site .some).rhs) :
+    ∃ value, EbnfValue.optionalView target
+      (EbnfValue.atShape shape
+        (OptionalSite.pack site .some values)) = some value := by
+  have childShape : site.child.expression = target :=
+    EbnfExpr.optional.inj
+      (site.expression_eq_optional.symm.trans shape)
+  let value := GrammarSymbolValues.view
+    (ProductionId.rhs_opt_some site) values |>.1
+  refine ⟨EbnfValue.transport childShape value, ?_⟩
+  have shapeEq : shape = site.expression_eq_optional.trans
+      (congrArg EbnfExpr.optional childShape) :=
+    Subsingleton.elim _ _
+  rw [shapeEq]
+  change EbnfValue.optionalView target
+    (EbnfValue.transport
+      (site.expression_eq_optional.trans
+        (congrArg EbnfExpr.optional childShape))
+      (OptionalSite.pack site .some values)) = _
+  rw [← EbnfValue.transport_trans]
+  change EbnfValue.optionalView target
+    (EbnfValue.transport (congrArg EbnfExpr.optional childShape)
+      (EbnfValue.atShape site.expression_eq_optional
+        (OptionalSite.pack site .some values))) = _
+  rw [OptionalSite.pack_some_eq,
+    transport_optional_some_eq]
+  simp [value, EbnfValue.optionalView, EbnfValue.optional]
+  exact childShape
+
+theorem auxiliaryValue_transport_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : GrammarSite} (siteEq : left = right)
+    (value : EbnfValue file tokens left.expression) :
+    Eq.mp (congrArg (GrammarSymbolValue file tokens)
+          (congrArg (fun site =>
+            GrammarSymbol.nonterminal (.aux site)) siteEq)) value =
+      EbnfValue.transport (congrArg GrammarSite.expression siteEq) value := by
+  cases siteEq
+  rfl
+
+theorem nonAssociativeRoot_sequenceTransport_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (level : NonAssociativeLevel) (site : SequenceSite)
+    (siteRoot : site.site = GrammarSite.root level.rule)
+    (layout : EbnfExpr.sequence
+        (site.children.map GrammarSite.expression) = m2cV1.rhs level.rule)
+    (value : EbnfValue file tokens
+      (.sequence (site.children.map GrammarSite.expression))) :
+    EbnfValue.atShape (GrammarSite.root_expression level.rule)
+        (Eq.mp (congrArg (GrammarSymbolValue file tokens)
+            (congrArg (fun child =>
+              GrammarSymbol.nonterminal (.aux child)) siteRoot))
+          (EbnfValue.ofShape site.expression_eq_sequence value)) =
+      EbnfValue.transport layout value := by
+  let packed := EbnfValue.ofShape site.expression_eq_sequence value
+  have outerAligned :
+      EbnfValue.atShape (GrammarSite.root_expression level.rule)
+          (Eq.mp (congrArg (GrammarSymbolValue file tokens)
+              (congrArg (fun child =>
+                GrammarSymbol.nonterminal (.aux child)) siteRoot)) packed) =
+        EbnfValue.atShape (GrammarSite.root_expression level.rule)
+          (EbnfValue.transport
+            (congrArg GrammarSite.expression siteRoot) packed) :=
+    congrArg (EbnfValue.atShape
+      (GrammarSite.root_expression level.rule))
+      (auxiliaryValue_transport_eq siteRoot packed)
+  rw [outerAligned]
+  unfold EbnfValue.atShape packed EbnfValue.ofShape
+  rw [EbnfValue.transport_trans, EbnfValue.transport_trans]
+
+theorem optionalView_sequence_ofAuxiliary_pair
+    {file : WorkspaceFile} {tokens : List Token}
+    {children : List GrammarSite} {firstSite secondSite : GrammarSite}
+    {first child : EbnfExpr}
+    (childrenEq : children = [firstSite, secondSite])
+    (firstEq : firstSite.expression = first)
+    (secondEq : secondSite.expression = .optional child)
+    (symbolLayout :
+      children.map (fun site => GrammarSymbol.nonterminal (.aux site)) =
+        [GrammarSymbol.nonterminal (.aux firstSite),
+          GrammarSymbol.nonterminal (.aux secondSite)])
+    (expressionLayout : children.map GrammarSite.expression =
+      [first, .optional child])
+    (firstValue : EbnfValue file tokens firstSite.expression)
+    (secondValue : EbnfValue file tokens secondSite.expression)
+    (present : ∃ value, EbnfValue.optionalView child
+      (EbnfValue.atShape secondEq secondValue) = some value) :
+    ∃ value, EbnfValue.optionalView child
+      (EbnfValue.sequence2View first (.optional child)
+        (EbnfValue.transport (congrArg EbnfExpr.sequence expressionLayout)
+          (EbnfValue.sequence (children.map GrammarSite.expression)
+            (EbnfValues.ofAuxiliaries children
+              (GrammarSymbolValues.transport symbolLayout.symm
+                (firstValue, (secondValue, ()))))))).2 = some value := by
+  subst children
+  change [GrammarSymbol.nonterminal (.aux firstSite),
+    GrammarSymbol.nonterminal (.aux secondSite)] = _ at symbolLayout
+  rcases present with ⟨value, present⟩
+  refine ⟨value, ?_⟩
+  have canonicalExpressionLayout :
+      [firstSite.expression, secondSite.expression] =
+        [first, .optional child] := by
+    simpa using expressionLayout
+  have expressionProofEq :
+      congrArg EbnfExpr.sequence expressionLayout =
+        congrArg EbnfExpr.sequence canonicalExpressionLayout :=
+    Subsingleton.elim _ _
+  rw [expressionProofEq]
+  have exactSymbolLayout : symbolLayout = rfl := Subsingleton.elim _ _
+  rw [exactSymbolLayout]
+  simp only [List.map]
+  rw [GrammarSymbolValues.transport_self]
+  rw [sequence2View_transport_pair_eq firstEq secondEq
+    canonicalExpressionLayout]
+  have firstAuxView := EbnfValues.ofAuxiliaries_cons_eq
+    firstSite [secondSite] firstValue (secondValue, ())
+  have tailEq :
+      (EbnfValues.consView firstSite.expression [secondSite.expression]
+        (EbnfValues.ofAuxiliaries [firstSite, secondSite]
+          (firstValue, (secondValue, ())))).2 =
+        EbnfValues.ofAuxiliaries [secondSite] (secondValue, ()) := by
+    exact congrArg Prod.snd firstAuxView
+  change EbnfValue.optionalView child
+    (EbnfValue.transport secondEq
+      (EbnfValues.consView secondSite.expression []
+        (EbnfValues.consView firstSite.expression [secondSite.expression]
+          (EbnfValues.ofAuxiliaries [firstSite, secondSite]
+            (firstValue, (secondValue, ())))).2).1) = some value
+  rw [tailEq]
+  have secondAuxView := EbnfValues.ofAuxiliaries_cons_eq
+    secondSite [] secondValue ()
+  have secondViewEq :
+      (EbnfValues.consView secondSite.expression []
+        (EbnfValues.ofAuxiliaries [secondSite] (secondValue, ()))).1 =
+        secondValue := by
+    exact congrArg Prod.fst secondAuxView
+  rw [secondViewEq]
+  simpa [EbnfValue.atShape] using present
+
+end Solcore.Surface.Multi
