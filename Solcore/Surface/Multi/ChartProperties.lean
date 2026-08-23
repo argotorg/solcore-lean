@@ -6497,6 +6497,276 @@ theorem executeFieldDeclRoot_reduces
   exact .fieldDecl origin finish nameData colon typeValue initializer
     semicolon name.identifierProjection_projects witness
 
+private def pragmaTargetData
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.optional (.list1
+      (.atom (.terminal (.category .identifier)))))) :
+    Option (NonemptyList (RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier)) :=
+  (pragmaTargetTerminals input).map fun terminals => terminals.map fun terminal => {
+    matched := terminal
+    spelling := terminal.identifierProjection.1
+    parsed := terminal.identifierProjection.2
+  }
+
+private theorem pragmaTargetData_rebuild
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.optional (.list1
+      (.atom (.terminal (.category .identifier)))))) :
+    EbnfValue.optional (.list1
+      (.atom (.terminal (.category .identifier))))
+      ((pragmaTargetData input).map fun values =>
+        EbnfValue.list1 (.atom (.terminal (.category .identifier)))
+          (values.map fun target => EbnfValue.terminalAtom
+            (.category .identifier) target.matched)) = input := by
+  have rebuilt := pragmaTargetTerminals_rebuild input
+  cases selected : pragmaTargetTerminals input with
+  | none =>
+      simpa [pragmaTargetData, selected] using rebuilt
+  | some terminals =>
+      cases terminals
+      simpa [pragmaTargetData, selected, NonemptyList.map,
+        Function.comp_def] using rebuilt
+
+private theorem pragmaTargetData_projects
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.optional (.list1
+      (.atom (.terminal (.category .identifier)))))) :
+    ∀ values, pragmaTargetData input = some values →
+      IdentifierProjects values.head.matched
+        values.head.spelling values.head.parsed ∧
+      ∀ target, target ∈ values.tail →
+        IdentifierProjects target.matched target.spelling target.parsed := by
+  intro values valuesEq
+  unfold pragmaTargetData at valuesEq
+  cases selected : pragmaTargetTerminals input with
+  | none => simp [selected] at valuesEq
+  | some terminals =>
+      simp only [selected, Option.map, Option.some.injEq] at valuesEq
+      subst values
+      constructor
+      · exact terminals.head.identifierProjection_projects
+      · intro target member
+        simp only [NonemptyList.map, List.mem_map] at member
+        rcases member with ⟨terminal, _terminalMember, rfl⟩
+        exact terminal.identifierProjection_projects
+
+private theorem executePragmaTargets_eq_targetData
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.optional (.list1
+      (.atom (.terminal (.category .identifier)))))) :
+    executePragmaTargets input =
+      (pragmaTargetData input).elim [] fun values =>
+        RuleReduction.firstRest (values.map fun target =>
+          RuleReduction.terminalLoc target.matched target.parsed) := by
+  unfold executePragmaTargets pragmaTargetData
+  cases selected : pragmaTargetTerminals input with
+  | none => rfl
+  | some terminals =>
+      cases terminals
+      simp [RuleReduction.firstRest, NonemptyList.map,
+        RuleReduction.terminalLoc]
+
+/-- The pragma executor realizes all four exact fixed-name reductions. -/
+theorem executePragmaDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .pragmaDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .pragmaDecl)) :
+    RuleReduction file tokens .pragmaDecl origin finish input
+      (executePragmaDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let pragmaAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .pragmaKw))
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let targetsAtom : EbnfExpr := .optional (.list1 identifierAtom)
+  let semicolonAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .semicolon))
+  let branches : List EbnfExpr := [
+    .sequence [pragmaAtom,
+      .atom (.terminal (.pragmaName .noCoverageCondition)),
+      targetsAtom, semicolonAtom],
+    .sequence [pragmaAtom,
+      .atom (.terminal (.pragmaName .noPattersonCondition)),
+      targetsAtom, semicolonAtom],
+    .sequence [pragmaAtom,
+      .atom (.terminal (.pragmaName .noBoundedVariableCondition)),
+      targetsAtom, semicolonAtom],
+    .sequence [pragmaAtom,
+      .atom (.terminal (.pragmaName .noGenericInstanceFor)),
+      targetsAtom, semicolonAtom]]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches
+      ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨
+      branch = 2 ∨ branch = 3 := by
+    have bound : branch.val < 4 := branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+    · exact Or.inr (Or.inr (Or.inr (Fin.ext valueEq)))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have transportSelf
+      (value : EbnfValue file tokens (.choice branches))
+      (shape : (.choice branches) = m2cV1.rhs .pragmaDecl) :
+      EbnfValue.transport shape value = value := by
+    rw [show shape = (by rfl) from Subsingleton.elim _ _]
+    rfl
+  rcases branchCases with rfl | rfl | rfl | rfl
+  · let viewed := EbnfValue.sequence4View pragmaAtom
+      (.atom (.terminal (.pragmaName .noCoverageCondition)))
+      targetsAtom semicolonAtom raw
+    let pragmaKw := EbnfValue.terminalView
+      (.hardKeyword .pragmaKw) viewed.1
+    let kindToken := EbnfValue.terminalView
+      (.pragmaName .noCoverageCondition) viewed.2.1
+    let targets := pragmaTargetData viewed.2.2.1
+    let semicolon := EbnfValue.terminalView
+      (.symbol .semicolon) viewed.2.2.2
+    have rawEq := EbnfValue.sequence4_of_view pragmaAtom
+      (.atom (.terminal (.pragmaName .noCoverageCondition)))
+      targetsAtom semicolonAtom raw
+    have pragmaEq := EbnfValue.terminal_of_view
+      (.hardKeyword .pragmaKw) viewed.1
+    have kindEq := EbnfValue.terminal_of_view
+      (.pragmaName .noCoverageCondition) viewed.2.1
+    have targetsEq := pragmaTargetData_rebuild viewed.2.2.1
+    have semicolonEq := EbnfValue.terminal_of_view
+      (.symbol .semicolon) viewed.2.2.2
+    have resultEq : executePragmaDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness {
+      kind := RuleReduction.terminalLoc kindToken .noCoverageCondition
+      targets := executePragmaTargets viewed.2.2.1
+    } := by
+      rw [executePragmaDeclRoot, viewEq]
+      rfl
+    have reduces := RuleReduction.pragmaDeclNoCoverageCondition
+      origin finish pragmaKw kindToken
+      targets semicolon (pragmaTargetData_projects viewed.2.2.1) witness
+    simp only [targets, NonemptyList.map] at reduces targetsEq
+    rw [transportSelf, pragmaEq, kindEq, targetsEq, semicolonEq,
+      rawEq, inputEq] at reduces
+    rw [executePragmaTargets_eq_targetData] at resultEq
+    exact resultEq.symm ▸ reduces
+  · let viewed := EbnfValue.sequence4View pragmaAtom
+      (.atom (.terminal (.pragmaName .noPattersonCondition)))
+      targetsAtom semicolonAtom raw
+    let pragmaKw := EbnfValue.terminalView
+      (.hardKeyword .pragmaKw) viewed.1
+    let kindToken := EbnfValue.terminalView
+      (.pragmaName .noPattersonCondition) viewed.2.1
+    let targets := pragmaTargetData viewed.2.2.1
+    let semicolon := EbnfValue.terminalView
+      (.symbol .semicolon) viewed.2.2.2
+    have rawEq := EbnfValue.sequence4_of_view pragmaAtom
+      (.atom (.terminal (.pragmaName .noPattersonCondition)))
+      targetsAtom semicolonAtom raw
+    have pragmaEq := EbnfValue.terminal_of_view
+      (.hardKeyword .pragmaKw) viewed.1
+    have kindEq := EbnfValue.terminal_of_view
+      (.pragmaName .noPattersonCondition) viewed.2.1
+    have targetsEq := pragmaTargetData_rebuild viewed.2.2.1
+    have semicolonEq := EbnfValue.terminal_of_view
+      (.symbol .semicolon) viewed.2.2.2
+    have resultEq : executePragmaDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness {
+      kind := RuleReduction.terminalLoc kindToken .noPattersonCondition
+      targets := executePragmaTargets viewed.2.2.1
+    } := by
+      rw [executePragmaDeclRoot, viewEq]
+      rfl
+    have reduces := RuleReduction.pragmaDeclNoPattersonCondition
+      origin finish pragmaKw kindToken
+      targets semicolon (pragmaTargetData_projects viewed.2.2.1) witness
+    simp only [targets, NonemptyList.map] at reduces targetsEq
+    rw [transportSelf, pragmaEq, kindEq, targetsEq, semicolonEq,
+      rawEq, inputEq] at reduces
+    rw [executePragmaTargets_eq_targetData] at resultEq
+    exact resultEq.symm ▸ reduces
+  · let viewed := EbnfValue.sequence4View pragmaAtom
+      (.atom (.terminal (.pragmaName .noBoundedVariableCondition)))
+      targetsAtom semicolonAtom raw
+    let pragmaKw := EbnfValue.terminalView
+      (.hardKeyword .pragmaKw) viewed.1
+    let kindToken := EbnfValue.terminalView
+      (.pragmaName .noBoundedVariableCondition) viewed.2.1
+    let targets := pragmaTargetData viewed.2.2.1
+    let semicolon := EbnfValue.terminalView
+      (.symbol .semicolon) viewed.2.2.2
+    have rawEq := EbnfValue.sequence4_of_view pragmaAtom
+      (.atom (.terminal (.pragmaName .noBoundedVariableCondition)))
+      targetsAtom semicolonAtom raw
+    have pragmaEq := EbnfValue.terminal_of_view
+      (.hardKeyword .pragmaKw) viewed.1
+    have kindEq := EbnfValue.terminal_of_view
+      (.pragmaName .noBoundedVariableCondition) viewed.2.1
+    have targetsEq := pragmaTargetData_rebuild viewed.2.2.1
+    have semicolonEq := EbnfValue.terminal_of_view
+      (.symbol .semicolon) viewed.2.2.2
+    have resultEq : executePragmaDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness {
+      kind := RuleReduction.terminalLoc kindToken
+        .noBoundedVariableCondition
+      targets := executePragmaTargets viewed.2.2.1
+    } := by
+      rw [executePragmaDeclRoot, viewEq]
+      rfl
+    have reduces := RuleReduction.pragmaDeclNoBoundedVariableCondition
+      origin finish pragmaKw
+      kindToken targets semicolon
+        (pragmaTargetData_projects viewed.2.2.1) witness
+    simp only [targets, NonemptyList.map] at reduces targetsEq
+    rw [transportSelf, pragmaEq, kindEq, targetsEq, semicolonEq,
+      rawEq, inputEq] at reduces
+    rw [executePragmaTargets_eq_targetData] at resultEq
+    exact resultEq.symm ▸ reduces
+  · let viewed := EbnfValue.sequence4View pragmaAtom
+      (.atom (.terminal (.pragmaName .noGenericInstanceFor)))
+      targetsAtom semicolonAtom raw
+    let pragmaKw := EbnfValue.terminalView
+      (.hardKeyword .pragmaKw) viewed.1
+    let kindToken := EbnfValue.terminalView
+      (.pragmaName .noGenericInstanceFor) viewed.2.1
+    let targets := pragmaTargetData viewed.2.2.1
+    let semicolon := EbnfValue.terminalView
+      (.symbol .semicolon) viewed.2.2.2
+    have rawEq := EbnfValue.sequence4_of_view pragmaAtom
+      (.atom (.terminal (.pragmaName .noGenericInstanceFor)))
+      targetsAtom semicolonAtom raw
+    have pragmaEq := EbnfValue.terminal_of_view
+      (.hardKeyword .pragmaKw) viewed.1
+    have kindEq := EbnfValue.terminal_of_view
+      (.pragmaName .noGenericInstanceFor) viewed.2.1
+    have targetsEq := pragmaTargetData_rebuild viewed.2.2.1
+    have semicolonEq := EbnfValue.terminal_of_view
+      (.symbol .semicolon) viewed.2.2.2
+    have resultEq : executePragmaDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness {
+      kind := RuleReduction.terminalLoc kindToken .noGenericInstanceFor
+      targets := executePragmaTargets viewed.2.2.1
+    } := by
+      rw [executePragmaDeclRoot, viewEq]
+      rfl
+    have reduces := RuleReduction.pragmaDeclNoGenericInstanceFor
+      origin finish pragmaKw kindToken
+      targets semicolon (pragmaTargetData_projects viewed.2.2.1) witness
+    simp only [targets, NonemptyList.map] at reduces targetsEq
+    rw [transportSelf, pragmaEq, kindEq, targetsEq, semicolonEq,
+      rawEq, inputEq] at reduces
+    rw [executePragmaTargets_eq_targetData] at resultEq
+    exact resultEq.symm ▸ reduces
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -6549,6 +6819,7 @@ theorem executeRootRule_reduces
   | typeAliasDecl =>
       exact executeTypeAliasDeclRoot_reduces origin finish ready input
   | fieldDecl => exact executeFieldDeclRoot_reduces origin finish ready input
+  | pragmaDecl => exact executePragmaDeclRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
