@@ -24682,3 +24682,113 @@ private theorem runPhaseCQueueStepsMulti?_total_invariants
         resultOperational⟩
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem beginPhaseCWorklist?_activationSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCActivationSafe result.counter := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  exact runMappedPrimitive?_activationSafe_of_not_witness current _ _ entered
+    fresh.activationSafe (by simp) enteredEq
+
+private theorem beginPhaseCWorklist?_multiInvariants
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCInitialFresh current.counter)
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCAllSafe result ∧
+      PhaseCEdgeSafe result ∧
+      PhaseCMultiBackpointerInvariant result ∧
+      PhaseCBackpointerLedgerExact result ∧
+      PhaseCOperationalInvariant file tokens result.payload := by
+  exact ⟨{
+    item := beginPhaseCWorklist?_itemSafe current result fresh selected
+    activation := beginPhaseCWorklist?_activationSafe current result fresh
+      selected
+    completion := beginPhaseCWorklist?_completionSafe current result fresh
+      selected
+  }, beginPhaseCWorklist?_edgeSafe current result fresh selected,
+    beginPhaseCWorklist?_multiBackpointerInvariant current result selected,
+    beginPhaseCWorklist?_ledgerExact current result selected,
+    beginPhaseCWorklist?_operationalInvariant current result selected⟩
+
+/-- Total bounded Phase-C execution.  This preserves the old work budget but
+returns the reached safe state at exhaustion instead of encoding exhaustion as
+`Option.none`; a later theorem must still prove that the chosen budget drains
+both queues. -/
+private def executePhaseCWorklistMulti?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens)) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) := do
+  let entered ← beginPhaseCWorklist? current
+  runPhaseCQueueStepsMulti? owned (chartGBound (tokens.length + 1)) entered
+
+private theorem executePhaseCWorklistMulti?_total_invariants
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (fresh : PhaseCInitialFresh current.counter) :
+    ∃ result, executePhaseCWorklistMulti? owned current = some result ∧
+      PhaseCAllSafe result ∧
+      PhaseCEdgeSafe result ∧
+      PhaseCMultiBackpointerInvariant result ∧
+      PhaseCBackpointerLedgerExact result ∧
+      PhaseCOperationalInvariant file tokens result.payload := by
+  obtain ⟨entered, enteredEq⟩ :=
+    (beginPhaseCWorklist?_total_iff_root_fresh current).mpr
+      (fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey]))
+  obtain ⟨enteredSafe, enteredEdgeSafe, enteredCovers, enteredExact,
+      enteredOperational⟩ :=
+    beginPhaseCWorklist?_multiInvariants current entered fresh enteredEq
+  obtain ⟨result, runEq, resultSafe, resultEdgeSafe, resultCovers,
+      resultExact, resultOperational⟩ :=
+    runPhaseCQueueStepsMulti?_total_invariants owned
+      (chartGBound (tokens.length + 1)) entered enteredSafe enteredEdgeSafe
+        enteredCovers enteredExact enteredOperational
+  refine ⟨result, ?_, resultSafe, resultEdgeSafe, resultCovers,
+    resultExact, resultOperational⟩
+  unfold executePhaseCWorklistMulti?
+  exact Option.bind_eq_some_iff.mpr ⟨entered, enteredEq, runEq⟩
+
+private def executeObservedPhaseABCWorklistMulti?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) := do
+  let phaseB ← executeObservedPhaseAB? file tokens owned
+  executePhaseCWorklistMulti? owned phaseB
+
+/-- Unconditional totality of the observed A/B prefix followed by the bounded
+multi-ledger Phase-C executor. -/
+private theorem executeObservedPhaseABCWorklistMulti?_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result := by
+  obtain ⟨phaseB, phaseBEq⟩ :=
+    executeObservedPhaseAB?_total file tokens owned
+  obtain ⟨result, phaseCEq, _safe, _edgeSafe, _covers, _exact,
+      _operational⟩ :=
+    executePhaseCWorklistMulti?_total_invariants owned phaseB
+      (executeObservedPhaseAB?_phaseCInitialFresh file tokens owned phaseB
+        phaseBEq)
+  refine ⟨result, ?_⟩
+  unfold executeObservedPhaseABCWorklistMulti?
+  rw [phaseBEq]
+  exact phaseCEq
+
+end Solcore.Surface.Multi.Chart
