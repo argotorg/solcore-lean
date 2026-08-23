@@ -5883,6 +5883,104 @@ theorem executeParameterRoot_reduces
       }) := constructorInputEq ▸ reduces
   exact resultEq.symm ▸ inputReduces
 
+/-- The data-constructor executor realizes its exact root reduction. -/
+theorem executeDataConstructorRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .dataConstructor origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .dataConstructor)) :
+    RuleReduction file tokens .dataConstructor origin finish input
+      (executeDataConstructorRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let nameAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let fieldsAtom : EbnfExpr := .list1 typeAtom
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let arguments : EbnfExpr :=
+    .sequence [openAtom, fieldsAtom, closeAtom]
+  change EbnfValue file tokens
+    (.sequence [nameAtom, .optional arguments]) at input
+  let viewed := EbnfValue.sequence2View
+    nameAtom (.optional arguments) input
+  let name := EbnfValue.terminalView (.category .identifier) viewed.1
+  let nameData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := name
+    spelling := name.identifierProjection.1
+    parsed := name.identifierProjection.2
+  }
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view
+    nameAtom (.optional arguments) input
+  have nameEq := EbnfValue.terminal_of_view
+    (.category .identifier) viewed.1
+  generalize selectedEq :
+    EbnfValue.optionalView arguments viewed.2 = selected
+  cases selected with
+  | none =>
+      have optionalEq : EbnfValue.optional arguments none = viewed.2 := by
+        calc
+          _ = EbnfValue.optional arguments
+              (EbnfValue.optionalView arguments viewed.2) := by
+                rw [selectedEq]
+          _ = viewed.2 := EbnfValue.optional_of_view arguments viewed.2
+      have resultEq : executeDataConstructorRoot file tokens
+          origin finish ready.1 ready.2.1 input = sourceLoc witness {
+        name := RuleReduction.terminalLoc name name.identifierProjection.2
+        fields := none
+      } := by
+        simp [executeDataConstructorRoot, viewed, selectedEq,
+          nameAtom, typeAtom, arguments, openAtom, fieldsAtom, closeAtom,
+          name, witness]
+        rfl
+      rw [resultEq, ← inputEq, ← nameEq, ← optionalEq]
+      exact .dataConstructorWithoutArguments origin finish nameData
+        name.identifierProjection_projects witness
+  | some rawArguments =>
+      let argumentView := EbnfValue.sequence3View
+        openAtom fieldsAtom closeAtom rawArguments
+      let openParen := EbnfValue.terminalView
+        (.symbol .leftParen) argumentView.1
+      let rawFields := EbnfValue.list1View typeAtom argumentView.2.1
+      let fields := rawFields.map (EbnfValue.ruleView .type)
+      let closeParen := EbnfValue.terminalView
+        (.symbol .rightParen) argumentView.2.2
+      have optionalEq : EbnfValue.optional arguments
+          (some rawArguments) = viewed.2 := by
+        calc
+          _ = EbnfValue.optional arguments
+              (EbnfValue.optionalView arguments viewed.2) := by
+                rw [selectedEq]
+          _ = viewed.2 := EbnfValue.optional_of_view arguments viewed.2
+      have argumentsEq := EbnfValue.sequence3_of_view
+        openAtom fieldsAtom closeAtom rawArguments
+      have openEq := EbnfValue.terminal_of_view
+        (.symbol .leftParen) argumentView.1
+      have fieldsMapEq : fields.map (EbnfValue.ruleAtom .type) =
+          rawFields := ruleNonemptyAtoms_of_views .type rawFields
+      have fieldsEq : EbnfValue.list1 typeAtom
+          (fields.map (EbnfValue.ruleAtom .type)) = argumentView.2.1 := by
+        rw [fieldsMapEq]
+        exact EbnfValue.list1_of_view typeAtom argumentView.2.1
+      have closeEq := EbnfValue.terminal_of_view
+        (.symbol .rightParen) argumentView.2.2
+      have resultEq : executeDataConstructorRoot file tokens
+          origin finish ready.1 ready.2.1 input = sourceLoc witness {
+        name := RuleReduction.terminalLoc name name.identifierProjection.2
+        fields := some fields
+      } := by
+        simp [executeDataConstructorRoot, viewed, selectedEq,
+          argumentView, fields, rawFields, nameAtom, typeAtom, arguments,
+          openAtom, fieldsAtom, closeAtom, name, witness]
+        rfl
+      rw [resultEq, ← inputEq, ← nameEq, ← optionalEq,
+        ← argumentsEq, ← openEq, ← fieldsEq, ← closeEq]
+      exact .dataConstructorWithArguments origin finish nameData
+        openParen fields closeParen name.identifierProjection_projects witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -5930,6 +6028,8 @@ theorem executeRootRule_reduces
   | assignmentStatement =>
       exact executeAssignmentStatementRoot_reduces origin finish ready input
   | parameter => exact executeParameterRoot_reduces origin finish ready input
+  | dataConstructor =>
+      exact executeDataConstructorRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
