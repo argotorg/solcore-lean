@@ -5736,6 +5736,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
   | fallbackDecl : ExecutableRootRule .fallbackDecl
+  | contractConstructorDecl : ExecutableRootRule .contractConstructorDecl
   | pragmaDecl : ExecutableRootRule .pragmaDecl
   | genericPrefix : ExecutableRootRule .genericPrefix
   | forallClause : ExecutableRootRule .forallClause
@@ -6588,6 +6589,48 @@ def executeFallbackDeclRoot
     marker := { span := fallbackKw.span, payload := .fallbackName }
     parameters := parameters
     returnType := returnValue.map fun value => value.2.1
+    body := EbnfValue.ruleView .body rawBody
+  }
+
+/-- Execute a contract-constructor declaration and its optional modifiers. -/
+def executeContractConstructorDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens
+      (m2cV1.rhs .contractConstructorDecl)) :
+    ContractConstructorDecl :=
+  let publicAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .publicKw))
+  let payableAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .payableKw))
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let children : List EbnfExpr := [.optional publicAtom,
+    .optional payableAtom,
+    .atom (.terminal (.hardKeyword .constructorKw)),
+    .atom (.terminal (.symbol .leftParen)), .list0 parameterAtom,
+    .atom (.terminal (.symbol .rightParen)),
+    .atom (.nonterminal .body)]
+  let ⟨rawPublic, rawPayable, rawConstructor, _, rawParameters,
+    _, rawBody, ⟨⟩⟩ := EbnfValue.sequenceFlatView children input
+  let publicToken := (EbnfValue.optionalView publicAtom rawPublic).map
+    (EbnfValue.terminalView (.hardKeyword .publicKw))
+  let payableToken := (EbnfValue.optionalView payableAtom rawPayable).map
+    (EbnfValue.terminalView (.hardKeyword .payableKw))
+  let constructorKw := EbnfValue.terminalView
+    (.hardKeyword .constructorKw) rawConstructor
+  let parameters := (EbnfValue.list0View parameterAtom rawParameters).map
+    (EbnfValue.ruleView .parameter)
+  sourceLoc
+      (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+    «public» := publicToken.map fun terminal =>
+      { span := terminal.span, payload := .publicModifier }
+    payable := payableToken.map fun terminal =>
+      { span := terminal.span, payload := .payableModifier }
+    marker := {
+      span := constructorKw.span, payload := .contractConstructorName }
+    parameters := parameters
     body := EbnfValue.ruleView .body rawBody
   }
 
@@ -7760,6 +7803,9 @@ def executeRootRule
       executeFieldDeclRoot file tokens origin finish owned ordered input
   | .fallbackDecl =>
       executeFallbackDeclRoot file tokens origin finish owned ordered input
+  | .contractConstructorDecl =>
+      executeContractConstructorDeclRoot file tokens origin finish
+        owned ordered input
   | .pragmaDecl =>
       executePragmaDeclRoot file tokens origin finish owned ordered input
   | .genericPrefix =>
