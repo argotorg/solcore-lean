@@ -18349,6 +18349,7 @@ theorem saturatedMatchArmHeaderObservation_eq_observed
 end Solcore.Surface.Multi.Chart
 
 
+
 namespace Solcore.Surface.Multi.Chart
 
 open Grammar
@@ -20242,5 +20243,52 @@ private theorem attemptContextualScan?_total_safe
             withItemActivationSafe edgeEq⟩
   · rw [if_neg (by simpa using applicable)]
     exact ⟨current, rfl, itemSafe, activationSafe⟩
+
+end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem dequeueContextualItem?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCCompletionSafe current.counter)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCCompletionSafe result.2.counter := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons head rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_phaseCCompletionSafe_of_not_insert
+        current _ _ next safe (by simp) nextEq
+
+private theorem dequeueContextualEdge?_completionSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCCompletionSafe current.counter)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCCompletionSafe result.2.counter := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      apply runMappedPrimitive?_phaseCCompletionSafe_of_not_insert
+        current _ _ next safe _ nextEq
+      intro waiting finished equal
+      generalize shapeEq : edge.val = shape at equal
+      cases shape <;> simp at equal
 
 end Solcore.Surface.Multi.Chart
