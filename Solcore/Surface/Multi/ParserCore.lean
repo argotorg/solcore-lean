@@ -5676,6 +5676,70 @@ theorem sequence4_of_view
   rw [valuesEq]
   exact sequence_of_view [first, second, third, fourth] input
 
+/-- A fully typed product of one semantic value for every sequence child. -/
+def SequenceValues
+    (file : WorkspaceFile) (tokens : List Token) : List EbnfExpr → Type
+  | [] => Unit
+  | child :: rest =>
+      EbnfValue file tokens child × SequenceValues file tokens rest
+
+/-- Flatten the indexed EBNF sequence carrier into its typed product. -/
+def sequenceValuesView
+    {file : WorkspaceFile} {tokens : List Token} :
+    (children : List EbnfExpr) →
+      EbnfValues file tokens children → SequenceValues file tokens children
+  | [], _ => ()
+  | child :: rest, input =>
+      let viewed := EbnfValues.consView child rest input
+      (viewed.1, sequenceValuesView rest viewed.2)
+
+/-- Rebuild the indexed EBNF sequence carrier from its typed product. -/
+def sequenceValuesBuild
+    {file : WorkspaceFile} {tokens : List Token} :
+    (children : List EbnfExpr) →
+      SequenceValues file tokens children → EbnfValues file tokens children
+  | [], _ => EbnfValues.nil
+  | child :: rest, viewed =>
+      EbnfValues.cons child rest viewed.1
+        (sequenceValuesBuild rest viewed.2)
+
+/-- Flattening and rebuilding an indexed sequence carrier is lossless. -/
+theorem sequenceValues_build_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr) (input : EbnfValues file tokens children) :
+    sequenceValuesBuild children (sequenceValuesView children input) =
+      input := by
+  induction children with
+  | nil => exact EbnfValues.nil_unique input
+  | cons child rest induction =>
+      simp only [sequenceValuesView, sequenceValuesBuild]
+      let viewed := EbnfValues.consView child rest input
+      calc
+        _ = EbnfValues.cons child rest viewed.1 viewed.2 := by
+          apply congrArg (EbnfValues.cons child rest viewed.1)
+          exact induction viewed.2
+        _ = input := EbnfValues.cons_of_view child rest input
+
+/-- View an arbitrary finite sequence as its fully typed child product. -/
+def sequenceFlatView
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    SequenceValues file tokens children :=
+  sequenceValuesView children (sequenceView children input)
+
+/-- Rebuilding an arbitrary flattened sequence recovers its original value. -/
+theorem sequence_of_flat_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (children : List EbnfExpr)
+    (input : EbnfValue file tokens (.sequence children)) :
+    sequence children
+      (sequenceValuesBuild children (sequenceFlatView children input)) =
+        input := by
+  unfold sequenceFlatView
+  rw [sequenceValues_build_view]
+  exact sequence_of_view children input
+
 end EbnfValue
 
 private def shallowRootWitness
