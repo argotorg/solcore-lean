@@ -25054,3 +25054,123 @@ private theorem phaseCQueueStepMulti?_fixed_or_units_lt
           exact Or.inr (by omega)
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem runPhaseCQueueStepsMulti?_eq_of_drained
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (items : current.payload.phaseC.itemQueue = [])
+    (edges : current.payload.phaseC.edgeQueue = []) :
+    ∀ fuel, runPhaseCQueueStepsMulti? owned fuel current = some current := by
+  intro fuel
+  induction fuel with
+  | zero => rfl
+  | succ fuel induction =>
+      simp [runPhaseCQueueStepsMulti?, phaseCQueueStepMulti?, items, edges,
+        induction]
+
+/-- The global address bound is also a queue-iteration bound: if the remaining
+fuel plus already consumed slots crosses the bound, every successful run ends
+with both queues drained. -/
+private theorem runPhaseCQueueStepsMulti?_drained_of_budget
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      chartGBound (tokens.length + 1) < current.counter.units + fuel →
+      runPhaseCQueueStepsMulti? owned fuel current = some result →
+      result.payload.phaseC.itemQueue = [] ∧
+        result.payload.phaseC.edgeQueue = [] := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current _result budget _selected
+      have bound := current.counter.units_le_chartGBound
+      omega
+  | succ fuel induction =>
+      intro current result budget selected
+      rw [runPhaseCQueueStepsMulti?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, runEq⟩
+      rcases phaseCQueueStepMulti?_fixed_or_units_lt owned current next nextEq
+        with fixed | progress
+      · rcases fixed with ⟨items, edges, nextEqCurrent⟩
+        subst next
+        have fixedRun := runPhaseCQueueStepsMulti?_eq_of_drained owned current
+          items edges fuel
+        rw [fixedRun] at runEq
+        cases runEq
+        exact ⟨items, edges⟩
+      · exact induction next result (by omega) runEq
+
+private theorem runPhaseCQueueStepsMulti?_chartGBound_drained
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (positive : 0 < current.counter.units)
+    (selected : runPhaseCQueueStepsMulti? owned
+      (chartGBound (tokens.length + 1)) current = some result) :
+    result.payload.phaseC.itemQueue = [] ∧
+      result.payload.phaseC.edgeQueue = [] := by
+  exact runPhaseCQueueStepsMulti?_drained_of_budget owned
+    (chartGBound (tokens.length + 1)) current result (by omega) selected
+
+private theorem beginPhaseCWorklist?_units_pos
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    0 < result.counter.units := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  have stateEq := Option.some.inj resultEq
+  unfold enterPhaseC? at enteredEq
+  have units : entered.counter.units = current.counter.units + 1 :=
+    runMappedPrimitive?_units current _ _ enteredEq
+  have resultUnits : entered.counter.units = result.counter.units := by
+    simpa only using congrArg
+      (fun state : CountedState tokens (PhaseCWorklist file tokens) =>
+        state.counter.units) stateEq
+  calc
+    0 < current.counter.units + 1 := Nat.zero_lt_succ _
+    _ = entered.counter.units := units.symm
+    _ = result.counter.units := resultUnits
+
+/-- The total multi-ledger executor's original ADR fuel drains both work
+queues; fuel exhaustion cannot expose a partially processed chart. -/
+private theorem executePhaseCWorklistMulti?_queues_empty
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executePhaseCWorklistMulti? owned current = some result) :
+    result.payload.phaseC.itemQueue = [] ∧
+      result.payload.phaseC.edgeQueue = [] := by
+  unfold executePhaseCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueueStepsMulti?_chartGBound_drained owned entered result
+    (beginPhaseCWorklist?_units_pos current entered enteredEq) runEq
+
+private theorem executeObservedPhaseABCWorklistMulti?_total_drained
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executeObservedPhaseABCWorklistMulti? file tokens owned =
+        some result ∧
+      result.payload.phaseC.itemQueue = [] ∧
+      result.payload.phaseC.edgeQueue = [] := by
+  obtain ⟨result, selected⟩ :=
+    executeObservedPhaseABCWorklistMulti?_total file tokens owned
+  refine ⟨result, selected, ?_⟩
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, _phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklistMulti?_queues_empty owned phaseB result phaseCEq
+
+end Solcore.Surface.Multi.Chart
