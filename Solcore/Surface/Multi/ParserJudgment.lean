@@ -19896,3 +19896,89 @@ theorem optionalView_sequence_ofAuxiliary_pair
   simpa [EbnfValue.atShape] using present
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- A canonical root/sequence packing whose second child was produced by the
+present optional branch exposes a present nonassociative input. -/
+theorem g10NonAssociativeInputPresent_of_auxiliary_pair_some
+    {file : WorkspaceFile} {tokens : List Token}
+    (level : NonAssociativeLevel)
+    (sequenceSite : SequenceSite) (optionalSite : OptionalSite)
+    (firstSite : GrammarSite)
+    (siteRoot : sequenceSite.site = GrammarSite.root level.rule)
+    (childrenEq : sequenceSite.children =
+      [firstSite, optionalSite.site])
+    (firstShape : firstSite.expression =
+      .atom (.nonterminal level.operandRule))
+    (optionalShape : optionalSite.site.expression =
+      .optional level.tailExpr)
+    (symbolLayout : sequenceSite.children.map (fun child =>
+        GrammarSymbol.nonterminal (.aux child)) =
+      [GrammarSymbol.nonterminal (.aux firstSite),
+        GrammarSymbol.nonterminal (.aux optionalSite.site)])
+    (expressionLayout : sequenceSite.children.map GrammarSite.expression =
+      [.atom (.nonterminal level.operandRule),
+        .optional level.tailExpr])
+    (firstValue : EbnfValue file tokens firstSite.expression)
+    (optionalValues : GrammarSymbolValues file tokens
+      (ProductionId.opt optionalSite .some).rhs) :
+    let optionalPacked := OptionalSite.pack optionalSite .some optionalValues
+    let sequenceValue := EbnfValue.sequence
+      (sequenceSite.children.map GrammarSite.expression)
+      (EbnfValues.ofAuxiliaries sequenceSite.children
+        (GrammarSymbolValues.transport symbolLayout.symm
+          (firstValue, (optionalPacked, ()))))
+    let sequencePacked := EbnfValue.ofShape
+      sequenceSite.expression_eq_sequence sequenceValue
+    let rootSymbolLayout := congrArg (fun child =>
+      GrammarSymbol.nonterminal (.aux child)) siteRoot
+    NonAssociativeInputPresent level
+      (EbnfValue.atShape (GrammarSite.root_expression level.rule)
+        (Eq.mp (congrArg (GrammarSymbolValue file tokens)
+          rootSymbolLayout) sequencePacked)) := by
+  dsimp only
+  let optionalPacked := OptionalSite.pack optionalSite .some optionalValues
+  let rawSequenceValue := EbnfValue.sequence
+    (sequenceSite.children.map GrammarSite.expression)
+    (EbnfValues.ofAuxiliaries sequenceSite.children
+      (GrammarSymbolValues.transport symbolLayout.symm
+        (firstValue, (optionalPacked, ()))))
+  have optionalPackedPresent : ∃ value,
+      EbnfValue.optionalView level.tailExpr
+        (EbnfValue.atShape optionalShape optionalPacked) = some value := by
+    dsimp only [optionalPacked]
+    exact optionalView_atShape_pack_some_present optionalSite
+      optionalShape optionalValues
+  have sequencePresent := optionalView_sequence_ofAuxiliary_pair
+    childrenEq firstShape optionalShape symbolLayout expressionLayout
+      firstValue optionalPacked optionalPackedPresent
+  have rootLayout : EbnfExpr.sequence
+      (sequenceSite.children.map GrammarSite.expression) =
+        m2cV1.rhs level.rule :=
+    (congrArg EbnfExpr.sequence expressionLayout).trans
+      (g10NonAssociative_rhs_eq level).symm
+  have rootInputEq := nonAssociativeRoot_sequenceTransport_eq level
+    sequenceSite siteRoot rootLayout rawSequenceValue
+  apply (nonAssociativeInputPresent_iff_optionalPresent _ _).mpr
+  rw [rootInputEq]
+  dsimp only [rawSequenceValue]
+  cases level <;>
+    have layoutProofEq : rootLayout =
+        congrArg EbnfExpr.sequence expressionLayout :=
+      Subsingleton.elim _ _ <;>
+    have transportedValueEq :
+        EbnfValue.transport rootLayout rawSequenceValue =
+          EbnfValue.transport
+            (congrArg EbnfExpr.sequence expressionLayout)
+            rawSequenceValue :=
+      congrArg (fun equality =>
+        EbnfValue.transport equality rawSequenceValue) layoutProofEq <;>
+    rw [transportedValueEq] <;>
+    simpa only [NonAssociativeOptionalPresent,
+      nonAssociativeOptionalView,
+      NonAssociativeLevel.operandRule] using sequencePresent
+
+end Solcore.Surface.Multi
