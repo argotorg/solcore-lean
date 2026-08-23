@@ -4509,6 +4509,66 @@ theorem executeExpressionRoot_reduces
   rw [resultEq, ← inputEq]
   exact .expression origin finish expression
 
+/-- The annotation executor realizes both optional-suffix reductions. -/
+theorem executeAnnotationRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .annotation origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .annotation)) :
+    RuleReduction file tokens .annotation origin finish input
+      (executeAnnotationRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .conditional)
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let suffix : EbnfExpr := .sequence [colonAtom, typeAtom]
+  change EbnfValue file tokens
+    (.sequence [expressionAtom, .optional suffix]) at input
+  let viewed := EbnfValue.sequence2View
+    expressionAtom (.optional suffix) input
+  let expression := EbnfValue.ruleView .conditional viewed.1
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view
+    expressionAtom (.optional suffix) input
+  have expressionEq := EbnfValue.rule_of_view .conditional viewed.1
+  have optionalEq := EbnfValue.optional_of_view suffix viewed.2
+  generalize selectedEq : EbnfValue.optionalView suffix viewed.2 = selected
+  cases selected with
+  | none =>
+      have resultEq : executeAnnotationRoot file tokens origin finish
+          ready.1 ready.2.1 input = expression := by
+        simp only [executeAnnotationRoot, expressionAtom, colonAtom,
+          typeAtom, suffix, viewed, expression, selectedEq]
+      have optionalEq' : EbnfValue.optional suffix none = viewed.2 := by
+        rw [← selectedEq]
+        exact optionalEq
+      rw [resultEq, ← inputEq, ← expressionEq, ← optionalEq']
+      exact .annotationNone origin finish expression
+  | some rawSuffix =>
+      let suffixView := EbnfValue.sequence2View
+        colonAtom typeAtom rawSuffix
+      let colon := EbnfValue.terminalView (.symbol .colon) suffixView.1
+      let typeValue := EbnfValue.ruleView .type suffixView.2
+      have suffixEq := EbnfValue.sequence2_of_view
+        colonAtom typeAtom rawSuffix
+      have colonEq := EbnfValue.terminal_of_view
+        (.symbol .colon) suffixView.1
+      have typeEq := EbnfValue.rule_of_view .type suffixView.2
+      have resultEq : executeAnnotationRoot file tokens origin finish
+          ready.1 ready.2.1 input =
+            sourceLoc witness (.annotation expression typeValue) := by
+        simp only [executeAnnotationRoot, expressionAtom, colonAtom,
+          typeAtom, suffix, viewed, expression, selectedEq,
+          suffixView, typeValue, witness]
+      have optionalEq' :
+          EbnfValue.optional suffix (some rawSuffix) = viewed.2 := by
+        rw [← selectedEq]
+        exact optionalEq
+      rw [resultEq, ← inputEq, ← expressionEq, ← optionalEq',
+        ← suffixEq, ← colonEq, ← typeEq]
+      exact .annotationSome origin finish expression colon typeValue witness
+
 /-- The block-statement executor realizes its exact root reduction. -/
 theorem executeBlockStatementRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -9201,6 +9261,8 @@ theorem executeRootRule_reduces
       exact executeTerminalExpressionRoot_reduces origin finish ready input
   | expression =>
       exact executeExpressionRoot_reduces origin finish ready input
+  | annotation =>
+      exact executeAnnotationRoot_reduces origin finish ready input
   | blockStatement =>
       exact executeBlockStatementRoot_reduces origin finish ready input
   | functionDecl =>
