@@ -22077,3 +22077,141 @@ private theorem executeObservedPhaseABCWorklist?_ledgerExact
   exact executePhaseCWorklist?_ledgerExact owned phaseB result phaseCEq
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Solcore.Workspace
+
+namespace NonAssociativeFrontierCandidates
+
+/-- Select the first root accepted by a caller-supplied proof-free semantic
+predicate.  The frontier root order is canonical and stable. -/
+def firstAcceptedRoot?
+    {tokens : List Token}
+    (frontier : NonAssociativeFrontierCandidates tokens)
+    (accepts : ContextualItemKey tokens → Bool) :
+    Option (ContextualItemKey tokens) :=
+  frontier.roots.find? accepts
+
+/-- Exact stable-order characterization of the selected root. -/
+theorem firstAcceptedRoot?_eq_some_iff
+    {tokens : List Token}
+    (frontier : NonAssociativeFrontierCandidates tokens)
+    (accepts : ContextualItemKey tokens → Bool)
+    (root : ContextualItemKey tokens) :
+    frontier.firstAcceptedRoot? accepts = some root ↔
+      accepts root = true ∧
+        ∃ index bound, frontier.roots[index] = root ∧
+          ∀ earlier : Nat, (earlierBound : earlier < index) →
+            (!accepts (frontier.roots.get
+              ⟨earlier, Nat.lt_trans earlierBound bound⟩)) = true := by
+  unfold firstAcceptedRoot?
+  exact List.find?_eq_some_iff_getElem
+
+/-- Selection succeeds exactly when some frontier root is accepted. -/
+theorem firstAcceptedRoot?_isSome_eq_true_iff
+    {tokens : List Token}
+    (frontier : NonAssociativeFrontierCandidates tokens)
+    (accepts : ContextualItemKey tokens → Bool) :
+    (frontier.firstAcceptedRoot? accepts).isSome = true ↔
+      ∃ root, root ∈ frontier.roots ∧ accepts root = true := by
+  unfold firstAcceptedRoot?
+  exact List.find?_isSome
+
+/-- Build the G10 diagnostic candidate when the supplied predicate accepts at
+least one root.  The selected root is intentionally erased from the closed
+diagnostic after stable selection. -/
+def repeatedDiagnosticCandidate?
+    {tokens : List Token}
+    (frontier : NonAssociativeFrontierCandidates tokens)
+    (accepts : ContextualItemKey tokens → Bool) : Option ParseDiagnostic := do
+  let _root ← frontier.firstAcceptedRoot? accepts
+  pure (.repeatedNonAssociative
+    frontier.operator.span frontier.level frontier.operator)
+
+/-- Diagnostic construction succeeds exactly for a nonempty accepted-root
+subset, and can return only the constructor fixed by this frontier. -/
+theorem repeatedDiagnosticCandidate?_eq_some_iff
+    {tokens : List Token}
+    (frontier : NonAssociativeFrontierCandidates tokens)
+    (accepts : ContextualItemKey tokens → Bool)
+    (diagnostic : ParseDiagnostic) :
+    frontier.repeatedDiagnosticCandidate? accepts = some diagnostic ↔
+      (∃ root, root ∈ frontier.roots ∧ accepts root = true) ∧
+      diagnostic = .repeatedNonAssociative
+        frontier.operator.span frontier.level frontier.operator := by
+  unfold repeatedDiagnosticCandidate?
+  cases selected : frontier.firstAcceptedRoot? accepts with
+  | none =>
+      have noAccepted : ¬ ∃ root,
+          root ∈ frontier.roots ∧ accepts root = true := by
+        intro accepted
+        have isSome :=
+          (firstAcceptedRoot?_isSome_eq_true_iff frontier accepts).mpr
+            accepted
+        rw [selected] at isSome
+        contradiction
+      constructor
+      · intro impossible
+        contradiction
+      · rintro ⟨accepted, _constructorEq⟩
+        exact (noAccepted accepted).elim
+  | some root =>
+      have accepted : ∃ candidate,
+          candidate ∈ frontier.roots ∧ accepts candidate = true :=
+        (firstAcceptedRoot?_isSome_eq_true_iff frontier accepts).mp (by
+          simp [selected])
+      constructor
+      · intro diagnosticEq
+        change some (.repeatedNonAssociative frontier.operator.span
+          frontier.level frontier.operator) = some diagnostic at diagnosticEq
+        exact ⟨accepted, (Option.some.inj diagnosticEq).symm⟩
+      · rintro ⟨_accepted, diagnosticEq⟩
+        change some (.repeatedNonAssociative frontier.operator.span
+          frontier.level frontier.operator) = some diagnostic
+        exact congrArg some diagnosticEq.symm
+
+end NonAssociativeFrontierCandidates
+
+namespace ContextualWorklistResult
+
+/-- Compute a repeated-nonassociative diagnostic candidate from the selected
+greatest frontier and a caller-supplied proof-free root predicate. -/
+def repeatedNonAssociativeDiagnosticCandidate?
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (accepts : ContextualItemKey tokens → Bool) : Option ParseDiagnostic := do
+  let frontier ← result.nonAssociativeFrontierCandidates? file
+  frontier.repeatedDiagnosticCandidate? accepts
+
+/-- Exact interface for future executable semantic predicates: one result is
+returned precisely when the selected frontier contains an accepted root. -/
+theorem repeatedNonAssociativeDiagnosticCandidate?_eq_some_iff
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (accepts : ContextualItemKey tokens → Bool)
+    (diagnostic : ParseDiagnostic) :
+    result.repeatedNonAssociativeDiagnosticCandidate? file accepts =
+        some diagnostic ↔
+      ∃ frontier : NonAssociativeFrontierCandidates tokens,
+        result.nonAssociativeFrontierCandidates? file = some frontier ∧
+        (∃ root, root ∈ frontier.roots ∧ accepts root = true) ∧
+        diagnostic = .repeatedNonAssociative
+          frontier.operator.span frontier.level frontier.operator := by
+  unfold repeatedNonAssociativeDiagnosticCandidate?
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨frontier, selected, diagnosticEq⟩
+    rcases (NonAssociativeFrontierCandidates.repeatedDiagnosticCandidate?_eq_some_iff
+        frontier accepts diagnostic).mp diagnosticEq with
+      ⟨accepted, constructorEq⟩
+    exact ⟨frontier, selected, accepted, constructorEq⟩
+  · rintro ⟨frontier, selected, accepted, constructorEq⟩
+    exact ⟨frontier, selected,
+      (NonAssociativeFrontierCandidates.repeatedDiagnosticCandidate?_eq_some_iff
+          frontier accepts diagnostic).mpr
+        ⟨accepted, constructorEq⟩⟩
+
+end ContextualWorklistResult
+
+end Solcore.Surface.Multi.Chart
