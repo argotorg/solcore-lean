@@ -5713,6 +5713,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | importEntry : ExecutableRootRule .importEntry
   | optionalComma : ExecutableRootRule .optionalComma
   | predicateList : ExecutableRootRule .predicateList
+  | predicate : ExecutableRootRule .predicate
   | instanceMethod : ExecutableRootRule .instanceMethod
   | armStatement : ExecutableRootRule .armStatement
   | statement : ExecutableRootRule .statement
@@ -6122,6 +6123,36 @@ private def shallowRootWitness
     (ordered : origin.val ≤ finish.val) :
     ConsumedSpanWitness file tokens origin finish :=
   ConsumedSpanWitness.compute file tokens origin finish owned ordered
+
+/-- Execute one generic predicate and its optional nonempty type arguments. -/
+def executePredicateRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .predicate)) : Predicate :=
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let argumentChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)), .list1 typeAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let argumentChild : EbnfExpr := .sequence argumentChildren
+  let children : List EbnfExpr := [
+    .atom (.nonterminal .typeAtom),
+    .atom (.terminal (.symbol .colon)),
+    .atom (.nonterminal .qualifiedName), .optional argumentChild]
+  let viewed := EbnfValue.sequenceFlatView children input
+  let parameters := (EbnfValue.optionalView argumentChild
+    viewed.2.2.2.1).map fun rawArguments =>
+      let argumentView := EbnfValue.sequenceFlatView
+        argumentChildren rawArguments
+      (EbnfValue.list1View typeAtom argumentView.2.1).map
+        (EbnfValue.ruleView .type)
+  sourceLoc (ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered) {
+      main := EbnfValue.ruleView .typeAtom viewed.1
+      className := EbnfValue.ruleView .qualifiedName viewed.2.2.1
+      parameters := parameters
+    }
 
 /-- Execute a block-statement root from its body value. -/
 def executeBlockStatementRoot
@@ -7337,6 +7368,8 @@ def executeRootRule
       executeImportEntryRoot file tokens origin finish owned ordered input
   | .optionalComma => executeOptionalCommaRoot input
   | .predicateList => executePredicateListRoot input
+  | .predicate =>
+      executePredicateRoot file tokens origin finish owned ordered input
   | .instanceMethod => executeInstanceMethodRoot input
   | .armStatement => executeArmStatementRoot input
   | .statement => executeStatementRoot input
