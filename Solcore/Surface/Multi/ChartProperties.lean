@@ -3781,3 +3781,44 @@ theorem executeRootRule_reduces
       exact executeOptionalCommaRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
+
+set_option autoImplicit false
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- Every supported root action tuple computes the exact result admitted by
+the declarative action relation. -/
+theorem executeRootAction_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (executable : ExecutableRootRule rule)
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens rule origin finish)
+    (input : GrammarSymbolValues file tokens (ProductionId.root rule).rhs) :
+    ActionReduces file tokens (.actionFor (.root rule)) origin finish input
+      (executeRootAction file tokens origin finish rule executable
+        ready.1 ready.2.1 input) := by
+  exact .root rule origin finish input _
+    (executeRootRule_reduces rule executable origin finish ready
+      (RootAction.unpack rule input))
+
+/-- The executable root result is the unique declarative action result. -/
+theorem ActionReduces.eq_executeRootAction
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId}
+    (executable : ExecutableRootRule rule)
+    {origin finish : Boundary tokens}
+    (ready : RuleReductionReady file tokens rule origin finish)
+    {input : GrammarSymbolValues file tokens (ProductionId.root rule).rhs}
+    {output : NonterminalValue file tokens (ProductionId.root rule).lhs}
+    (reduces : ActionReduces file tokens (.actionFor (.root rule))
+      origin finish input output) :
+    output = executeRootAction file tokens origin finish rule executable
+      ready.1 ready.2.1 input :=
+  ActionReduces.functional reduces
+    (executeRootAction_reduces rule executable origin finish ready input)
+
+end Solcore.Surface.Multi
