@@ -5337,3 +5337,42 @@ theorem nil_unique
 end EbnfValues
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+open Grammar
+
+/-- Execute a generated auxiliary action when the production is not a
+source-rule root.  Returning `none` isolates root reduction as the remaining
+source-span-aware execution boundary. -/
+def executeAuxiliaryAction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId)
+    (input : GrammarSymbolValues file tokens production.rhs) :
+    Option (NonterminalValue file tokens production.lhs) :=
+  match production with
+  | .root _ => none
+  | .atom site => some (AtomSite.pack site input)
+  | .seq site => some (SequenceSite.pack site input)
+  | .group site => some (GroupSite.pack site input)
+  | .choice site branch => some (ChoiceSite.pack site branch input)
+  | .opt site branch => some (OptionalSite.pack site branch input)
+  | .star site branch => some (StarSite.pack site branch input)
+  | .plus site branch => some (PlusSite.pack site branch input)
+  | .list0 site branch => some (List0Site.pack site branch input)
+  | .list1 site => some (List1Site.pack site input)
+  | .tail site branch => some (ListSite.pack site branch input)
+
+/-- The optional executor returns the same typed value as the proof-indexed
+auxiliary executor whenever the production is auxiliary. -/
+theorem executeAuxiliaryAction?_eq_some
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId)
+    (auxiliary : AuxiliaryProduction production)
+    (input : GrammarSymbolValues file tokens production.rhs) :
+    executeAuxiliaryAction? production input =
+      some (executeAuxiliaryAction production auxiliary input) := by
+  cases production <;> first | contradiction | rfl
+
+end Solcore.Surface.Multi
