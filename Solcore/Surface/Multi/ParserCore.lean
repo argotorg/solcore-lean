@@ -5533,6 +5533,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | prefix : ExecutableRootRule .prefix
   | postfixExpr : ExecutableRootRule .postfix
   | postfixPart : ExecutableRootRule .postfixPart
+  | atomExpr : ExecutableRootRule .atom
   | literalValue : ExecutableRootRule .literal
   | lambdaExpr : ExecutableRootRule .lambda
 
@@ -6528,6 +6529,97 @@ def executeLambdaRoot
   sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
     (.lambda parameters (returnType.map Prod.snd) body)
 
+/-- Execute an atomic expression from its selected typed branch. -/
+def executeAtomRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .atom)) : Expression :=
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let argumentExpr : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)),
+    .list0 expressionAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let tupleTail := EbnfValue.fixedInfixTailExpr
+    (.symbol .comma) .expression
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .literal),
+    .atom (.terminal (.category .identifier)),
+    .sequence [
+      .atom (.terminal (.symbol .dot)),
+      .atom (.terminal (.category .identifier)),
+      .optional argumentExpr],
+    .sequence [
+      .atom (.terminal (.symbol .at)),
+      .atom (.nonterminal .typeAtom)],
+    .atom (.nonterminal .lambda),
+    .sequence [
+      .atom (.terminal (.symbol .leftParen)),
+      .atom (.terminal (.symbol .rightParen))],
+    .sequence [
+      .atom (.terminal (.symbol .leftParen)), expressionAtom,
+      .atom (.terminal (.symbol .rightParen))],
+    .sequence [
+      .atom (.terminal (.symbol .leftParen)), expressionAtom,
+      .atom (.terminal (.symbol .comma)), expressionAtom,
+      .star tupleTail,
+      .atom (.terminal (.symbol .rightParen))]]
+  let witness := shallowRootWitness file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      sourceLoc witness (.literal (EbnfValue.ruleView .literal raw))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let name := EbnfValue.terminalView (.category .identifier) raw
+      sourceLoc witness
+        (.name (executableTerminalLoc name name.identifierProjection.2))
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .dot)))
+        (.atom (.terminal (.category .identifier)))
+        (.optional argumentExpr) raw
+      let dot := EbnfValue.terminalView (.symbol .dot) viewed.1
+      let name := EbnfValue.terminalView (.category .identifier) viewed.2.1
+      let arguments := (EbnfValue.optionalView argumentExpr viewed.2.2).map
+        fun argumentRaw =>
+          let argumentView := EbnfValue.sequence3View
+            (.atom (.terminal (.symbol .leftParen)))
+            (.list0 expressionAtom)
+            (.atom (.terminal (.symbol .rightParen))) argumentRaw
+          (EbnfValue.list0View expressionAtom argumentView.2.1).map
+            (EbnfValue.ruleView .expression)
+      sourceLoc witness (.dotConstructor
+        (executableTerminalLoc dot ())
+        (executableTerminalLoc name name.identifierProjection.2) arguments)
+  | ⟨⟨3, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View
+        (.atom (.terminal (.symbol .at)))
+        (.atom (.nonterminal .typeAtom)) raw
+      let marker := EbnfValue.terminalView (.symbol .at) viewed.1
+      sourceLoc witness (.proxy (executableTerminalLoc marker ())
+        (EbnfValue.ruleView .typeAtom viewed.2))
+  | ⟨⟨4, _⟩, raw⟩ => EbnfValue.ruleView .lambda raw
+  | ⟨⟨5, _⟩, _raw⟩ => sourceLoc witness (.tuple [])
+  | ⟨⟨6, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .leftParen))) expressionAtom
+        (.atom (.terminal (.symbol .rightParen))) raw
+      sourceLoc witness (.group (EbnfValue.ruleView .expression viewed.2.1))
+  | ⟨⟨7, _⟩, raw⟩ =>
+      let children : List EbnfExpr := [
+        .atom (.terminal (.symbol .leftParen)), expressionAtom,
+        .atom (.terminal (.symbol .comma)), expressionAtom,
+        .star tupleTail,
+        .atom (.terminal (.symbol .rightParen))]
+      let viewed := EbnfValue.sequenceFlatView children raw
+      let first := EbnfValue.ruleView .expression viewed.2.1
+      let second := EbnfValue.ruleView .expression viewed.2.2.2.1
+      let rest := (EbnfValue.starView tupleTail
+        viewed.2.2.2.2.1).map fun tail =>
+          (EbnfValue.fixedInfixTailView
+            (.symbol .comma) .expression tail).2
+      sourceLoc witness (.tuple (first :: second :: rest))
+
 /-- Locate an infix result between its left and right operands. -/
 def executableBetween
     (file : WorkspaceFile) {α : Type}
@@ -6672,6 +6764,8 @@ def executeRootRule
       executePrefixRoot file tokens origin finish owned ordered input
   | .postfixExpr => executePostfixRoot file input
   | .postfixPart => executePostfixPartRoot input
+  | .atomExpr =>
+      executeAtomRoot file tokens origin finish owned ordered input
   | .literalValue => executeLiteralRoot input
   | .lambdaExpr =>
       executeLambdaRoot file tokens origin finish owned ordered input
