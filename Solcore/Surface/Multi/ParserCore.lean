@@ -5695,6 +5695,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | parameter : ExecutableRootRule .parameter
+  | dataConstructor : ExecutableRootRule .dataConstructor
   | body : ExecutableRootRule .body
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
@@ -6246,6 +6247,34 @@ def executeParameterRoot
       { span := terminal.span, payload := .comptimeModifier }
     name := { span := name.span, payload := name.identifierProjection.2 }
     type := typeValue.map fun value => value.2.1
+  }
+
+/-- Execute one algebraic-data constructor and its optional field types. -/
+def executeDataConstructorRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .dataConstructor)) :
+    DataConstructor :=
+  let nameAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let arguments : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)), .list1 typeAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let viewed := EbnfValue.sequence2View
+    nameAtom (.optional arguments) input
+  let name := EbnfValue.terminalView (.category .identifier) viewed.1
+  let fields := (EbnfValue.optionalView arguments viewed.2).map fun raw =>
+    let argumentView := EbnfValue.sequence3View
+      (.atom (.terminal (.symbol .leftParen))) (.list1 typeAtom)
+      (.atom (.terminal (.symbol .rightParen))) raw
+    (EbnfValue.list1View typeAtom argumentView.2.1).map
+      (EbnfValue.ruleView .type)
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    name := { span := name.span, payload := name.identifierProjection.2 }
+    fields := fields
   }
 
 /-- Execute a braced body from its ordered statement values. -/
@@ -6970,6 +6999,8 @@ def executeRootRule
       executeAssignmentStatementRoot file tokens origin finish owned ordered input
   | .parameter =>
       executeParameterRoot file tokens origin finish owned ordered input
+  | .dataConstructor =>
+      executeDataConstructorRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
