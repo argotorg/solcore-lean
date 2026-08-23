@@ -20524,3 +20524,123 @@ theorem expectedFrontier?_eq_some_iff
 end ContextualWorklistResult
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Solcore.Workspace
+
+/-- Proof-free observation of the retained token or logical EOF at one parser
+boundary. -/
+structure FoundObservation where
+  span : SourceSpan
+  found : Found
+  deriving Repr, BEq, DecidableEq
+
+/-- Observe a retained token, logical EOF, or the inadmissible boundary after
+logical EOF. -/
+def observedFoundAt?
+    (file : WorkspaceFile) (tokens : List Token)
+    (boundary : Boundary tokens) : Option FoundObservation :=
+  if _inRange : boundary.val < tokens.length then
+    let token := tokens[boundary.val]
+    some {
+      span := token.span
+      found := .token token.payload
+    }
+  else if _atEnd : boundary.val = tokens.length then
+    some {
+      span := {
+        source := file.id
+        startByte := file.content.utf8ByteSize
+        endByte := file.content.utf8ByteSize
+      }
+      found := .endOfFile
+    }
+  else
+    none
+
+/-- Found observation is absent exactly after logical EOF. -/
+@[simp] theorem observedFoundAt?_eq_none_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (boundary : Boundary tokens) :
+    observedFoundAt? file tokens boundary = none ↔
+      tokens.length < boundary.val := by
+  unfold observedFoundAt?
+  split <;> rename_i inRange
+  · simp [Nat.not_lt_of_ge (Nat.le_of_lt inRange)]
+  · split <;> rename_i atEnd
+    · simp [atEnd]
+    · simp only [true_iff]
+      omega
+
+/-- Proof-free greatest frontier paired with its exact found token
+observation and canonical expected-terminal list. -/
+structure ObservedFrontier (tokens : List Token) where
+  cursor : Boundary tokens
+  span : SourceSpan
+  found : Found
+  expected : List Expected
+  deriving Repr, BEq, DecidableEq
+
+namespace ContextualWorklistResult
+
+/-- Select the greatest expected frontier and observe its retained token or
+logical EOF.  The boundary after logical EOF remains an explicit failure. -/
+def observedFrontier?
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    Option (ObservedFrontier tokens) := do
+  let frontier ← result.expectedFrontier?
+  let observation ← observedFoundAt? file tokens frontier.cursor
+  pure {
+    cursor := frontier.cursor
+    span := observation.span
+    found := observation.found
+    expected := frontier.expected
+  }
+
+end ContextualWorklistResult
+
+namespace ObservedFrontier
+
+/-- Construct an ordinary unexpected-token candidate exactly when the
+computed expected-terminal set is nonempty. -/
+def unexpected? {tokens : List Token}
+    (frontier : ObservedFrontier tokens) : Option ParseDiagnostic :=
+  match frontier.expected with
+  | [] => none
+  | head :: tail =>
+      some (.unexpected frontier.span frontier.found { head, tail })
+
+/-- Exact constructor equations for an unexpected-token candidate. -/
+theorem unexpected?_eq_some_iff
+    {tokens : List Token} (frontier : ObservedFrontier tokens)
+    (span : SourceSpan) (found : Found)
+    (expected : NonemptyList Expected) :
+    frontier.unexpected? = some (.unexpected span found expected) ↔
+      frontier.span = span ∧ frontier.found = found ∧
+        frontier.expected = expected.head :: expected.tail := by
+  cases frontier with
+  | mk cursor frontierSpan frontierFound frontierExpected =>
+      cases expected with
+      | mk expectedHead expectedTail =>
+          cases frontierExpected with
+          | nil => simp [unexpected?]
+          | cons frontierHead frontierTail => simp [unexpected?]
+
+end ObservedFrontier
+
+namespace ContextualWorklistResult
+
+/-- Compute the ordinary unexpected-token diagnostic candidate from the
+greatest observed frontier.  Applicability premises such as root absence and
+nonassociative exclusion remain deliberately external. -/
+def unexpectedDiagnosticCandidate?
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    Option ParseDiagnostic := do
+  let frontier ← result.observedFrontier? file
+  frontier.unexpected?
+
+end ContextualWorklistResult
+
+end Solcore.Surface.Multi.Chart
