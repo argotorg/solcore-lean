@@ -5401,6 +5401,9 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | letStatement : ExecutableRootRule .letStatement
   | breakStatement : ExecutableRootRule .breakStatement
   | continueStatement : ExecutableRootRule .continueStatement
+  | returnStatement : ExecutableRootRule .returnStatement
+  | assignmentStatement : ExecutableRootRule .assignmentStatement
+  | body : ExecutableRootRule .body
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -5552,6 +5555,124 @@ theorem sequence2_of_view
   rw [valuesEq]
   exact sequence_of_view [first, second] input
 
+/-- View an exact three-child sequence as its typed child values. -/
+def sequence3View
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third : EbnfExpr)
+    (input : EbnfValue file tokens (.sequence [first, second, third])) :
+    EbnfValue file tokens first × EbnfValue file tokens second ×
+      EbnfValue file tokens third :=
+  let values := sequenceView [first, second, third] input
+  let firstView := EbnfValues.consView first [second, third] values
+  let secondView := EbnfValues.consView second [third] firstView.2
+  let thirdView := EbnfValues.consView third [] secondView.2
+  (firstView.1, secondView.1, thirdView.1)
+
+/-- Rebuilding a viewed three-child sequence recovers the original value. -/
+theorem sequence3_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third : EbnfExpr)
+    (input : EbnfValue file tokens (.sequence [first, second, third])) :
+    sequence [first, second, third]
+      (EbnfValues.cons first [second, third]
+        (sequence3View first second third input).1
+        (EbnfValues.cons second [third]
+          (sequence3View first second third input).2.1
+          (EbnfValues.cons third []
+            (sequence3View first second third input).2.2
+            EbnfValues.nil))) = input := by
+  let values := sequenceView [first, second, third] input
+  let firstView := EbnfValues.consView first [second, third] values
+  let secondView := EbnfValues.consView second [third] firstView.2
+  let thirdView := EbnfValues.consView third [] secondView.2
+  have thirdTailEq : EbnfValues.cons third [] thirdView.1
+      EbnfValues.nil = secondView.2 := by
+    rw [EbnfValues.nil_unique thirdView.2]
+    exact EbnfValues.cons_of_view third [] secondView.2
+  have secondTailEq : EbnfValues.cons second [third] secondView.1
+      (EbnfValues.cons third [] thirdView.1 EbnfValues.nil) =
+        firstView.2 := by
+    rw [thirdTailEq]
+    exact EbnfValues.cons_of_view second [third] firstView.2
+  have valuesEq : EbnfValues.cons first [second, third] firstView.1
+      (EbnfValues.cons second [third] secondView.1
+        (EbnfValues.cons third [] thirdView.1 EbnfValues.nil)) = values := by
+    rw [secondTailEq]
+    exact EbnfValues.cons_of_view first [second, third] values
+  change sequence [first, second, third]
+    (EbnfValues.cons first [second, third] firstView.1
+      (EbnfValues.cons second [third] secondView.1
+        (EbnfValues.cons third [] thirdView.1 EbnfValues.nil))) = input
+  rw [valuesEq]
+  exact sequence_of_view [first, second, third] input
+
+/-- View an exact four-child sequence as its typed child values. -/
+def sequence4View
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third fourth : EbnfExpr)
+    (input : EbnfValue file tokens
+      (.sequence [first, second, third, fourth])) :
+    EbnfValue file tokens first × EbnfValue file tokens second ×
+      EbnfValue file tokens third × EbnfValue file tokens fourth :=
+  let values := sequenceView [first, second, third, fourth] input
+  let firstView := EbnfValues.consView first [second, third, fourth] values
+  let secondView := EbnfValues.consView second [third, fourth] firstView.2
+  let thirdView := EbnfValues.consView third [fourth] secondView.2
+  let fourthView := EbnfValues.consView fourth [] thirdView.2
+  (firstView.1, secondView.1, thirdView.1, fourthView.1)
+
+/-- Rebuilding a viewed four-child sequence recovers the original value. -/
+theorem sequence4_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third fourth : EbnfExpr)
+    (input : EbnfValue file tokens
+      (.sequence [first, second, third, fourth])) :
+    sequence [first, second, third, fourth]
+      (EbnfValues.cons first [second, third, fourth]
+        (sequence4View first second third fourth input).1
+        (EbnfValues.cons second [third, fourth]
+          (sequence4View first second third fourth input).2.1
+          (EbnfValues.cons third [fourth]
+            (sequence4View first second third fourth input).2.2.1
+            (EbnfValues.cons fourth []
+              (sequence4View first second third fourth input).2.2.2
+              EbnfValues.nil)))) = input := by
+  let values := sequenceView [first, second, third, fourth] input
+  let firstView := EbnfValues.consView first [second, third, fourth] values
+  let secondView := EbnfValues.consView second [third, fourth] firstView.2
+  let thirdView := EbnfValues.consView third [fourth] secondView.2
+  let fourthView := EbnfValues.consView fourth [] thirdView.2
+  have fourthTailEq : EbnfValues.cons fourth [] fourthView.1
+      EbnfValues.nil = thirdView.2 := by
+    rw [EbnfValues.nil_unique fourthView.2]
+    exact EbnfValues.cons_of_view fourth [] thirdView.2
+  have thirdTailEq : EbnfValues.cons third [fourth] thirdView.1
+      (EbnfValues.cons fourth [] fourthView.1 EbnfValues.nil) =
+        secondView.2 := by
+    rw [fourthTailEq]
+    exact EbnfValues.cons_of_view third [fourth] secondView.2
+  have secondTailEq : EbnfValues.cons second [third, fourth] secondView.1
+      (EbnfValues.cons third [fourth] thirdView.1
+        (EbnfValues.cons fourth [] fourthView.1 EbnfValues.nil)) =
+        firstView.2 := by
+    rw [thirdTailEq]
+    exact EbnfValues.cons_of_view second [third, fourth] firstView.2
+  have valuesEq :
+      EbnfValues.cons first [second, third, fourth] firstView.1
+        (EbnfValues.cons second [third, fourth] secondView.1
+          (EbnfValues.cons third [fourth] thirdView.1
+            (EbnfValues.cons fourth [] fourthView.1 EbnfValues.nil))) =
+        values := by
+    rw [secondTailEq]
+    exact EbnfValues.cons_of_view first [second, third, fourth] values
+  change sequence [first, second, third, fourth]
+    (EbnfValues.cons first [second, third, fourth] firstView.1
+      (EbnfValues.cons second [third, fourth] secondView.1
+        (EbnfValues.cons third [fourth] thirdView.1
+          (EbnfValues.cons fourth [] fourthView.1 EbnfValues.nil)))) = input
+  rw [valuesEq]
+  exact sequence_of_view [first, second, third, fourth] input
+
 end EbnfValue
 
 private def shallowRootWitness
@@ -5643,6 +5764,63 @@ def executeContinueStatementRoot
   sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
     (.continue (EbnfValue.terminalView (.symbol .semicolon) viewed.2).span)
 
+/-- Execute a return statement from its optional value and terminator. -/
+def executeReturnStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .returnStatement)) : Statement :=
+  let viewed := EbnfValue.sequence3View
+    (.atom (.terminal (.hardKeyword .returnKw)))
+    (.optional (.atom (.nonterminal .expression)))
+    (.atom (.terminal (.symbol .semicolon))) input
+  let value := (EbnfValue.optionalView
+    (.atom (.nonterminal .expression)) viewed.2.1).map
+      (EbnfValue.ruleView .expression)
+  let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2.2
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.return value semicolon.span)
+
+/-- Execute an assignment statement from its typed operands and operator. -/
+def executeAssignmentStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .assignmentStatement)) :
+    Statement :=
+  let viewed := EbnfValue.sequence4View
+    (.atom (.nonterminal .expression))
+    (.atom (.nonterminal .assignmentOperator))
+    (.atom (.nonterminal .expression))
+    (.atom (.terminal (.symbol .semicolon))) input
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.assignment
+      (EbnfValue.ruleView .assignmentOperator viewed.2.1)
+      (EbnfValue.ruleView .expression viewed.1)
+      (EbnfValue.ruleView .expression viewed.2.2.1))
+
+/-- Execute a braced body from its ordered statement values. -/
+def executeBodyRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .body)) : Body :=
+  let statementAtom : EbnfExpr := .atom (.nonterminal .statement)
+  let viewed := EbnfValue.sequence3View
+    (.atom (.terminal (.symbol .leftBrace))) (.star statementAtom)
+    (.atom (.terminal (.symbol .rightBrace))) input
+  let openBrace := EbnfValue.terminalView (.symbol .leftBrace) viewed.1
+  let statements := (EbnfValue.starView statementAtom viewed.2.1).map
+    (EbnfValue.ruleView .statement)
+  let closeBrace := EbnfValue.terminalView (.symbol .rightBrace) viewed.2.2
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    origin := .braced openBrace.span closeBrace.span
+    statements := statements
+  }
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -5673,6 +5851,11 @@ def executeRootRule
       executeBreakStatementRoot file tokens origin finish owned ordered input
   | .continueStatement =>
       executeContinueStatementRoot file tokens origin finish owned ordered input
+  | .returnStatement =>
+      executeReturnStatementRoot file tokens origin finish owned ordered input
+  | .assignmentStatement =>
+      executeAssignmentStatementRoot file tokens origin finish owned ordered input
+  | .body => executeBodyRoot file tokens origin finish owned ordered input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
