@@ -4441,6 +4441,177 @@ theorem executeContractMemberRoot_reduces
     rw [resultEq, ← inputEq, ← rawEq]
     exact .contractMemberConstructor origin finish declaration witness
 
+/-- The executable infix fold is the declarative semantic fold. -/
+private theorem executeInfixLeft_eq_foldInfixLeft
+    (file : WorkspaceFile) (left : Expression)
+    (rest : List (Located InfixOperator × Expression)) :
+    executeInfixLeft file left rest =
+      RuleReduction.foldInfixLeft file left rest := by
+  induction rest generalizing left with
+  | nil => rfl
+  | cons head tail induction =>
+      rcases head with ⟨operator, right⟩
+      simp only [executeInfixLeft, RuleReduction.foldInfixLeft]
+      change executeInfixLeft file
+          (RuleReduction.between file left.span right.span
+            (.infix operator left right)) tail =
+        RuleReduction.foldInfixLeft file
+          (RuleReduction.between file left.span right.span
+            (.infix operator left right)) tail
+      exact induction _
+
+/-- The logical-or executor realizes its exact fixed-infix reduction. -/
+theorem executeLogicalOrRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .logicalOr origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .logicalOr)) :
+    RuleReduction file tokens .logicalOr origin finish input
+      (executeLogicalOrRoot file input) := by
+  let terminal : TerminalSymbol := .symbol .logicalOr
+  let operand : GrammarRuleId := .logicalAnd
+  change EbnfValue file tokens
+    (EbnfValue.fixedInfixRootExpr terminal operand) at input
+  let viewed := EbnfValue.fixedInfixRootView terminal operand input
+  let left : Expression := viewed.1
+  let rest : List (MatchedTerminal file tokens terminal × Expression) :=
+    viewed.2
+  have inputEq := EbnfValue.fixedInfixRootValue_of_view
+    terminal operand input
+  have resultEq : executeLogicalOrRoot file input =
+      RuleReduction.foldInfixLeft file left
+        (rest.map fun value =>
+          (RuleReduction.infixOperator value.1 (.logicalOr value.1),
+            value.2)) := by
+    change executeInfixLeft file left
+      (rest.map fun value =>
+        (executableTerminalLoc value.1 .logicalOr, value.2)) = _
+    rw [executeInfixLeft_eq_foldInfixLeft]
+    rfl
+  rw [resultEq, ← inputEq]
+  exact .logicalOr origin finish left rest
+
+/-- The logical-and executor realizes its exact fixed-infix reduction. -/
+theorem executeLogicalAndRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .logicalAnd origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .logicalAnd)) :
+    RuleReduction file tokens .logicalAnd origin finish input
+      (executeLogicalAndRoot file input) := by
+  let terminal : TerminalSymbol := .symbol .logicalAnd
+  let operand : GrammarRuleId := .equality
+  change EbnfValue file tokens
+    (EbnfValue.fixedInfixRootExpr terminal operand) at input
+  let viewed := EbnfValue.fixedInfixRootView terminal operand input
+  let left : Expression := viewed.1
+  let rest : List (MatchedTerminal file tokens terminal × Expression) :=
+    viewed.2
+  have inputEq := EbnfValue.fixedInfixRootValue_of_view
+    terminal operand input
+  have resultEq : executeLogicalAndRoot file input =
+      RuleReduction.foldInfixLeft file left
+        (rest.map fun value =>
+          (RuleReduction.infixOperator value.1 (.logicalAnd value.1),
+            value.2)) := by
+    change executeInfixLeft file left
+      (rest.map fun value =>
+        (executableTerminalLoc value.1 .logicalAnd, value.2)) = _
+    rw [executeInfixLeft_eq_foldInfixLeft]
+    rfl
+  rw [resultEq, ← inputEq]
+  exact .logicalAnd origin finish left rest
+
+/-- The bitwise-or executor realizes its exact fixed-infix reduction. -/
+theorem executeBitOrRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .bitOr origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .bitOr)) :
+    RuleReduction file tokens .bitOr origin finish input
+      (executeBitOrRoot file input) := by
+  let terminal : TerminalSymbol := .symbol .pipe
+  let operand : GrammarRuleId := .bitXor
+  change EbnfValue file tokens
+    (EbnfValue.fixedInfixRootExpr terminal operand) at input
+  let viewed := EbnfValue.fixedInfixRootView terminal operand input
+  let left : Expression := viewed.1
+  let rest : List (MatchedTerminal file tokens terminal × Expression) :=
+    viewed.2
+  have inputEq := EbnfValue.fixedInfixRootValue_of_view
+    terminal operand input
+  have resultEq : executeBitOrRoot file input =
+      RuleReduction.foldInfixLeft file left
+        (rest.map fun value =>
+          (RuleReduction.infixOperator value.1 (.bitOr value.1), value.2)) := by
+    change executeInfixLeft file left
+      (rest.map fun value =>
+        (executableTerminalLoc value.1 .bitOr, value.2)) = _
+    rw [executeInfixLeft_eq_foldInfixLeft]
+    rfl
+  rw [resultEq, ← inputEq]
+  exact .bitOr origin finish left rest
+
+/-- The bitwise-xor executor realizes its exact fixed-infix reduction. -/
+theorem executeBitXorRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .bitXor origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .bitXor)) :
+    RuleReduction file tokens .bitXor origin finish input
+      (executeBitXorRoot file input) := by
+  let terminal : TerminalSymbol := .symbol .caret
+  let operand : GrammarRuleId := .bitAnd
+  change EbnfValue file tokens
+    (EbnfValue.fixedInfixRootExpr terminal operand) at input
+  let viewed := EbnfValue.fixedInfixRootView terminal operand input
+  let left : Expression := viewed.1
+  let rest : List (MatchedTerminal file tokens terminal × Expression) :=
+    viewed.2
+  have inputEq := EbnfValue.fixedInfixRootValue_of_view
+    terminal operand input
+  have resultEq : executeBitXorRoot file input =
+      RuleReduction.foldInfixLeft file left
+        (rest.map fun value =>
+          (RuleReduction.infixOperator value.1 (.bitXor value.1), value.2)) := by
+    change executeInfixLeft file left
+      (rest.map fun value =>
+        (executableTerminalLoc value.1 .bitXor, value.2)) = _
+    rw [executeInfixLeft_eq_foldInfixLeft]
+    rfl
+  rw [resultEq, ← inputEq]
+  exact .bitXor origin finish left rest
+
+/-- The bitwise-and executor realizes its exact fixed-infix reduction. -/
+theorem executeBitAndRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .bitAnd origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .bitAnd)) :
+    RuleReduction file tokens .bitAnd origin finish input
+      (executeBitAndRoot file input) := by
+  let terminal : TerminalSymbol := .symbol .amp
+  let operand : GrammarRuleId := .additive
+  change EbnfValue file tokens
+    (EbnfValue.fixedInfixRootExpr terminal operand) at input
+  let viewed := EbnfValue.fixedInfixRootView terminal operand input
+  let left : Expression := viewed.1
+  let rest : List (MatchedTerminal file tokens terminal × Expression) :=
+    viewed.2
+  have inputEq := EbnfValue.fixedInfixRootValue_of_view
+    terminal operand input
+  have resultEq : executeBitAndRoot file input =
+      RuleReduction.foldInfixLeft file left
+        (rest.map fun value =>
+          (RuleReduction.infixOperator value.1 (.bitAnd value.1), value.2)) := by
+    change executeInfixLeft file left
+      (rest.map fun value =>
+        (executableTerminalLoc value.1 .bitAnd, value.2)) = _
+    rw [executeInfixLeft_eq_foldInfixLeft]
+    rfl
+  rw [resultEq, ← inputEq]
+  exact .bitAnd origin finish left rest
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -4492,6 +4663,11 @@ theorem executeRootRule_reduces
       exact executeExpressionStatementRoot_reduces origin finish ready input
   | contractMember =>
       exact executeContractMemberRoot_reduces origin finish ready input
+  | logicalOr => exact executeLogicalOrRoot_reduces origin finish ready input
+  | logicalAnd => exact executeLogicalAndRoot_reduces origin finish ready input
+  | bitOr => exact executeBitOrRoot_reduces origin finish ready input
+  | bitXor => exact executeBitXorRoot_reduces origin finish ready input
+  | bitAnd => exact executeBitAndRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
