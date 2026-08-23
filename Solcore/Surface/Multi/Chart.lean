@@ -22425,3 +22425,209 @@ private theorem PhaseCCompletionInsertReady.not_of_conflict
   contradiction
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Total completion storage.  Rows with the same target may retain different
+coordinates.  Duplicate rows are harmless because U04 addresses remain
+single-use and the ledger is private. -/
+private abbrev CompletionBackpointerMultiLedger (tokens : List Token) :=
+  List (CompletionBackpointerEntry tokens)
+
+namespace CompletionBackpointerMultiLedger
+
+private def Contains
+    {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (after : ContextualItemKey tokens)
+    (coordinates : CompletionBackpointerCoordinates tokens) : Prop :=
+  ∃ entry, entry ∈ ledger ∧ entry.after = after ∧
+    entry.coordinates = coordinates
+
+private def insert
+    {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (entry : CompletionBackpointerEntry tokens) :
+    CompletionBackpointerMultiLedger tokens :=
+  entry :: ledger
+
+private theorem self_mem_insert
+    {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (entry : CompletionBackpointerEntry tokens) :
+    entry ∈ insert ledger entry := by
+  simp [insert]
+
+private theorem old_mem_insert
+    {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (entry old : CompletionBackpointerEntry tokens)
+    (member : old ∈ ledger) :
+    old ∈ insert ledger entry := by
+  simp [insert, member]
+
+private theorem contains_inserted
+    {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (entry : CompletionBackpointerEntry tokens) :
+    Contains (insert ledger entry) entry.after entry.coordinates :=
+  ⟨entry, self_mem_insert ledger entry, rfl, rfl⟩
+
+private theorem Contains.mono_insert
+    {tokens : List Token}
+    {ledger : CompletionBackpointerMultiLedger tokens}
+    (entry : CompletionBackpointerEntry tokens)
+    {after : ContextualItemKey tokens}
+    {coordinates : CompletionBackpointerCoordinates tokens}
+    (contained : Contains ledger after coordinates) :
+    Contains (insert ledger entry) after coordinates := by
+  obtain ⟨old, member, oldAfter, oldCoordinates⟩ := contained
+  exact ⟨old, old_mem_insert ledger entry old member,
+    oldAfter, oldCoordinates⟩
+
+private def CoversPackedEdges
+    (file : WorkspaceFile) (tokens : List Token)
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens)) : Prop :=
+  ∀ edge, edge ∈ edges →
+    match edge.val with
+    | .scanned _ _ _ => True
+    | .completed _ finished after shared =>
+        Contains ledger after (shared, finished.raw.production)
+
+/-- Total atomic insertion used in place of the rejecting U04 pre-update. -/
+private def insertCompleted
+    {file : WorkspaceFile} {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    CompletionBackpointerMultiLedger tokens ×
+      List (StructurallyValidContextualPackedEdge file tokens) :=
+  (insert ledger (CompletionBackpointerEntry.ofCompleted edge),
+    edges ++ [CompletionBackpointerLedger.packCompleted edge])
+
+private theorem insertCompleted_coversPackedEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (covers : CoversPackedEdges file tokens ledger edges) :
+    CoversPackedEdges file tokens (insertCompleted ledger edges edge).1
+      (insertCompleted ledger edges edge).2 := by
+  intro retained member
+  unfold insertCompleted at member ⊢
+  simp only at member ⊢
+  rw [List.mem_append] at member
+  rcases member with oldMember | inserted
+  · have oldCovered := covers retained oldMember
+    cases key : retained.val with
+    | scanned before after cursor => trivial
+    | completed waiting finished after shared =>
+        simp only [key] at oldCovered ⊢
+        exact oldCovered.mono_insert
+          (CompletionBackpointerEntry.ofCompleted edge)
+  · simp only [List.mem_singleton] at inserted
+    subst retained
+    change Contains
+      (insert ledger (CompletionBackpointerEntry.ofCompleted edge))
+      edge.after (edge.shared, edge.finished.raw.production)
+    exact contains_inserted ledger (CompletionBackpointerEntry.ofCompleted edge)
+
+private theorem insertCompleted_rowsExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (ledger : CompletionBackpointerMultiLedger tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (exact : CompletionBackpointerLedger.RowsExact ledger edges) :
+    CompletionBackpointerLedger.RowsExact
+      (insertCompleted ledger edges edge).1
+      (insertCompleted ledger edges edge).2 := by
+  unfold insertCompleted
+  simp only
+  intro entry member
+  simp only [insert, List.mem_cons] at member
+  rcases member with head | oldMember
+  · subst entry
+    exact ⟨CompletionBackpointerLedger.packCompleted edge,
+      edge.waiting, edge.finished, edge.after, edge.shared,
+      by simp [CompletionBackpointerLedger.packCompleted],
+      rfl, rfl, rfl⟩
+  · obtain ⟨retained, waiting, finished, after, shared,
+      retainedMember, retainedShape, entryAfter, coordinates⟩ :=
+        exact entry oldMember
+    exact ⟨retained, waiting, finished, after, shared,
+      by simp [retainedMember], retainedShape, entryAfter, coordinates⟩
+
+private theorem lookup_insert_eq_of_single_selected
+    {tokens : List Token}
+    {ledger result : CompletionBackpointerLedger tokens}
+    (entry : CompletionBackpointerEntry tokens)
+    (selected : CompletionBackpointerLedger.insert? ledger entry =
+      some result) :
+    ∀ after, CompletionBackpointerLedger.lookup? after
+      (insert ledger entry) =
+        CompletionBackpointerLedger.lookup? after result := by
+  unfold CompletionBackpointerLedger.insert? at selected
+  split at selected
+  next absent =>
+    cases selected
+    intro after
+    rfl
+  next stored present =>
+    split at selected
+    next agreeing =>
+      cases selected
+      intro after
+      unfold insert
+      change (if entry.after = after then some entry.coordinates
+        else CompletionBackpointerLedger.lookup? after ledger) =
+          CompletionBackpointerLedger.lookup? after ledger
+      by_cases sameAfter : entry.after = after
+      · rw [if_pos sameAfter]
+        subst after
+        exact (present.trans (congrArg some agreeing)).symm
+      · rw [if_neg sameAfter]
+    next conflicting => contradiction
+
+private theorem insertCompleted_observational_eq_of_single_selected
+    {file : WorkspaceFile} {tokens : List Token}
+    {ledger resultLedger : CompletionBackpointerLedger tokens}
+    {edges resultEdges :
+      List (StructurallyValidContextualPackedEdge file tokens)}
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : CompletionBackpointerLedger.insertCompleted?
+      ledger edges edge = some (resultLedger, resultEdges)) :
+    (insertCompleted ledger edges edge).2 = resultEdges ∧
+      ∀ after, CompletionBackpointerLedger.lookup? after
+        (insertCompleted ledger edges edge).1 =
+          CompletionBackpointerLedger.lookup? after resultLedger := by
+  unfold CompletionBackpointerLedger.insertCompleted? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨nextLedger, inserted, pairEq⟩
+  cases pairEq
+  unfold insertCompleted
+  exact ⟨rfl, lookup_insert_eq_of_single_selected
+    (CompletionBackpointerEntry.ofCompleted edge) inserted⟩
+
+private theorem insert_retains_conflicting_coordinates
+    {tokens : List Token}
+    (ledger : CompletionBackpointerLedger tokens)
+    (entry : CompletionBackpointerEntry tokens)
+    (conflict : CompletionBackpointerLedger.Conflict ledger entry) :
+    ∃ stored, stored ≠ entry.coordinates ∧
+      Contains (insert ledger entry) entry.after stored ∧
+      Contains (insert ledger entry) entry.after entry.coordinates := by
+  rcases conflict with ⟨stored, lookupEq, different⟩
+  obtain ⟨old, member, oldAfter, oldCoordinates⟩ :=
+    CompletionBackpointerLedger.lookup?_some_entry entry.after stored ledger
+      lookupEq
+  exact ⟨stored, different,
+    ⟨old, old_mem_insert ledger entry old member, oldAfter, oldCoordinates⟩,
+    contains_inserted ledger entry⟩
+
+end CompletionBackpointerMultiLedger
+
+end Solcore.Surface.Multi.Chart
