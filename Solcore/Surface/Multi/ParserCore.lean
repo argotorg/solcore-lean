@@ -5756,6 +5756,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | statement : ExecutableRootRule .statement
   | terminalExpression : ExecutableRootRule .terminalExpression
   | expression : ExecutableRootRule .expression
+  | annotation : ExecutableRootRule .annotation
   | blockStatement : ExecutableRootRule .blockStatement
   | functionDecl : ExecutableRootRule .functionDecl
   | classMethod : ExecutableRootRule .classMethod
@@ -6492,6 +6493,29 @@ def executeFunctionSignatureRoot
       parameters := parameters
       returnType := returnValue.map fun value => value.2.1
     }
+
+/-- Execute an annotation with or without its optional type suffix. -/
+def executeAnnotationRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .annotation)) : Expression :=
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .conditional)
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let suffix : EbnfExpr := .sequence [colonAtom, typeAtom]
+  let viewed := EbnfValue.sequence2View
+    expressionAtom (.optional suffix) input
+  let expression := EbnfValue.ruleView .conditional viewed.1
+  match EbnfValue.optionalView suffix viewed.2 with
+  | none => expression
+  | some rawSuffix =>
+      let suffixView := EbnfValue.sequence2View
+        colonAtom typeAtom rawSuffix
+      sourceLoc (ConsumedSpanWitness.compute
+        file tokens origin finish owned ordered)
+        (.annotation expression (EbnfValue.ruleView .type suffixView.2))
 
 /-- Execute a block-statement root from its body value. -/
 def executeBlockStatementRoot
@@ -8242,6 +8266,8 @@ def executeRootRule
   | .statement => executeStatementRoot input
   | .terminalExpression => executeTerminalExpressionRoot input
   | .expression => executeExpressionRoot input
+  | .annotation =>
+      executeAnnotationRoot file tokens origin finish owned ordered input
   | .blockStatement =>
       executeBlockStatementRoot file tokens origin finish owned ordered input
   | .functionDecl =>
