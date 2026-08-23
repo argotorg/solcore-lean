@@ -4441,6 +4441,109 @@ theorem executeContractMemberRoot_reduces
     rw [resultEq, ← inputEq, ← rawEq]
     exact .contractMemberConstructor origin finish declaration witness
 
+/-- The assignment-operator executor realizes its selected terminal root. -/
+theorem executeAssignmentOperatorRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .assignmentOperator origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .assignmentOperator)) :
+    RuleReduction file tokens .assignmentOperator origin finish input
+      (executeAssignmentOperatorRoot input) := by
+  let branches : List EbnfExpr := [
+    .atom (.terminal (.symbol .equal)),
+    .atom (.terminal (.symbol .plusEqual)),
+    .atom (.terminal (.symbol .minusEqual)),
+    .atom (.terminal (.symbol .caretEqual)),
+    .atom (.terminal (.symbol .ampEqual)),
+    .atom (.terminal (.symbol .pipeEqual)),
+    .atom (.terminal (.symbol .percentEqual))]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch.val = 0 ∨ branch.val = 1 ∨
+      branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 ∨
+      branch.val = 5 ∨ branch.val = 6 := by
+    have lengthEq : branches.length = 7 := by rfl
+    have bound : branch.val < 7 := by simpa [lengthEq] using branch.isLt
+    omega
+  rcases branchCases with valueEq | valueEq | valueEq | valueEq |
+      valueEq | valueEq | valueEq
+  · have branchEq : branch = 0 := Fin.ext valueEq
+    subst branch
+    let terminal := EbnfValue.terminalView (.symbol .equal) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .equal) raw
+    have resultEq : executeAssignmentOperatorRoot input =
+        RuleReduction.assignmentOperator terminal (.equal terminal) := by
+      rw [executeAssignmentOperatorRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .assignmentOperatorEqual origin finish terminal
+  · have branchEq : branch = 1 := Fin.ext valueEq
+    subst branch
+    let terminal := EbnfValue.terminalView (.symbol .plusEqual) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .plusEqual) raw
+    have resultEq : executeAssignmentOperatorRoot input =
+        RuleReduction.assignmentOperator terminal (.addEqual terminal) := by
+      rw [executeAssignmentOperatorRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .assignmentOperatorAddEqual origin finish terminal
+  · have branchEq : branch = 2 := Fin.ext valueEq
+    subst branch
+    let terminal := EbnfValue.terminalView (.symbol .minusEqual) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .minusEqual) raw
+    have resultEq : executeAssignmentOperatorRoot input =
+        RuleReduction.assignmentOperator terminal (.subtractEqual terminal) := by
+      rw [executeAssignmentOperatorRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .assignmentOperatorSubtractEqual origin finish terminal
+  · have branchEq : branch = 3 := Fin.ext valueEq
+    subst branch
+    let terminal := EbnfValue.terminalView (.symbol .caretEqual) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .caretEqual) raw
+    have resultEq : executeAssignmentOperatorRoot input =
+        RuleReduction.assignmentOperator terminal (.bitXorEqual terminal) := by
+      rw [executeAssignmentOperatorRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .assignmentOperatorBitXorEqual origin finish terminal
+  · have branchEq : branch = 4 := Fin.ext valueEq
+    subst branch
+    let terminal := EbnfValue.terminalView (.symbol .ampEqual) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .ampEqual) raw
+    have resultEq : executeAssignmentOperatorRoot input =
+        RuleReduction.assignmentOperator terminal (.bitAndEqual terminal) := by
+      rw [executeAssignmentOperatorRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .assignmentOperatorBitAndEqual origin finish terminal
+  · have branchEq : branch = 5 := Fin.ext valueEq
+    subst branch
+    let terminal := EbnfValue.terminalView (.symbol .pipeEqual) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .pipeEqual) raw
+    have resultEq : executeAssignmentOperatorRoot input =
+        RuleReduction.assignmentOperator terminal (.bitOrEqual terminal) := by
+      rw [executeAssignmentOperatorRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .assignmentOperatorBitOrEqual origin finish terminal
+  · have branchEq : branch = 6 := Fin.ext valueEq
+    subst branch
+    let terminal := EbnfValue.terminalView (.symbol .percentEqual) raw
+    have rawEq := EbnfValue.terminal_of_view (.symbol .percentEqual) raw
+    have resultEq : executeAssignmentOperatorRoot input =
+        RuleReduction.assignmentOperator terminal (.moduloEqual terminal) := by
+      rw [executeAssignmentOperatorRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .assignmentOperatorModuloEqual origin finish terminal
+
 /-- The executable infix fold is the declarative semantic fold. -/
 private theorem executeInfixLeft_eq_foldInfixLeft
     (file : WorkspaceFile) (left : Expression)
@@ -4663,6 +4766,8 @@ theorem executeRootRule_reduces
       exact executeExpressionStatementRoot_reduces origin finish ready input
   | contractMember =>
       exact executeContractMemberRoot_reduces origin finish ready input
+  | assignmentOperator =>
+      exact executeAssignmentOperatorRoot_reduces origin finish ready input
   | logicalOr => exact executeLogicalOrRoot_reduces origin finish ready input
   | logicalAnd => exact executeLogicalAndRoot_reduces origin finish ready input
   | bitOr => exact executeBitOrRoot_reduces origin finish ready input
