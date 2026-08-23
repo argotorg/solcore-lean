@@ -4868,6 +4868,137 @@ theorem executeLiteralRoot_reduces
     exact .literalString origin finish terminal payload
       (terminal.literalProjection_projects .stringLiteral (by simp))
 
+/-- The lambda executor realizes its arbitrary-length sequence root. -/
+theorem executeLambdaRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .lambda origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .lambda)) :
+    RuleReduction file tokens .lambda origin finish input
+      (executeLambdaRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let keywordAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .lamKw))
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let arrowAtom : EbnfExpr := .atom (.terminal (.symbol .arrow))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let returnExpr : EbnfExpr := .sequence [arrowAtom, typeAtom]
+  let bodyAtom : EbnfExpr := .atom (.nonterminal .body)
+  let children : List EbnfExpr := [keywordAtom, openAtom,
+    .list0 parameterAtom, closeAtom, .optional returnExpr, bodyAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  let viewed := EbnfValue.sequenceFlatView children input
+  let keyword := EbnfValue.terminalView
+    (.hardKeyword .lamKw) viewed.1
+  let openParen := EbnfValue.terminalView
+    (.symbol .leftParen) viewed.2.1
+  let rawParameters := EbnfValue.list0View
+    parameterAtom viewed.2.2.1
+  let parameters := rawParameters.map (EbnfValue.ruleView .parameter)
+  let closeParen := EbnfValue.terminalView
+    (.symbol .rightParen) viewed.2.2.2.1
+  let rawReturn := EbnfValue.optionalView
+    returnExpr viewed.2.2.2.2.1
+  let returnType : Option
+      (MatchedTerminal file tokens (.symbol .arrow) × TypeExpr) :=
+    rawReturn.map fun raw =>
+      let returnViewed := EbnfValue.sequence2View arrowAtom typeAtom raw
+      (EbnfValue.terminalView (.symbol .arrow) returnViewed.1,
+        EbnfValue.ruleView .type returnViewed.2)
+  let body := EbnfValue.ruleView .body viewed.2.2.2.2.2.1
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  have keywordEq := EbnfValue.terminal_of_view
+    (.hardKeyword .lamKw) viewed.1
+  have openEq := EbnfValue.terminal_of_view
+    (.symbol .leftParen) viewed.2.1
+  have parametersMapEq :
+      parameters.map (EbnfValue.ruleAtom .parameter) = rawParameters :=
+    shortRuleAtoms_of_views .parameter rawParameters
+  have parametersEq : EbnfValue.list0 parameterAtom
+      (parameters.map (EbnfValue.ruleAtom .parameter)) = viewed.2.2.1 := by
+    rw [parametersMapEq]
+    exact EbnfValue.list0_of_view parameterAtom viewed.2.2.1
+  have closeEq := EbnfValue.terminal_of_view
+    (.symbol .rightParen) viewed.2.2.2.1
+  have returnValuesEq :
+      (returnType.map fun value =>
+        EbnfValue.sequence [arrowAtom, typeAtom]
+          (EbnfValues.cons arrowAtom [typeAtom]
+            (EbnfValue.terminalAtom (.symbol .arrow) value.1)
+            (EbnfValues.cons typeAtom []
+              (EbnfValue.ruleAtom .type value.2) EbnfValues.nil))) =
+        rawReturn := by
+    cases selected : rawReturn with
+    | none => simp [returnType, selected]
+    | some raw =>
+        let returnViewed := EbnfValue.sequence2View arrowAtom typeAtom raw
+        let returnArrow := EbnfValue.terminalView
+          (.symbol .arrow) returnViewed.1
+        let returnedType := EbnfValue.ruleView .type returnViewed.2
+        have arrowEq := EbnfValue.terminal_of_view
+          (.symbol .arrow) returnViewed.1
+        have typeEq := EbnfValue.rule_of_view .type returnViewed.2
+        have sequenceEq := EbnfValue.sequence2_of_view
+          arrowAtom typeAtom raw
+        simp only [returnType, selected, Option.map]
+        apply congrArg some
+        change EbnfValue.sequence [arrowAtom, typeAtom]
+          (EbnfValues.cons arrowAtom [typeAtom]
+            (EbnfValue.terminalAtom (.symbol .arrow) returnArrow)
+            (EbnfValues.cons typeAtom []
+              (EbnfValue.ruleAtom .type returnedType) EbnfValues.nil)) = raw
+        rw [arrowEq, typeEq]
+        exact sequenceEq
+  have returnEq : EbnfValue.optional returnExpr
+      (returnType.map fun value =>
+        EbnfValue.sequence [arrowAtom, typeAtom]
+          (EbnfValues.cons arrowAtom [typeAtom]
+            (EbnfValue.terminalAtom (.symbol .arrow) value.1)
+            (EbnfValues.cons typeAtom []
+              (EbnfValue.ruleAtom .type value.2) EbnfValues.nil))) =
+        viewed.2.2.2.2.1 := by
+    rw [returnValuesEq]
+    exact EbnfValue.optional_of_view returnExpr viewed.2.2.2.2.1
+  have bodyEq := EbnfValue.rule_of_view .body viewed.2.2.2.2.2.1
+  have encodedInputEq : EbnfValue.sequence children
+      (EbnfValues.cons keywordAtom [openAtom, .list0 parameterAtom,
+          closeAtom, .optional returnExpr, bodyAtom]
+        (EbnfValue.terminalAtom (.hardKeyword .lamKw) keyword)
+        (EbnfValues.cons openAtom [.list0 parameterAtom, closeAtom,
+            .optional returnExpr, bodyAtom]
+          (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+          (EbnfValues.cons (.list0 parameterAtom)
+            [closeAtom, .optional returnExpr, bodyAtom]
+            (EbnfValue.list0 parameterAtom
+              (parameters.map (EbnfValue.ruleAtom .parameter)))
+            (EbnfValues.cons closeAtom [.optional returnExpr, bodyAtom]
+              (EbnfValue.terminalAtom (.symbol .rightParen) closeParen)
+              (EbnfValues.cons (.optional returnExpr) [bodyAtom]
+                (EbnfValue.optional returnExpr
+                  (returnType.map fun value =>
+                    EbnfValue.sequence [arrowAtom, typeAtom]
+                      (EbnfValues.cons arrowAtom [typeAtom]
+                        (EbnfValue.terminalAtom
+                          (.symbol .arrow) value.1)
+                        (EbnfValues.cons typeAtom []
+                          (EbnfValue.ruleAtom .type value.2)
+                          EbnfValues.nil))))
+                (EbnfValues.cons bodyAtom []
+                  (EbnfValue.ruleAtom .body body) EbnfValues.nil)))))) =
+      input := by
+    rw [keywordEq, openEq, parametersEq, closeEq, returnEq, bodyEq]
+    exact inputEq
+  have resultEq : executeLambdaRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness
+        (.lambda parameters (returnType.map Prod.snd) body) := by rfl
+  rw [resultEq, ← encodedInputEq]
+  exact .lambda origin finish keyword openParen parameters closeParen
+    returnType body witness
+
 /-- The executable infix fold is the declarative semantic fold. -/
 private theorem executeInfixLeft_eq_foldInfixLeft
     (file : WorkspaceFile) (left : Expression)
@@ -5175,6 +5306,7 @@ theorem executeRootRule_reduces
   | postfixPart =>
       exact executePostfixPartRoot_reduces origin finish ready input
   | literalValue => exact executeLiteralRoot_reduces origin finish ready input
+  | lambdaExpr => exact executeLambdaRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
