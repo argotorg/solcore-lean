@@ -5709,6 +5709,180 @@ theorem executePostfixRoot_reduces
   rw [resultEq, ← inputEq, ← atomEq, ← partsEq]
   exact .postfix origin finish atom parts
 
+private theorem parameterComptime_map
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ value : Option (MatchedTerminal file tokens
+        (.contextualKeyword .comptimeKw)),
+      (projects : ∀ terminal, value = some terminal →
+        RuleReduction.MarkerProjects file tokens terminal
+          .comptimeModifier) →
+      (match value, projects with
+        | none, _ => none
+        | some terminal, evidence => some (RuleReduction.marker terminal
+            (evidence terminal rfl))) =
+        value.map fun terminal =>
+          RuleReduction.terminalLoc terminal .comptimeModifier := by
+  intro value
+  cases value with
+  | none => intro _; rfl
+  | some _ => intro _; rfl
+
+theorem executeParameterRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .parameter origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .parameter)) :
+    RuleReduction file tokens .parameter origin finish input
+      (executeParameterRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let nameAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let typeChild : EbnfExpr := .sequence [colonAtom, typeAtom]
+  change EbnfValue file tokens (.sequence [
+    .optional comptimeAtom, nameAtom, .optional typeChild]) at input
+  let viewed := EbnfValue.sequence3View
+    (.optional comptimeAtom) nameAtom (.optional typeChild) input
+  let rawComptime := EbnfValue.optionalView comptimeAtom viewed.1
+  let comptime := rawComptime.map
+    (EbnfValue.terminalView (.contextualKeyword .comptimeKw))
+  let name := EbnfValue.terminalView (.category .identifier) viewed.2.1
+  let rawType := EbnfValue.optionalView typeChild viewed.2.2
+  let typeValue := rawType.map fun raw =>
+    let pair := EbnfValue.sequence2View colonAtom typeAtom raw
+    (EbnfValue.terminalView (.symbol .colon) pair.1,
+      EbnfValue.ruleView .type pair.2, ())
+  let nameData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := name
+    spelling := name.identifierProjection.1
+    parsed := name.identifierProjection.2
+  }
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence3_of_view
+    (.optional comptimeAtom) nameAtom (.optional typeChild) input
+  have comptimeEq : EbnfValue.optional comptimeAtom
+      (comptime.map (EbnfValue.terminalAtom
+        (.contextualKeyword .comptimeKw))) = viewed.1 := by
+    calc
+      _ = EbnfValue.optional comptimeAtom rawComptime := by
+        congr 1
+        cases selected : rawComptime with
+        | none => simp [comptime, selected]
+        | some raw =>
+            simp only [comptime, selected, Option.map]
+            exact congrArg some (EbnfValue.terminal_of_view
+              (.contextualKeyword .comptimeKw) raw)
+      _ = viewed.1 := EbnfValue.optional_of_view comptimeAtom viewed.1
+  have nameEq := EbnfValue.terminal_of_view
+    (.category .identifier) viewed.2.1
+  have typeEq : EbnfValue.optional typeChild
+      (typeValue.map fun value =>
+        EbnfValue.sequence [colonAtom, typeAtom]
+          (EbnfValues.cons colonAtom [typeAtom]
+            (EbnfValue.terminalAtom (.symbol .colon) value.1)
+            (EbnfValues.cons typeAtom []
+              (EbnfValue.ruleAtom .type value.2.1)
+              EbnfValues.nil))) = viewed.2.2 := by
+    calc
+      _ = EbnfValue.optional typeChild rawType := by
+        congr 1
+        cases selected : rawType with
+        | none =>
+            simp only [typeValue, selected, Option.map]
+        | some raw =>
+            simp only [typeValue, selected, Option.map]
+            apply congrArg some
+            let pair := EbnfValue.sequence2View colonAtom typeAtom raw
+            have rawEq := EbnfValue.sequence2_of_view
+              colonAtom typeAtom raw
+            have colonEq := EbnfValue.terminal_of_view
+              (.symbol .colon) pair.1
+            have ruleEq := EbnfValue.rule_of_view .type pair.2
+            rw [colonEq, ruleEq]
+            exact rawEq
+      _ = viewed.2.2 := EbnfValue.optional_of_view typeChild viewed.2.2
+  have resultEq : executeParameterRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        comptime := comptime.map fun terminal =>
+          RuleReduction.terminalLoc terminal .comptimeModifier
+        name := RuleReduction.terminalLoc name name.identifierProjection.2
+        type := typeValue.map fun value => value.2.1
+      } := by
+    rfl
+  have displayInputEq :
+      EbnfValue.sequence [
+        .optional comptimeAtom, nameAtom, .optional typeChild]
+        (EbnfValues.cons (.optional comptimeAtom)
+          [nameAtom, .optional typeChild]
+          (EbnfValue.optional comptimeAtom
+            (comptime.map (EbnfValue.terminalAtom
+              (.contextualKeyword .comptimeKw))))
+          (EbnfValues.cons nameAtom [.optional typeChild]
+            (EbnfValue.terminalAtom (.category .identifier) name)
+            (EbnfValues.cons (.optional typeChild) []
+              (EbnfValue.optional typeChild
+                (typeValue.map fun value =>
+                  EbnfValue.sequence [colonAtom, typeAtom]
+                    (EbnfValues.cons colonAtom [typeAtom]
+                      (EbnfValue.terminalAtom (.symbol .colon) value.1)
+                      (EbnfValues.cons typeAtom []
+                        (EbnfValue.ruleAtom .type value.2.1)
+                        EbnfValues.nil))))
+              EbnfValues.nil))) = input := by
+    rw [comptimeEq, nameEq, typeEq]
+    exact inputEq
+  have transportSelf
+      (value : EbnfValue file tokens (.sequence [
+        .optional comptimeAtom, nameAtom, .optional typeChild]))
+      (shape : (.sequence [
+        .optional comptimeAtom, nameAtom, .optional typeChild]) =
+          m2cV1.rhs .parameter) :
+      EbnfValue.transport shape value = value := by
+    rw [show shape = (by rfl) from Subsingleton.elim _ _]
+    rfl
+  let comptimeProjects : ∀ terminal, comptime = some terminal →
+      RuleReduction.MarkerProjects file tokens terminal
+        .comptimeModifier := fun terminal _ => .comptimeModifier terminal
+  have reduces := RuleReduction.parameter origin finish comptime nameData
+    typeValue comptimeProjects name.identifierProjection_projects witness
+  rw [transportSelf] at reduces
+  let relationalComptime : Option Marker :=
+    match comptime, comptimeProjects with
+    | none, _ => none
+    | some terminal, projects => some (RuleReduction.marker terminal
+        (projects terminal rfl))
+  let relationalOutput : Parameter := sourceLoc witness {
+    comptime := relationalComptime
+    name := RuleReduction.terminalLoc name name.identifierProjection.2
+    type := typeValue.map fun value => value.2.1
+  }
+  change RuleReduction file tokens .parameter origin finish _
+    relationalOutput at reduces
+  have outputEq : relationalOutput = sourceLoc witness {
+      comptime := comptime.map fun terminal =>
+        RuleReduction.terminalLoc terminal .comptimeModifier
+      name := RuleReduction.terminalLoc name name.identifierProjection.2
+      type := typeValue.map fun value => value.2.1
+    } := by
+    simp only [relationalOutput, relationalComptime]
+    rw [parameterComptime_map comptime comptimeProjects]
+  rw [outputEq] at reduces
+  simp only [nameData] at reduces
+  have constructorInputEq := displayInputEq
+  simp only [comptimeAtom, nameAtom, colonAtom, typeAtom, typeChild] at constructorInputEq
+  have inputReduces : RuleReduction file tokens .parameter origin finish input
+      (sourceLoc witness {
+        comptime := comptime.map fun terminal =>
+          RuleReduction.terminalLoc terminal .comptimeModifier
+        name := RuleReduction.terminalLoc name name.identifierProjection.2
+        type := typeValue.map fun value => value.2.1
+      }) := constructorInputEq ▸ reduces
+  exact resultEq.symm ▸ inputReduces
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -5755,6 +5929,7 @@ theorem executeRootRule_reduces
       exact executeReturnStatementRoot_reduces origin finish ready input
   | assignmentStatement =>
       exact executeAssignmentStatementRoot_reduces origin finish ready input
+  | parameter => exact executeParameterRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
