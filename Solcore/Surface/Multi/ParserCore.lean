@@ -5404,6 +5404,9 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | body : ExecutableRootRule .body
+  | forInitItem : ExecutableRootRule .forInitItem
+  | forPostItem : ExecutableRootRule .forPostItem
+  | expressionStatement : ExecutableRootRule .expressionStatement
 
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
@@ -5821,6 +5824,82 @@ def executeBodyRoot
     statements := statements
   }
 
+/-- Execute a `for` initializer from its selected typed alternative. -/
+def executeForInitItemRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .forInitItem)) :
+    ForInitItem :=
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let operatorAtom : EbnfExpr := .atom (.nonterminal .assignmentOperator)
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .letBinding),
+    .sequence [expressionAtom, operatorAtom, expressionAtom],
+    expressionAtom]
+  let witness := shallowRootWitness file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      sourceLoc witness (.letBinding (EbnfValue.ruleView .letBinding raw))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        expressionAtom operatorAtom expressionAtom raw
+      sourceLoc witness (.assignment
+        (EbnfValue.ruleView .assignmentOperator viewed.2.1)
+        (EbnfValue.ruleView .expression viewed.1)
+        (EbnfValue.ruleView .expression viewed.2.2))
+  | ⟨⟨2, _⟩, raw⟩ =>
+      sourceLoc witness (.expression (EbnfValue.ruleView .expression raw))
+
+/-- Execute a `for` post item from its selected typed alternative. -/
+def executeForPostItemRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .forPostItem)) :
+    ForPostItem :=
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let operatorAtom : EbnfExpr := .atom (.nonterminal .assignmentOperator)
+  let branches : List EbnfExpr := [
+    .sequence [expressionAtom, operatorAtom, expressionAtom], expressionAtom]
+  let witness := shallowRootWitness file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        expressionAtom operatorAtom expressionAtom raw
+      sourceLoc witness (.assignment
+        (EbnfValue.ruleView .assignmentOperator viewed.2.1)
+        (EbnfValue.ruleView .expression viewed.1)
+        (EbnfValue.ruleView .expression viewed.2.2))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      sourceLoc witness (.expression (EbnfValue.ruleView .expression raw))
+
+/-- Execute an expression statement from its terminated or terminal branch. -/
+def executeExpressionStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .expressionStatement)) :
+    Statement :=
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  let branches : List EbnfExpr := [
+    .sequence [expressionAtom, semicolonAtom],
+    .atom (.nonterminal .terminalExpression)]
+  let witness := shallowRootWitness file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View expressionAtom semicolonAtom raw
+      let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
+      sourceLoc witness (.expression
+        (EbnfValue.ruleView .expression viewed.1) (some semicolon.span))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      sourceLoc witness (.expression
+        (EbnfValue.ruleView .terminalExpression raw) none)
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -5856,6 +5935,12 @@ def executeRootRule
   | .assignmentStatement =>
       executeAssignmentStatementRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
+  | .forInitItem =>
+      executeForInitItemRoot file tokens origin finish owned ordered input
+  | .forPostItem =>
+      executeForPostItemRoot file tokens origin finish owned ordered input
+  | .expressionStatement =>
+      executeExpressionStatementRoot file tokens origin finish owned ordered input
 
 /-- Execute one supported root production directly from its chart action
 tuple. -/
