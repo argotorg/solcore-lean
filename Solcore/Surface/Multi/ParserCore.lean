@@ -5696,6 +5696,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | parameter : ExecutableRootRule .parameter
   | dataConstructor : ExecutableRootRule .dataConstructor
+  | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | body : ExecutableRootRule .body
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
@@ -6276,6 +6277,46 @@ def executeDataConstructorRoot
     name := { span := name.span, payload := name.identifierProjection.2 }
     fields := fields
   }
+
+/-- Execute a type-alias declaration and its optional type parameters. -/
+def executeTypeAliasDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .typeAliasDecl)) :
+    TypeAliasDecl :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let parameterChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .typeKw)), identifierAtom,
+    .optional parameterChild, .atom (.terminal (.symbol .equal)),
+    .atom (.nonterminal .type),
+    .atom (.terminal (.symbol .semicolon))]
+  let ⟨_, rawName, rawOptional, _, rawBody, _, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let parameters := (EbnfValue.optionalView parameterChild rawOptional).map
+    fun rawParameters =>
+      let parameterChildren : List EbnfExpr := [
+        .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+        .atom (.terminal (.symbol .rightParen))]
+      let ⟨_, rawNames, _, ⟨⟩⟩ :=
+        EbnfValue.sequenceFlatView parameterChildren rawParameters
+      (EbnfValue.list1View identifierAtom rawNames).map fun raw =>
+        let parameter := EbnfValue.terminalView
+          (.category .identifier) raw
+        { span := parameter.span,
+          payload := parameter.identifierProjection.2 }
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      name := { span := name.span, payload := name.identifierProjection.2 }
+      parameters := parameters
+      body := EbnfValue.ruleView .type rawBody
+    }
 
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
@@ -7001,6 +7042,8 @@ def executeRootRule
       executeParameterRoot file tokens origin finish owned ordered input
   | .dataConstructor =>
       executeDataConstructorRoot file tokens origin finish owned ordered input
+  | .typeAliasDecl =>
+      executeTypeAliasDeclRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
