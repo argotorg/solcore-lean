@@ -1850,6 +1850,55 @@ theorem matchedTerminal_identifier_projection_exact
           Identifier.parse spelling = some parsed :=
   Iff.rfl
 
+/-- Compute the spelling and parsed value of an identifier stream value. -/
+def executableIdentifierProjection? :
+    TerminalStreamValue → Option (String × Identifier)
+  | .retained token =>
+      match token.payload with
+      | .identifier spelling =>
+          match Identifier.parse spelling with
+          | some parsed => some (spelling, parsed)
+          | none => none
+      | _ => none
+  | .endOfFile => none
+
+/-- Every value already checked as an identifier has a computed projection. -/
+theorem executableIdentifierProjection?_isSome_of_matches
+    (value : TerminalStreamValue)
+    (matchedEvidence : TerminalMatches (.category .identifier) value) :
+    (executableIdentifierProjection? value).isSome = true := by
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with ⟨spelling, parsed, payloadEq, parseEq⟩
+      simp [executableIdentifierProjection?, payloadEq, parseEq]
+
+/-- Constructively project one checked identifier terminal. -/
+def MatchedTerminal.identifierProjection
+    {file : WorkspaceFile} {tokens : List Token}
+    (matched : MatchedTerminal file tokens (.category .identifier)) :
+    String × Identifier :=
+  (executableIdentifierProjection? matched.value).get (by
+    exact executableIdentifierProjection?_isSome_of_matches
+      matched.value matched.matches)
+
+/-- The computed identifier projection satisfies the declarative relation. -/
+theorem MatchedTerminal.identifierProjection_projects
+    {file : WorkspaceFile} {tokens : List Token}
+    (matched : MatchedTerminal file tokens (.category .identifier)) :
+    IdentifierProjects matched matched.identifierProjection.1
+      matched.identifierProjection.2 := by
+  rcases matched with
+    ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with ⟨spelling, parsed, payloadEq, parseEq⟩
+      unfold IdentifierProjects
+      simp only [MatchedTerminal.identifierProjection,
+        executableIdentifierProjection?, payloadEq, parseEq, Option.get_some]
+      exact ⟨token, rfl, payloadEq, trivial⟩
+
 /-- Exact spelling and parsed value projected from one path terminal. -/
 def PathSegmentProjects
     {file : WorkspaceFile} {tokens : List Token}
