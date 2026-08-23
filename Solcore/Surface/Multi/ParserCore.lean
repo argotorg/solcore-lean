@@ -5504,6 +5504,38 @@ theorem choice_of_view
     choice branches (choiceView branches input) = input := by
   simp [choiceView, choice]
 
+/-- View a binary choice without exposing its dependent finite index. -/
+def choice2View
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : EbnfExpr)
+    (input : EbnfValue file tokens (.choice [first, second])) :
+    Sum (EbnfValue file tokens first) (EbnfValue file tokens second) :=
+  match choiceView [first, second] input with
+  | ⟨⟨0, _⟩, raw⟩ => .inl raw
+  | ⟨⟨1, _⟩, raw⟩ => .inr raw
+
+/-- Rebuilding a viewed binary choice recovers the original value. -/
+theorem choice2_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second : EbnfExpr)
+    (input : EbnfValue file tokens (.choice [first, second])) :
+    (match choice2View first second input with
+      | .inl raw => choice [first, second] ⟨0, raw⟩
+      | .inr raw => choice [first, second] ⟨1, raw⟩) = input := by
+  unfold choice2View
+  generalize selectedEq : choiceView [first, second] input = selected
+  rcases selected with ⟨⟨branch, bound⟩, raw⟩
+  have values : branch = 0 ∨ branch = 1 := by
+    have : branch < 2 := by simpa using bound
+    omega
+  rcases values with rfl | rfl
+  · have rebuild := choice_of_view [first, second] input
+    rw [selectedEq] at rebuild
+    exact rebuild
+  · have rebuild := choice_of_view [first, second] input
+    rw [selectedEq] at rebuild
+    exact rebuild
+
 /-- View an optional expression as its exact optional child. -/
 def optionalView
     {file : WorkspaceFile} {tokens : List Token}
@@ -6554,16 +6586,15 @@ def executeImportEntryRoot
     .atom (.terminal (.hardKeyword .asKw)), identifierAtom]
   let namedChildren : List EbnfExpr := [
     identifierAtom, .optional (.sequence aliasChildren)]
-  let branches : List EbnfExpr := [starAtom, .sequence namedChildren]
   let witness := shallowRootWitness file tokens origin finish owned ordered
-  match EbnfValue.choiceView branches input with
-  | ⟨⟨0, _⟩, raw⟩ =>
+  match EbnfValue.choice2View starAtom (.sequence namedChildren) input with
+  | .inl raw =>
       let star := EbnfValue.terminalView (.symbol .star) raw
       sourceLoc witness (.wildcard {
         span := star.span
         payload := .wildcard
       })
-  | ⟨⟨1, _⟩, raw⟩ =>
+  | .inr raw =>
       let viewed := EbnfValue.sequence2View identifierAtom
         (.optional (.sequence aliasChildren)) raw
       let name := EbnfValue.terminalView
