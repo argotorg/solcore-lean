@@ -3308,6 +3308,253 @@ end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi
 
+open Grammar
+open Solcore.Workspace
+
+private theorem memoEnablesProduction_iff_enabled_multi
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (productionInstance : ProductionInstanceKey tokens) :
+    Chart.MemoEnablesProduction memo productionInstance ↔
+      EnabledProductionInstance file tokens memo correct final
+        productionInstance := by
+  constructor
+  · intro enabled guard polarity member
+    obtain ⟨guardInstance, decision, anchor, stored, allowed⟩ :=
+      enabled guard polarity member
+    have sameGuard : guardInstance.guard = guard := anchor.2.1
+    let raw : GuardWitnessKey.Raw tokens := {
+      productionInstance := productionInstance
+      guardInstance := guardInstance
+      polarity := polarity
+    }
+    have valid : GuardWitnessKey.Valid raw := by
+      constructor
+      · simpa only [raw, sameGuard] using member
+      · simpa only [raw, sameGuard] using anchor
+    let key : GuardWitnessKey tokens := ⟨raw, valid⟩
+    refine ⟨key, rfl, sameGuard, rfl, decision, stored, ?_, allowed⟩
+    exact (correct guardInstance decision).mp stored
+  · intro enabled guard polarity member
+    obtain ⟨key, productionEq, guardEq, polarityEq,
+      decision, stored, _evidence, allowed⟩ :=
+      enabled guard polarity member
+    refine ⟨key.guardInstance, decision, ?_, ?_, ?_⟩
+    · have anchor := key.property.2
+      change GuardAnchor key.productionInstance
+        (key.guardInstance.guard, key.polarity) key.guardInstance at anchor
+      change key.productionInstance = productionInstance at productionEq
+      change key.guardInstance.guard = guard at guardEq
+      change key.polarity = polarity at polarityEq
+      rw [productionEq, guardEq, polarityEq] at anchor
+      exact anchor
+    · exact stored
+    · simpa only [polarityEq] using allowed
+
+private theorem operationalContextualReach_sound_multi
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {item : ContextualItemKey tokens}
+    (reached : Chart.OperationalContextualReach file tokens memo item) :
+    ContextualReach file tokens memo correct final item := by
+  induction reached with
+  | root => exact ContextualReach.root
+  | predict waiting predicted _ next enabled waitingInduction =>
+      exact ContextualReach.predict waiting predicted waitingInduction next
+        ((memoEnablesProduction_iff_enabled_multi correct final _).mp enabled)
+  | scan before after cursor _ structural beforeInduction =>
+      exact ContextualReach.scan before after cursor beforeInduction structural
+  | complete waiting finished after shared _ _ structural
+      waitingInduction finishedInduction =>
+      exact ContextualReach.complete waiting finished after shared
+        waitingInduction finishedInduction structural
+
+private theorem operationalContextualEdgeReach_sound_multi
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {key : ContextualPackedEdgeKey tokens}
+    (reached : Chart.OperationalContextualEdgeReach file tokens memo key) :
+    ContextualEdgeReach file tokens memo correct final key := by
+  rcases reached with ⟨structural, endpoints⟩
+  constructor
+  · exact structural
+  · cases key with
+    | scanned before after cursor =>
+        exact ⟨operationalContextualReach_sound_multi correct final endpoints.1,
+          operationalContextualReach_sound_multi correct final endpoints.2⟩
+    | completed waiting finished after shared =>
+        exact ⟨operationalContextualReach_sound_multi correct final endpoints.1,
+          operationalContextualReach_sound_multi correct final endpoints.2.1,
+          operationalContextualReach_sound_multi correct final endpoints.2.2⟩
+
+private theorem contextualReach_operational_multi
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    Chart.OperationalContextualReach file tokens memo item := by
+  induction reached with
+  | root => exact Chart.OperationalContextualReach.root
+  | predict waiting predicted _ next enabled waitingInduction =>
+      exact Chart.OperationalContextualReach.predict waiting predicted
+        waitingInduction next
+          ((memoEnablesProduction_iff_enabled_multi correct final _).mpr enabled)
+  | scan before after cursor _ structural beforeInduction =>
+      exact Chart.OperationalContextualReach.scan before after cursor
+        beforeInduction structural
+  | complete waiting finished after shared _ _ structural
+      waitingInduction finishedInduction =>
+      exact Chart.OperationalContextualReach.complete waiting finished after
+        shared waitingInduction finishedInduction structural
+
+private theorem contextualEdgeReach_operational_multi
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {key : ContextualPackedEdgeKey tokens}
+    (reached : ContextualEdgeReach file tokens memo correct final key) :
+    Chart.OperationalContextualEdgeReach file tokens memo key := by
+  rcases reached with ⟨structural, endpoints⟩
+  constructor
+  · exact structural
+  · cases key with
+    | scanned before after cursor =>
+        exact ⟨contextualReach_operational_multi correct final endpoints.1,
+          contextualReach_operational_multi correct final endpoints.2⟩
+    | completed waiting finished after shared =>
+        exact ⟨contextualReach_operational_multi correct final endpoints.1,
+          contextualReach_operational_multi correct final endpoints.2.1,
+          contextualReach_operational_multi correct final endpoints.2.2⟩
+
+/-- The total multi-ledger executor preserves the unified semantic memo. -/
+theorem executeObservedContextualWorklistMulti?_memo_eq_semantic
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    result.memo = semanticGuardMemo owned :=
+  (Chart.executeObservedContextualWorklistMulti?_memo_eq_saturated
+    file tokens owned result selected).trans
+      (saturatedGuardMemo_eq_semantic owned)
+
+/-- Every total multi-ledger result carries a correct Phase-B memo. -/
+theorem executeObservedContextualWorklistMulti?_phaseBCorrect
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    PhaseBCorrect file tokens result.memo := by
+  rw [executeObservedContextualWorklistMulti?_memo_eq_semantic
+    file tokens owned result selected]
+  exact semanticGuardMemo_correct owned
+
+/-- Multi-ledger execution is declaratively sound without any backpointer
+uniqueness premise. -/
+theorem executeObservedContextualWorklistMulti?_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+    (forall item, item ∈ result.items ->
+      ContextualReach file tokens result.memo correct final item) ∧
+    (forall edge, edge ∈ result.edges ->
+      ContextualEdgeReach file tokens result.memo correct final edge.val) := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  have operational :=
+    Chart.executeObservedContextualWorklistMulti?_operational_sound
+      file tokens owned result selected
+  exact ⟨fun item member =>
+      operationalContextualReach_sound_multi correct final
+        (operational.1 item member),
+    fun edge member =>
+      operationalContextualEdgeReach_sound_multi correct final
+        (operational.2 edge member)⟩
+
+/-- Operational closure upgrades the multi-ledger result to exact item/edge
+correspondence.  Multiple completed edges for one target remain represented;
+no completion-backpointer uniqueness conclusion is made. -/
+theorem
+    executeObservedContextualWorklistMulti?_correspondence_of_operationalClosure
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (closed : Chart.OperationalContextualClosure file tokens result.memo
+      result.items result.edges) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+    (forall item, item ∈ result.items <->
+      ContextualReach file tokens result.memo correct final item) ∧
+    (forall key, (∃ retained, retained ∈ result.edges ∧
+        retained.val = key) <->
+      ContextualEdgeReach file tokens result.memo correct final key) := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  have sound := executeObservedContextualWorklistMulti?_sound
+    file tokens owned result selected
+  refine ⟨?_, ?_⟩
+  · intro item
+    exact ⟨sound.1 item, fun reached => closed.reach_complete
+      (contextualReach_operational_multi correct final reached)⟩
+  · intro key
+    constructor
+    · rintro ⟨retained, member, rfl⟩
+      exact sound.2 retained member
+    · intro reached
+      exact closed.edge_complete
+        (contextualEdgeReach_operational_multi correct final reached)
+
+/-- Total multi-ledger execution has exact declarative item/edge
+correspondence.  This deliberately does not assert a unique completion
+backpointer for edges sharing one target. -/
+theorem executeObservedContextualWorklistMulti?_correspondence
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+    (forall item, item ∈ result.items <->
+      ContextualReach file tokens result.memo correct final item) ∧
+    (forall key, (∃ retained, retained ∈ result.edges ∧
+        retained.val = key) <->
+      ContextualEdgeReach file tokens result.memo correct final key) :=
+  executeObservedContextualWorklistMulti?_correspondence_of_operationalClosure
+    file tokens owned result selected
+      (Chart.executeObservedContextualWorklistMulti?_operationalClosure
+        file tokens owned result selected)
+
+end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
 open Solcore.Workspace
 open Grammar
 
