@@ -4019,6 +4019,144 @@ theorem executeContinueStatementRoot_reduces
   rw [resultEq, ← inputEq, ← keywordEq, ← semicolonEq]
   exact .continueStatement origin finish keyword semicolon witness
 
+private theorem shortRuleAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (inputs : List
+      (EbnfValue file tokens (.atom (.nonterminal rule)))) :
+    (inputs.map (EbnfValue.ruleView rule)).map
+        (EbnfValue.ruleAtom rule) = inputs := by
+  induction inputs with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [EbnfValue.rule_of_view, induction]
+
+/-- The return-statement executor realizes its exact root reduction. -/
+theorem executeReturnStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .returnStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .returnStatement)) :
+    RuleReduction file tokens .returnStatement origin finish input
+      (executeReturnStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let keywordAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .returnKw))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let optionalAtom : EbnfExpr := .optional expressionAtom
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  change EbnfValue file tokens
+    (.sequence [keywordAtom, optionalAtom, semicolonAtom]) at input
+  let viewed := EbnfValue.sequence3View
+    keywordAtom optionalAtom semicolonAtom input
+  let keyword := EbnfValue.terminalView (.hardKeyword .returnKw) viewed.1
+  let rawValue := EbnfValue.optionalView expressionAtom viewed.2.1
+  let value := rawValue.map (EbnfValue.ruleView .expression)
+  let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence3_of_view
+    keywordAtom optionalAtom semicolonAtom input
+  have keywordEq := EbnfValue.terminal_of_view
+    (.hardKeyword .returnKw) viewed.1
+  have valueEq : EbnfValue.optional expressionAtom
+      (value.map (EbnfValue.ruleAtom .expression)) = viewed.2.1 := by
+    calc
+      _ = EbnfValue.optional expressionAtom rawValue := by
+        congr 1
+        cases selected : rawValue with
+        | none => simp [value, selected]
+        | some raw =>
+            simp only [value, selected, Option.map]
+            exact congrArg some (EbnfValue.rule_of_view .expression raw)
+      _ = viewed.2.1 := EbnfValue.optional_of_view expressionAtom viewed.2.1
+  have semicolonEq :=
+    EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2.2
+  have resultEq : executeReturnStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input =
+        sourceLoc witness (.return value semicolon.span) := by rfl
+  rw [resultEq, ← inputEq, ← keywordEq, ← valueEq, ← semicolonEq]
+  exact .returnStatement origin finish keyword value semicolon witness
+
+/-- The assignment-statement executor realizes its exact root reduction. -/
+theorem executeAssignmentStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .assignmentStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .assignmentStatement)) :
+    RuleReduction file tokens .assignmentStatement origin finish input
+      (executeAssignmentStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let operatorAtom : EbnfExpr := .atom (.nonterminal .assignmentOperator)
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  change EbnfValue file tokens (.sequence [
+    expressionAtom, operatorAtom, expressionAtom, semicolonAtom]) at input
+  let viewed := EbnfValue.sequence4View
+    expressionAtom operatorAtom expressionAtom semicolonAtom input
+  let left := EbnfValue.ruleView .expression viewed.1
+  let operator := EbnfValue.ruleView .assignmentOperator viewed.2.1
+  let right := EbnfValue.ruleView .expression viewed.2.2.1
+  let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2.2.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence4_of_view
+    expressionAtom operatorAtom expressionAtom semicolonAtom input
+  have leftEq := EbnfValue.rule_of_view .expression viewed.1
+  have operatorEq := EbnfValue.rule_of_view .assignmentOperator viewed.2.1
+  have rightEq := EbnfValue.rule_of_view .expression viewed.2.2.1
+  have semicolonEq :=
+    EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2.2.2
+  have resultEq : executeAssignmentStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input =
+        sourceLoc witness (.assignment operator left right) := by rfl
+  rw [resultEq, ← inputEq, ← leftEq, ← operatorEq, ← rightEq,
+    ← semicolonEq]
+  exact .assignmentStatement origin finish left operator right semicolon witness
+
+/-- The body executor realizes its exact braced root reduction. -/
+theorem executeBodyRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .body origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .body)) :
+    RuleReduction file tokens .body origin finish input
+      (executeBodyRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let statementAtom : EbnfExpr := .atom (.nonterminal .statement)
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftBrace))
+  let statementsAtom : EbnfExpr := .star statementAtom
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightBrace))
+  change EbnfValue file tokens
+    (.sequence [openAtom, statementsAtom, closeAtom]) at input
+  let viewed := EbnfValue.sequence3View
+    openAtom statementsAtom closeAtom input
+  let openBrace := EbnfValue.terminalView (.symbol .leftBrace) viewed.1
+  let rawStatements := EbnfValue.starView statementAtom viewed.2.1
+  let statements := rawStatements.map (EbnfValue.ruleView .statement)
+  let closeBrace := EbnfValue.terminalView (.symbol .rightBrace) viewed.2.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence3_of_view
+    openAtom statementsAtom closeAtom input
+  have openEq := EbnfValue.terminal_of_view (.symbol .leftBrace) viewed.1
+  have statementsMapEq :
+      statements.map (EbnfValue.ruleAtom .statement) = rawStatements :=
+    shortRuleAtoms_of_views .statement rawStatements
+  have statementsEq : EbnfValue.star statementAtom
+      (statements.map (EbnfValue.ruleAtom .statement)) = viewed.2.1 := by
+    rw [statementsMapEq]
+    exact EbnfValue.star_of_view statementAtom viewed.2.1
+  have closeEq := EbnfValue.terminal_of_view
+    (.symbol .rightBrace) viewed.2.2
+  have resultEq : executeBodyRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        origin := .braced openBrace.span closeBrace.span
+        statements := statements
+      } := by rfl
+  rw [resultEq, ← inputEq, ← openEq, ← statementsEq, ← closeEq]
+  exact .body origin finish openBrace statements closeBrace witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -4057,6 +4195,11 @@ theorem executeRootRule_reduces
       exact executeBreakStatementRoot_reduces origin finish ready input
   | continueStatement =>
       exact executeContinueStatementRoot_reduces origin finish ready input
+  | returnStatement =>
+      exact executeReturnStatementRoot_reduces origin finish ready input
+  | assignmentStatement =>
+      exact executeAssignmentStatementRoot_reduces origin finish ready input
+  | body => exact executeBodyRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
