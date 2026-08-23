@@ -21003,3 +21003,194 @@ private theorem contextualCompletedEdge?_edge_shape
     exact ⟨waitingEq.symm, finishedEq.symm⟩
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private def PhaseCCompletionInsertReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens) : Prop :=
+  ∀ after edge,
+    contextualCompletedEdge? (file := file) waiting finished =
+      some (after, edge) →
+    ∃ nextLedger, CompletionBackpointerLedger.insert?
+      current.payload.completionBackpointers
+      (CompletionBackpointerEntry.ofCompleted edge) = some nextLedger
+
+private theorem attemptContextualCompletion?_allSafe_of_selected
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (safe : PhaseCAllSafe current)
+    (selected : attemptContextualCompletion? current waiting finished =
+      some result) :
+    PhaseCAllSafe result := by
+  unfold attemptContextualCompletion? at selected
+  cases completion : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completion, Option.some.injEq] at selected
+      cases selected
+      exact safe
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completion] at selected
+      split at selected
+      next used =>
+        cases selected
+        exact safe
+      next fresh =>
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        have attemptedSafe : PhaseCAllSafe attempted := {
+          item := chargeContextualCompletion_itemSafe current attempted
+            safe.item (contextualCompletionKey waiting finished) attemptedEq
+          activation :=
+            runMappedPrimitive?_activationSafe_of_not_witness current _ id
+              attempted safe.activation (by simp) attemptedEq
+          completion :=
+            runMappedPrimitive?_phaseCCompletionSafe_of_not_insert current _
+              id attempted safe.completion (by simp) attemptedEq
+        }
+        have withItemSafe : PhaseCAllSafe withItem := {
+          item := insertContextualItem?_itemSafe attempted withItem .completion
+            after attemptedSafe.item itemEq
+          activation := insertContextualItem?_activationSafe attempted withItem
+            .completion after attemptedSafe.activation itemEq
+          completion := insertContextualItem?_completionSafe attempted withItem
+            .completion after attemptedSafe.completion itemEq
+        }
+        have attemptedUsed : (.cubic .U03_completionAttempt
+            (contextualCompletionKey waiting finished) :
+              UnitAddress tokens) ∈ attempted.counter.usedRev := by
+          rw [runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+          simp
+        have withItemUsed := insertContextualItem?_used_mono attempted withItem
+          .completion after itemEq attemptedUsed
+        have shape := contextualCompletedEdge?_edge_shape waiting finished
+          after edge completion
+        have exactAttempted : (.cubic .U03_completionAttempt
+            (contextualCompletionKey edge.waiting edge.finished) :
+              UnitAddress tokens) ∈ withItem.counter.usedRev := by
+          simpa only [shape.1, shape.2] using withItemUsed
+        exact {
+          item := insertContextualCompletedEdge?_itemSafe withItem result edge
+            withItemSafe.item edgeEq
+          activation := insertContextualCompletedEdge?_activationSafe withItem
+            result edge withItemSafe.activation edgeEq
+          completion := insertContextualCompletedEdge?_completionSafe withItem
+            result edge withItemSafe.completion exactAttempted edgeEq
+        }
+
+private theorem attemptContextualCompletion?_total_allSafe_of_insertReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (safe : PhaseCAllSafe current)
+    (insertReady : PhaseCCompletionInsertReady current waiting finished) :
+    ∃ result,
+      attemptContextualCompletion? current waiting finished = some result ∧
+      PhaseCAllSafe result := by
+  unfold attemptContextualCompletion?
+  cases completion : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none => exact ⟨current, rfl, safe⟩
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      let address : UnitAddress tokens :=
+        .cubic .U03_completionAttempt
+          (contextualCompletionKey waiting finished)
+      by_cases used : address ∈ current.counter.usedRev
+      · exact ⟨current, by simp [address, used], safe⟩
+      · let attempted : CountedState tokens (PhaseCWorklist file tokens) := {
+          payload := current.payload
+          counter := current.counter.charge address used
+        }
+        have attemptedEq : runMappedPrimitive? current address id =
+            some attempted := by
+          simp [runMappedPrimitive?, used, attempted]
+        have attemptedItemSafe := chargeContextualCompletion_itemSafe
+          current attempted safe.item
+            (contextualCompletionKey waiting finished)
+              (by simpa [address] using attemptedEq)
+        have attemptedActivationSafe :=
+          runMappedPrimitive?_activationSafe_of_not_witness current address id
+            attempted safe.activation (by simp [address]) attemptedEq
+        have attemptedCompletionSafe :=
+          runMappedPrimitive?_phaseCCompletionSafe_of_not_insert current
+            address id attempted safe.completion (by simp [address]) attemptedEq
+        obtain ⟨withItem, itemEq⟩ := insertContextualItem?_total attempted
+          .completion after attemptedItemSafe
+        have withItemSafe : PhaseCAllSafe withItem := {
+          item := insertContextualItem?_itemSafe attempted withItem .completion
+            after attemptedItemSafe itemEq
+          activation := insertContextualItem?_activationSafe attempted withItem
+            .completion after attemptedActivationSafe itemEq
+          completion := insertContextualItem?_completionSafe attempted withItem
+            .completion after attemptedCompletionSafe itemEq
+        }
+        have attemptedUsed : address ∈ attempted.counter.usedRev := by
+          simp [attempted, Counter.charge]
+        have withItemUsed : address ∈ withItem.counter.usedRev :=
+          insertContextualItem?_used_mono attempted withItem .completion after
+            itemEq attemptedUsed
+        have beforeEdgeFresh : (.cubic .U04_completedEdgeInsert
+            (contextualCompletionKey waiting finished) :
+              UnitAddress tokens) ∉ current.counter.usedRev := by
+          intro inserted
+          exact used (safe.completion waiting finished inserted)
+        have attemptedEdgeFresh : (.cubic .U04_completedEdgeInsert
+            (contextualCompletionKey waiting finished) :
+              UnitAddress tokens) ∉ attempted.counter.usedRev := by
+          rw [runMappedPrimitive?_usedRev current address id attempted
+            attemptedEq]
+          simp [address, beforeEdgeFresh]
+        have withItemEdgeFresh := insertContextualItem?_preserves_fresh
+          attempted withItem .completion after _
+            (by simp [ContextualItemInsertSource.unitKind])
+            attemptedEdgeFresh itemEq
+        have shape := contextualCompletedEdge?_edge_shape waiting finished
+          after edge completion
+        have exactEdgeFresh : (.cubic .U04_completedEdgeInsert
+            (contextualCompletionKey edge.waiting edge.finished) :
+              UnitAddress tokens) ∉ withItem.counter.usedRev := by
+          simpa only [shape.1, shape.2] using withItemEdgeFresh
+        have exactAttempted : (.cubic .U03_completionAttempt
+            (contextualCompletionKey edge.waiting edge.finished) :
+              UnitAddress tokens) ∈ withItem.counter.usedRev := by
+          simpa only [address, shape.1, shape.2] using withItemUsed
+        obtain ⟨nextLedger, ledgerEq⟩ :=
+          insertReady after edge completion
+        have attemptedPayload := runMappedPrimitive?_payload current address id
+          attemptedEq
+        change attempted.payload = current.payload at attemptedPayload
+        have storage := insertContextualItem?_completionStorage attempted
+          withItem .completion after itemEq
+        have ready : ∃ pair,
+            CompletionBackpointerLedger.insertCompleted?
+              withItem.payload.completionBackpointers
+              withItem.payload.phaseC.contextualEdges edge = some pair := by
+          refine ⟨(nextLedger,
+            withItem.payload.phaseC.contextualEdges ++
+              [CompletionBackpointerLedger.packCompleted edge]), ?_⟩
+          unfold CompletionBackpointerLedger.insertCompleted?
+          rw [storage.1, attemptedPayload, ledgerEq]
+          rfl
+        obtain ⟨result, edgeEq⟩ :=
+          insertContextualCompletedEdge?_total_of_ledgerReady withItem edge
+            ready exactEdgeFresh
+        exact ⟨result, by
+          simp [address, used, attemptedEq, itemEq, edgeEq],
+          {
+            item := insertContextualCompletedEdge?_itemSafe withItem result
+              edge withItemSafe.item edgeEq
+            activation := insertContextualCompletedEdge?_activationSafe
+              withItem result edge withItemSafe.activation edgeEq
+            completion := insertContextualCompletedEdge?_completionSafe
+              withItem result edge withItemSafe.completion exactAttempted edgeEq
+          }⟩
+
+end Solcore.Surface.Multi.Chart
