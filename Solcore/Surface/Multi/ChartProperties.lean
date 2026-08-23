@@ -6332,3 +6332,74 @@ theorem executeObservedContextualWorklist?_repeatedNonAssociativeAt_iff_frontier
     exact ⟨candidate, first, completed, ungrouped, found⟩
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- On successful execution, the proof-free root-shape bit is exactly the
+declarative pair of completions selecting a present outer optional. -/
+theorem executeObservedContextualWorklist?_completedNonAssociativeRootBool_eq_true_iff_edges
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (root : ContextualItemKey tokens) :
+    result.completedNonAssociativeRootBool root = true ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      ∃ rootWaiting sequence rootShared,
+        ContextualEdgeReach file tokens result.memo correct final
+          (.completed rootWaiting sequence root rootShared) ∧
+        ∃ sequenceWaiting optional optionalShared site,
+          ContextualEdgeReach file tokens result.memo correct final
+            (.completed sequenceWaiting optional sequence optionalShared) ∧
+          optional.raw.production = .opt site .some := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change Chart.retainedRootHasPresentOptional result.edges root = true ↔
+    ∃ rootWaiting sequence rootShared,
+      ContextualEdgeReach file tokens result.memo correct final
+        (.completed rootWaiting sequence root rootShared) ∧
+      ∃ sequenceWaiting optional optionalShared site,
+        ContextualEdgeReach file tokens result.memo correct final
+          (.completed sequenceWaiting optional sequence optionalShared) ∧
+        optional.raw.production = .opt site .some
+  have correspondence := executeObservedContextualWorklist?_correspondence
+    file tokens owned result selected
+  change
+    (∀ item, item ∈ result.items ↔
+      ContextualReach file tokens result.memo correct final item) ∧
+    (∀ key, (∃ retained, retained ∈ result.edges ∧ retained.val = key) ↔
+      ContextualEdgeReach file tokens result.memo correct final key) ∧
+    CompletionBackpointerUnique file tokens result.memo correct final
+      at correspondence
+  rw [Chart.retainedRootHasPresentOptional_eq_true_iff]
+  constructor
+  · rintro ⟨rootEdge, rootMember, rootWaiting, sequence, rootShared,
+      rootShape, optionalEdge, optionalMember, sequenceWaiting, optional,
+      optionalShared, site, optionalShape, production⟩
+    exact ⟨rootWaiting, sequence, rootShared,
+      (correspondence.2.1 _).mp ⟨rootEdge, rootMember, rootShape⟩,
+      sequenceWaiting, optional, optionalShared, site,
+      (correspondence.2.1 _).mp
+        ⟨optionalEdge, optionalMember, optionalShape⟩,
+      production⟩
+  · rintro ⟨rootWaiting, sequence, rootShared, rootReached,
+      sequenceWaiting, optional, optionalShared, site, optionalReached,
+      production⟩
+    obtain ⟨rootEdge, rootMember, rootShape⟩ :=
+      (correspondence.2.1 _).mpr rootReached
+    obtain ⟨optionalEdge, optionalMember, optionalShape⟩ :=
+      (correspondence.2.1 _).mpr optionalReached
+    exact ⟨rootEdge, rootMember, rootWaiting, sequence, rootShared,
+      rootShape, optionalEdge, optionalMember, sequenceWaiting, optional,
+      optionalShared, site, optionalShape, production⟩
+
+end Solcore.Surface.Multi
