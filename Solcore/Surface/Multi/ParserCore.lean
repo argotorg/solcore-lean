@@ -5738,6 +5738,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | pragmaDecl : ExecutableRootRule .pragmaDecl
   | genericPrefix : ExecutableRootRule .genericPrefix
   | forallClause : ExecutableRootRule .forallClause
+  | forallBinder : ExecutableRootRule .forallBinder
   | exportItem : ExecutableRootRule .exportItem
   | constructorSelection : ExecutableRootRule .constructorSelection
   | hidingClause : ExecutableRootRule .hidingClause
@@ -6732,6 +6733,51 @@ def executeForallClauseRoot
       }
     }
 
+/-- Execute one universal binder, including its optional class arguments. -/
+def executeForallBinderRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .forallBinder)) :
+    ForallBinder :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let argumentChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)), .list1 typeAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let argumentChild : EbnfExpr := .sequence argumentChildren
+  let boundedChildren : List EbnfExpr := [identifierAtom,
+    .atom (.terminal (.symbol .colon)),
+    .atom (.nonterminal .qualifiedName), .optional argumentChild]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choice2View identifierAtom
+      (.sequence boundedChildren) input with
+  | .inl rawName =>
+      let name := EbnfValue.terminalView
+        (.category .identifier) rawName
+      sourceLoc witness (.bare ({
+        span := name.span
+        payload := name.identifierProjection.2 } : IdentifierOccurrence))
+  | .inr rawBounded =>
+      let viewed := EbnfValue.sequenceFlatView boundedChildren rawBounded
+      let name := EbnfValue.terminalView
+        (.category .identifier) viewed.1
+      let arguments := (EbnfValue.optionalView argumentChild
+        viewed.2.2.2.1).map fun rawArguments =>
+          let argumentView := EbnfValue.sequenceFlatView
+            argumentChildren rawArguments
+          (EbnfValue.list1View typeAtom argumentView.2.1).map
+            (EbnfValue.ruleView .type)
+      sourceLoc witness (.bounded
+        ({
+          span := name.span
+          payload := name.identifierProjection.2
+        } : IdentifierOccurrence)
+        (EbnfValue.ruleView .qualifiedName viewed.2.2.1) arguments)
+
 /-- Execute one exported item and its optional constructor selection. -/
 def executeExportItemRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -7665,6 +7711,8 @@ def executeRootRule
       executeGenericPrefixRoot file tokens origin finish owned ordered input
   | .forallClause =>
       executeForallClauseRoot file tokens origin finish owned ordered input
+  | .forallBinder =>
+      executeForallBinderRoot file tokens origin finish owned ordered input
   | .exportItem =>
       executeExportItemRoot file tokens origin finish owned ordered input
   | .constructorSelection =>
