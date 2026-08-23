@@ -4200,6 +4200,114 @@ theorem executePredicateListRoot_reduces
   rw [resultEq, ← inputEq]
   exact .predicateList origin finish predicates
 
+/-- The predicate executor realizes its exact root reduction. -/
+theorem executePredicateRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .predicate origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .predicate)) :
+    RuleReduction file tokens .predicate origin finish input
+      (executePredicateRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let typesAtom : EbnfExpr := .list1 typeAtom
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  let argumentChildren : List EbnfExpr :=
+    [openAtom, typesAtom, closeAtom]
+  let argumentChild : EbnfExpr := .sequence argumentChildren
+  let children : List EbnfExpr := [
+    .atom (.nonterminal .typeAtom),
+    .atom (.terminal (.symbol .colon)),
+    .atom (.nonterminal .qualifiedName), .optional argumentChild]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize rootEq : EbnfValue.sequenceFlatView children input = root
+  rcases root with ⟨rawMain, rawColon, rawClass, rawOptional, ⟨⟩⟩
+  let main := EbnfValue.ruleView .typeAtom rawMain
+  let colon := EbnfValue.terminalView (.symbol .colon) rawColon
+  let className := EbnfValue.ruleView .qualifiedName rawClass
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  generalize optionalEq : EbnfValue.optionalView
+    argumentChild rawOptional = arguments
+  cases arguments with
+  | none =>
+      have resultEq : executePredicateRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness {
+            main := main
+            className := className
+            parameters := none
+          } := by
+        simp [executePredicateRoot, rootEq, optionalEq,
+          typeAtom, openAtom, typesAtom, closeAtom, argumentChildren,
+          argumentChild, children, main, className, witness]
+        congr 1
+      have rawOptionalEq : EbnfValue.optional argumentChild none =
+          rawOptional := by
+        calc
+          _ = EbnfValue.optional argumentChild
+              (EbnfValue.optionalView argumentChild rawOptional) := by
+                rw [optionalEq]
+          _ = rawOptional := EbnfValue.optional_of_view
+            argumentChild rawOptional
+      rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+        rootEq, ← EbnfValue.rule_of_view .typeAtom rawMain,
+        ← EbnfValue.terminal_of_view (.symbol .colon) rawColon,
+        ← EbnfValue.rule_of_view .qualifiedName rawClass,
+        ← rawOptionalEq]
+      exact .predicateWithoutArguments origin finish
+        main colon className witness
+  | some rawArguments =>
+      generalize argumentsEq : EbnfValue.sequenceFlatView
+        argumentChildren rawArguments = argumentValues
+      rcases argumentValues with ⟨rawOpen, rawTypes, rawClose, ⟨⟩⟩
+      let openParen := EbnfValue.terminalView
+        (.symbol .leftParen) rawOpen
+      let rawTypeValues := EbnfValue.list1View typeAtom rawTypes
+      let parameters := rawTypeValues.map (EbnfValue.ruleView .type)
+      let closeParen := EbnfValue.terminalView
+        (.symbol .rightParen) rawClose
+      have parametersMapEq : parameters.map
+          (EbnfValue.ruleAtom .type) = rawTypeValues :=
+        ruleNonemptyAtoms_of_views .type rawTypeValues
+      have parametersEq : EbnfValue.list1 typeAtom
+          (parameters.map (EbnfValue.ruleAtom .type)) = rawTypes := by
+        rw [parametersMapEq]
+        exact EbnfValue.list1_of_view typeAtom rawTypes
+      have resultEq : executePredicateRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness {
+            main := main
+            className := className
+            parameters := some parameters
+          } := by
+        simp [executePredicateRoot, rootEq, optionalEq, argumentsEq,
+          typeAtom, openAtom, typesAtom, closeAtom, argumentChildren,
+          argumentChild, children, main, className, rawTypeValues,
+          parameters, witness]
+        congr 1
+      have rawOptionalEq : EbnfValue.optional argumentChild
+          (some rawArguments) = rawOptional := by
+        calc
+          _ = EbnfValue.optional argumentChild
+              (EbnfValue.optionalView argumentChild rawOptional) := by
+                rw [optionalEq]
+          _ = rawOptional := EbnfValue.optional_of_view
+            argumentChild rawOptional
+      rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+        rootEq, ← EbnfValue.rule_of_view .typeAtom rawMain,
+        ← EbnfValue.terminal_of_view (.symbol .colon) rawColon,
+        ← EbnfValue.rule_of_view .qualifiedName rawClass,
+        ← rawOptionalEq,
+        ← EbnfValue.sequence_of_flat_view argumentChildren rawArguments,
+        argumentsEq,
+        ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+        ← parametersEq,
+        ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose]
+      exact .predicateWithArguments origin finish main colon className
+        openParen parameters closeParen witness
+
 /-- The instance-method executor realizes its transparent root reduction. -/
 theorem executeInstanceMethodRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -7295,6 +7403,8 @@ theorem executeRootRule_reduces
       exact executeOptionalCommaRoot_reduces origin finish ready input
   | predicateList =>
       exact executePredicateListRoot_reduces origin finish ready input
+  | predicate =>
+      exact executePredicateRoot_reduces origin finish ready input
   | instanceMethod =>
       exact executeInstanceMethodRoot_reduces origin finish ready input
   | armStatement =>
