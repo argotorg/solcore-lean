@@ -4342,6 +4342,105 @@ theorem executeExpressionStatementRoot_reduces
     rw [resultEq, ← inputEq, ← rawEq]
     exact .expressionStatementTerminal origin finish expression witness
 
+/-- The contract-member executor realizes its selected declaration root. -/
+theorem executeContractMemberRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .contractMember origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .contractMember)) :
+    RuleReduction file tokens .contractMember origin finish input
+      (executeContractMemberRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .dataDecl),
+    .atom (.nonterminal .typeAliasDecl),
+    .atom (.nonterminal .fieldDecl),
+    .atom (.nonterminal .functionDecl),
+    .atom (.nonterminal .fallbackDecl),
+    .atom (.nonterminal .contractConstructorDecl)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 ∨ branch = 5 := by
+    have lengthEq : branches.length = 6 := by rfl
+    have bound : branch.val < 6 := by simpa [lengthEq] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 ∨
+        branch.val = 5 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq |
+        valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+    · exact Or.inr
+        (Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))))
+    · exact Or.inr
+        (Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext valueEq)))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl | rfl
+  · let declaration := EbnfValue.ruleView .dataDecl raw
+    have rawEq := EbnfValue.rule_of_view .dataDecl raw
+    have resultEq : executeContractMemberRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.dataDecl declaration) := by
+      rw [executeContractMemberRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .contractMemberData origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .typeAliasDecl raw
+    have rawEq := EbnfValue.rule_of_view .typeAliasDecl raw
+    have resultEq : executeContractMemberRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.typeAlias declaration) := by
+      rw [executeContractMemberRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .contractMemberTypeAlias origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .fieldDecl raw
+    have rawEq := EbnfValue.rule_of_view .fieldDecl raw
+    have resultEq : executeContractMemberRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.field declaration) := by
+      rw [executeContractMemberRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .contractMemberField origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .functionDecl raw
+    have rawEq := EbnfValue.rule_of_view .functionDecl raw
+    have resultEq : executeContractMemberRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.function declaration) := by
+      rw [executeContractMemberRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .contractMemberFunction origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .fallbackDecl raw
+    have rawEq := EbnfValue.rule_of_view .fallbackDecl raw
+    have resultEq : executeContractMemberRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.fallback declaration) := by
+      rw [executeContractMemberRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .contractMemberFallback origin finish declaration witness
+  · let declaration := EbnfValue.ruleView .contractConstructorDecl raw
+    have rawEq := EbnfValue.rule_of_view .contractConstructorDecl raw
+    have resultEq : executeContractMemberRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.constructor declaration) := by
+      rw [executeContractMemberRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .contractMemberConstructor origin finish declaration witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -4391,6 +4490,8 @@ theorem executeRootRule_reduces
       exact executeForPostItemRoot_reduces origin finish ready input
   | expressionStatement =>
       exact executeExpressionStatementRoot_reduces origin finish ready input
+  | contractMember =>
+      exact executeContractMemberRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
