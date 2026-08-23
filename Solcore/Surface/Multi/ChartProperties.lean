@@ -3833,6 +3833,146 @@ theorem executeArmStatementRoot_reduces
   rw [resultEq, ← inputEq]
   exact .armStatement origin finish statement
 
+/-- The statement executor realizes its selected subtype reduction. -/
+theorem executeStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .statement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .statement)) :
+    RuleReduction file tokens .statement origin finish input
+      (executeStatementRoot input) := by
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .letStatement),
+    .atom (.nonterminal .returnStatement),
+    .atom (.nonterminal .matchStatement),
+    .atom (.nonterminal .ifStatement),
+    .atom (.nonterminal .forStatement),
+    .atom (.nonterminal .assemblyStatement),
+    .atom (.nonterminal .blockStatement),
+    .atom (.nonterminal .breakStatement),
+    .atom (.nonterminal .continueStatement),
+    .atom (.nonterminal .assignmentStatement),
+    .atom (.nonterminal .expressionStatement)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 ∨ branch = 5 ∨ branch = 6 ∨
+      branch = 7 ∨ branch = 8 ∨ branch = 9 ∨ branch = 10 := by
+    have branchesLength : branches.length = 11 := by rfl
+    have bound : branch.val < 11 := by
+      simpa [branchesLength] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 ∨
+        branch.val = 5 ∨ branch.val = 6 ∨ branch.val = 7 ∨
+        branch.val = 8 ∨ branch.val = 9 ∨ branch.val = 10 := by
+      omega
+    rcases valueCases with valueEq | valueEq | valueEq | valueEq |
+      valueEq | valueEq | valueEq | valueEq | valueEq | valueEq | valueEq
+    all_goals first
+      | exact Or.inl (Fin.ext valueEq)
+      | exact Or.inr (Or.inl (Fin.ext valueEq))
+      | exact Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))
+      | exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl (Fin.ext valueEq)))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inl (Fin.ext valueEq))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Or.inl (Fin.ext valueEq)))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext valueEq))))))))))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext valueEq))))))))))
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl
+  · let value := EbnfValue.ruleView .letStatement raw
+    have rawEq := EbnfValue.rule_of_view .letStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementLet origin finish value
+  · let value := EbnfValue.ruleView .returnStatement raw
+    have rawEq := EbnfValue.rule_of_view .returnStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementReturn origin finish value
+  · let value := EbnfValue.ruleView .matchStatement raw
+    have rawEq := EbnfValue.rule_of_view .matchStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementMatch origin finish value
+  · let value := EbnfValue.ruleView .ifStatement raw
+    have rawEq := EbnfValue.rule_of_view .ifStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementIf origin finish value
+  · let value := EbnfValue.ruleView .forStatement raw
+    have rawEq := EbnfValue.rule_of_view .forStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementFor origin finish value
+  · let value := EbnfValue.ruleView .assemblyStatement raw
+    have rawEq := EbnfValue.rule_of_view .assemblyStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementAssembly origin finish value
+  · let value := EbnfValue.ruleView .blockStatement raw
+    have rawEq := EbnfValue.rule_of_view .blockStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementBlock origin finish value
+  · let value := EbnfValue.ruleView .breakStatement raw
+    have rawEq := EbnfValue.rule_of_view .breakStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementBreak origin finish value
+  · let value := EbnfValue.ruleView .continueStatement raw
+    have rawEq := EbnfValue.rule_of_view .continueStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementContinue origin finish value
+  · let value := EbnfValue.ruleView .assignmentStatement raw
+    have rawEq := EbnfValue.rule_of_view .assignmentStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementAssignment origin finish value
+  · let value := EbnfValue.ruleView .expressionStatement raw
+    have rawEq := EbnfValue.rule_of_view .expressionStatement raw
+    have resultEq : executeStatementRoot input = value := by
+      rw [executeStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .statementExpression origin finish value
+
 /-- The terminal-expression executor realizes its transparent reduction. -/
 theorem executeTerminalExpressionRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -5263,6 +5403,8 @@ theorem executeRootRule_reduces
       exact executeInstanceMethodRoot_reduces origin finish ready input
   | armStatement =>
       exact executeArmStatementRoot_reduces origin finish ready input
+  | statement =>
+      exact executeStatementRoot_reduces origin finish ready input
   | terminalExpression =>
       exact executeTerminalExpressionRoot_reduces origin finish ready input
   | expression =>
