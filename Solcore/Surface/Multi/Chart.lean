@@ -23793,3 +23793,188 @@ private theorem beginPhaseCWorklist?_edgeSafe
   · simp [payload]
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem PhaseCEdgeSafe.append
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens)
+    (safe : PhaseCEdgeSafe current)
+    (queueEq : result.payload.phaseC.edgeQueue =
+      current.payload.phaseC.edgeQueue ++ [edge])
+    (usedEq : result.counter.usedRev =
+      contextualEdgeInsertAddress edge :: current.counter.usedRev)
+    (fresh : contextualEdgeInsertAddress edge ∉
+      current.counter.usedRev) :
+    PhaseCEdgeSafe result := by
+  constructor
+  · intro candidate member
+    rw [queueEq, List.mem_append, List.mem_singleton] at member
+    rw [usedEq, List.mem_cons]
+    rcases member with old | equal
+    · exact Or.inr (safe.inserted candidate old)
+    · subst candidate
+      exact Or.inl rfl
+  · intro candidate member
+    rw [usedEq, List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · exact (contextualEdgeInsertAddress_ne_dequeueAddress edge candidate
+        equal.symm).elim
+    · exact Or.inr (safe.causal candidate old)
+  · intro candidate member usedCandidate
+    rw [queueEq, List.mem_append, List.mem_singleton] at member
+    rw [usedEq, List.mem_cons] at usedCandidate
+    rcases member with old | equal
+    · rcases usedCandidate with collision | oldUsed
+      · exact contextualEdgeInsertAddress_ne_dequeueAddress edge candidate
+          collision.symm
+      · exact safe.queueFresh candidate old oldUsed
+    · subst candidate
+      rcases usedCandidate with collision | oldUsed
+      · exact contextualEdgeInsertAddress_ne_dequeueAddress edge edge
+          collision.symm
+      · exact fresh (safe.causal edge oldUsed)
+  · rw [queueEq, List.map_append]
+    simp only [List.map_cons, List.map_nil]
+    rw [List.nodup_append]
+    refine ⟨safe.queueAddressNodup, by simp, ?_⟩
+    intro address addressMember singleton singletonMember equal
+    obtain ⟨candidate, candidateMember, candidateAddress⟩ :=
+      List.mem_map.mp addressMember
+    have singletonAddress : singleton = contextualEdgeDequeueAddress edge :=
+      List.eq_of_mem_singleton singletonMember
+    apply fresh
+    have dequeueEqual : contextualEdgeDequeueAddress candidate =
+        contextualEdgeDequeueAddress edge :=
+      candidateAddress.trans (equal.trans singletonAddress)
+    rw [← contextualEdgeInsertAddress_eq_of_dequeueAddress_eq candidate edge
+      dequeueEqual]
+    exact safe.inserted candidate candidateMember
+
+private theorem insertContextualItem?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (safe : PhaseCEdgeSafe current)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCEdgeSafe result := by
+  unfold insertContextualItem? at selected
+  split at selected
+  · cases selected
+    exact safe
+  · apply phaseC_runMappedPrimitive?_edgeSafe_of_queue_eq current result
+      _ _ safe (by intro state; rfl) _ selected
+    intro edge equal
+    rcases edge with ⟨edge, valid⟩
+    cases source <;> cases edge <;>
+      simp [ContextualItemInsertSource.unitKind,
+        contextualEdgeDequeueAddress] at equal
+
+private theorem activateWorklistProduction?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (safe : PhaseCEdgeSafe current)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCEdgeSafe result.1 := by
+  have carrier := activateWorklistProduction?_reachCarrier current
+    productionInstance result selected
+  have queueEq := congrArg PhaseCReachCarrier.edgeQueue carrier
+  change result.1.payload.phaseC.edgeQueue =
+    current.payload.phaseC.edgeQueue at queueEq
+  have usedMono := activateWorklistProduction?_used_mono current
+    productionInstance result selected
+  constructor
+  · intro edge member
+    apply usedMono
+    exact safe.inserted edge (queueEq.symm ▸ member)
+  · intro edge member
+    apply usedMono
+    apply safe.causal edge
+    apply activateWorklistProduction?_nonActivationAddress current
+      productionInstance result _ (by
+        rcases edge with ⟨edge, valid⟩
+        cases edge <;> simp [contextualEdgeDequeueAddress]) (by
+        intro index slot
+        rcases edge with ⟨edge, valid⟩
+        cases edge <;> simp [contextualEdgeDequeueAddress]) selected member
+  · intro edge member usedEdge
+    apply safe.queueFresh edge (queueEq ▸ member)
+    apply activateWorklistProduction?_nonActivationAddress current
+      productionInstance result _ (by
+        rcases edge with ⟨edge, valid⟩
+        cases edge <;> simp [contextualEdgeDequeueAddress]) (by
+        intro index slot
+        rcases edge with ⟨edge, valid⟩
+        cases edge <;> simp [contextualEdgeDequeueAddress]) selected usedEdge
+  · simpa [queueEq] using safe.queueAddressNodup
+
+private theorem insertContextualScannedEdge?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (safe : PhaseCEdgeSafe current)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCEdgeSafe result := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact safe
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    have used := runMappedPrimitive?_usedRev current _ _ result selected
+    have fresh : (.linear .L06_scannedEdgeInsert
+        (contextualLinearKey edge.before) : UnitAddress tokens) ∉
+          current.counter.usedRev := by
+      have copy := selected
+      unfold runMappedPrimitive? at copy
+      split at copy
+      · assumption
+      · contradiction
+    apply PhaseCEdgeSafe.append current result
+      (CompletionBackpointerLedger.packScanned edge) safe
+    · rw [payload]
+    · simpa [contextualEdgeInsertAddress,
+        CompletionBackpointerLedger.packScanned] using used
+    · simpa [contextualEdgeInsertAddress,
+        CompletionBackpointerLedger.packScanned] using fresh
+
+private theorem insertContextualCompletedEdgeMulti?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (safe : PhaseCEdgeSafe current)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    PhaseCEdgeSafe result := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact safe
+  · have payload := runMappedPrimitive?_payload current _ _ selected
+    have used := runMappedPrimitive?_usedRev current _ _ result selected
+    have fresh : (.cubic .U04_completedEdgeInsert
+        (contextualCompletionKey edge.waiting edge.finished) :
+          UnitAddress tokens) ∉ current.counter.usedRev := by
+      have copy := selected
+      unfold runMappedPrimitive? at copy
+      split at copy
+      · assumption
+      · contradiction
+    apply PhaseCEdgeSafe.append current result
+      (CompletionBackpointerLedger.packCompleted edge) safe
+    · rw [payload]
+    · simpa [contextualEdgeInsertAddress,
+        CompletionBackpointerLedger.packCompleted] using used
+    · simpa [contextualEdgeInsertAddress,
+        CompletionBackpointerLedger.packCompleted] using fresh
+
+end Solcore.Surface.Multi.Chart
