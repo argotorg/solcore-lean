@@ -3933,3 +3933,180 @@ theorem ActionReduces.eq_executeRootAction
     (executeRootAction_reduces rule executable origin finish ready input)
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+private theorem contextualReach_enabledProductionInstance
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    EnabledProductionInstance file tokens memo correct final {
+      production := item.raw.production
+      origin := item.raw.origin
+      context := item.context
+    } := by
+  induction reached with
+  | root =>
+      intro guard polarity member
+      simp [guardOf] at member
+  | predict waiting predicted reached next enabled induction =>
+      exact enabled
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          matched, advance⟩
+      rw [advance.1, advance.2.2.1, ← structural.2]
+      exact induction
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, complete, lhs, waitingAt, finishedAt, advance⟩
+      rw [advance.1, advance.2.2.1, structural.2.2]
+      exact waitingInduction
+
+/-- At the greatest boundary selected by a successful observed execution,
+Chart's proof-free membership bit is exactly declarative expected-frontier
+membership. -/
+theorem executeObservedContextualWorklist?_expectedAtCurrentMemberBool_eq_true_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (cursor : Boundary tokens)
+    (greatestSelected : result.greatestCurrent? = some cursor)
+    (expected : Expected) :
+    result.expectedAtCurrentMemberBool cursor expected = true ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      ExpectedMember file tokens result.memo correct final cursor expected := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change result.expectedAtCurrentMemberBool cursor expected = true ↔
+    ExpectedMember file tokens result.memo correct final cursor expected
+  have greatest : GreatestReachableCursor
+      file tokens result.memo correct final cursor :=
+    (executeObservedContextualWorklist?_greatestCurrent?_eq_some_iff
+      file tokens owned result selected cursor).mp greatestSelected
+  have correspondence :=
+    executeObservedContextualWorklist?_correspondence
+      file tokens owned result selected
+  change
+    (∀ item, item ∈ result.items ↔
+      ContextualReach file tokens result.memo correct final item) ∧ _ ∧ _
+      at correspondence
+  rw [Chart.ContextualWorklistResult.expectedAtCurrentMemberBool_eq_true_iff]
+  constructor
+  · rintro ⟨item, member, currentEq, terminal, next, equality⟩
+    have reached := (correspondence.1 item).mp member
+    exact ⟨item, terminal, ⟨greatest, reached, currentEq⟩,
+      next, contextualReach_enabledProductionInstance reached, equality⟩
+  · rintro ⟨item, terminal, frontier, next, enabled, equality⟩
+    exact ⟨item, (correspondence.1 item).mpr frontier.2.1,
+      frontier.2.2, terminal, next, equality⟩
+
+/-- Membership in Chart's stable expected list is exactly declarative
+expected-frontier membership. -/
+theorem executeObservedContextualWorklist?_expectedAtCurrent_mem_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (cursor : Boundary tokens)
+    (greatestSelected : result.greatestCurrent? = some cursor)
+    (expected : Expected) :
+    expected ∈ result.expectedAtCurrent cursor ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      ExpectedMember file tokens result.memo correct final cursor expected := by
+  simp only [Chart.ContextualWorklistResult.expectedAtCurrent,
+    List.mem_filter, allExpected_complete, true_and]
+  exact executeObservedContextualWorklist?_expectedAtCurrentMemberBool_eq_true_iff
+      file tokens owned result selected cursor greatestSelected expected
+
+/-- A selected proof-free expected frontier is exactly the greatest
+declarative cursor paired with its complete expected-terminal union. -/
+theorem executeObservedContextualWorklist?_expectedFrontier?_eq_some_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (frontier : Chart.ExpectedFrontier tokens) :
+    result.expectedFrontier? = some frontier ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      ∃ greatest : GreatestReachableCursor
+          file tokens result.memo correct final frontier.cursor,
+        frontier.expected = canonicalExpectedValues
+          owned correct final frontier.cursor greatest := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change result.expectedFrontier? = some frontier ↔
+    ∃ greatest : GreatestReachableCursor
+        file tokens result.memo correct final frontier.cursor,
+      frontier.expected = canonicalExpectedValues
+        owned correct final frontier.cursor greatest
+  rw [Chart.ContextualWorklistResult.expectedFrontier?_eq_some_iff]
+  constructor
+  · rintro ⟨greatestSelected, expectedEq⟩
+    let greatest :=
+      (executeObservedContextualWorklist?_greatestCurrent?_eq_some_iff
+        file tokens owned result selected frontier.cursor).mp greatestSelected
+    have computedEq : result.expectedAtCurrent frontier.cursor =
+        canonicalExpectedValues
+          owned correct final frontier.cursor greatest := by
+      unfold Chart.ContextualWorklistResult.expectedAtCurrent
+      unfold canonicalExpectedValues
+      apply List.filter_congr
+      intro expected _member
+      letI : Decidable (ExpectedMember file tokens result.memo correct final
+          frontier.cursor expected) :=
+        expectedMemberDecision
+          owned correct final frontier.cursor greatest expected
+      apply Bool.eq_iff_iff.mpr
+      rw [executeObservedContextualWorklist?_expectedAtCurrentMemberBool_eq_true_iff
+          file tokens owned result selected frontier.cursor
+            greatestSelected expected]
+      rw [decide_eq_true_iff]
+    exact ⟨greatest, expectedEq.trans computedEq⟩
+  · rintro ⟨greatest, expectedEq⟩
+    have greatestSelected : result.greatestCurrent? =
+        some frontier.cursor :=
+      (executeObservedContextualWorklist?_greatestCurrent?_eq_some_iff
+        file tokens owned result selected frontier.cursor).mpr greatest
+    have computedEq : result.expectedAtCurrent frontier.cursor =
+        canonicalExpectedValues
+          owned correct final frontier.cursor greatest := by
+      unfold Chart.ContextualWorklistResult.expectedAtCurrent
+      unfold canonicalExpectedValues
+      apply List.filter_congr
+      intro expected _member
+      letI : Decidable (ExpectedMember file tokens result.memo correct final
+          frontier.cursor expected) :=
+        expectedMemberDecision
+          owned correct final frontier.cursor greatest expected
+      apply Bool.eq_iff_iff.mpr
+      rw [executeObservedContextualWorklist?_expectedAtCurrentMemberBool_eq_true_iff
+          file tokens owned result selected frontier.cursor
+            greatestSelected expected]
+      rw [decide_eq_true_iff]
+    exact ⟨greatestSelected, expectedEq.trans computedEq.symm⟩
+
+end Solcore.Surface.Multi
