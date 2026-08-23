@@ -4157,6 +4157,191 @@ theorem executeBodyRoot_reduces
   rw [resultEq, ← inputEq, ← openEq, ← statementsEq, ← closeEq]
   exact .body origin finish openBrace statements closeBrace witness
 
+/-- The `for` initializer executor realizes its selected root reduction. -/
+theorem executeForInitItemRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .forInitItem origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .forInitItem)) :
+    RuleReduction file tokens .forInitItem origin finish input
+      (executeForInitItemRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let operatorAtom : EbnfExpr := .atom (.nonterminal .assignmentOperator)
+  let branches : List EbnfExpr := [
+    .atom (.nonterminal .letBinding),
+    .sequence [expressionAtom, operatorAtom, expressionAtom], expressionAtom]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 := by
+    have lengthEq : branches.length = 3 := by rfl
+    have bound : branch.val < 3 := by simpa [lengthEq] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 := by omega
+    rcases valueCases with valueEq | valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Or.inl (Fin.ext valueEq))
+    · exact Or.inr (Or.inr (Fin.ext valueEq))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl
+  · let binding := EbnfValue.ruleView .letBinding raw
+    have rawEq := EbnfValue.rule_of_view .letBinding raw
+    have resultEq : executeForInitItemRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.letBinding binding) := by
+      rw [executeForInitItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .forInitItemLet origin finish binding witness
+  · let viewed := EbnfValue.sequence3View
+      expressionAtom operatorAtom expressionAtom raw
+    let left := EbnfValue.ruleView .expression viewed.1
+    let operator := EbnfValue.ruleView .assignmentOperator viewed.2.1
+    let right := EbnfValue.ruleView .expression viewed.2.2
+    have rawEq := EbnfValue.sequence3_of_view
+      expressionAtom operatorAtom expressionAtom raw
+    have leftEq := EbnfValue.rule_of_view .expression viewed.1
+    have operatorEq :=
+      EbnfValue.rule_of_view .assignmentOperator viewed.2.1
+    have rightEq := EbnfValue.rule_of_view .expression viewed.2.2
+    have resultEq : executeForInitItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.assignment operator left right) := by
+      rw [executeForInitItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← leftEq, ← operatorEq, ← rightEq]
+    exact .forInitItemAssignment origin finish left operator right witness
+  · let expression := EbnfValue.ruleView .expression raw
+    have rawEq := EbnfValue.rule_of_view .expression raw
+    have resultEq : executeForInitItemRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.expression expression) := by
+      rw [executeForInitItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .forInitItemExpression origin finish expression witness
+
+/-- The `for` post-item executor realizes its selected root reduction. -/
+theorem executeForPostItemRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .forPostItem origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .forPostItem)) :
+    RuleReduction file tokens .forPostItem origin finish input
+      (executeForPostItemRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let operatorAtom : EbnfExpr := .atom (.nonterminal .assignmentOperator)
+  let branches : List EbnfExpr := [
+    .sequence [expressionAtom, operatorAtom, expressionAtom], expressionAtom]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have lengthEq : branches.length = 2 := by rfl
+    have bound : branch.val < 2 := by simpa [lengthEq] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · let viewed := EbnfValue.sequence3View
+      expressionAtom operatorAtom expressionAtom raw
+    let left := EbnfValue.ruleView .expression viewed.1
+    let operator := EbnfValue.ruleView .assignmentOperator viewed.2.1
+    let right := EbnfValue.ruleView .expression viewed.2.2
+    have rawEq := EbnfValue.sequence3_of_view
+      expressionAtom operatorAtom expressionAtom raw
+    have leftEq := EbnfValue.rule_of_view .expression viewed.1
+    have operatorEq :=
+      EbnfValue.rule_of_view .assignmentOperator viewed.2.1
+    have rightEq := EbnfValue.rule_of_view .expression viewed.2.2
+    have resultEq : executeForPostItemRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.assignment operator left right) := by
+      rw [executeForPostItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← leftEq, ← operatorEq, ← rightEq]
+    exact .forPostItemAssignment origin finish left operator right witness
+  · let expression := EbnfValue.ruleView .expression raw
+    have rawEq := EbnfValue.rule_of_view .expression raw
+    have resultEq : executeForPostItemRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.expression expression) := by
+      rw [executeForPostItemRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .forPostItemExpression origin finish expression witness
+
+/-- The expression-statement executor realizes its selected root reduction. -/
+theorem executeExpressionStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .expressionStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .expressionStatement)) :
+    RuleReduction file tokens .expressionStatement origin finish input
+      (executeExpressionStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
+  let branches : List EbnfExpr := [
+    .sequence [expressionAtom, semicolonAtom],
+    .atom (.nonterminal .terminalExpression)]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 := by
+    have lengthEq : branches.length = 2 := by rfl
+    have bound : branch.val < 2 := by simpa [lengthEq] using branch.isLt
+    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
+    rcases valueCases with valueEq | valueEq
+    · exact Or.inl (Fin.ext valueEq)
+    · exact Or.inr (Fin.ext valueEq)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl
+  · let viewed := EbnfValue.sequence2View expressionAtom semicolonAtom raw
+    let expression := EbnfValue.ruleView .expression viewed.1
+    let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
+    have rawEq := EbnfValue.sequence2_of_view
+      expressionAtom semicolonAtom raw
+    have expressionEq := EbnfValue.rule_of_view .expression viewed.1
+    have semicolonEq :=
+      EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2
+    have resultEq : executeExpressionStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.expression expression (some semicolon.span)) := by
+      rw [executeExpressionStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← expressionEq, ← semicolonEq]
+    exact .expressionStatementTerminated
+      origin finish expression semicolon witness
+  · let expression := EbnfValue.ruleView .terminalExpression raw
+    have rawEq := EbnfValue.rule_of_view .terminalExpression raw
+    have resultEq : executeExpressionStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input =
+          sourceLoc witness (.expression expression none) := by
+      rw [executeExpressionStatementRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq]
+    exact .expressionStatementTerminal origin finish expression witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -4200,6 +4385,12 @@ theorem executeRootRule_reduces
   | assignmentStatement =>
       exact executeAssignmentStatementRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
+  | forInitItem =>
+      exact executeForInitItemRoot_reduces origin finish ready input
+  | forPostItem =>
+      exact executeForPostItemRoot_reduces origin finish ready input
+  | expressionStatement =>
+      exact executeExpressionStatementRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
