@@ -5733,6 +5733,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | fieldDecl : ExecutableRootRule .fieldDecl
   | pragmaDecl : ExecutableRootRule .pragmaDecl
   | constructorSelection : ExecutableRootRule .constructorSelection
+  | hidingClause : ExecutableRootRule .hidingClause
   | body : ExecutableRootRule .body
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
@@ -6570,6 +6571,32 @@ def executeConstructorSelectionRoot
             IdentifierOccurrence)
       sourceLoc witness (.named names)
 
+/-- Execute one import-hiding clause and its ordered identifier names. -/
+def executeHidingClauseRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .hidingClause)) :
+    HidingClause :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let viewed := EbnfValue.sequence4View
+    (.atom (.terminal (.hardKeyword .hidingKw)))
+    (.atom (.terminal (.symbol .leftBrace)))
+    (.list0 identifierAtom)
+    (.atom (.terminal (.symbol .rightBrace))) input
+  let names := (EbnfValue.list0View identifierAtom viewed.2.2.1).map
+    fun rawName =>
+      let name := EbnfValue.terminalView
+        (.category .identifier) rawName
+      ({ span := name.span, payload := name.identifierProjection.2 } :
+        IdentifierOccurrence)
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      names := names
+    }
+
 /-- Execute one wildcard, named, or aliased import-selector entry. -/
 def executeImportEntryRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -7346,6 +7373,8 @@ def executeRootRule
   | .constructorSelection =>
       executeConstructorSelectionRoot file tokens origin finish
         owned ordered input
+  | .hidingClause =>
+      executeHidingClauseRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
