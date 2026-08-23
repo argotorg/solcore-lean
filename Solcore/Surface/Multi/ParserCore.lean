@@ -5630,6 +5630,51 @@ theorem choice3_of_view
     have rebuild := choice_of_view [first, second, third] input
     rw [selectedEq] at rebuild
     exact rebuild
+
+/-- View a four-way choice without exposing its dependent finite index. -/
+def choice4View
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third fourth : EbnfExpr)
+    (input : EbnfValue file tokens
+      (.choice [first, second, third, fourth])) :
+    Sum (EbnfValue file tokens first)
+      (Sum (EbnfValue file tokens second)
+        (Sum (EbnfValue file tokens third)
+          (EbnfValue file tokens fourth))) :=
+  match choiceView [first, second, third, fourth] input with
+  | ⟨⟨0, _⟩, raw⟩ => .inl raw
+  | ⟨⟨1, _⟩, raw⟩ => .inr (.inl raw)
+  | ⟨⟨2, _⟩, raw⟩ => .inr (.inr (.inl raw))
+  | ⟨⟨3, _⟩, raw⟩ => .inr (.inr (.inr raw))
+
+/-- Rebuilding a viewed four-way choice recovers its original value. -/
+theorem choice4_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (first second third fourth : EbnfExpr)
+    (input : EbnfValue file tokens
+      (.choice [first, second, third, fourth])) :
+    (match choice4View first second third fourth input with
+      | .inl raw => choice [first, second, third, fourth] ⟨0, raw⟩
+      | .inr (.inl raw) =>
+          choice [first, second, third, fourth] ⟨1, raw⟩
+      | .inr (.inr (.inl raw)) =>
+          choice [first, second, third, fourth] ⟨2, raw⟩
+      | .inr (.inr (.inr raw)) =>
+          choice [first, second, third, fourth] ⟨3, raw⟩) = input := by
+  unfold choice4View
+  generalize selectedEq :
+    choiceView [first, second, third, fourth] input = selected
+  rcases selected with ⟨⟨branch, bound⟩, raw⟩
+  have values : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 := by
+    have : branch < 4 := by simpa using bound
+    omega
+  rcases values with rfl | rfl | rfl | rfl
+  all_goals
+    have rebuild := choice_of_view
+      [first, second, third, fourth] input
+    rw [selectedEq] at rebuild
+    exact rebuild
 /-- View an optional expression as its exact optional child. -/
 def optionalView
     {file : WorkspaceFile} {tokens : List Token}
@@ -5852,6 +5897,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | logicalOr : ExecutableRootRule .logicalOr
   | logicalAnd : ExecutableRootRule .logicalAnd
   | equality : ExecutableRootRule .equality
+  | relational : ExecutableRootRule .relational
   | bitOr : ExecutableRootRule .bitOr
   | bitXor : ExecutableRootRule .bitXor
   | bitAnd : ExecutableRootRule .bitAnd
@@ -8444,6 +8490,53 @@ def executeEqualityRoot
         (ConsumedSpanWitness.compute file tokens origin finish owned ordered)
         (.infix operator left decoded.2)
 
+/-- Execute a relational root, including the operator-free form. -/
+def executeRelationalRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .relational)) : Expression :=
+  let operand : EbnfExpr := .atom (.nonterminal .bitOr)
+  let lessAtom : EbnfExpr := .atom (.terminal (.symbol .less))
+  let greaterAtom : EbnfExpr := .atom (.terminal (.symbol .greater))
+  let lessEqualAtom : EbnfExpr := .atom (.terminal (.symbol .lessEqual))
+  let greaterEqualAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .greaterEqual))
+  let operatorExpr : EbnfExpr := .group (.choice [lessAtom, greaterAtom,
+    lessEqualAtom, greaterEqualAtom])
+  let tail : EbnfExpr := .sequence [operatorExpr, operand]
+  let outer := EbnfValue.sequence2View operand (.optional tail) input
+  let left := EbnfValue.ruleView .bitOr outer.1
+  match EbnfValue.optionalView tail outer.2 with
+  | none => left
+  | some rawTail =>
+      let inner := EbnfValue.sequence2View operatorExpr operand rawTail
+      let right := EbnfValue.ruleView .bitOr inner.2
+      let witness := ConsumedSpanWitness.compute
+        file tokens origin finish owned ordered
+      let rawChoice := EbnfValue.groupView
+        (.choice [lessAtom, greaterAtom, lessEqualAtom, greaterEqualAtom])
+        inner.1
+      match EbnfValue.choice4View lessAtom greaterAtom lessEqualAtom
+          greaterEqualAtom rawChoice with
+      | .inl raw =>
+          let operator := EbnfValue.terminalView (.symbol .less) raw
+          sourceLoc witness (.infix
+            (executableTerminalLoc operator .less) left right)
+      | .inr (.inl raw) =>
+          let operator := EbnfValue.terminalView (.symbol .greater) raw
+          sourceLoc witness (.infix
+            (executableTerminalLoc operator .greater) left right)
+      | .inr (.inr (.inl raw)) =>
+          let operator := EbnfValue.terminalView (.symbol .lessEqual) raw
+          sourceLoc witness (.infix
+            (executableTerminalLoc operator .lessEqual) left right)
+      | .inr (.inr (.inr raw)) =>
+          let operator := EbnfValue.terminalView (.symbol .greaterEqual) raw
+          sourceLoc witness (.infix
+            (executableTerminalLoc operator .greaterEqual) left right)
+
 def executeBitOrRoot
     (file : WorkspaceFile) {tokens : List Token}
     (input : EbnfValue file tokens (m2cV1.rhs .bitOr)) : Expression :=
@@ -8588,6 +8681,8 @@ def executeRootRule
   | .logicalAnd => executeLogicalAndRoot file input
   | .equality =>
       executeEqualityRoot file tokens origin finish owned ordered input
+  | .relational =>
+      executeRelationalRoot file tokens origin finish owned ordered input
   | .bitOr => executeBitOrRoot file input
   | .bitXor => executeBitXorRoot file input
   | .bitAnd => executeBitAndRoot file input
