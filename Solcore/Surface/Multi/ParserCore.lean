@@ -5561,6 +5561,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | letStatement : ExecutableRootRule .letStatement
   | breakStatement : ExecutableRootRule .breakStatement
   | continueStatement : ExecutableRootRule .continueStatement
+  | assemblyStatement : ExecutableRootRule .assemblyStatement
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | body : ExecutableRootRule .body
@@ -6032,6 +6033,21 @@ def executeContinueStatementRoot
     (.atom (.terminal (.symbol .semicolon))) input
   sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
     (.continue (EbnfValue.terminalView (.symbol .semicolon) viewed.2).span)
+
+/-- Execute an opaque assembly statement from its checked block token. -/
+def executeAssemblyStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .assemblyStatement)) :
+    Statement :=
+  let viewed := EbnfValue.sequence2View
+    (.atom (.terminal (.hardKeyword .assemblyKw)))
+    (.atom (.terminal (.category .assemblyBlock))) input
+  let assembly := EbnfValue.terminalView (.category .assemblyBlock) viewed.2
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
+    (.assembly assembly.assemblyProjection)
 
 /-- Execute a return statement from its optional value and terminator. -/
 def executeReturnStatementRoot
@@ -6784,6 +6800,8 @@ def executeRootRule
       executeBreakStatementRoot file tokens origin finish owned ordered input
   | .continueStatement =>
       executeContinueStatementRoot file tokens origin finish owned ordered input
+  | .assemblyStatement =>
+      executeAssemblyStatementRoot file tokens origin finish owned ordered input
   | .returnStatement =>
       executeReturnStatementRoot file tokens origin finish owned ordered input
   | .assignmentStatement =>
