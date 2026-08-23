@@ -20292,3 +20292,235 @@ private theorem dequeueContextualEdge?_completionSafe
       cases shape <;> simp at equal
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+namespace ContextualWorklistResult
+
+/-- Observe the diagnostic expectation of the terminal immediately after one
+contextual item's dot, if its next grammar symbol is a terminal. -/
+def nextExpected? {tokens : List Token}
+    (item : ContextualItemKey tokens) : Option Expected :=
+  match item.raw.production.rhs[item.raw.dot.val]? with
+  | some (.terminal terminal) => some terminal.expected
+  | _ => none
+
+/-- The item-local observer returns exactly the expectation of its next
+terminal symbol. -/
+theorem nextExpected?_eq_some_iff
+    {tokens : List Token}
+    (item : ContextualItemKey tokens) (expected : Expected) :
+    nextExpected? item = some expected ↔
+      ∃ terminal, NextSymbol item.raw (.terminal terminal) ∧
+        expected = terminal.expected := by
+  unfold nextExpected?
+  cases lookup : item.raw.production.rhs[item.raw.dot.val]? with
+  | none => simp [NextSymbol, lookup]
+  | some symbol =>
+      cases symbol with
+      | nonterminal nonterminal => simp [NextSymbol, lookup]
+      | terminal terminal =>
+          have inRange :
+              item.raw.dot.val < item.raw.production.rhs.length := by
+            by_cases inRange :
+                item.raw.dot.val < item.raw.production.rhs.length
+            · exact inRange
+            · have beyond :
+                  item.raw.production.rhs.length ≤ item.raw.dot.val :=
+                Nat.le_of_not_gt inRange
+              rw [List.getElem?_eq_none beyond] at lookup
+              contradiction
+          have getEq : item.raw.production.rhs[item.raw.dot.val] =
+              .terminal terminal := by
+            exact Option.some.inj
+              ((List.getElem?_eq_getElem inRange).symm.trans lookup)
+          simp [NextSymbol, inRange, getEq, eq_comm]
+
+/-- Observe one item's next terminal expectation only at a selected current
+boundary. -/
+def expectedAtCurrentItem? {tokens : List Token}
+    (cursor : Boundary tokens) (item : ContextualItemKey tokens) :
+    Option Expected :=
+  if _sameCurrent : item.raw.current = cursor then
+    nextExpected? item
+  else
+    none
+
+/-- Exact characterization of one item-local frontier observation. -/
+theorem expectedAtCurrentItem?_eq_some_iff
+    {tokens : List Token}
+    (cursor : Boundary tokens) (item : ContextualItemKey tokens)
+    (expected : Expected) :
+    expectedAtCurrentItem? cursor item = some expected ↔
+      item.raw.current = cursor ∧
+        ∃ terminal, NextSymbol item.raw (.terminal terminal) ∧
+          expected = terminal.expected := by
+  unfold expectedAtCurrentItem?
+  split <;> rename_i sameCurrent
+  · rw [nextExpected?_eq_some_iff]
+    exact (and_iff_right sameCurrent).symm
+  · simp [sameCurrent]
+
+/-- Raw frontier expectations in retained contextual-item order. -/
+def expectedAtCurrentCandidates
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) : List Expected :=
+  result.items.filterMap (expectedAtCurrentItem? cursor)
+
+private def containsExpected (values : List Expected)
+    (expected : Expected) : Bool :=
+  values.any fun candidate => decide (candidate = expected)
+
+private theorem containsExpected_eq_true_iff
+    (values : List Expected) (expected : Expected) :
+    containsExpected values expected = true ↔ expected ∈ values := by
+  unfold containsExpected
+  rw [List.any_eq_true]
+  constructor
+  · rintro ⟨candidate, member, same⟩
+    have equality : candidate = expected := of_decide_eq_true same
+    simpa only [equality] using member
+  · intro member
+    exact ⟨expected, member, by simp⟩
+
+/-- Decide whether one retained item contributes the displayed expectation at
+the selected boundary. -/
+def expectedAtCurrentMemberBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) (expected : Expected) : Bool :=
+  containsExpected (result.expectedAtCurrentCandidates cursor) expected
+
+/-- Exact contributor characterization of executable expected membership. -/
+theorem expectedAtCurrentMemberBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) (expected : Expected) :
+    result.expectedAtCurrentMemberBool cursor expected = true ↔
+      ∃ item, item ∈ result.items ∧
+        item.raw.current = cursor ∧
+          ∃ terminal, NextSymbol item.raw (.terminal terminal) ∧
+            expected = terminal.expected := by
+  rw [expectedAtCurrentMemberBool, containsExpected_eq_true_iff,
+    expectedAtCurrentCandidates, List.mem_filterMap]
+  constructor
+  · rintro ⟨item, member, selected⟩
+    exact ⟨item, member,
+      (expectedAtCurrentItem?_eq_some_iff
+        cursor item expected).mp selected⟩
+  · rintro ⟨item, member, exact⟩
+    exact ⟨item, member,
+      (expectedAtCurrentItem?_eq_some_iff
+        cursor item expected).mpr exact⟩
+
+/-- The expected terminal set at one boundary, deduplicated in the stable
+public expectation order. -/
+def expectedAtCurrent
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) : List Expected :=
+  allExpected.filter (result.expectedAtCurrentMemberBool cursor)
+
+/-- Membership in the computed expected set is exactly contribution by one
+retained item at the selected boundary. -/
+theorem expectedAtCurrent_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) (expected : Expected) :
+    expected ∈ result.expectedAtCurrent cursor ↔
+      ∃ item, item ∈ result.items ∧
+        item.raw.current = cursor ∧
+          ∃ terminal, NextSymbol item.raw (.terminal terminal) ∧
+            expected = terminal.expected := by
+  simp only [expectedAtCurrent, List.mem_filter, allExpected_complete,
+    expectedAtCurrentMemberBool_eq_true_iff, true_and]
+
+/-- The computed expected set contains no duplicate diagnostic class. -/
+theorem expectedAtCurrent_nodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) :
+    (result.expectedAtCurrent cursor).Nodup := by
+  exact List.Pairwise.filter _ allExpected_nodup
+
+/-- The computed expected set follows the stable public expectation order. -/
+theorem expectedAtCurrent_sorted
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (cursor : Boundary tokens) :
+    (result.expectedAtCurrent cursor).Pairwise
+      (fun left right => Expected.compare left right = .lt) := by
+  exact List.Pairwise.filter _ allExpected_sorted
+
+end ContextualWorklistResult
+
+/-- Proof-free diagnostic frontier selected from one contextual worklist
+result.  Its expectation list may be empty; absence of a frontier is reserved
+for an empty retained item ledger. -/
+structure ExpectedFrontier (tokens : List Token) where
+  cursor : Boundary tokens
+  expected : List Expected
+  deriving Repr, BEq, DecidableEq
+
+namespace ContextualWorklistResult
+
+/-- Select the greatest retained current boundary together with its canonical
+expected terminal set. -/
+def expectedFrontier?
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    Option (ExpectedFrontier tokens) := do
+  let cursor ← result.greatestCurrent?
+  pure {
+    cursor := cursor
+    expected := result.expectedAtCurrent cursor
+  }
+
+/-- Frontier selection is absent exactly for an empty retained item ledger. -/
+@[simp] theorem expectedFrontier?_eq_none_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens) :
+    result.expectedFrontier? = none ↔ result.items = [] := by
+  constructor
+  · intro returnedNone
+    cases selected : result.greatestCurrent? with
+    | none =>
+        exact (greatestCurrent?_eq_none_iff result).mp selected
+    | some cursor =>
+        unfold expectedFrontier? at returnedNone
+        rw [selected] at returnedNone
+        contradiction
+  · intro empty
+    have returnedNone := (greatestCurrent?_eq_none_iff result).mpr empty
+    unfold expectedFrontier?
+    rw [returnedNone]
+    rfl
+
+/-- Exact projection equations for a selected proof-free frontier. -/
+theorem expectedFrontier?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (frontier : ExpectedFrontier tokens) :
+    result.expectedFrontier? = some frontier ↔
+      result.greatestCurrent? = some frontier.cursor ∧
+        frontier.expected = result.expectedAtCurrent frontier.cursor := by
+  unfold expectedFrontier?
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨cursor, selected, frontierEq⟩
+    cases frontierEq
+    exact ⟨selected, rfl⟩
+  · rintro ⟨selected, expectedEq⟩
+    refine ⟨frontier.cursor, selected, ?_⟩
+    cases frontier with
+    | mk cursor expected =>
+        simp only at expectedEq ⊢
+        cases expectedEq
+        rfl
+
+end ContextualWorklistResult
+
+end Solcore.Surface.Multi.Chart
