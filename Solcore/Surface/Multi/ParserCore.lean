@@ -2883,6 +2883,74 @@ theorem transport_self
   rw [exactEquality]
   rfl
 
+theorem transport_append_pair
+    {file : WorkspaceFile} {tokens : List Token}
+    {priorSymbols full : List GrammarSymbol} {first second : GrammarSymbol}
+    (priorLayout : priorSymbols = [first])
+    (fullLayout : priorSymbols ++ [second] = full)
+    (viewLayout : full = [first, second])
+    (head : GrammarSymbolValue file tokens first)
+    (last : GrammarSymbolValue file tokens second) :
+    transport viewLayout
+        (transport fullLayout
+          (append (transport priorLayout.symm (head, ())) (last, ()))) =
+      (head, (last, ())) := by
+  subst priorSymbols
+  subst full
+  simp only [transport_self]
+  rfl
+
+theorem transport_append_pair_to
+    {file : WorkspaceFile} {tokens : List Token}
+    {priorSymbols full target : List GrammarSymbol}
+    {first second : GrammarSymbol}
+    (priorLayout : priorSymbols = [first])
+    (fullLayout : priorSymbols ++ [second] = full)
+    (viewLayout : full = target)
+    (targetLayout : target = [first, second])
+    (head : GrammarSymbolValue file tokens first)
+    (last : GrammarSymbolValue file tokens second) :
+    transport viewLayout
+        (transport fullLayout
+          (append (transport priorLayout.symm (head, ())) (last, ()))) =
+      transport targetLayout.symm (head, (last, ())) := by
+  subst priorSymbols
+  subst full
+  subst target
+  simp only [transport_self]
+  rfl
+
+theorem transport_append_single
+    {file : WorkspaceFile} {tokens : List Token}
+    {full : List GrammarSymbol} {symbol : GrammarSymbol}
+    (fullLayout : [symbol] = full)
+    (viewLayout : full = [symbol])
+    (value : GrammarSymbolValue file tokens symbol) :
+    transport viewLayout
+        (transport fullLayout
+          (append (left := []) () (value, ()))) =
+      (value, ()) := by
+  subst full
+  simp only [transport_self]
+  rfl
+
+theorem transport_append_single_to
+    {file : WorkspaceFile} {tokens : List Token}
+    {full : List GrammarSymbol} {source target : GrammarSymbol}
+    (fullLayout : [source] = full)
+    (viewLayout : full = [target])
+    (symbolLayout : source = target)
+    (value : GrammarSymbolValue file tokens source) :
+    transport viewLayout
+        (transport fullLayout
+          (append (left := []) () (value, ()))) =
+      (Eq.mp (congrArg (GrammarSymbolValue file tokens) symbolLayout) value,
+        ()) := by
+  subst full
+  subst target
+  simp only [transport_self]
+  rfl
+
 end GrammarSymbolValues
 
 /-- Semantic values for the already consumed prefix of one item. -/
@@ -2982,6 +3050,26 @@ def transport
     (equality : left = right) :
     EbnfValue file tokens left → EbnfValue file tokens right :=
   Eq.mp (congrArg (EbnfValue file tokens) equality)
+
+theorem transport_trans
+    {file : WorkspaceFile} {tokens : List Token}
+    {first second third : EbnfExpr}
+    (left : first = second) (right : second = third)
+    (value : EbnfValue file tokens first) :
+    transport right (transport left value) =
+      transport (left.trans right) value := by
+  cases left
+  cases right
+  rfl
+
+theorem transport_self
+    {file : WorkspaceFile} {tokens : List Token}
+    {expression : EbnfExpr} (equality : expression = expression)
+    (value : EbnfValue file tokens expression) :
+    transport equality value = value := by
+  have exactEquality : equality = rfl := Subsingleton.elim _ _
+  rw [exactEquality]
+  rfl
 
 /-- View a site-indexed value at a checked displayed expression shape. -/
 def atShape
