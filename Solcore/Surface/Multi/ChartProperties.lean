@@ -4769,6 +4769,77 @@ theorem executeBitAndRoot_reduces
   rw [resultEq, ← inputEq]
   exact .bitAnd origin finish left rest
 
+/-- The executable postfix fold is the declarative semantic fold. -/
+private theorem executePostfixLeft_eq_foldPostfix
+    (file : WorkspaceFile) (receiver : Expression)
+    (parts : List PostfixPartValue) :
+    executePostfixLeft file receiver parts =
+      RuleReduction.foldPostfix file receiver parts := by
+  induction parts generalizing receiver with
+  | nil => rfl
+  | cons part rest induction =>
+      cases part with
+      | call openParen arguments closeParen =>
+          simp only [executePostfixLeft, RuleReduction.foldPostfix]
+          change executePostfixLeft file
+              (RuleReduction.between file receiver.span closeParen
+                (.call receiver arguments)) rest =
+            RuleReduction.foldPostfix file
+              (RuleReduction.between file receiver.span closeParen
+                (.call receiver arguments)) rest
+          exact induction _
+      | select dot field =>
+          simp only [executePostfixLeft, RuleReduction.foldPostfix]
+          change executePostfixLeft file
+              (RuleReduction.between file receiver.span field.span
+                (.select receiver field)) rest =
+            RuleReduction.foldPostfix file
+              (RuleReduction.between file receiver.span field.span
+                (.select receiver field)) rest
+          exact induction _
+      | index openBracket index closeBracket =>
+          simp only [executePostfixLeft, RuleReduction.foldPostfix]
+          change executePostfixLeft file
+              (RuleReduction.between file receiver.span closeBracket
+                (.index receiver index)) rest =
+            RuleReduction.foldPostfix file
+              (RuleReduction.between file receiver.span closeBracket
+                (.index receiver index)) rest
+          exact induction _
+
+/-- The postfix executor realizes its exact ordered fold reduction. -/
+theorem executePostfixRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .postfix origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .postfix)) :
+    RuleReduction file tokens .postfix origin finish input
+      (executePostfixRoot file input) := by
+  let atomExpr : EbnfExpr := .atom (.nonterminal .atom)
+  let partExpr : EbnfExpr := .atom (.nonterminal .postfixPart)
+  change EbnfValue file tokens
+    (.sequence [atomExpr, .star partExpr]) at input
+  let viewed := EbnfValue.sequence2View atomExpr (.star partExpr) input
+  let atom := EbnfValue.ruleView .atom viewed.1
+  let rawParts := EbnfValue.starView partExpr viewed.2
+  let parts := rawParts.map (EbnfValue.ruleView .postfixPart)
+  have inputEq := EbnfValue.sequence2_of_view
+    atomExpr (.star partExpr) input
+  have atomEq := EbnfValue.rule_of_view .atom viewed.1
+  have partsMapEq :
+      parts.map (EbnfValue.ruleAtom .postfixPart) = rawParts :=
+    shortRuleAtoms_of_views .postfixPart rawParts
+  have partsEq : EbnfValue.star partExpr
+      (parts.map (EbnfValue.ruleAtom .postfixPart)) = viewed.2 := by
+    rw [partsMapEq]
+    exact EbnfValue.star_of_view partExpr viewed.2
+  have resultEq : executePostfixRoot file input =
+      RuleReduction.foldPostfix file atom parts := by
+    change executePostfixLeft file atom parts = _
+    exact executePostfixLeft_eq_foldPostfix file atom parts
+  rw [resultEq, ← inputEq, ← atomEq, ← partsEq]
+  exact .postfix origin finish atom parts
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -4828,6 +4899,7 @@ theorem executeRootRule_reduces
   | bitXor => exact executeBitXorRoot_reduces origin finish ready input
   | bitAnd => exact executeBitAndRoot_reduces origin finish ready input
   | «prefix» => exact executePrefixRoot_reduces origin finish ready input
+  | postfixExpr => exact executePostfixRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
