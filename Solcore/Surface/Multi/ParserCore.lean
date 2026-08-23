@@ -5732,6 +5732,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | dataConstructor : ExecutableRootRule .dataConstructor
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
+  | fallbackDecl : ExecutableRootRule .fallbackDecl
   | pragmaDecl : ExecutableRootRule .pragmaDecl
   | constructorSelection : ExecutableRootRule .constructorSelection
   | hidingClause : ExecutableRootRule .hidingClause
@@ -6416,6 +6417,60 @@ def executeFieldDeclRoot
     name := { span := name.span, payload := name.identifierProjection.2 }
     type := typeValue
     initializer := initializer.map fun value => value.2.1
+  }
+
+/-- Execute a fallback declaration and its optional modifiers and return type. -/
+def executeFallbackDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .fallbackDecl)) :
+    FallbackDecl :=
+  let genericAtom : EbnfExpr := .atom (.nonterminal .genericPrefix)
+  let publicAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .publicKw))
+  let payableAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .payableKw))
+  let parameterAtom : EbnfExpr := .atom (.nonterminal .parameter)
+  let returnChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .arrow)), .atom (.nonterminal .type)]
+  let children : List EbnfExpr := [.optional genericAtom,
+    .optional publicAtom, .optional payableAtom,
+    .atom (.terminal (.hardKeyword .fallbackKw)),
+    .atom (.terminal (.symbol .leftParen)), .list0 parameterAtom,
+    .atom (.terminal (.symbol .rightParen)), .optional returnChild,
+    .atom (.nonterminal .body)]
+  let ⟨rawGeneric, rawPublic, rawPayable, rawFallback, _, rawParameters,
+    _, rawReturn, rawBody, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let genericPrefix := (EbnfValue.optionalView genericAtom rawGeneric).map
+    (EbnfValue.ruleView .genericPrefix)
+  let publicToken := (EbnfValue.optionalView publicAtom rawPublic).map
+    (EbnfValue.terminalView (.hardKeyword .publicKw))
+  let payableToken := (EbnfValue.optionalView payableAtom rawPayable).map
+    (EbnfValue.terminalView (.hardKeyword .payableKw))
+  let fallbackKw := EbnfValue.terminalView
+    (.hardKeyword .fallbackKw) rawFallback
+  let parameters := (EbnfValue.list0View parameterAtom rawParameters).map
+    (EbnfValue.ruleView .parameter)
+  let returnValue := (EbnfValue.optionalView returnChild rawReturn).map
+    fun raw =>
+      let pair := EbnfValue.sequence2View
+        (.atom (.terminal (.symbol .arrow)))
+        (.atom (.nonterminal .type)) raw
+      (EbnfValue.terminalView (.symbol .arrow) pair.1,
+        EbnfValue.ruleView .type pair.2, ())
+  sourceLoc (shallowRootWitness file tokens origin finish owned ordered) {
+    genericPrefix := genericPrefix
+    «public» := publicToken.map fun terminal =>
+      { span := terminal.span, payload := .publicModifier }
+    payable := payableToken.map fun terminal =>
+      { span := terminal.span, payload := .payableModifier }
+    marker := { span := fallbackKw.span, payload := .fallbackName }
+    parameters := parameters
+    returnType := returnValue.map fun value => value.2.1
+    body := EbnfValue.ruleView .body rawBody
   }
 
 /-- Decode the optional nonempty matched identifier targets of one pragma. -/
@@ -7401,6 +7456,8 @@ def executeRootRule
       executeTypeAliasDeclRoot file tokens origin finish owned ordered input
   | .fieldDecl =>
       executeFieldDeclRoot file tokens origin finish owned ordered input
+  | .fallbackDecl =>
+      executeFallbackDeclRoot file tokens origin finish owned ordered input
   | .pragmaDecl =>
       executePragmaDeclRoot file tokens origin finish owned ordered input
   | .constructorSelection =>
