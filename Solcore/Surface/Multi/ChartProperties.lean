@@ -8461,6 +8461,259 @@ theorem executeImportDeclRoot_reduces
     exact .importDeclItems origin finish importKw reference dot openBrace
       entries closeBrace hidingValue semicolon witness
 
+private theorem exportDeclRuleAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (values : List (EbnfValue file tokens
+      (.atom (.nonterminal rule)))) :
+    (values.map (EbnfValue.ruleView rule)).map
+      (EbnfValue.ruleAtom rule) = values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.cons.injEq]
+      exact ⟨EbnfValue.rule_of_view rule head, induction⟩
+
+/-- The export-declaration executor realizes its selected root reduction. -/
+theorem executeExportDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .exportDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .exportDecl)) :
+    RuleReduction file tokens .exportDecl origin finish input
+      (executeExportDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let localAtom : EbnfExpr := .atom (.nonterminal .localExportEntry)
+  let remoteAtom : EbnfExpr := .atom (.nonterminal .remoteExportEntry)
+  let localChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 localAtom,
+    .atom (.terminal (.symbol .rightBrace)),
+    .atom (.terminal (.symbol .semicolon))]
+  let moduleChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .semicolon))]
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.hardKeyword .asKw)),
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .semicolon))]
+  let wildcardChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef), .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .semicolon))]
+  let bracedChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef), .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 remoteAtom,
+    .atom (.terminal (.symbol .rightBrace)),
+    .atom (.terminal (.symbol .semicolon))]
+  let branches : List EbnfExpr := [.sequence localChildren,
+    .sequence moduleChildren, .sequence aliasChildren,
+    .sequence wildcardChildren, .sequence bracedChildren]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 := by
+    have branchesLength : branches.length = 5 := by rfl
+    have bound : branch.val < 5 := by
+      calc
+        branch.val < branches.length := branch.isLt
+        _ = 5 := branchesLength
+    have values : branch.val = 0 ∨ branch.val = 1 ∨
+        branch.val = 2 ∨ branch.val = 3 ∨ branch.val = 4 := by omega
+    rcases values with h | h | h | h | h
+    · exact Or.inl (Fin.ext h)
+    · exact Or.inr (Or.inl (Fin.ext h))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext h)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext h))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext h))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl
+  · let values := EbnfValue.sequenceFlatView localChildren raw
+    let rawExport := values.1
+    let rawOpen := values.2.1
+    let rawEntries := values.2.2.1
+    let rawClose := values.2.2.2.1
+    let rawSemicolon := values.2.2.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view localChildren raw
+    have rawEq' : EbnfValue.sequence localChildren
+        (EbnfValue.sequenceValuesBuild localChildren
+          ⟨rawExport, rawOpen, rawEntries, rawClose, rawSemicolon, ⟨⟩⟩) =
+        raw := rawEq
+    let exportKw := EbnfValue.terminalView
+      (.hardKeyword .exportKw) rawExport
+    let openBrace := EbnfValue.terminalView (.symbol .leftBrace) rawOpen
+    let rawEntryValues := EbnfValue.list0View localAtom rawEntries
+    let entries := rawEntryValues.map
+      (EbnfValue.ruleView .localExportEntry)
+    let closeBrace := EbnfValue.terminalView (.symbol .rightBrace) rawClose
+    let semicolon := EbnfValue.terminalView (.symbol .semicolon) rawSemicolon
+    have entriesEq : EbnfValue.list0 localAtom
+        (entries.map (EbnfValue.ruleAtom .localExportEntry)) =
+        rawEntries := by
+      rw [exportDeclRuleAtoms_of_views .localExportEntry rawEntryValues]
+      exact EbnfValue.list0_of_view localAtom rawEntries
+    have resultEq : executeExportDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.local
+          (RuleReduction.between file openBrace.span closeBrace.span {
+            entries := entries
+          })) := by
+      rw [executeExportDeclRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← EbnfValue.terminal_of_view (.symbol .leftBrace) rawOpen,
+      ← entriesEq,
+      ← EbnfValue.terminal_of_view (.symbol .rightBrace) rawClose,
+      ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact .exportDeclLocal origin finish exportKw openBrace entries
+      closeBrace semicolon witness
+  · let values := EbnfValue.sequenceFlatView moduleChildren raw
+    let rawExport := values.1
+    let rawReference := values.2.1
+    let rawSemicolon := values.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view moduleChildren raw
+    have rawEq' : EbnfValue.sequence moduleChildren
+        (EbnfValue.sequenceValuesBuild moduleChildren
+          ⟨rawExport, rawReference, rawSemicolon, ⟨⟩⟩) = raw := rawEq
+    let exportKw := EbnfValue.terminalView
+      (.hardKeyword .exportKw) rawExport
+    let reference := EbnfValue.ruleView .moduleRef rawReference
+    let semicolon := EbnfValue.terminalView (.symbol .semicolon) rawSemicolon
+    have resultEq : executeExportDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.module reference none) := by
+      rw [executeExportDeclRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← EbnfValue.rule_of_view .moduleRef rawReference,
+      ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact .exportDeclModule origin finish exportKw reference semicolon witness
+  · let values := EbnfValue.sequenceFlatView aliasChildren raw
+    let rawExport := values.1
+    let rawReference := values.2.1
+    let rawAs := values.2.2.1
+    let rawName := values.2.2.2.1
+    let rawSemicolon := values.2.2.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view aliasChildren raw
+    have rawEq' : EbnfValue.sequence aliasChildren
+        (EbnfValue.sequenceValuesBuild aliasChildren
+          ⟨rawExport, rawReference, rawAs, rawName, rawSemicolon, ⟨⟩⟩) =
+        raw := rawEq
+    let exportKw := EbnfValue.terminalView
+      (.hardKeyword .exportKw) rawExport
+    let reference := EbnfValue.ruleView .moduleRef rawReference
+    let asKw := EbnfValue.terminalView (.hardKeyword .asKw) rawAs
+    let name := EbnfValue.terminalView (.category .identifier) rawName
+    let nameData : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier := {
+      matched := name
+      spelling := name.identifierProjection.1
+      parsed := name.identifierProjection.2
+    }
+    let semicolon := EbnfValue.terminalView (.symbol .semicolon) rawSemicolon
+    have resultEq : executeExportDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.module reference
+          (some (RuleReduction.terminalLoc name
+            name.identifierProjection.2))) := by
+      rw [executeExportDeclRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← EbnfValue.rule_of_view .moduleRef rawReference,
+      ← EbnfValue.terminal_of_view (.hardKeyword .asKw) rawAs,
+      ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+      ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact .exportDeclAliased origin finish exportKw reference asKw nameData
+      semicolon name.identifierProjection_projects witness
+  · let values := EbnfValue.sequenceFlatView wildcardChildren raw
+    let rawExport := values.1
+    let rawReference := values.2.1
+    let rawDot := values.2.2.1
+    let rawStar := values.2.2.2.1
+    let rawSemicolon := values.2.2.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view wildcardChildren raw
+    have rawEq' : EbnfValue.sequence wildcardChildren
+        (EbnfValue.sequenceValuesBuild wildcardChildren
+          ⟨rawExport, rawReference, rawDot, rawStar, rawSemicolon, ⟨⟩⟩) =
+        raw := rawEq
+    let exportKw := EbnfValue.terminalView
+      (.hardKeyword .exportKw) rawExport
+    let reference := EbnfValue.ruleView .moduleRef rawReference
+    let dot := EbnfValue.terminalView (.symbol .dot) rawDot
+    let star := EbnfValue.terminalView (.symbol .star) rawStar
+    let semicolon := EbnfValue.terminalView (.symbol .semicolon) rawSemicolon
+    have resultEq : executeExportDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.from reference
+          (RuleReduction.between file dot.span star.span
+            (.dotWildcard (RuleReduction.terminalLoc star .wildcard)))) := by
+      rw [executeExportDeclRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← EbnfValue.rule_of_view .moduleRef rawReference,
+      ← EbnfValue.terminal_of_view (.symbol .dot) rawDot,
+      ← EbnfValue.terminal_of_view (.symbol .star) rawStar,
+      ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact .exportDeclWildcard origin finish exportKw reference dot star
+      semicolon (.wildcardStar star) witness
+  · let values := EbnfValue.sequenceFlatView bracedChildren raw
+    let rawExport := values.1
+    let rawReference := values.2.1
+    let rawDot := values.2.2.1
+    let rawOpen := values.2.2.2.1
+    let rawEntries := values.2.2.2.2.1
+    let rawClose := values.2.2.2.2.2.1
+    let rawSemicolon := values.2.2.2.2.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view bracedChildren raw
+    have rawEq' : EbnfValue.sequence bracedChildren
+        (EbnfValue.sequenceValuesBuild bracedChildren
+          ⟨rawExport, rawReference, rawDot, rawOpen, rawEntries, rawClose,
+            rawSemicolon, ⟨⟩⟩) = raw := rawEq
+    let exportKw := EbnfValue.terminalView
+      (.hardKeyword .exportKw) rawExport
+    let reference := EbnfValue.ruleView .moduleRef rawReference
+    let dot := EbnfValue.terminalView (.symbol .dot) rawDot
+    let openBrace := EbnfValue.terminalView (.symbol .leftBrace) rawOpen
+    let rawEntryValues := EbnfValue.list0View remoteAtom rawEntries
+    let entries := rawEntryValues.map
+      (EbnfValue.ruleView .remoteExportEntry)
+    let closeBrace := EbnfValue.terminalView (.symbol .rightBrace) rawClose
+    let semicolon := EbnfValue.terminalView (.symbol .semicolon) rawSemicolon
+    have entriesEq : EbnfValue.list0 remoteAtom
+        (entries.map (EbnfValue.ruleAtom .remoteExportEntry)) =
+        rawEntries := by
+      rw [exportDeclRuleAtoms_of_views .remoteExportEntry rawEntryValues]
+      exact EbnfValue.list0_of_view remoteAtom rawEntries
+    have resultEq : executeExportDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.from reference
+          (RuleReduction.between file openBrace.span closeBrace.span
+            (.braced entries))) := by
+      rw [executeExportDeclRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.hardKeyword .exportKw) rawExport,
+      ← EbnfValue.rule_of_view .moduleRef rawReference,
+      ← EbnfValue.terminal_of_view (.symbol .dot) rawDot,
+      ← EbnfValue.terminal_of_view (.symbol .leftBrace) rawOpen,
+      ← entriesEq,
+      ← EbnfValue.terminal_of_view (.symbol .rightBrace) rawClose,
+      ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+    exact .exportDeclBraced origin finish exportKw reference dot openBrace
+      entries closeBrace semicolon witness
+
 /-- The import-entry executor realizes its selected root reduction. -/
 theorem executeImportEntryRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -8809,6 +9062,8 @@ theorem executeRootRule_reduces
   | topItem => exact executeTopItemRoot_reduces origin finish ready input
   | importDecl =>
       exact executeImportDeclRoot_reduces origin finish ready input
+  | exportDecl =>
+      exact executeExportDeclRoot_reduces origin finish ready input
   | importEntry =>
       exact executeImportEntryRoot_reduces origin finish ready input
   | localExportEntry =>
