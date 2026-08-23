@@ -3763,6 +3763,107 @@ theorem executeModuleRoot_reduces
   exact .module origin finish items eof endpoints.1 endpoints.2
     (matchedTerminal_eof_empty_span eof).2.1
 
+private theorem ruleNonemptyAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (inputs : NonemptyList
+      (EbnfValue file tokens (.atom (.nonterminal rule)))) :
+    (inputs.map (EbnfValue.ruleView rule)).map
+        (EbnfValue.ruleAtom rule) = inputs := by
+  cases inputs with
+  | mk head tail =>
+      simp only [NonemptyList.map, NonemptyList.mk.injEq]
+      constructor
+      · exact EbnfValue.rule_of_view rule head
+      · induction tail with
+        | nil => rfl
+        | cons next rest induction =>
+            simp [EbnfValue.rule_of_view, induction]
+
+/-- The predicate-list executor realizes its exact root reduction. -/
+theorem executePredicateListRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .predicateList origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .predicateList)) :
+    RuleReduction file tokens .predicateList origin finish input
+      (executePredicateListRoot input) := by
+  change EbnfValue file tokens
+    (.list1 (.atom (.nonterminal .predicate))) at input
+  let raw := EbnfValue.list1View
+    (.atom (.nonterminal .predicate)) input
+  let predicates := raw.map (EbnfValue.ruleView .predicate)
+  have mappedEq : predicates.map (EbnfValue.ruleAtom .predicate) = raw :=
+    ruleNonemptyAtoms_of_views .predicate raw
+  have inputEq : EbnfValue.list1 (.atom (.nonterminal .predicate))
+      (predicates.map (EbnfValue.ruleAtom .predicate)) = input := by
+    rw [mappedEq]
+    exact EbnfValue.list1_of_view _ input
+  have resultEq : executePredicateListRoot input = predicates := by rfl
+  rw [resultEq, ← inputEq]
+  exact .predicateList origin finish predicates
+
+/-- The instance-method executor realizes its transparent root reduction. -/
+theorem executeInstanceMethodRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .instanceMethod origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .instanceMethod)) :
+    RuleReduction file tokens .instanceMethod origin finish input
+      (executeInstanceMethodRoot input) := by
+  change EbnfValue file tokens (.atom (.nonterminal .functionDecl)) at input
+  let value := EbnfValue.ruleView .functionDecl input
+  have inputEq := EbnfValue.rule_of_view .functionDecl input
+  have resultEq : executeInstanceMethodRoot input = value := by rfl
+  rw [resultEq, ← inputEq]
+  exact .instanceMethod origin finish value
+
+/-- The arm-statement executor realizes its transparent root reduction. -/
+theorem executeArmStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .armStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .armStatement)) :
+    RuleReduction file tokens .armStatement origin finish input
+      (executeArmStatementRoot input) := by
+  change EbnfValue file tokens (.atom (.nonterminal .statement)) at input
+  let statement := EbnfValue.ruleView .statement input
+  have inputEq := EbnfValue.rule_of_view .statement input
+  have resultEq : executeArmStatementRoot input = statement := by rfl
+  rw [resultEq, ← inputEq]
+  exact .armStatement origin finish statement
+
+/-- The terminal-expression executor realizes its transparent reduction. -/
+theorem executeTerminalExpressionRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .terminalExpression
+      origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .terminalExpression)) :
+    RuleReduction file tokens .terminalExpression origin finish input
+      (executeTerminalExpressionRoot input) := by
+  change EbnfValue file tokens (.atom (.nonterminal .expression)) at input
+  let expression := EbnfValue.ruleView .expression input
+  have inputEq := EbnfValue.rule_of_view .expression input
+  have resultEq : executeTerminalExpressionRoot input = expression := by rfl
+  rw [resultEq, ← inputEq]
+  exact .terminalExpression origin finish expression
+
+/-- The expression executor realizes its transparent annotation reduction. -/
+theorem executeExpressionRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (_ready : RuleReductionReady file tokens .expression origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .expression)) :
+    RuleReduction file tokens .expression origin finish input
+      (executeExpressionRoot input) := by
+  change EbnfValue file tokens (.atom (.nonterminal .annotation)) at input
+  let expression := EbnfValue.ruleView .annotation input
+  have inputEq := EbnfValue.rule_of_view .annotation input
+  have resultEq : executeExpressionRoot input = expression := by rfl
+  rw [resultEq, ← inputEq]
+  exact .expression origin finish expression
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -3779,6 +3880,16 @@ theorem executeRootRule_reduces
   | topItem => exact executeTopItemRoot_reduces origin finish ready input
   | optionalComma =>
       exact executeOptionalCommaRoot_reduces origin finish ready input
+  | predicateList =>
+      exact executePredicateListRoot_reduces origin finish ready input
+  | instanceMethod =>
+      exact executeInstanceMethodRoot_reduces origin finish ready input
+  | armStatement =>
+      exact executeArmStatementRoot_reduces origin finish ready input
+  | terminalExpression =>
+      exact executeTerminalExpressionRoot_reduces origin finish ready input
+  | expression =>
+      exact executeExpressionRoot_reduces origin finish ready input
 
 end Solcore.Surface.Multi
 
