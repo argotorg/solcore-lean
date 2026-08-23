@@ -4317,3 +4317,144 @@ theorem executeObservedContextualWorklist?_expectedFrontier?_ne_none
   contradiction
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+
+/-- Chart's proof-free found observation is exactly the declarative retained
+token-or-EOF relation. -/
+theorem chart_observedFoundAt?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (boundary : Boundary tokens)
+    (observation : Chart.FoundObservation) :
+    Chart.observedFoundAt? file tokens boundary = some observation ↔
+      FoundAt file tokens boundary observation.span observation.found := by
+  unfold Chart.observedFoundAt?
+  split <;> rename_i inRange
+  · let cursor : TerminalCursor tokens := ⟨boundary.val, by omega⟩
+    have atBoundary : cursor.beforeBoundary = boundary := by
+      exact Fin.ext rfl
+    let token := tokens[boundary.val]
+    let candidate : Chart.FoundObservation := {
+      span := token.span
+      found := .token token.payload
+    }
+    have candidateAt : FoundAt file tokens boundary
+        candidate.span candidate.found := by
+      exact .retained cursor boundary token atBoundary
+        (.retained cursor token inRange
+          (List.getElem?_eq_getElem inRange)
+          (owned token (List.getElem_mem inRange)))
+    constructor
+    · intro selected
+      have same : candidate = observation := Option.some.inj selected
+      simpa only [same] using candidateAt
+    · intro applies
+      rcases FoundAt.functional candidateAt applies with
+        ⟨spanEq, foundEq⟩
+      apply congrArg some
+      cases candidate
+      cases observation
+      simp only at spanEq foundEq ⊢
+      cases spanEq
+      cases foundEq
+      rfl
+  · split <;> rename_i atEnd
+    · let cursor : TerminalCursor tokens := ⟨boundary.val, by omega⟩
+      have atBoundary : cursor.beforeBoundary = boundary := by
+        exact Fin.ext rfl
+      let candidate : Chart.FoundObservation := {
+        span := {
+          source := file.id
+          startByte := file.content.utf8ByteSize
+          endByte := file.content.utf8ByteSize
+        }
+        found := .endOfFile
+      }
+      have candidateAt : FoundAt file tokens boundary
+          candidate.span candidate.found := by
+        exact .endOfFile cursor boundary atBoundary atEnd
+      constructor
+      · intro selected
+        have same : candidate = observation := Option.some.inj selected
+        simpa only [same] using candidateAt
+      · intro applies
+        rcases FoundAt.functional candidateAt applies with
+          ⟨spanEq, foundEq⟩
+        apply congrArg some
+        cases candidate
+        cases observation
+        simp only at spanEq foundEq ⊢
+        cases spanEq
+        cases foundEq
+        rfl
+    · constructor
+      · intro impossible
+        contradiction
+      · intro applies
+        have atMost := FoundAt.boundary_le_logicalEOF applies
+        omega
+
+/-- A selected observed frontier carries exactly the greatest declarative
+cursor, its canonical expected list, and its found token relation. -/
+theorem executeObservedContextualWorklist?_observedFrontier?_eq_some_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (frontier : Chart.ObservedFrontier tokens) :
+    result.observedFrontier? file = some frontier ↔
+      let correct := executeObservedContextualWorklist?_phaseBCorrect
+        file tokens owned result selected
+      let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+        file tokens owned result selected
+      ∃ greatest : GreatestReachableCursor
+          file tokens result.memo correct final frontier.cursor,
+        frontier.expected = canonicalExpectedValues
+          owned correct final frontier.cursor greatest ∧
+          FoundAt file tokens frontier.cursor frontier.span frontier.found := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change result.observedFrontier? file = some frontier ↔
+    ∃ greatest : GreatestReachableCursor
+        file tokens result.memo correct final frontier.cursor,
+      frontier.expected = canonicalExpectedValues
+        owned correct final frontier.cursor greatest ∧
+        FoundAt file tokens frontier.cursor frontier.span frontier.found
+  unfold Chart.ContextualWorklistResult.observedFrontier?
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨expectedFrontier, expectedEq, observation,
+      observationEq, frontierEq⟩
+    cases frontierEq
+    rcases
+        (executeObservedContextualWorklist?_expectedFrontier?_eq_some_iff
+          file tokens owned result selected expectedFrontier).mp expectedEq with
+      ⟨greatest, canonical⟩
+    exact ⟨greatest, canonical,
+      (chart_observedFoundAt?_eq_some_iff
+        owned expectedFrontier.cursor observation).mp observationEq⟩
+  · rintro ⟨greatest, canonical, foundAt⟩
+    let expectedFrontier : Chart.ExpectedFrontier tokens := {
+      cursor := frontier.cursor
+      expected := frontier.expected
+    }
+    let observation : Chart.FoundObservation := {
+      span := frontier.span
+      found := frontier.found
+    }
+    refine ⟨expectedFrontier, ?_, observation, ?_, ?_⟩
+    · exact
+        (executeObservedContextualWorklist?_expectedFrontier?_eq_some_iff
+          file tokens owned result selected expectedFrontier).mpr
+            ⟨greatest, canonical⟩
+    · exact (chart_observedFoundAt?_eq_some_iff
+        owned frontier.cursor observation).mpr foundAt
+    · cases frontier
+      rfl
+
+end Solcore.Surface.Multi
