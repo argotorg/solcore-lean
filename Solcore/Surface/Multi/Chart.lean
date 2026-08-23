@@ -24205,3 +24205,177 @@ private theorem processContextualItemMulti?_total_with_edgeSafe
       selected⟩
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem dequeueContextualItem?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (safe : PhaseCEdgeSafe current)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCEdgeSafe result.2 := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      apply phaseC_runMappedPrimitive?_edgeSafe_of_queue_eq current next
+        _ _ safe (by intro state; rfl) _ nextEq
+      intro edge equal
+      rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [contextualEdgeDequeueAddress] at equal
+
+private theorem dequeueContextualEdge?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens)
+    (rest : List (StructurallyValidContextualPackedEdge file tokens))
+    (queue : current.payload.phaseC.edgeQueue = edge :: rest)
+    (safe : PhaseCEdgeSafe current) :
+    ∃ after, dequeueContextualEdge? current = some (edge, after) := by
+  have fresh := safe.queueFresh edge (by simp [queue])
+  unfold dequeueContextualEdge?
+  rw [queue]
+  change ∃ after, (do
+    let next ← runMappedPrimitive? current
+      (contextualEdgeDequeueAddress edge)
+      (fun state => ({
+        phaseC := { state.phaseC with edgeQueue := rest }
+        completionBackpointers := state.completionBackpointers
+      } : PhaseCWorklist file tokens))
+    pure (edge, next)) = some (edge, after)
+  simp [runMappedPrimitive?, fresh]
+
+private theorem dequeueContextualEdge?_itemSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens)
+    (rest : List (StructurallyValidContextualPackedEdge file tokens))
+    (queue : current.payload.phaseC.edgeQueue = edge :: rest)
+    (safe : PhaseCItemSafe current)
+    (selected : dequeueContextualEdge? current = some (edge, after)) :
+    PhaseCItemSafe after := by
+  unfold dequeueContextualEdge? at selected
+  rw [queue] at selected
+  change (do
+    let next ← runMappedPrimitive? current
+      (contextualEdgeDequeueAddress edge)
+      (fun state => ({
+        phaseC := { state.phaseC with edgeQueue := rest }
+        completionBackpointers := state.completionBackpointers
+      } : PhaseCWorklist file tokens))
+    pure (edge, next)) = some (edge, after) at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  have payload := runMappedPrimitive?_payload current _ _ nextEq
+  have used := runMappedPrimitive?_usedRev current _ _ after nextEq
+  constructor
+  · intro source item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases source <;> cases edge <;>
+        simp [ContextualItemInsertSource.unitKind,
+          contextualEdgeDequeueAddress] at equal
+    · simpa [payload] using safe.inserted source item old
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [contextualEdgeDequeueAddress] at equal
+    · simpa [payload] using safe.dequeued item old
+  · intro item production member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [contextualEdgeDequeueAddress] at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.predicted item production old)
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [contextualEdgeDequeueAddress] at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scanned item old)
+  · intro item member
+    rw [used, List.mem_cons] at member
+    rcases member with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [contextualEdgeDequeueAddress] at equal
+    · rw [used]
+      exact List.mem_cons_of_mem _ (safe.scannedEdge item old)
+  · intro item member usedItem
+    rw [payload] at member
+    rw [used, List.mem_cons] at usedItem
+    rcases usedItem with equal | old
+    · rcases edge with ⟨edge, valid⟩
+      cases edge <;> simp [contextualEdgeDequeueAddress] at equal
+    · exact safe.queueFresh item member old
+  · simpa [payload] using safe.itemsNodup
+  · simpa [payload] using safe.queueNodup
+  · simpa [payload] using safe.queueSubset
+
+private theorem dequeueContextualEdge?_edgeSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current after : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens)
+    (rest : List (StructurallyValidContextualPackedEdge file tokens))
+    (queue : current.payload.phaseC.edgeQueue = edge :: rest)
+    (safe : PhaseCEdgeSafe current)
+    (selected : dequeueContextualEdge? current = some (edge, after)) :
+    PhaseCEdgeSafe after := by
+  unfold dequeueContextualEdge? at selected
+  rw [queue] at selected
+  change (do
+    let next ← runMappedPrimitive? current
+      (contextualEdgeDequeueAddress edge)
+      (fun state => ({
+        phaseC := { state.phaseC with edgeQueue := rest }
+        completionBackpointers := state.completionBackpointers
+      } : PhaseCWorklist file tokens))
+    pure (edge, next)) = some (edge, after) at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨next, nextEq, output⟩
+  simp only [pure, Option.some.injEq, Prod.mk.injEq, true_and] at output
+  subst next
+  have payload := runMappedPrimitive?_payload current _ _ nextEq
+  have used := runMappedPrimitive?_usedRev current _ _ after nextEq
+  have queueUnique := safe.queueAddressNodup
+  rw [queue, List.map_cons, List.nodup_cons] at queueUnique
+  have payloadQueue : after.payload.phaseC.edgeQueue = rest := by
+    simp [payload]
+  constructor
+  · intro candidate member
+    rw [payloadQueue] at member
+    rw [used]
+    exact List.mem_cons_of_mem _
+      (safe.inserted candidate (by simp [queue, member]))
+  · intro candidate member
+    rw [used, List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · have insertEqual :=
+        contextualEdgeInsertAddress_eq_of_dequeueAddress_eq candidate edge equal
+      apply Or.inr
+      simpa only [insertEqual] using safe.inserted edge (by simp [queue])
+    · exact Or.inr (safe.causal candidate old)
+  · intro candidate member usedCandidate
+    rw [payloadQueue] at member
+    rw [used, List.mem_cons] at usedCandidate
+    rcases usedCandidate with equal | old
+    · apply queueUnique.1
+      exact List.mem_map.mpr ⟨candidate, member, equal⟩
+    · exact safe.queueFresh candidate (by simp [queue, member]) old
+  · simpa [payloadQueue] using queueUnique.2
+
+end Solcore.Surface.Multi.Chart
