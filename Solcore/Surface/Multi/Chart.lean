@@ -21424,3 +21424,103 @@ theorem nonAssociativeFrontierCandidates?_eq_some_iff
 end ContextualWorklistResult
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem CompletionBackpointerLedger.lookup?_some_entry
+    {tokens : List Token}
+    (after : ContextualItemKey tokens)
+    (coordinates : CompletionBackpointerCoordinates tokens) :
+    ∀ ledger,
+      CompletionBackpointerLedger.lookup? after ledger = some coordinates →
+      ∃ entry, entry ∈ ledger ∧ entry.after = after ∧
+        entry.coordinates = coordinates := by
+  intro ledger
+  induction ledger with
+  | nil => simp [CompletionBackpointerLedger.lookup?]
+  | cons head tail induction =>
+      intro selected
+      unfold CompletionBackpointerLedger.lookup? at selected
+      split at selected
+      next equal =>
+        have coordinatesEq := Option.some.inj selected
+        exact ⟨head, by simp, equal, coordinatesEq⟩
+      next different =>
+        obtain ⟨entry, member, afterEq, coordinatesEq⟩ :=
+          induction selected
+        exact ⟨entry, by simp [member], afterEq, coordinatesEq⟩
+
+/-- Every executable backpointer row is witnessed by the exact retained
+completed edge that introduced its coordinates. -/
+private def PhaseCBackpointerLedgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop :=
+  ∀ entry, entry ∈ current.payload.completionBackpointers →
+    ∃ retained waiting finished after shared,
+      retained ∈ current.payload.phaseC.contextualEdges ∧
+      retained.val = .completed waiting finished after shared ∧
+      entry.after = after ∧
+      entry.coordinates = (shared, finished.raw.production)
+
+/-- The prospective semantic condition needed when a newly checked
+completion shares its target with an already retained completion. -/
+private def PhaseCProspectiveCompletionUnique
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) : Prop :=
+  ∀ retained,
+    retained ∈ current.payload.phaseC.contextualEdges →
+    ∀ oldWaiting oldFinished oldAfter oldShared,
+      retained.val =
+        .completed oldWaiting oldFinished oldAfter oldShared →
+    ∀ edge : StructurallyValidContextualCompletedEdge file tokens,
+      oldAfter = edge.after →
+      oldShared = edge.shared ∧
+        oldFinished.raw.production = edge.finished.raw.production
+
+private theorem PhaseCCompletionInsertReady.of_ledgerExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (ledgerExact : PhaseCBackpointerLedgerExact current)
+    (prospective : PhaseCProspectiveCompletionUnique current)
+    (waiting finished : ContextualItemKey tokens) :
+    PhaseCCompletionInsertReady current waiting finished := by
+  intro after edge computed
+  unfold CompletionBackpointerLedger.insert?
+  simp only [CompletionBackpointerEntry.ofCompleted,
+    CompletionBackpointerEntry.coordinates]
+  cases lookupEq : CompletionBackpointerLedger.lookup? edge.after
+      current.payload.completionBackpointers with
+  | none =>
+      exact ⟨CompletionBackpointerEntry.ofCompleted edge ::
+        current.payload.completionBackpointers, rfl⟩
+  | some stored =>
+      obtain ⟨entry, entryMember, entryAfter, entryCoordinates⟩ :=
+        CompletionBackpointerLedger.lookup?_some_entry edge.after stored
+          current.payload.completionBackpointers lookupEq
+      obtain ⟨retained, oldWaiting, oldFinished, oldAfter, oldShared,
+        retainedMember, retainedShape, exactAfter, exactCoordinates⟩ :=
+          ledgerExact entry entryMember
+      have sameAfter : oldAfter = edge.after := by
+        rw [← exactAfter]
+        exact entryAfter
+      have unique := prospective retained retainedMember oldWaiting oldFinished
+        oldAfter oldShared retainedShape edge sameAfter
+      have storedEq : stored =
+          (CompletionBackpointerEntry.ofCompleted edge).coordinates := by
+        calc
+          stored = entry.coordinates := entryCoordinates.symm
+          _ = (oldShared, oldFinished.raw.production) := exactCoordinates
+          _ = (edge.shared, edge.finished.raw.production) := by
+            rw [unique.1, unique.2]
+          _ = (CompletionBackpointerEntry.ofCompleted edge).coordinates := rfl
+      have storedPairEq : stored =
+          (edge.shared, edge.finished.raw.production) := by
+        simpa only [CompletionBackpointerEntry.ofCompleted,
+          CompletionBackpointerEntry.coordinates] using storedEq
+      exact ⟨current.payload.completionBackpointers,
+        by simp only [storedPairEq, if_pos]⟩
+
+end Solcore.Surface.Multi.Chart
