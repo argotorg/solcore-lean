@@ -9286,6 +9286,58 @@ theorem executeHidingClauseRoot_reduces
         rawName).identifierProjection_projects)
     witness
 
+/-- Align one dotted module path tail with its parsed path component. -/
+private def moduleRefTailData
+    {file : WorkspaceFile} {tokens : List Token}
+    (pair : MatchedTerminal file tokens (.symbol .dot) ×
+      MatchedTerminal file tokens (.category .pathComponent)) :
+    MatchedTerminal file tokens (.symbol .dot) ×
+      RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment :=
+  (pair.1, {
+    matched := pair.2
+    spelling := pair.2.pathProjection.1
+    parsed := pair.2.pathProjection.2
+  })
+
+private theorem moduleRefTailData_values
+    {file : WorkspaceFile} {tokens : List Token}
+    (values : List (EbnfValue file tokens
+      (EbnfValue.terminalPairTailExpr
+        (.symbol .dot) (.category .pathComponent)))) :
+    ((values.map (EbnfValue.terminalPairTailView
+      (.symbol .dot) (.category .pathComponent))).map
+        moduleRefTailData).map (fun entry =>
+      EbnfValue.terminalPairTailValue
+        (.symbol .dot) (.category .pathComponent)
+        (entry.1, entry.2.matched)) = values := by
+  induction values with
+  | nil => rfl
+  | cons head rest induction =>
+      simp only [List.map_cons, List.cons.injEq]
+      constructor
+      · simp only [moduleRefTailData]
+        exact EbnfValue.terminalPairTailValue_of_view
+          (.symbol .dot) (.category .pathComponent) head
+      · exact induction
+
+private theorem moduleRefTailData_projects
+    {file : WorkspaceFile} {tokens : List Token}
+    (values : List (EbnfValue file tokens
+      (EbnfValue.terminalPairTailExpr
+        (.symbol .dot) (.category .pathComponent))))
+    (entry : MatchedTerminal file tokens (.symbol .dot) ×
+      RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment)
+    (member : entry ∈ (values.map (EbnfValue.terminalPairTailView
+      (.symbol .dot) (.category .pathComponent))).map
+        moduleRefTailData) :
+    PathSegmentProjects entry.2.matched
+      entry.2.spelling entry.2.parsed := by
+  simp only [List.mem_map] at member
+  rcases member with ⟨pair, _pairMember, rfl⟩
+  exact pair.2.pathProjection_projects
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
