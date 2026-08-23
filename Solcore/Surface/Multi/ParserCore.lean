@@ -1927,6 +1927,68 @@ theorem matchedTerminal_path_projection_exact
           PathSegment.parse spelling = some parsed :=
   Iff.rfl
 
+/-- Constructively decode a checked path-component stream value. -/
+def executablePathProjection? :
+    TerminalStreamValue → Option (String × PathSegment)
+  | .retained token =>
+      match token.payload with
+      | .identifier spelling =>
+          match PathSegment.parse spelling with
+          | some parsed => some (spelling, parsed)
+          | none => none
+      | .hardKeyword keyword =>
+          match PathSegment.parse keyword.spelling with
+          | some parsed => some (keyword.spelling, parsed)
+          | none => none
+      | _ => none
+  | .endOfFile => none
+
+/-- Every checked path component has a computed projection. -/
+theorem executablePathProjection?_isSome_of_matches
+    (value : TerminalStreamValue)
+    (matchedEvidence : TerminalMatches (.category .pathComponent) value) :
+    (executablePathProjection? value).isSome = true := by
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with
+        ⟨spelling, parsed, payloadEq, parseEq⟩ |
+        ⟨keyword, parsed, payloadEq, parseEq⟩
+      · simp [executablePathProjection?, payloadEq, parseEq]
+      · simp [executablePathProjection?, payloadEq, parseEq]
+
+/-- Constructively project one checked path-component terminal. -/
+def MatchedTerminal.pathProjection
+    {file : WorkspaceFile} {tokens : List Token}
+    (matched : MatchedTerminal file tokens (.category .pathComponent)) :
+    String × PathSegment :=
+  (executablePathProjection? matched.value).get (by
+    exact executablePathProjection?_isSome_of_matches
+      matched.value matched.matches)
+
+/-- The computed path projection satisfies the declarative relation. -/
+theorem MatchedTerminal.pathProjection_projects
+    {file : WorkspaceFile} {tokens : List Token}
+    (matched : MatchedTerminal file tokens (.category .pathComponent)) :
+    PathSegmentProjects matched matched.pathProjection.1
+      matched.pathProjection.2 := by
+  rcases matched with
+    ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+  | retained token =>
+      rcases matchedEvidence with
+        ⟨spelling, parsed, payloadEq, parseEq⟩ |
+        ⟨keyword, parsed, payloadEq, parseEq⟩
+      · unfold PathSegmentProjects
+        simp only [MatchedTerminal.pathProjection,
+          executablePathProjection?, payloadEq, parseEq, Option.get_some]
+        exact ⟨token, rfl, Or.inl payloadEq, trivial⟩
+      · unfold PathSegmentProjects
+        simp only [MatchedTerminal.pathProjection,
+          executablePathProjection?, payloadEq, parseEq, Option.get_some]
+        exact ⟨token, rfl, Or.inr ⟨keyword, payloadEq, rfl⟩, trivial⟩
+
 /-- Exact spelling and external-library value projected from one path terminal. -/
 def ExternalLibraryProjects
     {file : WorkspaceFile} {tokens : List Token}
@@ -5742,6 +5804,7 @@ executable from their typed EBNF values. -/
 inductive ExecutableRootRule : GrammarRuleId → Type where
   | module : ExecutableRootRule .module
   | topItem : ExecutableRootRule .topItem
+  | moduleRef : ExecutableRootRule .moduleRef
   | importDecl : ExecutableRootRule .importDecl
   | exportDecl : ExecutableRootRule .exportDecl
   | importEntry : ExecutableRootRule .importEntry
@@ -7940,6 +8003,78 @@ def executableTerminalLoc
     Located α :=
   { span := matched.span, payload := payload }
 
+/-- Execute every module-reference spelling and root interpretation. -/
+def executeModuleRefRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .moduleRef)) :
+    ModuleReference :=
+  let pathAtom : EbnfExpr :=
+    .atom (.terminal (.category .pathComponent))
+  let tail := EbnfValue.terminalPairTailExpr
+    (.symbol .dot) (.category .pathComponent)
+  let externalChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .at)), pathAtom,
+    .atom (.terminal (.symbol .dot)), pathAtom, .star tail]
+  let localChildren : List EbnfExpr := [pathAtom, .star tail]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choice2View
+      (.sequence externalChildren) (.sequence localChildren) input with
+  | .inl raw =>
+      let viewed := EbnfValue.sequenceFlatView externalChildren raw
+      let atToken := EbnfValue.terminalView (.symbol .at) viewed.1
+      let library := EbnfValue.terminalView
+        (.category .pathComponent) viewed.2.1
+      let next := EbnfValue.terminalView
+        (.category .pathComponent) viewed.2.2.2.1
+      let rest := (EbnfValue.starView tail viewed.2.2.2.2.1).map
+        (EbnfValue.terminalPairTailView
+          (.symbol .dot) (.category .pathComponent))
+      sourceLoc witness (.external
+        (executableTerminalLoc atToken .externalSigil)
+        (executableTerminalLoc library {
+          segment := library.pathProjection.2 })
+        {
+          head := executableTerminalLoc next next.pathProjection.2
+          tail := rest.map fun entry =>
+            executableTerminalLoc entry.2 entry.2.pathProjection.2
+        })
+  | .inr raw =>
+      let viewed := EbnfValue.sequence2View pathAtom (.star tail) raw
+      let first := EbnfValue.terminalView
+        (.category .pathComponent) viewed.1
+      let rest := (EbnfValue.starView tail viewed.2).map
+        (EbnfValue.terminalPairTailView
+          (.symbol .dot) (.category .pathComponent))
+      sourceLoc witness <|
+        if first.pathProjection.1 = "std" then
+          .standard
+            (executableTerminalLoc first .standardRoot)
+            (rest.map fun entry =>
+              executableTerminalLoc entry.2 entry.2.pathProjection.2)
+        else if first.pathProjection.1 = "lib" then
+          match rest with
+          | [] => .relative {
+              head := executableTerminalLoc first first.pathProjection.2
+              tail := []
+            }
+          | next :: remaining => .libraryRoot
+              (executableTerminalLoc first .libraryRoot) {
+                head := executableTerminalLoc
+                  next.2 next.2.pathProjection.2
+                tail := remaining.map fun entry =>
+                  executableTerminalLoc entry.2 entry.2.pathProjection.2
+              }
+        else
+          .relative {
+            head := executableTerminalLoc first first.pathProjection.2
+            tail := rest.map fun entry =>
+              executableTerminalLoc entry.2 entry.2.pathProjection.2
+          }
+
 /-- Execute an assignment operator from its selected terminal branch. -/
 def executeAssignmentOperatorRoot
     {file : WorkspaceFile} {tokens : List Token}
@@ -8366,6 +8501,8 @@ def executeRootRule
   match executable with
   | .module => executeModuleRoot file input
   | .topItem => executeTopItemRoot file tokens origin finish owned ordered input
+  | .moduleRef =>
+      executeModuleRefRoot file tokens origin finish owned ordered input
   | .importDecl =>
       executeImportDeclRoot file tokens origin finish owned ordered input
   | .exportDecl =>
