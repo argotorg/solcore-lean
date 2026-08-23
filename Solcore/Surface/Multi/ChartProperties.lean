@@ -4159,6 +4159,38 @@ theorem executeContinueStatementRoot_reduces
   rw [resultEq, ← inputEq, ← keywordEq, ← semicolonEq]
   exact .continueStatement origin finish keyword semicolon witness
 
+/-- The assembly-statement executor realizes its exact root reduction. -/
+theorem executeAssemblyStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .assemblyStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .assemblyStatement)) :
+    RuleReduction file tokens .assemblyStatement origin finish input
+      (executeAssemblyStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let keywordAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .assemblyKw))
+  let assemblyAtom : EbnfExpr :=
+    .atom (.terminal (.category .assemblyBlock))
+  change EbnfValue file tokens (.sequence [keywordAtom, assemblyAtom]) at input
+  let viewed := EbnfValue.sequence2View keywordAtom assemblyAtom input
+  let keyword := EbnfValue.terminalView (.hardKeyword .assemblyKw) viewed.1
+  let assembly := EbnfValue.terminalView (.category .assemblyBlock) viewed.2
+  let slice := assembly.assemblyProjection
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence2_of_view keywordAtom assemblyAtom input
+  have keywordEq :=
+    EbnfValue.terminal_of_view (.hardKeyword .assemblyKw) viewed.1
+  have assemblyEq :=
+    EbnfValue.terminal_of_view (.category .assemblyBlock) viewed.2
+  have resultEq : executeAssemblyStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness (.assembly slice) := by
+    rfl
+  rw [resultEq, ← inputEq, ← keywordEq, ← assemblyEq]
+  exact .assemblyStatement origin finish keyword assembly slice
+    assembly.assemblyProjection_projects witness
+
 private theorem shortRuleAtoms_of_views
     {file : WorkspaceFile} {tokens : List Token}
     (rule : GrammarRuleId)
@@ -5717,6 +5749,8 @@ theorem executeRootRule_reduces
       exact executeBreakStatementRoot_reduces origin finish ready input
   | continueStatement =>
       exact executeContinueStatementRoot_reduces origin finish ready input
+  | assemblyStatement =>
+      exact executeAssemblyStatementRoot_reduces origin finish ready input
   | returnStatement =>
       exact executeReturnStatementRoot_reduces origin finish ready input
   | assignmentStatement =>
