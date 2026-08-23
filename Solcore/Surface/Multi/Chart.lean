@@ -19674,6 +19674,135 @@ theorem greatestCurrent?_eq_some_iff
 end ContextualWorklistResult
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Whether one generated production is the present branch of an optional. -/
+def isPresentOptionalProduction : ProductionId → Bool
+  | .opt _ .some => true
+  | _ => false
+
+/-- The production classifier is exact. -/
+theorem isPresentOptionalProduction_eq_true_iff
+    (production : ProductionId) :
+    isPresentOptionalProduction production = true ↔
+      ∃ site, production = .opt site .some := by
+  cases production <;> simp [isPresentOptionalProduction]
+  case opt site branch => cases branch <;> simp
+
+/-- Whether the retained edge ledger exposes a present optional as the final
+completed child of `after`. -/
+def retainedPresentOptionalCompletionTo
+    {file : WorkspaceFile} {tokens : List Token}
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (after : ContextualItemKey tokens) : Bool :=
+  edges.any fun retained =>
+    match retained.val with
+    | .completed _ finished actualAfter _ =>
+        decide (actualAfter = after) &&
+          isPresentOptionalProduction finished.raw.production
+    | .scanned .. => false
+
+/-- The retained structural fingerprint of a complete root whose sole child
+sequence ends in a present optional. -/
+def retainedRootHasPresentOptional
+    {file : WorkspaceFile} {tokens : List Token}
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (root : ContextualItemKey tokens) : Bool :=
+  edges.any fun retained =>
+    match retained.val with
+    | .completed _ finished actualAfter _ =>
+        decide (actualAfter = root) &&
+          retainedPresentOptionalCompletionTo edges finished
+    | .scanned .. => false
+
+namespace ContextualWorklistResult
+
+/-- Proof-free G10 semantic-shape predicate.  For a canonical relational or
+equality root, a present outer optional is the structural fingerprint of a
+completed same-level operation. -/
+def completedNonAssociativeRootBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualWorklistResult file tokens)
+    (root : ContextualItemKey tokens) : Bool :=
+  retainedRootHasPresentOptional result.edges root
+
+end ContextualWorklistResult
+
+/-- Exact retained-edge meaning of the final-optional observation. -/
+theorem retainedPresentOptionalCompletionTo_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (after : ContextualItemKey tokens) :
+    retainedPresentOptionalCompletionTo edges after = true ↔
+      ∃ retained, retained ∈ edges ∧
+        ∃ waiting finished shared site,
+          retained.val = .completed waiting finished after shared ∧
+          finished.raw.production = .opt site .some := by
+  unfold retainedPresentOptionalCompletionTo
+  rw [List.any_eq_true]
+  constructor
+  · rintro ⟨retained, member, accepted⟩
+    cases shape : retained.val with
+    | scanned before target cursor => simp [shape] at accepted
+    | completed waiting finished target shared =>
+        simp only [shape, Bool.and_eq_true, decide_eq_true_eq] at accepted
+        rcases accepted with ⟨targetEq, present⟩
+        subst target
+        obtain ⟨site, production⟩ :=
+          (isPresentOptionalProduction_eq_true_iff _).mp present
+        exact ⟨retained, member, waiting, finished, shared, site, shape,
+          production⟩
+  · rintro ⟨retained, member, waiting, finished, shared, site,
+      shape, production⟩
+    refine ⟨retained, member, ?_⟩
+    rw [shape]
+    simp [production, isPresentOptionalProduction]
+
+/-- Exact two-completion meaning of the root semantic-shape fingerprint. -/
+theorem retainedRootHasPresentOptional_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (root : ContextualItemKey tokens) :
+    retainedRootHasPresentOptional edges root = true ↔
+      ∃ rootEdge, rootEdge ∈ edges ∧
+        ∃ rootWaiting sequence shared,
+          rootEdge.val = .completed rootWaiting sequence root shared ∧
+          ∃ optionalEdge, optionalEdge ∈ edges ∧
+            ∃ sequenceWaiting optional optionalShared site,
+              optionalEdge.val = .completed sequenceWaiting optional sequence
+                optionalShared ∧
+              optional.raw.production = .opt site .some := by
+  unfold retainedRootHasPresentOptional
+  rw [List.any_eq_true]
+  constructor
+  · rintro ⟨rootEdge, rootMember, accepted⟩
+    cases shape : rootEdge.val with
+    | scanned before after cursor => simp [shape] at accepted
+    | completed rootWaiting sequence after shared =>
+        simp only [shape, Bool.and_eq_true, decide_eq_true_eq] at accepted
+        rcases accepted with ⟨afterEq, present⟩
+        subst after
+        obtain ⟨optionalEdge, optionalMember, sequenceWaiting, optional,
+            optionalShared, site, optionalShape, production⟩ :=
+          (retainedPresentOptionalCompletionTo_eq_true_iff
+            edges sequence).mp present
+        exact ⟨rootEdge, rootMember, rootWaiting, sequence, shared, shape,
+          optionalEdge, optionalMember, sequenceWaiting, optional,
+          optionalShared, site, optionalShape, production⟩
+  · rintro ⟨rootEdge, rootMember, rootWaiting, sequence, shared, rootShape,
+      optionalEdge, optionalMember, sequenceWaiting, optional,
+      optionalShared, site, optionalShape, production⟩
+    refine ⟨rootEdge, rootMember, ?_⟩
+    rw [rootShape]
+    simpa using ((retainedPresentOptionalCompletionTo_eq_true_iff
+      edges sequence).mpr ⟨optionalEdge, optionalMember, sequenceWaiting,
+        optional, optionalShared, site, optionalShape, production⟩)
+
+end Solcore.Surface.Multi.Chart
 namespace Solcore.Surface.Multi.Chart
 
 open Grammar
