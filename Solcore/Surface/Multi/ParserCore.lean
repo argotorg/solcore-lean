@@ -5699,6 +5699,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
   | pragmaDecl : ExecutableRootRule .pragmaDecl
+  | constructorSelection : ExecutableRootRule .constructorSelection
   | body : ExecutableRootRule .body
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
@@ -6497,6 +6498,45 @@ def executePragmaDeclRoot
         targets := executePragmaTargets viewed.2.2.1
       }
 
+/-- Execute constructor selections attached to exported items. -/
+def executeConstructorSelectionRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens
+      (m2cV1.rhs .constructorSelection)) : ConstructorSelection :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let allChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)),
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .rightParen))]
+  let namedChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let branches : List EbnfExpr :=
+    [.sequence allChildren, .sequence namedChildren]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView allChildren raw
+      let star := EbnfValue.terminalView (.symbol .star) viewed.2.1
+      sourceLoc witness (.all {
+        span := star.span
+        payload := .wildcard
+      })
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView namedChildren raw
+      let names := (EbnfValue.list1View identifierAtom viewed.2.1).map
+        fun rawName =>
+          let name := EbnfValue.terminalView
+            (.category .identifier) rawName
+          ({ span := name.span, payload := name.identifierProjection.2 } :
+            IdentifierOccurrence)
+      sourceLoc witness (.named names)
+
 /-- Execute a braced body from its ordered statement values. -/
 def executeBodyRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -7227,6 +7267,9 @@ def executeRootRule
       executeFieldDeclRoot file tokens origin finish owned ordered input
   | .pragmaDecl =>
       executePragmaDeclRoot file tokens origin finish owned ordered input
+  | .constructorSelection =>
+      executeConstructorSelectionRoot file tokens origin finish
+        owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
