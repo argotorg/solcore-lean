@@ -7183,3 +7183,55 @@ theorem executeObservedContextualWorklist?_completedNonAssociativeRootBool_eq_tr
       optionalShared, site, optionalShape, production⟩
 
 end Solcore.Surface.Multi
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The proof-free present-optional root bit of one executed coherent
+nonassociative candidate forces a completed source operator value. -/
+theorem executeObservedContextualWorklist?_completedNonAssociativeRootBool_eq_true_implies_completed
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel) :
+    let correct := executeObservedContextualWorklist?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+      file tokens owned result selected
+    ∀ candidate : NonAssociativeFrontierValue file tokens result.memo
+        correct final cursor level,
+      result.completedNonAssociativeRootBool
+          (CanonicalCompleteRootItem tokens level.rule candidate.origin
+            cursor candidate.context) = true →
+        ∃ first, CompletedNonAssociative level candidate first := by
+  let correct := executeObservedContextualWorklist?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklist?_allGuardsFinal
+    file tokens owned result selected
+  change ∀ candidate : NonAssociativeFrontierValue file tokens result.memo
+      correct final cursor level,
+    result.completedNonAssociativeRootBool
+        (CanonicalCompleteRootItem tokens level.rule candidate.origin cursor
+          candidate.context) = true →
+      ∃ first, CompletedNonAssociative level candidate first
+  intro candidate marked
+  let root := CanonicalCompleteRootItem tokens level.rule candidate.origin
+    cursor candidate.context
+  have edgeShape :=
+    (executeObservedContextualWorklist?_completedNonAssociativeRootBool_eq_true_iff_edges
+      file tokens owned result selected root).mp marked
+  rcases edgeShape with ⟨rootWaiting, sequence, rootShared, rootReached,
+    sequenceWaiting, optional, optionalShared, site, optionalReached,
+    optionalProduction⟩
+  have correspondence := executeObservedContextualWorklist?_correspondence
+    file tokens owned result selected
+  obtain ⟨first, completed⟩ := g10CompletedValue_of_presentCompletionEdges
+    correspondence.2.2 candidate.root.2.2 rootReached optionalReached
+      optionalProduction
+  exact ⟨first,
+    (completedNonAssociative_iff_value level candidate first).mpr completed⟩
+
+end Solcore.Surface.Multi
