@@ -4110,3 +4110,43 @@ theorem executeObservedContextualWorklist?_expectedFrontier?_eq_some_iff
     exact ⟨greatestSelected, expectedEq.trans computedEq.symm⟩
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+
+/-- Every successful observed contextual execution exposes its computed
+expected frontier. -/
+theorem executeObservedContextualWorklist?_expectedFrontier?_exists
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    ∃ frontier, result.expectedFrontier? = some frontier := by
+  rcases executeObservedContextualWorklist?_greatestCurrent?_exists
+    file tokens owned result selected with ⟨cursor, cursorEq⟩
+  let frontier : Chart.ExpectedFrontier tokens := {
+    cursor := cursor
+    expected := result.expectedAtCurrent cursor
+  }
+  exact ⟨frontier,
+    (Chart.ContextualWorklistResult.expectedFrontier?_eq_some_iff
+      result frontier).mpr ⟨cursorEq, rfl⟩⟩
+
+/-- The absent expected-frontier branch is unreachable after successful
+observed contextual execution. -/
+theorem executeObservedContextualWorklist?_expectedFrontier?_ne_none
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklist? file tokens owned =
+      some result) :
+    result.expectedFrontier? ≠ none := by
+  rcases executeObservedContextualWorklist?_expectedFrontier?_exists
+    file tokens owned result selected with ⟨frontier, frontierEq⟩
+  intro noneEq
+  rw [noneEq] at frontierEq
+  contradiction
+
+end Solcore.Surface.Multi
