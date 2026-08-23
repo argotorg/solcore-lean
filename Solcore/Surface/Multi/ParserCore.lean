@@ -5711,6 +5711,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | module : ExecutableRootRule .module
   | topItem : ExecutableRootRule .topItem
   | importDecl : ExecutableRootRule .importDecl
+  | exportDecl : ExecutableRootRule .exportDecl
   | importEntry : ExecutableRootRule .importEntry
   | localExportEntry : ExecutableRootRule .localExportEntry
   | remoteExportEntry : ExecutableRootRule .remoteExportEntry
@@ -6264,6 +6265,109 @@ def executeImportDeclRoot
             payload := { entries := entries }
           } : ImportSelection) hidingValue
       }
+
+/-- Execute all five export-declaration forms. -/
+def executeExportDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .exportDecl)) :
+    ExportDecl :=
+  let localAtom : EbnfExpr := .atom (.nonterminal .localExportEntry)
+  let remoteAtom : EbnfExpr := .atom (.nonterminal .remoteExportEntry)
+  let localChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 localAtom,
+    .atom (.terminal (.symbol .rightBrace)),
+    .atom (.terminal (.symbol .semicolon))]
+  let moduleChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.symbol .semicolon))]
+  let aliasChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef),
+    .atom (.terminal (.hardKeyword .asKw)),
+    .atom (.terminal (.category .identifier)),
+    .atom (.terminal (.symbol .semicolon))]
+  let wildcardChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef), .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .star)),
+    .atom (.terminal (.symbol .semicolon))]
+  let bracedChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .exportKw)),
+    .atom (.nonterminal .moduleRef), .atom (.terminal (.symbol .dot)),
+    .atom (.terminal (.symbol .leftBrace)), .list0 remoteAtom,
+    .atom (.terminal (.symbol .rightBrace)),
+    .atom (.terminal (.symbol .semicolon))]
+  let branches : List EbnfExpr := [.sequence localChildren,
+    .sequence moduleChildren, .sequence aliasChildren,
+    .sequence wildcardChildren, .sequence bracedChildren]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView localChildren raw
+      let openBrace := EbnfValue.terminalView
+        (.symbol .leftBrace) viewed.2.1
+      let entries := (EbnfValue.list0View localAtom viewed.2.2.1).map
+        (EbnfValue.ruleView .localExportEntry)
+      let closeBrace := EbnfValue.terminalView
+        (.symbol .rightBrace) viewed.2.2.2.1
+      sourceLoc witness (.local ({
+        span := {
+          source := file.id
+          startByte := openBrace.span.startByte
+          endByte := closeBrace.span.endByte
+        }
+        payload := { entries := entries }
+      } : LocalExportList))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView moduleChildren raw
+      sourceLoc witness (.module
+        (EbnfValue.ruleView .moduleRef viewed.2.1) none)
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView aliasChildren raw
+      let name := EbnfValue.terminalView
+        (.category .identifier) viewed.2.2.2.1
+      sourceLoc witness (.module
+        (EbnfValue.ruleView .moduleRef viewed.2.1)
+        (some { span := name.span, payload := name.identifierProjection.2 }))
+  | ⟨⟨3, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView wildcardChildren raw
+      let reference := EbnfValue.ruleView .moduleRef viewed.2.1
+      let dot := EbnfValue.terminalView (.symbol .dot) viewed.2.2.1
+      let star := EbnfValue.terminalView (.symbol .star) viewed.2.2.2.1
+      sourceLoc witness (.from reference ({
+        span := {
+          source := file.id
+          startByte := dot.span.startByte
+          endByte := star.span.endByte
+        }
+        payload := .dotWildcard {
+          span := star.span
+          payload := .wildcard
+        }
+      } : RemoteExportSelection))
+  | ⟨⟨4, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequenceFlatView bracedChildren raw
+      let reference := EbnfValue.ruleView .moduleRef viewed.2.1
+      let openBrace := EbnfValue.terminalView
+        (.symbol .leftBrace) viewed.2.2.2.1
+      let entries := (EbnfValue.list0View remoteAtom
+        viewed.2.2.2.2.1).map (EbnfValue.ruleView .remoteExportEntry)
+      let closeBrace := EbnfValue.terminalView
+        (.symbol .rightBrace) viewed.2.2.2.2.2.1
+      sourceLoc witness (.from reference ({
+        span := {
+          source := file.id
+          startByte := openBrace.span.startByte
+          endByte := closeBrace.span.endByte
+        }
+        payload := .braced entries
+      } : RemoteExportSelection))
 
 private def shallowRootWitness
     (file : WorkspaceFile) (tokens : List Token)
@@ -7841,6 +7945,8 @@ def executeRootRule
   | .topItem => executeTopItemRoot file tokens origin finish owned ordered input
   | .importDecl =>
       executeImportDeclRoot file tokens origin finish owned ordered input
+  | .exportDecl =>
+      executeExportDeclRoot file tokens origin finish owned ordered input
   | .importEntry =>
       executeImportEntryRoot file tokens origin finish owned ordered input
   | .localExportEntry =>
