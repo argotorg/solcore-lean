@@ -19626,3 +19626,63 @@ theorem relationalNone_reverse_requires_passThroughSafe
   exact absent (reverse input first reduces completed)
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+
+theorem g10NonAssociativeRootChild_isSequence
+    (level : NonAssociativeLevel) (production : ProductionId)
+    (lhsEq : production.lhs = .aux (GrammarSite.root level.rule)) :
+    ∃ site : SequenceSite, production = .seq site := by
+  have rootKind :
+      (GrammarSite.root level.rule).expression.kind = .sequence := by
+    rw [GrammarSite.root_expression]
+    cases level <;> rfl
+  have impossible {kind : EbnfNodeKind}
+      (site : GrammarSiteOfKind kind) (different : kind ≠ .sequence)
+      (same : site.site = GrammarSite.root level.rule) : False := by
+    have actual := site.hasKind
+    rw [same, rootKind] at actual
+    exact different actual.symm
+  cases production with
+  | root rule => cases lhsEq
+  | atom site => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | seq site => exact ⟨site, rfl⟩
+  | group site => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | choice site branch => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | opt site branch => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | star site branch => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | plus site branch => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | list0 site branch => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | list1 site => exact (impossible site (by decide)
+      (NonterminalSymbol.aux.inj lhsEq)).elim
+  | tail site branch => cases lhsEq
+
+theorem g10NonAssociative_rhs_eq (level : NonAssociativeLevel) :
+    m2cV1.rhs level.rule = .sequence [
+      .atom (.nonterminal level.operandRule),
+      .optional level.tailExpr] := by
+  cases level <;> rfl
+
+theorem g10List_eq_pair_of_length_two
+    {alpha : Type} (values : List alpha) (length : values.length = 2) :
+    ∃ first second, values = [first, second] := by
+  cases values with
+  | nil => simp at length
+  | cons first rest =>
+    cases rest with
+    | nil => simp at length
+    | cons second tail =>
+      cases tail with
+      | nil => exact ⟨first, second, rfl⟩
+      | cons third tail => simp at length
+
+end Solcore.Surface.Multi
