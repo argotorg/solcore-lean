@@ -24628,3 +24628,57 @@ private theorem phaseCQueueStepMulti?_total_invariants
         resultOperational⟩
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- A total bounded runner.  Fuel exhaustion returns the current safe state;
+whether it is drained remains an explicit, separately checkable property. -/
+private def runPhaseCQueueStepsMulti?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Nat → CountedState tokens (PhaseCWorklist file tokens) →
+      Option (CountedState tokens (PhaseCWorklist file tokens))
+  | 0, current => some current
+  | fuel + 1, current => do
+      let next ← phaseCQueueStepMulti? owned current
+      runPhaseCQueueStepsMulti? owned fuel next
+
+private theorem runPhaseCQueueStepsMulti?_total_invariants
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCAllSafe current →
+      PhaseCEdgeSafe current →
+      PhaseCMultiBackpointerInvariant current →
+      PhaseCBackpointerLedgerExact current →
+      PhaseCOperationalInvariant file tokens current.payload →
+      ∃ result, runPhaseCQueueStepsMulti? owned fuel current = some result ∧
+        PhaseCAllSafe result ∧
+        PhaseCEdgeSafe result ∧
+        PhaseCMultiBackpointerInvariant result ∧
+        PhaseCBackpointerLedgerExact result ∧
+        PhaseCOperationalInvariant file tokens result.payload := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current safe edgeSafe covers exact operational
+      exact ⟨current, rfl, safe, edgeSafe, covers, exact, operational⟩
+  | succ previous induction =>
+      intro current safe edgeSafe covers exact operational
+      obtain ⟨next, nextEq, nextSafe, nextEdgeSafe, nextCovers,
+          nextExact, nextOperational⟩ :=
+        phaseCQueueStepMulti?_total_invariants owned current safe edgeSafe
+          covers exact operational
+      obtain ⟨result, resultEq, resultSafe, resultEdgeSafe,
+          resultCovers, resultExact, resultOperational⟩ :=
+        induction next nextSafe nextEdgeSafe nextCovers nextExact
+          nextOperational
+      exact ⟨result, by
+        simp [runPhaseCQueueStepsMulti?, nextEq, resultEq],
+        resultSafe, resultEdgeSafe, resultCovers, resultExact,
+        resultOperational⟩
+
+end Solcore.Surface.Multi.Chart
