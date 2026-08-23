@@ -3556,6 +3556,156 @@ end Solcore.Surface.Multi
 namespace Solcore.Surface.Multi
 
 open Solcore.Workspace
+
+/-- The total multi-ledger executor's completed-module-root bit is exactly
+declarative reachability of the canonical whole-file module item. -/
+theorem
+    executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    result.containsCompleteModuleRootItem = true ↔
+      ContextualReach file tokens result.memo
+        (executeObservedContextualWorklistMulti?_phaseBCorrect
+          file tokens owned result selected)
+        (Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result selected)
+        (CanonicalCompleteRootItem tokens .module
+          (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain) := by
+  rw [Chart.ContextualWorklistResult.containsCompleteModuleRootItem_eq_true_iff]
+  exact (executeObservedContextualWorklistMulti?_correspondence
+    file tokens owned result selected).1 _
+
+/-- Every declarative source-backed module forces the proof-free completed
+module-root bit in the total multi-ledger result. -/
+theorem
+    executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_of_sourceBackedRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (module : ParsedModuleV1)
+    (sourceRoot : SourceBackedRoot file tokens module) :
+    result.containsCompleteModuleRootItem = true := by
+  rcases sourceRoot with
+    ⟨memo, correct, final, reached, _complete, _coherent⟩
+  let resultCorrect :=
+    executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+  let resultFinal :=
+    Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+  have memoEq : memo = result.memo :=
+    phaseBCorrect_final_memo_unique
+      correct final resultCorrect resultFinal
+  subst memo
+  have reachedResult : ContextualReach file tokens result.memo
+      resultCorrect resultFinal
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain) :=
+    reached
+  exact
+    (executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_iff
+      file tokens owned result selected).mpr reachedResult
+
+/-- A false completed-module-root bit rules out every declarative
+source-backed module in the total multi-ledger result. -/
+theorem
+    executeObservedContextualWorklistMulti?_noSourceBackedRoot_of_completeModuleRootItem_eq_false
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (absent : result.containsCompleteModuleRootItem = false) :
+    ¬ ∃ module, SourceBackedRoot file tokens module := by
+  rintro ⟨module, sourceRoot⟩
+  have present :=
+    executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_of_sourceBackedRoot
+      file tokens owned result selected module sourceRoot
+  rw [absent] at present
+  contradiction
+
+/-- Every final public parser success judgment forces the proof-free
+completed-module-root bit. -/
+theorem
+    executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_of_parses
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (module : ParsedModuleV1)
+    (parsed : Parses file tokens module) :
+    result.containsCompleteModuleRootItem = true := by
+  cases parsed with
+  | sourceBackedRoot _ sourceRoot =>
+      exact
+        executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_of_sourceBackedRoot
+          file tokens owned result selected module sourceRoot
+
+/-- A selected coherent module value is the only additional interface needed
+to upgrade the proof-free completed-root bit to the final parser judgment. -/
+theorem
+    executeObservedContextualWorklistMulti?_parses_of_completeModuleRootItem_eq_true_of_coherentReduction
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (present : result.containsCompleteModuleRootItem = true)
+    (module : ParsedModuleV1)
+    (coherent : CoherentReduction file tokens result.memo
+      (executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result selected)
+      (Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+        file tokens owned result selected)
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)
+      module) :
+    Parses file tokens module := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  have reached : ContextualReach file tokens result.memo correct final
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain) :=
+    (executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_iff
+      file tokens owned result selected).mp present
+  exact .sourceBackedRoot file tokens module owned
+    ⟨result.memo, correct, final, reached,
+      canonicalCompleteRootItem_complete .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain,
+      coherent⟩
+
+/-- The same proof-free root-absence bit rules out the final public parser
+success judgment, without assuming a unique completion backpointer. -/
+theorem
+    executeObservedContextualWorklistMulti?_noParses_of_completeModuleRootItem_eq_false
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (absent : result.containsCompleteModuleRootItem = false) :
+    ¬ ∃ module, Parses file tokens module := by
+  rintro ⟨module, parsed⟩
+  cases parsed with
+  | sourceBackedRoot _ sourceRoot =>
+      exact
+        (executeObservedContextualWorklistMulti?_noSourceBackedRoot_of_completeModuleRootItem_eq_false
+          file tokens owned result selected absent)
+          ⟨module, sourceRoot⟩
+
+end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
 open Grammar
 
 /-- Auxiliary action execution is accepted by the exact declarative action
