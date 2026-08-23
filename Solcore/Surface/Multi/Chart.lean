@@ -19601,3 +19601,258 @@ private theorem attemptContextualPrediction?_total_safe
                 item nextActivationSafe insertedEq⟩
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem insertContextualItem?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (selected : insertContextualItem? current source item = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact fun _ => id
+  next absent =>
+    rw [runMappedPrimitive?_usedRev current _ _ result selected]
+    exact fun _ member => List.mem_cons_of_mem _ member
+
+private theorem attemptContextualPrediction?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact fun _ => id
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedMono : current.counter.usedRev ⊆
+              attempted.counter.usedRev := by
+            rw [runMappedPrimitive?_usedRev current _ id attempted
+              attemptedEq]
+            exact fun _ member => List.mem_cons_of_mem _ member
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedMono
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedMono :=
+                  activateWorklistProduction?_used_mono attempted
+                    productionInstance activated activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  cases selected
+                  exact fun address member =>
+                    activatedMono (attemptedMono member)
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  exact fun address member =>
+                    insertContextualItem?_used_mono activated.1 result
+                      .prediction item selected
+                        (activatedMono (attemptedMono member))
+
+private theorem insertContextualItem?_preserves_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens) (target : UnitAddress tokens)
+    (notInsert : target ≠
+      (.linear source.unitKind (contextualLinearKey item) :
+        UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : insertContextualItem? current source item = some result) :
+    target ∉ result.counter.usedRev := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present => cases selected; exact fresh
+  next absent =>
+    rw [runMappedPrimitive?_usedRev current _ _ result selected]
+    simp only [List.mem_cons, not_or]
+    exact ⟨notInsert, fresh⟩
+
+private theorem attemptContextualPrediction?_preserves_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (target : UnitAddress tokens)
+    (notAttempt : target ≠
+      (.prediction .R01_predictionAttempt
+        (contextualPredictionKey waiting predicted) : UnitAddress tokens))
+    (notProduction : ∀ productionInstance,
+      target ≠ UnitAddress.production productionInstance)
+    (notWitness : ∀ productionInstance index slot,
+      target ≠ UnitAddress.guardWitness slot
+        (guardCellAddress productionInstance index))
+    (notInsert : ∀ item, target ≠
+      (.linear .L03_itemInsert (contextualLinearKey item) :
+        UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    target ∉ result.counter.usedRev := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact fresh
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedFresh : target ∉ attempted.counter.usedRev := by
+            rw [runMappedPrimitive?_usedRev current _ id attempted
+              attemptedEq]
+            simp only [List.mem_cons, not_or]
+            exact ⟨notAttempt, fresh⟩
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedFresh
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedFresh :
+                    target ∉ activated.1.counter.usedRev := by
+                  intro member
+                  exact attemptedFresh
+                    (activateWorklistProduction?_nonActivationAddress
+                      attempted productionInstance activated target
+                        (notProduction productionInstance)
+                        (notWitness productionInstance) activatedEq member)
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  cases selected
+                  exact activatedFresh
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  exact insertContextualItem?_preserves_fresh activated.1
+                    result .prediction item target (notInsert item)
+                      activatedFresh selected
+
+private theorem attemptContextualPredictions?_total_safe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current : CountedState tokens (PhaseCWorklist file tokens)),
+      productions.Nodup →
+      PhaseCItemSafe current →
+      PhaseCActivationSafe current.counter →
+      (.linear .L01_itemDequeue (contextualLinearKey waiting) :
+        UnitAddress tokens) ∈ current.counter.usedRev →
+      (∀ production, production ∈ productions →
+        (.prediction .R01_predictionAttempt
+          (contextualPredictionKey waiting production) :
+            UnitAddress tokens) ∉ current.counter.usedRev) →
+      (.linear .L04_scanAttempt (contextualLinearKey waiting) :
+        UnitAddress tokens) ∉ current.counter.usedRev →
+      (.linear .L06_scannedEdgeInsert (contextualLinearKey waiting) :
+        UnitAddress tokens) ∉ current.counter.usedRev →
+      ∃ result,
+        attemptContextualPredictions? waiting productions current =
+          some result ∧
+        PhaseCItemSafe result ∧
+        PhaseCActivationSafe result.counter ∧
+        (.linear .L01_itemDequeue (contextualLinearKey waiting) :
+          UnitAddress tokens) ∈ result.counter.usedRev ∧
+        (.linear .L04_scanAttempt (contextualLinearKey waiting) :
+          UnitAddress tokens) ∉ result.counter.usedRev ∧
+        (.linear .L06_scannedEdgeInsert (contextualLinearKey waiting) :
+          UnitAddress tokens) ∉ result.counter.usedRev := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current _unique itemSafe activationSafe dequeued _predictions
+        scanFresh edgeFresh
+      exact ⟨current, rfl, itemSafe, activationSafe, dequeued,
+        scanFresh, edgeFresh⟩
+  | cons head rest induction =>
+      intro current unique itemSafe activationSafe dequeued predictions
+        scanFresh edgeFresh
+      rw [List.nodup_cons] at unique
+      obtain ⟨next, nextEq, nextItemSafe, nextActivationSafe⟩ :=
+        attemptContextualPrediction?_total_safe current waiting head itemSafe
+          activationSafe dequeued (predictions head (by simp))
+      have nextDequeued := attemptContextualPrediction?_used_mono current next
+        waiting head nextEq dequeued
+      have restFresh : ∀ production, production ∈ rest →
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting production) :
+              UnitAddress tokens) ∉ next.counter.usedRev := by
+        intro production member
+        apply attemptContextualPrediction?_preserves_fresh current next waiting
+          head _ _ (by simp) (by simp) (by simp)
+          (predictions production (by simp [member])) nextEq
+        intro equal
+        simp only [UnitAddress.prediction.injEq] at equal
+        have productionEq := congrArg ChartPredictionKey.production equal.2
+        change production = head at productionEq
+        exact unique.1 (productionEq ▸ member)
+      have nextScanFresh := attemptContextualPrediction?_preserves_fresh
+        current next waiting head _ (by simp) (by simp) (by simp) (by simp)
+          scanFresh nextEq
+      have nextEdgeFresh := attemptContextualPrediction?_preserves_fresh
+        current next waiting head _ (by simp) (by simp) (by simp) (by simp)
+          edgeFresh nextEq
+      obtain ⟨result, restEq, resultItemSafe, resultActivationSafe,
+        resultDequeued, resultScanFresh, resultEdgeFresh⟩ :=
+          induction next unique.2 nextItemSafe nextActivationSafe nextDequeued
+            restFresh nextScanFresh nextEdgeFresh
+      exact ⟨result, by simp [attemptContextualPredictions?, nextEq, restEq],
+        resultItemSafe, resultActivationSafe, resultDequeued,
+        resultScanFresh, resultEdgeFresh⟩
+
+private theorem attemptAllContextualPredictions?_total_safe
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (itemSafe : PhaseCItemSafe current)
+    (activationSafe : PhaseCActivationSafe current.counter)
+    (workFresh : PhaseCItemWorkFresh current waiting) :
+    ∃ result,
+      attemptContextualPredictions? waiting allProductionIds current =
+        some result ∧
+      PhaseCItemSafe result ∧
+      PhaseCActivationSafe result.counter ∧
+      (.linear .L01_itemDequeue (contextualLinearKey waiting) :
+        UnitAddress tokens) ∈ result.counter.usedRev ∧
+      (.linear .L04_scanAttempt (contextualLinearKey waiting) :
+        UnitAddress tokens) ∉ result.counter.usedRev ∧
+      (.linear .L06_scannedEdgeInsert (contextualLinearKey waiting) :
+        UnitAddress tokens) ∉ result.counter.usedRev := by
+  exact attemptContextualPredictions?_total_safe waiting allProductionIds
+    current allProductionIds_nodup itemSafe activationSafe
+      workFresh.dequeued
+      (fun production _member => workFresh.predictions production)
+      workFresh.scan workFresh.scannedEdge
+
+end Solcore.Surface.Multi.Chart
