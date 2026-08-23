@@ -5408,6 +5408,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | forPostItem : ExecutableRootRule .forPostItem
   | expressionStatement : ExecutableRootRule .expressionStatement
   | contractMember : ExecutableRootRule .contractMember
+  | assignmentOperator : ExecutableRootRule .assignmentOperator
   | logicalOr : ExecutableRootRule .logicalOr
   | logicalAnd : ExecutableRootRule .logicalAnd
   | bitOr : ExecutableRootRule .bitOr
@@ -6136,6 +6137,41 @@ def executableTerminalLoc
     Located α :=
   { span := matched.span, payload := payload }
 
+/-- Execute an assignment operator from its selected terminal branch. -/
+def executeAssignmentOperatorRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (m2cV1.rhs .assignmentOperator)) :
+    Located AssignmentOperator :=
+  match EbnfValue.choiceView [
+      .atom (.terminal (.symbol .equal)),
+      .atom (.terminal (.symbol .plusEqual)),
+      .atom (.terminal (.symbol .minusEqual)),
+      .atom (.terminal (.symbol .caretEqual)),
+      .atom (.terminal (.symbol .ampEqual)),
+      .atom (.terminal (.symbol .pipeEqual)),
+      .atom (.terminal (.symbol .percentEqual))] input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      executableTerminalLoc
+        (EbnfValue.terminalView (.symbol .equal) raw) .equal
+  | ⟨⟨1, _⟩, raw⟩ =>
+      executableTerminalLoc
+        (EbnfValue.terminalView (.symbol .plusEqual) raw) .addEqual
+  | ⟨⟨2, _⟩, raw⟩ =>
+      executableTerminalLoc
+        (EbnfValue.terminalView (.symbol .minusEqual) raw) .subtractEqual
+  | ⟨⟨3, _⟩, raw⟩ =>
+      executableTerminalLoc
+        (EbnfValue.terminalView (.symbol .caretEqual) raw) .bitXorEqual
+  | ⟨⟨4, _⟩, raw⟩ =>
+      executableTerminalLoc
+        (EbnfValue.terminalView (.symbol .ampEqual) raw) .bitAndEqual
+  | ⟨⟨5, _⟩, raw⟩ =>
+      executableTerminalLoc
+        (EbnfValue.terminalView (.symbol .pipeEqual) raw) .bitOrEqual
+  | ⟨⟨6, _⟩, raw⟩ =>
+      executableTerminalLoc
+        (EbnfValue.terminalView (.symbol .percentEqual) raw) .moduloEqual
+
 /-- Locate an infix result between its left and right operands. -/
 def executableBetween
     (file : WorkspaceFile) {α : Type}
@@ -6239,6 +6275,7 @@ def executeRootRule
       executeExpressionStatementRoot file tokens origin finish owned ordered input
   | .contractMember =>
       executeContractMemberRoot file tokens origin finish owned ordered input
+  | .assignmentOperator => executeAssignmentOperatorRoot input
   | .logicalOr => executeLogicalOrRoot file input
   | .logicalAnd => executeLogicalAndRoot file input
   | .bitOr => executeBitOrRoot file input
