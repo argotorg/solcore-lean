@@ -24792,3 +24792,265 @@ private theorem executeObservedPhaseABCWorklistMulti?_total
   exact phaseCEq
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem runMappedPrimitive?_used_mono_phaseC
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before) (address : UnitAddress tokens)
+    (transition : before → after) (result : CountedState tokens after)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  rw [runMappedPrimitive?_usedRev current address transition result selected]
+  exact fun _ member => List.mem_cons_of_mem _ member
+
+private theorem Counter.units_le_of_used_subset
+    {tokens : List Token} (current result : Counter tokens)
+    (subset : current.usedRev ⊆ result.usedRev) :
+    current.units ≤ result.units := by
+  exact nodup_length_le_of_subset current.unique subset
+
+private theorem insertContextualScannedEdge?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact fun _ => id
+  · exact runMappedPrimitive?_used_mono_phaseC current _ _ result selected
+
+private theorem insertContextualCompletedEdgeMulti?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact fun _ => id
+  · exact runMappedPrimitive?_used_mono_phaseC current _ _ result selected
+
+private theorem attemptContextualPredictions?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      attemptContextualPredictions? waiting productions current = some result →
+      current.counter.usedRev ⊆ result.counter.usedRev := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact fun _ => id
+  | cons predicted rest induction =>
+      intro current result selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact fun address member => induction next result restEq
+        (attemptContextualPrediction?_used_mono current next waiting predicted
+          nextEq member)
+
+private theorem attemptContextualScan?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (selected : attemptContextualScan? owned current before = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedMono := runMappedPrimitive?_used_mono_phaseC current _ id
+      attempted attemptedEq
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq] at remainderEq
+        cases remainderEq
+        exact attemptedMono
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        exact fun address member =>
+          insertContextualScannedEdge?_used_mono withItem result edge edgeEq
+            (insertContextualItem?_used_mono attempted withItem .scan after
+              itemEq (attemptedMono member))
+  · cases selected
+    exact fun _ => id
+
+private theorem attemptContextualCompletionMulti?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (selected : attemptContextualCompletionMulti? current waiting finished =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold attemptContextualCompletionMulti? at selected
+  cases completion : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completion] at selected
+      cases selected
+      exact fun _ => id
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completion] at selected
+      split at selected
+      · cases selected
+        exact fun _ => id
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨attempted, attemptedEq, withItem, itemEq,
+          edgeEq⟩
+        have attemptedMono := runMappedPrimitive?_used_mono_phaseC current _
+          id attempted attemptedEq
+        exact fun address member =>
+          insertContextualCompletedEdgeMulti?_used_mono withItem result edge
+            edgeEq (insertContextualItem?_used_mono attempted withItem
+              .completion after itemEq (attemptedMono member))
+
+private theorem attemptContextualCompletionsWithMulti?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ others
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      attemptContextualCompletionsWithMulti? pivot others current =
+        some result →
+      current.counter.usedRev ⊆ result.counter.usedRev := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact fun _ => id
+  | cons other rest induction =>
+      intro current result selected
+      rw [attemptContextualCompletionsWithMulti?] at selected
+      cases forwardEq :
+          attemptContextualCompletionMulti? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardMono := attemptContextualCompletionMulti?_used_mono
+            current forward pivot other forwardEq
+          split at selected
+          · exact fun address member =>
+              induction forward result selected (forwardMono member)
+          · simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq :
+                attemptContextualCompletionMulti? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact fun address member => induction reverse result selected
+                  (attemptContextualCompletionMulti?_used_mono forward reverse
+                    other pivot reverseEq (forwardMono member))
+
+private theorem processContextualItemMulti?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : processContextualItemMulti? owned item current = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold processContextualItemMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  exact fun address member =>
+    attemptContextualCompletionsWithMulti?_used_mono item _ scanned result
+      completedEq (attemptContextualScan?_used_mono owned predicted scanned item
+        scannedEq (attemptContextualPredictions?_used_mono item _ current
+          predicted predictedEq member))
+
+private theorem dequeueContextualItem?_units_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (selected : dequeueContextualItem? current = some result) :
+    result.2.counter.units = current.counter.units + 1 := by
+  unfold dequeueContextualItem? at selected
+  cases queueEq : current.payload.phaseC.itemQueue with
+  | nil => simp [queueEq] at selected
+  | cons item rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_units current _ _ nextEq
+
+private theorem dequeueContextualEdge?_units_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (selected : dequeueContextualEdge? current = some result) :
+    result.2.counter.units = current.counter.units + 1 := by
+  unfold dequeueContextualEdge? at selected
+  cases queueEq : current.payload.phaseC.edgeQueue with
+  | nil => simp [queueEq] at selected
+  | cons edge rest =>
+      simp only [queueEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_units current _ _ nextEq
+
+/-- One total queue step is an exact fixed point on a drained state; otherwise
+it consumes at least one globally unique primitive address. -/
+private theorem phaseCQueueStepMulti?_fixed_or_units_lt
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : phaseCQueueStepMulti? owned current = some result) :
+    (current.payload.phaseC.itemQueue = [] ∧
+      current.payload.phaseC.edgeQueue = [] ∧ result = current) ∨
+      current.counter.units < result.counter.units := by
+  cases items : current.payload.phaseC.itemQueue with
+  | nil =>
+      cases edges : current.payload.phaseC.edgeQueue with
+      | nil =>
+          simp only [phaseCQueueStepMulti?, items, edges,
+            Option.some.injEq] at selected
+          exact Or.inl ⟨rfl, rfl, selected.symm⟩
+      | cons edge rest =>
+          simp only [phaseCQueueStepMulti?, items, edges] at selected
+          cases dequeuedEq : dequeueContextualEdge? current with
+          | none => simp [dequeuedEq] at selected
+          | some dequeued =>
+              rw [dequeuedEq] at selected
+              cases selected
+              exact Or.inr (by
+                have exactUnits := dequeueContextualEdge?_units_exact current
+                  dequeued dequeuedEq
+                omega)
+  | cons item rest =>
+      simp only [phaseCQueueStepMulti?, items] at selected
+      cases dequeuedEq : dequeueContextualItem? current with
+      | none => simp [dequeuedEq] at selected
+      | some dequeued =>
+          rw [dequeuedEq] at selected
+          rcases dequeued with ⟨pivot, after⟩
+          simp only at selected
+          have exactUnits := dequeueContextualItem?_units_exact current
+            (pivot, after) dequeuedEq
+          simp only at exactUnits
+          have mono := Counter.units_le_of_used_subset after.counter
+            result.counter
+              (processContextualItemMulti?_used_mono owned pivot after result
+                selected)
+          exact Or.inr (by omega)
+
+end Solcore.Surface.Multi.Chart
