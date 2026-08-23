@@ -25253,3 +25253,174 @@ theorem executeObservedContextualWorklistMulti?_operational_sound
   exact ⟨invariant.1, invariant.2.2.1⟩
 
 end Solcore.Surface.Multi.Chart
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem phaseCQueueStepMulti?_operationalInvariant_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (invariant : PhaseCOperationalInvariant file tokens current.payload)
+    (selected : phaseCQueueStepMulti? owned current = some result) :
+    PhaseCOperationalInvariant file tokens result.payload ∧
+      result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  cases items : current.payload.phaseC.itemQueue with
+  | nil =>
+      cases edges : current.payload.phaseC.edgeQueue with
+      | nil =>
+          simp only [phaseCQueueStepMulti?, items, edges,
+            Option.some.injEq] at selected
+          cases selected
+          exact ⟨invariant, rfl⟩
+      | cons edge rest =>
+          simp only [phaseCQueueStepMulti?, items, edges] at selected
+          cases dequeuedEq : dequeueContextualEdge? current with
+          | none => simp [dequeuedEq] at selected
+          | some dequeued =>
+              rw [dequeuedEq] at selected
+              cases selected
+              exact ⟨dequeueContextualEdge?_operationalInvariant current
+                dequeued invariant dequeuedEq,
+                dequeueContextualEdge?_memo current dequeued dequeuedEq⟩
+  | cons item rest =>
+      simp only [phaseCQueueStepMulti?, items] at selected
+      cases dequeuedEq : dequeueContextualItem? current with
+      | none => simp [dequeuedEq] at selected
+      | some dequeued =>
+          rw [dequeuedEq] at selected
+          rcases dequeued with ⟨pivot, after⟩
+          simp only at selected
+          have afterSound := dequeueContextualItem?_operationalInvariant
+            current (pivot, after) invariant dequeuedEq
+          have afterMemo := dequeueContextualItem?_memo current
+            (pivot, after) dequeuedEq
+          have pivotReached : OperationalContextualReach file tokens
+              after.payload.phaseC.memo pivot := by
+            rw [afterMemo]
+            exact afterSound.1
+          have resultSound :=
+            processContextualItemMulti?_operationalInvariant owned pivot after
+              result afterSound.2 pivotReached selected
+          exact ⟨resultSound.1, resultSound.2.trans afterMemo⟩
+
+private theorem runPhaseCQueueStepsMulti?_operationalInvariant_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCOperationalInvariant file tokens current.payload →
+      runPhaseCQueueStepsMulti? owned fuel current = some result →
+      PhaseCOperationalInvariant file tokens result.payload ∧
+        result.payload.phaseC.memo = current.payload.phaseC.memo := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result invariant selected
+      cases selected
+      exact ⟨invariant, rfl⟩
+  | succ fuel induction =>
+      intro current result invariant selected
+      rw [runPhaseCQueueStepsMulti?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, runEq⟩
+      have nextSound := phaseCQueueStepMulti?_operationalInvariant_memo owned
+        current next invariant nextEq
+      have resultSound := induction next result nextSound.1 runEq
+      exact ⟨resultSound.1, resultSound.2.trans nextSound.2⟩
+
+private theorem executePhaseCWorklistMulti?_operationalInvariant_memo
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executePhaseCWorklistMulti? owned current = some result) :
+    PhaseCOperationalInvariant file tokens result.payload ∧
+      result.payload.phaseC.memo = current.payload.memo := by
+  unfold executePhaseCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  have runSound := runPhaseCQueueStepsMulti?_operationalInvariant_memo owned
+    (chartGBound (tokens.length + 1)) entered result
+      (beginPhaseCWorklist?_operationalInvariant current entered enteredEq)
+      runEq
+  exact ⟨runSound.1,
+    runSound.2.trans (beginPhaseCWorklist?_memo current entered enteredEq)⟩
+
+private theorem executeObservedPhaseABCWorklistMulti?_allFinal
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    AllGuardsFinal result.payload.phaseC.memo := by
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  have final := executeObservedPhaseAB?_allFinal file tokens owned phaseB
+    phaseBEq
+  have memoEq :=
+    (executePhaseCWorklistMulti?_operationalInvariant_memo owned phaseB
+      result phaseCEq).2
+  rw [memoEq]
+  exact final
+
+private theorem executeObservedPhaseABCWorklistMulti?_memo_eq_saturated
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    result.payload.phaseC.memo = saturatedGuardMemo owned := by
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  have memoPreserved :=
+    (executePhaseCWorklistMulti?_operationalInvariant_memo owned phaseB
+      result phaseCEq).2
+  let guardResult : GuardWorklistResult tokens := {
+    memo := phaseB.payload.memo
+  }
+  have guardSelected :
+      executeObservedGuardWorklist? file tokens owned = some guardResult := by
+    unfold executeObservedGuardWorklist?
+    rw [phaseBEq]
+    rfl
+  have canonical := executeObservedGuardWorklist?_memo_eq_saturated
+    file tokens owned guardResult guardSelected
+  exact memoPreserved.trans (by simpa [guardResult] using canonical)
+
+/-- Every successful total multi-ledger execution exposes a fully finalized
+guard memo. -/
+theorem executeObservedContextualWorklistMulti?_allGuardsFinal
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklistMulti? file tokens owned =
+      some result) :
+    AllGuardsFinal result.memo := by
+  unfold executeObservedContextualWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCWorklistMulti?_allFinal file tokens owned
+    internal internalEq
+
+/-- Phase C preserves the exact saturated guard memo through the total
+multi-ledger executor. -/
+theorem executeObservedContextualWorklistMulti?_memo_eq_saturated
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklistMulti? file tokens owned =
+      some result) :
+    result.memo = saturatedGuardMemo owned := by
+  unfold executeObservedContextualWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCWorklistMulti?_memo_eq_saturated
+    file tokens owned internal internalEq
+
+end Solcore.Surface.Multi.Chart
