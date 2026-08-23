@@ -9338,6 +9338,293 @@ private theorem moduleRefTailData_projects
   rcases member with ⟨pair, _pairMember, rfl⟩
   exact pair.2.pathProjection_projects
 
+/-- The module-reference executor realizes its exact root reduction. -/
+theorem executeModuleRefRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .moduleRef origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .moduleRef)) :
+    RuleReduction file tokens .moduleRef origin finish input
+      (executeModuleRefRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let pathAtom : EbnfExpr :=
+    .atom (.terminal (.category .pathComponent))
+  let tail := EbnfValue.terminalPairTailExpr
+    (.symbol .dot) (.category .pathComponent)
+  let externalChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .at)), pathAtom,
+    .atom (.terminal (.symbol .dot)), pathAtom, .star tail]
+  let localChildren : List EbnfExpr := [pathAtom, .star tail]
+  change EbnfValue file tokens
+    (.choice [.sequence externalChildren, .sequence localChildren]) at input
+  generalize viewEq : EbnfValue.choice2View
+    (.sequence externalChildren) (.sequence localChildren) input = viewed
+  have normalizedViewEq := viewEq
+  simp only [externalChildren, localChildren, pathAtom, tail] at normalizedViewEq
+  have inputEq := EbnfValue.choice2_of_view
+    (.sequence externalChildren) (.sequence localChildren) input
+  rw [viewEq] at inputEq
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases viewed with raw | raw
+  · let viewed := EbnfValue.sequenceFlatView externalChildren raw
+    change EbnfValue.choice
+      [.sequence externalChildren, .sequence localChildren]
+        ⟨0, raw⟩ = input at inputEq
+    let rawAt := viewed.1
+    let rawLibrary := viewed.2.1
+    let rawDot := viewed.2.2.1
+    let rawNext := viewed.2.2.2.1
+    let rawStar := viewed.2.2.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view externalChildren raw
+    have rawEq' : EbnfValue.sequence externalChildren
+        (EbnfValue.sequenceValuesBuild externalChildren
+          ⟨rawAt, rawLibrary, rawDot, rawNext, rawStar, ⟨⟩⟩) = raw :=
+      rawEq
+    let atToken := EbnfValue.terminalView (.symbol .at) rawAt
+    let library := EbnfValue.terminalView
+      (.category .pathComponent) rawLibrary
+    let dot := EbnfValue.terminalView (.symbol .dot) rawDot
+    let next := EbnfValue.terminalView
+      (.category .pathComponent) rawNext
+    let rawRest := EbnfValue.starView tail rawStar
+    let libraryData : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) ExternalLibraryName := {
+      matched := library
+      spelling := library.pathProjection.1
+      parsed := { segment := library.pathProjection.2 }
+    }
+    let nextData : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment := {
+      matched := next
+      spelling := next.pathProjection.1
+      parsed := next.pathProjection.2
+    }
+    let rest := rawRest.map (EbnfValue.terminalPairTailView
+      (.symbol .dot) (.category .pathComponent))
+    let restData := rest.map moduleRefTailData
+    have restValuesEq := moduleRefTailData_values rawRest
+    have restEq : EbnfValue.star tail
+        (restData.map fun entry =>
+          EbnfValue.terminalPairTailValue
+            (.symbol .dot) (.category .pathComponent)
+            (entry.1, entry.2.matched)) = rawStar := by
+      rw [restValuesEq]
+      exact EbnfValue.star_of_view tail rawStar
+    have libraryProjects : ExternalLibraryProjects libraryData.matched
+        libraryData.spelling libraryData.parsed := by
+      rcases library.pathProjection_projects with
+        ⟨token, valueEq, shape, parseEq⟩
+      refine ⟨token, valueEq, shape, ?_⟩
+      change (PathSegment.parse library.pathProjection.1).map
+        (fun segment => ({ segment } : ExternalLibraryName)) =
+          some { segment := library.pathProjection.2 }
+      rw [parseEq]
+      rfl
+    have nextProjects : PathSegmentProjects nextData.matched
+        nextData.spelling nextData.parsed :=
+      next.pathProjection_projects
+    have restProjects : ∀ entry, entry ∈ restData →
+        PathSegmentProjects entry.2.matched
+          entry.2.spelling entry.2.parsed :=
+      moduleRefTailData_projects rawRest
+    have resultEq : executeModuleRefRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.external
+          (RuleReduction.terminalLoc atToken .externalSigil)
+          (RuleReduction.terminalLoc libraryData.matched libraryData.parsed)
+          {
+            head := RuleReduction.terminalLoc nextData.matched nextData.parsed
+            tail := restData.map fun entry =>
+              RuleReduction.terminalLoc entry.2.matched entry.2.parsed
+          }) := by
+      simp [executeModuleRefRoot, normalizedViewEq, restData,
+        moduleRefTailData, rest, libraryData,
+        nextData, atToken, library, next, rawRest, rawAt, rawLibrary,
+        rawNext, rawStar, viewed, externalChildren, localChildren, pathAtom,
+        tail, witness, List.map_map, Function.comp_def,
+        executableTerminalLoc, RuleReduction.terminalLoc]
+    rw [resultEq, ← inputEq, ← rawEq',
+      ← EbnfValue.terminal_of_view (.symbol .at) rawAt,
+      ← EbnfValue.terminal_of_view (.category .pathComponent) rawLibrary,
+      ← EbnfValue.terminal_of_view (.symbol .dot) rawDot,
+      ← EbnfValue.terminal_of_view (.category .pathComponent) rawNext,
+      ← restEq]
+    exact .moduleRefExternal origin finish atToken libraryData dot nextData
+      restData (.externalSigil atToken) libraryProjects nextProjects
+      restProjects witness
+  · let viewed := EbnfValue.sequence2View pathAtom (.star tail) raw
+    change EbnfValue.choice
+      [.sequence externalChildren, .sequence localChildren]
+        ⟨1, raw⟩ = input at inputEq
+    let rawFirst := viewed.1
+    let rawStar := viewed.2
+    have rawEq := EbnfValue.sequence2_of_view pathAtom (.star tail) raw
+    have rawEq' : EbnfValue.sequence [pathAtom, .star tail]
+        (EbnfValues.cons pathAtom [.star tail] rawFirst
+          (EbnfValues.cons (.star tail) [] rawStar EbnfValues.nil)) = raw :=
+      rawEq
+    let first := EbnfValue.terminalView
+      (.category .pathComponent) rawFirst
+    let rawRest := EbnfValue.starView tail rawStar
+    let rest := rawRest.map (EbnfValue.terminalPairTailView
+      (.symbol .dot) (.category .pathComponent))
+    let firstData : RuleReduction.SpelledTerminalData file tokens
+        (.category .pathComponent) PathSegment := {
+      matched := first
+      spelling := first.pathProjection.1
+      parsed := first.pathProjection.2
+    }
+    let restData := rest.map moduleRefTailData
+    have restValuesEq := moduleRefTailData_values rawRest
+    have restEq : EbnfValue.star tail
+        (restData.map fun entry =>
+          EbnfValue.terminalPairTailValue
+            (.symbol .dot) (.category .pathComponent)
+            (entry.1, entry.2.matched)) = rawStar := by
+      rw [restValuesEq]
+      exact EbnfValue.star_of_view tail rawStar
+    have firstProjects : PathSegmentProjects firstData.matched
+        firstData.spelling firstData.parsed :=
+      first.pathProjection_projects
+    have restProjects : ∀ entry, entry ∈ restData →
+        PathSegmentProjects entry.2.matched
+          entry.2.spelling entry.2.parsed :=
+      moduleRefTailData_projects rawRest
+    by_cases standardEq : firstData.spelling = "std"
+    · have standardProjectionEq : first.pathProjection.1 = "std" :=
+        standardEq
+      let marker : RuleReduction.MarkerProjects file tokens
+          firstData.matched .standardRoot :=
+        .standardRoot firstData.matched firstData.parsed (by
+          simpa [standardEq] using firstProjects)
+      have resultEq : executeModuleRefRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness (.standard
+            (RuleReduction.terminalLoc firstData.matched .standardRoot)
+            (restData.map fun entry => RuleReduction.terminalLoc
+              entry.2.matched entry.2.parsed)) := by
+        simp [executeModuleRefRoot, normalizedViewEq, standardProjectionEq, firstData,
+          restData, moduleRefTailData, rest, first, rawRest,
+          rawFirst, rawStar, viewed, witness,
+          externalChildren, localChildren, pathAtom, tail, List.map_map,
+          Function.comp_def,
+          executableTerminalLoc, RuleReduction.terminalLoc]
+      rw [resultEq, ← inputEq, ← rawEq',
+        ← EbnfValue.terminal_of_view
+          (.category .pathComponent) rawFirst, ← restEq]
+      exact .moduleRefStandard origin finish firstData.matched restData
+        marker restProjects witness
+    · have standardProjectionNe : first.pathProjection.1 ≠ "std" :=
+        standardEq
+      by_cases libraryEq : firstData.spelling = "lib"
+      · have libraryProjectionEq : first.pathProjection.1 = "lib" :=
+          libraryEq
+        let marker : RuleReduction.MarkerProjects file tokens
+            firstData.matched .libraryRoot :=
+          .libraryRoot firstData.matched firstData.parsed (by
+            simpa [libraryEq] using firstProjects)
+        generalize restCaseEq : rest = selectedRest
+        cases selectedRest with
+        | nil =>
+            have normalizedRestCaseEq := restCaseEq
+            simp only [rest, rawRest, rawStar, viewed, pathAtom, tail] at normalizedRestCaseEq
+            have restDataEq : restData = [] := by
+              simp [restData, restCaseEq]
+            rw [restDataEq] at restEq
+            have resultEq : executeModuleRefRoot file tokens origin finish
+                ready.1 ready.2.1 input = sourceLoc witness (.relative {
+                  head := RuleReduction.terminalLoc
+                    firstData.matched firstData.parsed
+                  tail := []
+                }) := by
+              simp [executeModuleRefRoot, normalizedViewEq,
+                libraryProjectionEq, normalizedRestCaseEq,
+                firstData, first, rawFirst, viewed,
+                externalChildren, localChildren, pathAtom, tail, witness,
+                executableTerminalLoc,
+                RuleReduction.terminalLoc]
+            rw [resultEq, ← inputEq, ← rawEq',
+              ← EbnfValue.terminal_of_view
+                (.category .pathComponent) rawFirst, ← restEq]
+            exact .moduleRefRelativeLibraryEmpty origin finish firstData
+              firstProjects marker witness
+        | cons next remaining =>
+            have normalizedRestCaseEq := restCaseEq
+            simp only [rest, rawRest, rawStar, viewed, pathAtom, tail] at normalizedRestCaseEq
+            let nextData : RuleReduction.SpelledTerminalData file tokens
+                (.category .pathComponent) PathSegment := {
+              matched := next.2
+              spelling := next.2.pathProjection.1
+              parsed := next.2.pathProjection.2
+            }
+            let remainingData : List
+                (MatchedTerminal file tokens (.symbol .dot) ×
+                  RuleReduction.SpelledTerminalData file tokens
+                    (.category .pathComponent) PathSegment) :=
+              remaining.map fun entry => (entry.1, {
+                matched := entry.2
+                spelling := entry.2.pathProjection.1
+                parsed := entry.2.pathProjection.2
+              })
+            have restDataEq : restData =
+                (next.1, nextData) :: remainingData := by
+              simp [restData, moduleRefTailData, restCaseEq,
+                nextData, remainingData]
+            rw [restDataEq] at restEq
+            have nextProjects : PathSegmentProjects nextData.matched
+                nextData.spelling nextData.parsed :=
+              next.2.pathProjection_projects
+            have remainingProjects : ∀ entry, entry ∈ remainingData →
+                PathSegmentProjects entry.2.matched
+                  entry.2.spelling entry.2.parsed := by
+              intro entry member
+              simp only [remainingData, List.mem_map] at member
+              rcases member with ⟨entry, _entryMember, rfl⟩
+              exact entry.2.pathProjection_projects
+            have resultEq : executeModuleRefRoot file tokens origin finish
+                ready.1 ready.2.1 input = sourceLoc witness (.libraryRoot
+                  (RuleReduction.terminalLoc firstData.matched .libraryRoot) {
+                    head := RuleReduction.terminalLoc
+                      nextData.matched nextData.parsed
+                    tail := remainingData.map fun entry =>
+                      RuleReduction.terminalLoc
+                        entry.2.matched entry.2.parsed
+                  }) := by
+              simp [executeModuleRefRoot, normalizedViewEq,
+                libraryProjectionEq, normalizedRestCaseEq,
+                firstData, nextData, remainingData, first,
+                rawFirst, viewed, externalChildren,
+                localChildren, pathAtom, tail, witness,
+                List.map_map, Function.comp_def, executableTerminalLoc,
+                RuleReduction.terminalLoc]
+            rw [resultEq, ← inputEq, ← rawEq',
+              ← EbnfValue.terminal_of_view
+                (.category .pathComponent) rawFirst, ← restEq]
+            exact .moduleRefLibraryRoot origin finish firstData.matched
+              next.1 nextData remainingData marker nextProjects
+              remainingProjects witness
+      · have libraryProjectionNe : first.pathProjection.1 ≠ "lib" :=
+          libraryEq
+        have resultEq : executeModuleRefRoot file tokens origin finish
+            ready.1 ready.2.1 input = sourceLoc witness (.relative {
+              head := RuleReduction.terminalLoc
+                firstData.matched firstData.parsed
+              tail := restData.map fun entry => RuleReduction.terminalLoc
+                entry.2.matched entry.2.parsed
+            }) := by
+          simp [executeModuleRefRoot, normalizedViewEq,
+            standardProjectionNe, libraryProjectionNe,
+            firstData, restData, rest, first, rawRest, rawFirst, rawStar,
+            moduleRefTailData, viewed, externalChildren, localChildren,
+            pathAtom, tail, witness,
+            List.map_map,
+            Function.comp_def, executableTerminalLoc,
+            RuleReduction.terminalLoc]
+        rw [resultEq, ← inputEq, ← rawEq',
+          ← EbnfValue.terminal_of_view
+            (.category .pathComponent) rawFirst, ← restEq]
+        exact .moduleRefRelativeOther origin finish firstData restData
+          firstProjects restProjects standardEq libraryEq witness
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -9352,6 +9639,8 @@ theorem executeRootRule_reduces
   cases executable with
   | module => exact executeModuleRoot_reduces origin finish ready input
   | topItem => exact executeTopItemRoot_reduces origin finish ready input
+  | moduleRef =>
+      exact executeModuleRefRoot_reduces origin finish ready input
   | importDecl =>
       exact executeImportDeclRoot_reduces origin finish ready input
   | exportDecl =>
