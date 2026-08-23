@@ -7394,6 +7394,59 @@ theorem executeGenericPrefixRoot_reduces
       exact .genericPrefixContext origin finish forallClause
         predicates fatArrow witness
 
+/-- The forall-clause executor realizes its exact root reduction. -/
+theorem executeForallClauseRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .forallClause origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .forallClause)) :
+    RuleReduction file tokens .forallClause origin finish input
+      (executeForallClauseRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let forallAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .forallKw))
+  let binderAtom : EbnfExpr := .atom (.nonterminal .forallBinder)
+  let tail := EbnfValue.rulePairTailExpr .optionalComma .forallBinder
+  let dotAtom : EbnfExpr := .atom (.terminal (.symbol .dot))
+  change EbnfValue file tokens
+    (.sequence [forallAtom, binderAtom, .star tail, dotAtom]) at input
+  let viewed := EbnfValue.sequence4View
+    forallAtom binderAtom (.star tail) dotAtom input
+  let forallKw := EbnfValue.terminalView
+    (.hardKeyword .forallKw) viewed.1
+  let first := EbnfValue.ruleView .forallBinder viewed.2.1
+  let rawRest := EbnfValue.starView tail viewed.2.2.1
+  let rest := rawRest.map
+    (EbnfValue.rulePairTailView .optionalComma .forallBinder)
+  let dot := EbnfValue.terminalView (.symbol .dot) viewed.2.2.2
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence4_of_view
+    forallAtom binderAtom (.star tail) dotAtom input
+  have forallEq := EbnfValue.terminal_of_view
+    (.hardKeyword .forallKw) viewed.1
+  have firstEq := EbnfValue.rule_of_view .forallBinder viewed.2.1
+  have restMapEq : rest.map (EbnfValue.rulePairTailValue
+      .optionalComma .forallBinder) = rawRest := by
+    simp [rest, List.map_map, Function.comp_def,
+      EbnfValue.rulePairTailValue_of_view]
+  have restEq : EbnfValue.star tail
+      (rest.map (EbnfValue.rulePairTailValue
+        .optionalComma .forallBinder)) = viewed.2.2.1 := by
+    rw [restMapEq]
+    exact EbnfValue.star_of_view tail viewed.2.2.1
+  have dotEq := EbnfValue.terminal_of_view (.symbol .dot) viewed.2.2.2
+  have resultEq : executeForallClauseRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        binders := {
+          head := first
+          tail := rest.map Prod.snd
+        }
+      } := by
+    rfl
+  rw [resultEq, ← inputEq, ← forallEq, ← firstEq, ← restEq, ← dotEq]
+  exact .forallClause origin finish forallKw first rest dot witness
+
 /-- The export-item executor realizes its exact root reduction. -/
 theorem executeExportItemRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -7996,6 +8049,8 @@ theorem executeRootRule_reduces
   | pragmaDecl => exact executePragmaDeclRoot_reduces origin finish ready input
   | genericPrefix =>
       exact executeGenericPrefixRoot_reduces origin finish ready input
+  | forallClause =>
+      exact executeForallClauseRoot_reduces origin finish ready input
   | exportItem =>
       exact executeExportItemRoot_reduces origin finish ready input
   | constructorSelection =>
