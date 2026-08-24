@@ -11052,6 +11052,36 @@ def lookupReduction?
     Option (ContextualReductionValue file tokens item) :=
   lookupReductionIn? item state.reductions
 
+/-- Look up the reduction at the one canonical whole-input module item. -/
+def lookupModuleReduction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) :
+    Option (ContextualReductionValue file tokens
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)) :=
+  state.lookupReduction? (CanonicalCompleteRootItem tokens .module
+    (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)
+
+/-- Project the exact canonical module reduction to its public AST carrier. -/
+def lookupParsedModule?
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) :
+    Option ParsedModuleV1 :=
+  state.lookupModuleReduction?.map fun reduction => reduction.value
+
+/-- Module projection succeeds exactly from a retained canonical reduction. -/
+theorem lookupParsedModule?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (module : ParsedModuleV1) :
+    state.lookupParsedModule? = some module ↔
+      ∃ reduction,
+        state.lookupModuleReduction? = some reduction ∧
+          reduction.value = module := by
+  simp only [lookupParsedModule?, Option.map_eq_some_iff]
+  constructor <;> rintro ⟨reduction, selected, valueEq⟩ <;>
+    exact ⟨reduction, selected, valueEq⟩
+
 /-- Prefix deduplication uses only the contextual item identity. -/
 def prefixMemberBool
     {file : WorkspaceFile} {tokens : List Token}
