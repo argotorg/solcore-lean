@@ -30033,6 +30033,47 @@ private def phaseCQueueStepMulti?
           | some (_, afterDequeue) => some afterDequeue
       | [] => some current
 
+/-- One recognition queue step preserves every address reserved for semantic
+evaluation, whether it dequeues an item, an edge, or is already drained. -/
+private theorem phaseCQueueStepMulti?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : phaseCQueueStepMulti? owned current = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  cases items : current.payload.phaseC.itemQueue with
+  | nil =>
+      cases edges : current.payload.phaseC.edgeQueue with
+      | nil =>
+          simp only [phaseCQueueStepMulti?, items, edges,
+            Option.some.injEq] at selected
+          subst result
+          exact fresh
+      | cons edge rest =>
+          simp only [phaseCQueueStepMulti?, items, edges] at selected
+          cases dequeued : dequeueContextualEdge? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              simp only [Option.some.injEq] at selected
+              subst result
+              exact dequeueContextualEdge?_valueAddressesFresh current pair
+                fresh dequeued
+  | cons item rest =>
+      simp only [phaseCQueueStepMulti?, items] at selected
+      cases dequeued : dequeueContextualItem? current with
+      | none => simp [dequeued] at selected
+      | some pair =>
+          rw [dequeued] at selected
+          rcases pair with ⟨pivot, after⟩
+          simp only at selected
+          exact processContextualItemMulti?_valueAddressesFresh owned pivot
+            after result
+              (dequeueContextualItem?_valueAddressesFresh current
+                (pivot, after) fresh dequeued)
+              selected
+
 /-- Every one-step queue selection is total and jointly preserves operational
 soundness, address safety, and both multi-ledger coverage directions. -/
 private theorem phaseCQueueStepMulti?_total_invariants
@@ -30110,6 +30151,32 @@ private def runPhaseCQueueStepsMulti?
   | fuel + 1, current => do
       let next ← phaseCQueueStepMulti? owned current
       runPhaseCQueueStepsMulti? owned fuel next
+
+/-- The bounded recognition runner preserves the full semantic reserve at
+every fuel depth. -/
+private theorem runPhaseCQueueStepsMulti?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current result :
+      CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCValueAddressesFresh current.counter →
+      runPhaseCQueueStepsMulti? owned fuel current = some result →
+      PhaseCValueAddressesFresh result.counter := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result fresh selected
+      cases selected
+      exact fresh
+  | succ previous induction =>
+      intro current result fresh selected
+      rw [runPhaseCQueueStepsMulti?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      exact induction next result
+        (phaseCQueueStepMulti?_valueAddressesFresh owned current next fresh
+          nextEq)
+        resultEq
 
 private theorem runPhaseCQueueStepsMulti?_total_invariants
     {file : WorkspaceFile} {tokens : List Token}
@@ -30202,6 +30269,23 @@ private def executePhaseCWorklistMulti?
   let entered ← beginPhaseCWorklist? current
   runPhaseCQueueStepsMulti? owned (chartGBound (tokens.length + 1)) entered
 
+/-- Recognition execution preserves the semantic address reserve established
+by the A/B prefix. -/
+private theorem executePhaseCWorklistMulti?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : executePhaseCWorklistMulti? owned current = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold executePhaseCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueueStepsMulti?_valueAddressesFresh owned _ entered result
+    (beginPhaseCWorklist?_valueAddressesFresh current entered fresh enteredEq)
+    runEq
+
 private theorem executePhaseCWorklistMulti?_total_invariants
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -30236,6 +30320,23 @@ private def executeObservedPhaseABCWorklistMulti?
     Option (CountedState tokens (PhaseCWorklist file tokens)) := do
   let phaseB ← executeObservedPhaseAB? file tokens owned
   executePhaseCWorklistMulti? owned phaseB
+
+/-- The fully observed recognition run reaches saturation without consuming
+any address owned by the following semantic pass. -/
+private theorem executeObservedPhaseABCWorklistMulti?_valueAddressesFresh
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklistMulti?_valueAddressesFresh owned phaseB result
+    (executeObservedPhaseAB?_phaseCInitialFresh file tokens owned phaseB
+      phaseBEq).valueAddressesFresh
+    phaseCEq
 
 /-- Run semantic evaluation over the saturated multi-ledger recognition
 worklist without discarding the shared one-use counter. -/
