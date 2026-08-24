@@ -14471,3 +14471,75 @@ theorem executeObservedContextualWorklist?_completedNonAssociativeRootBool_eq_tr
     (completedNonAssociative_iff_value level candidate first).mpr completed⟩
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+namespace Chart
+
+namespace ContextualValueFrontierState
+
+/-- A selected canonical module projection from a coherent frontier is the
+matching declaratively coherent reduction. -/
+theorem lookupParsedModule?_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state : ContextualValueFrontierState file tokens)
+    (coherent : state.ValuesCoherent memo correct final)
+    (module : ParsedModuleV1)
+    (selected : state.lookupParsedModule? = some module) :
+    CoherentReduction file tokens memo correct final
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)
+      module := by
+  obtain ⟨reduction, reductionEq, valueEq⟩ :=
+    (state.lookupParsedModule?_eq_some_iff module).mp selected
+  have reductionCoherent := state.lookupReduction?_coherent
+    (CanonicalCompleteRootItem tokens .module
+      (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)
+    reduction coherent reductionEq
+  simpa only [valueEq] using reductionCoherent
+
+/-- A selected canonical module projection from a coherent frontier carries
+the complete declarative source-root certificate. -/
+theorem lookupParsedModule?_sourceBackedRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state : ContextualValueFrontierState file tokens)
+    (coherent : state.ValuesCoherent memo correct final)
+    (module : ParsedModuleV1)
+    (selected : state.lookupParsedModule? = some module) :
+    SourceBackedRoot file tokens module := by
+  have reduction := state.lookupParsedModule?_coherent coherent module selected
+  cases reduction with
+  | reduce item priorValues output reached complete coherentPrefix action =>
+      exact ⟨memo, correct, final, reached, complete,
+        .reduce _ priorValues _ reached complete coherentPrefix action⟩
+
+/-- A selected canonical module projection from a coherent frontier is a
+public parse result. -/
+theorem lookupParsedModule?_parses
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state : ContextualValueFrontierState file tokens)
+    (coherent : state.ValuesCoherent memo correct final)
+    (module : ParsedModuleV1)
+    (selected : state.lookupParsedModule? = some module) :
+    Parses file tokens module := by
+  exact .sourceBackedRoot file tokens module owned
+    (state.lookupParsedModule?_sourceBackedRoot coherent module selected)
+
+end ContextualValueFrontierState
+
+end Chart
+
+end Solcore.Surface.Multi
