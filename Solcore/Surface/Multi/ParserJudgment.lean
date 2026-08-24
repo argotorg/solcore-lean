@@ -19630,6 +19630,7 @@ end Solcore.Surface.Multi
 namespace Solcore.Surface.Multi
 
 open Grammar
+open Solcore.Workspace
 
 theorem g10NonAssociativeRootChild_isSequence
     (level : NonAssociativeLevel) (production : ProductionId)
@@ -19665,6 +19666,146 @@ theorem g10NonAssociativeRootChild_isSequence
   | list1 site => exact (impossible site (by decide)
       (NonterminalSymbol.aux.inj lhsEq)).elim
   | tail site branch => cases lhsEq
+
+/-- A reached dot-zero item has not advanced beyond its production origin. -/
+theorem contextualReach_zero_origin_eq_current
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (zero : item.raw.dot.val = 0) :
+    item.raw.origin = item.raw.current := by
+  induction reached with
+  | root => rfl
+  | predict => rfl
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      omega
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, complete, lhs, waitingAtShared,
+          finishedAtShared, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      omega
+
+/-- The completion entering one canonical nonassociative root has a unique
+shared boundary and sequence production even when the saturated chart retains
+multiple completion backpointers elsewhere. -/
+theorem g10NonAssociativeRoot_completion_backpointer
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {level : NonAssociativeLevel}
+    {origin finish : Boundary tokens}
+    {context : GuardContext tokens}
+    {leftWaiting leftFinished rightWaiting rightFinished :
+      ContextualItemKey tokens}
+    {leftShared rightShared : Boundary tokens}
+    (leftEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed leftWaiting leftFinished
+        (CanonicalCompleteRootItem tokens level.rule origin finish context)
+        leftShared))
+    (rightEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed rightWaiting rightFinished
+        (CanonicalCompleteRootItem tokens level.rule origin finish context)
+        rightShared)) :
+    leftShared = rightShared ∧
+      leftFinished.raw.production = rightFinished.raw.production := by
+  obtain ⟨leftWitness⟩ :=
+    packedEdge_completed_valid_iff.mp leftEdge.1.1
+  obtain ⟨rightWitness⟩ :=
+    packedEdge_completed_valid_iff.mp rightEdge.1.1
+  have leftWaitingProduction :
+      leftWaiting.raw.production = .root level.rule := by
+    exact leftWitness.advance.1.symm
+  have rightWaitingProduction :
+      rightWaiting.raw.production = .root level.rule := by
+    exact rightWitness.advance.1.symm
+  have leftWaitingDot : leftWaiting.raw.dot.val = 0 := by
+    have advanced := leftWitness.advance.2.1
+    change 1 = leftWaiting.raw.dot.val + 1 at advanced
+    omega
+  have rightWaitingDot : rightWaiting.raw.dot.val = 0 := by
+    have advanced := rightWitness.advance.2.1
+    change 1 = rightWaiting.raw.dot.val + 1 at advanced
+    omega
+  have leftWaitingOrigin : leftWaiting.raw.origin = origin := by
+    exact leftWitness.advance.2.2.1.symm
+  have rightWaitingOrigin : rightWaiting.raw.origin = origin := by
+    exact rightWitness.advance.2.2.1.symm
+  have leftOriginCurrent := contextualReach_zero_origin_eq_current
+    leftEdge.2.1 leftWaitingDot
+  have rightOriginCurrent := contextualReach_zero_origin_eq_current
+    rightEdge.2.1 rightWaitingDot
+  have leftSharedOrigin : leftShared = origin :=
+    leftWitness.waitingAtShared.symm.trans
+      (leftOriginCurrent.symm.trans leftWaitingOrigin)
+  have rightSharedOrigin : rightShared = origin :=
+    rightWitness.waitingAtShared.symm.trans
+      (rightOriginCurrent.symm.trans rightWaitingOrigin)
+  have sharedEq : leftShared = rightShared :=
+    leftSharedOrigin.trans rightSharedOrigin.symm
+  have leftFinishedLhs : leftFinished.raw.production.lhs =
+      .aux (GrammarSite.root level.rule) := by
+    let index : Nat := leftWaiting.raw.dot.val
+    have selected : some (GrammarSymbol.nonterminal
+          (.aux (GrammarSite.root level.rule))) =
+        some (GrammarSymbol.nonterminal leftFinished.raw.production.lhs) := by
+      calc
+        _ = (ProductionId.root level.rule).rhs[index]? := by
+          simp [index, leftWaitingDot, ProductionId.rhs]
+        _ = leftWaiting.raw.production.rhs[index]? :=
+          congrArg (fun production : ProductionId =>
+            production.rhs[index]?) leftWaitingProduction.symm
+        _ = leftWaiting.raw.production.rhs[leftWaiting.raw.dot.val]? := rfl
+        _ = _ := leftWitness.next.2
+    exact (GrammarSymbol.nonterminal.inj (Option.some.inj selected)).symm
+  have rightFinishedLhs : rightFinished.raw.production.lhs =
+      .aux (GrammarSite.root level.rule) := by
+    let index : Nat := rightWaiting.raw.dot.val
+    have selected : some (GrammarSymbol.nonterminal
+          (.aux (GrammarSite.root level.rule))) =
+        some (GrammarSymbol.nonterminal rightFinished.raw.production.lhs) := by
+      calc
+        _ = (ProductionId.root level.rule).rhs[index]? := by
+          simp [index, rightWaitingDot, ProductionId.rhs]
+        _ = rightWaiting.raw.production.rhs[index]? :=
+          congrArg (fun production : ProductionId =>
+            production.rhs[index]?) rightWaitingProduction.symm
+        _ = rightWaiting.raw.production.rhs[rightWaiting.raw.dot.val]? := rfl
+        _ = _ := rightWitness.next.2
+    exact (GrammarSymbol.nonterminal.inj (Option.some.inj selected)).symm
+  obtain ⟨leftSite, leftProduction⟩ :=
+    g10NonAssociativeRootChild_isSequence level
+      leftFinished.raw.production leftFinishedLhs
+  obtain ⟨rightSite, rightProduction⟩ :=
+    g10NonAssociativeRootChild_isSequence level
+      rightFinished.raw.production rightFinishedLhs
+  have leftSiteRoot : leftSite.site = GrammarSite.root level.rule := by
+    rw [leftProduction] at leftFinishedLhs
+    exact NonterminalSymbol.aux.inj leftFinishedLhs
+  have rightSiteRoot : rightSite.site = GrammarSite.root level.rule := by
+    rw [rightProduction] at rightFinishedLhs
+    exact NonterminalSymbol.aux.inj rightFinishedLhs
+  have siteEq : leftSite = rightSite := by
+    cases leftSite with
+    | mk leftRaw leftKind =>
+        cases rightSite with
+        | mk rightRaw rightKind =>
+            simp only at leftSiteRoot rightSiteRoot ⊢
+            have rawEq : leftRaw = rightRaw :=
+              leftSiteRoot.trans rightSiteRoot.symm
+            cases rawEq
+            rfl
+  subst rightSite
+  exact ⟨sharedEq, leftProduction.trans rightProduction.symm⟩
 
 theorem g10NonAssociative_rhs_eq (level : NonAssociativeLevel) :
     m2cV1.rhs level.rule = .sequence [
