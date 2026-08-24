@@ -12385,6 +12385,52 @@ private theorem attemptPhaseCValuePrediction?_units
         cases remainder
         exact Or.inr (Or.inl attemptedUnits)
 
+private theorem runPhaseCValueQueue?_queue_empty
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      runPhaseCValueQueue? owned fuel current = some result →
+        result.payload.frontier.queue = [] := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result selected
+      rw [runPhaseCValueQueue?] at selected
+      split at selected
+      · cases selected
+        rename_i condition
+        exact List.isEmpty_iff.mp condition
+      · contradiction
+  | succ previous induction =>
+      intro current result selected
+      rw [runPhaseCValueQueue?] at selected
+      cases queueEq : current.payload.frontier.queue with
+      | nil =>
+          simp only [queueEq] at selected
+          cases selected
+          exact queueEq
+      | cons item rest =>
+          simp only [queueEq, Option.bind_eq_bind,
+            Option.bind_eq_some_iff] at selected
+          rcases selected with ⟨dequeued, _dequeuedEq, processed,
+            _processingEq, runEq⟩
+          exact induction processed result runEq
+
+private theorem executePhaseCValueWorklist?_queue_empty
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : executePhaseCValueWorklist? owned current = some result) :
+    result.payload.frontier.queue = [] := by
+  unfold executePhaseCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, _enteredEq, runEq⟩
+  exact runPhaseCValueQueue?_queue_empty owned
+    (chartGBound (tokens.length + 1)) entered result runEq
+
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
