@@ -247,4 +247,85 @@ theorem executeObservedContextualValueWorklistMulti?_candidate_none_implies_notR
   rw [absent] at emitted
   contradiction
 
+/-- Every successful partial parse outcome emitted by semantic execution is a
+declaratively valid parse. -/
+theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_ok_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (module : ParsedModuleV1)
+    (outcome : result.parseOutcome? file = some (.ok module)) :
+    Parses file tokens module := by
+  have parsed :=
+    (Chart.ContextualValueWorklistResult.parseOutcome?_eq_some_ok_iff
+      file result module).mp outcome
+  exact executeObservedContextualValueWorklistMulti?_parses
+    file tokens owned result selected module parsed
+
+/-- Under only the local completed-shape invariant, every error already
+emitted by the partial parse outcome is declaratively applicable. -/
+theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_error_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (invariant :
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      CoherentNonAssociativeRootCompletedInvariant
+        file tokens result.recognition.memo correct final)
+    (diagnostic : ParseDiagnostic)
+    (outcome : result.parseOutcome? file = some (.error diagnostic)) :
+    ParseDiagnostic.Applies file tokens diagnostic := by
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  rcases
+      (Chart.ContextualValueWorklistResult.parseOutcome?_eq_some_error_iff
+        file result diagnostic).mp outcome with
+    ⟨parsedAbsent, repeated | ⟨repeatedAbsent, ordinary⟩⟩
+  have rootAbsent :
+      result.recognition.containsCompleteModuleRootItem = false := by
+    cases rootEq : result.recognition.containsCompleteModuleRootItem with
+    | false => rfl
+    | true =>
+        have parsedSome :=
+          (executeObservedContextualValueWorklistMulti?_parsedModule?_isSome_eq_true_iff_completeModuleRoot
+            file tokens owned result selected).mpr rootEq
+        simp [parsedAbsent] at parsedSome
+  · exact
+      executeObservedContextualValueWorklistMulti?_repeatedNonAssociativeDiagnosticCandidate?_applies
+        file tokens owned result selected rootAbsent diagnostic repeated
+  · have notRepeated :=
+      executeObservedContextualValueWorklistMulti?_candidate_none_implies_notRepeated
+        file tokens owned result selected invariant repeatedAbsent
+    cases diagnostic with
+    | unexpected span found expected =>
+        exact
+          executeObservedContextualWorklistMulti?_rootlessUnexpectedDiagnosticCandidate?_applies
+            file tokens owned result.recognition recognitionSelected
+              span found expected ordinary notRepeated
+    | repeatedNonAssociative span level operator =>
+        unfold Chart.ContextualWorklistResult.rootlessUnexpectedDiagnosticCandidate?
+          at ordinary
+        split at ordinary
+        · contradiction
+        · unfold Chart.ContextualWorklistResult.unexpectedDiagnosticCandidate?
+            at ordinary
+          simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at ordinary
+          rcases ordinary with ⟨frontier, _selectedFrontier, impossible⟩
+          cases frontier with
+          | mk frontierCursor frontierSpan frontierFound frontierExpected =>
+              cases frontierExpected <;>
+                simp [Chart.ObservedFrontier.unexpected?] at impossible
+
 end Solcore.Surface.Multi
