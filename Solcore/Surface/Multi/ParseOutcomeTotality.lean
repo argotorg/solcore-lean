@@ -324,6 +324,61 @@ theorem rootlessFrontierCertificateBool_eq_true_iff
   · rintro ⟨coverage, completion, prediction⟩
     exact ⟨⟨coverage, completion⟩, prediction⟩
 
+/-- Once reached match-arm contexts supply coverage, the only executable
+residual is the pair of grammar-rank tables. -/
+def rootlessRankCertificateBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (potential : FrontierGrammarPotential tokens) : Bool :=
+  let cursor := computedGreatestReachableCursor owned correct final
+  frontierCompletionRankTable owned correct final cursor potential &&
+    frontierPredictionRankTable owned correct final cursor potential
+
+/-- The reduced rank certificate is exact for its two finite tables. -/
+theorem rootlessRankCertificateBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (potential : FrontierGrammarPotential tokens) :
+    rootlessRankCertificateBool owned correct final potential = true ↔
+      let cursor := computedGreatestReachableCursor owned correct final
+      frontierCompletionRankTable
+          owned correct final cursor potential = true ∧
+        frontierPredictionRankTable
+          owned correct final cursor potential = true := by
+  simp [rootlessRankCertificateBool]
+
+/-- Reached match-arm readiness, two accepted rank tables, and post-EOF
+closure construct the full progress interface. -/
+theorem rootlessExecutableProgress_of_computedRankTables
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (ready : ∀ waiting : ContextualItemKey tokens,
+      ContextualReach file tokens memo correct final waiting →
+        MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted : rootlessRankCertificateBool
+      owned correct final potential = true)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  have ranks :=
+    (rootlessRankCertificateBool_eq_true_iff
+      owned correct final potential).mp accepted
+  exact rootlessExecutableProgress_of_computedFrontierTables owned
+    (frontierCoverageTable_eq_true_of_reached_matchArmReady owned
+      correct final (computedGreatestReachableCursor owned correct final)
+      ready)
+    potential ranks.1 ranks.2 postEof
+
 /-- For an observed recognition result, all remaining frontier components are
 four executable checks: coverage, two rank tables, and post-EOF closure. -/
 theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_checkedTablesAt
@@ -528,6 +583,46 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_fr
       checks.1 checks.2.1 checks.2.2
       (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true
         file tokens owned result selected)
+
+/-- For a selected recognition ledger, reached match-arm readiness and the
+two-table rank certificate are the complete remaining progress interface. -/
+theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+    (∀ waiting : ContextualItemKey tokens,
+      ContextualReach file tokens result.memo correct final waiting →
+        MatchArmPairContextReadyAt waiting) →
+    ∀ potential : FrontierGrammarPotential tokens,
+      rootlessRankCertificateBool owned correct final potential = true →
+      RootlessExecutableProgress
+        file tokens result.memo correct final := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  change (∀ waiting : ContextualItemKey tokens,
+      ContextualReach file tokens result.memo correct final waiting →
+        MatchArmPairContextReadyAt waiting) →
+    ∀ potential : FrontierGrammarPotential tokens,
+      rootlessRankCertificateBool owned correct final potential = true →
+      RootlessExecutableProgress file tokens result.memo correct final
+  intro ready potential accepted
+  have forcesRoot :=
+    (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true_iff
+      file tokens owned result selected).mp
+      (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true
+        file tokens owned result selected)
+  change PostLogicalEofTerminalWaitForcesRoot
+    file tokens result.memo correct final at forcesRoot
+  exact rootlessExecutableProgress_of_computedRankTables
+    owned ready potential accepted forcesRoot
 
 /-- The value-carrying executor inherits the reduced frontier certificate from
 its selected recognition ledger. -/
