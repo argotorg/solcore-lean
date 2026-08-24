@@ -19393,6 +19393,79 @@ private def PhaseCInitialFresh {tokens : List Token}
   ∀ address, phaseCInitialAddress address →
     address ∉ counter.usedRev
 
+/-- The broad Phase-C freshness boundary in particular reserves every address
+owned exclusively by the later semantic value traversal. -/
+private theorem PhaseCInitialFresh.valueAddressesFresh
+    {tokens : List Token} {counter : Counter tokens}
+    (fresh : PhaseCInitialFresh counter) :
+    PhaseCValueAddressesFresh counter := by
+  constructor
+  · intro item
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])
+    · intro predicted _member
+      exact fresh _ (by
+        simp [phaseCInitialAddress, contextualPredictionKey])
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])
+  · intro item
+    constructor
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualLinearKey])
+  · intro waiting finished
+    constructor
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualCompletionKey])
+    · exact fresh _ (by
+        simp [phaseCInitialAddress, contextualCompletionKey])
+
+/-- Recognition initialization consumes only L03, so every semantic-only
+address remains fresh in the entered recognition worklist. -/
+private theorem beginPhaseCWorklist?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : beginPhaseCWorklist? current = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  let address : UnitAddress tokens :=
+    .linear .L03_itemInsert (contextualLinearKey (contextualRoot tokens))
+  have usedEq := runMappedPrimitive?_usedRev current address _ entered
+    (by simpa [address] using enteredEq)
+  have preserve (target : UnitAddress tokens)
+      (different : target ≠ address)
+      (unused : target ∉ current.counter.usedRev) :
+      target ∉ entered.counter.usedRev := by
+    rw [usedEq]
+    simp [different, unused]
+  constructor
+  · intro item
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · exact preserve _ (by simp [address]) (fresh.source item).1
+    · intro predicted member
+      exact preserve _ (by simp [address])
+        ((fresh.source item).2.1 predicted member)
+    · exact preserve _ (by simp [address]) (fresh.source item).2.2.1
+    · exact preserve _ (by simp [address]) (fresh.source item).2.2.2
+  · intro item
+    exact ⟨preserve _ (by simp [address]) (fresh.candidate item).1,
+      preserve _ (by simp [address]) (fresh.candidate item).2⟩
+  · intro waiting finished
+    exact ⟨preserve _ (by simp [address])
+        (fresh.completion waiting finished).1,
+      preserve _ (by simp [address])
+        (fresh.completion waiting finished).2⟩
+
 private theorem PhaseAReservedFresh.phaseCInitialFresh
     {tokens : List Token} {counter : Counter tokens}
     (invariant : PhaseAReservedFresh counter) :
