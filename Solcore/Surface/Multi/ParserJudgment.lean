@@ -18563,6 +18563,89 @@ theorem contextualReach_guardContextOrderedAt
         _ ≤ finished.raw.current.val :=
           contextualReach_ordered finishedReached
 
+private theorem descendContext_eq_of_postfixRegion_not_root
+    {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (predicted : ProductionId)
+    (inRegion : predicted.sourceRule = .postfix ∨
+      predicted.sourceRule = .atom)
+    (notRoot : predicted ≠ .root .postfix) :
+    descendContext waiting predicted = waiting.context := by
+  rcases waiting with
+    ⟨⟨waitingProduction, waitingDot, waitingOrigin, waitingCurrent⟩,
+      waitingContext⟩
+  cases predicted with
+  | root rule =>
+      simp only [ProductionId.sourceRule] at inRegion
+      rcases inRegion with rfl | rfl
+      · exact (notRoot rfl).elim
+      · simp [descendContext, ProductionId.lhs]
+  | atom site
+  | seq site
+  | group site
+  | choice site branch
+  | opt site branch
+  | star site branch
+  | plus site branch
+  | list0 site branch
+  | list1 site =>
+      simp only [ProductionId.sourceRule] at inRegion
+      rcases inRegion with ruleEq | ruleEq <;>
+        cases waitingProduction <;>
+        simp [descendContext, ProductionId.lhs, GrammarSite.isAt,
+          ruleEq]
+  | tail site branch =>
+      simp [descendContext, ProductionId.lhs]
+
+/-- Every reached item inside the `postfix`/`atom` expansion region carries
+the postfix invocation context introduced when the postfix root was entered. -/
+theorem contextualReach_postfixRegion_context
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (inRegion : item.raw.production.sourceRule = .postfix ∨
+      item.raw.production.sourceRule = .atom) :
+    ∃ start, item.context = .postfixInvocation start := by
+  induction reached with
+  | root => simp [ProductionId.sourceRule] at inRegion
+  | predict waiting predicted reached next enabled induction =>
+      have member : GrammarSymbol.nonterminal predicted.lhs ∈
+          waiting.raw.production.rhs :=
+        List.mem_of_getElem? next.2
+      by_cases rootPostfix : predicted = .root .postfix
+      · subst predicted
+        exact ⟨waiting.raw.current, rfl⟩
+      · have waitingRegion :=
+          (ProductionId.enters_postfix_region_of_lhs_mem_rhs
+            waiting.raw.production predicted member inRegion).resolve_left
+              rootPostfix
+        rcases induction waitingRegion with ⟨start, contextEq⟩
+        refine ⟨start, ?_⟩
+        rw [descendContext_eq_of_postfixRegion_not_root
+          waiting predicted inRegion rootPostfix]
+        exact contextEq
+  | scan before after cursor reached structural induction =>
+      rcases structural with ⟨valid, contextEq⟩
+      rcases valid with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      rw [← contextEq]
+      apply induction
+      simpa only [production] using inRegion
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural with ⟨valid, finishedContext, afterContext⟩
+      rcases valid with
+        ⟨symbol, next, complete, lhs, waitingAt, finishedAt, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      rw [afterContext]
+      apply waitingInduction
+      simpa only [production] using inRegion
+
 private theorem enabledProductionInstance_of_guardless
     {file : WorkspaceFile} {tokens : List Token}
     {memo : GuardMemo tokens}
