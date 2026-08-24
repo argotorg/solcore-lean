@@ -35039,4 +35039,105 @@ private theorem processContextualItemMulti?_edgesNodup
     scanned.payload.phaseC.contextualItems scanned result scannedUnique
       completedEq
 
+private theorem phaseCQueueStepMulti?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : phaseCQueueStepMulti? owned current = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  cases items : current.payload.phaseC.itemQueue with
+  | nil =>
+      cases edges : current.payload.phaseC.edgeQueue with
+      | nil =>
+          simp only [phaseCQueueStepMulti?, items, edges,
+            Option.some.injEq] at selected
+          subst result
+          exact unique
+      | cons edge rest =>
+          simp only [phaseCQueueStepMulti?, items, edges] at selected
+          cases dequeued : dequeueContextualEdge? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              simp only [Option.some.injEq] at selected
+              subst result
+              exact dequeueContextualEdge?_edgesNodup current pair unique
+                dequeued
+  | cons item rest =>
+      simp only [phaseCQueueStepMulti?, items] at selected
+      cases dequeued : dequeueContextualItem? current with
+      | none => simp [dequeued] at selected
+      | some pair =>
+          rw [dequeued] at selected
+          rcases pair with ⟨pivot, after⟩
+          simp only at selected
+          exact processContextualItemMulti?_edgesNodup owned pivot after
+            result (dequeueContextualItem?_edgesNodup current
+              (pivot, after) unique dequeued) selected
+
+private theorem runPhaseCQueueStepsMulti?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      current.payload.phaseC.contextualEdges.Nodup →
+      runPhaseCQueueStepsMulti? owned fuel current = some result →
+      result.payload.phaseC.contextualEdges.Nodup := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result unique selected
+      cases selected
+      exact unique
+  | succ previous induction =>
+      intro current result unique selected
+      rw [runPhaseCQueueStepsMulti?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      exact induction next result
+        (phaseCQueueStepMulti?_edgesNodup owned current next unique nextEq)
+        resultEq
+
+private theorem executePhaseCWorklistMulti?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executePhaseCWorklistMulti? owned current = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold executePhaseCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueueStepsMulti?_edgesNodup owned _ entered result
+    (beginPhaseCWorklist?_edgesNodup current entered enteredEq) runEq
+
+private theorem executeObservedPhaseABCWorklistMulti?_edgesNodup
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, _phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklistMulti?_edgesNodup owned phaseB result phaseCEq
+
+/-- A successful total recognition run exposes every retained checked edge at
+most once. -/
+theorem executeObservedContextualWorklistMulti?_edges_nodup
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualWorklistResult file tokens)
+    (selected : executeObservedContextualWorklistMulti? file tokens owned =
+      some result) :
+    result.edges.Nodup := by
+  unfold executeObservedContextualWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCWorklistMulti?_edgesNodup
+    file tokens owned internal internalEq
+
 end Solcore.Surface.Multi.Chart
