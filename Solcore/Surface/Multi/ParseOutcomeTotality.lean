@@ -529,6 +529,40 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_fr
       (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true
         file tokens owned result selected)
 
+/-- The value-carrying executor inherits the reduced frontier certificate from
+its selected recognition ledger. -/
+theorem executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result.recognition recognitionSelected
+    ∀ potential : FrontierGrammarPotential tokens,
+      rootlessFrontierCertificateBool owned correct final potential = true →
+      RootlessExecutableProgress
+        file tokens result.recognition.memo correct final := by
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  change ∀ potential : FrontierGrammarPotential tokens,
+    rootlessFrontierCertificateBool owned correct final potential = true →
+    RootlessExecutableProgress
+      file tokens result.recognition.memo correct final
+  exact
+    executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
+      file tokens owned result.recognition recognitionSelected
+
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
@@ -645,6 +679,38 @@ def executeObservedContextualParseOfProgress
     (executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
       file tokens owned result selected progress)
 
+/-- Executable parse outcome driven directly by the reduced three-table
+frontier certificate. -/
+def executeObservedContextualParseOfFrontierCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      rootlessFrontierCertificateBool
+        owned correct final potential = true) :
+    Except ParseDiagnostic ParsedModuleV1 :=
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  executeObservedContextualParseOfProgress file tokens owned
+    (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
+      file tokens owned result selected potential accepted)
+
 /-- The certificate-driven executable outcome is exactly the value selected
 by the option-based implementation. -/
 theorem executeObservedContextualParseOfProgress_selected
@@ -682,6 +748,41 @@ theorem executeObservedContextualParseOfProgress_selected
           file tokens owned)
         progress,
     rfl⟩
+
+/-- The certificate-driven entry point selects exactly the implementation's
+option result. -/
+theorem executeObservedContextualParseOfFrontierCertificate_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      rootlessFrontierCertificateBool
+        owned correct final potential = true) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    result.parseOutcome? file =
+      some (executeObservedContextualParseOfFrontierCertificate
+        file tokens owned potential accepted) := by
+  exact executeObservedContextualParseOfProgress_selected file tokens owned
+    (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
+      file tokens owned
+        (Chart.executeObservedContextualValueWorklistMulti file tokens owned)
+        (Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned)
+        potential accepted)
 
 /-- The certificate-driven executable result is declaratively sound: modules
 parse, and diagnostics apply to the supplied source. -/
@@ -745,5 +846,57 @@ theorem executeObservedContextualParseOfProgress_sound
       exact
         executeObservedContextualValueWorklistMulti?_parseOutcome?_error_sound
           file tokens owned result selected invariant diagnostic outcomeSelected
+
+/-- The reduced-certificate entry point inherits declarative soundness from
+the proof-driven total executor. -/
+theorem executeObservedContextualParseOfFrontierCertificate_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      rootlessFrontierCertificateBool
+        owned correct final potential = true)
+    (invariant :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      CoherentNonAssociativeRootCompletedInvariant
+        file tokens result.recognition.memo correct final) :
+    match executeObservedContextualParseOfFrontierCertificate
+        file tokens owned potential accepted with
+    | .ok module => Parses file tokens module
+    | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
+  unfold executeObservedContextualParseOfFrontierCertificate
+  exact executeObservedContextualParseOfProgress_sound file tokens owned
+    (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
+      file tokens owned
+        (Chart.executeObservedContextualValueWorklistMulti file tokens owned)
+        (Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned)
+        potential accepted)
+    invariant
 
 end Solcore.Surface.Multi
