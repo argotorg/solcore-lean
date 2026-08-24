@@ -27738,6 +27738,146 @@ private theorem attemptPhaseCRetainedCompletedEdges?_total_processing
       current result safe present notQueued selected
   exact ⟨result, selected, resultSafe, resultPresent, resultNotQueued⟩
 
+/-- One dequeued semantic source runs through prediction, retained scans, and
+retained completions while preserving the frontier invariants required by the
+next runner iteration. -/
+private theorem processPhaseCValueItem?_total_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (unique : current.payload.recognition.phaseC.contextualEdges.Nodup)
+    (operational : PhaseCOperationalInvariant file tokens
+      current.payload.recognition)
+    (closed : OperationalContextualClosure file tokens
+      current.payload.recognition.phaseC.memo
+      current.payload.recognition.phaseC.contextualItems
+      current.payload.recognition.phaseC.contextualEdges)
+    (sourceMember : source ∈
+      current.payload.recognition.phaseC.contextualItems)
+    (safe : PhaseCValueAddressSafe current)
+    (present : current.payload.frontier.prefixMemberBool source = true)
+    (notQueued : source ∉ current.payload.frontier.queue)
+    (fresh : PhaseCValueProcessingFresh current.counter source)
+    (queueNodup : current.payload.frontier.queue.Nodup)
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (recognized : PhaseCValueQueueRecognized current) :
+    ∃ result,
+      processPhaseCValueItem? owned source current = some result ∧
+        result.payload.recognition = current.payload.recognition ∧
+        PhaseCValueAddressSafe result ∧
+        result.payload.frontier.prefixMemberBool source = true ∧
+        source ∉ result.payload.frontier.queue ∧
+        result.payload.frontier.queue.Nodup ∧
+        result.payload.frontier.queuePrefixesAvailable = true ∧
+        PhaseCValueQueueRecognized result := by
+  obtain ⟨predicted, predictedEq, predictedSafe, predictedPresent,
+      predictedNotQueued, predictedFresh⟩ :=
+    attemptPhaseCValuePredictions?_total_processing owned current source safe
+      present notQueued fresh
+  have predictedRecognition :=
+    attemptPhaseCValuePredictions?_recognition owned source allProductionIds
+      current predicted predictedEq
+  have predictedUnique :
+      predicted.payload.recognition.phaseC.contextualEdges.Nodup := by
+    rw [predictedRecognition]
+    exact unique
+  have predictedNodup : predicted.payload.frontier.queue.Nodup :=
+    attemptPhaseCValuePredictions?_queueNodup owned source allProductionIds
+      current predicted queueNodup available predictedEq
+  have predictedAvailable :
+      predicted.payload.frontier.queuePrefixesAvailable = true :=
+    attemptPhaseCValuePredictions?_queuePrefixesAvailable owned source
+      allProductionIds current predicted available predictedEq
+  have predictedRecognized : PhaseCValueQueueRecognized predicted :=
+    attemptPhaseCValuePredictions?_queueRecognized owned source
+      allProductionIds current predicted recognized predictedEq
+  have predictedTargets : ∀ packed,
+      packed ∈ predicted.payload.recognition.phaseC.contextualEdges →
+      PhaseCRecognitionEdgeTargetMember predicted packed := by
+    intro packed member
+    unfold PhaseCRecognitionEdgeTargetMember
+    rw [predictedRecognition] at member ⊢
+    exact operational.retained_target_member closed packed member
+  have ordered := operational.source_ordered source sourceMember
+  obtain ⟨scanned, scannedEq, scannedSafe, scannedPresent,
+      scannedNotQueued⟩ :=
+    attemptPhaseCRetainedScannedEdges?_total_processing owned source
+      predicted.payload.recognition.phaseC.contextualEdges predicted
+        predictedUnique ordered predictedSafe predictedPresent
+          predictedNotQueued predictedFresh
+  have scannedRecognition :=
+    attemptPhaseCRetainedScannedEdges?_recognition owned source
+      predicted.payload.recognition.phaseC.contextualEdges predicted scanned
+        scannedEq
+  have scannedUnique :
+      scanned.payload.recognition.phaseC.contextualEdges.Nodup := by
+    rw [scannedRecognition, predictedRecognition]
+    exact unique
+  have scannedNodup : scanned.payload.frontier.queue.Nodup :=
+    attemptPhaseCRetainedScannedEdges?_queueNodup owned source
+      predicted.payload.recognition.phaseC.contextualEdges predicted scanned
+        predictedNodup predictedAvailable scannedEq
+  have scannedAvailable :
+      scanned.payload.frontier.queuePrefixesAvailable = true :=
+    attemptPhaseCRetainedScannedEdges?_queuePrefixesAvailable owned source
+      predicted.payload.recognition.phaseC.contextualEdges predicted scanned
+        predictedAvailable scannedEq
+  have scannedRecognized : PhaseCValueQueueRecognized scanned :=
+    attemptPhaseCRetainedScannedEdges?_queueRecognized owned source
+      predicted.payload.recognition.phaseC.contextualEdges predicted scanned
+        predictedRecognized predictedTargets scannedEq
+  have scannedTargets : ∀ packed,
+      packed ∈ scanned.payload.recognition.phaseC.contextualEdges →
+      PhaseCRecognitionEdgeTargetMember scanned packed := by
+    intro packed member
+    unfold PhaseCRecognitionEdgeTargetMember
+    rw [scannedRecognition, predictedRecognition] at member ⊢
+    exact operational.retained_target_member closed packed member
+  have completionGeometry : ∀ packed,
+      packed ∈ scanned.payload.recognition.phaseC.contextualEdges →
+      PhaseCCompletionGeometryReady scanned source packed := by
+    intro packed member
+    have currentMember : packed ∈
+        current.payload.recognition.phaseC.contextualEdges := by
+      rw [scannedRecognition, predictedRecognition] at member
+      exact member
+    have ready := operational.completion_ready source packed currentMember
+    rcases packed with ⟨key, structural⟩
+    cases key with
+    | scanned before after cursor => trivial
+    | completed waiting finished after shared =>
+        intro relevant
+        obtain ⟨waitingOrdered, finishedOrdered, moduleReady⟩ :=
+          ready relevant
+        exact ⟨waitingOrdered, finishedOrdered,
+          fun _absent production => moduleReady production⟩
+  obtain ⟨result, completedEq, resultSafe, resultPresent,
+      resultNotQueued⟩ :=
+    attemptPhaseCRetainedCompletedEdges?_total_processing owned source
+      scanned.payload.recognition.phaseC.contextualEdges scanned scannedUnique
+        scannedSafe scannedPresent scannedNotQueued completionGeometry
+  have resultNodup : result.payload.frontier.queue.Nodup :=
+    attemptPhaseCRetainedCompletedEdges?_queueNodup owned source
+      scanned.payload.recognition.phaseC.contextualEdges scanned result
+        scannedNodup scannedAvailable completedEq
+  have resultAvailable :
+      result.payload.frontier.queuePrefixesAvailable = true :=
+    attemptPhaseCRetainedCompletedEdges?_queuePrefixesAvailable owned source
+      scanned.payload.recognition.phaseC.contextualEdges scanned result
+        scannedAvailable completedEq
+  have resultRecognized : PhaseCValueQueueRecognized result :=
+    attemptPhaseCRetainedCompletedEdges?_queueRecognized owned source
+      scanned.payload.recognition.phaseC.contextualEdges scanned result
+        scannedRecognized scannedTargets completedEq
+  have selected : processPhaseCValueItem? owned source current = some result := by
+    simp [processPhaseCValueItem?, predictedEq, scannedEq, completedEq]
+  exact ⟨result, selected,
+    processPhaseCValueItem?_recognition owned source current result selected,
+    resultSafe, resultPresent, resultNotQueued, resultNodup,
+    resultAvailable, resultRecognized⟩
+
 private theorem chargeContextualPrediction_itemSafe
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
