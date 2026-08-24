@@ -7,6 +7,7 @@ import Solcore.Surface.Multi.NonAssociativeInvariantBridge
 import Solcore.Surface.Multi.NonAssociativeOptionalStrict
 import Solcore.Surface.Multi.OperandBoundaryExclusion
 import Solcore.Surface.Multi.ParseOutcomeTotality
+import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
 import Solcore.Surface.Multi.RootlessNormalizationRank
 
 set_option autoImplicit false
