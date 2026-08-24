@@ -34364,6 +34364,61 @@ def RecognitionPrefixesMaterialized
   ∀ item, item ∈ result.recognition.items →
     result.frontier.prefixMemberBool item = true
 
+/-- A semantic frontier is pending-closed when every enabled transition from
+an available value has either published its target or still has an endpoint
+waiting in the FIFO queue. This certificate collapses to full materialization
+once the public queue is drained. -/
+structure RecognitionMaterializationPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens) : Prop where
+  root : result.frontier.prefixMemberBool {
+    raw := {
+      production := .root .module
+      dot := ⟨0, Nat.zero_lt_succ _⟩
+      origin := Boundary.start tokens
+      current := Boundary.start tokens
+    }
+    context := .plain
+  } = true
+  predict : ∀ (waiting : ContextualItemKey tokens)
+      (predicted : ProductionId),
+    waiting ∈ result.recognition.items →
+    result.frontier.prefixMemberBool waiting = true →
+    ∀ (_next : NextSymbol waiting.raw (.nonterminal predicted.lhs)),
+      MemoEnablesProduction result.recognition.memo {
+        production := predicted
+        origin := waiting.raw.current
+        context := descendContext waiting predicted
+      } →
+      result.frontier.prefixMemberBool {
+        raw := {
+          production := predicted
+          dot := ⟨0, Nat.zero_lt_succ _⟩
+          origin := waiting.raw.current
+          current := waiting.raw.current
+        }
+        context := descendContext waiting predicted
+      } = true ∨ waiting ∈ result.frontier.queue
+  scan : ∀ (retained : StructurallyValidContextualPackedEdge file tokens)
+      (before after : ContextualItemKey tokens)
+      (cursor : TerminalCursor tokens),
+    retained ∈ result.recognition.edges →
+    retained.val = .scanned before after cursor →
+    result.frontier.prefixMemberBool before = true →
+    result.frontier.prefixMemberBool after = true ∨
+      before ∈ result.frontier.queue
+  complete : ∀
+      (retained : StructurallyValidContextualPackedEdge file tokens)
+      (waiting finished after : ContextualItemKey tokens)
+      (shared : Boundary tokens),
+    retained ∈ result.recognition.edges →
+    retained.val = .completed waiting finished after shared →
+    result.frontier.prefixMemberBool waiting = true →
+    (result.frontier.lookupReduction? finished).isSome = true →
+    result.frontier.prefixMemberBool after = true ∨
+      waiting ∈ result.frontier.queue ∨
+      finished ∈ result.frontier.queue
+
 /-- Materialization exposes the semantic prefix at the canonical completed
 module item whenever recognition reports that item. -/
 theorem completeModuleRoot_prefixMemberBool_eq_true
