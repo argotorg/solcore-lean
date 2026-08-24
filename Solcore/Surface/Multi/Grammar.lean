@@ -188,58 +188,58 @@ inductive EbnfExpr where
 structure EbnfGrammar where
   rhs : GrammarRuleId → EbnfExpr
 
-private def terminal (value : TerminalSymbol) : EbnfExpr :=
+def terminal (value : TerminalSymbol) : EbnfExpr :=
   .atom (.terminal value)
 
-private def hardKeyword (keyword : HardKeyword) : EbnfExpr :=
+def hardKeyword (keyword : HardKeyword) : EbnfExpr :=
   terminal (.hardKeyword keyword)
 
-private def contextualKeyword (keyword : ContextualKeyword) : EbnfExpr :=
+def contextualKeyword (keyword : ContextualKeyword) : EbnfExpr :=
   terminal (.contextualKeyword keyword)
 
-private def pragmaName (kind : PragmaKind) : EbnfExpr :=
+def pragmaName (kind : PragmaKind) : EbnfExpr :=
   terminal (.pragmaName kind)
 
-private def symbol (value : Symbol) : EbnfExpr :=
+def symbol (value : Symbol) : EbnfExpr :=
   terminal (.symbol value)
 
-private def category (value : TerminalCategory) : EbnfExpr :=
+def category (value : TerminalCategory) : EbnfExpr :=
   terminal (.category value)
 
-private def nonterminal (rule : GrammarRuleId) : EbnfExpr :=
+def nonterminal (rule : GrammarRuleId) : EbnfExpr :=
   .atom (.nonterminal rule)
 
-private def sequence (children : List EbnfExpr) : EbnfExpr :=
+def sequence (children : List EbnfExpr) : EbnfExpr :=
   .sequence children
 
-private def choice (branches : List EbnfExpr) : EbnfExpr :=
+def choice (branches : List EbnfExpr) : EbnfExpr :=
   .choice branches
 
-private def group (child : EbnfExpr) : EbnfExpr :=
+def group (child : EbnfExpr) : EbnfExpr :=
   .group child
 
-private def optional (child : EbnfExpr) : EbnfExpr :=
+def optional (child : EbnfExpr) : EbnfExpr :=
   .optional child
 
-private def star (child : EbnfExpr) : EbnfExpr :=
+def star (child : EbnfExpr) : EbnfExpr :=
   .star child
 
-private def plus (child : EbnfExpr) : EbnfExpr :=
+def plus (child : EbnfExpr) : EbnfExpr :=
   .plus child
 
-private def list0 (element : EbnfExpr) : EbnfExpr :=
+def list0 (element : EbnfExpr) : EbnfExpr :=
   .list0 element
 
-private def list1 (element : EbnfExpr) : EbnfExpr :=
+def list1 (element : EbnfExpr) : EbnfExpr :=
   .list1 element
 
-private def identifier : EbnfExpr :=
+def identifier : EbnfExpr :=
   category .identifier
 
-private def pathComponent : EbnfExpr :=
+def pathComponent : EbnfExpr :=
   category .pathComponent
 
-private def m2cV1Rhs : GrammarRuleId → EbnfExpr
+def m2cV1Rhs : GrammarRuleId → EbnfExpr
   | .module =>
       sequence [star (nonterminal .topItem), terminal .endOfFile]
   | .topItem =>
