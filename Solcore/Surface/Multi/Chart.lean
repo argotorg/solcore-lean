@@ -22691,6 +22691,199 @@ private theorem attemptPhaseCCompletedEdge?_preserves_unrelated_fresh
     cases selected
     exact fresh
 
+/-- The frontier selected by any prepared candidate contains its exact target,
+including the duplicate branch that returns the original frontier. -/
+private theorem insertCandidate?_published_item_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    (match candidate.kind with
+      | .duplicate => state
+      | .insertedIncomplete => candidate.state
+      | .insertedComplete => candidate.state).prefixMemberBool item = true := by
+  unfold ContextualValueFrontierState.insertCandidate? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact present
+  next absent =>
+    split at selected
+    next complete =>
+      cases reductionEq : ContextualReductionValue.reduce? owned item prior with
+      | none => simp [reductionEq] at selected
+      | some reduction =>
+          rw [reductionEq] at selected
+          cases selected
+          rw [insertReduction_prefixMemberBool]
+          exact (insertPrefix_prefixMemberBool_eq_true_iff
+            state item item prior).2 (Or.inr rfl)
+    next incomplete =>
+      cases selected
+      exact (insertPrefix_prefixMemberBool_eq_true_iff
+        state item item prior).2 (Or.inr rfl)
+
+/-- If one completion leaves a target absent, it could not have selected that
+target's L09 insertion; hence a previously fresh target L09 remains fresh. -/
+private theorem attemptPhaseCCompletedEdge?_preserves_insert_fresh_of_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (fresh : (.linear .L09_frontierInsert
+      (contextualLinearKey target) : UnitAddress tokens) ∉
+        current.counter.usedRev)
+    (absent : result.payload.frontier.prefixMemberBool target = false)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    (.linear .L09_frontierInsert
+      (contextualLinearKey target) : UnitAddress tokens) ∉
+        result.counter.usedRev := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with rfl | active
+  · exact fresh
+  · rcases active with ⟨prior, child, rebuilt, candidate, relevant,
+      prefixEq, reductionEq, attemptFresh, rebuiltEq, candidateEq,
+      frontierEq⟩
+    have targetNe : target ≠ edge.after := by
+      intro equal
+      subst target
+      have present : result.payload.frontier.prefixMemberBool edge.after =
+          true := by
+        rw [frontierEq]
+        exact insertCandidate?_published_item_present owned
+          current.payload.frontier edge.after _ candidate candidateEq
+      rw [present] at absent
+      contradiction
+    apply attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned source
+      edge current result
+        (.linear .L09_frontierInsert (contextualLinearKey target))
+    · simp
+    · simp
+    · simp
+    · intro equal
+      simp only [UnitAddress.linear.injEq] at equal
+      exact targetNe (contextualLinearKey_injective equal.2)
+    · exact fresh
+    · exact selected
+
+/-- Completion processing only grows prefix membership, so absence after the
+attempt implies absence before it. -/
+private theorem attemptPhaseCCompletedEdge?_prefix_absent_before
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (absent : result.payload.frontier.prefixMemberBool target = false)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    current.payload.frontier.prefixMemberBool target = false := by
+  cases present : current.payload.frontier.prefixMemberBool target with
+  | false => rfl
+  | true =>
+      have retained := attemptPhaseCCompletedEdge?_preserves_prefix_present
+        owned source target edge current result present selected
+      rw [absent] at retained
+      contradiction
+
+/-- A completed-edge attempt preserves the exact freshness bundle needed by
+a different future completion. The future U06 premise is contravariant via
+used-list monotonicity; L09 uses result-side target absence. -/
+private theorem attemptPhaseCCompletedEdge?_preserves_completion_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (head future : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (different : contextualCompletionKey future.waiting future.finished ≠
+      contextualCompletionKey head.waiting head.finished)
+    (fresh :
+      (.cubic .U06_frontierCompletion
+          (contextualCompletionKey future.waiting future.finished) :
+        UnitAddress tokens) ∉ current.counter.usedRev →
+      (.cubic .U07_frontierCompletedTraversal
+          (contextualCompletionKey future.waiting future.finished) :
+        UnitAddress tokens) ∉ current.counter.usedRev ∧
+      (current.payload.frontier.prefixMemberBool future.after = false →
+        (.linear .L09_frontierInsert
+            (contextualLinearKey future.after) : UnitAddress tokens) ∉
+              current.counter.usedRev ∧
+        (CompleteItem future.after.raw →
+          (.cubic .U05_completedAction
+              (contextualCompletionKey future.waiting future.finished) :
+            UnitAddress tokens) ∉ current.counter.usedRev)))
+    (selected : attemptPhaseCCompletedEdge? owned source head current =
+      some result) :
+    (.cubic .U06_frontierCompletion
+        (contextualCompletionKey future.waiting future.finished) :
+      UnitAddress tokens) ∉ result.counter.usedRev →
+    (.cubic .U07_frontierCompletedTraversal
+        (contextualCompletionKey future.waiting future.finished) :
+      UnitAddress tokens) ∉ result.counter.usedRev ∧
+    (result.payload.frontier.prefixMemberBool future.after = false →
+      (.linear .L09_frontierInsert
+          (contextualLinearKey future.after) : UnitAddress tokens) ∉
+            result.counter.usedRev ∧
+      (CompleteItem future.after.raw →
+        (.cubic .U05_completedAction
+            (contextualCompletionKey future.waiting future.finished) :
+          UnitAddress tokens) ∉ result.counter.usedRev)) := by
+  intro resultU06Fresh
+  have currentU06Fresh :
+      (.cubic .U06_frontierCompletion
+          (contextualCompletionKey future.waiting future.finished) :
+        UnitAddress tokens) ∉ current.counter.usedRev := by
+    intro used
+    exact resultU06Fresh
+      (attemptPhaseCCompletedEdge?_used_mono owned source head current result
+        selected used)
+  obtain ⟨currentU07Fresh, currentConditional⟩ := fresh currentU06Fresh
+  constructor
+  · apply attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned source
+      head current result
+        (.cubic .U07_frontierCompletedTraversal
+          (contextualCompletionKey future.waiting future.finished))
+    · simp
+    · intro equal
+      simp only [UnitAddress.cubic.injEq] at equal
+      exact different equal.2
+    · simp
+    · simp
+    · exact currentU07Fresh
+    · exact selected
+  · intro resultAbsent
+    have currentAbsent := attemptPhaseCCompletedEdge?_prefix_absent_before
+      owned source future.after head current result resultAbsent selected
+    obtain ⟨currentL09Fresh, currentU05Fresh⟩ :=
+      currentConditional currentAbsent
+    constructor
+    · exact
+        attemptPhaseCCompletedEdge?_preserves_insert_fresh_of_absent owned
+          source future.after head current result currentL09Fresh resultAbsent
+            selected
+    · intro complete
+      apply attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned source
+        head current result
+          (.cubic .U05_completedAction
+            (contextualCompletionKey future.waiting future.finished))
+      · simp
+      · simp
+      · intro equal
+        simp only [UnitAddress.cubic.injEq] at equal
+        exact different equal.2
+      · simp
+      · exact currentU05Fresh complete
+      · exact selected
+
 
 private structure PhaseCItemSafe
     {file : WorkspaceFile} {tokens : List Token}
