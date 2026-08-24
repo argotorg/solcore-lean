@@ -10231,6 +10231,78 @@ theorem executeTypeAtomRoot_reduces
     exact .typeAtomTuple origin finish openParen first comma second rest
       closeParen witness
 
+private theorem executableMatchArmBody_eq_armBody
+    {file : WorkspaceFile} {tokens : List Token}
+    (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow))
+    (statements : List Statement) :
+    executableMatchArmBody file fatArrow statements =
+      RuleReduction.armBody fatArrow statements := by
+  cases statements <;> rfl
+
+/-- The match-arm executor realizes its exact source-rule reduction. -/
+theorem executeMatchArmRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .matchArm origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .matchArm)) :
+    RuleReduction file tokens .matchArm origin finish input
+      (executeMatchArmRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let pipeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .pipe))
+  let patternAtom : EbnfExpr := .atom (.nonterminal .pattern)
+  let arrowAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .fatArrow))
+  let statementAtom : EbnfExpr := .atom (.nonterminal .armStatement)
+  let children : List EbnfExpr := [pipeAtom, .list1 patternAtom,
+    arrowAtom, .star statementAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize viewEq : EbnfValue.sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawPipe, rawPatterns, rawArrow, rawStatements, ⟨⟩⟩
+  let pipe := EbnfValue.terminalView (.symbol .pipe) rawPipe
+  let rawPatternValues := EbnfValue.list1View patternAtom rawPatterns
+  let patterns := rawPatternValues.map (EbnfValue.ruleView .pattern)
+  let arrow := EbnfValue.terminalView (.symbol .fatArrow) rawArrow
+  let rawStatementValues := EbnfValue.starView statementAtom rawStatements
+  let statements := rawStatementValues.map
+    (EbnfValue.ruleView .armStatement)
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  rw [viewEq] at inputEq
+  have patternValuesEq :
+      patterns.map (EbnfValue.ruleAtom .pattern) = rawPatternValues :=
+    ruleNonemptyAtoms_of_views .pattern rawPatternValues
+  have rawPatternsEq : EbnfValue.list1 patternAtom
+      (patterns.map (EbnfValue.ruleAtom .pattern)) = rawPatterns := by
+    rw [patternValuesEq]
+    exact EbnfValue.list1_of_view patternAtom rawPatterns
+  have statementValuesEq :
+      statements.map (EbnfValue.ruleAtom .armStatement) =
+        rawStatementValues :=
+    ruleAtoms_of_views .armStatement rawStatementValues
+  have rawStatementsEq : EbnfValue.star statementAtom
+      (statements.map (EbnfValue.ruleAtom .armStatement)) =
+        rawStatements := by
+    rw [statementValuesEq]
+    exact EbnfValue.star_of_view statementAtom rawStatements
+  have resultEq : executeMatchArmRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        patterns := patterns
+        body := RuleReduction.armBody arrow statements
+      } := by
+    simp [executeMatchArmRoot, children, pipeAtom, patternAtom, arrowAtom,
+      statementAtom, viewEq, rawPatternValues, patterns, arrow,
+      rawStatementValues, statements, witness,
+      executableMatchArmBody_eq_armBody]
+  rw [resultEq, ← inputEq]
+  simp only [children, EbnfValue.sequenceValuesBuild]
+  rw [← EbnfValue.terminal_of_view (.symbol .pipe) rawPipe,
+    ← rawPatternsEq,
+    ← EbnfValue.terminal_of_view (.symbol .fatArrow) rawArrow,
+    ← rawStatementsEq]
+  exact .matchArm origin finish pipe patterns arrow statements witness
+
 /-- Align one dotted module path tail with its parsed path component. -/
 private def moduleRefTailData
     {file : WorkspaceFile} {tokens : List Token}
@@ -10608,6 +10680,8 @@ theorem executeRootRule_reduces
       exact executeInstanceMethodRoot_reduces origin finish ready input
   | armStatement =>
       exact executeArmStatementRoot_reduces origin finish ready input
+  | matchArm =>
+      exact executeMatchArmRoot_reduces origin finish ready input
   | statement =>
       exact executeStatementRoot_reduces origin finish ready input
   | terminalExpression =>
