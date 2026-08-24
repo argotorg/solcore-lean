@@ -293,4 +293,175 @@ theorem frontierDottedCompletionRank_of_table
       owned correct final cursor potential waiting after).mp lower
     exact Or.inr ⟨after, ⟨frontier.1, facts.1, facts.2.1⟩, facts.2.2⟩
 
+private def dottedAdvanceItemDecision
+    {tokens : List Token} (before : DottedItem tokens)
+    (next : Boundary tokens) (after : DottedItem tokens) :
+    Decidable (AdvanceItem before next after) := by
+  unfold AdvanceItem
+  infer_instance
+
+/-- One exact direct-epsilon advance cell for a dotted potential. -/
+def frontierDottedEpsilonRankCell
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (waiting : ContextualItemKey tokens) (production : ProductionId)
+    (after : ContextualItemKey tokens) : Bool :=
+  let child : ProductionInstanceKey tokens := {
+    production := production
+    origin := waiting.raw.current
+    context := descendContext waiting production
+  }
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  letI : Decidable
+      (ContextualReach file tokens memo correct final after) :=
+    contextualReachDecision owned correct final after
+  letI : Decidable
+      (NextSymbol waiting.raw (.nonterminal production.lhs)) :=
+    dottedNextSymbolDecision waiting.raw (.nonterminal production.lhs)
+  letI : Decidable
+      (EnabledProductionInstance file tokens memo correct final child) :=
+    enabledProductionInstanceDecision correct final child
+  letI : Decidable
+      (AdvanceItem waiting.raw waiting.raw.current after.raw) :=
+    dottedAdvanceItemDecision waiting.raw waiting.raw.current after.raw
+  if ContextualReach file tokens memo correct final waiting then
+    if waiting.raw.current = cursor then
+      if NextSymbol waiting.raw (.nonterminal production.lhs) then
+        if EnabledProductionInstance file tokens memo correct final child then
+          if production.rhs = [] then
+            if ContextualReach file tokens memo correct final after then
+              if after.raw.current = cursor then
+                if AdvanceItem waiting.raw waiting.raw.current after.raw then
+                  decide (frontierDottedGrammarRank potential after <
+                    frontierDottedGrammarRank potential waiting)
+                else true
+              else true
+            else true
+          else true
+        else true
+      else true
+    else true
+  else true
+
+/-- Exact finite direct-epsilon advance table for a dotted potential. -/
+def frontierDottedEpsilonRankTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierDottedGrammarPotential tokens) : Bool :=
+  (allContextualItems tokens).all fun waiting =>
+    allProductionIds.all fun production =>
+      (allContextualItems tokens).all fun after =>
+        frontierDottedEpsilonRankCell owned correct final cursor potential
+          waiting production after
+
+/-- A checked dotted epsilon table supplies every selected direct advance. -/
+theorem frontierDottedEpsilonRank_lt_of_table
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (checked : frontierDottedEpsilonRankTable
+      owned correct final cursor potential = true)
+    (waiting : ContextualItemKey tokens) (production : ProductionId)
+    (after : ContextualItemKey tokens)
+    (waitingReached : ContextualReach
+      file tokens memo correct final waiting)
+    (waitingCurrent : waiting.raw.current = cursor)
+    (next : NextSymbol waiting.raw (.nonterminal production.lhs))
+    (enabled : EnabledProductionInstance file tokens memo correct final {
+      production := production
+      origin := waiting.raw.current
+      context := descendContext waiting production
+    }) (epsilon : production.rhs = [])
+    (afterReached : ContextualReach file tokens memo correct final after)
+    (afterCurrent : after.raw.current = cursor)
+    (advance : AdvanceItem waiting.raw waiting.raw.current after.raw) :
+    frontierDottedGrammarRank potential after <
+      frontierDottedGrammarRank potential waiting := by
+  have waitingRow := (List.all_eq_true.mp checked) waiting
+    (allContextualItems_complete waiting)
+  have productionRow := (List.all_eq_true.mp waitingRow) production
+    (allProductionIds_complete production)
+  have cell := (List.all_eq_true.mp productionRow) after
+    (allContextualItems_complete after)
+  simp only [frontierDottedEpsilonRankCell] at cell
+  rw [if_pos waitingReached, if_pos waitingCurrent, if_pos next,
+    if_pos enabled, if_pos epsilon, if_pos afterReached,
+    if_pos afterCurrent, if_pos advance] at cell
+  exact decide_eq_true_iff.mp cell
+
+/-- The three exact dotted tables construct every field of the abstract
+frontier normalization ranking. -/
+theorem frontierNormalizationRanking_of_dottedGrammarPotential
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens}
+    (potential : FrontierDottedGrammarPotential tokens)
+    (completion : frontierDottedCompletionRankTable
+      owned correct final cursor potential = true)
+    (epsilon : frontierDottedEpsilonRankTable
+      owned correct final cursor potential = true)
+    (prediction : frontierDottedPredictionRankTable
+      owned correct final cursor potential = true) :
+    FrontierNormalizationRanking file tokens memo correct final cursor
+      (frontierDottedGrammarRank potential) := by
+  constructor
+  · exact frontierDottedCompletionRank_of_table
+      owned correct final cursor potential completion
+  · intro waiting production after frontier next enabled epsilonProduction
+      afterFrontier advance
+    exact frontierDottedEpsilonRank_lt_of_table
+      owned correct final cursor potential epsilon waiting production after
+      frontier.2.1 frontier.2.2 next enabled epsilonProduction
+      afterFrontier.2.1 afterFrontier.2.2 advance
+  · intro waiting production frontier next enabled nonempty _predicted
+    exact frontierDottedPredictionRank_lt_of_table
+      owned correct final cursor potential prediction waiting production
+      frontier.2.1 frontier.2.2 next enabled nonempty
+
+/-- One dotted potential accepted by all three exact finite rank tables. -/
+def DottedGrammarRankedFrontierNormalization
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) : Prop :=
+  ∃ potential : FrontierDottedGrammarPotential tokens,
+    frontierDottedCompletionRankTable
+        owned correct final cursor potential = true ∧
+      frontierDottedEpsilonRankTable
+        owned correct final cursor potential = true ∧
+      frontierDottedPredictionRankTable
+        owned correct final cursor potential = true
+
+/-- A three-table dotted certificate supplies abstract ranked
+normalization. -/
+theorem rankedFrontierNormalization_of_dottedGrammarRanked
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens}
+    (ranked : DottedGrammarRankedFrontierNormalization
+      file tokens owned memo correct final cursor) :
+    RankedFrontierNormalization file tokens memo correct final cursor := by
+  rcases ranked with ⟨potential, completion, epsilon, prediction⟩
+  exact ⟨frontierDottedGrammarRank potential,
+    frontierNormalizationRanking_of_dottedGrammarPotential
+      owned potential completion epsilon prediction⟩
+
 end Solcore.Surface.Multi
