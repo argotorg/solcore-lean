@@ -18478,6 +18478,91 @@ def AnchoredNonterminalCoverageAt
               context := descendContext waiting negative
             } (guard, .negative) key
 
+/-- Every contextual region begins no later than the item's current parser
+boundary; the plain context carries no region boundary. -/
+def GuardContextOrderedAt {tokens : List Token}
+    (context : GuardContext tokens) (cursor : Boundary tokens) : Prop :=
+  match context with
+  | .plain => True
+  | .postfixInvocation start
+  | .bracedBody start
+  | .armBody start => start.val ≤ cursor.val
+
+private theorem guardContextOrderedAt_mono
+    {tokens : List Token}
+    {context : GuardContext tokens}
+    {left right : Boundary tokens}
+    (ordered : GuardContextOrderedAt context left)
+    (forward : left.val ≤ right.val) :
+    GuardContextOrderedAt context right := by
+  cases context with
+  | plain => trivial
+  | postfixInvocation start
+  | bracedBody start
+  | armBody start =>
+      exact Nat.le_trans ordered forward
+
+private theorem guardContextOrderedAt_descendContext
+    {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (predicted : ProductionId)
+    (ordered : GuardContextOrderedAt
+      waiting.context waiting.raw.current) :
+    GuardContextOrderedAt
+      (descendContext waiting predicted) waiting.raw.current := by
+  unfold descendContext
+  split
+  · simp [GuardContextOrderedAt]
+  · split
+    · split
+      · simp [GuardContextOrderedAt]
+      · split
+        · simp [GuardContextOrderedAt]
+        · exact ordered
+    · exact ordered
+
+/-- Prediction introduces contexts at the current boundary, while scanning and
+completion can only move that boundary forward, so every reached item has an
+ordered structural guard context. -/
+theorem contextualReach_guardContextOrderedAt
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    GuardContextOrderedAt item.context item.raw.current := by
+  induction reached with
+  | root => trivial
+  | predict waiting predicted reached next enabled induction =>
+      exact guardContextOrderedAt_descendContext
+        waiting predicted induction
+  | scan before after cursor reached structural induction =>
+      rcases structural with ⟨valid, contextEq⟩
+      rcases valid with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      rw [← contextEq, current]
+      apply guardContextOrderedAt_mono induction
+      calc
+        before.raw.current.val = cursor.val := by rw [← atCurrent]; rfl
+        _ ≤ cursor.val + 1 := Nat.le_succ _
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural with ⟨valid, finishedContext, afterContext⟩
+      rcases valid with
+        ⟨symbol, next, complete, lhs, waitingAt, finishedAt, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      rw [afterContext, current]
+      apply guardContextOrderedAt_mono waitingInduction
+      calc
+        waiting.raw.current.val = shared.val := congrArg Fin.val waitingAt
+        _ = finished.raw.origin.val :=
+          (congrArg Fin.val finishedAt).symm
+        _ ≤ finished.raw.current.val :=
+          contextualReach_ordered finishedReached
+
 private theorem enabledProductionInstance_of_guardless
     {file : WorkspaceFile} {tokens : List Token}
     {memo : GuardMemo tokens}
