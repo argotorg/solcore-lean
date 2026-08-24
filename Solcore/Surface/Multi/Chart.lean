@@ -11338,6 +11338,162 @@ theorem dequeue?_of_cons
     state.dequeue? = some (item, { state with queue := rest }) := by
   simp [dequeue?, queueEq]
 
+/-- Executable check that every queued key still has its exact dependent
+prefix value in the ledger. -/
+def queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) : Bool :=
+  state.queue.all fun item => (state.lookupPrefix? item).isSome
+
+/-- Prefix membership and dependent prefix lookup use the same exact key. -/
+theorem prefixMemberBool_eq_true_iff_lookupPrefix?_isSome
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    state.prefixMemberBool item = true ↔
+      (state.lookupPrefix? item).isSome = true := by
+  rw [lookupPrefix?_isSome_iff]
+  simp [prefixMemberBool]
+
+/-- Reduction membership and dependent reduction lookup use the same exact
+key. -/
+theorem reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    state.reductionMemberBool item = true ↔
+      (state.lookupReduction? item).isSome = true := by
+  rw [lookupReduction?_isSome_iff]
+  simp [reductionMemberBool]
+
+/-- Pointwise reading of the executable queue invariant. -/
+theorem queuePrefixesAvailable_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) :
+    state.queuePrefixesAvailable = true ↔
+      ∀ item, item ∈ state.queue →
+        (state.lookupPrefix? item).isSome = true := by
+  simp [queuePrefixesAvailable]
+
+/-- A queued key has an exact dependent prefix lookup result. -/
+theorem exists_lookupPrefix?_eq_some_of_queue
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (available : state.queuePrefixesAvailable = true)
+    (item : ContextualItemKey tokens)
+    (member : item ∈ state.queue) :
+    ∃ value, state.lookupPrefix? item = some value := by
+  have present :=
+    (queuePrefixesAvailable_eq_true_iff state).1 available item member
+  cases selected : state.lookupPrefix? item with
+  | none => simp [selected] at present
+  | some value => exact ⟨value, rfl⟩
+
+@[simp] theorem empty_queuePrefixesAvailable
+    (file : WorkspaceFile) (tokens : List Token) :
+    (empty file tokens).queuePrefixesAvailable = true := rfl
+
+/-- Retaining a prefix preserves queue availability, including for the
+freshly appended key. -/
+theorem queuePrefixesAvailable_insertPrefix
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (inserted : ContextualItemKey tokens)
+    (value : ContextualPrefixValue file tokens inserted)
+    (available : state.queuePrefixesAvailable = true) :
+    (state.insertPrefix inserted value).queuePrefixesAvailable = true := by
+  cases present : state.prefixMemberBool inserted with
+  | true =>
+    rw [insertPrefix_of_present state inserted value present]
+    exact available
+  | false =>
+    have effects := insertPrefix_of_absent state inserted value present
+    rw [queuePrefixesAvailable_eq_true_iff]
+    intro queued member
+    rw [lookupPrefix?_isSome_iff]
+    rw [effects.1]
+    rw [effects.2.2] at member
+    simp only [List.mem_append, List.mem_singleton] at member
+    rcases member with old | rfl
+    · have oldPresent :=
+        (queuePrefixesAvailable_eq_true_iff state).1 available queued old
+      obtain ⟨entry, entryMember, equal⟩ :=
+        (lookupPrefix?_isSome_iff state queued).1 oldPresent
+      exact ⟨entry, by simp [entryMember], equal⟩
+    · exact ⟨⟨queued, value⟩, by simp, rfl⟩
+
+/-- Retaining a reduction does not disturb prefix availability. -/
+theorem queuePrefixesAvailable_insertReduction
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (reduction : ContextualReductionValue file tokens item)
+    (available : state.queuePrefixesAvailable = true) :
+    (state.insertReduction item reduction).queuePrefixesAvailable = true := by
+  cases present : state.reductionMemberBool item with
+  | true =>
+    rw [insertReduction_of_present state item reduction present]
+    exact available
+  | false =>
+    have effects := insertReduction_of_absent state item reduction present
+    rw [queuePrefixesAvailable_eq_true_iff] at available ⊢
+    intro candidate member
+    rw [lookupPrefix?_isSome_iff, effects.1]
+    have oldPresent := available candidate (by
+      simpa only [effects.2.2] using member)
+    exact (lookupPrefix?_isSome_iff state candidate).1 oldPresent
+
+/-- Every successful candidate preparation preserves queue availability. -/
+theorem queuePrefixesAvailable_insertCandidate?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : CandidateInsertResult file tokens)
+    (available : state.queuePrefixesAvailable = true)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    candidate.state.queuePrefixesAvailable = true := by
+  unfold insertCandidate? at selected
+  split at selected
+  next present =>
+    simp only [Option.some.injEq] at selected
+    cases selected
+    exact available
+  next absent =>
+    split at selected
+    next complete =>
+      cases reductionEq : ContextualReductionValue.reduce? owned item prior with
+      | none => simp [reductionEq] at selected
+      | some reduction =>
+          simp only [reductionEq, Option.some.injEq] at selected
+          cases selected
+          exact queuePrefixesAvailable_insertReduction
+            (state.insertPrefix item prior) item reduction
+              (queuePrefixesAvailable_insertPrefix state item prior available)
+    next incomplete =>
+      simp only [Option.some.injEq] at selected
+      cases selected
+      exact queuePrefixesAvailable_insertPrefix state item prior available
+
+/-- Dequeueing only shortens the queue and preserves exact prefix
+availability for all remaining keys. -/
+theorem queuePrefixesAvailable_dequeue?
+    {file : WorkspaceFile} {tokens : List Token}
+    (state next : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (available : state.queuePrefixesAvailable = true)
+    (selected : state.dequeue? = some (item, next)) :
+    next.queuePrefixesAvailable = true := by
+  cases queueEq : state.queue with
+  | nil => simp [dequeue?, queueEq] at selected
+  | cons head rest =>
+      simp only [dequeue?, queueEq, Option.some.injEq] at selected
+      cases selected
+      rw [queuePrefixesAvailable_eq_true_iff] at available ⊢
+      intro candidate member
+      exact available candidate (by simp [queueEq, member])
+
 end ContextualValueFrontierState
 
 /-- A rebuilt scan witness whose packed key is exactly the stored structural
