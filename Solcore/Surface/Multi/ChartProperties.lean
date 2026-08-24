@@ -8091,6 +8091,193 @@ theorem executeTypeAliasDeclRoot_reduces
               raw).identifierProjection_projects)
         witness
 
+/-- The data-declaration executor realizes its exact root reduction. -/
+theorem executeDataDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .dataDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .dataDecl)) :
+    RuleReduction file tokens .dataDecl origin finish input
+      (executeDataDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let dataAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .dataKw))
+  let semicolonAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .semicolon))
+  let children : List EbnfExpr := [dataAtom, dataDeclIdentifierAtom,
+    .optional dataDeclParameterExpr, .optional dataDeclConstructorExpr,
+    semicolonAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : EbnfValue.sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawData, rawName, rawParameters,
+    rawConstructors, rawSemicolon, ⟨⟩⟩
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  rw [sequenceEq] at inputEq
+  let dataKw := EbnfValue.terminalView (.hardKeyword .dataKw) rawData
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let nameData : RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier := {
+    matched := name
+    spelling := name.identifierProjection.1
+    parsed := name.identifierProjection.2
+  }
+  let parameters := (EbnfValue.optionalView dataDeclParameterExpr
+    rawParameters).map dataDeclParameterView
+  let constructors := (EbnfValue.optionalView dataDeclConstructorExpr
+    rawConstructors).map dataDeclConstructorView
+  let semicolon := EbnfValue.terminalView
+    (.symbol .semicolon) rawSemicolon
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have parametersEq : EbnfValue.optional dataDeclParameterExpr
+      (parameters.map dataDeclParameterInput) = rawParameters := by
+    exact dataDecl_optional_map_of_view dataDeclParameterExpr
+      dataDeclParameterView dataDeclParameterInput
+      dataDeclParameterInput_of_view rawParameters
+  have constructorsEq : EbnfValue.optional dataDeclConstructorExpr
+      (constructors.map dataDeclConstructorInput) = rawConstructors := by
+    exact dataDecl_optional_map_of_view dataDeclConstructorExpr
+      dataDeclConstructorView dataDeclConstructorInput
+      dataDeclConstructorInput_of_view rawConstructors
+  have parameterProjects : ∀ value, parameters = some value →
+      IdentifierProjects value.2.1.head.matched
+        value.2.1.head.spelling value.2.1.head.parsed ∧
+      ∀ parameter, parameter ∈ value.2.1.tail →
+        IdentifierProjects parameter.matched
+          parameter.spelling parameter.parsed := by
+    intro value valueEq
+    generalize selectedEq : EbnfValue.optionalView
+      dataDeclParameterExpr rawParameters = selected
+    cases selected with
+    | none => simp [parameters, selectedEq] at valueEq
+    | some raw =>
+        have valueEq' : value = dataDeclParameterView raw := by
+          simpa [parameters, selectedEq] using valueEq.symm
+        subst value
+        exact dataDeclParameterView_projects raw
+  have parametersResultEq :
+      (EbnfValue.optionalView dataDeclParameterExpr rawParameters).map
+          (fun raw =>
+            let parameterChildren : List EbnfExpr := [
+              .atom (.terminal (.symbol .leftParen)),
+              .list1 dataDeclIdentifierAtom,
+              .atom (.terminal (.symbol .rightParen))]
+            let ⟨_, rawNames, _, ⟨⟩⟩ := EbnfValue.sequenceFlatView
+              parameterChildren raw
+            (EbnfValue.list1View dataDeclIdentifierAtom rawNames).map
+              fun value =>
+                let terminal := EbnfValue.terminalView
+                  (.category .identifier) value
+                RuleReduction.terminalLoc terminal
+                  terminal.identifierProjection.2) =
+        parameters.map fun value =>
+          value.2.1.map fun parameter => RuleReduction.terminalLoc
+            parameter.matched parameter.parsed := by
+    generalize selectedEq : EbnfValue.optionalView
+      dataDeclParameterExpr rawParameters = selected
+    cases selected with
+    | none => simp [parameters, selectedEq]
+    | some raw =>
+        simpa [parameters, selectedEq] using
+          dataDeclParameterResult_of_view raw
+  have constructorsResultEq :
+      (EbnfValue.optionalView dataDeclConstructorExpr rawConstructors).map
+          (fun raw =>
+            let viewed := EbnfValue.sequence3View
+              (.atom (.terminal (.symbol .equal)))
+              (.atom (.nonterminal .dataConstructor))
+              (.star dataDeclConstructorTail) raw
+            let head : DataConstructor :=
+              EbnfValue.ruleView .dataConstructor viewed.2.1
+            let tail : List DataConstructor :=
+              (EbnfValue.starView dataDeclConstructorTail viewed.2.2).map
+                fun rawTail =>
+                  (EbnfValue.fixedInfixTailView
+                    (.symbol .pipe) .dataConstructor rawTail).2
+            ({ head := head, tail := tail } :
+              NonemptyList DataConstructor)) =
+        constructors.map fun value =>
+          ({ head := value.2.1, tail := value.2.2.1.map Prod.snd } :
+            NonemptyList DataConstructor) := by
+    generalize selectedEq : EbnfValue.optionalView
+      dataDeclConstructorExpr rawConstructors = selected
+    cases selected with
+    | none => simp [constructors, selectedEq]
+    | some raw =>
+        simpa [constructors, selectedEq] using
+          dataDeclConstructorResult_of_view raw
+  simp only [children, dataAtom, semicolonAtom,
+    dataDeclParameterExpr, dataDeclConstructorExpr,
+    dataDeclConstructorTail, dataDeclIdentifierAtom,
+    EbnfValue.fixedInfixTailExpr] at input sequenceEq inputEq
+  simp only [dataDeclParameterExpr, dataDeclIdentifierAtom,
+    RuleReduction.terminalLoc] at parametersResultEq
+  simp only [dataDeclConstructorExpr, dataDeclConstructorTail,
+    EbnfValue.fixedInfixTailExpr,
+    EbnfValue.fixedInfixTailView] at constructorsResultEq
+  have resultEq : executeDataDeclRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        name := RuleReduction.terminalLoc name name.identifierProjection.2
+        parameters := parameters.map fun value =>
+          value.2.1.map fun parameter => RuleReduction.terminalLoc
+            parameter.matched parameter.parsed
+        constructors := constructors.map fun value => {
+          head := value.2.1
+          tail := value.2.2.1.map Prod.snd
+        }
+      } := by
+    simp only [executeDataDeclRoot]
+    rw [sequenceEq]
+    simp only
+    change @Eq (Located DataDeclPayload) _ _
+    apply (sourceLoc_eq_iff _ _ _ _).2
+    simpa [name, RuleReduction.terminalLoc,
+      parametersResultEq, constructorsResultEq]
+  rw [resultEq, ← inputEq]
+  simp only [EbnfValue.sequenceValuesBuild]
+  rw [← EbnfValue.terminal_of_view (.hardKeyword .dataKw) rawData,
+    ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+    ← parametersEq, ← constructorsEq,
+    ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSemicolon]
+  have transportSelf
+      (value : EbnfValue file tokens (.sequence [
+        .atom (.terminal (.hardKeyword .dataKw)),
+        .atom (.terminal (.category .identifier)),
+        .optional (.sequence [
+          .atom (.terminal (.symbol .leftParen)),
+          .list1 (.atom (.terminal (.category .identifier))),
+          .atom (.terminal (.symbol .rightParen))]),
+        .optional (.sequence [
+          .atom (.terminal (.symbol .equal)),
+          .atom (.nonterminal .dataConstructor),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .pipe)),
+            .atom (.nonterminal .dataConstructor)]))]),
+        .atom (.terminal (.symbol .semicolon))]))
+      (shape : (.sequence [
+        .atom (.terminal (.hardKeyword .dataKw)),
+        .atom (.terminal (.category .identifier)),
+        .optional (.sequence [
+          .atom (.terminal (.symbol .leftParen)),
+          .list1 (.atom (.terminal (.category .identifier))),
+          .atom (.terminal (.symbol .rightParen))]),
+        .optional (.sequence [
+          .atom (.terminal (.symbol .equal)),
+          .atom (.nonterminal .dataConstructor),
+          .star (.group (.sequence [
+            .atom (.terminal (.symbol .pipe)),
+            .atom (.nonterminal .dataConstructor)]))]),
+        .atom (.terminal (.symbol .semicolon))]) =
+          m2cV1.rhs .dataDecl) :
+      EbnfValue.transport shape value = value := by
+    rw [show shape = (by rfl) from Subsingleton.elim _ _]
+    rfl
+  have reduces := RuleReduction.dataDecl origin finish dataKw nameData
+    parameters constructors semicolon name.identifierProjection_projects
+    parameterProjects witness
+  rw [transportSelf] at reduces
+  exact reduces
+
 /-- The contract-declaration executor realizes its exact root reduction. -/
 theorem executeContractDeclRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -11837,6 +12024,8 @@ theorem executeRootRule_reduces
   | assignmentStatement =>
       exact executeAssignmentStatementRoot_reduces origin finish ready input
   | parameter => exact executeParameterRoot_reduces origin finish ready input
+  | dataDecl =>
+      exact executeDataDeclRoot_reduces origin finish ready input
   | contractDecl =>
       exact executeContractDeclRoot_reduces origin finish ready input
   | dataConstructor =>
