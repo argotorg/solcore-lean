@@ -464,4 +464,290 @@ theorem rankedFrontierNormalization_of_dottedGrammarRanked
     frontierNormalizationRanking_of_dottedGrammarPotential
       owned potential completion epsilon prediction⟩
 
+/-- Number of dotted grammar/span coordinates in one finite potential. -/
+def frontierDottedGrammarFrameCount (tokens : List Token) : Nat :=
+  allDottedRhs.length * (tokens.length + 2) * (tokens.length + 2)
+
+/-- One proof-free dotted grammar/span coordinate. -/
+structure FrontierDottedGrammarFrame (tokens : List Token) where
+  dotted : DottedRhs
+  origin : Boundary tokens
+  current : Boundary tokens
+  deriving DecidableEq
+
+/-- Every dotted grammar/span coordinate in stable order. -/
+def allFrontierDottedGrammarFrames
+    (tokens : List Token) : List (FrontierDottedGrammarFrame tokens) :=
+  allDottedRhs.flatMap fun dotted =>
+    (allParserBoundaries tokens).flatMap fun origin =>
+      (allParserBoundaries tokens).map fun current =>
+        { dotted, origin, current }
+
+/-- Every dotted grammar/span coordinate occurs in the stable carrier. -/
+theorem allFrontierDottedGrammarFrames_complete
+    {tokens : List Token} (frame : FrontierDottedGrammarFrame tokens) :
+    frame ∈ allFrontierDottedGrammarFrames tokens := by
+  rw [allFrontierDottedGrammarFrames, List.mem_flatMap]
+  refine ⟨frame.dotted, allDottedRhs_complete _, ?_⟩
+  rw [List.mem_flatMap]
+  refine ⟨frame.origin, allParserBoundaries_complete _, ?_⟩
+  rw [List.mem_map]
+  exact ⟨frame.current, allParserBoundaries_complete _, by cases frame; rfl⟩
+
+private def frontierDottedGrammarFrameValue
+    {tokens : List Token} (potential : FrontierDottedGrammarPotential tokens)
+    (frame : FrontierDottedGrammarFrame tokens) : Nat :=
+  potential frame.dotted frame.origin frame.current
+
+private def frontierDottedGrammarPotentialLookup
+    {tokens : List Token} :
+    List (FrontierDottedGrammarFrame tokens) → List Nat →
+      FrontierDottedGrammarFrame tokens → Nat
+  | frame :: frames, value :: values, target =>
+      if frame = target then value
+      else frontierDottedGrammarPotentialLookup frames values target
+  | _, _, _ => 0
+
+private theorem frontierDottedGrammarPotentialLookup_map
+    {tokens : List Token}
+    (frames : List (FrontierDottedGrammarFrame tokens))
+    (value : FrontierDottedGrammarFrame tokens → Nat)
+    (target : FrontierDottedGrammarFrame tokens)
+    (member : target ∈ frames) :
+    frontierDottedGrammarPotentialLookup frames (frames.map value) target =
+      value target := by
+  induction frames with
+  | nil => simp at member
+  | cons frame frames induction =>
+      by_cases equal : frame = target
+      · subst target
+        simp [frontierDottedGrammarPotentialLookup]
+      · simp only [List.mem_cons] at member
+        rcases member with equal' | member
+        · exact (equal equal'.symm).elim
+        · simp [frontierDottedGrammarPotentialLookup, equal,
+            induction member]
+
+/-- Interpret a value list over the stable dotted-frame carrier. -/
+def frontierDottedGrammarPotentialOfValues
+    (tokens : List Token) (values : List Nat) :
+    FrontierDottedGrammarPotential tokens :=
+  fun dotted origin current =>
+    frontierDottedGrammarPotentialLookup
+      (allFrontierDottedGrammarFrames tokens) values
+      { dotted, origin, current }
+
+/-- Tabulate a dotted potential in stable frame order. -/
+def frontierDottedGrammarValuesOfPotential
+    (tokens : List Token) (potential : FrontierDottedGrammarPotential tokens) :
+    List Nat :=
+  (allFrontierDottedGrammarFrames tokens).map
+    (frontierDottedGrammarFrameValue potential)
+
+/-- Stable dotted-frame tabulation followed by lookup is exact. -/
+theorem frontierDottedGrammarPotentialOfValues_valuesOfPotential
+    {tokens : List Token} (potential : FrontierDottedGrammarPotential tokens) :
+    frontierDottedGrammarPotentialOfValues tokens
+      (frontierDottedGrammarValuesOfPotential tokens potential) =
+        potential := by
+  funext dotted origin current
+  exact frontierDottedGrammarPotentialLookup_map
+    (allFrontierDottedGrammarFrames tokens)
+    (frontierDottedGrammarFrameValue potential)
+    { dotted, origin, current }
+    (allFrontierDottedGrammarFrames_complete _)
+
+/-- The stable dotted-frame carrier has its advertised cardinality. -/
+theorem allFrontierDottedGrammarFrames_length (tokens : List Token) :
+    (allFrontierDottedGrammarFrames tokens).length =
+      frontierDottedGrammarFrameCount tokens := by
+  have boundaryLength :
+      (allParserBoundaries tokens).length = tokens.length + 2 := by
+    simp [allParserBoundaries]
+  have oneDotted : ∀ dotted : DottedRhs,
+      ((allParserBoundaries tokens).flatMap fun origin =>
+        (allParserBoundaries tokens).map fun current =>
+          ({ dotted, origin, current } :
+            FrontierDottedGrammarFrame tokens)).length =
+        (tokens.length + 2) * (tokens.length + 2) := by
+    intro dotted
+    have generalOrigins : ∀ origins : List (Boundary tokens),
+        (origins.flatMap fun origin =>
+          (allParserBoundaries tokens).map fun current =>
+            ({ dotted, origin, current } :
+              FrontierDottedGrammarFrame tokens)).length =
+          origins.length * (tokens.length + 2) := by
+      intro origins
+      induction origins with
+      | nil => simp
+      | cons origin origins induction =>
+          simp [boundaryLength, induction, Nat.add_mul, Nat.add_comm]
+    rw [generalOrigins, boundaryLength]
+  have general : ∀ dotteds : List DottedRhs,
+      (dotteds.flatMap fun dotted =>
+        (allParserBoundaries tokens).flatMap fun origin =>
+          (allParserBoundaries tokens).map fun current =>
+            ({ dotted, origin, current } :
+              FrontierDottedGrammarFrame tokens)).length =
+        dotteds.length * (tokens.length + 2) *
+          (tokens.length + 2) := by
+    intro dotteds
+    induction dotteds with
+    | nil => simp
+    | cons dotted dotteds induction =>
+        simp [oneDotted, induction, Nat.add_mul, Nat.mul_assoc,
+          Nat.add_comm]
+  exact (general allDottedRhs).trans (by
+    simp [frontierDottedGrammarFrameCount, Nat.mul_assoc])
+
+/-- Exhaustively search the bounded dotted-potential space for acceptance by
+all three exact normalization tables. -/
+def boundedFrontierDottedGrammarPotential?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) :
+    Option (FrontierDottedGrammarPotential tokens) :=
+  let count := frontierDottedGrammarFrameCount tokens
+  let base := count + 1
+  ((allBoundedNatLists count base).find? fun values =>
+    let potential := frontierDottedGrammarPotentialOfValues tokens values
+    frontierDottedCompletionRankTable
+        owned correct final cursor potential &&
+      (frontierDottedEpsilonRankTable
+          owned correct final cursor potential &&
+        frontierDottedPredictionRankTable
+          owned correct final cursor potential)).map
+    (frontierDottedGrammarPotentialOfValues tokens)
+
+/-- Every returned dotted potential satisfies all three exact tables. -/
+theorem boundedFrontierDottedGrammarPotential?_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    {potential : FrontierDottedGrammarPotential tokens}
+    (selected : boundedFrontierDottedGrammarPotential?
+      owned correct final cursor = some potential) :
+    frontierDottedCompletionRankTable
+        owned correct final cursor potential = true ∧
+      frontierDottedEpsilonRankTable
+          owned correct final cursor potential = true ∧
+        frontierDottedPredictionRankTable
+          owned correct final cursor potential = true := by
+  unfold boundedFrontierDottedGrammarPotential? at selected
+  simp only [Option.map_eq_some_iff] at selected
+  rcases selected with ⟨values, found, rfl⟩
+  have accepted := List.find?_some found
+  rw [Bool.and_eq_true, Bool.and_eq_true] at accepted
+  exact accepted
+
+/-- Any bounded accepting dotted potential is represented by the exhaustive
+search. -/
+theorem boundedFrontierDottedGrammarPotential?_isSome_of_bounded
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (bounded : ∀ dotted origin current,
+      potential dotted origin current <
+        frontierDottedGrammarFrameCount tokens + 1)
+    (completion : frontierDottedCompletionRankTable
+      owned correct final cursor potential = true)
+    (epsilon : frontierDottedEpsilonRankTable
+      owned correct final cursor potential = true)
+    (prediction : frontierDottedPredictionRankTable
+      owned correct final cursor potential = true) :
+    (boundedFrontierDottedGrammarPotential?
+      owned correct final cursor).isSome = true := by
+  unfold boundedFrontierDottedGrammarPotential?
+  simp only [Option.isSome_map, List.find?_isSome]
+  let values := frontierDottedGrammarValuesOfPotential tokens potential
+  have length : values.length = frontierDottedGrammarFrameCount tokens := by
+    simp [values, frontierDottedGrammarValuesOfPotential,
+      allFrontierDottedGrammarFrames_length]
+  have valuesBounded : ∀ value, value ∈ values →
+      value < frontierDottedGrammarFrameCount tokens + 1 := by
+    intro value member
+    simp only [values, frontierDottedGrammarValuesOfPotential,
+      List.mem_map] at member
+    rcases member with ⟨frame, _frameMember, rfl⟩
+    exact bounded frame.dotted frame.origin frame.current
+  refine ⟨values, ?_, ?_⟩
+  · simpa only [length] using
+      (allBoundedNatLists_complete _ values valuesBounded)
+  · rw [frontierDottedGrammarPotentialOfValues_valuesOfPotential]
+    rw [Bool.and_eq_true, Bool.and_eq_true]
+    exact ⟨completion, epsilon, prediction⟩
+
+/-- Executable success residual for the bounded dotted-potential search. -/
+def BoundedFrontierDottedGrammarRankSearchSucceeds
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) : Prop :=
+  (boundedFrontierDottedGrammarPotential?
+    owned correct final cursor).isSome = true
+
+/-- A bounded three-table witness discharges dotted search success. -/
+theorem boundedFrontierDottedGrammarRankSearchSucceeds_of_potential
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (bounded : ∀ dotted origin current,
+      potential dotted origin current <
+        frontierDottedGrammarFrameCount tokens + 1)
+    (completion : frontierDottedCompletionRankTable
+      owned correct final cursor potential = true)
+    (epsilon : frontierDottedEpsilonRankTable
+      owned correct final cursor potential = true)
+    (prediction : frontierDottedPredictionRankTable
+      owned correct final cursor potential = true) :
+    BoundedFrontierDottedGrammarRankSearchSucceeds
+      owned correct final cursor :=
+  boundedFrontierDottedGrammarPotential?_isSome_of_bounded
+    owned correct final cursor potential bounded completion epsilon prediction
+
+/-- Successful bounded dotted synthesis exposes its accepted three-table
+certificate. -/
+theorem dottedGrammarRankedFrontierNormalization_of_boundedSearch
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens}
+    (success : BoundedFrontierDottedGrammarRankSearchSucceeds
+      owned correct final cursor) :
+    DottedGrammarRankedFrontierNormalization
+      file tokens owned memo correct final cursor := by
+  unfold BoundedFrontierDottedGrammarRankSearchSucceeds at success
+  rw [Option.isSome_iff_exists] at success
+  rcases success with ⟨potential, selected⟩
+  exact ⟨potential,
+    boundedFrontierDottedGrammarPotential?_sound
+      owned correct final cursor selected⟩
+
+/-- Successful bounded dotted synthesis directly supplies abstract ranked
+normalization. -/
+theorem rankedFrontierNormalization_of_boundedDottedSearch
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens}
+    (success : BoundedFrontierDottedGrammarRankSearchSucceeds
+      owned correct final cursor) :
+    RankedFrontierNormalization file tokens memo correct final cursor :=
+  rankedFrontierNormalization_of_dottedGrammarRanked owned
+    (dottedGrammarRankedFrontierNormalization_of_boundedSearch
+      owned success)
+
 end Solcore.Surface.Multi
