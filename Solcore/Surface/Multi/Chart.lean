@@ -11713,6 +11713,24 @@ private structure PhaseCValueAddressSafe
       (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
         current.counter.usedRev
 
+/-- Recognition hands semantic execution a counter on which no semantic
+value address has yet been consumed. -/
+private structure PhaseCValueAddressesFresh
+    {tokens : List Token} (counter : Counter tokens) : Prop where
+  source : ∀ item, PhaseCValueSourceFresh counter item
+  candidate : ∀ item,
+    (.linear .L09_frontierInsert (contextualLinearKey item) :
+        UnitAddress tokens) ∉ counter.usedRev ∧
+      (.linear .L13_epsilonAction (contextualLinearKey item) :
+        UnitAddress tokens) ∉ counter.usedRev
+  completion : ∀ waiting finished,
+    (.cubic .U07_frontierCompletedTraversal
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∉
+        counter.usedRev ∧
+      (.cubic .U05_completedAction
+        (contextualCompletionKey waiting finished) : UnitAddress tokens) ∉
+          counter.usedRev
+
 /-- Causal membership turns prefix absence into freshness for every future
 source charge of that item. -/
 private theorem PhaseCValueAddressSafe.sourceFresh_of_absent
@@ -23020,6 +23038,217 @@ private theorem attemptPhaseCCompletedEdge?_preserves_completion_fresh
       · simp
       · exact currentU05Fresh complete
       · exact selected
+
+/-- Charging the canonical root insertion turns a completely fresh semantic
+counter into the stable causal address invariant. -/
+private theorem beginPhaseCValueWorklist?_total_addressSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (queuesEmpty : current.payload.phaseC.itemQueue = [] ∧
+      current.payload.phaseC.edgeQueue = [])
+    (fresh : PhaseCValueAddressesFresh current.counter) :
+    ∃ result, beginPhaseCValueWorklist? current = some result ∧
+      PhaseCValueAddressSafe result := by
+  let root := contextualRoot tokens
+  let address : UnitAddress tokens :=
+    .linear .L09_frontierInsert (contextualLinearKey root)
+  have addressFresh : address ∉ current.counter.usedRev :=
+    (fresh.candidate root).1
+  obtain ⟨result, selected⟩ : ∃ result,
+      beginPhaseCValueWorklist? current = some result := by
+    unfold beginPhaseCValueWorklist?
+    rw [queuesEmpty.1, queuesEmpty.2]
+    unfold runMappedPrimitive?
+    rw [dif_pos addressFresh]
+    exact ⟨_, rfl⟩
+  refine ⟨result, selected, ?_⟩
+  have mappedEq := selected
+  unfold beginPhaseCValueWorklist? at mappedEq
+  rw [queuesEmpty.1, queuesEmpty.2] at mappedEq
+  have usedEq := runMappedPrimitive?_usedRev current address _ result
+    (by simpa [address, root] using mappedEq)
+  have frontierEq :=
+    (beginPhaseCValueWorklist?_exact current result selected).2.2.2
+  constructor
+  · intro item member
+    rw [frontierEq] at member
+    simp only [List.mem_singleton] at member
+    subst item
+    unfold PhaseCValueSourceFresh
+    rw [usedEq]
+    simpa [PhaseCValueSourceFresh, address, root] using fresh.source root
+  · intro item member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact ((fresh.source item).1 old).elim
+  · intro item predicted productionMember member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact ((fresh.source item).2.1 predicted productionMember old).elim
+  · intro item member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact ((fresh.source item).2.2.1 old).elim
+  · intro item member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact ((fresh.source item).2.2.2 old).elim
+  · intro item member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp only [address, UnitAddress.linear.injEq, true_and] at equal
+      have itemEq := contextualLinearKey_injective equal
+      subst item
+      rw [frontierEq]
+      rfl
+    · exact ((fresh.candidate item).1 old).elim
+  · intro item member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact ((fresh.candidate item).2 old).elim
+  · intro waiting finished member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact ((fresh.completion waiting finished).1 old).elim
+  · intro waiting finished member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact ((fresh.completion waiting finished).2 old).elim
+
+/-- Dequeueing a unique queued item consumes only its L08 address and
+preserves the stable causal invariant on the remaining queue. -/
+private theorem dequeuePhaseCValueFrontier?_total_addressSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens) (rest : List (ContextualItemKey tokens))
+    (queueEq : current.payload.frontier.queue = item :: rest)
+    (queueNodup : current.payload.frontier.queue.Nodup)
+    (prefixesAvailable :
+      current.payload.frontier.queuePrefixesAvailable = true)
+    (safe : PhaseCValueAddressSafe current) :
+    ∃ result, dequeuePhaseCValueFrontier? current = some (item, result) ∧
+      PhaseCValueAddressSafe result := by
+  let address : UnitAddress tokens :=
+    .linear .L08_frontierDequeue (contextualLinearKey item)
+  have itemQueued : item ∈ current.payload.frontier.queue := by
+    rw [queueEq]
+    simp
+  have addressFresh : address ∉ current.counter.usedRev :=
+    (safe.queuedSourceFresh item itemQueued).1
+  have dequeuedEq := ContextualValueFrontierState.dequeue?_of_cons
+    current.payload.frontier item rest queueEq
+  obtain ⟨result, selected⟩ : ∃ result,
+      dequeuePhaseCValueFrontier? current = some (item, result) := by
+    unfold dequeuePhaseCValueFrontier?
+    rw [dequeuedEq]
+    simp only
+    unfold runMappedPrimitive?
+    rw [dif_pos addressFresh]
+    exact ⟨_, rfl⟩
+  refine ⟨result, selected, ?_⟩
+  have mappedEq := selected
+  unfold dequeuePhaseCValueFrontier? at mappedEq
+  rw [dequeuedEq] at mappedEq
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at mappedEq
+  rcases mappedEq with ⟨next, nextEq, pairEq⟩
+  cases pairEq
+  have usedEq := runMappedPrimitive?_usedRev current address _ result nextEq
+  obtain ⟨exactRest, exactQueue, _recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current item result selected
+  have restEq : exactRest = rest :=
+    (List.cons.inj (exactQueue.symm.trans queueEq)).2
+  subst exactRest
+  have prefixEq : ∀ target, result.payload.frontier.prefixMemberBool target =
+      current.payload.frontier.prefixMemberBool target := by
+    intro target
+    rw [frontierEq]
+    rfl
+  have itemPresent : current.payload.frontier.prefixMemberBool item = true := by
+    rw [ContextualValueFrontierState.prefixMemberBool_eq_true_iff_lookupPrefix?_isSome]
+    exact (ContextualValueFrontierState.queuePrefixesAvailable_eq_true_iff
+      current.payload.frontier).mp prefixesAvailable item itemQueued
+  have itemNotRest : item ∉ rest := by
+    exact (List.nodup_cons.mp (queueEq ▸ queueNodup)).1
+  constructor
+  · intro candidate member
+    have restMember : candidate ∈ rest := by
+      rw [frontierEq] at member
+      exact member
+    have candidateQueued : candidate ∈ current.payload.frontier.queue := by
+      rw [queueEq]
+      exact List.mem_cons_of_mem item restMember
+    have initial := safe.queuedSourceFresh candidate candidateQueued
+    have different : candidate ≠ item := by
+      intro equal
+      exact itemNotRest (equal ▸ restMember)
+    have addressNe :
+        (.linear .L08_frontierDequeue (contextualLinearKey candidate) :
+          UnitAddress tokens) ≠ address := by
+      intro equal
+      simp only [address, UnitAddress.linear.injEq, true_and] at equal
+      exact different (contextualLinearKey_injective equal)
+    unfold PhaseCValueSourceFresh at initial ⊢
+    rw [usedEq]
+    refine ⟨by simp [addressNe, initial.1], ?_, ?_, ?_⟩
+    · intro predicted productionMember
+      simp [address, initial.2.1 predicted productionMember]
+    · simp [address, initial.2.2.1]
+    · simp [address, initial.2.2.2]
+  · intro candidate member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp only [address, UnitAddress.linear.injEq, true_and] at equal
+      rw [contextualLinearKey_injective equal, prefixEq]
+      exact itemPresent
+    · rw [prefixEq]
+      exact safe.dequeueUsedPresent candidate old
+  · intro candidate predicted productionMember member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · rw [prefixEq]
+      exact safe.predictionUsedPresent candidate predicted productionMember old
+  · intro candidate member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · rw [prefixEq]
+      exact safe.scanTraversalUsedPresent candidate old
+  · intro candidate member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · rw [prefixEq]
+      exact safe.scanActionUsedPresent candidate old
+  · intro candidate member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · rw [prefixEq]
+      exact safe.insertUsedPresent candidate old
+  · intro candidate member
+    rw [usedEq, List.mem_cons] at member
+    rcases member with equal | old
+    · simp [address] at equal
+    · rw [prefixEq]
+      exact safe.epsilonActionUsedPresent candidate old
+  · intro waiting finished member
+    rw [usedEq, List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact Or.inr (safe.completionTraversalAttempted waiting finished old)
+  · intro waiting finished member
+    rw [usedEq, List.mem_cons] at member ⊢
+    rcases member with equal | old
+    · simp [address] at equal
+    · exact Or.inr (safe.completionActionAttempted waiting finished old)
 
 /-- Static readiness for one retained packed edge, relative to the dequeued
 source and the state at the current fold position. Irrelevant completions and
