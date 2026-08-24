@@ -198,6 +198,53 @@ theorem rootlessExecutableProgress_of_checkedFrontierTablesAt
       ⟨potential, completion, prediction⟩)
     postEof
 
+/-- For an observed recognition result, all remaining frontier components are
+four executable checks: coverage, two rank tables, and post-EOF closure. -/
+theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_checkedTablesAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+    ∀ (cursor : Boundary tokens),
+      GreatestReachableCursor
+        file tokens result.memo correct final cursor →
+      ∀ potential : FrontierGrammarPotential tokens,
+        frontierCoverageTable owned correct final cursor = true →
+        frontierCompletionRankTable
+          owned correct final cursor potential = true →
+        frontierPredictionRankTable
+          owned correct final cursor potential = true →
+        result.postLogicalEofTerminalClosedBool = true →
+          RootlessExecutableProgress
+            file tokens result.memo correct final := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  change ∀ (cursor : Boundary tokens),
+    GreatestReachableCursor file tokens result.memo correct final cursor →
+    ∀ potential : FrontierGrammarPotential tokens,
+      frontierCoverageTable owned correct final cursor = true →
+      frontierCompletionRankTable
+        owned correct final cursor potential = true →
+      frontierPredictionRankTable
+        owned correct final cursor potential = true →
+      result.postLogicalEofTerminalClosedBool = true →
+        RootlessExecutableProgress file tokens result.memo correct final
+  intro cursor greatest potential coverage completion prediction postEof
+  have forcesRoot :=
+    (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true_iff
+      file tokens owned result selected).mp postEof
+  change PostLogicalEofTerminalWaitForcesRoot
+    file tokens result.memo correct final at forcesRoot
+  exact rootlessExecutableProgress_of_checkedFrontierTablesAt
+    owned greatest coverage potential completion prediction forcesRoot
+
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
