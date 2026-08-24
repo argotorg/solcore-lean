@@ -36455,4 +36455,57 @@ theorem executeObservedContextualValueWorklistMulti?_valueTrace
   rw [recognitionExact]
   exact trace
 
+/-- Internal semantic worklists projected to the public liveness carrier. -/
+private def phaseCValuePublicResult
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    ContextualValueWorklistResult file tokens := {
+  recognition := {
+    memo := current.payload.recognition.phaseC.memo
+    items := current.payload.recognition.phaseC.contextualItems
+    edges := current.payload.recognition.phaseC.contextualEdges
+  }
+  frontier := current.payload.frontier
+}
+
+/-- Semantic initialization establishes pending materialization: its only
+available prefix is the canonical root, which is still queued. -/
+private theorem beginPhaseCValueWorklist?_materializationPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    (phaseCValuePublicResult result).RecognitionMaterializationPending := by
+  have exact := beginPhaseCValueWorklist?_exact current result selected
+  constructor
+  · change result.payload.frontier.prefixMemberBool _ = true
+    rw [exact.2.2.2]
+    rfl
+  · intro waiting predicted waitingMember waitingPresent next enabled
+    right
+    change result.payload.frontier.prefixMemberBool waiting = true at waitingPresent
+    change waiting ∈ result.payload.frontier.queue
+    rw [exact.2.2.2] at waitingPresent ⊢
+    simp only [ContextualValueFrontierState.prefixMemberBool,
+      List.any_cons, decide_eq_true_eq, List.any_nil, Bool.or_false]
+      at waitingPresent
+    simp [waitingPresent]
+  · intro retained before after cursor retainedMember shape beforePresent
+    right
+    change result.payload.frontier.prefixMemberBool before = true at beforePresent
+    change before ∈ result.payload.frontier.queue
+    rw [exact.2.2.2] at beforePresent ⊢
+    simp only [ContextualValueFrontierState.prefixMemberBool,
+      List.any_cons, decide_eq_true_eq, List.any_nil, Bool.or_false]
+      at beforePresent
+    simp [beforePresent]
+  · intro retained waiting finished after shared retainedMember shape
+      waitingPresent reductionSome
+    change (result.payload.frontier.lookupReduction? finished).isSome = true at reductionSome
+    have empty : result.payload.frontier.lookupReduction? finished = none := by
+      rw [exact.2.2.2]
+      rfl
+    rw [empty] at reductionSome
+    simp at reductionSome
+
 end Solcore.Surface.Multi.Chart
