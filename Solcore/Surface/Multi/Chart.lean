@@ -10779,6 +10779,66 @@ theorem witnessedContextualCompletedEdge?_erase
   split <;> try rfl
   split <;> rfl
 
+/-- The semantic value attached to one exact consumed contextual prefix. -/
+structure ContextualPrefixValue
+    (file : WorkspaceFile) (tokens : List Token)
+    (item : ContextualItemKey tokens) where
+  value : PrefixValues file tokens item
+
+/-- The semantic result attached to one exact completed contextual item. -/
+structure ContextualReductionValue
+    (file : WorkspaceFile) (tokens : List Token)
+    (item : ContextualItemKey tokens) where
+  value : NonterminalValue file tokens item.raw.production.lhs
+
+namespace ContextualPrefixValue
+
+/-- Start the semantic frontier at an exact dot-zero item. -/
+def zero
+    {file : WorkspaceFile} {tokens : List Token}
+    (item : ContextualItemKey tokens)
+    (atZero : item.raw.dot.val = 0) :
+    ContextualPrefixValue file tokens item :=
+  ⟨PrefixValues.zeroValue item atZero⟩
+
+/-- Traverse one witnessed terminal edge. -/
+def scan
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualScannedEdge file tokens)
+    (prior : ContextualPrefixValue file tokens edge.before) :
+    ContextualPrefixValue file tokens edge.after :=
+  ⟨PrefixValues.scanValue edge.before edge.after edge.witness.terminal
+    edge.witness.next edge.witness.matched edge.witness.advance prior.value⟩
+
+/-- Traverse one witnessed completion edge with its computed child value. -/
+def complete
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualCompletedEdge file tokens)
+    (prior : ContextualPrefixValue file tokens edge.waiting)
+    (child : ContextualReductionValue file tokens edge.finished) :
+    ContextualPrefixValue file tokens edge.after :=
+  ⟨PrefixValues.completeValue edge.waiting edge.finished edge.after
+    edge.witness.next edge.witness.advance prior.value child.value⟩
+
+end ContextualPrefixValue
+
+namespace ContextualReductionValue
+
+/-- Apply the generated production action to one exact complete prefix. -/
+def reduce
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (ordered : item.raw.origin.val ≤ item.raw.current.val)
+    (isComplete : CompleteItem item.raw)
+    (prior : ContextualPrefixValue file tokens item) :
+    ContextualReductionValue file tokens item :=
+  ⟨executeProductionAction file tokens item.raw.origin item.raw.current
+    item.raw.production owned ordered
+    (PrefixValues.fullValue item isComplete prior.value)⟩
+
+end ContextualReductionValue
+
 end Chart
 
 namespace Chart
