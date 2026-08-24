@@ -199,4 +199,60 @@ theorem contextualReach_terminal_step_strict
           _ = _ := witness.next.2
       exact GrammarSymbol.noConfusion (Option.some.inj impossible)
 
+/-- A reached item immediately after its first terminal recovers the exact
+matched terminal, starting at the item's production origin. -/
+theorem contextualReach_one_terminal
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {item : ContextualItemKey tokens}
+    {terminal : TerminalSymbol}
+    (reached : ContextualReach file tokens memo correct final item)
+    (one : item.raw.dot.val = 1)
+    (selected : item.raw.production.rhs[0]? = some (.terminal terminal)) :
+    ∃ matched : MatchedTerminal file tokens terminal,
+      matched.cursor.beforeBoundary = item.raw.origin ∧
+      matched.cursor.afterBoundary = item.raw.current := by
+  cases reached with
+  | root => contradiction
+  | predict => contradiction
+  | scan before target cursor beforeReached structural =>
+      rcases structural.1 with
+        ⟨scannedTerminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with ⟨productionEq, dotEq, originEq, currentEq⟩
+      have beforeZero : before.raw.dot.val = 0 := by omega
+      have terminalEq : terminal = scannedTerminal := by
+        apply GrammarSymbol.terminal.inj
+        apply Option.some.inj
+        calc
+          some (GrammarSymbol.terminal terminal) =
+              item.raw.production.rhs[0]? := selected.symm
+          _ = before.raw.production.rhs[0]? := congrArg
+            (fun production : ProductionId => production.rhs[0]?) productionEq
+          _ = before.raw.production.rhs[before.raw.dot.val]? := by rw [beforeZero]
+          _ = some (GrammarSymbol.terminal scannedTerminal) := next.2
+      subst scannedTerminal
+      have beforeOriginCurrent := contextualReach_zero_origin_eq_current
+        beforeReached beforeZero
+      refine ⟨⟨cursor, value, span, terminalAt, terminalMatches⟩, ?_, ?_⟩
+      · exact atCurrent.trans
+          (beforeOriginCurrent.symm.trans originEq.symm)
+      · exact currentEq.symm
+  | complete waiting child target shared waitingReached childReached structural =>
+      obtain ⟨witness⟩ := packedEdge_completed_valid_iff.mp structural.1
+      have waitingZero : waiting.raw.dot.val = 0 := by
+        have advanced := witness.advance.2.1
+        omega
+      have impossible : some (GrammarSymbol.terminal terminal) =
+          some (GrammarSymbol.nonterminal child.raw.production.lhs) := by
+        calc
+          _ = item.raw.production.rhs[0]? := selected.symm
+          _ = waiting.raw.production.rhs[0]? := congrArg
+            (fun production : ProductionId => production.rhs[0]?)
+              witness.advance.1
+          _ = waiting.raw.production.rhs[waiting.raw.dot.val]? := by
+            rw [waitingZero]
+          _ = _ := witness.next.2
+      exact GrammarSymbol.noConfusion (Option.some.inj impossible)
+
 end Solcore.Surface.Multi
