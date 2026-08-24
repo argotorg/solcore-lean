@@ -11108,6 +11108,54 @@ theorem lookupReduction?_isSome_iff
           · exact False.elim (different equal)
           · exact ⟨candidate, member, equal⟩
 
+/-- A successful dependent prefix lookup returns the transported value of an
+actual retained entry. -/
+theorem lookupPrefix?_some_entry
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (result : ContextualPrefixValue file tokens item)
+    (selected : state.lookupPrefix? item = some result) :
+    ∃ entry, entry ∈ state.prefixes ∧
+      ∃ same : entry.item = item, result = same ▸ entry.value := by
+  change lookupPrefixIn? item state.prefixes = some result at selected
+  generalize state.prefixes = entries at selected ⊢
+  induction entries with
+  | nil => simp [lookupPrefixIn?] at selected
+  | cons entry rest induction =>
+      simp only [lookupPrefixIn?] at selected
+      split at selected
+      next same =>
+        exact ⟨entry, by simp, same, (Option.some.inj selected).symm⟩
+      next different =>
+        obtain ⟨retained, member, same, resultEq⟩ := induction selected
+        exact ⟨retained, List.mem_cons_of_mem entry member,
+          same, resultEq⟩
+
+/-- A successful dependent reduction lookup returns the transported value of
+an actual retained entry. -/
+theorem lookupReduction?_some_entry
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (result : ContextualReductionValue file tokens item)
+    (selected : state.lookupReduction? item = some result) :
+    ∃ entry, entry ∈ state.reductions ∧
+      ∃ same : entry.item = item, result = same ▸ entry.reduction := by
+  change lookupReductionIn? item state.reductions = some result at selected
+  generalize state.reductions = entries at selected ⊢
+  induction entries with
+  | nil => simp [lookupReductionIn?] at selected
+  | cons entry rest induction =>
+      simp only [lookupReductionIn?] at selected
+      split at selected
+      next same =>
+        exact ⟨entry, by simp, same, (Option.some.inj selected).symm⟩
+      next different =>
+        obtain ⟨retained, member, same, resultEq⟩ := induction selected
+        exact ⟨retained, List.mem_cons_of_mem entry member,
+          same, resultEq⟩
+
 /-- Look up the reduction at the one canonical whole-input module item. -/
 def lookupModuleReduction?
     {file : WorkspaceFile} {tokens : List Token}

@@ -12606,6 +12606,43 @@ def ValuesCoherent
     CoherentReduction file tokens memo correct final
       entry.item entry.reduction.value
 
+/-- Dependent prefix lookup exposes a coherent value from a coherent ledger. -/
+theorem lookupPrefix?_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (result : ContextualPrefixValue file tokens item)
+    (coherent : ValuesCoherent memo correct final state)
+    (selected : state.lookupPrefix? item = some result) :
+    CoherentPrefix file tokens memo correct final item result.value := by
+  obtain ⟨entry, member, same, resultEq⟩ :=
+    lookupPrefix?_some_entry state item result selected
+  subst item
+  cases resultEq
+  simpa using coherent.1 entry member
+
+/-- Dependent reduction lookup exposes a coherent value from a coherent
+ledger. -/
+theorem lookupReduction?_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (result : ContextualReductionValue file tokens item)
+    (coherent : ValuesCoherent memo correct final state)
+    (selected : state.lookupReduction? item = some result) :
+    CoherentReduction file tokens memo correct final item result.value := by
+  obtain ⟨entry, member, same, resultEq⟩ :=
+    lookupReduction?_some_entry state item result selected
+  subst item
+  cases resultEq
+  simpa using coherent.2 entry member
+
 /-- The empty frontier contains no incoherent semantic value. -/
 @[simp] theorem empty_valuesCoherent
     {file : WorkspaceFile} {tokens : List Token}
