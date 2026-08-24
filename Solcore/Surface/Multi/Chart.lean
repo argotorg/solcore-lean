@@ -32988,6 +32988,154 @@ private theorem Counter.units_le_of_used_subset
     current.units ≤ result.units := by
   exact nodup_length_le_of_subset current.unique subset
 
+/-- Folding semantic predictions never removes an already consumed unit. -/
+private theorem attemptPhaseCValuePredictions?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        current.counter.usedRev ⊆ result.counter.usedRev := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact fun _ => id
+  | cons predicted rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact fun address member => induction next result restEq
+        (attemptPhaseCValuePrediction?_used_mono owned current next waiting
+          predicted nextEq member)
+
+/-- Constructor dispatch for retained scans preserves the consumed ledger. -/
+private theorem attemptPhaseCPackedScannedEdge?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact attemptPhaseCScannedEdge?_used_mono owned source {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      } current result selected
+  | completed =>
+      cases selected
+      exact fun _ => id
+
+/-- Folding retained scans never removes an already consumed unit. -/
+private theorem attemptPhaseCRetainedScannedEdges?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        current.counter.usedRev ⊆ result.counter.usedRev := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact fun _ => id
+  | cons edge rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact fun address member => induction next result restEq
+        (attemptPhaseCPackedScannedEdge?_used_mono owned source edge current
+          next nextEq member)
+
+/-- Constructor dispatch for retained completions preserves the ledger. -/
+private theorem attemptPhaseCPackedCompletedEdge?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned =>
+      cases selected
+      exact fun _ => id
+  | completed waiting finished after shared =>
+      exact attemptPhaseCCompletedEdge?_used_mono owned source {
+        waiting := waiting
+        finished := finished
+        after := after
+        shared := shared
+        structural := structural
+      } current result selected
+
+/-- Folding retained completions never removes an already consumed unit. -/
+private theorem attemptPhaseCRetainedCompletedEdges?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        current.counter.usedRev ⊆ result.counter.usedRev := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact fun _ => id
+  | cons edge rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact fun address member => induction next result restEq
+        (attemptPhaseCPackedCompletedEdge?_used_mono owned source edge current
+          next nextEq member)
+
+/-- Processing one semantic source only grows the global consumed ledger. -/
+private theorem processPhaseCValueItem?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : processPhaseCValueItem? owned source current = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold processPhaseCValueItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  exact fun address member =>
+    attemptPhaseCRetainedCompletedEdges?_used_mono owned source _ scanned result
+      completedEq
+        (attemptPhaseCRetainedScannedEdges?_used_mono owned source _ predicted
+          scanned scannedEq
+            (attemptPhaseCValuePredictions?_used_mono owned source _ current
+              predicted predictedEq member))
+
 private theorem insertContextualScannedEdge?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
