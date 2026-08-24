@@ -4,6 +4,7 @@ import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Measure
 import Solcore.Surface.Multi.NonAssociativeOptionalStrict
 import Solcore.Surface.Multi.OperandBoundaryExclusion
+import Solcore.Surface.Multi.RootlessNormalizationRank
 
 set_option autoImplicit false
 
