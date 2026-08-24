@@ -26321,6 +26321,16 @@ private def executeObservedPhaseABCWorklistMulti?
   let phaseB ← executeObservedPhaseAB? file tokens owned
   executePhaseCWorklistMulti? owned phaseB
 
+/-- Run semantic evaluation over the saturated multi-ledger recognition
+worklist without discarding the shared one-use counter. -/
+private def executeObservedPhaseABCValueWorklist?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) := do
+  let recognition ←
+    executeObservedPhaseABCWorklistMulti? file tokens owned
+  executePhaseCValueWorklist? owned recognition
+
 /-- Unconditional totality of the observed A/B prefix followed by the bounded
 multi-ledger Phase-C executor. -/
 private theorem executeObservedPhaseABCWorklistMulti?_total
@@ -26728,6 +26738,29 @@ namespace Solcore.Surface.Multi.Chart
 
 open Grammar
 open Solcore.Workspace
+
+/-- Public proof-free view of saturated recognition together with its
+item-keyed semantic frontier. -/
+structure ContextualValueWorklistResult
+    (file : WorkspaceFile) (tokens : List Token) where
+  recognition : ContextualWorklistResult file tokens
+  frontier : ContextualValueFrontierState file tokens
+
+/-- Run saturated multi-ledger recognition followed by semantic frontier
+evaluation. Failure remains explicit until semantic totality is proved. -/
+def executeObservedContextualValueWorklistMulti?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (ContextualValueWorklistResult file tokens) := do
+  let result ← executeObservedPhaseABCValueWorklist? file tokens owned
+  pure {
+    recognition := {
+      memo := result.payload.recognition.phaseC.memo
+      items := result.payload.recognition.phaseC.contextualItems
+      edges := result.payload.recognition.phaseC.contextualEdges
+    }
+    frontier := result.payload.frontier
+  }
 
 /-- Public proof-free view of the total Phase-C executor.  Internally it uses
 the multi-valued completion ledger, so distinct completed edges targeting the
