@@ -18296,6 +18296,139 @@ def EnabledNonterminalCoverageAt
             context := descendContext waiting production
           }
 
+/-- The finite grammar-table rows whose left-hand side matches one selected
+nonterminal and whose exact prediction instance is enabled. -/
+def enabledProductionsForNonterminal
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens)
+    (symbol : NonterminalSymbol) : List ProductionId :=
+  allProductionIds.filter fun production =>
+    decide (production.lhs = symbol) &&
+      @decide
+        (EnabledProductionInstance file tokens memo correct final {
+          production := production
+          origin := waiting.raw.current
+          context := descendContext waiting production
+        })
+        (enabledProductionInstanceDecision correct final _)
+
+/-- Membership in the finite enabled-production table is exactly matching the
+selected nonterminal and satisfying its finalized guard instance. -/
+theorem enabledProductionsForNonterminal_mem_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens)
+    (symbol : NonterminalSymbol)
+    (production : ProductionId) :
+    production ∈ enabledProductionsForNonterminal
+        correct final waiting symbol ↔
+      production.lhs = symbol ∧
+        EnabledProductionInstance file tokens memo correct final {
+          production := production
+          origin := waiting.raw.current
+          context := descendContext waiting production
+        } := by
+  simp only [enabledProductionsForNonterminal, List.mem_filter,
+    Bool.and_eq_true, decide_eq_true_iff,
+    allProductionIds_complete, true_and]
+
+/-- Nonterminal coverage is exactly nonemptiness of the finite enabled row
+list for every nonterminal actually selected by the waiting item. -/
+theorem enabledNonterminalCoverageAt_iff_finite_nonempty
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens) :
+    EnabledNonterminalCoverageAt file tokens memo correct final waiting ↔
+      ∀ symbol,
+        NextSymbol waiting.raw (.nonterminal symbol) →
+          enabledProductionsForNonterminal
+            correct final waiting symbol ≠ [] := by
+  constructor
+  · intro coverage symbol next empty
+    rcases coverage symbol next with ⟨production, lhs, enabled⟩
+    have member := (enabledProductionsForNonterminal_mem_iff
+      correct final waiting symbol production).mpr ⟨lhs, enabled⟩
+    rw [empty] at member
+    simp at member
+  · intro nonempty symbol next
+    obtain ⟨production, member⟩ := List.exists_mem_of_ne_nil
+      (enabledProductionsForNonterminal correct final waiting symbol)
+      (nonempty symbol next)
+    exact ⟨production, (enabledProductionsForNonterminal_mem_iff
+      correct final waiting symbol production).mp member⟩
+
+/-- Exact nonterminal coverage is constructively decidable by inspecting the
+single next symbol and the finite enabled-production table. -/
+def enabledNonterminalCoverageAtDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens) :
+    Decidable
+      (EnabledNonterminalCoverageAt
+        file tokens memo correct final waiting) := by
+  cases lookup : waiting.raw.production.rhs[waiting.raw.dot.val]? with
+  | none =>
+      apply isTrue
+      intro symbol next
+      unfold NextSymbol at next
+      rw [lookup] at next
+      simp at next
+  | some selected =>
+      cases selected with
+      | terminal terminal =>
+          apply isTrue
+          intro symbol next
+          unfold NextSymbol at next
+          rw [lookup] at next
+          simp at next
+      | nonterminal symbol =>
+          have inRange :
+              waiting.raw.dot.val <
+                waiting.raw.production.rhs.length := by
+            by_cases inRange : waiting.raw.dot.val <
+                waiting.raw.production.rhs.length
+            · exact inRange
+            · have atLeast : waiting.raw.production.rhs.length ≤
+                  waiting.raw.dot.val := Nat.le_of_not_gt inRange
+              rw [List.getElem?_eq_none atLeast] at lookup
+              contradiction
+          have next :
+              NextSymbol waiting.raw (.nonterminal symbol) :=
+            ⟨inRange, lookup⟩
+          cases table : enabledProductionsForNonterminal
+              correct final waiting symbol with
+          | nil =>
+              apply isFalse
+              intro coverage
+              have nonempty :=
+                (enabledNonterminalCoverageAt_iff_finite_nonempty
+                  correct final waiting).mp coverage symbol next
+              exact nonempty table
+          | cons production rest =>
+              apply isTrue
+              apply (enabledNonterminalCoverageAt_iff_finite_nonempty
+                correct final waiting).mpr
+              intro other otherNext
+              have selectedEq : other = symbol := by
+                have symbolEq :
+                    some (GrammarSymbol.nonterminal other) =
+                      some (GrammarSymbol.nonterminal symbol) :=
+                  otherNext.2.symm.trans lookup
+                exact GrammarSymbol.nonterminal.inj
+                  (Option.some.inj symbolEq)
+              subst other
+              rw [table]
+              simp
+
 /-- One frontier item is either complete, waits for a terminal, advances
 through an enabled epsilon child, or predicts an enabled nonempty child. -/
 def FrontierNormalizationStep
