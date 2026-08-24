@@ -161,5 +161,46 @@ theorem terminalFrontierWait_of_rootless_rankedNormalization
   · exact waiting
   · exact (rootAbsent rootReached).elim
 
+/-- The remaining logical-EOF closure fact: a terminal wait at the boundary
+after logical EOF can occur only when saturation also contains the completed
+module root. -/
+def PostLogicalEofTerminalWaitForcesRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) : Prop :=
+  ∀ cursor,
+    GreatestReachableCursor file tokens memo correct final cursor →
+    TerminalFrontierWait file tokens memo correct final cursor →
+    cursor.val = tokens.length + 1 →
+      ContextualReach file tokens memo correct final
+        (CanonicalCompleteRootItem tokens .module
+          (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)
+
+/-- Under post-EOF closure, a rootless terminal frontier is necessarily at
+or before logical EOF, where an ordinary observation can be constructed. -/
+theorem greatestCursor_le_logicalEOF_of_rootless_terminalWait
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (waiting : TerminalFrontierWait
+      file tokens memo correct final cursor)
+    (rootAbsent : ¬ ContextualReach file tokens memo correct final
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)) :
+    cursor.val ≤ tokens.length := by
+  apply Nat.le_of_not_gt
+  intro pastEof
+  have afterEof : cursor.val = tokens.length + 1 := by
+    have bounded := cursor.isLt
+    omega
+  exact rootAbsent (postEof cursor greatest waiting afterEof)
+
 
 end Solcore.Surface.Multi

@@ -29,6 +29,35 @@ def RootlessExecutableProgress
           RankedFrontierNormalization
             file tokens memo correct final cursor
 
+/-- Coverage, ranked normalization, and post-EOF closure jointly supply the
+exact rootless progress interface consumed by the executable outcome. -/
+theorem rootlessExecutableProgress_of_components
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (coverage : ∀ cursor,
+      GreatestReachableCursor file tokens memo correct final cursor →
+        ∀ waiting,
+          FrontierReach file tokens memo correct final cursor waiting →
+            EnabledNonterminalCoverageAt
+              file tokens memo correct final waiting)
+    (ranked : ∀ cursor,
+      GreatestReachableCursor file tokens memo correct final cursor →
+        RankedFrontierNormalization
+          file tokens memo correct final cursor)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  intro cursor greatest rootAbsent
+  have waiting := terminalFrontierWait_of_rootless_rankedNormalization
+    greatest (coverage cursor greatest) (ranked cursor greatest) rootAbsent
+  exact ⟨
+    greatestCursor_le_logicalEOF_of_rootless_terminalWait
+      postEof greatest waiting rootAbsent,
+    coverage cursor greatest,
+    ranked cursor greatest⟩
+
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
