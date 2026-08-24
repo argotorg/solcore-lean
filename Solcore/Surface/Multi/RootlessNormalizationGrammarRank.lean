@@ -162,6 +162,101 @@ theorem frontierGrammarRank_lt_predicted_of_positiveSpan
   apply frontierRawGrammarRank_lt_of_potential_lt
   exact frontierSpanPotential_predicted_lt_of_positiveSpan
     width zero positive zeroBound waiting production progress
+
+/-- Boundary-free rank of one dotted production in the zero-span mode. -/
+def frontierZeroSpanGrammarRank
+    (zero : ProductionId → Nat) (dotted : DottedRhs) : Nat :=
+  (D + 1) * zero dotted.production +
+    (dotted.production.rhs.length - dotted.dot.val)
+
+/-- The canonical dot-zero child of one boundary-free prediction cell. -/
+def frontierZeroSpanPredictedDotted
+    (production : ProductionId) : DottedRhs := {
+  production := production
+  dot := ⟨0, Nat.zero_lt_succ _⟩
+}
+
+/-- One admissible zero-span grammar edge checks strict prediction descent. -/
+def frontierZeroSpanPredictionRankCell
+    (admissible : DottedRhs → Bool) (zero : ProductionId → Nat)
+    (waiting : DottedRhs) (production : ProductionId) : Bool :=
+  if admissible waiting then
+    if waiting.production.rhs[waiting.dot.val]? =
+        some (.nonterminal production.lhs) then
+      if production.rhs ≠ [] then
+        decide (frontierZeroSpanGrammarRank zero
+            (frontierZeroSpanPredictedDotted production) <
+          frontierZeroSpanGrammarRank zero waiting)
+      else true
+    else true
+  else true
+
+/-- Finite zero-span dependency table over dotted productions. -/
+def frontierZeroSpanPredictionRankTable
+    (admissible : DottedRhs → Bool)
+    (zero : ProductionId → Nat) : Bool :=
+  allDottedRhs.all fun waiting =>
+    allProductionIds.all fun production =>
+      frontierZeroSpanPredictionRankCell admissible zero waiting production
+
+/-- An accepted zero-span table supplies every selected admissible edge. -/
+theorem frontierZeroSpanPredictionRank_lt_of_table
+    (admissible : DottedRhs → Bool) (zero : ProductionId → Nat)
+    (checked : frontierZeroSpanPredictionRankTable admissible zero = true)
+    (waiting : DottedRhs) (production : ProductionId)
+    (waitingAdmissible : admissible waiting = true)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal production.lhs))
+    (nonempty : production.rhs ≠ []) :
+    frontierZeroSpanGrammarRank zero
+        (frontierZeroSpanPredictedDotted production) <
+      frontierZeroSpanGrammarRank zero waiting := by
+  have row := (List.all_eq_true.mp checked) waiting
+    (allDottedRhs_complete waiting)
+  have cell := (List.all_eq_true.mp row) production
+    (allProductionIds_complete production)
+  simp only [frontierZeroSpanPredictionRankCell] at cell
+  rw [if_pos waitingAdmissible, if_pos next, if_pos nonempty] at cell
+  exact decide_eq_true_iff.mp cell
+
+/-- Exact finite membership test for dotted shapes represented by a reached
+zero-span item on the selected frontier. -/
+def frontierReachedZeroSpanDottedBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (dotted : DottedRhs) : Bool :=
+  (allContextualItems tokens).any fun waiting =>
+    letI : Decidable
+        (ContextualReach file tokens memo correct final waiting) :=
+      contextualReachDecision owned correct final waiting
+    decide (ContextualReach file tokens memo correct final waiting) &&
+      decide (waiting.raw.current = cursor) &&
+      decide (waiting.raw.origin = waiting.raw.current) &&
+      decide ((⟨waiting.raw.production, waiting.raw.dot⟩ : DottedRhs) = dotted)
+
+/-- Every reached zero-span frontier item activates its exact dotted shape. -/
+theorem frontierReachedZeroSpanDottedBool_eq_true_of_reached
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (waiting : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final waiting)
+    (current : waiting.raw.current = cursor)
+    (atOrigin : waiting.raw.origin = waiting.raw.current) :
+    frontierReachedZeroSpanDottedBool owned correct final cursor
+      ⟨waiting.raw.production, waiting.raw.dot⟩ = true := by
+  unfold frontierReachedZeroSpanDottedBool
+  apply List.any_eq_true.mpr
+  refine ⟨waiting, allContextualItems_complete waiting, ?_⟩
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  simp [reached, current, atOrigin]
 private def nextSymbolDecision
     {tokens : List Token} (item : DottedItem tokens)
     (symbol : GrammarSymbol) : Decidable (NextSymbol item symbol) := by
@@ -559,6 +654,67 @@ theorem frontierPredictionRankTable_eq_true_of_zeroSpan
       · simp [frontierPredictionRankCell, reached, current, next]
     · simp [frontierPredictionRankCell, reached, current]
   · simp [frontierPredictionRankCell, reached]
+
+/-- A finite boundary-free zero-span table, plus exact admissibility coverage,
+discharges the complete contextual prediction table. -/
+theorem frontierPredictionRankTable_eq_true_of_zeroSpanTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (zeroBound : ∀ production, zero production < width)
+    (admissible : DottedRhs → Bool)
+    (admissibleAt : ∀ waiting,
+      ContextualReach file tokens memo correct final waiting →
+      waiting.raw.current = cursor →
+      waiting.raw.origin = waiting.raw.current →
+      admissible {
+        production := waiting.raw.production
+        dot := waiting.raw.dot
+      } = true)
+    (checked : frontierZeroSpanPredictionRankTable
+      admissible zero = true) :
+    frontierPredictionRankTable owned correct final cursor
+      (frontierSpanPotential width zero positive) = true := by
+  apply frontierPredictionRankTable_eq_true_of_zeroSpan
+    owned correct final cursor width zero positive zeroBound
+  intro waiting production reached current atOrigin next _enabled nonempty
+  let dotted : DottedRhs := {
+    production := waiting.raw.production
+    dot := waiting.raw.dot
+  }
+  have decreases := frontierZeroSpanPredictionRank_lt_of_table
+    admissible zero checked dotted production
+      (admissibleAt waiting reached current atOrigin) next.2 nonempty
+  simpa only [dotted, frontierGrammarRank, frontierRawGrammarRank,
+    frontierSpanPotential, FrontierPredictedItem,
+    frontierZeroSpanGrammarRank, frontierZeroSpanPredictedDotted,
+    frontierRhsRemaining, if_pos atOrigin, if_true] using decreases
+
+/-- The exact reached-zero-span dotted graph is sufficient for every
+contextual prediction row; no separate admissibility proof is exposed. -/
+theorem frontierPredictionRankTable_eq_true_of_reachedZeroSpanTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (zeroBound : ∀ production, zero production < width)
+    (checked : frontierZeroSpanPredictionRankTable
+      (frontierReachedZeroSpanDottedBool owned correct final cursor)
+      zero = true) :
+    frontierPredictionRankTable owned correct final cursor
+      (frontierSpanPotential width zero positive) = true := by
+  apply frontierPredictionRankTable_eq_true_of_zeroSpanTable
+    owned correct final cursor width zero positive zeroBound
+      (frontierReachedZeroSpanDottedBool owned correct final cursor)
+  · intro waiting reached current atOrigin
+    exact frontierReachedZeroSpanDottedBool_eq_true_of_reached
+      owned correct final cursor waiting reached current atOrigin
+  · exact checked
 theorem frontierPredictionRank_lt_of_table
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
