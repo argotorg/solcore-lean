@@ -38663,6 +38663,129 @@ private theorem dequeueProcessPhaseCValueItem?_materializationPending
   · exact processPhaseCValueItem?_completionAttemptMaterialized owned source
       dequeued result materialized processEq
 
+/-- Pending recognition materialization and its causal U06 invariant survive
+the complete bounded semantic queue drain. -/
+private theorem runPhaseCValueQueue?_materializationPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      OperationalContextualClosure file tokens
+          current.payload.recognition.phaseC.memo
+          current.payload.recognition.phaseC.contextualItems
+          current.payload.recognition.phaseC.contextualEdges →
+      (phaseCValuePublicResult current).RecognitionMaterializationPending →
+      PhaseCValueCompletionAttemptMaterialized current →
+      runPhaseCValueQueue? owned fuel current = some result →
+      (phaseCValuePublicResult result).RecognitionMaterializationPending ∧
+        PhaseCValueCompletionAttemptMaterialized result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result closed pending materialized selected
+      rw [runPhaseCValueQueue?] at selected
+      split at selected
+      · cases selected
+        exact ⟨pending, materialized⟩
+      · contradiction
+  | succ previous induction =>
+      intro current result closed pending materialized selected
+      rw [runPhaseCValueQueue?] at selected
+      cases queueEq : current.payload.frontier.queue with
+      | nil =>
+          simp only [queueEq, Option.some.injEq] at selected
+          subst result
+          exact ⟨pending, materialized⟩
+      | cons item rest =>
+          simp only [queueEq, Option.bind_eq_bind,
+            Option.bind_eq_some_iff] at selected
+          rcases selected with ⟨dequeued, dequeuedEq, processed,
+            processedEq, runEq⟩
+          rcases dequeued with ⟨source, afterDequeue⟩
+          have dequeuedMaterialized :=
+            dequeuePhaseCValueFrontier?_completionAttemptMaterialized current
+              afterDequeue source materialized dequeuedEq
+          have step :=
+            dequeueProcessPhaseCValueItem?_materializationPending owned source
+              current afterDequeue processed closed pending
+                dequeuedMaterialized dequeuedEq processedEq
+          have recognitionEq :=
+            dequeueProcessPhaseCValueItem?_recognition owned source current
+              afterDequeue processed dequeuedEq processedEq
+          have processedClosed : OperationalContextualClosure file tokens
+              processed.payload.recognition.phaseC.memo
+              processed.payload.recognition.phaseC.contextualItems
+              processed.payload.recognition.phaseC.contextualEdges := by
+            rw [recognitionEq]
+            exact closed
+          exact induction processed result processedClosed step.1 step.2 runEq
+
+/-- Recognition closure, initial U06 freshness, and bounded queue execution
+jointly produce the public pending-materialization invariant. -/
+private theorem executePhaseCValueWorklist?_materializationPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (closed : OperationalContextualClosure file tokens
+      current.payload.phaseC.memo current.payload.phaseC.contextualItems
+        current.payload.phaseC.contextualEdges)
+    (fresh : PhaseCValueCompletionAttemptsFresh current.counter)
+    (selected : executePhaseCValueWorklist? owned current = some result) :
+    (phaseCValuePublicResult result).RecognitionMaterializationPending := by
+  unfold executePhaseCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  have exact := beginPhaseCValueWorklist?_exact current entered enteredEq
+  have enteredClosed : OperationalContextualClosure file tokens
+      entered.payload.recognition.phaseC.memo
+      entered.payload.recognition.phaseC.contextualItems
+      entered.payload.recognition.phaseC.contextualEdges := by
+    rw [exact.2.2.1]
+    exact closed
+  exact (runPhaseCValueQueue?_materializationPending owned
+    (chartGBound (tokens.length + 1)) entered result enteredClosed
+      (beginPhaseCValueWorklist?_materializationPending current entered enteredEq)
+      (beginPhaseCValueWorklist?_completionAttemptMaterialized current entered
+        fresh enteredEq) runEq).1
+
+/-- The observed recognition-to-value pipeline establishes pending
+materialization without an external semantic premise. -/
+private theorem executeObservedPhaseABCValueWorklist?_materializationPending
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : executeObservedPhaseABCValueWorklist? file tokens owned =
+      some result) :
+    (phaseCValuePublicResult result).RecognitionMaterializationPending := by
+  unfold executeObservedPhaseABCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨recognition, recognitionEq, valueEq⟩
+  exact executePhaseCValueWorklist?_materializationPending owned recognition
+    result
+      (executeObservedPhaseABCWorklistMulti?_operationalClosure file tokens
+        owned recognition recognitionEq)
+      (executeObservedPhaseABCWorklistMulti?_valueCompletionAttemptsFresh file
+        tokens owned recognition recognitionEq)
+      valueEq
+
+/-- Every successful public semantic execution supplies the pending
+materialization premise required by the queue-empty closure theorem. -/
+theorem executeObservedContextualValueWorklistMulti?_materializationPending
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualValueWorklistResult file tokens)
+    (selected : executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    result.RecognitionMaterializationPending := by
+  unfold executeObservedContextualValueWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCValueWorklist?_materializationPending
+    file tokens owned internal internalEq
+
 end Solcore.Surface.Multi.Chart
 
 namespace Solcore.Surface.Multi.Chart
