@@ -551,6 +551,68 @@ private theorem candidateAt_startByte
       subst token
       rfl
 
+/-- Every normal lexical candidate carries a span owned by its source file. -/
+private theorem candidateAt_span_valid
+    {file : WorkspaceFile}
+    {pendingAssembly : Bool}
+    {cursor : Nat}
+    {candidate : LexicalJudgment.Candidate}
+    (recognized :
+      LexicalJudgment.CandidateAt file pendingAssembly cursor candidate) :
+    candidate.span.ValidFor file := by
+  cases recognized with
+  | lineComment endByte comment recognized =>
+      rcases recognized with ⟨span, tokenEquation⟩
+      subst comment
+      exact (sourceSpan_valid_iff file cursor endByte).mpr span.2.1
+  | blockComment endByte comment recognized =>
+      rcases recognized with ⟨span, tokenEquation⟩
+      subst comment
+      rcases span with
+        ⟨_open, closeCursor, _run, _close, _endEquation, range⟩
+      exact (sourceSpan_valid_iff file cursor endByte).mpr range
+  | string endByte token recognized =>
+      rcases recognized with
+        ⟨spelling, decoded, _quote, _contents, sourceText, tokenEquation⟩
+      subst token
+      exact (sourceSpan_valid_iff file cursor endByte).mpr sourceText.1
+  | pragmaName endByte token recognized =>
+      rcases recognized with ⟨kind, spelling, tokenEquation⟩
+      subst token
+      exact (sourceSpan_valid_iff file cursor endByte).mpr spelling.1.1
+  | identifier endByte token recognized =>
+      rcases recognized with
+        ⟨text, kind, _valid, sourceText, _classification, tokenEquation⟩
+      subst token
+      exact (sourceSpan_valid_iff file cursor endByte).mpr sourceText.1
+  | decimal endByte token recognized =>
+      rcases recognized with ⟨digits, _valid, sourceText, tokenEquation⟩
+      subst token
+      exact (sourceSpan_valid_iff file cursor endByte).mpr sourceText.1
+  | hexadecimal endByte token recognized =>
+      rcases recognized with ⟨digits, _valid, sourceText, tokenEquation⟩
+      subst token
+      exact (sourceSpan_valid_iff file cursor endByte).mpr sourceText.1
+  | symbol endByte symbol token recognized kind =>
+      rcases recognized with
+        ⟨written, sourceText, _slashGuard, _assemblyGuard, tokenEquation⟩
+      subst token
+      exact (sourceSpan_valid_iff file cursor endByte).mpr sourceText.1
+
+/-- Every opaque assembly token carries the exact owned source span. -/
+private theorem assemblyTokenAt_span_valid
+    {file : WorkspaceFile}
+    {startByte endByte : Nat}
+    {token : Token}
+    (recognized :
+      LexicalJudgment.AssemblyTokenAt file startByte endByte token) :
+    token.span.ValidFor file := by
+  rcases recognized with ⟨slice, sliceAt, tokenEquation⟩
+  subst token
+  rcases sliceAt with
+    ⟨_open, closeCursor, _run, _close, _endEquation, range, _slice⟩
+  exact (sourceSpan_valid_iff file startByte endByte).mpr range
+
 /-- A character suffix paired with its exact starting UTF-8 byte cursor. -/
 private inductive SuffixAt
     (file : WorkspaceFile)
@@ -8087,6 +8149,22 @@ theorem lexer_maximal_munch
   rcases lexer_sound execution with ⟨source, lexical⟩
   rcases lexical with ⟨pendingAssembly, partition⟩
   exact lexesPrefix_retainedTransitions partition
+
+/-- Successful lexer output supplies the parser's token-ownership premise
+without an additional caller proof. -/
+theorem lexer_tokensOwnedBy
+    {file : WorkspaceFile}
+    {lexed : LexedModule}
+    (execution : lexModule file = .ok lexed) :
+    TokensOwnedBy file lexed.tokens := by
+  intro token member
+  rcases (lexer_maximal_munch execution).1 token member with
+      normal | assembly
+  · rcases normal with ⟨pendingAssembly, candidateClass, winner⟩
+    simpa [LexicalJudgment.Candidate.span] using
+      candidateAt_span_valid winner.1
+  · rcases assembly with ⟨endByte, recognized⟩
+    exact assemblyTokenAt_span_valid recognized
 
 private theorem byteAt_functional
     {file : WorkspaceFile}
