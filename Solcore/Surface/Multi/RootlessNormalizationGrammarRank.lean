@@ -54,6 +54,65 @@ private def nextSymbolDecision
     (symbol : GrammarSymbol) : Decidable (NextSymbol item symbol) := by
   unfold NextSymbol
   infer_instance
+/-- One executable enabled-coverage cell.  Only reached items on the selected
+frontier impose a coverage obligation. -/
+def frontierCoverageCell
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (waiting : ContextualItemKey tokens) : Bool :=
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  letI : Decidable (waiting.raw.current = cursor) := inferInstance
+  letI : Decidable
+      (EnabledNonterminalCoverageAt
+        file tokens memo correct final waiting) :=
+    enabledNonterminalCoverageAtDecision correct final waiting
+  if ContextualReach file tokens memo correct final waiting then
+    if waiting.raw.current = cursor then
+      decide (EnabledNonterminalCoverageAt
+        file tokens memo correct final waiting)
+    else true
+  else true
+
+/-- Coverage for every reached item on one frontier is checked over the public
+finite contextual-item carrier. -/
+def frontierCoverageTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) : Bool :=
+  (allContextualItems tokens).all fun waiting =>
+    frontierCoverageCell owned correct final cursor waiting
+
+/-- Acceptance of the finite coverage table supplies the exact proposition
+required by frontier normalization. -/
+theorem enabledNonterminalCoverageAt_of_frontierCoverageTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (checked : frontierCoverageTable owned correct final cursor = true)
+    (waiting : ContextualItemKey tokens)
+    (frontier : FrontierReach
+      file tokens memo correct final cursor waiting) :
+    EnabledNonterminalCoverageAt
+      file tokens memo correct final waiting := by
+  letI : Decidable
+      (EnabledNonterminalCoverageAt
+        file tokens memo correct final waiting) :=
+    enabledNonterminalCoverageAtDecision correct final waiting
+  have cell := (List.all_eq_true.mp checked) waiting
+    (allContextualItems_complete waiting)
+  simp only [frontierCoverageCell] at cell
+  rw [if_pos frontier.2.1, if_pos frontier.2.2] at cell
+  exact decide_eq_true_iff.mp cell
+
 /-- One executable prediction-rank cell.  Its antecedent is the exact
 frontier-local prediction premise, apart from greatest-cursor evidence shared
 by every row. -/

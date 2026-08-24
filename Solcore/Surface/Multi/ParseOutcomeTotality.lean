@@ -168,6 +168,35 @@ theorem rootlessExecutableProgress_of_checkedGrammarPotentialAt
   exact rootlessExecutableProgress_of_grammarComponentsAt
     owned greatest anchored ⟨potential, completion, prediction⟩ postEof
 
+/-- All frontier normalization inputs can be supplied as three executable
+Boolean checks: enabled coverage, completion rank, and prediction rank. -/
+theorem rootlessExecutableProgress_of_checkedFrontierTablesAt
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (coverage : frontierCoverageTable
+      owned correct final cursor = true)
+    (potential : FrontierGrammarPotential tokens)
+    (completion : frontierCompletionRankTable
+      owned correct final cursor potential = true)
+    (prediction : frontierPredictionRankTable
+      owned correct final cursor potential = true)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  exact rootlessExecutableProgress_of_componentsAt greatest
+    (fun waiting frontier =>
+      enabledNonterminalCoverageAt_of_frontierCoverageTable
+        owned correct final cursor coverage waiting frontier)
+    (rankedFrontierNormalization_of_grammarRanked owned
+      ⟨potential, completion, prediction⟩)
+    postEof
+
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
