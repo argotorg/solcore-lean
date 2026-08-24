@@ -5529,6 +5529,77 @@ theorem executeBodyRoot_reduces
   rw [resultEq, ← inputEq, ← openEq, ← statementsEq, ← closeEq]
   exact .body origin finish openBrace statements closeBrace witness
 
+/-- The `for`-statement executor realizes its exact root reduction. -/
+theorem executeForStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .forStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .forStatement)) :
+    RuleReduction file tokens .forStatement origin finish input
+      (executeForStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let initAtom : EbnfExpr := .atom (.nonterminal .forInitItem)
+  let postAtom : EbnfExpr := .atom (.nonterminal .forPostItem)
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .forKw)),
+    .atom (.terminal (.symbol .leftParen)), .list0 initAtom,
+    .atom (.terminal (.symbol .semicolon)),
+    .atom (.nonterminal .expression),
+    .atom (.terminal (.symbol .semicolon)), .list0 postAtom,
+    .atom (.terminal (.symbol .rightParen)),
+    .atom (.nonterminal .body)]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize viewEq : EbnfValue.sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawFor, rawOpen, rawInit, rawFirstSemi, rawCondition,
+    rawSecondSemi, rawPost, rawClose, rawBody, ⟨⟩⟩
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  rw [viewEq] at inputEq
+  let rawInitializers := EbnfValue.list0View initAtom rawInit
+  let initializers := rawInitializers.map (EbnfValue.ruleView .forInitItem)
+  let rawPostItems := EbnfValue.list0View postAtom rawPost
+  let post := rawPostItems.map (EbnfValue.ruleView .forPostItem)
+  have initializersMapEq : initializers.map
+      (EbnfValue.ruleAtom .forInitItem) = rawInitializers :=
+    shortRuleAtoms_of_views .forInitItem rawInitializers
+  have initializersEq : EbnfValue.list0 initAtom
+      (initializers.map (EbnfValue.ruleAtom .forInitItem)) = rawInit := by
+    rw [initializersMapEq]
+    exact EbnfValue.list0_of_view initAtom rawInit
+  have postMapEq : post.map (EbnfValue.ruleAtom .forPostItem) =
+      rawPostItems :=
+    shortRuleAtoms_of_views .forPostItem rawPostItems
+  have postEq : EbnfValue.list0 postAtom
+      (post.map (EbnfValue.ruleAtom .forPostItem)) = rawPost := by
+    rw [postMapEq]
+    exact EbnfValue.list0_of_view postAtom rawPost
+  let forKeyword := EbnfValue.terminalView (.hardKeyword .forKw) rawFor
+  let openParen := EbnfValue.terminalView (.symbol .leftParen) rawOpen
+  let firstSemicolon :=
+    EbnfValue.terminalView (.symbol .semicolon) rawFirstSemi
+  let condition := EbnfValue.ruleView .expression rawCondition
+  let secondSemicolon :=
+    EbnfValue.terminalView (.symbol .semicolon) rawSecondSemi
+  let closeParen := EbnfValue.terminalView (.symbol .rightParen) rawClose
+  let body := EbnfValue.ruleView .body rawBody
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have resultEq : executeForStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input =
+        sourceLoc witness (.forLoop initializers condition post body) := by
+    rw [executeForStatementRoot, viewEq]
+  rw [resultEq, ← inputEq,
+    ← EbnfValue.terminal_of_view (.hardKeyword .forKw) rawFor,
+    ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+    ← initializersEq,
+    ← EbnfValue.terminal_of_view (.symbol .semicolon) rawFirstSemi,
+    ← EbnfValue.rule_of_view .expression rawCondition,
+    ← EbnfValue.terminal_of_view (.symbol .semicolon) rawSecondSemi,
+    ← postEq,
+    ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose,
+    ← EbnfValue.rule_of_view .body rawBody]
+  exact .forStatement origin finish forKeyword openParen initializers
+    firstSemicolon condition secondSemicolon post closeParen body witness
+
 /-- The `for` initializer executor realizes its selected root reduction. -/
 theorem executeForInitItemRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -10599,6 +10670,8 @@ theorem executeRootRule_reduces
       exact executeTypeAtomRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
+  | forStatement =>
+      exact executeForStatementRoot_reduces origin finish ready input
   | forInitItem =>
       exact executeForInitItemRoot_reduces origin finish ready input
   | forPostItem =>
