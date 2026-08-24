@@ -146,6 +146,19 @@ theorem frontierCoverageTable_eq_true_of_reached_matchArmReady
     · simp [frontierCoverageCell, reached, current]
   · simp [frontierCoverageCell, reached]
 
+/-- Reachability discharges every cell of the finite coverage table for the
+fixed grammar. -/
+theorem frontierCoverageTable_eq_true
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) :
+    frontierCoverageTable owned correct final cursor = true := by
+  exact frontierCoverageTable_eq_true_of_reached_matchArmReady
+    owned correct final cursor fun waiting reached =>
+      matchArmPairContextReadyAt_of_reached waiting reached
+
 /-- Executable check that a boundary is reached and bounds every reached
 contextual item. -/
 def greatestReachableCursorBool

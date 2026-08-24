@@ -325,7 +325,7 @@ theorem rootlessFrontierCertificateBool_eq_true_iff
   · rintro ⟨coverage, completion, prediction⟩
     exact ⟨⟨coverage, completion⟩, prediction⟩
 
-/-- Once reached match-arm contexts supply coverage, the only executable
+/-- Fixed-grammar reachability supplies coverage, so the only executable
 residual is the pair of grammar-rank tables. -/
 def rootlessRankCertificateBool
     {file : WorkspaceFile} {tokens : List Token}
@@ -374,17 +374,14 @@ theorem rootlessRankCertificateBool_eq_true_of_boundedSearch
     owned correct final
       (computedGreatestReachableCursor owned correct final) selected
 
-/-- Reached match-arm readiness, two accepted rank tables, and post-EOF
-closure construct the full progress interface. -/
+/-- Two accepted rank tables and post-EOF closure construct the full progress
+interface; fixed-grammar coverage follows from reachability. -/
 theorem rootlessExecutableProgress_of_computedRankTables
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
     {memo : GuardMemo tokens}
     {correct : PhaseBCorrect file tokens memo}
     {final : AllGuardsFinal memo}
-    (ready : ∀ waiting : ContextualItemKey tokens,
-      ContextualReach file tokens memo correct final waiting →
-        MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : rootlessRankCertificateBool
       owned correct final potential = true)
@@ -395,9 +392,8 @@ theorem rootlessExecutableProgress_of_computedRankTables
     (rootlessRankCertificateBool_eq_true_iff
       owned correct final potential).mp accepted
   exact rootlessExecutableProgress_of_computedFrontierTables owned
-    (frontierCoverageTable_eq_true_of_reached_matchArmReady owned
-      correct final (computedGreatestReachableCursor owned correct final)
-      ready)
+    (frontierCoverageTable_eq_true owned correct final
+      (computedGreatestReachableCursor owned correct final))
     potential ranks.1 ranks.2 postEof
 
 /-- Fully executable three-table certificate for the concrete value-carrying
@@ -851,8 +847,8 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_fr
       (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true
         file tokens owned result selected)
 
-/-- For a selected recognition ledger, reached match-arm readiness and the
-two-table rank certificate are the complete remaining progress interface. -/
+/-- For a selected recognition ledger, the two-table rank certificate is the
+complete remaining progress interface. -/
 theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
@@ -863,9 +859,6 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_ra
       file tokens owned result selected
     let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
       file tokens owned result selected
-    (∀ waiting : ContextualItemKey tokens,
-      ContextualReach file tokens result.memo correct final waiting →
-        MatchArmPairContextReadyAt waiting) →
     ∀ potential : FrontierGrammarPotential tokens,
       rootlessRankCertificateBool owned correct final potential = true →
       RootlessExecutableProgress
@@ -874,13 +867,10 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_ra
     file tokens owned result selected
   let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
     file tokens owned result selected
-  change (∀ waiting : ContextualItemKey tokens,
-      ContextualReach file tokens result.memo correct final waiting →
-        MatchArmPairContextReadyAt waiting) →
-    ∀ potential : FrontierGrammarPotential tokens,
+  change ∀ potential : FrontierGrammarPotential tokens,
       rootlessRankCertificateBool owned correct final potential = true →
       RootlessExecutableProgress file tokens result.memo correct final
-  intro ready potential accepted
+  intro potential accepted
   have forcesRoot :=
     (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true_iff
       file tokens owned result selected).mp
@@ -889,7 +879,7 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_ra
   change PostLogicalEofTerminalWaitForcesRoot
     file tokens result.memo correct final at forcesRoot
   exact rootlessExecutableProgress_of_computedRankTables
-    owned ready potential accepted forcesRoot
+    owned potential accepted forcesRoot
 
 /-- The value-carrying executor inherits the reduced frontier certificate from
 its selected recognition ledger. -/
@@ -925,8 +915,8 @@ theorem executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_
     executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
       file tokens owned result.recognition recognitionSelected
 
-/-- The value-carrying executor needs only reached match-arm readiness and
-the reduced two-table rank certificate. -/
+/-- The value-carrying executor needs only the reduced two-table rank
+certificate. -/
 theorem executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
@@ -940,9 +930,6 @@ theorem executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_
       file tokens owned result.recognition recognitionSelected
     let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
       file tokens owned result.recognition recognitionSelected
-    (∀ waiting : ContextualItemKey tokens,
-      ContextualReach file tokens result.recognition.memo correct final waiting →
-        MatchArmPairContextReadyAt waiting) →
     ∀ potential : FrontierGrammarPotential tokens,
       rootlessRankCertificateBool owned correct final potential = true →
       RootlessExecutableProgress
@@ -954,10 +941,7 @@ theorem executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_
     file tokens owned result.recognition recognitionSelected
   let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
     file tokens owned result.recognition recognitionSelected
-  change (∀ waiting : ContextualItemKey tokens,
-      ContextualReach file tokens result.recognition.memo correct final waiting →
-        MatchArmPairContextReadyAt waiting) →
-    ∀ potential : FrontierGrammarPotential tokens,
+  change ∀ potential : FrontierGrammarPotential tokens,
       rootlessRankCertificateBool owned correct final potential = true →
       RootlessExecutableProgress
         file tokens result.recognition.memo correct final
@@ -1099,28 +1083,11 @@ def executeObservedContextualParseOfFrontierCertificate
     (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
       file tokens owned result selected potential accepted)
 
-/-- Executable parse outcome driven by reached match-arm readiness and the
-reduced two-table rank certificate. -/
+/-- Executable parse outcome driven by the reduced two-table rank
+certificate. -/
 def executeObservedContextualParseOfRankCertificate
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : executeObservedContextualRankCertificateBool
       file tokens owned potential = true) :
@@ -1132,30 +1099,13 @@ def executeObservedContextualParseOfRankCertificate
       file tokens owned
   executeObservedContextualParseOfProgress file tokens owned
     (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
-      file tokens owned result selected ready potential accepted)
+      file tokens owned result selected potential accepted)
 
 /-- Executable parse outcome driven by the combined rank and G10 finite
 certificate. -/
 def executeObservedContextualParseOfFormalCertificate
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : executeObservedContextualFormalCertificateBool
       file tokens owned potential = true) :
@@ -1164,37 +1114,20 @@ def executeObservedContextualParseOfFormalCertificate
     (executeObservedContextualFormalCertificateBool_eq_true_iff
       file tokens owned potential).mp accepted
   executeObservedContextualParseOfRankCertificate
-    file tokens owned ready potential checks.1
+    file tokens owned potential checks.1
 
 /-- Direct parse outcome using the potential synthesized by the bounded
 frontier search. -/
 def executeObservedContextualParseOfBoundedSearch
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
       file tokens owned)
     (nonAssociativeAccepted :
       executeObservedContextualNonAssociativeCertificateBool
         file tokens owned = true) :
     Except ParseDiagnostic ParsedModuleV1 :=
-  executeObservedContextualParseOfFormalCertificate file tokens owned ready
+  executeObservedContextualParseOfFormalCertificate file tokens owned
     (executeObservedContextualBoundedPotential file tokens owned success)
     (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
       file tokens owned success nonAssociativeAccepted)
@@ -1263,23 +1196,6 @@ result. -/
 theorem executeObservedContextualParseOfRankCertificate_selected
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : executeObservedContextualRankCertificateBool
       file tokens owned potential = true) :
@@ -1287,37 +1203,20 @@ theorem executeObservedContextualParseOfRankCertificate_selected
       file tokens owned
     result.parseOutcome? file =
       some (executeObservedContextualParseOfRankCertificate
-        file tokens owned ready potential accepted) := by
+        file tokens owned potential accepted) := by
   exact executeObservedContextualParseOfProgress_selected file tokens owned
     (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
       file tokens owned
         (Chart.executeObservedContextualValueWorklistMulti file tokens owned)
         (Chart.executeObservedContextualValueWorklistMulti_selected
           file tokens owned)
-        ready potential accepted)
+        potential accepted)
 
 /-- The combined-certificate entry point selects exactly the implementation's
 option result. -/
 theorem executeObservedContextualParseOfFormalCertificate_selected
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : executeObservedContextualFormalCertificateBool
       file tokens owned potential = true) :
@@ -1325,36 +1224,19 @@ theorem executeObservedContextualParseOfFormalCertificate_selected
       file tokens owned
     result.parseOutcome? file =
       some (executeObservedContextualParseOfFormalCertificate
-        file tokens owned ready potential accepted) := by
+        file tokens owned potential accepted) := by
   let checks :=
     (executeObservedContextualFormalCertificateBool_eq_true_iff
       file tokens owned potential).mp accepted
   simpa [executeObservedContextualParseOfFormalCertificate] using
     executeObservedContextualParseOfRankCertificate_selected
-      file tokens owned ready potential checks.1
+      file tokens owned potential checks.1
 
 /-- Bounded synthesis preserves exact selection of the implementation's
 option result. -/
 theorem executeObservedContextualParseOfBoundedSearch_selected
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
       file tokens owned)
     (nonAssociativeAccepted :
@@ -1364,9 +1246,9 @@ theorem executeObservedContextualParseOfBoundedSearch_selected
       file tokens owned
     result.parseOutcome? file =
       some (executeObservedContextualParseOfBoundedSearch
-        file tokens owned ready success nonAssociativeAccepted) := by
+        file tokens owned success nonAssociativeAccepted) := by
   exact executeObservedContextualParseOfFormalCertificate_selected
-    file tokens owned ready
+    file tokens owned
       (executeObservedContextualBoundedPotential file tokens owned success)
       (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
         file tokens owned success nonAssociativeAccepted)
@@ -1477,23 +1359,6 @@ proof-driven total executor. -/
 theorem executeObservedContextualParseOfRankCertificate_sound
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : executeObservedContextualRankCertificateBool
       file tokens owned potential = true)
@@ -1514,7 +1379,7 @@ theorem executeObservedContextualParseOfRankCertificate_sound
       CoherentNonAssociativeRootCompletedInvariant
         file tokens result.recognition.memo correct final) :
     match executeObservedContextualParseOfRankCertificate
-        file tokens owned ready potential accepted with
+        file tokens owned potential accepted with
     | .ok module => Parses file tokens module
     | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
   unfold executeObservedContextualParseOfRankCertificate
@@ -1524,7 +1389,7 @@ theorem executeObservedContextualParseOfRankCertificate_sound
         (Chart.executeObservedContextualValueWorklistMulti file tokens owned)
         (Chart.executeObservedContextualValueWorklistMulti_selected
           file tokens owned)
-        ready potential accepted)
+        potential accepted)
     invariant
 
 /-- The rank-certificate entry point is sound from its executable rank and
@@ -1532,23 +1397,6 @@ nonassociative tables, without a separately supplied G10 invariant. -/
 theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeCertificate
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (rankAccepted : executeObservedContextualRankCertificateBool
       file tokens owned potential = true)
@@ -1556,11 +1404,11 @@ theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeC
       executeObservedContextualNonAssociativeCertificateBool
         file tokens owned = true) :
     match executeObservedContextualParseOfRankCertificate
-        file tokens owned ready potential rankAccepted with
+        file tokens owned potential rankAccepted with
     | .ok module => Parses file tokens module
     | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
   exact executeObservedContextualParseOfRankCertificate_sound
-    file tokens owned ready potential rankAccepted
+    file tokens owned potential rankAccepted
       (executeObservedContextualCoherentNonAssociativeInvariant_of_certificate
         file tokens owned nonAssociativeAccepted)
 
@@ -1568,28 +1416,11 @@ theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeC
 theorem executeObservedContextualParseOfFormalCertificate_sound
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : executeObservedContextualFormalCertificateBool
       file tokens owned potential = true) :
     match executeObservedContextualParseOfFormalCertificate
-        file tokens owned ready potential accepted with
+        file tokens owned potential accepted with
     | .ok module => Parses file tokens module
     | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
   let checks :=
@@ -1598,40 +1429,23 @@ theorem executeObservedContextualParseOfFormalCertificate_sound
   unfold executeObservedContextualParseOfFormalCertificate
   exact
     executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeCertificate
-      file tokens owned ready potential checks.1 checks.2
+      file tokens owned potential checks.1 checks.2
 
 /-- Bounded synthesis yields a declaratively sound direct parse. -/
 theorem executeObservedContextualParseOfBoundedSearch_sound
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
-    (ready :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      ∀ waiting : ContextualItemKey tokens,
-        ContextualReach file tokens result.recognition.memo correct final waiting →
-          MatchArmPairContextReadyAt waiting)
     (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
       file tokens owned)
     (nonAssociativeAccepted :
       executeObservedContextualNonAssociativeCertificateBool
         file tokens owned = true) :
     match executeObservedContextualParseOfBoundedSearch
-        file tokens owned ready success nonAssociativeAccepted with
+        file tokens owned success nonAssociativeAccepted with
     | .ok module => Parses file tokens module
     | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
   exact executeObservedContextualParseOfFormalCertificate_sound
-    file tokens owned ready
+    file tokens owned
       (executeObservedContextualBoundedPotential file tokens owned success)
       (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
         file tokens owned success nonAssociativeAccepted)
