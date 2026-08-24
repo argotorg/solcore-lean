@@ -10897,6 +10897,194 @@ def reduce
 
 end ContextualReductionValue
 
+/-- One dependent semantic prefix stored under its contextual item key. -/
+structure ContextualPrefixLedgerEntry
+    (file : WorkspaceFile) (tokens : List Token) where
+  item : ContextualItemKey tokens
+  value : ContextualPrefixValue file tokens item
+
+/-- One dependent completed value stored under its contextual item key. -/
+structure ContextualReductionLedgerEntry
+    (file : WorkspaceFile) (tokens : List Token) where
+  item : ContextualItemKey tokens
+  reduction : ContextualReductionValue file tokens item
+
+/-- Proof-free semantic frontier state. Values are attached to item keys;
+only newly discovered prefix keys enter the ordered queue. -/
+structure ContextualValueFrontierState
+    (file : WorkspaceFile) (tokens : List Token) where
+  prefixes : List (ContextualPrefixLedgerEntry file tokens)
+  reductions : List (ContextualReductionLedgerEntry file tokens)
+  queue : List (ContextualItemKey tokens)
+
+namespace ContextualValueFrontierState
+
+/-- The empty semantic frontier. -/
+def empty (file : WorkspaceFile) (tokens : List Token) :
+    ContextualValueFrontierState file tokens :=
+  ⟨[], [], []⟩
+
+private def lookupPrefixIn?
+    {file : WorkspaceFile} {tokens : List Token}
+    (item : ContextualItemKey tokens) :
+    List (ContextualPrefixLedgerEntry file tokens) →
+      Option (ContextualPrefixValue file tokens item)
+  | [] => none
+  | entry :: rest =>
+      if same : entry.item = item then
+        some (same ▸ entry.value)
+      else
+        lookupPrefixIn? item rest
+
+private def lookupReductionIn?
+    {file : WorkspaceFile} {tokens : List Token}
+    (item : ContextualItemKey tokens) :
+    List (ContextualReductionLedgerEntry file tokens) →
+      Option (ContextualReductionValue file tokens item)
+  | [] => none
+  | entry :: rest =>
+      if same : entry.item = item then
+        some (same ▸ entry.reduction)
+      else
+        lookupReductionIn? item rest
+
+/-- Look up a retained prefix by exact contextual item identity. -/
+def lookupPrefix?
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    Option (ContextualPrefixValue file tokens item) :=
+  lookupPrefixIn? item state.prefixes
+
+/-- Look up a retained reduction by exact contextual item identity. -/
+def lookupReduction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    Option (ContextualReductionValue file tokens item) :=
+  lookupReductionIn? item state.reductions
+
+/-- Prefix deduplication uses only the contextual item identity. -/
+def prefixMemberBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) : Bool :=
+  state.prefixes.any fun entry => decide (entry.item = item)
+
+/-- Reduction deduplication uses only the contextual item identity. -/
+def reductionMemberBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) : Bool :=
+  state.reductions.any fun entry => decide (entry.item = item)
+
+/-- Atomically retain and enqueue a new prefix; a duplicate key is a no-op. -/
+def insertPrefix
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualPrefixValue file tokens item) :
+    ContextualValueFrontierState file tokens :=
+  if state.prefixMemberBool item then
+    state
+  else {
+    prefixes := state.prefixes ++ [⟨item, value⟩]
+    reductions := state.reductions
+    queue := state.queue ++ [item]
+  }
+
+/-- Retain a completed value without creating a second frontier identity. -/
+def insertReduction
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (reduction : ContextualReductionValue file tokens item) :
+    ContextualValueFrontierState file tokens :=
+  if state.reductionMemberBool item then
+    state
+  else {
+    prefixes := state.prefixes
+    reductions := state.reductions ++ [⟨item, reduction⟩]
+    queue := state.queue
+  }
+
+/-- Remove the oldest newly discovered prefix key. -/
+def dequeue?
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) :
+    Option (ContextualItemKey tokens ×
+      ContextualValueFrontierState file tokens) :=
+  match state.queue with
+  | [] => none
+  | item :: rest => some (item, { state with queue := rest })
+
+@[simp] theorem empty_lookupPrefix?
+    (file : WorkspaceFile) (tokens : List Token)
+    (item : ContextualItemKey tokens) :
+    (empty file tokens).lookupPrefix? item = none := rfl
+
+@[simp] theorem empty_lookupReduction?
+    (file : WorkspaceFile) (tokens : List Token)
+    (item : ContextualItemKey tokens) :
+    (empty file tokens).lookupReduction? item = none := rfl
+
+theorem insertPrefix_of_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualPrefixValue file tokens item)
+    (present : state.prefixMemberBool item = true) :
+    state.insertPrefix item value = state := by
+  simp [insertPrefix, present]
+
+theorem insertPrefix_of_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualPrefixValue file tokens item)
+    (absent : state.prefixMemberBool item = false) :
+    (state.insertPrefix item value).prefixes =
+        state.prefixes ++ [⟨item, value⟩] ∧
+      (state.insertPrefix item value).reductions = state.reductions ∧
+      (state.insertPrefix item value).queue = state.queue ++ [item] := by
+  simp [insertPrefix, absent]
+
+theorem insertReduction_of_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (reduction : ContextualReductionValue file tokens item)
+    (present : state.reductionMemberBool item = true) :
+    state.insertReduction item reduction = state := by
+  simp [insertReduction, present]
+
+theorem insertReduction_of_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (reduction : ContextualReductionValue file tokens item)
+    (absent : state.reductionMemberBool item = false) :
+    (state.insertReduction item reduction).prefixes = state.prefixes ∧
+      (state.insertReduction item reduction).reductions =
+        state.reductions ++ [⟨item, reduction⟩] ∧
+      (state.insertReduction item reduction).queue = state.queue := by
+  simp [insertReduction, absent]
+
+@[simp] theorem dequeue?_empty
+    (file : WorkspaceFile) (tokens : List Token) :
+    (empty file tokens).dequeue? = none := rfl
+
+theorem dequeue?_of_cons
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (queueEq : state.queue = item :: rest) :
+    state.dequeue? = some (item, { state with queue := rest }) := by
+  simp [dequeue?, queueEq]
+
+end ContextualValueFrontierState
+
 end Chart
 
 namespace Chart
