@@ -11646,6 +11646,143 @@ private structure PhaseCValueWorklist
   recognition : PhaseCWorklist file tokens
   frontier : ContextualValueFrontierState file tokens
 
+/-- The source-specific addresses that must still be fresh while an item is
+waiting in the semantic queue. -/
+private def PhaseCValueSourceFresh
+    {tokens : List Token} (counter : Counter tokens)
+    (item : ContextualItemKey tokens) : Prop :=
+  (.linear .L08_frontierDequeue (contextualLinearKey item) :
+      UnitAddress tokens) ∉ counter.usedRev ∧
+  (∀ predicted, predicted ∈ allProductionIds →
+    (.prediction .R02_frontierPrediction
+      (contextualPredictionKey item predicted) : UnitAddress tokens) ∉
+        counter.usedRev) ∧
+  (.linear .L14_frontierScannedTraversal (contextualLinearKey item) :
+      UnitAddress tokens) ∉ counter.usedRev ∧
+  (.linear .L12_scannedAction (contextualLinearKey item) :
+      UnitAddress tokens) ∉ counter.usedRev
+
+/-- Stable semantic states relate every consumed item address to persistent
+prefix membership. Queue freshness records the one remaining temporal fact:
+a retained prefix has not necessarily been processed yet. Completion actions
+are causally dominated by their guarded U06 attempt. -/
+private structure PhaseCValueAddressSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens)) : Prop where
+  queuedSourceFresh : ∀ item, item ∈ current.payload.frontier.queue →
+    PhaseCValueSourceFresh current.counter item
+  dequeueUsedPresent : ∀ item,
+    (.linear .L08_frontierDequeue (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    current.payload.frontier.prefixMemberBool item = true
+  predictionUsedPresent : ∀ item predicted,
+    predicted ∈ allProductionIds →
+    (.prediction .R02_frontierPrediction
+      (contextualPredictionKey item predicted) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    current.payload.frontier.prefixMemberBool item = true
+  scanTraversalUsedPresent : ∀ item,
+    (.linear .L14_frontierScannedTraversal (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    current.payload.frontier.prefixMemberBool item = true
+  scanActionUsedPresent : ∀ item,
+    (.linear .L12_scannedAction (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    current.payload.frontier.prefixMemberBool item = true
+  insertUsedPresent : ∀ item,
+    (.linear .L09_frontierInsert (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    current.payload.frontier.prefixMemberBool item = true
+  epsilonActionUsedPresent : ∀ item,
+    (.linear .L13_epsilonAction (contextualLinearKey item) :
+      UnitAddress tokens) ∈ current.counter.usedRev →
+    current.payload.frontier.prefixMemberBool item = true
+  completionTraversalAttempted : ∀ waiting finished,
+    (.cubic .U07_frontierCompletedTraversal
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    (.cubic .U06_frontierCompletion
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev
+  completionActionAttempted : ∀ waiting finished,
+    (.cubic .U05_completedAction
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    (.cubic .U06_frontierCompletion
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev
+
+/-- Causal membership turns prefix absence into freshness for every future
+source charge of that item. -/
+private theorem PhaseCValueAddressSafe.sourceFresh_of_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    {current : CountedState tokens (PhaseCValueWorklist file tokens)}
+    (safe : PhaseCValueAddressSafe current)
+    (item : ContextualItemKey tokens)
+    (absent : current.payload.frontier.prefixMemberBool item = false) :
+    PhaseCValueSourceFresh current.counter item := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro used
+    have present := safe.dequeueUsedPresent item used
+    rw [absent] at present
+    contradiction
+  · intro predicted member used
+    have present := safe.predictionUsedPresent item predicted member used
+    rw [absent] at present
+    contradiction
+  · intro used
+    have present := safe.scanTraversalUsedPresent item used
+    rw [absent] at present
+    contradiction
+  · intro used
+    have present := safe.scanActionUsedPresent item used
+    rw [absent] at present
+    contradiction
+
+/-- Prefix absence also supplies the two candidate-local linear addresses. -/
+private theorem PhaseCValueAddressSafe.candidateFresh_of_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    {current : CountedState tokens (PhaseCValueWorklist file tokens)}
+    (safe : PhaseCValueAddressSafe current)
+    (item : ContextualItemKey tokens)
+    (absent : current.payload.frontier.prefixMemberBool item = false) :
+    (.linear .L09_frontierInsert (contextualLinearKey item) :
+        UnitAddress tokens) ∉ current.counter.usedRev ∧
+      (.linear .L13_epsilonAction (contextualLinearKey item) :
+        UnitAddress tokens) ∉ current.counter.usedRev := by
+  constructor
+  · intro used
+    have present := safe.insertUsedPresent item used
+    rw [absent] at present
+    contradiction
+  · intro used
+    have present := safe.epsilonActionUsedPresent item used
+    rw [absent] at present
+    contradiction
+
+/-- A fresh guarded completion attempt makes both downstream cubic addresses
+fresh without separate global premises. -/
+private theorem PhaseCValueAddressSafe.completionFresh_of_attemptFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    {current : CountedState tokens (PhaseCValueWorklist file tokens)}
+    (safe : PhaseCValueAddressSafe current)
+    (waiting finished : ContextualItemKey tokens)
+    (fresh : (.cubic .U06_frontierCompletion
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∉
+        current.counter.usedRev) :
+    (.cubic .U07_frontierCompletedTraversal
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∉
+        current.counter.usedRev ∧
+      (.cubic .U05_completedAction
+        (contextualCompletionKey waiting finished) : UnitAddress tokens) ∉
+          current.counter.usedRev := by
+  constructor
+  · exact fun used => fresh
+      (safe.completionTraversalAttempted waiting finished used)
+  · exact fun used => fresh
+      (safe.completionActionAttempted waiting finished used)
+
 /-- Start semantic evaluation only after both recognition queues drain. The
 canonical dot-zero root is inserted and charged as the first frontier key. -/
 private def beginPhaseCValueWorklist?
