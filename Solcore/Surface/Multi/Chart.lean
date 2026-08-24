@@ -33735,6 +33735,177 @@ private theorem attemptPhaseCRetainedCompletedEdges?_used_mono
         (attemptPhaseCPackedCompletedEdge?_used_mono owned source edge current
           next nextEq member)
 
+/-- Every consumed retained-completion attempt has already materialized its
+semantic target prefix. -/
+private def PhaseCValueCompletionAttemptMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens)) : Prop :=
+  ∀ retained waiting finished after shared,
+    retained ∈ current.payload.recognition.phaseC.contextualEdges →
+    retained.val = .completed waiting finished after shared →
+    (.cubic .U06_frontierCompletion
+      (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+        current.counter.usedRev →
+    current.payload.frontier.prefixMemberBool after = true
+
+/-- A newly consumed completion attempt publishes its exact target prefix. -/
+private theorem attemptPhaseCCompletedEdge?_target_present_of_new_attempt
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (fresh : (.cubic .U06_frontierCompletion
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∉ current.counter.usedRev)
+    (used : (.cubic .U06_frontierCompletion
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ result.counter.usedRev)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.prefixMemberBool edge.after = true := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with rfl | active
+  · exact (fresh used).elim
+  · rcases active with ⟨prior, child, rebuilt, candidate, relevant,
+      prefixEq, reductionEq, attemptFresh, rebuiltEq, candidateEq,
+      frontierEq⟩
+    rw [frontierEq]
+    exact insertCandidate?_published_item_present owned
+      current.payload.frontier edge.after _ candidate candidateEq
+
+/-- One completion attempt preserves materialization for every retained
+completion key, including the one newly charged by the attempt. -/
+private theorem attemptPhaseCCompletedEdge?_completionAttemptMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (materialized : PhaseCValueCompletionAttemptMaterialized current)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    PhaseCValueCompletionAttemptMaterialized result := by
+  intro retained waiting finished after shared member retainedEq used
+  have recognitionEq :=
+    (attemptPhaseCCompletedEdge?_exact owned source edge current result
+      selected).1
+  have oldMember :
+      retained ∈ current.payload.recognition.phaseC.contextualEdges := by
+    rw [← recognitionEq]
+    exact member
+  let target : UnitAddress tokens :=
+    .cubic .U06_frontierCompletion
+      (contextualCompletionKey waiting finished)
+  by_cases oldUsed : target ∈ current.counter.usedRev
+  · exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source
+      after edge current result
+        (materialized retained waiting finished after shared oldMember
+          retainedEq oldUsed) selected
+  · have newly := attemptPhaseCCompletedEdge?_new_used owned source edge
+      current result target oldUsed used selected
+    rcases newly with attempt | traversal | action | insert
+    · have keyEq : contextualCompletionKey waiting finished =
+          contextualCompletionKey edge.waiting edge.finished := by
+        simpa only [target, UnitAddress.cubic.injEq, true_and] using attempt
+      let packedEdge : StructurallyValidContextualPackedEdge file tokens :=
+        ⟨.completed edge.waiting edge.finished edge.after edge.shared,
+          edge.structural⟩
+      have retainedKey : retainedCompletedKey? retained =
+          some (contextualCompletionKey waiting finished) := by
+        simp [retainedCompletedKey?, retainedEq]
+      have packedKey : retainedCompletedKey? packedEdge =
+          some (contextualCompletionKey waiting finished) := by
+        change some (contextualCompletionKey edge.waiting edge.finished) =
+          some (contextualCompletionKey waiting finished)
+        exact congrArg some keyEq.symm
+      have same := retainedCompletedKey?_injective retained packedEdge
+        (contextualCompletionKey waiting finished) retainedKey packedKey
+      have afterEq : after = edge.after := by
+        have values := congrArg (fun packed => match packed.val with
+          | .scanned _ target _ => target
+          | .completed _ _ target _ => target) same
+        simpa [packedEdge, retainedEq] using values
+      have headFresh : (.cubic .U06_frontierCompletion
+          (contextualCompletionKey edge.waiting edge.finished) :
+            UnitAddress tokens) ∉ current.counter.usedRev := by
+        intro headUsed
+        apply oldUsed
+        change (.cubic .U06_frontierCompletion
+          (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+            current.counter.usedRev
+        rw [keyEq]
+        exact headUsed
+      have headUsed : (.cubic .U06_frontierCompletion
+          (contextualCompletionKey edge.waiting edge.finished) :
+            UnitAddress tokens) ∈ result.counter.usedRev := by
+        rw [← keyEq]
+        simpa only [target] using used
+      have present :=
+        attemptPhaseCCompletedEdge?_target_present_of_new_attempt owned source
+          edge current result headFresh headUsed selected
+      simpa [afterEq] using present
+    · simp [target] at traversal
+    · simp [target] at action
+    · simp [target] at insert
+
+/-- Constructor dispatch preserves completion-attempt materialization. -/
+private theorem attemptPhaseCPackedCompletedEdge?_completionAttemptMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (materialized : PhaseCValueCompletionAttemptMaterialized current)
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    PhaseCValueCompletionAttemptMaterialized result := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned =>
+      cases selected
+      exact materialized
+  | completed waiting finished after shared =>
+      exact attemptPhaseCCompletedEdge?_completionAttemptMaterialized owned
+        source {
+          waiting := waiting
+          finished := finished
+          after := after
+          shared := shared
+          structural := structural
+        } current result materialized selected
+
+/-- Folding retained completions preserves attempt materialization. -/
+private theorem attemptPhaseCRetainedCompletedEdges?_completionAttemptMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      PhaseCValueCompletionAttemptMaterialized current →
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+      PhaseCValueCompletionAttemptMaterialized result := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result materialized selected
+      cases selected
+      exact materialized
+  | cons edge rest induction =>
+      intro current result materialized selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCPackedCompletedEdge?_completionAttemptMaterialized owned
+          source edge current next materialized nextEq) restEq
+
 /-- Processing one semantic source only grows the global consumed ledger. -/
 private theorem processPhaseCValueItem?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
