@@ -12566,6 +12566,188 @@ theorem ContextualReductionValue.reduce_coherent
       item.raw.current ready owned ordered
       (PrefixValues.fullValue item isComplete prior.value))
 
+namespace ContextualValueFrontierState
+
+/-- Item identities present in the dependent prefix ledger. -/
+def prefixKeys
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) :
+    List (ContextualItemKey tokens) :=
+  state.prefixes.map ContextualPrefixLedgerEntry.item
+
+/-- Item identities present in the dependent reduction ledger. -/
+def reductionKeys
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) :
+    List (ContextualItemKey tokens) :=
+  state.reductions.map ContextualReductionLedgerEntry.item
+
+/-- Every semantic item identity is stored at most once, and every queued
+identity denotes an already retained prefix. -/
+def WellFormed
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) : Prop :=
+  state.prefixKeys.Nodup ∧
+    state.reductionKeys.Nodup ∧
+    state.queue.Nodup ∧
+    (∀ item, item ∈ state.queue → item ∈ state.prefixKeys) ∧
+    ∀ item, item ∈ state.reductionKeys → item ∈ state.prefixKeys
+
+/-- Executable prefix membership is exactly key-ledger membership. -/
+theorem prefixMemberBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    state.prefixMemberBool item = true ↔ item ∈ state.prefixKeys := by
+  simp only [prefixMemberBool, prefixKeys, List.any_eq_true,
+    List.mem_map]
+  constructor
+  · rintro ⟨entry, member, equal⟩
+    exact ⟨entry, member, of_decide_eq_true equal⟩
+  · rintro ⟨entry, member, equal⟩
+    exact ⟨entry, member, by simp [equal]⟩
+
+/-- Executable reduction membership is exactly key-ledger membership. -/
+theorem reductionMemberBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    state.reductionMemberBool item = true ↔
+      item ∈ state.reductionKeys := by
+  simp only [reductionMemberBool, reductionKeys, List.any_eq_true,
+    List.mem_map]
+  constructor
+  · rintro ⟨entry, member, equal⟩
+    exact ⟨entry, member, of_decide_eq_true equal⟩
+  · rintro ⟨entry, member, equal⟩
+    exact ⟨entry, member, by simp [equal]⟩
+
+/-- The empty semantic frontier satisfies all ledger and queue invariants. -/
+@[simp] theorem empty_wellFormed
+    (file : WorkspaceFile) (tokens : List Token) :
+    (empty file tokens).WellFormed := by
+  simp [WellFormed, prefixKeys, reductionKeys, empty]
+
+/-- Prefix insertion preserves key uniqueness and enqueues a key at most
+once. -/
+theorem insertPrefix_wellFormed
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualPrefixValue file tokens item)
+    (wellFormed : state.WellFormed) :
+    (state.insertPrefix item value).WellFormed := by
+  by_cases present : state.prefixMemberBool item = true
+  · rw [insertPrefix_of_present state item value present]
+    exact wellFormed
+  · have absent : state.prefixMemberBool item = false := by
+      cases equal : state.prefixMemberBool item <;> simp_all
+    have itemFresh : item ∉ state.prefixKeys := by
+      intro member
+      exact present ((prefixMemberBool_eq_true_iff state item).mpr member)
+    have itemQueueFresh : item ∉ state.queue := by
+      intro member
+      exact itemFresh (wellFormed.2.2.2.1 item member)
+    rcases wellFormed with
+      ⟨prefixUnique, reductionUnique, queueUnique, queueSubset,
+        reductionSubset⟩
+    simp only [WellFormed, prefixKeys, reductionKeys, insertPrefix, absent,
+      Bool.false_eq_true, ↓reduceIte, List.map_append, List.map_cons,
+      List.map_nil]
+    refine ⟨?_, reductionUnique, ?_, ?_, ?_⟩
+    · rw [List.nodup_append]
+      refine ⟨by simpa only [prefixKeys] using prefixUnique, by simp, ?_⟩
+      intro old oldMember new newMember
+      simp only [List.mem_singleton] at newMember
+      subst new
+      intro equal
+      exact itemFresh (equal ▸ oldMember)
+    · rw [List.nodup_append]
+      refine ⟨queueUnique, by simp, ?_⟩
+      intro old oldMember new newMember
+      simp only [List.mem_singleton] at newMember
+      subst new
+      intro equal
+      exact itemQueueFresh (equal ▸ oldMember)
+    · intro candidate member
+      rw [List.mem_append] at member ⊢
+      rcases member with old | new
+      · exact Or.inl (queueSubset candidate old)
+      · exact Or.inr (by simpa using new)
+    · intro candidate member
+      rw [List.mem_append]
+      exact Or.inl (reductionSubset candidate member)
+
+/-- Reduction insertion preserves the invariant when its prefix key is
+already retained; it never creates a second queue identity. -/
+theorem insertReduction_wellFormed
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualReductionValue file tokens item)
+    (wellFormed : state.WellFormed)
+    (prefixPresent : state.prefixMemberBool item = true) :
+    (state.insertReduction item value).WellFormed := by
+  by_cases present : state.reductionMemberBool item = true
+  · rw [insertReduction_of_present state item value present]
+    exact wellFormed
+  · have absent : state.reductionMemberBool item = false := by
+      cases equal : state.reductionMemberBool item <;> simp_all
+    have itemFresh : item ∉ state.reductionKeys := by
+      intro member
+      exact present ((reductionMemberBool_eq_true_iff state item).mpr member)
+    rcases wellFormed with
+      ⟨prefixUnique, reductionUnique, queueUnique, queueSubset,
+        reductionSubset⟩
+    simp only [WellFormed, prefixKeys, reductionKeys, insertReduction,
+      absent, Bool.false_eq_true, ↓reduceIte, List.map_append, List.map_cons,
+      List.map_nil]
+    refine ⟨prefixUnique, ?_, queueUnique, queueSubset, ?_⟩
+    · rw [List.nodup_append]
+      refine ⟨by simpa only [reductionKeys] using reductionUnique,
+        by simp, ?_⟩
+      intro old oldMember new newMember
+      simp only [List.mem_singleton] at newMember
+      subst new
+      intro equal
+      exact itemFresh (equal ▸ oldMember)
+    · intro candidate member
+      rw [List.mem_append] at member
+      rcases member with old | new
+      · exact reductionSubset candidate old
+      · have candidateEq : candidate = item := by simpa using new
+        subst candidate
+        exact (prefixMemberBool_eq_true_iff state item).mp prefixPresent
+
+/-- Removing the oldest queue key preserves all persistent-ledger and queue
+invariants. -/
+theorem dequeue?_wellFormed
+    {file : WorkspaceFile} {tokens : List Token}
+    (state next : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (wellFormed : state.WellFormed)
+    (selected : state.dequeue? = some (item, next)) :
+    next.WellFormed := by
+  unfold dequeue? at selected
+  cases queueEq : state.queue with
+  | nil => simp [queueEq] at selected
+  | cons head tail =>
+      simp only [queueEq, Option.some.injEq, Prod.mk.injEq] at selected
+      rcases selected with ⟨_headEq, nextEq⟩
+      subst next
+      rcases wellFormed with
+        ⟨prefixUnique, reductionUnique, queueUnique, queueSubset,
+          reductionSubset⟩
+      simp only [WellFormed, prefixKeys, reductionKeys]
+      refine ⟨prefixUnique, reductionUnique,
+        (List.nodup_cons.mp (queueEq ▸ queueUnique)).2, ?_,
+        reductionSubset⟩
+      intro candidate member
+      exact queueSubset candidate
+        (queueEq.symm ▸ List.mem_cons_of_mem _ member)
+
+end ContextualValueFrontierState
+
 end Chart
 
 end Solcore.Surface.Multi
