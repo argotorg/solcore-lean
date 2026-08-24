@@ -7645,6 +7645,289 @@ private theorem identifierAtoms_of_views
   | mk head tail =>
       simp [NonemptyList.map, EbnfValue.terminal_of_view]
 
+private abbrev dataDeclIdentifierAtom : EbnfExpr :=
+  .atom (.terminal (.category .identifier))
+
+private abbrev dataDeclParameterExpr : EbnfExpr := .sequence [
+  .atom (.terminal (.symbol .leftParen)),
+  .list1 dataDeclIdentifierAtom,
+  .atom (.terminal (.symbol .rightParen))]
+
+private abbrev DataDeclParameterData
+    (file : WorkspaceFile) (tokens : List Token) :=
+  MatchedTerminal file tokens (.symbol .leftParen) ×
+    (NonemptyList (RuleReduction.SpelledTerminalData file tokens
+      (.category .identifier) Identifier) ×
+      (MatchedTerminal file tokens (.symbol .rightParen) × Unit))
+
+private def dataDeclParameterView
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens dataDeclParameterExpr) :
+    DataDeclParameterData file tokens :=
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  let viewed := EbnfValue.sequenceFlatView
+    [openAtom, .list1 dataDeclIdentifierAtom, closeAtom] input
+  let names := (EbnfValue.list1View dataDeclIdentifierAtom
+    viewed.2.1).map fun raw =>
+      let terminal := EbnfValue.terminalView
+        (.category .identifier) raw
+      ({
+        matched := terminal
+        spelling := terminal.identifierProjection.1
+        parsed := terminal.identifierProjection.2
+      } : RuleReduction.SpelledTerminalData file tokens
+        (.category .identifier) Identifier)
+  (EbnfValue.terminalView (.symbol .leftParen) viewed.1,
+    names, EbnfValue.terminalView (.symbol .rightParen) viewed.2.2.1, ())
+
+private def dataDeclParameterInput
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : DataDeclParameterData file tokens) :
+    EbnfValue file tokens dataDeclParameterExpr :=
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  EbnfValue.sequence [openAtom, .list1 dataDeclIdentifierAtom, closeAtom]
+    (EbnfValues.cons openAtom
+      [.list1 dataDeclIdentifierAtom, closeAtom]
+      (EbnfValue.terminalAtom (.symbol .leftParen) value.1)
+      (EbnfValues.cons (.list1 dataDeclIdentifierAtom) [closeAtom]
+        (EbnfValue.list1 dataDeclIdentifierAtom
+          (value.2.1.map fun name => EbnfValue.terminalAtom
+            (.category .identifier) name.matched))
+        (EbnfValues.cons closeAtom []
+          (EbnfValue.terminalAtom (.symbol .rightParen) value.2.2.1)
+          EbnfValues.nil)))
+
+private theorem dataDeclParameterInput_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens dataDeclParameterExpr) :
+    dataDeclParameterInput (dataDeclParameterView input) = input := by
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  let viewed := EbnfValue.sequenceFlatView
+    [openAtom, .list1 dataDeclIdentifierAtom, closeAtom] input
+  let rawNames := EbnfValue.list1View dataDeclIdentifierAtom viewed.2.1
+  have mappedEq :
+      ((rawNames.map fun raw =>
+        let terminal := EbnfValue.terminalView
+          (.category .identifier) raw
+        ({
+          matched := terminal
+          spelling := terminal.identifierProjection.1
+          parsed := terminal.identifierProjection.2
+        } : RuleReduction.SpelledTerminalData file tokens
+          (.category .identifier) Identifier)).map fun name =>
+            EbnfValue.terminalAtom
+              (.category .identifier) name.matched) = rawNames := by
+    cases rawNames with
+    | mk head tail =>
+        simp [NonemptyList.map, List.map_map, Function.comp_def,
+          EbnfValue.terminal_of_view]
+  unfold dataDeclParameterInput dataDeclParameterView
+  dsimp only
+  rw [mappedEq,
+    EbnfValue.list1_of_view dataDeclIdentifierAtom viewed.2.1,
+    EbnfValue.terminal_of_view,
+    EbnfValue.terminal_of_view]
+  exact EbnfValue.sequence_of_flat_view
+    [openAtom, .list1 dataDeclIdentifierAtom, closeAtom] input
+
+private theorem dataDeclParameterView_projects
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens dataDeclParameterExpr) :
+    let value := dataDeclParameterView input
+    IdentifierProjects value.2.1.head.matched
+      value.2.1.head.spelling value.2.1.head.parsed ∧
+    ∀ parameter, parameter ∈ value.2.1.tail →
+      IdentifierProjects parameter.matched
+        parameter.spelling parameter.parsed := by
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  let viewed := EbnfValue.sequenceFlatView
+    [openAtom, .list1 dataDeclIdentifierAtom, closeAtom] input
+  let rawNames := EbnfValue.list1View dataDeclIdentifierAtom viewed.2.1
+  constructor
+  · exact (EbnfValue.terminalView (.category .identifier)
+      rawNames.head).identifierProjection_projects
+  · intro parameter parameterMem
+    simp only [dataDeclParameterView, NonemptyList.map] at parameterMem
+    rcases List.mem_map.mp parameterMem with ⟨raw, _rawMem, rfl⟩
+    exact (EbnfValue.terminalView
+      (.category .identifier) raw).identifierProjection_projects
+
+private theorem dataDeclParameterResult_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens dataDeclParameterExpr) :
+    (let parameterChildren : List EbnfExpr := [
+      .atom (.terminal (.symbol .leftParen)),
+      .list1 dataDeclIdentifierAtom,
+      .atom (.terminal (.symbol .rightParen))]
+    let ⟨_, rawNames, _, ⟨⟩⟩ := EbnfValue.sequenceFlatView
+      parameterChildren input
+    (EbnfValue.list1View dataDeclIdentifierAtom rawNames).map
+        (fun value =>
+          let terminal := EbnfValue.terminalView
+            (.category .identifier) value
+          RuleReduction.terminalLoc terminal
+            terminal.identifierProjection.2)) =
+      (dataDeclParameterView input).2.1.map fun parameter =>
+        RuleReduction.terminalLoc parameter.matched parameter.parsed := by
+  generalize sequenceEq : EbnfValue.sequenceFlatView [
+    .atom (.terminal (.symbol .leftParen)),
+    .list1 dataDeclIdentifierAtom,
+    .atom (.terminal (.symbol .rightParen))] input = viewed
+  rcases viewed with ⟨rawOpen, rawNames, rawClose, ⟨⟩⟩
+  simp [dataDeclParameterView, sequenceEq, NonemptyList.map,
+    List.map_map, Function.comp_def, RuleReduction.terminalLoc]
+
+private abbrev dataDeclConstructorTail : EbnfExpr :=
+  EbnfValue.fixedInfixTailExpr (.symbol .pipe) .dataConstructor
+
+private abbrev dataDeclConstructorExpr : EbnfExpr := .sequence [
+  .atom (.terminal (.symbol .equal)),
+  .atom (.nonterminal .dataConstructor),
+  .star dataDeclConstructorTail]
+
+private abbrev DataDeclConstructorData
+    (file : WorkspaceFile) (tokens : List Token) :=
+  MatchedTerminal file tokens (.symbol .equal) ×
+    (DataConstructor ×
+      (List (MatchedTerminal file tokens (.symbol .pipe) ×
+        DataConstructor) × Unit))
+
+private def dataDeclConstructorView
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens dataDeclConstructorExpr) :
+    DataDeclConstructorData file tokens :=
+  let equalAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .equal))
+  let constructorAtom : EbnfExpr :=
+    .atom (.nonterminal .dataConstructor)
+  let viewed := EbnfValue.sequence3View equalAtom constructorAtom
+    (.star dataDeclConstructorTail) input
+  (EbnfValue.terminalView (.symbol .equal) viewed.1,
+    EbnfValue.ruleView .dataConstructor viewed.2.1,
+    (EbnfValue.starView dataDeclConstructorTail viewed.2.2).map
+      (EbnfValue.fixedInfixTailView (.symbol .pipe) .dataConstructor), ())
+
+private def dataDeclConstructorInput
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : DataDeclConstructorData file tokens) :
+    EbnfValue file tokens dataDeclConstructorExpr :=
+  let equalAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .equal))
+  let constructorAtom : EbnfExpr :=
+    .atom (.nonterminal .dataConstructor)
+  EbnfValue.sequence [equalAtom, constructorAtom,
+      .star dataDeclConstructorTail]
+    (EbnfValues.cons equalAtom
+      [constructorAtom, .star dataDeclConstructorTail]
+      (EbnfValue.terminalAtom (.symbol .equal) value.1)
+      (EbnfValues.cons constructorAtom [.star dataDeclConstructorTail]
+        (EbnfValue.ruleAtom .dataConstructor value.2.1)
+        (EbnfValues.cons (.star dataDeclConstructorTail) []
+          (EbnfValue.star dataDeclConstructorTail
+            (value.2.2.1.map (EbnfValue.fixedInfixTailValue
+              (.symbol .pipe) .dataConstructor))) EbnfValues.nil)))
+
+private theorem dataDeclConstructorTails_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (values : List (EbnfValue file tokens dataDeclConstructorTail)) :
+    (values.map (EbnfValue.fixedInfixTailView
+      (.symbol .pipe) .dataConstructor)).map
+        (EbnfValue.fixedInfixTailValue
+          (.symbol .pipe) .dataConstructor) = values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.cons.injEq]
+      exact ⟨EbnfValue.fixedInfixTailValue_of_view
+        (.symbol .pipe) .dataConstructor head, induction⟩
+
+private theorem dataDeclConstructorInput_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens dataDeclConstructorExpr) :
+    dataDeclConstructorInput (dataDeclConstructorView input) = input := by
+  let equalAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .equal))
+  let constructorAtom : EbnfExpr :=
+    .atom (.nonterminal .dataConstructor)
+  let viewed := EbnfValue.sequence3View equalAtom constructorAtom
+    (.star dataDeclConstructorTail) input
+  let rawTails := EbnfValue.starView dataDeclConstructorTail viewed.2.2
+  have tailsEq : EbnfValue.star dataDeclConstructorTail
+      ((rawTails.map (EbnfValue.fixedInfixTailView
+        (.symbol .pipe) .dataConstructor)).map
+          (EbnfValue.fixedInfixTailValue
+            (.symbol .pipe) .dataConstructor)) = viewed.2.2 := by
+    rw [dataDeclConstructorTails_of_views rawTails]
+    exact EbnfValue.star_of_view dataDeclConstructorTail viewed.2.2
+  change EbnfValue.sequence
+      [equalAtom, constructorAtom, .star dataDeclConstructorTail]
+      (EbnfValues.cons equalAtom
+        [constructorAtom, .star dataDeclConstructorTail]
+        (EbnfValue.terminalAtom (.symbol .equal)
+          (EbnfValue.terminalView (.symbol .equal) viewed.1))
+        (EbnfValues.cons constructorAtom [.star dataDeclConstructorTail]
+          (EbnfValue.ruleAtom .dataConstructor
+            (EbnfValue.ruleView .dataConstructor viewed.2.1))
+          (EbnfValues.cons (.star dataDeclConstructorTail) []
+            (EbnfValue.star dataDeclConstructorTail
+              ((rawTails.map (EbnfValue.fixedInfixTailView
+                (.symbol .pipe) .dataConstructor)).map
+                  (EbnfValue.fixedInfixTailValue
+                    (.symbol .pipe) .dataConstructor))) EbnfValues.nil))) = input
+  rw [EbnfValue.terminal_of_view, EbnfValue.rule_of_view, tailsEq]
+  exact EbnfValue.sequence3_of_view equalAtom constructorAtom
+    (.star dataDeclConstructorTail) input
+
+private theorem dataDeclConstructorResult_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens dataDeclConstructorExpr) :
+    let viewed := EbnfValue.sequence3View
+      (.atom (.terminal (.symbol .equal)))
+      (.atom (.nonterminal .dataConstructor))
+      (.star dataDeclConstructorTail) input
+    let head : DataConstructor :=
+      EbnfValue.ruleView .dataConstructor viewed.2.1
+    let tail : List DataConstructor :=
+      (EbnfValue.starView dataDeclConstructorTail viewed.2.2).map
+        fun rawTail =>
+          (EbnfValue.fixedInfixTailView
+            (.symbol .pipe) .dataConstructor rawTail).2
+    ({ head := head, tail := tail } : NonemptyList DataConstructor) =
+      let value := dataDeclConstructorView input
+      ({ head := value.2.1, tail := value.2.2.1.map Prod.snd } :
+        NonemptyList DataConstructor) := by
+  simp [dataDeclConstructorView, List.map_map, Function.comp_def]
+
+private theorem dataDecl_optional_map_of_view
+    {file : WorkspaceFile} {tokens : List Token} {alpha : Type}
+    (child : EbnfExpr) (decode : EbnfValue file tokens child → alpha)
+    (encode : alpha → EbnfValue file tokens child)
+    (roundtrip : ∀ raw, encode (decode raw) = raw)
+    (input : EbnfValue file tokens (.optional child)) :
+    EbnfValue.optional child
+      ((EbnfValue.optionalView child input).map decode |>.map encode) =
+        input := by
+  generalize viewEq : EbnfValue.optionalView child input = viewed
+  cases viewed with
+  | none =>
+      simpa [viewEq] using EbnfValue.optional_of_view child input
+  | some raw =>
+      simp only [Option.map]
+      rw [roundtrip raw]
+      simpa [viewEq] using EbnfValue.optional_of_view child input
+
 /-- The type-alias executor realizes its exact root reduction. -/
 theorem executeTypeAliasDeclRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
