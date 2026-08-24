@@ -15073,3 +15073,109 @@ theorem executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_com
         present
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The rootless ordinary diagnostic selected from the total multi-ledger
+executor is declaratively sound once the higher-priority G10 branch is
+excluded. -/
+theorem executeObservedContextualWorklistMulti?_rootlessUnexpectedDiagnosticCandidate?_applies
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (span : SourceSpan) (found : Found)
+    (expected : NonemptyList Expected)
+    (candidate : result.rootlessUnexpectedDiagnosticCandidate? file =
+      some (.unexpected span found expected))
+    (notRepeated : ∀ cursor level operator,
+      ¬ RepeatedNonAssociativeAt file tokens result.memo
+        (executeObservedContextualWorklistMulti?_phaseBCorrect
+          file tokens owned result selected)
+        (Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result selected)
+        cursor level operator) :
+    ParseDiagnostic.Applies file tokens
+      (.unexpected span found expected) := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  have correspondence := executeObservedContextualWorklistMulti?_correspondence
+    file tokens owned result selected
+  rcases
+      (Chart.ContextualWorklistResult.rootlessUnexpectedDiagnosticCandidate?_eq_some_iff
+        file result (.unexpected span found expected)).mp candidate with
+    ⟨absent, ordinary⟩
+  unfold Chart.ContextualWorklistResult.unexpectedDiagnosticCandidate?
+    at ordinary
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at ordinary
+  rcases ordinary with ⟨frontier, frontierEq, unexpectedEq⟩
+  rcases (Chart.ObservedFrontier.unexpected?_eq_some_iff
+      frontier span found expected).mp unexpectedEq with
+    ⟨spanEq, foundEq, expectedEq⟩
+  unfold Chart.ContextualWorklistResult.observedFrontier? at frontierEq
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at frontierEq
+  rcases frontierEq with
+    ⟨expectedFrontier, selectedExpected, observation, selectedObservation,
+      exactFrontier⟩
+  cases exactFrontier
+  rcases
+      (Chart.ContextualWorklistResult.expectedFrontier?_eq_some_iff
+        result expectedFrontier).mp selectedExpected with
+    ⟨selectedGreatest, computedExpected⟩
+  rcases
+      (Chart.ContextualWorklistResult.greatestCurrent?_eq_some_iff
+        result expectedFrontier.cursor).mp selectedGreatest with
+    ⟨⟨greatestItem, greatestMember, greatestCurrent⟩, upper⟩
+  have greatest : GreatestReachableCursor file tokens result.memo correct final
+      expectedFrontier.cursor := by
+    refine ⟨⟨greatestItem,
+      (correspondence.1 greatestItem).mp greatestMember,
+      greatestCurrent⟩, ?_⟩
+    intro item reached
+    exact upper item ((correspondence.1 item).mpr reached)
+  have expectedMember : ∀ value,
+      value ∈ result.expectedAtCurrent expectedFrontier.cursor ↔
+        ExpectedMember file tokens result.memo correct final
+          expectedFrontier.cursor value := by
+    intro value
+    rw [Chart.ContextualWorklistResult.expectedAtCurrent_mem_iff]
+    constructor
+    · rintro ⟨item, member, currentEq, terminal, next, valueEq⟩
+      have reached := (correspondence.1 item).mp member
+      exact ⟨item, terminal, ⟨greatest, reached, currentEq⟩, next,
+        contextualReach_enabledProductionInstance reached, valueEq⟩
+    · rintro ⟨item, terminal, frontierReach, next, _enabled, valueEq⟩
+      exact ⟨item, (correspondence.1 item).mpr frontierReach.2.1,
+        frontierReach.2.2, terminal, next, valueEq⟩
+  have expectedList : expected.head :: expected.tail =
+      result.expectedAtCurrent expectedFrontier.cursor := by
+    exact expectedEq.symm.trans computedExpected
+  have canonical : CanonicalExpected file tokens result.memo correct final
+      expectedFrontier.cursor expected := by
+    constructor
+    · intro value
+      rw [expectedList, expectedMember]
+    · constructor
+      · rw [expectedList]
+        exact result.expectedAtCurrent_nodup expectedFrontier.cursor
+      · rw [expectedList]
+        exact result.expectedAtCurrent_sorted expectedFrontier.cursor
+  have foundAt : FoundAt file tokens expectedFrontier.cursor span found := by
+    have observed := (chart_observedFoundAt?_eq_some_iff owned
+      expectedFrontier.cursor observation).mp selectedObservation
+    change observation.span = span at spanEq
+    change observation.found = found at foundEq
+    simpa only [spanEq, foundEq] using observed
+  exact .unexpected file tokens result.memo correct final
+    expectedFrontier.cursor span found expected
+    (executeObservedContextualWorklistMulti?_noSourceBackedRoot_of_completeModuleRootItem_eq_false
+      file tokens owned result selected absent)
+    greatest canonical foundAt (notRepeated expectedFrontier.cursor)
+
+end Solcore.Surface.Multi
