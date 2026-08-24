@@ -2,6 +2,7 @@ import Solcore.Surface.Multi.DiagnosticExhaustiveness
 import Solcore.Surface.Multi.LexicalJudgment
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Measure
+import Solcore.Surface.Multi.OperandBoundaryExclusion
 
 set_option autoImplicit false
 
