@@ -403,6 +403,93 @@ def NonAssociativeOperandPrefixExclusive
     FoundNonAssociativeOperatorAt file tokens split level operator →
     split.val < finish.val → False
 
+/-- Stable finite enumeration of the two nonassociative levels. -/
+def allNonAssociativeLevels : List NonAssociativeLevel :=
+  [.relational, .equality]
+
+theorem allNonAssociativeLevels_complete
+    (level : NonAssociativeLevel) :
+    level ∈ allNonAssociativeLevels := by
+  cases level <;> simp [allNonAssociativeLevels]
+
+/-- Stable finite enumeration of every boundary of one retained stream. -/
+def allOperandBoundaries (tokens : List Token) :
+    List (Boundary tokens) :=
+  List.ofFn id
+
+theorem allOperandBoundaries_complete
+    {tokens : List Token} (cursor : Boundary tokens) :
+    cursor ∈ allOperandBoundaries tokens := by
+  rw [allOperandBoundaries, List.mem_ofFn]
+  exact ⟨cursor, rfl⟩
+
+/-- One executable cell rejects an operand recognition that extends across a
+same-level operator after an already completed prefix. -/
+def nonAssociativeOperandPrefixExclusiveCell
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (level : NonAssociativeLevel)
+    (origin split finish : Boundary tokens) : Bool :=
+  !(
+    contextualRecognizesBool file tokens owned correct final
+      (.rule level.operandRule) origin split &&
+    contextualRecognizesBool file tokens owned correct final
+      (.rule level.operandRule) origin finish &&
+    nonAssociativeOperatorAtBool tokens split level &&
+    decide (split.val < finish.val))
+
+/-- Finite executable certificate for every origin, split, finish, and
+nonassociative level in one contextual ledger. -/
+def nonAssociativeOperandPrefixExclusiveTable
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) : Bool :=
+  allNonAssociativeLevels.all fun level =>
+    (allOperandBoundaries tokens).all fun origin =>
+      (allOperandBoundaries tokens).all fun split =>
+        (allOperandBoundaries tokens).all fun finish =>
+          nonAssociativeOperandPrefixExclusiveCell
+            file tokens owned correct final level origin split finish
+
+/-- An accepted finite table constructs the exact operand-prefix exclusion
+interface consumed by G10 completion alignment. -/
+theorem nonAssociativeOperandPrefixExclusive_of_table
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (accepted : nonAssociativeOperandPrefixExclusiveTable
+      file tokens owned correct final = true) :
+    NonAssociativeOperandPrefixExclusive
+      file tokens memo correct final := by
+  intro level origin split finish operator short long found later
+  have levelAccepted := (List.all_eq_true.mp accepted)
+    level (allNonAssociativeLevels_complete level)
+  have originAccepted := (List.all_eq_true.mp levelAccepted)
+    origin (allOperandBoundaries_complete origin)
+  have splitAccepted := (List.all_eq_true.mp originAccepted)
+    split (allOperandBoundaries_complete split)
+  have cellAccepted := (List.all_eq_true.mp splitAccepted)
+    finish (allOperandBoundaries_complete finish)
+  have shortAccepted :=
+    (contextualRecognizesBool_eq_true_iff owned correct final
+      (.rule level.operandRule) origin split).mpr short
+  have longAccepted :=
+    (contextualRecognizesBool_eq_true_iff owned correct final
+      (.rule level.operandRule) origin finish).mpr long
+  have foundAccepted :=
+    nonAssociativeOperatorAtBool_eq_true_of_found owned found
+  have laterAccepted : decide (split.val < finish.val) = true :=
+    decide_eq_true later
+  simp [nonAssociativeOperandPrefixExclusiveCell, shortAccepted,
+    longAccepted, foundAccepted, laterAccepted] at cellAccepted
+
 /-- The pure prefix-exclusion fact bounds any competing reached sequence
 prefix by the operand frontier immediately before the same-level operator. -/
 theorem g10SequencePrefix_competitor_le
