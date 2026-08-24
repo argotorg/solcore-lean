@@ -247,7 +247,7 @@ theorem executeObservedContextualValueWorklistMulti?_candidate_none_implies_notR
   rw [absent] at emitted
   contradiction
 
-/-- Every successful partial parse outcome emitted by semantic execution is a
+/-- Every successful parse outcome emitted by semantic execution is a
 declaratively valid parse. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_ok_sound
     (file : WorkspaceFile) (tokens : List Token)
@@ -265,7 +265,7 @@ theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_ok_sound
     file tokens owned result selected module parsed
 
 /-- Under only the local completed-shape invariant, every error already
-emitted by the partial parse outcome is declaratively applicable. -/
+emitted by the parse outcome is declaratively applicable. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_error_sound
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)

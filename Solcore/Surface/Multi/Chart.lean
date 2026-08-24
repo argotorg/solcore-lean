@@ -38894,7 +38894,7 @@ def parseOutcome?
           | some diagnostic => some (.error diagnostic)
           | none => none
 
-/-- A successful partial outcome is exactly the canonical module projection;
+/-- A successful optional outcome is exactly the canonical module projection;
 error candidates cannot mask it. -/
 theorem parseOutcome?_eq_some_ok_iff
     (file : WorkspaceFile) {tokens : List Token}
@@ -38924,7 +38924,7 @@ theorem parseOutcome?_eq_some_error_iff
   split <;> simp_all
   split <;> simp_all
 
-/-- The partial outcome remains empty exactly when all three executable
+/-- The optional outcome remains empty exactly when all three executable
 projections are empty. -/
 theorem parseOutcome?_eq_none_iff
     (file : WorkspaceFile) {tokens : List Token}
