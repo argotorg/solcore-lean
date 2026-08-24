@@ -2,6 +2,8 @@ import Solcore.Surface.Multi.DiagnosticExhaustiveness
 import Solcore.Surface.Multi.LexicalJudgment
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Measure
+import Solcore.Surface.Multi.NonAssociativeCompletionAlignment
+import Solcore.Surface.Multi.NonAssociativeInvariantBridge
 import Solcore.Surface.Multi.NonAssociativeOptionalStrict
 import Solcore.Surface.Multi.OperandBoundaryExclusion
 import Solcore.Surface.Multi.ParseOutcomeTotality
