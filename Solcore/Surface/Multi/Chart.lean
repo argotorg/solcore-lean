@@ -12431,6 +12431,90 @@ private theorem executePhaseCValueWorklist?_queue_empty
   exact runPhaseCValueQueue?_queue_empty owned
     (chartGBound (tokens.length + 1)) entered result runEq
 
+private theorem attemptPhaseCScannedEdge?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    result.payload.recognition = current.payload.recognition ∧
+      (result.payload.frontier = current.payload.frontier ∨
+        ∃ (rebuilt : RebuiltContextualScannedEdge edge)
+          (prior : ContextualPrefixValue file tokens edge.before)
+          (candidate : ContextualValueFrontierState.CandidateInsertResult
+            file tokens),
+          rebuildContextualScannedEdge? owned edge = some rebuilt ∧
+            current.payload.frontier.lookupPrefix? edge.before = some prior ∧
+            current.payload.frontier.insertCandidate? owned edge.after
+                (rebuilt.scan prior) = some candidate ∧
+            result.payload.frontier =
+              match candidate.kind with
+              | .duplicate => current.payload.frontier
+              | .insertedIncomplete => candidate.state
+              | .insertedComplete => candidate.state) := by
+  unfold attemptPhaseCScannedEdge? at selected
+  split at selected
+  next sameSource =>
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨rebuilt, rebuiltEq, prior, priorEq, candidate,
+        candidateEq, traversed, traversedEq, actioned, actionedEq,
+        publishedEq⟩
+      have traversedPayload := runMappedPrimitive?_payload current _ id
+        traversedEq
+      have actionedPayload := runMappedPrimitive?_payload traversed _ id
+        actionedEq
+      have publishedExact := publishPhaseCValueCandidate?_exact
+        actioned result edge.after candidate publishedEq
+      rw [actionedPayload, traversedPayload] at publishedExact
+      exact ⟨publishedExact.1, Or.inr ⟨rebuilt, prior, candidate,
+        rebuiltEq, priorEq, candidateEq, publishedExact.2⟩⟩
+  next differentSource =>
+      cases selected
+      exact ⟨rfl, Or.inl rfl⟩
+
+private theorem attemptPhaseCScannedEdge?_units
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    result.counter.units = current.counter.units ∨
+      result.counter.units = current.counter.units + 2 ∨
+      result.counter.units = current.counter.units + 3 := by
+  unfold attemptPhaseCScannedEdge? at selected
+  split at selected
+  next sameSource =>
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨rebuilt, rebuiltEq, prior, priorEq, candidate,
+        candidateEq, traversed, traversedEq, actioned, actionedEq,
+        publishedEq⟩
+      have traversedUnits := runMappedPrimitive?_units current _ id
+        traversedEq
+      have actionedUnits := runMappedPrimitive?_units traversed _ id
+        actionedEq
+      have publishedUnits := publishPhaseCValueCandidate?_units
+        actioned result edge.after candidate publishedEq
+      rw [actionedUnits, traversedUnits] at publishedUnits
+      cases kindEq : candidate.kind with
+      | duplicate =>
+          simp [kindEq] at publishedUnits
+          exact Or.inr (Or.inl publishedUnits)
+      | insertedIncomplete =>
+          simp [kindEq] at publishedUnits
+          exact Or.inr (Or.inr publishedUnits)
+      | insertedComplete =>
+          simp [kindEq] at publishedUnits
+          exact Or.inr (Or.inr publishedUnits)
+  next differentSource =>
+      cases selected
+      exact Or.inl rfl
+
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
