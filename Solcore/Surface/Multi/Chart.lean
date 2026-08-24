@@ -27924,6 +27924,29 @@ structure ContextualValueWorklistResult
   recognition : ContextualWorklistResult file tokens
   frontier : ContextualValueFrontierState file tokens
 
+namespace ContextualValueWorklistResult
+
+/-- Project the AST only from the canonical complete whole-input module key. -/
+def parsedModule?
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens) :
+    Option ParsedModuleV1 :=
+  result.frontier.lookupParsedModule?
+
+/-- Public result projection succeeds exactly from its canonical module
+reduction. -/
+theorem parsedModule?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens)
+    (module : ParsedModuleV1) :
+    result.parsedModule? = some module ↔
+      ∃ reduction,
+        result.frontier.lookupModuleReduction? = some reduction ∧
+          reduction.value = module := by
+  exact result.frontier.lookupParsedModule?_eq_some_iff module
+
+end ContextualValueWorklistResult
+
 /-- Run saturated multi-ledger recognition followed by semantic frontier
 evaluation. Failure remains explicit until semantic totality is proved. -/
 def executeObservedContextualValueWorklistMulti?
