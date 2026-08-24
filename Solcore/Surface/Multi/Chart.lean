@@ -36011,3 +36011,66 @@ theorem executeObservedContextualValueWorklistMulti?_total
   simp [executeObservedContextualValueWorklistMulti?, internalEq]
 
 end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+/-- Prediction, scan, and completion folds preserve the same public frontier
+trace while processing one dequeued semantic item. -/
+private theorem processPhaseCValueItem?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (itemsEq : current.payload.recognition.phaseC.contextualItems =
+      recognition.items)
+    (edgesEq : current.payload.recognition.phaseC.contextualEdges =
+      recognition.edges)
+    (trace : ContextualValueFrontierTrace owned recognition
+      current.payload.frontier)
+    (selected : processPhaseCValueItem? owned item current = some result) :
+    ContextualValueFrontierTrace owned recognition
+      result.payload.frontier := by
+  unfold processPhaseCValueItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  have predictedTrace := attemptPhaseCValuePredictions?_valueTrace owned
+    recognition item allProductionIds current predicted itemsEq trace
+      predictedEq
+  have predictedRecognition := attemptPhaseCValuePredictions?_recognition
+    owned item allProductionIds current predicted predictedEq
+  have predictedEdgesEq :
+      predicted.payload.recognition.phaseC.contextualEdges =
+        recognition.edges := by
+    rw [predictedRecognition]
+    exact edgesEq
+  have edgeSubset : ∀ edge,
+      edge ∈ predicted.payload.recognition.phaseC.contextualEdges →
+        edge ∈ recognition.edges := by
+    intro edge member
+    rw [← predictedEdgesEq]
+    exact member
+  have scannedTrace := attemptPhaseCRetainedScannedEdges?_valueTrace owned
+    recognition item predicted.payload.recognition.phaseC.contextualEdges
+      predicted scanned edgeSubset predictedTrace scannedEq
+  have scannedRecognition :=
+    attemptPhaseCRetainedScannedEdges?_recognition owned item
+      predicted.payload.recognition.phaseC.contextualEdges predicted scanned
+        scannedEq
+  have completedSubset : ∀ edge,
+      edge ∈ scanned.payload.recognition.phaseC.contextualEdges →
+        edge ∈ recognition.edges := by
+    intro edge member
+    rw [scannedRecognition, predictedRecognition] at member
+    rw [← edgesEq]
+    exact member
+  exact attemptPhaseCRetainedCompletedEdges?_valueTrace owned recognition item
+    scanned.payload.recognition.phaseC.contextualEdges scanned result
+      completedSubset scannedTrace completedEq
+
+end Solcore.Surface.Multi.Chart
