@@ -28316,6 +28316,42 @@ private def attemptContextualCompletionMulti?
         let withItem ← insertContextualItem? attempted .completion after
         insertContextualCompletedEdgeMulti? withItem edge
 
+/-- A recognition completion attempt consumes only U03, item-insertion, and
+U04 addresses, leaving every later semantic address reserved. -/
+private theorem attemptContextualCompletionMulti?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : attemptContextualCompletionMulti? current waiting finished =
+      some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold attemptContextualCompletionMulti? at selected
+  cases completion : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completion] at selected
+      cases selected
+      exact fresh
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completion] at selected
+      split at selected
+      next used =>
+        cases selected
+        exact fresh
+      next unused =>
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        have attemptedFresh :=
+          runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
+            attempted fresh (by intro semantic; cases semantic) attemptedEq
+        have withItemFresh := insertContextualItem?_valueAddressesFresh
+          attempted withItem .completion after attemptedFresh itemEq
+        exact insertContextualCompletedEdgeMulti?_valueAddressesFresh withItem
+          result edge withItemFresh edgeEq
+
 private theorem attemptContextualCompletionMulti?_backpointers
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
@@ -28528,6 +28564,49 @@ private def attemptContextualCompletionsWithMulti?
         else
           attemptContextualCompletionMulti? forward other pivot
       attemptContextualCompletionsWithMulti? pivot rest reverse
+
+/-- Pairwise recognition completion preserves the complete semantic address
+reserve through both forward and reverse attempts. -/
+private theorem attemptContextualCompletionsWithMulti?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ (others : List (ContextualItemKey tokens))
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCValueAddressesFresh current.counter →
+      attemptContextualCompletionsWithMulti? pivot others current =
+        some result →
+      PhaseCValueAddressesFresh result.counter := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result fresh selected
+      cases selected
+      exact fresh
+  | cons other rest induction =>
+      intro current result fresh selected
+      rw [attemptContextualCompletionsWithMulti?] at selected
+      cases forwardEq :
+          attemptContextualCompletionMulti? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardFresh :=
+            attemptContextualCompletionMulti?_valueAddressesFresh current
+              forward pivot other fresh forwardEq
+          split at selected
+          next same =>
+            exact induction forward result forwardFresh selected
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq :
+                attemptContextualCompletionMulti? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact induction reverse result
+                  (attemptContextualCompletionMulti?_valueAddressesFresh
+                    forward reverse other pivot forwardFresh reverseEq)
+                  selected
 
 /-- The list lift is total and preserves every Phase-C safety and
 multi-ledger invariant. -/
@@ -28760,6 +28839,29 @@ private def processContextualItemMulti?
   let scanned ← attemptContextualScan? owned predicted item
   attemptContextualCompletionsWithMulti? item
     scanned.payload.phaseC.contextualItems scanned
+
+/-- Every recognition item-processing phase preserves the address reserve
+needed to start semantic evaluation after saturation. -/
+private theorem processContextualItemMulti?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : processContextualItemMulti? owned item current = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold processContextualItemMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  have predictedFresh :=
+    attemptContextualPredictions?_valueAddressesFresh item allProductionIds
+      current predicted fresh predictedEq
+  have scannedFresh := attemptContextualScan?_valueAddressesFresh owned
+    predicted scanned item predictedFresh scannedEq
+  exact attemptContextualCompletionsWithMulti?_valueAddressesFresh item
+    scanned.payload.phaseC.contextualItems scanned result scannedFresh
+      completedEq
 
 private theorem processContextualItemMulti?_total_allSafe_backpointers
     {file : WorkspaceFile} {tokens : List Token}
