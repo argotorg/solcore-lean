@@ -1,5 +1,6 @@
 import Solcore.Surface.Multi.ChartProperties
 import Solcore.Surface.Multi.RootlessNormalizationRank
+import Lean.Elab.Tactic
 
 set_option autoImplicit false
 
@@ -7,6 +8,235 @@ namespace Solcore.Surface.Multi
 
 open Grammar
 open Solcore.Workspace
+
+private def postEofGrammarShapeBool : Bool :=
+  allProductionIds.all fun production =>
+    ((! production.rhs.contains (.terminal .endOfFile)) ||
+      decide (production = .atom moduleEofAtomSite)) &&
+    ((! production.rhs.contains
+        (.nonterminal (.aux moduleEofGrammarSite))) ||
+      decide (production = .seq moduleRootSequenceSite)) &&
+    ((! production.rhs.contains
+        (.nonterminal (.aux (GrammarSite.root .module)))) ||
+      decide (production = .root .module))
+
+set_option maxRecDepth 4000 in
+private theorem postEofGrammarShapeBool_true :
+    postEofGrammarShapeBool = true := by
+  run_tac
+    Lean.Meta.withTransparency .all do
+      (← Lean.Elab.Tactic.getMainGoal).refl
+
+private theorem ProductionId.postEof_shape (production : ProductionId) :
+    (.terminal .endOfFile ∈ production.rhs →
+      production = .atom moduleEofAtomSite) ∧
+    (.nonterminal (.aux moduleEofGrammarSite) ∈ production.rhs →
+      production = .seq moduleRootSequenceSite) ∧
+    (.nonterminal (.aux (GrammarSite.root .module)) ∈ production.rhs →
+      production = .root .module) := by
+  have row := (List.all_eq_true.mp postEofGrammarShapeBool_true)
+    production (allProductionIds_complete production)
+  simp only [Bool.and_eq_true] at row
+  refine ⟨?_, ?_, ?_⟩
+  · intro member
+    have accepted := row.1.1
+    rw [Bool.or_eq_true] at accepted
+    rcases accepted with absent | equal
+    · have present : production.rhs.contains (.terminal .endOfFile) =
+          true := List.contains_iff_mem.mpr member
+      rw [present] at absent
+      contradiction
+    · exact of_decide_eq_true equal
+  · intro member
+    have accepted := row.1.2
+    rw [Bool.or_eq_true] at accepted
+    rcases accepted with absent | equal
+    · have present : production.rhs.contains
+          (.nonterminal (.aux moduleEofGrammarSite)) = true :=
+        List.contains_iff_mem.mpr member
+      rw [present] at absent
+      contradiction
+    · exact of_decide_eq_true equal
+  · intro member
+    have accepted := row.2
+    rw [Bool.or_eq_true] at accepted
+    rcases accepted with absent | equal
+    · have present : production.rhs.contains
+          (.nonterminal (.aux (GrammarSite.root .module))) = true :=
+        List.contains_iff_mem.mpr member
+      rw [present] at absent
+      contradiction
+    · exact of_decide_eq_true equal
+
+private theorem Chart.OperationalContextualReach.afterLogicalEOF_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached : Chart.OperationalContextualReach file tokens memo item)
+    (current : item.raw.current = Boundary.afterLogicalEOF tokens) :
+    (item.raw.production = .atom moduleEofAtomSite ∧
+        CompleteItem item.raw) ∨
+      (item.raw.production = .seq moduleRootSequenceSite ∧
+        CompleteItem item.raw) ∨
+      (item.raw.production = .root .module ∧ CompleteItem item.raw) := by
+  induction reached with
+  | root =>
+      have values := congrArg Fin.val current
+      simp [Boundary.start, Boundary.afterLogicalEOF] at values
+  | predict waiting predicted reached next enabled induction =>
+      rcases induction current with
+          ⟨production, complete⟩ | ⟨production, complete⟩ |
+            ⟨production, complete⟩
+      all_goals
+        unfold NextSymbol at next
+        unfold CompleteItem at complete
+        omega
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      have cursorAtEnd : cursor.val = tokens.length := by
+        have values := congrArg Fin.val current
+        rw [advance.2.2.2] at values
+        change cursor.val + 1 = tokens.length + 1 at values
+        omega
+      cases terminalAt with
+      | retained token inRange lookup valid => omega
+      | endOfFile atEnd =>
+          have terminalEq : terminal = .endOfFile := by
+            cases terminal <;> simp [TerminalMatches] at terminalMatches ⊢
+          subst terminal
+          have beforeProduction : before.raw.production =
+              .atom moduleEofAtomSite :=
+            (ProductionId.postEof_shape before.raw.production).1
+              (List.mem_of_getElem? next.2)
+          have afterProduction : after.raw.production =
+              .atom moduleEofAtomSite :=
+            advance.1.trans beforeProduction
+          have beforeRhs : before.raw.production.rhs =
+              [.terminal .endOfFile] :=
+            (congrArg ProductionId.rhs beforeProduction).trans
+              ProductionId.rhs_moduleEofAtom
+          have beforeDot : before.raw.dot.val = 0 := by
+            have bound := next.1
+            have rhsLength : before.raw.production.rhs.length = 1 :=
+              congrArg List.length beforeRhs
+            omega
+          exact Or.inl ⟨afterProduction, by
+            unfold CompleteItem
+            rw [advance.2.1, beforeDot]
+            have afterRhs : after.raw.production.rhs =
+                [.terminal .endOfFile] :=
+              (congrArg ProductionId.rhs afterProduction).trans
+                ProductionId.rhs_moduleEofAtom
+            rw [congrArg List.length afterRhs]
+            rfl⟩
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, childComplete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      have finishedCurrent : finished.raw.current =
+          Boundary.afterLogicalEOF tokens :=
+        advance.2.2.2.symm.trans current
+      rcases finishedInduction finishedCurrent with
+          ⟨finishedProduction, finishedComplete⟩ |
+          ⟨finishedProduction, finishedComplete⟩ |
+          ⟨finishedProduction, finishedComplete⟩
+      · have exactNext : waiting.raw.production.rhs[waiting.raw.dot.val]? =
+            some (.nonterminal (.aux moduleEofGrammarSite)) := by
+          calc
+            _ = some (.nonterminal symbol) := next.2
+            _ = some (.nonterminal finished.raw.production.lhs) := by
+              rw [lhsEq]
+            _ = _ := by
+              rw [finishedProduction]
+              rfl
+        have waitingProduction : waiting.raw.production =
+            .seq moduleRootSequenceSite :=
+          (ProductionId.postEof_shape waiting.raw.production).2.1
+            (List.mem_of_getElem? exactNext)
+        have waitingRhs : waiting.raw.production.rhs =
+            [.nonterminal (.aux moduleItemsGrammarSite),
+              .nonterminal (.aux moduleEofGrammarSite)] :=
+          (congrArg ProductionId.rhs waitingProduction).trans
+            ProductionId.rhs_moduleRootSequence
+        have waitingDot : waiting.raw.dot.val = 1 := by
+          have bound := next.1
+          have rhsLength : waiting.raw.production.rhs.length = 2 :=
+            congrArg List.length waitingRhs
+          have cases : waiting.raw.dot.val = 0 ∨
+              waiting.raw.dot.val = 1 := by omega
+          rcases cases with zero | one
+          · have selected := exactNext
+            rw [congrArg (fun rhs : List GrammarSymbol =>
+              rhs[waiting.raw.dot.val]?) waitingRhs, zero] at selected
+            simp [moduleItemsGrammarSite, moduleEofGrammarSite] at selected
+          · exact one
+        have afterProduction := advance.1.trans waitingProduction
+        exact Or.inr (Or.inl ⟨afterProduction, by
+          unfold CompleteItem
+          rw [advance.2.1, waitingDot]
+          have afterRhs : after.raw.production.rhs =
+              [.nonterminal (.aux moduleItemsGrammarSite),
+                .nonterminal (.aux moduleEofGrammarSite)] :=
+            (congrArg ProductionId.rhs afterProduction).trans
+              ProductionId.rhs_moduleRootSequence
+          rw [congrArg List.length afterRhs]
+          rfl⟩)
+      · have exactNext : waiting.raw.production.rhs[waiting.raw.dot.val]? =
+            some (.nonterminal (.aux (GrammarSite.root .module))) := by
+          calc
+            _ = some (.nonterminal symbol) := next.2
+            _ = some (.nonterminal finished.raw.production.lhs) := by
+              rw [lhsEq]
+            _ = _ := by
+              rw [finishedProduction]
+              rfl
+        have waitingProduction : waiting.raw.production = .root .module :=
+          (ProductionId.postEof_shape waiting.raw.production).2.2
+            (List.mem_of_getElem? exactNext)
+        have waitingDot : waiting.raw.dot.val = 0 := by
+          have bound := next.1
+          have rhsLength : waiting.raw.production.rhs.length = 1 := by
+            rw [waitingProduction]
+            simp [ProductionId.rhs]
+          omega
+        have afterProduction := advance.1.trans waitingProduction
+        exact Or.inr (Or.inr ⟨afterProduction, by
+          unfold CompleteItem
+          rw [advance.2.1, waitingDot]
+          have afterRhs : after.raw.production.rhs =
+              [.nonterminal (.aux (GrammarSite.root .module))] := by
+            rw [afterProduction]
+            rfl
+          rw [congrArg List.length afterRhs]
+          rfl⟩)
+      · have exactNext : waiting.raw.production.rhs[waiting.raw.dot.val]? =
+            some (.nonterminal (.rule .module)) := by
+          calc
+            _ = some (.nonterminal symbol) := next.2
+            _ = some (.nonterminal finished.raw.production.lhs) := by
+              rw [lhsEq]
+            _ = _ := by
+              rw [finishedProduction]
+              rfl
+        exact (ProductionId.rhs_no_moduleRule waiting.raw.production
+          (List.mem_of_getElem? exactNext)).elim
+
+private theorem Chart.OperationalContextualReach.no_terminal_afterLogicalEOF
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached : Chart.OperationalContextualReach file tokens memo item)
+    (current : item.raw.current = Boundary.afterLogicalEOF tokens)
+    {terminal : TerminalSymbol}
+    (next : NextSymbol item.raw (.terminal terminal)) : False := by
+  rcases reached.afterLogicalEOF_shape current with
+      ⟨production, complete⟩ | ⟨production, complete⟩ |
+        ⟨production, complete⟩
+  all_goals
+    unfold NextSymbol at next
+    unfold CompleteItem at complete
+    omega
 
 namespace Chart.ContextualWorklistResult
 
@@ -206,6 +436,29 @@ theorem executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosed_iff
       greatest ⟨item, terminal, ⟨greatest, reached, current⟩,
         next, enabled⟩ rfl
     exact (correspondence.1 _).mpr rootReached
+
+/-- A saturated observed worklist has no terminal expectation past logical
+EOF, so its finite post-EOF closure certificate is always set. -/
+theorem executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    result.postLogicalEofTerminalClosedBool = true := by
+  have sound :=
+    Chart.executeObservedContextualWorklistMulti?_operational_sound
+      file tokens owned result selected
+  have empty : result.expectedAtCurrent
+      (Boundary.afterLogicalEOF tokens) = [] := by
+    rw [List.eq_nil_iff_forall_not_mem]
+    intro expected member
+    rcases (Chart.ContextualWorklistResult.expectedAtCurrent_mem_iff
+      result (Boundary.afterLogicalEOF tokens) expected).mp member with
+      ⟨item, itemMember, current, terminal, next, _expectedEq⟩
+    exact (sound.1 item itemMember).no_terminal_afterLogicalEOF current next
+  unfold Chart.ContextualWorklistResult.postLogicalEofTerminalClosedBool
+  simp [empty]
 
 /-- The single executable bit is exactly the original post-EOF residual for
 the recognition result returned by the total worklist. -/
