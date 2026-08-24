@@ -12566,6 +12566,29 @@ theorem ContextualReductionValue.reduce_coherent
       item.raw.current ready owned ordered
       (PrefixValues.fullValue item isComplete prior.value))
 
+/-- Every successful executable readiness check yields a declaratively
+coherent reduction. -/
+theorem ContextualReductionValue.reduce?_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final item)
+    (prior : ContextualPrefixValue file tokens item)
+    (priorCoherent : CoherentPrefix file tokens memo correct final
+      item prior.value)
+    (result : ContextualReductionValue file tokens item)
+    (selected : ContextualReductionValue.reduce? owned item prior =
+      some result) :
+    CoherentReduction file tokens memo correct final item result.value := by
+  rcases (ContextualReductionValue.reduce?_eq_some_iff
+    owned item prior result).mp selected with
+    ⟨_ordered, complete, moduleInterval, rfl⟩
+  exact ContextualReductionValue.reduce_coherent owned item reached complete
+    prior priorCoherent moduleInterval
+
 namespace ContextualValueFrontierState
 
 /-- Item identities present in the dependent prefix ledger. -/
