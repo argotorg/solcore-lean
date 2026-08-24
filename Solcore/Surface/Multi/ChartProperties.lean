@@ -4569,6 +4569,141 @@ theorem executeAnnotationRoot_reduces
         ← suffixEq, ← colonEq, ← typeEq]
       exact .annotationSome origin finish expression colon typeValue witness
 
+/-- The conditional executor realizes all exact conditional reductions. -/
+theorem executeConditionalRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .conditional origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .conditional)) :
+    RuleReduction file tokens .conditional origin finish input
+      (executeConditionalRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let keywordChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .ifKw)),
+    .atom (.nonterminal .conditional),
+    .atom (.terminal (.contextualKeyword .thenKw)),
+    .atom (.nonterminal .conditional),
+    .atom (.terminal (.hardKeyword .elseKw)),
+    .atom (.nonterminal .conditional)]
+  let ternaryChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .question)),
+    .atom (.nonterminal .conditional),
+    .atom (.terminal (.symbol .colon)),
+    .atom (.nonterminal .conditional)]
+  let logicalOrAtom : EbnfExpr := .atom (.nonterminal .logicalOr)
+  let ternaryBranch : EbnfExpr := .sequence ternaryChildren
+  let logicalBranch : EbnfExpr :=
+    .sequence [logicalOrAtom, .optional ternaryBranch]
+  let keywordBranch : EbnfExpr := .sequence keywordChildren
+  change EbnfValue file tokens
+    (.choice [keywordBranch, logicalBranch]) at input
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  generalize selectedEq : EbnfValue.choice2View
+    keywordBranch logicalBranch input = selected
+  have inputEq := EbnfValue.choice2_of_view
+    keywordBranch logicalBranch input
+  rw [selectedEq] at inputEq
+  cases selected with
+  | inl rawKeyword =>
+      generalize valuesEq : EbnfValue.sequenceFlatView
+        keywordChildren rawKeyword = values
+      rcases values with
+        ⟨rawIf, rawCondition, rawThenKeyword, rawThen,
+          rawElseKeyword, rawElse, ⟨⟩⟩
+      have rawEq := EbnfValue.sequence_of_flat_view
+        keywordChildren rawKeyword
+      rw [valuesEq] at rawEq
+      let ifKeyword := EbnfValue.terminalView
+        (.hardKeyword .ifKw) rawIf
+      let condition := EbnfValue.ruleView .conditional rawCondition
+      let thenKeyword := EbnfValue.terminalView
+        (.contextualKeyword .thenKw) rawThenKeyword
+      let thenBranch := EbnfValue.ruleView .conditional rawThen
+      let elseKeyword := EbnfValue.terminalView
+        (.hardKeyword .elseKw) rawElseKeyword
+      let elseBranch := EbnfValue.ruleView .conditional rawElse
+      have resultEq : executeConditionalRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness
+            (.keywordConditional condition thenBranch elseBranch) := by
+        simp [executeConditionalRoot, keywordChildren, ternaryChildren,
+          logicalOrAtom, ternaryBranch, logicalBranch, keywordBranch,
+          selectedEq, valuesEq, condition, thenBranch, elseBranch,
+          witness]
+      rw [resultEq, ← inputEq, ← rawEq,
+        ← EbnfValue.terminal_of_view (.hardKeyword .ifKw) rawIf,
+        ← EbnfValue.rule_of_view .conditional rawCondition,
+        ← EbnfValue.terminal_of_view
+          (.contextualKeyword .thenKw) rawThenKeyword,
+        ← EbnfValue.rule_of_view .conditional rawThen,
+        ← EbnfValue.terminal_of_view
+          (.hardKeyword .elseKw) rawElseKeyword,
+        ← EbnfValue.rule_of_view .conditional rawElse]
+      exact .conditionalKeyword origin finish ifKeyword condition
+        thenKeyword thenBranch elseKeyword elseBranch witness
+  | inr rawLogical =>
+      let viewed := EbnfValue.sequence2View
+        logicalOrAtom (.optional ternaryBranch) rawLogical
+      let condition := EbnfValue.ruleView .logicalOr viewed.1
+      have rawEq := EbnfValue.sequence2_of_view
+        logicalOrAtom (.optional ternaryBranch) rawLogical
+      have conditionEq := EbnfValue.rule_of_view .logicalOr viewed.1
+      generalize optionalEq : EbnfValue.optionalView
+        ternaryBranch viewed.2 = optionalValue
+      have optionalRebuild := EbnfValue.optional_of_view
+        ternaryBranch viewed.2
+      cases optionalValue with
+      | none =>
+          have optionalValueEq :
+              EbnfValue.optional ternaryBranch none = viewed.2 := by
+            rw [← optionalEq]
+            exact optionalRebuild
+          have resultEq : executeConditionalRoot file tokens origin finish
+              ready.1 ready.2.1 input = condition := by
+            simp [executeConditionalRoot, keywordChildren, ternaryChildren,
+              logicalOrAtom, ternaryBranch, logicalBranch, keywordBranch,
+              selectedEq, viewed, condition, optionalEq]
+          rw [resultEq, ← inputEq, ← rawEq,
+            ← conditionEq, ← optionalValueEq]
+          exact .conditionalLogical origin finish condition
+      | some rawTernary =>
+          let questionAtom : EbnfExpr :=
+            .atom (.terminal (.symbol .question))
+          let conditionalAtom : EbnfExpr :=
+            .atom (.nonterminal .conditional)
+          let colonAtom : EbnfExpr :=
+            .atom (.terminal (.symbol .colon))
+          let values := EbnfValue.sequence4View questionAtom
+            conditionalAtom colonAtom conditionalAtom rawTernary
+          let question := EbnfValue.terminalView
+            (.symbol .question) values.1
+          let thenBranch := EbnfValue.ruleView .conditional values.2.1
+          let colon := EbnfValue.terminalView (.symbol .colon) values.2.2.1
+          let elseBranch := EbnfValue.ruleView .conditional values.2.2.2
+          have ternaryEq := EbnfValue.sequence4_of_view questionAtom
+            conditionalAtom colonAtom conditionalAtom rawTernary
+          have optionalValueEq :
+              EbnfValue.optional ternaryBranch (some rawTernary) =
+                viewed.2 := by
+            rw [← optionalEq]
+            exact optionalRebuild
+          have resultEq : executeConditionalRoot file tokens origin finish
+              ready.1 ready.2.1 input = sourceLoc witness
+                (.ternaryConditional condition thenBranch elseBranch) := by
+            simp [executeConditionalRoot, keywordChildren, ternaryChildren,
+              logicalOrAtom, ternaryBranch, logicalBranch, keywordBranch,
+              selectedEq, viewed, condition, optionalEq, values,
+              questionAtom, conditionalAtom, colonAtom, thenBranch,
+              elseBranch, witness]
+          rw [resultEq, ← inputEq, ← rawEq, ← conditionEq,
+            ← optionalValueEq, ← ternaryEq,
+            ← EbnfValue.terminal_of_view (.symbol .question) values.1,
+            ← EbnfValue.rule_of_view .conditional values.2.1,
+            ← EbnfValue.terminal_of_view (.symbol .colon) values.2.2.1,
+            ← EbnfValue.rule_of_view .conditional values.2.2.2]
+          exact .conditionalTernary origin finish condition question
+            thenBranch colon elseBranch witness
+
 /-- The block-statement executor realizes its exact root reduction. -/
 theorem executeBlockStatementRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -9874,6 +10009,8 @@ theorem executeRootRule_reduces
       exact executeExpressionRoot_reduces origin finish ready input
   | annotation =>
       exact executeAnnotationRoot_reduces origin finish ready input
+  | conditional =>
+      exact executeConditionalRoot_reduces origin finish ready input
   | blockStatement =>
       exact executeBlockStatementRoot_reduces origin finish ready input
   | functionDecl =>
