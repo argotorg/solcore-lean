@@ -15054,4 +15054,22 @@ theorem executeObservedContextualValueWorklistMulti?_parses
   exact executeObservedContextualValueWorklistMulti?_valuesCoherent
     file tokens owned result selected
 
+/-- Once pending liveness is available, executable well-formedness is supplied
+by the executor trace and no longer remains a separate caller premise. -/
+theorem executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_completeModuleRoot_of_pending
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (pending : result.RecognitionMaterializationPending)
+    (present : result.recognition.containsCompleteModuleRootItem = true) :
+    ∃ module, result.parsedModule? = some module := by
+  exact
+    executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_completeModuleRoot
+      file tokens owned result selected pending
+        (executeObservedContextualValueWorklistMulti?_executableWellFormed
+          file tokens owned result selected)
+        present
+
 end Solcore.Surface.Multi
