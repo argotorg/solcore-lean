@@ -14769,6 +14769,39 @@ theorem executeObservedContextualValueWorklistMulti?_parses_of_valuesCoherent
   exact result.frontier.lookupParsedModule?_parses owned coherent module
     (by simpa [Chart.ContextualValueWorklistResult.parsedModule?] using parsed)
 
+/-- Recognition materialization plus executable reduction availability turns
+the completed-module-root bit into an actual projected AST. -/
+theorem Chart.ContextualValueWorklistResult.parsedModule?_exists_of_completeModuleRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (materialized : result.RecognitionPrefixesMaterialized)
+    (wellFormed : result.frontier.ExecutableWellFormed)
+    (present : result.recognition.containsCompleteModuleRootItem = true) :
+    ∃ module, result.parsedModule? = some module := by
+  let root := CanonicalCompleteRootItem tokens .module
+    (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain
+  have prefixPresent : result.frontier.prefixMemberBool root = true := by
+    simpa only [root] using
+      result.completeModuleRoot_prefixMemberBool_eq_true materialized present
+  have prefixMember : root ∈ result.frontier.prefixKeys :=
+    (result.frontier.prefixMemberBool_eq_true_iff root).mp prefixPresent
+  have reductionMember : root ∈ result.frontier.reductionKeys :=
+    wellFormed.2 root prefixMember
+      (canonicalCompleteRootItem_complete .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain)
+  have reductionSome :
+      (result.frontier.lookupReduction? root).isSome = true :=
+    (result.frontier.lookupReduction?_isSome_eq_true_iff_member root).mpr
+      reductionMember
+  cases selected : result.frontier.lookupReduction? root with
+  | none => simp [selected] at reductionSome
+  | some reduction =>
+      refine ⟨reduction.value, ?_⟩
+      apply (result.parsedModule?_eq_some_iff reduction.value).mpr
+      exact ⟨reduction, by
+        simpa [Chart.ContextualValueFrontierState.lookupModuleReduction?, root]
+          using selected, rfl⟩
+
 end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi
