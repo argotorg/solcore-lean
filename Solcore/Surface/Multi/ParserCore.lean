@@ -5894,6 +5894,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | type : ExecutableRootRule .type
   | typeAtom : ExecutableRootRule .typeAtom
   | qualifiedName : ExecutableRootRule .qualifiedName
+  | forStatement : ExecutableRootRule .forStatement
   | forInitItem : ExecutableRootRule .forInitItem
   | forPostItem : ExecutableRootRule .forPostItem
   | expressionStatement : ExecutableRootRule .expressionStatement
@@ -7598,6 +7599,35 @@ def executeTypeRoot
           let codomain := EbnfValue.ruleView .type arrowViewed.2
           sourceLoc witness (.function domain codomain)
 
+/-- Decode every semantic component of a `for` statement root. -/
+def executeForStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .forStatement)) :
+    Statement :=
+  let initAtom : EbnfExpr := .atom (.nonterminal .forInitItem)
+  let postAtom : EbnfExpr := .atom (.nonterminal .forPostItem)
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .forKw)),
+    .atom (.terminal (.symbol .leftParen)), .list0 initAtom,
+    .atom (.terminal (.symbol .semicolon)),
+    .atom (.nonterminal .expression),
+    .atom (.terminal (.symbol .semicolon)), .list0 postAtom,
+    .atom (.terminal (.symbol .rightParen)),
+    .atom (.nonterminal .body)]
+  let ⟨_, _, rawInit, _, rawCondition, _, rawPost, _, rawBody, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let initializers := (EbnfValue.list0View initAtom rawInit).map
+    (EbnfValue.ruleView .forInitItem)
+  let post := (EbnfValue.list0View postAtom rawPost).map
+    (EbnfValue.ruleView .forPostItem)
+  sourceLoc (ConsumedSpanWitness.compute
+      file tokens origin finish owned ordered)
+    (.forLoop initializers (EbnfValue.ruleView .expression rawCondition)
+      post (EbnfValue.ruleView .body rawBody))
+
 /-- Execute a `for` initializer from its selected typed alternative. -/
 def executeForInitItemRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -8901,6 +8931,8 @@ def executeRootRule
       executeTypeAtomRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
+  | .forStatement =>
+      executeForStatementRoot file tokens origin finish owned ordered input
   | .forInitItem =>
       executeForInitItemRoot file tokens origin finish owned ordered input
   | .forPostItem =>
