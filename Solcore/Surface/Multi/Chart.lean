@@ -23048,6 +23048,79 @@ private theorem dequeuePhaseCValueFrontier?_valueTrace
     (ContextualValueFrontierState.dequeue?_of_cons
       current.payload.frontier item rest queueEq)
 
+/-- One semantic prediction preserves the public frontier trace over the
+immutable recognition result. -/
+private theorem attemptPhaseCValuePrediction?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (itemsEq : current.payload.recognition.phaseC.contextualItems =
+      recognition.items)
+    (trace : ContextualValueFrontierTrace owned recognition
+      current.payload.frontier)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    ContextualValueFrontierTrace owned recognition result.payload.frontier := by
+  rcases (attemptPhaseCValuePrediction?_exact owned current result waiting
+    predicted selected).2 with unchanged | inserted
+  · exact .same trace unchanged.symm
+  · rcases inserted with ⟨item, productionInstance, atZero, candidate,
+      predictedEq, itemMember, candidateEq, frontierEq⟩
+    have retained : item ∈ recognition.items := by
+      rw [← itemsEq]
+      exact (phaseCItemMemberBool_true_iff _ item).mp itemMember
+    have candidateTrace : ContextualValueFrontierTrace owned recognition
+        candidate.state :=
+      .prediction trace retained atZero candidate candidateEq
+    have publishedEq :=
+      ContextualValueFrontierState.insertCandidate?_publishedState_eq
+        owned current.payload.frontier item
+          (ContextualPrefixValue.zero item atZero) candidate candidateEq
+    exact .same candidateTrace (frontierEq.trans publishedEq).symm
+
+/-- Folding a finite prediction table preserves the same public frontier
+trace and recognition item view. -/
+private theorem attemptPhaseCValuePredictions?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      current.payload.recognition.phaseC.contextualItems = recognition.items →
+      ContextualValueFrontierTrace owned recognition
+        current.payload.frontier →
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+      ContextualValueFrontierTrace owned recognition
+        result.payload.frontier := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result _itemsEq trace selected
+      cases selected
+      exact trace
+  | cons predicted rest induction =>
+      intro current result itemsEq trace selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      have nextTrace := attemptPhaseCValuePrediction?_valueTrace owned
+        recognition current next waiting predicted itemsEq trace nextEq
+      have recognitionEq :=
+        (attemptPhaseCValuePrediction?_exact owned current next waiting
+          predicted nextEq).1
+      have nextItemsEq :
+          next.payload.recognition.phaseC.contextualItems =
+            recognition.items := by
+        rw [recognitionEq]
+        exact itemsEq
+      exact induction next result nextItemsEq nextTrace restEq
+
 end Solcore.Surface.Multi.Chart
 
 namespace Solcore.Surface.Multi.Chart
