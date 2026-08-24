@@ -37078,6 +37078,19 @@ private theorem beginPhaseCValueWorklist?_materializationPending
     rw [empty] at reductionSome
     simp at reductionSome
 
+/-- Recognition-side U06 freshness initializes the causal completion
+materialization invariant before the semantic queue starts. -/
+private theorem beginPhaseCValueWorklist?_completionAttemptMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (fresh : PhaseCValueCompletionAttemptsFresh current.counter)
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    PhaseCValueCompletionAttemptMaterialized result := by
+  intro retained waiting finished after shared member shape used
+  exact (beginPhaseCValueWorklist?_valueCompletionAttemptsFresh current result
+    fresh selected waiting finished used).elim
+
 /-- A semantic transition grows the frontier without silently creating an
 unprocessed value: every new prefix or reduction key remains queued. -/
 private structure PhaseCValueFrontierGrowth
