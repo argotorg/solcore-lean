@@ -27258,6 +27258,23 @@ private theorem executeObservedPhaseABCValueWorklist?_queue_empty
   exact executePhaseCValueWorklist?_queue_empty
     owned recognition result valueEq
 
+private theorem executeObservedPhaseABCValueWorklist?_recognition
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : executeObservedPhaseABCValueWorklist? file tokens owned =
+      some result) :
+    ∃ recognition,
+      executeObservedPhaseABCWorklistMulti? file tokens owned =
+          some recognition ∧
+        result.payload.recognition = recognition.payload := by
+  unfold executeObservedPhaseABCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨recognition, recognitionEq, valueEq⟩
+  exact ⟨recognition, recognitionEq,
+    executePhaseCValueWorklist?_recognition
+      owned recognition result valueEq⟩
+
 /-- Unconditional totality of the observed A/B prefix followed by the bounded
 multi-ledger Phase-C executor. -/
 private theorem executeObservedPhaseABCWorklistMulti?_total
@@ -27718,6 +27735,25 @@ def executeObservedContextualWorklistMulti?
     items := result.payload.phaseC.contextualItems
     edges := result.payload.phaseC.contextualEdges
   }
+
+/-- Semantic evaluation preserves exactly the recognition result exposed by
+the independently total contextual worklist executor. -/
+theorem executeObservedContextualValueWorklistMulti?_recognition
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualValueWorklistResult file tokens)
+    (selected : executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    executeObservedContextualWorklistMulti? file tokens owned =
+      some result.recognition := by
+  unfold executeObservedContextualValueWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  obtain ⟨recognition, recognitionEq, payloadEq⟩ :=
+    executeObservedPhaseABCValueWorklist?_recognition
+      file tokens owned internal internalEq
+  simp [executeObservedContextualWorklistMulti?, recognitionEq, payloadEq]
 
 /-- The public multi-ledger contextual executor succeeds for every owned token
 stream.  Its hidden queues are drained before the public result is exposed. -/
