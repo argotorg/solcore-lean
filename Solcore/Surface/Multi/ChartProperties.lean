@@ -5173,6 +5173,95 @@ theorem executeIfStatementRoot_reduces
       exact .ifStatementWithElse origin finish ifKeyword openParen
         condition closeParen thenBody elseKeyword elseBody witness
 
+/-- The match-statement executor realizes its exact source-rule reduction. -/
+theorem executeMatchStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .matchStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .matchStatement)) :
+    RuleReduction file tokens .matchStatement origin finish input
+      (executeMatchStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let matchAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .matchKw))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftBrace))
+  let armAtom : EbnfExpr := .atom (.nonterminal .matchArm)
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightBrace))
+  let semicolonAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .semicolon))
+  let children : List EbnfExpr := [matchAtom, .list1 expressionAtom,
+    openAtom, .plus armAtom, closeAtom, .optional semicolonAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize viewEq : EbnfValue.sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawMatch, rawScrutinees, rawOpen, rawArms,
+    rawClose, rawTerminator, ⟨⟩⟩
+  let matchKeyword := EbnfValue.terminalView
+    (.hardKeyword .matchKw) rawMatch
+  let rawScrutineeValues :=
+    EbnfValue.list1View expressionAtom rawScrutinees
+  let scrutinees := rawScrutineeValues.map
+    (EbnfValue.ruleView .expression)
+  let openBrace := EbnfValue.terminalView
+    (.symbol .leftBrace) rawOpen
+  let rawArmValues := EbnfValue.plusView armAtom rawArms
+  let arms := rawArmValues.map (EbnfValue.ruleView .matchArm)
+  let closeBrace := EbnfValue.terminalView
+    (.symbol .rightBrace) rawClose
+  let rawTerminatorValue := EbnfValue.optionalView
+    semicolonAtom rawTerminator
+  let terminator := rawTerminatorValue.map
+    (EbnfValue.terminalView (.symbol .semicolon))
+  have scrutineesRebuild : EbnfValue.list1 expressionAtom
+      (scrutinees.map (EbnfValue.ruleAtom .expression)) =
+        rawScrutinees := by
+    rw [show scrutinees.map (EbnfValue.ruleAtom .expression) =
+        rawScrutineeValues from
+      ruleNonemptyAtoms_of_views .expression rawScrutineeValues]
+    exact EbnfValue.list1_of_view expressionAtom rawScrutinees
+  have armsRebuild : EbnfValue.plus armAtom
+      (arms.map (EbnfValue.ruleAtom .matchArm)) = rawArms := by
+    rw [show arms.map (EbnfValue.ruleAtom .matchArm) =
+        rawArmValues from
+      ruleNonemptyAtoms_of_views .matchArm rawArmValues]
+    exact EbnfValue.plus_of_view armAtom rawArms
+  have terminatorValuesRebuild : terminator.map
+      (EbnfValue.terminalAtom (.symbol .semicolon)) =
+        rawTerminatorValue := by
+    cases selected : rawTerminatorValue with
+    | none => simp [terminator, selected]
+    | some raw =>
+        simp [terminator, selected,
+          EbnfValue.terminal_of_view]
+  have terminatorRebuild : EbnfValue.optional semicolonAtom
+      (terminator.map
+        (EbnfValue.terminalAtom (.symbol .semicolon))) =
+        rawTerminator := by
+    rw [terminatorValuesRebuild]
+    exact EbnfValue.optional_of_view semicolonAtom rawTerminator
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  have resultEq : executeMatchStatementRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness
+        (.match scrutinees arms
+          (terminator.map MatchedTerminal.span)) := by
+    simp only [executeMatchStatementRoot, children, matchAtom,
+      expressionAtom, openAtom, armAtom, closeAtom, semicolonAtom,
+      viewEq, scrutinees, rawScrutineeValues, arms, rawArmValues,
+      terminator, rawTerminatorValue, witness]
+  rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+    viewEq,
+    ← EbnfValue.terminal_of_view (.hardKeyword .matchKw) rawMatch,
+    ← scrutineesRebuild,
+    ← EbnfValue.terminal_of_view (.symbol .leftBrace) rawOpen,
+    ← armsRebuild,
+    ← EbnfValue.terminal_of_view (.symbol .rightBrace) rawClose,
+    ← terminatorRebuild]
+  exact .matchStatement origin finish matchKeyword scrutinees openBrace
+    arms closeBrace terminator witness
+
 private theorem shortRuleAtoms_of_views
     {file : WorkspaceFile} {tokens : List Token}
     (rule : GrammarRuleId)
@@ -10710,6 +10799,8 @@ theorem executeRootRule_reduces
       exact executeAssemblyStatementRoot_reduces origin finish ready input
   | ifStatement =>
       exact executeIfStatementRoot_reduces origin finish ready input
+  | matchStatement =>
+      exact executeMatchStatementRoot_reduces origin finish ready input
   | returnStatement =>
       exact executeReturnStatementRoot_reduces origin finish ready input
   | assignmentStatement =>
