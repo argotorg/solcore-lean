@@ -13627,6 +13627,296 @@ private theorem executePhaseCValueWorklist?_recognition
     (chartGBound (tokens.length + 1)) entered result runEq).trans
       (beginPhaseCValueWorklist?_exact current entered enteredEq).2.2.1
 
+private theorem candidateInsertResult_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (available : state.queuePrefixesAvailable = true)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    (match candidate.kind with
+      | .duplicate => state
+      | .insertedIncomplete => candidate.state
+      | .insertedComplete => candidate.state).queuePrefixesAvailable =
+        true := by
+  have prepared :=
+    ContextualValueFrontierState.queuePrefixesAvailable_insertCandidate?
+      owned state item prior candidate available selected
+  cases kindEq : candidate.kind with
+  | duplicate => simpa [kindEq] using available
+  | insertedIncomplete => simpa [kindEq] using prepared
+  | insertedComplete => simpa [kindEq] using prepared
+
+private theorem attemptPhaseCValuePrediction?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  rcases (attemptPhaseCValuePrediction?_exact owned current result waiting
+    predicted selected).2 with unchanged | inserted
+  · rw [unchanged]
+    exact available
+  · rcases inserted with ⟨item, productionInstance, atZero, candidate,
+      predictionEq, _member, candidateEq, frontierEq⟩
+    rw [frontierEq]
+    exact candidateInsertResult_queuePrefixesAvailable owned
+      current.payload.frontier item (ContextualPrefixValue.zero item atZero)
+        candidate available candidateEq
+
+private theorem attemptPhaseCValuePredictions?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.queuePrefixesAvailable = true →
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        result.payload.frontier.queuePrefixesAvailable = true := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result available selected
+      cases selected
+      exact available
+  | cons predicted rest induction =>
+      intro current result available selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCValuePrediction?_queuePrefixesAvailable owned current
+          next waiting predicted available nextEq) restEq
+
+private theorem attemptPhaseCScannedEdge?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  rcases (attemptPhaseCScannedEdge?_exact owned source edge current result
+    selected).2 with unchanged | inserted
+  · rw [unchanged]
+    exact available
+  · rcases inserted with ⟨rebuilt, prior, candidate, _rebuiltEq, _priorEq,
+      candidateEq, frontierEq⟩
+    rw [frontierEq]
+    exact candidateInsertResult_queuePrefixesAvailable owned
+      current.payload.frontier edge.after (rebuilt.scan prior) candidate
+        available candidateEq
+
+private theorem attemptPhaseCPackedScannedEdge?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact attemptPhaseCScannedEdge?_queuePrefixesAvailable owned source {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      } current result available selected
+  | completed waiting finished after shared =>
+      cases selected
+      exact available
+
+private theorem attemptPhaseCRetainedScannedEdges?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.queuePrefixesAvailable = true →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        result.payload.frontier.queuePrefixesAvailable = true := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result available selected
+      cases selected
+      exact available
+  | cons edge rest induction =>
+      intro current result available selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCPackedScannedEdge?_queuePrefixesAvailable owned source
+          edge current next available nextEq) restEq
+
+private theorem attemptPhaseCCompletedEdge?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with unchanged | inserted
+  · subst result
+    exact available
+  · rcases inserted with ⟨prior, child, rebuilt, candidate, _relevant,
+      _priorEq, _childEq, _fresh, _rebuiltEq, candidateEq, frontierEq⟩
+    rw [frontierEq]
+    exact candidateInsertResult_queuePrefixesAvailable owned
+      current.payload.frontier edge.after (rebuilt.complete prior child)
+        candidate available candidateEq
+
+private theorem attemptPhaseCPackedCompletedEdge?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      cases selected
+      exact available
+  | completed waiting finished after shared =>
+      exact attemptPhaseCCompletedEdge?_queuePrefixesAvailable owned source {
+        waiting := waiting
+        finished := finished
+        after := after
+        shared := shared
+        structural := structural
+      } current result available selected
+
+private theorem attemptPhaseCRetainedCompletedEdges?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.queuePrefixesAvailable = true →
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        result.payload.frontier.queuePrefixesAvailable = true := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result available selected
+      cases selected
+      exact available
+  | cons edge rest induction =>
+      intro current result available selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCPackedCompletedEdge?_queuePrefixesAvailable owned source
+          edge current next available nextEq) restEq
+
+private theorem processPhaseCValueItem?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : processPhaseCValueItem? owned item current = some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  unfold processPhaseCValueItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  exact attemptPhaseCRetainedCompletedEdges?_queuePrefixesAvailable owned item
+    _ scanned result
+      (attemptPhaseCRetainedScannedEdges?_queuePrefixesAvailable owned item _
+        predicted scanned
+          (attemptPhaseCValuePredictions?_queuePrefixesAvailable owned item _
+            current predicted available predictedEq) scannedEq) completedEq
+
+private theorem runPhaseCValueQueue?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.queuePrefixesAvailable = true →
+      runPhaseCValueQueue? owned fuel current = some result →
+        result.payload.frontier.queuePrefixesAvailable = true := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result available selected
+      rw [runPhaseCValueQueue?] at selected
+      split at selected
+      · cases selected
+        exact available
+      · contradiction
+  | succ previous induction =>
+      intro current result available selected
+      rw [runPhaseCValueQueue?] at selected
+      cases queueEq : current.payload.frontier.queue with
+      | nil =>
+          simp only [queueEq] at selected
+          cases selected
+          exact available
+      | cons item rest =>
+          simp only [queueEq, Option.bind_eq_bind,
+            Option.bind_eq_some_iff] at selected
+          rcases selected with ⟨dequeued, dequeuedEq, processed,
+            processedEq, runEq⟩
+          rcases dequeued with ⟨dequeuedItem, afterDequeue⟩
+          have afterAvailable :=
+            dequeuePhaseCValueFrontier?_queuePrefixesAvailable current
+              dequeuedItem afterDequeue available dequeuedEq
+          exact induction processed result
+            (processPhaseCValueItem?_queuePrefixesAvailable owned
+              dequeuedItem afterDequeue processed afterAvailable processedEq)
+            runEq
+
+private theorem executePhaseCValueWorklist?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : executePhaseCValueWorklist? owned current = some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  unfold executePhaseCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCValueQueue?_queuePrefixesAvailable owned
+    (chartGBound (tokens.length + 1)) entered result
+      (beginPhaseCValueWorklist?_queuePrefixesAvailable current entered
+        enteredEq) runEq
+
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
