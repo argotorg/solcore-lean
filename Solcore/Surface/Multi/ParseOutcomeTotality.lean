@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.DiagnosticExhaustiveness
+import Solcore.Surface.Multi.PostLogicalEofClosure
 import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
 
 set_option autoImplicit false
