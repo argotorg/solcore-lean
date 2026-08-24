@@ -504,8 +504,158 @@ def frontierGrammarPotentialOfCode
     let base := frontierGrammarFrameCount tokens + 1
     (code / base ^ frontierGrammarFrameIndex production origin current) % base
 
-/-- Exhaustively search the finite bounded potential space for a code whose
-completion and prediction tables both accept. -/
+/-- One proof-free coordinate of a frontier grammar potential. -/
+structure FrontierGrammarFrame (tokens : List Token) where
+  production : ProductionId
+  origin : Boundary tokens
+  current : Boundary tokens
+  deriving DecidableEq
+
+/-- Every grammar/span coordinate in stable production/origin/current order. -/
+def allFrontierGrammarFrames
+    (tokens : List Token) : List (FrontierGrammarFrame tokens) :=
+  allProductionIds.flatMap fun production =>
+    (allParserBoundaries tokens).flatMap fun origin =>
+      (allParserBoundaries tokens).map fun current =>
+        { production, origin, current }
+
+/-- Every frontier grammar coordinate occurs in the stable enumeration. -/
+theorem allFrontierGrammarFrames_complete
+    {tokens : List Token} (frame : FrontierGrammarFrame tokens) :
+    frame ∈ allFrontierGrammarFrames tokens := by
+  rw [allFrontierGrammarFrames, List.mem_flatMap]
+  refine ⟨frame.production, allProductionIds_complete _, ?_⟩
+  rw [List.mem_flatMap]
+  refine ⟨frame.origin, allParserBoundaries_complete _, ?_⟩
+  rw [List.mem_map]
+  exact ⟨frame.current, allParserBoundaries_complete _, by cases frame; rfl⟩
+
+/-- Enumerate all fixed-length lists whose entries are below one bound. -/
+def allBoundedNatLists : Nat → Nat → List (List Nat)
+  | 0, _ => [[]]
+  | count + 1, bound =>
+      (List.range bound).flatMap fun head =>
+        (allBoundedNatLists count bound).map (head :: ·)
+
+/-- Every pointwise bounded list occurs in the exhaustive list space. -/
+theorem allBoundedNatLists_complete
+    (bound : Nat) (values : List Nat)
+    (bounded : ∀ value, value ∈ values → value < bound) :
+    values ∈ allBoundedNatLists values.length bound := by
+  induction values with
+  | nil => simp [allBoundedNatLists]
+  | cons head tail induction =>
+      simp only [List.length_cons, allBoundedNatLists, List.mem_flatMap,
+        List.mem_range, List.mem_map]
+      refine ⟨head, bounded head (by simp), tail, ?_, rfl⟩
+      apply induction
+      intro value member
+      exact bounded value (by simp [member])
+
+private def frontierGrammarFrameValue
+    {tokens : List Token} (potential : FrontierGrammarPotential tokens)
+    (frame : FrontierGrammarFrame tokens) : Nat :=
+  potential frame.production frame.origin frame.current
+
+private def frontierGrammarPotentialLookup
+    {tokens : List Token} :
+    List (FrontierGrammarFrame tokens) → List Nat →
+      FrontierGrammarFrame tokens → Nat
+  | frame :: frames, value :: values, target =>
+      if frame = target then value
+      else frontierGrammarPotentialLookup frames values target
+  | _, _, _ => 0
+
+private theorem frontierGrammarPotentialLookup_map
+    {tokens : List Token} (frames : List (FrontierGrammarFrame tokens))
+    (value : FrontierGrammarFrame tokens → Nat)
+    (target : FrontierGrammarFrame tokens) (member : target ∈ frames) :
+    frontierGrammarPotentialLookup frames (frames.map value) target =
+      value target := by
+  induction frames with
+  | nil => simp at member
+  | cons frame frames induction =>
+      by_cases equal : frame = target
+      · subst target
+        simp [frontierGrammarPotentialLookup]
+      · simp only [List.mem_cons] at member
+        rcases member with equal' | member
+        · exact (equal equal'.symm).elim
+        · simp [frontierGrammarPotentialLookup, equal,
+            induction member]
+
+/-- Interpret one value list over the stable grammar-frame enumeration. -/
+def frontierGrammarPotentialOfValues
+    (tokens : List Token) (values : List Nat) :
+    FrontierGrammarPotential tokens :=
+  fun production origin current =>
+    frontierGrammarPotentialLookup (allFrontierGrammarFrames tokens) values
+      { production, origin, current }
+
+/-- Tabulate a potential in stable grammar-frame order. -/
+def frontierGrammarValuesOfPotential
+    (tokens : List Token) (potential : FrontierGrammarPotential tokens) :
+    List Nat :=
+  (allFrontierGrammarFrames tokens).map
+    (frontierGrammarFrameValue potential)
+
+/-- Stable tabulation followed by lookup recovers the original potential. -/
+theorem frontierGrammarPotentialOfValues_valuesOfPotential
+    {tokens : List Token} (potential : FrontierGrammarPotential tokens) :
+    frontierGrammarPotentialOfValues tokens
+      (frontierGrammarValuesOfPotential tokens potential) = potential := by
+  funext production origin current
+  exact frontierGrammarPotentialLookup_map
+    (allFrontierGrammarFrames tokens) (frontierGrammarFrameValue potential)
+    { production, origin, current }
+    (allFrontierGrammarFrames_complete _)
+
+/-- The stable frame enumeration has the advertised mixed-radix count. -/
+theorem allFrontierGrammarFrames_length (tokens : List Token) :
+    (allFrontierGrammarFrames tokens).length =
+      frontierGrammarFrameCount tokens := by
+  have lengthOfBoundaries :
+      (allParserBoundaries tokens).length = tokens.length + 2 := by
+    simp [allParserBoundaries]
+  have oneProduction : ∀ production : ProductionId,
+      ((allParserBoundaries tokens).flatMap fun origin =>
+        (allParserBoundaries tokens).map fun current =>
+          ({ production, origin, current } :
+            FrontierGrammarFrame tokens)).length =
+        (tokens.length + 2) * (tokens.length + 2) := by
+    intro production
+    have generalOrigins : ∀ origins : List (Boundary tokens),
+        (origins.flatMap fun origin =>
+          (allParserBoundaries tokens).map fun current =>
+            ({ production, origin, current } :
+              FrontierGrammarFrame tokens)).length =
+          origins.length * (tokens.length + 2) := by
+      intro origins
+      induction origins with
+      | nil => simp
+      | cons origin origins induction =>
+          simp [lengthOfBoundaries, induction, Nat.add_mul,
+            Nat.add_comm]
+    rw [generalOrigins, lengthOfBoundaries]
+  have general : ∀ productions : List ProductionId,
+      (productions.flatMap fun production =>
+        (allParserBoundaries tokens).flatMap fun origin =>
+          (allParserBoundaries tokens).map fun current =>
+            ({ production, origin, current } :
+              FrontierGrammarFrame tokens)).length =
+        productions.length * (tokens.length + 2) *
+          (tokens.length + 2) := by
+    intro productions
+    induction productions with
+    | nil => simp
+    | cons production productions induction =>
+        simp [oneProduction, induction, Nat.add_mul, Nat.mul_assoc,
+          Nat.add_comm]
+  exact (general allProductionIds).trans (by
+    simp [frontierGrammarFrameCount, Nat.mul_assoc])
+
+/-- Exhaustively search the finite bounded potential space for a value list
+whose completion and prediction tables both accept. -/
 def boundedFrontierGrammarPotential?
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -515,11 +665,11 @@ def boundedFrontierGrammarPotential?
     Option (FrontierGrammarPotential tokens) :=
   let count := frontierGrammarFrameCount tokens
   let base := count + 1
-  ((List.range (base ^ count)).find? fun code =>
-    let potential := frontierGrammarPotentialOfCode tokens code
+  ((allBoundedNatLists count base).find? fun values =>
+    let potential := frontierGrammarPotentialOfValues tokens values
     frontierCompletionRankTable owned correct final cursor potential &&
       frontierPredictionRankTable owned correct final cursor potential).map
-    (frontierGrammarPotentialOfCode tokens)
+    (frontierGrammarPotentialOfValues tokens)
 
 /-- Every potential returned by the bounded search satisfies both exact
 finite rank tables. -/
@@ -538,10 +688,48 @@ theorem boundedFrontierGrammarPotential?_sound
         owned correct final cursor potential = true := by
   unfold boundedFrontierGrammarPotential? at selected
   simp only [Option.map_eq_some_iff] at selected
-  rcases selected with ⟨code, found, rfl⟩
+  rcases selected with ⟨values, found, rfl⟩
   have accepted := List.find?_some found
   rw [Bool.and_eq_true] at accepted
   exact accepted
+
+/-- Any pointwise bounded accepting potential is represented by the finite
+search, so its search result is nonempty. -/
+theorem boundedFrontierGrammarPotential?_isSome_of_bounded
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierGrammarPotential tokens)
+    (bounded : ∀ production origin current,
+      potential production origin current <
+        frontierGrammarFrameCount tokens + 1)
+    (completion : frontierCompletionRankTable
+      owned correct final cursor potential = true)
+    (prediction : frontierPredictionRankTable
+      owned correct final cursor potential = true) :
+    (boundedFrontierGrammarPotential?
+      owned correct final cursor).isSome = true := by
+  unfold boundedFrontierGrammarPotential?
+  simp only [Option.isSome_map, List.find?_isSome]
+  let values := frontierGrammarValuesOfPotential tokens potential
+  have length : values.length = frontierGrammarFrameCount tokens := by
+    simp [values, frontierGrammarValuesOfPotential,
+      allFrontierGrammarFrames_length]
+  have valuesBounded : ∀ value, value ∈ values →
+      value < frontierGrammarFrameCount tokens + 1 := by
+    intro value member
+    simp only [values, frontierGrammarValuesOfPotential,
+      List.mem_map] at member
+    rcases member with ⟨frame, _frameMember, rfl⟩
+    exact bounded frame.production frame.origin frame.current
+  refine ⟨values, ?_, ?_⟩
+  · simpa only [length] using
+      (allBoundedNatLists_complete _ values valuesBounded)
+  · rw [frontierGrammarPotentialOfValues_valuesOfPotential]
+    rw [Bool.and_eq_true]
+    exact ⟨completion, prediction⟩
 
 /-- The single exact residual left by bounded potential synthesis. -/
 def BoundedFrontierGrammarRankSearchSucceeds
@@ -552,6 +740,27 @@ def BoundedFrontierGrammarRankSearchSucceeds
     (final : AllGuardsFinal memo) (cursor : Boundary tokens) : Prop :=
   (boundedFrontierGrammarPotential?
     owned correct final cursor).isSome = true
+
+/-- A bounded accepting potential discharges the exact search-success
+residual; no separate mixed-radix representation proof is required. -/
+theorem boundedFrontierGrammarRankSearchSucceeds_of_potential
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierGrammarPotential tokens)
+    (bounded : ∀ production origin current,
+      potential production origin current <
+        frontierGrammarFrameCount tokens + 1)
+    (completion : frontierCompletionRankTable
+      owned correct final cursor potential = true)
+    (prediction : frontierPredictionRankTable
+      owned correct final cursor potential = true) :
+    BoundedFrontierGrammarRankSearchSucceeds
+      owned correct final cursor :=
+  boundedFrontierGrammarPotential?_isSome_of_bounded
+    owned correct final cursor potential bounded completion prediction
 
 /-- The two finite tables and structural epsilon descent construct all three
 fields of the abstract normalization ranking. -/
