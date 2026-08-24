@@ -13312,6 +13312,33 @@ theorem scan_coherent
           fields.1.symm) prior))).value
   simpa [witnessedPrior] using transported
 
+/-- Preparing the target of an exact retained scan preserves coherence of
+the entire dependent value frontier. -/
+theorem insertCandidate?_valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    {edge : StructurallyValidContextualScannedEdge file tokens}
+    (rebuilt : RebuiltContextualScannedEdge edge)
+    (edgeReached : ContextualEdgeReach file tokens memo correct final
+      (.scanned edge.before edge.after edge.cursor))
+    (before : state.ValuesCoherent memo correct final)
+    (prior : ContextualPrefixValue file tokens edge.before)
+    (priorEq : state.lookupPrefix? edge.before = some prior)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned edge.after
+      (rebuilt.scan prior) = some candidate) :
+    candidate.state.ValuesCoherent memo correct final := by
+  have priorCoherent := state.lookupPrefix?_coherent edge.before prior
+    before priorEq
+  have nextCoherent := rebuilt.scan_coherent edgeReached prior priorCoherent
+  exact state.insertCandidate?_valuesCoherent owned edge.after
+    edgeReached.2.2 (rebuilt.scan prior) before nextCoherent candidate selected
+
 end RebuiltContextualScannedEdge
 
 namespace RebuiltContextualCompletedEdge
@@ -13366,6 +13393,39 @@ theorem complete_coherent
         (Eq.mp (congrArg (ContextualReductionValue file tokens)
           fields.2.1.symm) child))).value
   simpa [witnessedPrior, witnessedChild] using transported
+
+/-- Preparing the target of an exact retained completion preserves coherence
+of the entire dependent value frontier. -/
+theorem insertCandidate?_valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    {edge : StructurallyValidContextualCompletedEdge file tokens}
+    (rebuilt : RebuiltContextualCompletedEdge edge)
+    (edgeReached : ContextualEdgeReach file tokens memo correct final
+      (.completed edge.waiting edge.finished edge.after edge.shared))
+    (before : state.ValuesCoherent memo correct final)
+    (prior : ContextualPrefixValue file tokens edge.waiting)
+    (priorEq : state.lookupPrefix? edge.waiting = some prior)
+    (child : ContextualReductionValue file tokens edge.finished)
+    (childEq : state.lookupReduction? edge.finished = some child)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned edge.after
+      (rebuilt.complete prior child) = some candidate) :
+    candidate.state.ValuesCoherent memo correct final := by
+  have priorCoherent := state.lookupPrefix?_coherent edge.waiting prior
+    before priorEq
+  have childCoherent := state.lookupReduction?_coherent edge.finished child
+    before childEq
+  have nextCoherent := rebuilt.complete_coherent edgeReached prior child
+    priorCoherent childCoherent
+  exact state.insertCandidate?_valuesCoherent owned edge.after
+    edgeReached.2.2.2 (rebuilt.complete prior child) before nextCoherent
+      candidate selected
 
 end RebuiltContextualCompletedEdge
 
