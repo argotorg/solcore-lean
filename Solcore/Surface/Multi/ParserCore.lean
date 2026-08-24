@@ -926,6 +926,37 @@ theorem atArmBody
       } := by
   simp [GuardAnchor, guardAnchorContextStart?, member, context]
 
+/-- Any structurally valid G02 anchor exposes its match-arm body context and
+an ordered body start. -/
+theorem armBody_of_g02
+    {tokens : List Token}
+    {productionInstance : ProductionInstanceKey tokens}
+    {polarity : Polarity}
+    {guardInstance : GuardInstanceKey tokens}
+    (anchor : GuardAnchor productionInstance
+      (.G02_matchArmBoundary, polarity) guardInstance) :
+    ∃ start,
+      productionInstance.context = .armBody start ∧
+      start.val ≤ productionInstance.origin.val := by
+  rcases productionInstance with ⟨production, origin, context⟩
+  rcases guardInstance with
+    ⟨guard, contextStart, siteCursor, instanceOrdered⟩
+  rcases anchor with ⟨_member, guardEq, siteEq, contextStartEq⟩
+  cases context with
+  | plain =>
+      simp [guardAnchorContextStart?] at contextStartEq
+  | postfixInvocation start =>
+      simp [guardAnchorContextStart?] at contextStartEq
+  | bracedBody start =>
+      simp [guardAnchorContextStart?] at contextStartEq
+  | armBody start =>
+      refine ⟨start, rfl, ?_⟩
+      have startEq : start = contextStart := by
+        simpa [guardAnchorContextStart?] using contextStartEq
+      rw [startEq]
+      change siteCursor = origin at siteEq
+      simpa only [siteEq] using instanceOrdered
+
 /-- A production cell determines at most one structural guard anchor. -/
 theorem functional
     {tokens : List Token}
