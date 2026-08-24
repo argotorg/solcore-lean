@@ -122,14 +122,17 @@ def frontierSpanPotential
     if origin = current then zero production
     else (origin.val + 1) * width + positive production
 
-/-- Once a waiting item has consumed input, its predicted zero-span child has
-strictly smaller coarse potential whenever zero weights fit the production
-carrier. -/
+/-- Once a waiting item has consumed input, its predicted nonempty zero-span
+child has strictly smaller coarse potential whenever nonempty zero weights fit
+the production carrier.  Epsilon weights remain unconstrained so completion
+may place them above positive-span continuations. -/
 theorem frontierSpanPotential_predicted_lt_of_positiveSpan
     (width : Nat) (zero positive : ProductionId → Nat)
-    (zeroBound : ∀ production, zero production < width)
+    (zeroBound : ∀ production, production.rhs ≠ [] →
+      zero production < width)
     {tokens : List Token} (waiting : ContextualItemKey tokens)
     (production : ProductionId)
+    (nonempty : production.rhs ≠ [])
     (progress : waiting.raw.origin.val < waiting.raw.current.val) :
     frontierSpanPotential width zero positive production
         waiting.raw.current waiting.raw.current <
@@ -140,7 +143,7 @@ theorem frontierSpanPotential_predicted_lt_of_positiveSpan
     rw [equal] at progress
     omega
   simp only [frontierSpanPotential, if_neg different]
-  exact Nat.lt_of_lt_of_le (zeroBound production)
+  exact Nat.lt_of_lt_of_le (zeroBound production nonempty)
     (calc
       width ≤ width + (waiting.raw.origin.val * width +
           positive waiting.raw.production) := Nat.le_add_right _ _
@@ -151,9 +154,11 @@ theorem frontierSpanPotential_predicted_lt_of_positiveSpan
 /-- Positive-span frontier prediction decreases the full grammar rank. -/
 theorem frontierGrammarRank_lt_predicted_of_positiveSpan
     (width : Nat) (zero positive : ProductionId → Nat)
-    (zeroBound : ∀ production, zero production < width)
+    (zeroBound : ∀ production, production.rhs ≠ [] →
+      zero production < width)
     {tokens : List Token} (waiting : ContextualItemKey tokens)
     (production : ProductionId)
+    (nonempty : production.rhs ≠ [])
     (progress : waiting.raw.origin.val < waiting.raw.current.val) :
     frontierGrammarRank (frontierSpanPotential width zero positive)
         (FrontierPredictedItem waiting production) <
@@ -161,7 +166,7 @@ theorem frontierGrammarRank_lt_predicted_of_positiveSpan
         waiting := by
   apply frontierRawGrammarRank_lt_of_potential_lt
   exact frontierSpanPotential_predicted_lt_of_positiveSpan
-    width zero positive zeroBound waiting production progress
+    width zero positive zeroBound waiting production nonempty progress
 
 /-- Boundary-free rank of one dotted production in the zero-span mode. -/
 def frontierZeroSpanGrammarRank
@@ -570,7 +575,8 @@ theorem frontierPredictionRankTable_eq_true_of_zeroSpan
     (correct : PhaseBCorrect file tokens memo)
     (final : AllGuardsFinal memo) (cursor : Boundary tokens)
     (width : Nat) (zero positive : ProductionId → Nat)
-    (zeroBound : ∀ production, zero production < width)
+    (zeroBound : ∀ production, production.rhs ≠ [] →
+      zero production < width)
     (zeroSpan : ∀ waiting production,
       ContextualReach file tokens memo correct final waiting →
       waiting.raw.current = cursor →
@@ -636,7 +642,7 @@ theorem frontierPredictionRankTable_eq_true_of_zeroSpan
                 exact atOrigin (Fin.ext equal)
               exact frontierGrammarRank_lt_predicted_of_positiveSpan
                 width zero positive zeroBound waiting production
-                  (Nat.lt_of_le_of_ne ordered valueNe)
+                  nonempty (Nat.lt_of_le_of_ne ordered valueNe)
           · simp [frontierPredictionRankCell, reached, current, next,
               nonempty]
         · have disabledAtCursor : ¬ EnabledProductionInstance file tokens
@@ -664,7 +670,8 @@ theorem frontierPredictionRankTable_eq_true_of_zeroSpanTable
     (correct : PhaseBCorrect file tokens memo)
     (final : AllGuardsFinal memo) (cursor : Boundary tokens)
     (width : Nat) (zero positive : ProductionId → Nat)
-    (zeroBound : ∀ production, zero production < width)
+    (zeroBound : ∀ production, production.rhs ≠ [] →
+      zero production < width)
     (admissible : DottedRhs → Bool)
     (admissibleAt : ∀ waiting,
       ContextualReach file tokens memo correct final waiting →
@@ -702,7 +709,8 @@ theorem frontierPredictionRankTable_eq_true_of_reachedZeroSpanTable
     (correct : PhaseBCorrect file tokens memo)
     (final : AllGuardsFinal memo) (cursor : Boundary tokens)
     (width : Nat) (zero positive : ProductionId → Nat)
-    (zeroBound : ∀ production, zero production < width)
+    (zeroBound : ∀ production, production.rhs ≠ [] →
+      zero production < width)
     (checked : frontierZeroSpanPredictionRankTable
       (frontierReachedZeroSpanDottedBool owned correct final cursor)
       zero = true) :
