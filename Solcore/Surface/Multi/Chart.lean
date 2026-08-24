@@ -10747,6 +10747,38 @@ def witnessedContextualCompletedEdge?
   else
     none
 
+/-- Erasing a witnessed scan recovers the recognition worklist's structural
+scan exactly. -/
+theorem witnessedContextualScannedEdge?_erase
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before : ContextualItemKey tokens) :
+    (witnessedContextualScannedEdge? owned before).map
+        (fun result => (result.1, result.2.toStructural)) =
+      contextualScannedEdge? owned before := by
+  unfold witnessedContextualScannedEdge? contextualScannedEdge?
+  split <;> try rfl
+  split <;> try rfl
+  split <;> try rfl
+  simp only
+  split <;> rfl
+
+/-- Erasing a witnessed completion recovers the recognition worklist's
+structural completion exactly. -/
+theorem witnessedContextualCompletedEdge?_erase
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished : ContextualItemKey tokens) :
+    (witnessedContextualCompletedEdge? (file := file) waiting finished).map
+        (fun result => (result.1, result.2.toStructural)) =
+      contextualCompletedEdge? (file := file) waiting finished := by
+  unfold witnessedContextualCompletedEdge? contextualCompletedEdge?
+  split <;> try rfl
+  split <;> try rfl
+  split <;> try rfl
+  split <;> try rfl
+  split <;> try rfl
+  split <;> rfl
+
 end Chart
 
 namespace Chart
