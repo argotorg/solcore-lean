@@ -5885,6 +5885,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | contractDecl : ExecutableRootRule .contractDecl
   | dataConstructor : ExecutableRootRule .dataConstructor
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
+  | classDecl : ExecutableRootRule .classDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
   | fallbackDecl : ExecutableRootRule .fallbackDecl
   | contractConstructorDecl : ExecutableRootRule .contractConstructorDecl
@@ -6341,6 +6342,99 @@ theorem rulePairTailValue_of_view
     input
   rw [firstEq, secondEq, sequenceEq]
   exact groupEq
+
+/-- The parenthesized nonempty type arguments shared by declarations. -/
+def typeArgumentsExpr : EbnfExpr :=
+  .sequence [
+    .atom (.terminal (.symbol .leftParen)),
+    .list1 (.atom (.nonterminal .type)),
+    .atom (.terminal (.symbol .rightParen))]
+
+/-- Decode parenthesized nonempty type arguments without losing delimiters. -/
+def typeArgumentsView
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens typeArgumentsExpr) :
+    MatchedTerminal file tokens (.symbol .leftParen) ×
+      (NonemptyList TypeExpr ×
+        (MatchedTerminal file tokens (.symbol .rightParen) × Unit)) :=
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  let viewed := sequenceFlatView
+    [openAtom, .list1 typeAtom, closeAtom] input
+  (terminalView (.symbol .leftParen) viewed.1,
+    (list1View typeAtom viewed.2.1).map (ruleView .type),
+    terminalView (.symbol .rightParen) viewed.2.2.1, ())
+
+/-- Rebuild parenthesized nonempty type arguments from their semantic view. -/
+def typeArgumentsValue
+    {file : WorkspaceFile} {tokens : List Token}
+    (value : MatchedTerminal file tokens (.symbol .leftParen) ×
+      (NonemptyList TypeExpr ×
+        (MatchedTerminal file tokens (.symbol .rightParen) × Unit))) :
+    EbnfValue file tokens typeArgumentsExpr :=
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  sequence [openAtom, .list1 typeAtom, closeAtom]
+    (EbnfValues.cons openAtom [.list1 typeAtom, closeAtom]
+      (terminalAtom (.symbol .leftParen) value.1)
+      (EbnfValues.cons (.list1 typeAtom) [closeAtom]
+        (list1 typeAtom (value.2.1.map (ruleAtom .type)))
+        (EbnfValues.cons closeAtom []
+          (terminalAtom (.symbol .rightParen) value.2.2.1)
+          EbnfValues.nil)))
+
+/-- Decoding and rebuilding type arguments recovers their typed input. -/
+theorem typeArgumentsValue_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens typeArgumentsExpr) :
+    typeArgumentsValue (typeArgumentsView input) = input := by
+  let openAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .leftParen))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let closeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .rightParen))
+  let children : List EbnfExpr :=
+    [openAtom, .list1 typeAtom, closeAtom]
+  generalize viewEq : sequenceFlatView children input = viewed
+  rcases viewed with ⟨rawOpen, rawTypes, rawClose, ⟨⟩⟩
+  let typeValues := list1View typeAtom rawTypes
+  let types : NonemptyList TypeExpr :=
+    typeValues.map fun raw => ruleView .type raw
+  have typeValuesEq :
+      types.map (ruleAtom .type) = typeValues := by
+    dsimp only [types]
+    cases typeValues with
+    | mk head tail =>
+        simp only [NonemptyList.map, NonemptyList.mk.injEq]
+        constructor
+        · exact rule_of_view .type head
+        · induction tail with
+          | nil => rfl
+          | cons next rest induction =>
+              change ruleAtom .type (ruleView .type next) ::
+                  (rest.map fun raw => ruleView .type raw).map
+                    (ruleAtom .type) = next :: rest
+              rw [rule_of_view .type next]
+              exact congrArg (List.cons next) induction
+  have inputEq := sequence_of_flat_view children input
+  rw [viewEq] at inputEq
+  have decodedEq : typeArgumentsView input =
+      (terminalView (.symbol .leftParen) rawOpen, types,
+        terminalView (.symbol .rightParen) rawClose, ()) := by
+    simp [typeArgumentsView, openAtom, typeAtom,
+      closeAtom, children, viewEq, types, typeValues]
+  rw [decodedEq]
+  simp only [typeArgumentsValue, typeArgumentsExpr]
+  rw [terminal_of_view (.symbol .leftParen) rawOpen,
+    typeValuesEq, list1_of_view typeAtom rawTypes,
+    terminal_of_view (.symbol .rightParen) rawClose]
+  exact inputEq
 
 end EbnfValue
 
@@ -7067,6 +7161,46 @@ def executeDataDeclRoot
       name := { span := name.span, payload := name.identifierProjection.2 }
       parameters := parameters
       constructors := constructors
+    }
+
+/-- Execute a type-class declaration and its optional type arguments. -/
+def executeClassDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .classDecl)) : ClassDecl :=
+  let genericAtom : EbnfExpr := .atom (.nonterminal .genericPrefix)
+  let typeAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let nameAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let methodAtom : EbnfExpr := .atom (.nonterminal .classMethod)
+  let parameterChild := EbnfValue.typeArgumentsExpr
+  let children : List EbnfExpr := [.optional genericAtom,
+    .atom (.terminal (.hardKeyword .classKw)), typeAtom,
+    .atom (.terminal (.symbol .colon)), nameAtom,
+    .optional parameterChild,
+    .atom (.terminal (.symbol .leftBrace)), .star methodAtom,
+    .atom (.terminal (.symbol .rightBrace))]
+  let ⟨rawGeneric, _, rawMain, _, rawName, rawParameters, _, rawMethods,
+    _, ⟨⟩⟩ := EbnfValue.sequenceFlatView children input
+  let genericPrefix := (EbnfValue.optionalView genericAtom rawGeneric).map
+    (EbnfValue.ruleView .genericPrefix)
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let parameterData := (EbnfValue.optionalView
+    parameterChild rawParameters).map EbnfValue.typeArgumentsView
+  let parameters := parameterData.map fun value => value.2.1
+  let methods := (EbnfValue.starView methodAtom rawMethods).map
+    (EbnfValue.ruleView .classMethod)
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      genericPrefix := genericPrefix
+      main := EbnfValue.ruleView .typeAtom rawMain
+      className := {
+        span := name.span
+        payload := name.identifierProjection.2
+      }
+      parameters := parameters
+      methods := methods
     }
 
 /-- Execute a contract declaration and preserve its ordered members. -/
@@ -9258,6 +9392,8 @@ def executeRootRule
       executeDataConstructorRoot file tokens origin finish owned ordered input
   | .typeAliasDecl =>
       executeTypeAliasDeclRoot file tokens origin finish owned ordered input
+  | .classDecl =>
+      executeClassDeclRoot file tokens origin finish owned ordered input
   | .fieldDecl =>
       executeFieldDeclRoot file tokens origin finish owned ordered input
   | .fallbackDecl =>
