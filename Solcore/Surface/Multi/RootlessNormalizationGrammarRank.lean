@@ -113,6 +113,79 @@ theorem enabledNonterminalCoverageAt_of_frontierCoverageTable
   rw [if_pos frontier.2.1, if_pos frontier.2.2] at cell
   exact decide_eq_true_iff.mp cell
 
+/-- Executable check that a boundary is reached and bounds every reached
+contextual item. -/
+def greatestReachableCursorBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) : Bool :=
+  ((allContextualItems tokens).any fun item =>
+    letI : Decidable
+        (ContextualReach file tokens memo correct final item) :=
+      contextualReachDecision owned correct final item
+    decide (ContextualReach file tokens memo correct final item) &&
+      decide (item.raw.current = cursor)) &&
+  ((allContextualItems tokens).all fun item =>
+    letI : Decidable
+        (ContextualReach file tokens memo correct final item) :=
+      contextualReachDecision owned correct final item
+    if ContextualReach file tokens memo correct final item then
+      decide (item.raw.current.val ≤ cursor.val)
+    else true)
+
+/-- The finite greatest-cursor check is exact. -/
+theorem greatestReachableCursorBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) :
+    greatestReachableCursorBool owned correct final cursor = true ↔
+      GreatestReachableCursor
+        file tokens memo correct final cursor := by
+  unfold greatestReachableCursorBool
+  constructor
+  · intro checked
+    rw [Bool.and_eq_true] at checked
+    rcases checked with ⟨reachedSome, bounded⟩
+    constructor
+    · rcases List.any_eq_true.mp reachedSome with
+        ⟨item, _member, cell⟩
+      letI : Decidable
+          (ContextualReach file tokens memo correct final item) :=
+        contextualReachDecision owned correct final item
+      simp only [Bool.and_eq_true, decide_eq_true_iff] at cell
+      exact ⟨item, cell.1, cell.2⟩
+    · intro item reached
+      have row := (List.all_eq_true.mp bounded) item
+        (allContextualItems_complete item)
+      letI : Decidable
+          (ContextualReach file tokens memo correct final item) :=
+        contextualReachDecision owned correct final item
+      rw [if_pos reached] at row
+      exact decide_eq_true_iff.mp row
+  · intro greatest
+    rw [Bool.and_eq_true]
+    constructor
+    · rcases greatest.1 with ⟨item, reached, current⟩
+      apply List.any_eq_true.mpr
+      refine ⟨item, allContextualItems_complete item, ?_⟩
+      letI : Decidable
+          (ContextualReach file tokens memo correct final item) :=
+        contextualReachDecision owned correct final item
+      simp [reached, current]
+    · apply List.all_eq_true.mpr
+      intro item _member
+      letI : Decidable
+          (ContextualReach file tokens memo correct final item) :=
+        contextualReachDecision owned correct final item
+      by_cases reached :
+          ContextualReach file tokens memo correct final item
+      · simp [reached, greatest.2 item reached]
+      · simp [reached]
+
 /-- One executable prediction-rank cell.  Its antecedent is the exact
 frontier-local prediction premise, apart from greatest-cursor evidence shared
 by every row. -/
