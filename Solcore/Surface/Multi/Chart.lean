@@ -34690,4 +34690,164 @@ theorem executeObservedContextualWorklistMulti?_operationalClosure
   exact executeObservedPhaseABCWorklistMulti?_operationalClosure
     file tokens owned internal internalEq
 
+private theorem phaseCEdgeMemberBool_eq_true_iff_mem
+    {file : WorkspaceFile} {tokens : List Token}
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (edge : StructurallyValidContextualPackedEdge file tokens) :
+    phaseCEdgeMemberBool edges edge = true ↔ edge ∈ edges := by
+  rw [phaseCEdgeMemberBool_true_iff]
+  constructor
+  · rintro ⟨candidate, member, equal⟩
+    have : candidate = edge := Subtype.ext equal
+    simpa only [this] using member
+  · intro member
+    exact ⟨edge, member, rfl⟩
+
+private theorem phaseC_runMappedPrimitive?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (address : UnitAddress tokens)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : runMappedPrimitive? current address id = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  rw [runMappedPrimitive?_payload current address id selected]
+  exact unique
+
+private theorem activateWorklistProduction?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    result.1.payload.phaseC.contextualEdges.Nodup := by
+  have equal := activateWorklistProduction?_reachCarrier current
+    productionInstance result selected
+  have edgesEqual := congrArg PhaseCReachCarrier.edges equal
+  change result.1.payload.phaseC.contextualEdges =
+    current.payload.phaseC.contextualEdges at edgesEqual
+  rw [edgesEqual]
+  exact unique
+
+private theorem insertContextualItem?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : insertContextualItem? current source item = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  rw [(insertContextualItem?_completionStorage current result source item
+    selected).2]
+  exact unique
+
+private theorem insertContextualScannedEdge?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact unique
+  · next absent =>
+      have payload := runMappedPrimitive?_payload current _ _ selected
+      rw [payload, List.nodup_append]
+      refine ⟨unique, by simp, ?_⟩
+      intro candidate member packed singleton equal
+      have packedEq : packed = CompletionBackpointerLedger.packScanned edge :=
+        List.eq_of_mem_singleton singleton
+      have inserted : CompletionBackpointerLedger.packScanned edge ∈
+          current.payload.phaseC.contextualEdges := by
+        rw [← packedEq, ← equal]
+        exact member
+      have present := (phaseCEdgeMemberBool_eq_true_iff_mem _ _).mpr inserted
+      simp [present] at absent
+
+private theorem insertContextualCompletedEdgeMulti?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  · cases selected
+    exact unique
+  · next absent =>
+      have payload := runMappedPrimitive?_payload current _ _ selected
+      rw [payload]
+      change (current.payload.phaseC.contextualEdges ++
+        [CompletionBackpointerLedger.packCompleted edge]).Nodup
+      rw [List.nodup_append]
+      refine ⟨unique, by simp, ?_⟩
+      intro candidate member packed singleton equal
+      have packedEq : packed = CompletionBackpointerLedger.packCompleted edge :=
+        List.eq_of_mem_singleton singleton
+      have inserted : CompletionBackpointerLedger.packCompleted edge ∈
+          current.payload.phaseC.contextualEdges := by
+        rw [← packedEq, ← equal]
+        exact member
+      have present := (phaseCEdgeMemberBool_eq_true_iff_mem _ _).mpr inserted
+      simp [present] at absent
+
+private theorem dequeueContextualItem?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : dequeueContextualItem? current = some result) :
+    result.2.payload.phaseC.contextualEdges.Nodup := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      rw [runMappedPrimitive?_payload current _ _ nextEq]
+      exact unique
+
+private theorem dequeueContextualEdge?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : dequeueContextualEdge? current = some result) :
+    result.2.payload.phaseC.contextualEdges.Nodup := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, output⟩
+      cases output
+      rw [runMappedPrimitive?_payload current _ _ nextEq]
+      exact unique
+
+private theorem beginPhaseCWorklist?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : beginPhaseCWorklist? current = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold beginPhaseCWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, resultEq⟩
+  cases resultEq
+  unfold enterPhaseC? at enteredEq
+  rw [runMappedPrimitive?_payload current _ _ enteredEq]
+  simp
+
 end Solcore.Surface.Multi.Chart
