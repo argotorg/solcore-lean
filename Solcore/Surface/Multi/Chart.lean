@@ -22903,6 +22903,100 @@ private theorem insertCandidate?_prefixMemberBool_eq_true_iff
     next incomplete =>
       cases selected
       exact insertPrefix_prefixMemberBool_eq_true_iff state item target prior
+
+/-- Candidate preparation either retains the queue on a duplicate or appends
+the one newly materialized prefix. -/
+private theorem insertCandidate?_queue_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    candidate.state.queue =
+      match candidate.kind with
+      | .duplicate => state.queue
+      | .insertedIncomplete | .insertedComplete => state.queue ++ [item] := by
+  unfold ContextualValueFrontierState.insertCandidate? at selected
+  split at selected
+  next present =>
+    cases selected
+    rfl
+  next absent =>
+    have absentBool : state.prefixMemberBool item = false :=
+      Bool.eq_false_iff.mpr absent
+    split at selected
+    next complete =>
+      cases reductionEq : ContextualReductionValue.reduce? owned item prior with
+      | none => simp [reductionEq] at selected
+      | some reduction =>
+          simp only [reductionEq, Option.some.injEq] at selected
+          cases selected
+          unfold ContextualValueFrontierState.insertReduction
+          split <;> exact (ContextualValueFrontierState.insertPrefix_of_absent
+            state item prior absentBool).2.2
+    next incomplete =>
+      cases selected
+      exact (ContextualValueFrontierState.insertPrefix_of_absent
+        state item prior absentBool).2.2
+
+private theorem insertCandidate?_nonduplicate_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned item prior = some candidate)
+    (nonduplicate : candidate.kind ≠ .duplicate) :
+    state.prefixMemberBool item = false := by
+  unfold ContextualValueFrontierState.insertCandidate? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact (nonduplicate rfl).elim
+  next absent => exact Bool.eq_false_iff.mpr absent
+
+/-- Every queued key after candidate preparation is old, except for the one
+newly appended key, which was absent before preparation. -/
+private theorem insertCandidate?_queue_member
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item target : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned item prior = some candidate)
+    (member : target ∈ candidate.state.queue) :
+    target ∈ state.queue ∨
+      state.prefixMemberBool item = false ∧ target = item := by
+  have queueEq := insertCandidate?_queue_eq owned state item prior candidate
+    selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      left
+      rw [kindEq] at queueEq
+      rwa [queueEq] at member
+  | insertedIncomplete =>
+      rw [kindEq] at queueEq
+      have queued : target ∈ state.queue ∨ target = item := by
+        rw [queueEq] at member
+        simpa using member
+      exact queued.imp_right fun equal =>
+        ⟨insertCandidate?_nonduplicate_absent owned state item prior candidate
+          selected (by simp [kindEq]), equal⟩
+  | insertedComplete =>
+      rw [kindEq] at queueEq
+      have queued : target ∈ state.queue ∨ target = item := by
+        rw [queueEq] at member
+        simpa using member
+      exact queued.imp_right fun equal =>
+        ⟨insertCandidate?_nonduplicate_absent owned state item prior candidate
+          selected (by simp [kindEq]), equal⟩
 /-- A semantic prediction can only grow prefix membership. -/
 private theorem attemptPhaseCValuePrediction?_preserves_prefix_present
     {file : WorkspaceFile} {tokens : List Token}
