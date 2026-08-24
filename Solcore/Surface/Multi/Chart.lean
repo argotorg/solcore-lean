@@ -11505,6 +11505,71 @@ private def phaseCItemMemberBool
     (item : ContextualItemKey tokens) : Bool :=
   items.any fun candidate => decide (candidate = item)
 
+/-- Publish one prepared semantic candidate. A fresh complete candidate
+consumes its epsilon-action unit before the prefix/reduction pair becomes
+visible atomically under the single frontier-insertion unit. -/
+private def publishPhaseCValueCandidate?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  match candidate.kind with
+  | .duplicate => some current
+  | .insertedIncomplete =>
+      runMappedPrimitive? current
+        (.linear .L09_frontierInsert (contextualLinearKey item))
+        fun state => { state with frontier := candidate.state }
+  | .insertedComplete => do
+      let actioned ← runMappedPrimitive? current
+        (.linear .L13_epsilonAction (contextualLinearKey item)) id
+      runMappedPrimitive? actioned
+        (.linear .L09_frontierInsert (contextualLinearKey item))
+        fun state => { state with frontier := candidate.state }
+
+/-- Attempt one syntactically applicable semantic prediction. Recognition
+membership prevents a disabled production from entering the value frontier;
+the checked dot-zero proof constructs its exact prefix value without
+eliminating a proposition-valued existential. -/
+private def attemptPhaseCValuePrediction?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  match contextualPredictedItem? waiting predicted with
+  | none => some current
+  | some (item, _) => do
+      let attempted ← runMappedPrimitive? current
+        (.prediction .R02_frontierPrediction
+          (contextualPredictionKey waiting predicted)) id
+      if phaseCItemMemberBool
+          attempted.payload.recognition.phaseC.contextualItems item then
+        if atZero : item.raw.dot.val = 0 then
+          let prior := ContextualPrefixValue.zero item atZero
+          let candidate ← ContextualValueFrontierState.insertCandidate?
+            owned attempted.payload.frontier item prior
+          publishPhaseCValueCandidate? attempted item candidate
+        else
+          none
+      else
+        some attempted
+
+/-- Fold semantic prediction over the finite production table. -/
+private def attemptPhaseCValuePredictions?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    List ProductionId →
+      CountedState tokens (PhaseCValueWorklist file tokens) →
+      Option (CountedState tokens (PhaseCValueWorklist file tokens))
+  | [], current => some current
+  | predicted :: rest, current => do
+      let next ← attemptPhaseCValuePrediction?
+        owned current waiting predicted
+      attemptPhaseCValuePredictions? owned waiting rest next
+
 private def phaseCEdgeMemberBool
     {file : WorkspaceFile} {tokens : List Token}
     (edges : List (StructurallyValidContextualPackedEdge file tokens))
