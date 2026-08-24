@@ -7047,8 +7047,10 @@ def executeDataDeclRoot
       let viewed := EbnfValue.sequence3View
         (.atom (.terminal (.symbol .equal))) constructorAtom
         (.star constructorTail) raw
-      let head := EbnfValue.ruleView .dataConstructor viewed.2.1
-      let tail := (EbnfValue.starView constructorTail viewed.2.2).map
+      let head : DataConstructor :=
+        EbnfValue.ruleView .dataConstructor viewed.2.1
+      let tail : List DataConstructor :=
+        (EbnfValue.starView constructorTail viewed.2.2).map
         fun rawTail =>
           let sequence := EbnfValue.groupView
             (.sequence [.atom (.terminal (.symbol .pipe)),
