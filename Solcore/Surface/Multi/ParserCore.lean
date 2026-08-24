@@ -5876,6 +5876,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | continueStatement : ExecutableRootRule .continueStatement
   | assemblyStatement : ExecutableRootRule .assemblyStatement
   | ifStatement : ExecutableRootRule .ifStatement
+  | matchStatement : ExecutableRootRule .matchStatement
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | parameter : ExecutableRootRule .parameter
@@ -6907,6 +6908,35 @@ def executeIfStatementRoot
   sourceLoc
     (ConsumedSpanWitness.compute file tokens origin finish owned ordered)
     (.ifThenElse condition thenBody elseBody)
+
+/-- Execute a match statement from its nonempty scrutinees and arms. -/
+def executeMatchStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .matchStatement)) :
+    Statement :=
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let armAtom : EbnfExpr := .atom (.nonterminal .matchArm)
+  let semicolonAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .semicolon))
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .matchKw)), .list1 expressionAtom,
+    .atom (.terminal (.symbol .leftBrace)), .plus armAtom,
+    .atom (.terminal (.symbol .rightBrace)), .optional semicolonAtom]
+  let ⟨_, rawScrutinees, _, rawArms, _, rawTerminator, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let scrutinees := (EbnfValue.list1View
+    expressionAtom rawScrutinees).map (EbnfValue.ruleView .expression)
+  let arms := (EbnfValue.plusView armAtom rawArms).map
+    (EbnfValue.ruleView .matchArm)
+  let terminator := (EbnfValue.optionalView
+    semicolonAtom rawTerminator).map
+      (EbnfValue.terminalView (.symbol .semicolon))
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered)
+    (.match scrutinees arms (terminator.map MatchedTerminal.span))
 
 /-- Execute a return statement from its optional value and terminator. -/
 def executeReturnStatementRoot
@@ -9013,6 +9043,8 @@ def executeRootRule
       executeAssemblyStatementRoot file tokens origin finish owned ordered input
   | .ifStatement =>
       executeIfStatementRoot file tokens origin finish owned ordered input
+  | .matchStatement =>
+      executeMatchStatementRoot file tokens origin finish owned ordered input
   | .returnStatement =>
       executeReturnStatementRoot file tokens origin finish owned ordered input
   | .assignmentStatement =>
