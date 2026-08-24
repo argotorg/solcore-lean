@@ -18646,6 +18646,142 @@ theorem contextualReach_postfixRegion_context
       apply waitingInduction
       simpa only [production] using inRegion
 
+/-- The remaining dynamic context obligation for the two guarded match-arm
+star productions at one waiting prediction site. -/
+def MatchArmPairContextReadyAt {tokens : List Token}
+    (waiting : ContextualItemKey tokens) : Prop :=
+  ∀ positive negative,
+    positive.sourceRule = .matchArm →
+    negative.sourceRule = .matchArm →
+    guardOf positive = [(.G02_matchArmBoundary, .positive)] →
+    guardOf negative = [(.G02_matchArmBoundary, .negative)] →
+    NextSymbol waiting.raw (.nonterminal positive.lhs) →
+    positive.lhs = negative.lhs →
+    ∃ start,
+      descendContext waiting positive = .armBody start ∧
+      descendContext waiting negative = .armBody start ∧
+      start.val ≤ waiting.raw.current.val
+
+private theorem production_ne_postfixRoot_of_sourceRule_atom
+    (production : ProductionId)
+    (sourceRule : production.sourceRule = .atom) :
+    production ≠ .root .postfix := by
+  intro rootEq
+  subst production
+  simp [ProductionId.sourceRule] at sourceRule
+
+/-- Static grammar coverage and reached postfix context propagation construct
+all prediction anchors except for the isolated match-arm context obligation. -/
+theorem anchoredNonterminalCoverageAt_of_reached_matchArmReady
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (waiting : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final waiting)
+    (armReady : MatchArmPairContextReadyAt waiting) :
+    AnchoredNonterminalCoverageAt tokens waiting := by
+  intro symbol next
+  cases staticNonterminalCoverage symbol with
+  | guardless production lhs guards =>
+      exact Or.inl ⟨production, lhs, guards⟩
+  | originPair guard originGuard positive negative positiveLhs negativeLhs
+      positiveOnly negativeOnly =>
+      right
+      have coreOrigin :
+          guard = .G01_statementIf ∨
+          guard = .G03_parameterComptime ∨
+          guard = .G04_letComptime ∨
+          guard = .G05_typeComptime ∨
+          guard = .G06_patternComptime ∨
+          guard = .G09_genericContext := by
+        rcases originGuard with h | h | h | h
+        · exact Or.inr (Or.inl h)
+        · exact Or.inr (Or.inr (Or.inl h))
+        · exact Or.inr (Or.inr (Or.inr (Or.inl h)))
+        · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr h))))
+      let key : GuardInstanceKey tokens := {
+        guard := guard
+        contextStart := waiting.raw.current
+        siteCursor := waiting.raw.current
+        ordered := Nat.le_refl _
+      }
+      refine ⟨guard, positive, negative, key,
+        positiveLhs, negativeLhs, positiveOnly, negativeOnly, ?_, ?_⟩
+      · exact GuardAnchor.atOrigin _ _ _
+          (by rw [positiveOnly]; simp) coreOrigin
+      · exact GuardAnchor.atOrigin _ _ _
+          (by rw [negativeOnly]; simp) coreOrigin
+  | postfixPair positive negative positiveLhs negativeLhs positiveRule
+      negativeRule positiveOnly negativeOnly =>
+      right
+      have positiveNext : NextSymbol waiting.raw
+          (.nonterminal positive.lhs) := by
+        simpa only [positiveLhs] using next
+      have member : GrammarSymbol.nonterminal positive.lhs ∈
+          waiting.raw.production.rhs :=
+        List.mem_of_getElem? positiveNext.2
+      have parentRegion :=
+        (ProductionId.enters_postfix_region_of_lhs_mem_rhs
+          waiting.raw.production positive member
+            (Or.inr positiveRule)).resolve_left
+              (production_ne_postfixRoot_of_sourceRule_atom
+                positive positiveRule)
+      rcases contextualReach_postfixRegion_context reached parentRegion with
+        ⟨start, contextEq⟩
+      have startOrdered : start.val ≤ waiting.raw.current.val := by
+        have ordered := contextualReach_guardContextOrderedAt reached
+        rw [contextEq] at ordered
+        exact ordered
+      have positiveDescend :
+          descendContext waiting positive = waiting.context :=
+        descendContext_eq_of_postfixRegion_not_root waiting positive
+          (Or.inr positiveRule)
+          (production_ne_postfixRoot_of_sourceRule_atom
+            positive positiveRule)
+      have negativeDescend :
+          descendContext waiting negative = waiting.context :=
+        descendContext_eq_of_postfixRegion_not_root waiting negative
+          (Or.inr negativeRule)
+          (production_ne_postfixRoot_of_sourceRule_atom
+            negative negativeRule)
+      let key : GuardInstanceKey tokens := {
+        guard := .G07_leadingDotArguments
+        contextStart := start
+        siteCursor := waiting.raw.current
+        ordered := startOrdered
+      }
+      refine ⟨.G07_leadingDotArguments, positive, negative, key,
+        positiveLhs, negativeLhs, positiveOnly, negativeOnly, ?_, ?_⟩
+      · exact GuardAnchor.atPostfixInvocation _ .positive start
+          (by rw [positiveOnly]; simp)
+          (positiveDescend.trans contextEq) startOrdered
+      · exact GuardAnchor.atPostfixInvocation _ .negative start
+          (by rw [negativeOnly]; simp)
+          (negativeDescend.trans contextEq) startOrdered
+  | armPair positive negative positiveLhs negativeLhs positiveRule
+      negativeRule positiveOnly negativeOnly =>
+      right
+      have positiveNext : NextSymbol waiting.raw
+          (.nonterminal positive.lhs) := by
+        simpa only [positiveLhs] using next
+      rcases armReady positive negative positiveRule negativeRule
+          positiveOnly negativeOnly positiveNext
+          (positiveLhs.trans negativeLhs.symm) with
+        ⟨start, positiveDescend, negativeDescend, startOrdered⟩
+      let key : GuardInstanceKey tokens := {
+        guard := .G02_matchArmBoundary
+        contextStart := start
+        siteCursor := waiting.raw.current
+        ordered := startOrdered
+      }
+      refine ⟨.G02_matchArmBoundary, positive, negative, key,
+        positiveLhs, negativeLhs, positiveOnly, negativeOnly, ?_, ?_⟩
+      · exact GuardAnchor.atArmBody _ .positive start
+          (by rw [positiveOnly]; simp) positiveDescend startOrdered
+      · exact GuardAnchor.atArmBody _ .negative start
+          (by rw [negativeOnly]; simp) negativeDescend startOrdered
+
 private theorem enabledProductionInstance_of_guardless
     {file : WorkspaceFile} {tokens : List Token}
     {memo : GuardMemo tokens}

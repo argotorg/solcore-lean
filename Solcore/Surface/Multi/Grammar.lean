@@ -4365,6 +4365,8 @@ inductive StaticNonterminalCoverage
       (positive negative : ProductionId)
       (positiveLhs : positive.lhs = symbol)
       (negativeLhs : negative.lhs = symbol)
+      (positiveRule : positive.sourceRule = .atom)
+      (negativeRule : negative.sourceRule = .atom)
       (positiveOnly : guardOf positive =
         [(.G07_leadingDotArguments, .positive)])
       (negativeOnly : guardOf negative =
@@ -4373,6 +4375,8 @@ inductive StaticNonterminalCoverage
       (positive negative : ProductionId)
       (positiveLhs : positive.lhs = symbol)
       (negativeLhs : negative.lhs = symbol)
+      (positiveRule : positive.sourceRule = .matchArm)
+      (negativeRule : negative.sourceRule = .matchArm)
       (positiveOnly : guardOf positive =
         [(.G02_matchArmBoundary, .positive)])
       (negativeOnly : guardOf negative =
@@ -4446,9 +4450,18 @@ theorem staticNonterminalCoverage
               · simp [guardOf, optionalSite, parameterLocated, letLocated]
               · simp [guardOf, optionalSite, parameterLocated, letLocated]
             · by_cases atomLocated : site.isAt .atom [2, 2] = true
-              · refine .postfixPair
+              · have atomRule : site.val.rule = .atom :=
+                  (by
+                    have located :
+                        (site.val.rule == .atom) = true ∧
+                          (site.val.path == [2, 2]) = true := by
+                      simpa [GrammarSite.isAt] using atomLocated
+                    exact beq_iff_eq.mp located.1)
+                refine .postfixPair
                   (.opt optionalSite .some) (.opt optionalSite .none)
-                  rfl rfl ?_ ?_
+                  rfl rfl (by simpa [ProductionId.sourceRule, optionalSite])
+                  (by simpa [ProductionId.sourceRule, optionalSite])
+                  ?_ ?_
                 · simp [guardOf, optionalSite, parameterLocated, letLocated,
                     atomLocated]
                 · simp [guardOf, optionalSite, parameterLocated, letLocated,
@@ -4470,8 +4483,16 @@ theorem staticNonterminalCoverage
           let starSite : StarSite := ⟨site, by
             simp [expression, EbnfExpr.kind]⟩
           by_cases matchArmLocated : site.isAt .matchArm [3] = true
-          · refine .armPair (.star starSite .nil) (.star starSite .cons)
-              rfl rfl ?_ ?_
+          · have matchArmRule : site.val.rule = .matchArm :=
+              (by
+                have located :
+                    (site.val.rule == .matchArm) = true ∧
+                      (site.val.path == [3]) = true := by
+                  simpa [GrammarSite.isAt] using matchArmLocated
+                exact beq_iff_eq.mp located.1)
+            refine .armPair (.star starSite .nil) (.star starSite .cons)
+              rfl rfl (by simpa [ProductionId.sourceRule, starSite])
+              (by simpa [ProductionId.sourceRule, starSite]) ?_ ?_
             · simp [guardOf, starSite, matchArmLocated]
             · simp [guardOf, starSite, matchArmLocated]
           · exact .guardless (.star starSite .nil) rfl

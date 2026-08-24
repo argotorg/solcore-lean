@@ -865,6 +865,67 @@ def GuardAnchor
 
 namespace GuardAnchor
 
+/-- Origin-anchored guards share the prediction origin and site cursor. -/
+theorem atOrigin
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (guard : PriorityGuardId)
+    (polarity : Polarity)
+    (member : (guard, polarity) ∈ guardOf productionInstance.production)
+    (originAnchored :
+      guard = .G01_statementIf ∨
+      guard = .G03_parameterComptime ∨
+      guard = .G04_letComptime ∨
+      guard = .G05_typeComptime ∨
+      guard = .G06_patternComptime ∨
+      guard = .G09_genericContext) :
+    GuardAnchor productionInstance (guard, polarity) {
+      guard := guard
+      contextStart := productionInstance.origin
+      siteCursor := productionInstance.origin
+      ordered := Nat.le_refl _
+    } := by
+  rcases originAnchored with rfl | rfl | rfl | rfl | rfl | rfl <;>
+    simp [GuardAnchor, guardAnchorContextStart?, member]
+
+/-- A G07 cell anchors at the inherited postfix invocation start. -/
+theorem atPostfixInvocation
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (polarity : Polarity)
+    (start : Boundary tokens)
+    (member : (.G07_leadingDotArguments, polarity) ∈
+      guardOf productionInstance.production)
+    (context : productionInstance.context = .postfixInvocation start)
+    (ordered : start.val ≤ productionInstance.origin.val) :
+    GuardAnchor productionInstance
+      (.G07_leadingDotArguments, polarity) {
+        guard := .G07_leadingDotArguments
+        contextStart := start
+        siteCursor := productionInstance.origin
+        ordered := ordered
+      } := by
+  simp [GuardAnchor, guardAnchorContextStart?, member, context]
+
+/-- A G02 cell anchors at the inherited match-arm body start. -/
+theorem atArmBody
+    {tokens : List Token}
+    (productionInstance : ProductionInstanceKey tokens)
+    (polarity : Polarity)
+    (start : Boundary tokens)
+    (member : (.G02_matchArmBoundary, polarity) ∈
+      guardOf productionInstance.production)
+    (context : productionInstance.context = .armBody start)
+    (ordered : start.val ≤ productionInstance.origin.val) :
+    GuardAnchor productionInstance
+      (.G02_matchArmBoundary, polarity) {
+        guard := .G02_matchArmBoundary
+        contextStart := start
+        siteCursor := productionInstance.origin
+        ordered := ordered
+      } := by
+  simp [GuardAnchor, guardAnchorContextStart?, member, context]
+
 /-- A production cell determines at most one structural guard anchor. -/
 theorem functional
     {tokens : List Token}
