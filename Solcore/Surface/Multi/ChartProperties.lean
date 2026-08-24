@@ -14802,6 +14802,100 @@ theorem Chart.ContextualValueWorklistResult.parsedModule?_exists_of_completeModu
         simpa [Chart.ContextualValueFrontierState.lookupModuleReduction?, root]
           using selected, rfl⟩
 
+/-- Pending transition closure becomes full recognition materialization after
+the semantic executor drains its queue. Complete children are supplied by the
+executable frontier invariant. -/
+theorem Chart.ContextualValueWorklistResult.recognitionPrefixesMaterialized_of_pending
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (pending : result.RecognitionMaterializationPending)
+    (wellFormed : result.frontier.ExecutableWellFormed) :
+    result.RecognitionPrefixesMaterialized := by
+  have recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  have sound := Chart.executeObservedContextualWorklistMulti?_operational_sound
+    file tokens owned result.recognition recognitionSelected
+  have closed := Chart.executeObservedContextualWorklistMulti?_operationalClosure
+    file tokens owned result.recognition recognitionSelected
+  have drained :=
+    Chart.executeObservedContextualValueWorklistMulti?_queue_empty
+      file tokens owned result selected
+  intro item member
+  have reached := sound.1 item member
+  induction reached with
+  | root => exact pending.root
+  | predict waiting predicted waitingReached next enabled waitingInduction =>
+      have waitingPresent := waitingInduction
+        (closed.reach_complete waitingReached)
+      rcases pending.predict waiting predicted
+          (closed.reach_complete waitingReached) waitingPresent next enabled
+        with present | queued
+      · exact present
+      · simp [drained] at queued
+  | scan before after cursor beforeReached structural beforeInduction =>
+      have beforePresent := beforeInduction
+        (closed.reach_complete beforeReached)
+      obtain ⟨retained, retainedMember, shape⟩ :=
+        (closed.scan_closed before after cursor
+          (closed.reach_complete beforeReached) structural).2
+      rcases pending.scan retained before after cursor retainedMember shape
+          beforePresent with present | queued
+      · exact present
+      · simp [drained] at queued
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      obtain ⟨retained, retainedMember, shape⟩ :=
+        (closed.complete_closed waiting finished after shared
+          (closed.reach_complete waitingReached)
+          (closed.reach_complete finishedReached) structural).2
+      have waitingPresent := waitingInduction
+        (closed.reach_complete waitingReached)
+      have finishedPresent := finishedInduction
+        (closed.reach_complete finishedReached)
+      have finishedComplete : CompleteItem finished.raw := by
+        rcases structural.1 with
+          ⟨_symbol, _next, complete, _lhs, _waitingAt, _finishedAt,
+            _advance⟩
+        exact complete
+      have finishedPrefixMember :
+          finished ∈ result.frontier.prefixKeys :=
+        (result.frontier.prefixMemberBool_eq_true_iff finished).mp
+          finishedPresent
+      have finishedReductionMember :
+          finished ∈ result.frontier.reductionKeys :=
+        wellFormed.2 finished finishedPrefixMember finishedComplete
+      have finishedReductionSome :
+          (result.frontier.lookupReduction? finished).isSome = true :=
+        (result.frontier.lookupReduction?_isSome_eq_true_iff_member
+          finished).mpr finishedReductionMember
+      rcases pending.complete retained waiting finished after shared
+          retainedMember shape waitingPresent finishedReductionSome with
+        present | waitingQueued | finishedQueued
+      · exact present
+      · simp [drained] at waitingQueued
+      · simp [drained] at finishedQueued
+
+/-- The complete-root success bridge, parameterized by the pending semantic
+liveness certificate and executable frontier discipline. -/
+theorem executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_completeModuleRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (pending : result.RecognitionMaterializationPending)
+    (wellFormed : result.frontier.ExecutableWellFormed)
+    (present : result.recognition.containsCompleteModuleRootItem = true) :
+    ∃ module, result.parsedModule? = some module := by
+  exact result.parsedModule?_exists_of_completeModuleRoot
+    (result.recognitionPrefixesMaterialized_of_pending file tokens owned
+      selected pending wellFormed)
+    wellFormed present
+
 end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi
