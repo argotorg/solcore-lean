@@ -37078,4 +37078,167 @@ private theorem beginPhaseCValueWorklist?_materializationPending
     rw [empty] at reductionSome
     simp at reductionSome
 
+/-- A semantic transition grows the frontier without silently creating an
+unprocessed value: every new prefix or reduction key remains queued. -/
+private structure PhaseCValueFrontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (before after : ContextualValueFrontierState file tokens) : Prop where
+  queue : before.queue ⊆ after.queue
+  prefixPresent : ∀ item, after.prefixMemberBool item = true →
+    before.prefixMemberBool item = true ∨ item ∈ after.queue
+  reduction : ∀ item, (after.lookupReduction? item).isSome = true →
+    (before.lookupReduction? item).isSome = true ∨ item ∈ after.queue
+
+private theorem PhaseCValueFrontierGrowth.refl
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) :
+    PhaseCValueFrontierGrowth state state := by
+  exact ⟨fun _ => id, fun _ present => Or.inl present,
+    fun _ present => Or.inl present⟩
+
+private theorem PhaseCValueFrontierGrowth.trans
+    {file : WorkspaceFile} {tokens : List Token}
+    {first second third : ContextualValueFrontierState file tokens}
+    (left : PhaseCValueFrontierGrowth first second)
+    (right : PhaseCValueFrontierGrowth second third) :
+    PhaseCValueFrontierGrowth first third := by
+  constructor
+  · exact fun item member => right.queue (left.queue member)
+  · intro item present
+    rcases right.prefixPresent item present with middle | queued
+    · rcases left.prefixPresent item middle with old | queued
+      · exact Or.inl old
+      · exact Or.inr (right.queue queued)
+    · exact Or.inr queued
+  · intro item present
+    rcases right.reduction item present with middle | queued
+    · rcases left.reduction item middle with old | queued
+      · exact Or.inl old
+      · exact Or.inr (right.queue queued)
+    · exact Or.inr queued
+
+/-- Prefix insertion leaves the independent reduction ledger unchanged. -/
+private theorem insertPrefix_reductionMemberBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item target : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item) :
+    (state.insertPrefix item prior).reductionMemberBool target =
+      state.reductionMemberBool target := by
+  unfold ContextualValueFrontierState.insertPrefix
+  split <;> rfl
+
+/-- Reduction insertion grows membership by at most its exact item key. -/
+private theorem insertReduction_reductionMemberBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item target : ContextualItemKey tokens)
+    (reduction : ContextualReductionValue file tokens item) :
+    (state.insertReduction item reduction).reductionMemberBool target = true ↔
+      state.reductionMemberBool target = true ∨ target = item := by
+  cases present : state.reductionMemberBool item with
+  | true =>
+      rw [ContextualValueFrontierState.insertReduction_of_present
+        state item reduction present]
+      constructor
+      · exact Or.inl
+      · rintro (old | rfl)
+        · exact old
+        · exact present
+  | false =>
+      unfold ContextualValueFrontierState.insertReduction
+      rw [if_neg (Bool.eq_false_iff.mp present)]
+      unfold ContextualValueFrontierState.reductionMemberBool
+      rw [List.any_append, Bool.or_eq_true]
+      simp only [List.any_cons, decide_eq_true_eq, List.any_nil,
+        Bool.or_false]
+      constructor
+      · rintro (old | equal)
+        · exact Or.inl old
+        · exact Or.inr equal.symm
+      · rintro (old | equal)
+        · exact Or.inl old
+        · exact Or.inr equal.symm
+
+/-- Candidate preparation satisfies frontier growth, including the atomic
+complete-prefix/reduction case. -/
+private theorem insertCandidate?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    PhaseCValueFrontierGrowth state candidate.state := by
+  unfold ContextualValueFrontierState.insertCandidate? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact .refl state
+  next absent =>
+    have absentBool : state.prefixMemberBool item = false :=
+      Bool.eq_false_iff.mpr absent
+    split at selected
+    next complete =>
+      cases reduced : ContextualReductionValue.reduce? owned item prior with
+      | none => simp [reduced] at selected
+      | some reduction =>
+          rw [reduced] at selected
+          cases selected
+          have prefixExact := ContextualValueFrontierState.insertPrefix_of_absent
+            state item prior absentBool
+          have reductionQueue :
+              ((state.insertPrefix item prior).insertReduction item reduction).queue =
+                (state.insertPrefix item prior).queue := by
+            unfold ContextualValueFrontierState.insertReduction
+            split <;> rfl
+          have queueEq :
+              ((state.insertPrefix item prior).insertReduction item reduction).queue =
+                state.queue ++ [item] := reductionQueue.trans prefixExact.2.2
+          constructor
+          · intro target member
+            rw [queueEq]
+            exact List.mem_append_left [item] member
+          · intro target targetPresent
+            rw [insertReduction_prefixMemberBool,
+              insertPrefix_prefixMemberBool_eq_true_iff] at targetPresent
+            rcases targetPresent with old | rfl
+            · exact Or.inl old
+            · exact Or.inr (by rw [queueEq]; simp)
+          · intro target targetPresent
+            have targetMember :=
+              (ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+                _ target).2 targetPresent
+            rw [insertReduction_reductionMemberBool_eq_true_iff,
+              insertPrefix_reductionMemberBool] at targetMember
+            rcases targetMember with old | rfl
+            · exact Or.inl
+                ((ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+                  state target).1 old)
+            · exact Or.inr (by rw [queueEq]; simp)
+    next incomplete =>
+      cases selected
+      have prefixExact := ContextualValueFrontierState.insertPrefix_of_absent
+        state item prior absentBool
+      constructor
+      · intro target member
+        rw [prefixExact.2.2]
+        exact List.mem_append_left [item] member
+      · intro target targetPresent
+        rw [insertPrefix_prefixMemberBool_eq_true_iff] at targetPresent
+        rcases targetPresent with old | rfl
+        · exact Or.inl old
+        · exact Or.inr (by rw [prefixExact.2.2]; simp)
+      · intro target targetPresent
+        exact Or.inl (by
+          have member :=
+            (ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+              _ target).2 targetPresent
+          rw [insertPrefix_reductionMemberBool] at member
+          exact
+            (ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+              state target).1 member)
+
 end Solcore.Surface.Multi.Chart
