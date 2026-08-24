@@ -15826,6 +15826,256 @@ private theorem OperationalContextualReach.ordered
           (congrArg Fin.val finishedAtShared).symm
         _ ≤ finished.raw.current.val := finishedOrdered
 
+private theorem operational_moduleEofAtom_complete_current
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached : OperationalContextualReach file tokens memo item)
+    (production : item.raw.production = .atom moduleEofAtomSite)
+    (complete : CompleteItem item.raw) :
+    item.raw.current = Boundary.afterLogicalEOF tokens := by
+  induction reached with
+  | root => contradiction
+  | predict waiting predicted reached next enabled induction =>
+      change predicted = .atom moduleEofAtomSite at production
+      subst predicted
+      simp [CompleteItem] at complete
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      have beforeProduction : before.raw.production =
+          .atom moduleEofAtomSite := advance.1.symm.trans production
+      have afterRhs : after.raw.production.rhs = [.terminal .endOfFile] :=
+        (congrArg ProductionId.rhs production).trans
+          ProductionId.rhs_moduleEofAtom
+      have afterDot : after.raw.dot.val = 1 := by
+        unfold CompleteItem at complete
+        exact complete.trans (congrArg List.length afterRhs)
+      have beforeDot : before.raw.dot.val = 0 := by
+        rw [advance.2.1] at afterDot
+        omega
+      have terminalEq : terminal = .endOfFile := by
+        have beforeRhs : before.raw.production.rhs =
+            [.terminal .endOfFile] :=
+          (congrArg ProductionId.rhs beforeProduction).trans
+            ProductionId.rhs_moduleEofAtom
+        have selected : before.raw.production.rhs[0]? =
+            some (.terminal terminal) := by
+          simpa [beforeDot] using next.2
+        have lookupEq : before.raw.production.rhs[0]? =
+            ([.terminal .endOfFile] : List GrammarSymbol)[0]? :=
+          congrArg (fun rhs : List GrammarSymbol => rhs[0]?) beforeRhs
+        rw [lookupEq] at selected
+        simpa using (Option.some.inj selected).symm
+      subst terminal
+      cases value with
+      | retained token => simp [TerminalMatches] at terminalMatches
+      | endOfFile =>
+          cases terminalAt with
+          | endOfFile atEnd =>
+              apply Fin.ext
+              rw [advance.2.2.2]
+              change cursor.val + 1 = tokens.length + 1
+              omega
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, childComplete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      have waitingProduction : waiting.raw.production =
+          .atom moduleEofAtomSite := advance.1.symm.trans production
+      have waitingRhs : waiting.raw.production.rhs =
+          [.terminal .endOfFile] :=
+        (congrArg ProductionId.rhs waitingProduction).trans
+          ProductionId.rhs_moduleEofAtom
+      have bound : waiting.raw.dot.val < 1 := by
+        calc
+          waiting.raw.dot.val < waiting.raw.production.rhs.length := next.1
+          _ = 1 := congrArg List.length waitingRhs
+      have dotZero : waiting.raw.dot.val = 0 := by omega
+      have impossible : waiting.raw.production.rhs[0]? =
+          some (.nonterminal symbol) := by
+        simpa [dotZero] using next.2
+      have lookupEq : waiting.raw.production.rhs[0]? =
+          ([.terminal .endOfFile] : List GrammarSymbol)[0]? :=
+        congrArg (fun rhs : List GrammarSymbol => rhs[0]?) waitingRhs
+      rw [lookupEq] at impossible
+      simp at impossible
+
+private theorem operational_moduleRootSequence_complete_current
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached : OperationalContextualReach file tokens memo item)
+    (production : item.raw.production = .seq moduleRootSequenceSite)
+    (complete : CompleteItem item.raw) :
+    item.raw.current = Boundary.afterLogicalEOF tokens := by
+  induction reached with
+  | root => contradiction
+  | predict waiting predicted reached next enabled induction =>
+      change predicted = .seq moduleRootSequenceSite at production
+      subst predicted
+      unfold CompleteItem at complete
+      change 0 = (ProductionId.seq moduleRootSequenceSite).rhs.length at complete
+      have rhsLength :
+          (ProductionId.seq moduleRootSequenceSite).rhs.length = 2 :=
+        congrArg List.length ProductionId.rhs_moduleRootSequence
+      omega
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      have waitingProduction : before.raw.production =
+          .seq moduleRootSequenceSite := advance.1.symm.trans production
+      have waitingRhs :=
+        (congrArg ProductionId.rhs waitingProduction).trans
+          ProductionId.rhs_moduleRootSequence
+      have afterRhs :=
+        (congrArg ProductionId.rhs production).trans
+          ProductionId.rhs_moduleRootSequence
+      have afterDot : after.raw.dot.val = 2 := by
+        unfold CompleteItem at complete
+        exact complete.trans (congrArg List.length afterRhs)
+      have beforeDot : before.raw.dot.val = 1 := by
+        rw [advance.2.1] at afterDot
+        omega
+      have impossible : before.raw.production.rhs[1]? =
+          some (.terminal terminal) := by
+        simpa [beforeDot] using next.2
+      rw [congrArg (fun rhs : List GrammarSymbol => rhs[1]?) waitingRhs]
+        at impossible
+      simp at impossible
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, childComplete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      have waitingProduction : waiting.raw.production =
+          .seq moduleRootSequenceSite := advance.1.symm.trans production
+      have waitingRhs :=
+        (congrArg ProductionId.rhs waitingProduction).trans
+          ProductionId.rhs_moduleRootSequence
+      have afterRhs :=
+        (congrArg ProductionId.rhs production).trans
+          ProductionId.rhs_moduleRootSequence
+      have afterDot : after.raw.dot.val = 2 := by
+        unfold CompleteItem at complete
+        exact complete.trans (congrArg List.length afterRhs)
+      have waitingDot : waiting.raw.dot.val = 1 := by
+        rw [advance.2.1] at afterDot
+        omega
+      have selected : waiting.raw.production.rhs[1]? =
+          some (.nonterminal symbol) := by
+        simpa [waitingDot] using next.2
+      rw [congrArg (fun rhs : List GrammarSymbol => rhs[1]?) waitingRhs]
+        at selected
+      have symbolEq : symbol = .aux moduleEofGrammarSite := by
+        simpa using (Option.some.inj selected).symm
+      have finishedProduction : finished.raw.production =
+          .atom moduleEofAtomSite :=
+        ProductionId.eq_moduleEofAtom_of_lhs finished.raw.production
+          (lhsEq.trans symbolEq)
+      exact advance.2.2.2.trans
+        (operational_moduleEofAtom_complete_current finishedReached
+          finishedProduction childComplete)
+
+private theorem OperationalContextualReach.moduleRoot_origin
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached : OperationalContextualReach file tokens memo item)
+    (production : item.raw.production = .root .module) :
+    item.raw.origin = Boundary.start tokens := by
+  induction reached with
+  | root => rfl
+  | predict waiting predicted reached next enabled induction =>
+      change predicted = .root .module at production
+      subst predicted
+      have selected : waiting.raw.production.rhs[waiting.raw.dot.val]? =
+          some (.nonterminal (.rule .module)) := by
+        simpa [ProductionId.lhs] using next.2
+      exact (ProductionId.rhs_no_moduleRule waiting.raw.production
+        (List.mem_of_getElem? selected)).elim
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rw [advance.2.2.1]
+      exact induction (advance.1.symm.trans production)
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, childComplete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      rw [advance.2.2.1]
+      exact waitingInduction (advance.1.symm.trans production)
+
+/-- An operationally reached complete module root necessarily spans the
+canonical source interval, from the initial boundary through logical EOF. -/
+theorem OperationalContextualReach.completeModule_interval
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached : OperationalContextualReach file tokens memo item)
+    (production : item.raw.production = .root .module)
+    (complete : CompleteItem item.raw) :
+    item.raw.origin = Boundary.start tokens ∧
+      item.raw.current = Boundary.afterLogicalEOF tokens := by
+  refine ⟨reached.moduleRoot_origin production, ?_⟩
+  induction reached with
+  | root => simp [CompleteItem, ProductionId.rhs] at complete
+  | predict waiting predicted reached next enabled induction =>
+      change predicted = .root .module at production
+      subst predicted
+      simp [CompleteItem, ProductionId.rhs] at complete
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      have beforeProduction : before.raw.production = .root .module :=
+        advance.1.symm.trans production
+      have afterDot : after.raw.dot.val = 1 := by
+        unfold CompleteItem at complete
+        simpa [production, ProductionId.rhs] using complete
+      have beforeDot : before.raw.dot.val = 0 := by
+        rw [advance.2.1] at afterDot
+        omega
+      have impossible : before.raw.production.rhs[0]? =
+          some (.terminal terminal) := by
+        simpa [beforeDot] using next.2
+      have lookupEq : before.raw.production.rhs[0]? =
+          (ProductionId.root .module).rhs[0]? :=
+        congrArg (fun production : ProductionId => production.rhs[0]?)
+          beforeProduction
+      rw [lookupEq] at impossible
+      simp [ProductionId.rhs] at impossible
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, childComplete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      have waitingProduction : waiting.raw.production = .root .module :=
+        advance.1.symm.trans production
+      have afterDot : after.raw.dot.val = 1 := by
+        unfold CompleteItem at complete
+        simpa [production, ProductionId.rhs] using complete
+      have waitingDot : waiting.raw.dot.val = 0 := by
+        rw [advance.2.1] at afterDot
+        omega
+      have selected : waiting.raw.production.rhs[0]? =
+          some (.nonterminal symbol) := by
+        simpa [waitingDot] using next.2
+      have lookupEq : waiting.raw.production.rhs[0]? =
+          (ProductionId.root .module).rhs[0]? :=
+        congrArg (fun production : ProductionId => production.rhs[0]?)
+          waitingProduction
+      rw [lookupEq] at selected
+      have symbolEq : symbol = .aux (GrammarSite.root .module) := by
+        simpa [ProductionId.rhs] using
+          (Option.some.inj selected).symm
+      have finishedProduction := ProductionId.eq_moduleRootSequence_of_lhs
+        finished.raw.production (lhsEq.trans symbolEq)
+      exact advance.2.2.2.trans
+        (operational_moduleRootSequence_complete_current finishedReached
+          finishedProduction childComplete)
+
 /-- Operational reachability of every endpoint of one checked worklist edge. -/
 def OperationalContextualEdgeReach
     (file : WorkspaceFile)
