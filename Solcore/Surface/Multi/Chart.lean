@@ -33769,6 +33769,154 @@ private theorem processContextualItemMulti?_valueCompletionAttemptsFresh
             allProductionIds current predicted fresh predictedEq) scannedEq)
       completedEq
 
+private theorem dequeueContextualItem?_valueCompletionAttemptsFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueCompletionAttemptsFresh current.counter)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCValueCompletionAttemptsFresh result.2.counter := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_valueCompletionAttemptsFresh current _ _ next
+        fresh (by intros; simp [phaseCValueCompletionAttemptAddress]) nextEq
+
+private theorem dequeueContextualEdge?_valueCompletionAttemptsFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueCompletionAttemptsFresh current.counter)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCValueCompletionAttemptsFresh result.2.counter := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      let address : UnitAddress tokens :=
+        match edge.val with
+        | .scanned before _ _ =>
+            .linear .L02_scannedEdgeDequeue (contextualLinearKey before)
+        | .completed waiting finished _ _ =>
+            .cubic .U02_completedEdgeDequeue
+              (contextualCompletionKey waiting finished)
+      apply runMappedPrimitive?_valueCompletionAttemptsFresh current address _
+        next fresh
+      · intro waiting finished
+        rcases edge with ⟨key, structural⟩
+        cases key <;> simp [address, phaseCValueCompletionAttemptAddress]
+      · simpa [address] using nextEq
+
+private theorem phaseCQueueStepMulti?_valueCompletionAttemptsFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueCompletionAttemptsFresh current.counter)
+    (selected : phaseCQueueStepMulti? owned current = some result) :
+    PhaseCValueCompletionAttemptsFresh result.counter := by
+  cases items : current.payload.phaseC.itemQueue with
+  | nil =>
+      cases edges : current.payload.phaseC.edgeQueue with
+      | nil => simp_all [phaseCQueueStepMulti?]
+      | cons edge rest =>
+          simp only [phaseCQueueStepMulti?, items, edges] at selected
+          cases dequeued : dequeueContextualEdge? current with
+          | none => simp [dequeued] at selected
+          | some pair =>
+              rw [dequeued] at selected
+              cases selected
+              exact dequeueContextualEdge?_valueCompletionAttemptsFresh
+                current pair fresh dequeued
+  | cons item rest =>
+      simp only [phaseCQueueStepMulti?, items] at selected
+      cases dequeued : dequeueContextualItem? current with
+      | none => simp [dequeued] at selected
+      | some pair =>
+          rw [dequeued] at selected
+          rcases pair with ⟨pivot, after⟩
+          exact processContextualItemMulti?_valueCompletionAttemptsFresh owned
+            pivot after result
+              (dequeueContextualItem?_valueCompletionAttemptsFresh current
+                (pivot, after) fresh dequeued) selected
+
+private theorem runPhaseCQueueStepsMulti?_valueCompletionAttemptsFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCValueCompletionAttemptsFresh current.counter →
+      runPhaseCQueueStepsMulti? owned fuel current = some result →
+      PhaseCValueCompletionAttemptsFresh result.counter := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result fresh selected
+      cases selected
+      exact fresh
+  | succ previous induction =>
+      intro current result fresh selected
+      rw [runPhaseCQueueStepsMulti?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      exact induction next result
+        (phaseCQueueStepMulti?_valueCompletionAttemptsFresh owned current next
+          fresh nextEq) resultEq
+
+private theorem executePhaseCWorklistMulti?_valueCompletionAttemptsFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseBSealed file tokens))
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueCompletionAttemptsFresh current.counter)
+    (selected : executePhaseCWorklistMulti? owned current = some result) :
+    PhaseCValueCompletionAttemptsFresh result.counter := by
+  unfold executePhaseCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact runPhaseCQueueStepsMulti?_valueCompletionAttemptsFresh owned _ entered
+    result (beginPhaseCWorklist?_valueCompletionAttemptsFresh current entered
+      fresh enteredEq) runEq
+
+/-- The observed recognition result has not consumed any U06 attempt. -/
+private theorem executeObservedPhaseABCWorklistMulti?_valueCompletionAttemptsFresh
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens))
+    (selected : executeObservedPhaseABCWorklistMulti? file tokens owned =
+      some result) :
+    PhaseCValueCompletionAttemptsFresh result.counter := by
+  unfold executeObservedPhaseABCWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨phaseB, phaseBEq, phaseCEq⟩
+  exact executePhaseCWorklistMulti?_valueCompletionAttemptsFresh owned phaseB
+    result (executeObservedPhaseAB?_phaseCInitialFresh file tokens owned
+      phaseB phaseBEq).valueCompletionAttemptsFresh phaseCEq
+
+private theorem beginPhaseCValueWorklist?_valueCompletionAttemptsFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (fresh : PhaseCValueCompletionAttemptsFresh current.counter)
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    PhaseCValueCompletionAttemptsFresh result.counter := by
+  unfold beginPhaseCValueWorklist? at selected
+  split at selected
+  next success =>
+    exact runMappedPrimitive?_valueCompletionAttemptsFresh current _ _ result
+      fresh (by intros; simp [phaseCValueCompletionAttemptAddress]) selected
+  next failure => contradiction
+
 /-- Run semantic evaluation over the saturated multi-ledger recognition
 worklist without discarding the shared one-use counter. -/
 private def executeObservedPhaseABCValueWorklist?
