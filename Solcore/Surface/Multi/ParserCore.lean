@@ -7091,11 +7091,12 @@ def executeContractDeclRoot
   let name := EbnfValue.terminalView (.category .identifier) rawName
   let parameters := (EbnfValue.optionalView
     parameterChild rawParameters).map fun raw =>
-      let viewed := EbnfValue.sequence3View
-        (.atom (.terminal (.symbol .leftParen)))
-        (.list1 identifierAtom)
-        (.atom (.terminal (.symbol .rightParen))) raw
-      (EbnfValue.list1View identifierAtom viewed.2.1).map fun value =>
+      let parameterChildren : List EbnfExpr := [
+        .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+        .atom (.terminal (.symbol .rightParen))]
+      let ⟨_, rawNames, _, ⟨⟩⟩ :=
+        EbnfValue.sequenceFlatView parameterChildren raw
+      (EbnfValue.list1View identifierAtom rawNames).map fun value =>
         let terminal := EbnfValue.terminalView
           (.category .identifier) value
         { span := terminal.span, payload := terminal.identifierProjection.2 }
