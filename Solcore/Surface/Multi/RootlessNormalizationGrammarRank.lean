@@ -113,6 +113,39 @@ theorem enabledNonterminalCoverageAt_of_frontierCoverageTable
   rw [if_pos frontier.2.1, if_pos frontier.2.2] at cell
   exact decide_eq_true_iff.mp cell
 
+/-- Reached match-arm context readiness discharges every cell of the finite
+coverage table through the fixed grammar classification. -/
+theorem frontierCoverageTable_eq_true_of_reached_matchArmReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (ready : ∀ waiting : ContextualItemKey tokens,
+      ContextualReach file tokens memo correct final waiting →
+        MatchArmPairContextReadyAt waiting) :
+    frontierCoverageTable owned correct final cursor = true := by
+  apply List.all_eq_true.mpr
+  intro waiting _member
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  letI : Decidable (waiting.raw.current = cursor) := inferInstance
+  letI : Decidable
+      (EnabledNonterminalCoverageAt
+        file tokens memo correct final waiting) :=
+    enabledNonterminalCoverageAtDecision correct final waiting
+  by_cases reached :
+      ContextualReach file tokens memo correct final waiting
+  · by_cases current : waiting.raw.current = cursor
+    · simp only [frontierCoverageCell, if_pos reached, if_pos current]
+      apply decide_eq_true_iff.mpr
+      exact enabledNonterminalCoverageAt_of_anchored correct final waiting
+        (anchoredNonterminalCoverageAt_of_reached_matchArmReady
+          waiting reached (ready waiting reached))
+    · simp [frontierCoverageCell, reached, current]
+  · simp [frontierCoverageCell, reached]
+
 /-- Executable check that a boundary is reached and bounds every reached
 contextual item. -/
 def greatestReachableCursorBool
