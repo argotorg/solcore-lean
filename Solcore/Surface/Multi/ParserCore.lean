@@ -5890,6 +5890,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | hidingClause : ExecutableRootRule .hidingClause
   | body : ExecutableRootRule .body
   | type : ExecutableRootRule .type
+  | typeAtom : ExecutableRootRule .typeAtom
   | qualifiedName : ExecutableRootRule .qualifiedName
   | forInitItem : ExecutableRootRule .forInitItem
   | forPostItem : ExecutableRootRule .forPostItem
@@ -8671,6 +8672,68 @@ def executeMultiplicativeRoot
       | .inl star => executableTerminalLoc star .multiply
       | .inr (.inl slash) => executableTerminalLoc slash .divide
       | .inr (.inr percent) => executableTerminalLoc percent .modulo), value.2))
+
+/-- Execute every atomic type form from its selected typed branch. -/
+def executeTypeAtomRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .typeAtom)) : TypeExpr :=
+  let atAtom : EbnfExpr := .atom (.terminal (.symbol .at))
+  let atomAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let nameAtom : EbnfExpr := .atom (.nonterminal .qualifiedName)
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let commaAtom : EbnfExpr := .atom (.terminal (.symbol .comma))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let argumentsExpr : EbnfExpr :=
+    .sequence [openAtom, .list1 typeAtom, closeAtom]
+  let tupleTail := EbnfValue.fixedInfixTailExpr (.symbol .comma) .type
+  let branches : List EbnfExpr := [
+    .sequence [atAtom, atomAtom],
+    .sequence [nameAtom, .optional argumentsExpr],
+    .sequence [openAtom, closeAtom],
+    .sequence [openAtom, typeAtom, closeAtom],
+    .sequence [openAtom, typeAtom, commaAtom, typeAtom,
+      .star tupleTail, closeAtom]]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View atAtom atomAtom raw
+      let marker := EbnfValue.terminalView (.symbol .at) viewed.1
+      let inner := EbnfValue.ruleView .typeAtom viewed.2
+      sourceLoc witness
+        (.proxy (executableTerminalLoc marker ()) inner)
+  | ⟨⟨1, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View
+        nameAtom (.optional argumentsExpr) raw
+      let name := EbnfValue.ruleView .qualifiedName viewed.1
+      let arguments := (EbnfValue.optionalView argumentsExpr viewed.2).map
+        fun rawArguments =>
+          let argumentView := EbnfValue.sequence3View
+            openAtom (.list1 typeAtom) closeAtom rawArguments
+          (EbnfValue.list1View typeAtom argumentView.2.1).map
+            (EbnfValue.ruleView .type)
+      sourceLoc witness (.named name arguments)
+  | ⟨⟨2, _⟩, _raw⟩ => sourceLoc witness (.tuple [])
+  | ⟨⟨3, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        openAtom typeAtom closeAtom raw
+      sourceLoc witness (.group (EbnfValue.ruleView .type viewed.2.1))
+  | ⟨⟨4, _⟩, raw⟩ =>
+      let children : List EbnfExpr := [openAtom, typeAtom, commaAtom,
+        typeAtom, .star tupleTail, closeAtom]
+      let viewed := EbnfValue.sequenceFlatView children raw
+      let first := EbnfValue.ruleView .type viewed.2.1
+      let second := EbnfValue.ruleView .type viewed.2.2.2.1
+      let rest := (EbnfValue.starView tupleTail
+        viewed.2.2.2.2.1).map fun tail =>
+          (EbnfValue.fixedInfixTailView
+            (.symbol .comma) .type tail).2
+      sourceLoc witness (.tuple (first :: second :: rest))
+
 /-- Execute one currently supported source-rule root. -/
 def executeRootRule
     (file : WorkspaceFile) (tokens : List Token)
@@ -8758,6 +8821,8 @@ def executeRootRule
       executeHidingClauseRoot file tokens origin finish owned ordered input
   | .body => executeBodyRoot file tokens origin finish owned ordered input
   | .type => executeTypeRoot file tokens origin finish owned ordered input
+  | .typeAtom =>
+      executeTypeAtomRoot file tokens origin finish owned ordered input
   | .qualifiedName =>
       executeQualifiedNameRoot file tokens origin finish owned ordered input
   | .forInitItem =>
