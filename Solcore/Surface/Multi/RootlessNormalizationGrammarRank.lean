@@ -1355,6 +1355,53 @@ theorem frontierCompletionRank_of_table
       owned correct final cursor potential waiting after).mp lower
     exact Or.inr ⟨after, ⟨frontier.1, facts.1, facts.2.1⟩, facts.2.2⟩
 
+/-- Conversely, any explicit normalization witness for every completed item
+at a greatest frontier makes the finite completion table accept. -/
+theorem frontierCompletionRankTable_eq_true_of_normalizes
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (potential : FrontierGrammarPotential tokens)
+    (normalizes : ∀ waiting,
+      FrontierReach file tokens memo correct final cursor waiting →
+      CompleteItem waiting.raw →
+      waiting = CanonicalCompleteRootItem tokens .module
+          (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain ∨
+        ∃ after : ContextualItemKey tokens,
+          FrontierReach file tokens memo correct final cursor after ∧
+          frontierGrammarRank potential after <
+            frontierGrammarRank potential waiting) :
+    frontierCompletionRankTable
+      owned correct final cursor potential = true := by
+  apply List.all_eq_true.mpr
+  intro waiting _waitingMember
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  letI : Decidable (CompleteItem waiting.raw) :=
+    completeItemDecision waiting.raw
+  by_cases reached : ContextualReach file tokens memo correct final waiting
+  · by_cases current : waiting.raw.current = cursor
+    · by_cases complete : CompleteItem waiting.raw
+      · simp only [frontierCompletionRankCell, if_pos reached,
+          if_pos current, if_pos complete, Bool.or_eq_true]
+        rcases normalizes waiting ⟨greatest, reached, current⟩ complete with
+          root | ⟨after, afterFrontier, decreases⟩
+        · exact Or.inl (decide_eq_true_iff.mpr root)
+        · apply Or.inr
+          apply List.any_eq_true.mpr
+          refine ⟨after, allContextualItems_complete after, ?_⟩
+          apply (frontierLowerRankCell_eq_true_iff
+            owned correct final cursor potential waiting after).mpr
+          exact ⟨afterFrontier.2.1, afterFrontier.2.2, decreases⟩
+      · simp [frontierCompletionRankCell, reached, current, complete]
+    · simp [frontierCompletionRankCell, reached, current]
+  · simp [frontierCompletionRankCell, reached]
+
 /-- Number of finite grammar/span coordinates available to a potential. -/
 def frontierGrammarFrameCount (tokens : List Token) : Nat :=
   allProductionIds.length * (tokens.length + 2) * (tokens.length + 2)
