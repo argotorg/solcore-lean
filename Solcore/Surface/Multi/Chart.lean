@@ -11743,6 +11743,48 @@ private def attemptPhaseCRetainedCompletedEdges?
         owned source edge current
       attemptPhaseCRetainedCompletedEdges? owned source rest next
 
+/-- Process one dequeued semantic item against prediction and the immutable
+retained scan/completion edge set. -/
+private def processPhaseCValueItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) := do
+  let predicted ← attemptPhaseCValuePredictions?
+    owned item allProductionIds current
+  let scanned ← attemptPhaseCRetainedScannedEdges? owned item
+    predicted.payload.recognition.phaseC.contextualEdges predicted
+  attemptPhaseCRetainedCompletedEdges? owned item
+    scanned.payload.recognition.phaseC.contextualEdges scanned
+
+/-- Drain the semantic frontier using only a grammar-derived internal fuel
+bound; callers never select fuel. -/
+private def runPhaseCValueQueue?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    Nat → CountedState tokens (PhaseCValueWorklist file tokens) →
+      Option (CountedState tokens (PhaseCValueWorklist file tokens))
+  | 0, current =>
+      if current.payload.frontier.queue.isEmpty then some current else none
+  | fuel + 1, current =>
+      match current.payload.frontier.queue with
+      | [] => some current
+      | _ :: _ => do
+          let (item, dequeued) ← dequeuePhaseCValueFrontier? current
+          let processed ← processPhaseCValueItem? owned item dequeued
+          runPhaseCValueQueue? owned fuel processed
+
+/-- Begin and fully drain semantic evaluation over one saturated recognition
+worklist while preserving its original one-use counter. -/
+private def executePhaseCValueWorklist?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) := do
+  let entered ← beginPhaseCValueWorklist? current
+  runPhaseCValueQueue? owned (chartGBound (tokens.length + 1)) entered
+
 private def phaseCEdgeMemberBool
     {file : WorkspaceFile} {tokens : List Token}
     (edges : List (StructurallyValidContextualPackedEdge file tokens))
