@@ -5,22 +5,6 @@ namespace Solcore.Surface.Multi
 
 open Grammar Solcore.Workspace
 
-/-- The local fact produced by inversion of a reached present optional: its
-first token is the level operator, and the optional consumes input. -/
-def NonAssociativeOptionalSomeOperatorProducer
-    (file : WorkspaceFile) (tokens : List Token)
-    (memo : GuardMemo tokens)
-    (correct : PhaseBCorrect file tokens memo)
-    (final : AllGuardsFinal memo) : Prop :=
-  ∀ (level : NonAssociativeLevel) (site : OptionalSite)
-      (item : ContextualItemKey tokens),
-    ContextualReach file tokens memo correct final item →
-    item.raw.production = .opt site .some →
-    site.site.expression = .optional level.tailExpr →
-    CompleteItem item.raw →
-    ∃ operator, FoundNonAssociativeOperatorAt file tokens item.raw.origin
-      level operator
-
 /-- A production whose auxiliary left-hand side is an optional grammar site
 is one of that site's two optional productions. -/
 theorem g10Production_optional_of_lhs
@@ -120,8 +104,6 @@ theorem g10NonAssociativeOptional_finished_eq
     {final : AllGuardsFinal memo}
     (exclusive : NonAssociativeOperandPrefixExclusive
       file tokens memo correct final)
-    (producer : NonAssociativeOptionalSomeOperatorProducer
-      file tokens memo correct final)
     (level : NonAssociativeLevel)
     (sequenceSite : SequenceSite) (firstSite secondSite : GrammarSite)
     (children : sequenceSite.children = [firstSite, secondSite])
@@ -173,7 +155,8 @@ theorem g10NonAssociativeOptional_finished_eq
       .optional level.tailExpr :=
     (congrArg GrammarSite.expression siteEq).trans secondShape
   obtain ⟨leftOperator, leftFound⟩ :=
-    producer level site leftFinished leftEdge.2.2.1
+    contextualReach_complete_nonAssociativeOptionalSome_operator level site
+      leftEdge.2.2.1
       leftProduction fixedShape leftWitness.complete
   have leftStrict :=
     contextualReach_complete_nonAssociativeOptionalSome_strict level site
@@ -213,7 +196,8 @@ theorem g10NonAssociativeOptional_finished_eq
       omega
   | some =>
       obtain ⟨rightOperator, rightFound⟩ :=
-        producer level site rightFinished rightEdge.2.2.1
+        contextualReach_complete_nonAssociativeOptionalSome_operator level site
+          rightEdge.2.2.1
           rightProduction fixedShape rightWitness.complete
       have foundAtRight : FoundNonAssociativeOperatorAt file tokens
           rightWaiting.raw.current level rightOperator := by
@@ -238,8 +222,6 @@ theorem g10CompletedValue_of_presentCompletionEdges_of_operandPrefixExclusive
     {file : WorkspaceFile} {tokens : List Token} {memo : GuardMemo tokens}
     {correct : PhaseBCorrect file tokens memo} {final : AllGuardsFinal memo}
     (exclusive : NonAssociativeOperandPrefixExclusive
-      file tokens memo correct final)
-    (producer : NonAssociativeOptionalSomeOperatorProducer
       file tokens memo correct final)
     {cursor : Boundary tokens} {level : NonAssociativeLevel}
     {origin : Boundary tokens} {context : GuardContext tokens}
@@ -313,7 +295,7 @@ theorem g10CompletedValue_of_presentCompletionEdges_of_operandPrefixExclusive
     exact g10CompletedEdge_finished_eq_of_coordinates edge rootReached
       sharedEq productionEq
   · intro waiting finished shared edge
-    exact g10NonAssociativeOptional_finished_eq exclusive producer level
+    exact g10NonAssociativeOptional_finished_eq exclusive level
       sequenceSite firstSite secondSite children shapes.1 shapes.2
       sequenceProduction rootWitness.complete optionalReached siteEq
       optionalProduction edge

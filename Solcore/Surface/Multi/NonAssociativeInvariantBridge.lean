@@ -32,17 +32,15 @@ def CoherentNonAssociativeCompletedHasPresentCompletion
           (.completed sequenceWaiting optional sequence optionalShared) ∧
         optional.raw.production = .opt site .some
 
-/-- Operand-prefix exclusion and the local present-optional producer replace
-global completion-backpointer uniqueness once coherent completed results are
-known to originate in a present optional. -/
+/-- Operand-prefix exclusion and local optional inversion replace global
+completion-backpointer uniqueness once coherent completed results are known
+to originate in a present optional. -/
 theorem coherentNonAssociativeRootCompletedInvariant_of_operandPrefixExclusive
     {file : WorkspaceFile} {tokens : List Token}
     {memo : GuardMemo tokens}
     {correct : PhaseBCorrect file tokens memo}
     {final : AllGuardsFinal memo}
     (exclusive : NonAssociativeOperandPrefixExclusive
-      file tokens memo correct final)
-    (producer : NonAssociativeOptionalSomeOperatorProducer
       file tokens memo correct final)
     (present : CoherentNonAssociativeCompletedHasPresentCompletion
       file tokens memo correct final) :
@@ -55,12 +53,12 @@ theorem coherentNonAssociativeRootCompletedInvariant_of_operandPrefixExclusive
       ⟨rootWaiting, sequence, rootShared, sequenceWaiting, optional,
         optionalShared, site, rootEdge, optionalEdge, optionalProduction⟩
     exact g10CompletedValue_of_presentCompletionEdges_of_operandPrefixExclusive
-      exclusive producer rightCoherent rootEdge optionalEdge optionalProduction
+      exclusive rightCoherent rootEdge optionalEdge optionalProduction
   · intro rightCompleted
     rcases present level origin cursor context right rightCoherent rightCompleted with
       ⟨rootWaiting, sequence, rootShared, sequenceWaiting, optional,
         optionalShared, site, rootEdge, optionalEdge, optionalProduction⟩
     exact g10CompletedValue_of_presentCompletionEdges_of_operandPrefixExclusive
-      exclusive producer leftCoherent rootEdge optionalEdge optionalProduction
+      exclusive leftCoherent rootEdge optionalEdge optionalProduction
 
 end Solcore.Surface.Multi
