@@ -37789,4 +37789,227 @@ private theorem attemptPhaseCRetainedCompletedEdges?_target_present
           (attemptPhaseCPackedCompletedEdge?_completionAttemptMaterialized owned
             source head current next materialized nextEq) restEq
 
+private theorem attemptPhaseCValuePredictions?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting target : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.prefixMemberBool target = true →
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        result.payload.frontier.prefixMemberBool target = true := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result present selected
+      cases selected
+      exact present
+  | cons predicted rest induction =>
+      intro current result present selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+          next waiting target predicted present nextEq) restEq
+
+private theorem attemptPhaseCPackedScannedEdge?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : current.payload.frontier.prefixMemberBool target = true)
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    result.payload.frontier.prefixMemberBool target = true := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact attemptPhaseCScannedEdge?_preserves_prefix_present owned source
+        target {
+          before := before
+          after := after
+          cursor := cursor
+          structural := structural
+        } current result present selected
+  | completed =>
+      cases selected
+      exact present
+
+private theorem attemptPhaseCRetainedScannedEdges?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.prefixMemberBool target = true →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        result.payload.frontier.prefixMemberBool target = true := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result present selected
+      cases selected
+      exact present
+  | cons packed rest induction =>
+      intro current result present selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCPackedScannedEdge?_preserves_prefix_present owned source
+          target packed current next present nextEq) restEq
+
+/-- Processing a semantic source never removes an existing prefix. -/
+private theorem processPhaseCValueItem?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : current.payload.frontier.prefixMemberBool target = true)
+    (selected : processPhaseCValueItem? owned source current = some result) :
+    result.payload.frontier.prefixMemberBool target = true := by
+  unfold processPhaseCValueItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  exact attemptPhaseCRetainedCompletedEdges?_preserves_prefix_present owned
+    source target _ scanned result
+      (attemptPhaseCRetainedScannedEdges?_preserves_prefix_present owned source
+        target _ predicted scanned
+          (attemptPhaseCValuePredictions?_preserves_prefix_present owned source
+            target allProductionIds current predicted present predictedEq)
+          scannedEq)
+      completedEq
+
+/-- One exact recognized prediction publishes its computed dot-zero target. -/
+private theorem attemptPhaseCValuePrediction?_target_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (item : ContextualItemKey tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (computed : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance))
+    (recognized : phaseCItemMemberBool
+      current.payload.recognition.phaseC.contextualItems item = true)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    result.payload.frontier.prefixMemberBool item = true := by
+  unfold attemptPhaseCValuePrediction? at selected
+  rw [computed] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨attempted, attemptedEq, remainder⟩
+  have attemptedPayload := runMappedPrimitive?_payload current _ id attemptedEq
+  have attemptedRecognized : phaseCItemMemberBool
+      attempted.payload.recognition.phaseC.contextualItems item = true := by
+    rw [attemptedPayload]
+    exact recognized
+  rw [if_pos attemptedRecognized] at remainder
+  have atZero :=
+    (contextualPredictedItem?_valueShape waiting item predicted
+      productionInstance computed).2.1
+  rw [dif_pos atZero] at remainder
+  simp only [Option.bind_eq_some_iff] at remainder
+  rcases remainder with ⟨candidate, candidateEq, actioned, actionedEq,
+    publishedEq⟩
+  have actionedPayload := chargePhaseCCompletedCandidate?_exact attempted
+    actioned _ candidate actionedEq
+  have published :=
+    (publishPhaseCValueCandidate?_exact actioned result item candidate
+      publishedEq).2
+  rw [attemptedPayload] at candidateEq
+  rw [actionedPayload, attemptedPayload] at published
+  rw [published]
+  exact insertCandidate?_published_item_present owned current.payload.frontier
+    item _ candidate candidateEq
+
+/-- A prediction target whose production occurs in the finite table is
+present after the whole prediction fold. -/
+private theorem attemptPhaseCValuePredictions?_target_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens)
+    (predicted : ProductionId)
+    (item : ContextualItemKey tokens)
+    (productionInstance : ProductionInstanceKey tokens)
+    (computed : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance)) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      predicted ∈ productions →
+      phaseCItemMemberBool
+        current.payload.recognition.phaseC.contextualItems item = true →
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        result.payload.frontier.prefixMemberBool item = true := by
+  intro productions
+  induction productions with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result member recognized selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      rw [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact attemptPhaseCValuePredictions?_preserves_prefix_present owned
+          waiting item rest next result
+            (attemptPhaseCValuePrediction?_target_present owned current next
+              waiting predicted item productionInstance computed recognized
+                nextEq) restEq
+      · have recognitionEq :=
+          (attemptPhaseCValuePrediction?_exact owned current next waiting head
+            nextEq).1
+        have nextRecognized : phaseCItemMemberBool
+            next.payload.recognition.phaseC.contextualItems item = true := by
+          rw [recognitionEq]
+          exact recognized
+        exact induction next result member nextRecognized restEq
+
+/-- A retained scan at the exact dequeued source is present after its fold. -/
+private theorem attemptPhaseCRetainedScannedEdges?_target_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (sameSource : edge.before = source) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      (⟨.scanned edge.before edge.after edge.cursor, edge.structural⟩ :
+        StructurallyValidContextualPackedEdge file tokens) ∈ edges →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        result.payload.frontier.prefixMemberBool edge.after = true := by
+  intro edges
+  induction edges with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result member selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      rw [List.mem_cons] at member
+      rcases member with same | member
+      · subst head
+        have edgeEq : attemptPhaseCScannedEdge? owned source edge current =
+            some next := by
+          simpa [attemptPhaseCPackedScannedEdge?] using nextEq
+        exact attemptPhaseCRetainedScannedEdges?_preserves_prefix_present owned
+          source edge.after rest next result
+            (attemptPhaseCScannedEdge?_target_present owned source edge current
+              next sameSource edgeEq) restEq
+      · exact induction next result member restEq
+
 end Solcore.Surface.Multi.Chart
