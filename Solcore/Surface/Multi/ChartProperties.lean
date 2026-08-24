@@ -4806,6 +4806,203 @@ theorem executeLetStatementRoot_reduces
   rw [resultEq, ← inputEq, ← bindingEq, ← semicolonEq]
   exact .letStatement origin finish binding semicolon witness
 
+/-- The let-binding executor realizes its exact root reduction. -/
+theorem executeLetBindingRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .letBinding origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .letBinding)) :
+    RuleReduction file tokens .letBinding origin finish input
+      (executeLetBindingRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let letAtom : EbnfExpr := .atom (.terminal (.hardKeyword .letKw))
+  let nameAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let typeSeq : EbnfExpr := .sequence [colonAtom, .optional comptimeAtom,
+    typeAtom]
+  let equalAtom : EbnfExpr := .atom (.terminal (.symbol .equal))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let initSeq : EbnfExpr := .sequence [equalAtom, expressionAtom]
+  let children := [letAtom, nameAtom, .optional typeSeq, .optional initSeq]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize rootEq : EbnfValue.sequenceFlatView children input = root
+  rcases root with ⟨rawLet, rawName, rawType, rawInit, ⟨⟩⟩
+  let keyword := EbnfValue.terminalView (.hardKeyword .letKw) rawLet
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let decodeInit (raw : EbnfValue file tokens initSeq) :=
+    let values := EbnfValue.sequenceFlatView
+      [equalAtom, expressionAtom] raw
+    (EbnfValue.terminalView (.symbol .equal) values.1,
+      EbnfValue.ruleView .expression values.2.1)
+  let encodeInit (value : MatchedTerminal file tokens (.symbol .equal) ×
+      Expression) : EbnfValue file tokens initSeq :=
+    EbnfValue.sequence [equalAtom, expressionAtom]
+      (EbnfValue.sequenceValuesBuild [equalAtom, expressionAtom]
+        (EbnfValue.terminalAtom (.symbol .equal) value.1,
+          EbnfValue.ruleAtom .expression value.2, ()))
+  have initRoundtrip : ∀ raw, encodeInit (decodeInit raw) = raw := by
+    intro raw
+    generalize initEq : EbnfValue.sequenceFlatView
+      [equalAtom, expressionAtom] raw = pair
+    rcases pair with ⟨rawEqual, rawExpression, ⟨⟩⟩
+    simp only [decodeInit, encodeInit, initEq]
+    rw [EbnfValue.terminal_of_view (.symbol .equal) rawEqual,
+      EbnfValue.rule_of_view .expression rawExpression]
+    have rebuild := EbnfValue.sequence_of_flat_view
+      [equalAtom, expressionAtom] raw
+    rw [initEq] at rebuild
+    exact rebuild
+  let initializer := (EbnfValue.optionalView initSeq rawInit).map decodeInit
+  have initializerEq : EbnfValue.optional initSeq
+      (initializer.map encodeInit) = rawInit := by
+    calc
+      _ = EbnfValue.optional initSeq
+          ((EbnfValue.optionalView initSeq rawInit).map decodeInit |>.map
+            encodeInit) := by rfl
+      _ = EbnfValue.optional initSeq
+          (EbnfValue.optionalView initSeq rawInit) := by
+            cases selected : EbnfValue.optionalView initSeq rawInit with
+            | none => rfl
+            | some raw =>
+                change EbnfValue.optional initSeq
+                  (some (encodeInit (decodeInit raw))) =
+                    EbnfValue.optional initSeq (some raw)
+                rw [initRoundtrip raw]
+      _ = rawInit := EbnfValue.optional_of_view initSeq rawInit
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  generalize typeEq : EbnfValue.optionalView typeSeq rawType = typeViewed
+  cases typeViewed with
+  | none =>
+      have typeRebuild := EbnfValue.optional_of_view typeSeq rawType
+      rw [typeEq] at typeRebuild
+      have normalizedRootEq := rootEq
+      simp only [children, letAtom, nameAtom, typeSeq, colonAtom,
+        comptimeAtom, typeAtom, initSeq, equalAtom, expressionAtom] at normalizedRootEq
+      have normalizedTypeEq := typeEq
+      simp only [typeSeq, colonAtom, comptimeAtom, typeAtom] at normalizedTypeEq
+      have resultEq : executeLetBindingRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness {
+            comptime := none
+            name := executableTerminalLoc name name.identifierProjection.2
+            type := none
+            initializer := initializer.map Prod.snd
+          } := by
+        simp [executeLetBindingRoot, normalizedRootEq, normalizedTypeEq,
+          initializer, decodeInit, witness, name]
+        rfl
+      rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+        rootEq,
+        ← EbnfValue.terminal_of_view (.hardKeyword .letKw) rawLet,
+        ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+        ← typeRebuild, ← initializerEq]
+      exact .letBindingUntyped origin finish keyword name
+        name.identifierProjection.1 name.identifierProjection.2
+        name.identifierProjection_projects initializer witness
+  | some rawTypeSeq =>
+      have typeRebuild := EbnfValue.optional_of_view typeSeq rawType
+      rw [typeEq] at typeRebuild
+      generalize sequenceEq : EbnfValue.sequenceFlatView
+        [colonAtom, .optional comptimeAtom, typeAtom] rawTypeSeq = values
+      rcases values with ⟨rawColon, rawComptimeOpt, rawTypeValue, ⟨⟩⟩
+      let colon := EbnfValue.terminalView (.symbol .colon) rawColon
+      let typeValue := EbnfValue.ruleView .type rawTypeValue
+      generalize comptimeEq : EbnfValue.optionalView comptimeAtom
+        rawComptimeOpt = viewed
+      cases viewed with
+      | none =>
+          have comptimeRebuild :=
+            EbnfValue.optional_of_view comptimeAtom rawComptimeOpt
+          rw [comptimeEq] at comptimeRebuild
+          have normalizedRootEq := rootEq
+          simp only [children, letAtom, nameAtom, typeSeq, colonAtom,
+            comptimeAtom, typeAtom, initSeq, equalAtom, expressionAtom] at normalizedRootEq
+          have normalizedTypeEq := typeEq
+          simp only [typeSeq, colonAtom, comptimeAtom, typeAtom] at normalizedTypeEq
+          have normalizedSequenceEq := sequenceEq
+          simp only [colonAtom, comptimeAtom, typeAtom] at normalizedSequenceEq
+          have normalizedComptimeEq := comptimeEq
+          simp only [comptimeAtom] at normalizedComptimeEq
+          have resultEq : executeLetBindingRoot file tokens origin finish
+              ready.1 ready.2.1 input = sourceLoc witness {
+                comptime := none
+                name := executableTerminalLoc name
+                  name.identifierProjection.2
+                type := some typeValue
+                initializer := initializer.map Prod.snd
+              } := by
+            simp [executeLetBindingRoot, normalizedRootEq,
+              normalizedTypeEq, normalizedSequenceEq,
+              normalizedComptimeEq, initializer, decodeInit, witness,
+              name, typeValue]
+            rfl
+          rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+            rootEq,
+            ← EbnfValue.terminal_of_view (.hardKeyword .letKw) rawLet,
+            ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+            ← typeRebuild,
+            ← EbnfValue.sequence_of_flat_view
+              [colonAtom, .optional comptimeAtom, typeAtom] rawTypeSeq,
+            sequenceEq,
+            ← EbnfValue.terminal_of_view (.symbol .colon) rawColon,
+            ← comptimeRebuild,
+            ← EbnfValue.rule_of_view .type rawTypeValue,
+            ← initializerEq]
+          exact .letBindingTyped origin finish keyword name
+            name.identifierProjection.1 name.identifierProjection.2
+            name.identifierProjection_projects colon typeValue initializer
+            witness
+      | some rawComptime =>
+          have comptimeRebuild :=
+            EbnfValue.optional_of_view comptimeAtom rawComptimeOpt
+          rw [comptimeEq] at comptimeRebuild
+          let comptime := EbnfValue.terminalView
+            (.contextualKeyword .comptimeKw) rawComptime
+          have normalizedRootEq := rootEq
+          simp only [children, letAtom, nameAtom, typeSeq, colonAtom,
+            comptimeAtom, typeAtom, initSeq, equalAtom, expressionAtom] at normalizedRootEq
+          have normalizedTypeEq := typeEq
+          simp only [typeSeq, colonAtom, comptimeAtom, typeAtom] at normalizedTypeEq
+          have normalizedSequenceEq := sequenceEq
+          simp only [colonAtom, comptimeAtom, typeAtom] at normalizedSequenceEq
+          have normalizedComptimeEq := comptimeEq
+          simp only [comptimeAtom] at normalizedComptimeEq
+          have resultEq : executeLetBindingRoot file tokens origin finish
+              ready.1 ready.2.1 input = sourceLoc witness {
+                comptime := some (executableTerminalLoc
+                  comptime .comptimeModifier)
+                name := executableTerminalLoc name
+                  name.identifierProjection.2
+                type := some typeValue
+                initializer := initializer.map Prod.snd
+              } := by
+            simp [executeLetBindingRoot, normalizedRootEq,
+              normalizedTypeEq, normalizedSequenceEq,
+              normalizedComptimeEq, initializer, decodeInit, witness,
+              name, typeValue, comptime]
+            rfl
+          rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+            rootEq,
+            ← EbnfValue.terminal_of_view (.hardKeyword .letKw) rawLet,
+            ← EbnfValue.terminal_of_view (.category .identifier) rawName,
+            ← typeRebuild,
+            ← EbnfValue.sequence_of_flat_view
+              [colonAtom, .optional comptimeAtom, typeAtom] rawTypeSeq,
+            sequenceEq,
+            ← EbnfValue.terminal_of_view (.symbol .colon) rawColon,
+            ← comptimeRebuild,
+            ← EbnfValue.terminal_of_view
+              (.contextualKeyword .comptimeKw) rawComptime,
+            ← EbnfValue.rule_of_view .type rawTypeValue,
+            ← initializerEq]
+          exact .letBindingComptime origin finish keyword name
+            name.identifierProjection.1 name.identifierProjection.2
+            name.identifierProjection_projects colon comptime typeValue
+            initializer witness
+
 /-- The break-statement executor realizes its exact root reduction. -/
 theorem executeBreakStatementRoot_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -10358,6 +10555,8 @@ theorem executeRootRule_reduces
       exact executeClassMethodRoot_reduces origin finish ready input
   | letStatement =>
       exact executeLetStatementRoot_reduces origin finish ready input
+  | letBinding =>
+      exact executeLetBindingRoot_reduces origin finish ready input
   | breakStatement =>
       exact executeBreakStatementRoot_reduces origin finish ready input
   | continueStatement =>
