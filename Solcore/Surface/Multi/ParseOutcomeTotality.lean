@@ -698,6 +698,46 @@ theorem executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_
     executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
       file tokens owned result.recognition recognitionSelected
 
+/-- The value-carrying executor needs only reached match-arm readiness and
+the reduced two-table rank certificate. -/
+theorem executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result.recognition recognitionSelected
+    (∀ waiting : ContextualItemKey tokens,
+      ContextualReach file tokens result.recognition.memo correct final waiting →
+        MatchArmPairContextReadyAt waiting) →
+    ∀ potential : FrontierGrammarPotential tokens,
+      rootlessRankCertificateBool owned correct final potential = true →
+      RootlessExecutableProgress
+        file tokens result.recognition.memo correct final := by
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  change (∀ waiting : ContextualItemKey tokens,
+      ContextualReach file tokens result.recognition.memo correct final waiting →
+        MatchArmPairContextReadyAt waiting) →
+    ∀ potential : FrontierGrammarPotential tokens,
+      rootlessRankCertificateBool owned correct final potential = true →
+      RootlessExecutableProgress
+        file tokens result.recognition.memo correct final
+  exact
+    executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
+      file tokens owned result.recognition recognitionSelected
+
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
@@ -832,6 +872,41 @@ def executeObservedContextualParseOfFrontierCertificate
     (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
       file tokens owned result selected potential accepted)
 
+/-- Executable parse outcome driven by reached match-arm readiness and the
+reduced two-table rank certificate. -/
+def executeObservedContextualParseOfRankCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted : executeObservedContextualRankCertificateBool
+      file tokens owned potential = true) :
+    Except ParseDiagnostic ParsedModuleV1 :=
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  executeObservedContextualParseOfProgress file tokens owned
+    (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
+      file tokens owned result selected ready potential accepted)
+
 /-- The certificate-driven executable outcome is exactly the value selected
 by the option-based implementation. -/
 theorem executeObservedContextualParseOfProgress_selected
@@ -890,6 +965,44 @@ theorem executeObservedContextualParseOfFrontierCertificate_selected
         (Chart.executeObservedContextualValueWorklistMulti_selected
           file tokens owned)
         potential accepted)
+
+/-- The two-table entry point selects exactly the implementation's option
+result. -/
+theorem executeObservedContextualParseOfRankCertificate_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted : executeObservedContextualRankCertificateBool
+      file tokens owned potential = true) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    result.parseOutcome? file =
+      some (executeObservedContextualParseOfRankCertificate
+        file tokens owned ready potential accepted) := by
+  exact executeObservedContextualParseOfProgress_selected file tokens owned
+    (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
+      file tokens owned
+        (Chart.executeObservedContextualValueWorklistMulti file tokens owned)
+        (Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned)
+        ready potential accepted)
 
 /-- The certificate-driven executable result is declaratively sound: modules
 parse, and diagnostics apply to the supplied source. -/
@@ -990,6 +1103,61 @@ theorem executeObservedContextualParseOfFrontierCertificate_sound
         (Chart.executeObservedContextualValueWorklistMulti_selected
           file tokens owned)
         potential accepted)
+    invariant
+
+/-- The two-table entry point inherits declarative soundness from the
+proof-driven total executor. -/
+theorem executeObservedContextualParseOfRankCertificate_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted : executeObservedContextualRankCertificateBool
+      file tokens owned potential = true)
+    (invariant :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      CoherentNonAssociativeRootCompletedInvariant
+        file tokens result.recognition.memo correct final) :
+    match executeObservedContextualParseOfRankCertificate
+        file tokens owned ready potential accepted with
+    | .ok module => Parses file tokens module
+    | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
+  unfold executeObservedContextualParseOfRankCertificate
+  exact executeObservedContextualParseOfProgress_sound file tokens owned
+    (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
+      file tokens owned
+        (Chart.executeObservedContextualValueWorklistMulti file tokens owned)
+        (Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned)
+        ready potential accepted)
     invariant
 
 end Solcore.Surface.Multi
