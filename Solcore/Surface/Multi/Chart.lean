@@ -12697,6 +12697,270 @@ private theorem chargePhaseCCompletedCandidate?_preserves_fresh
       rw [runMappedPrimitive?_usedRev current completeAction id result selected]
       simp only [List.mem_cons, not_or]
       exact ⟨notAction, fresh⟩
+/-- One semantic prediction attempt succeeds from fresh R02/L09/L13
+addresses. The L09/L13 premises are needed only when the builder selects its
+generated item; stating them conditionally keeps the theorem exact. -/
+private theorem attemptPhaseCValuePrediction?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (attemptFresh : (.prediction .R02_frontierPrediction
+      (contextualPredictionKey waiting predicted) : UnitAddress tokens) ∉
+        current.counter.usedRev)
+    (candidateFresh : ∀ item productionInstance,
+      contextualPredictedItem? waiting predicted =
+          some (item, productionInstance) →
+        (.linear .L09_frontierInsert (contextualLinearKey item) :
+            UnitAddress tokens) ∉ current.counter.usedRev ∧
+        (.linear .L13_epsilonAction (contextualLinearKey item) :
+            UnitAddress tokens) ∉ current.counter.usedRev) :
+    ∃ result, attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result := by
+  unfold attemptPhaseCValuePrediction?
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none => exact ⟨current, rfl⟩
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      let attempted : CountedState tokens (PhaseCValueWorklist file tokens) := {
+        payload := current.payload
+        counter := current.counter.charge
+          (.prediction .R02_frontierPrediction
+            (contextualPredictionKey waiting predicted)) attemptFresh
+      }
+      have attemptedEq : runMappedPrimitive? current
+          (.prediction .R02_frontierPrediction
+            (contextualPredictionKey waiting predicted)) id =
+            some attempted := by
+        simp [runMappedPrimitive?, attemptFresh, attempted]
+      rw [attemptedEq]
+      simp only [Option.bind_eq_bind, Option.bind_some]
+      have shape := contextualPredictedItem?_valueShape waiting item
+        predicted productionInstance predictedEq
+      by_cases recognized : phaseCItemMemberBool
+          attempted.payload.recognition.phaseC.contextualItems item = true
+      · rw [if_pos recognized, dif_pos shape.2.1]
+        let prior : ContextualPrefixValue file tokens item :=
+          ContextualPrefixValue.zero item shape.2.1
+        obtain ⟨candidate, candidateEq⟩ :=
+          insertCandidate?_total_atZero owned attempted.payload.frontier item
+            prior shape.2.1 (shape.2.2.1.trans shape.2.2.2.symm)
+        rw [candidateEq]
+        simp only [Option.bind_some]
+        have fresh := candidateFresh item productionInstance predictedEq
+        have insertFresh : (.linear .L09_frontierInsert
+            (contextualLinearKey item) : UnitAddress tokens) ∉
+              attempted.counter.usedRev := by
+          simp [attempted, Counter.charge, fresh.1]
+        have epsilonFresh : (.linear .L13_epsilonAction
+            (contextualLinearKey item) : UnitAddress tokens) ∉
+              attempted.counter.usedRev := by
+          simp [attempted, Counter.charge, fresh.2]
+        obtain ⟨actioned, actionedEq⟩ :=
+          chargePhaseCCompletedCandidate?_total attempted
+            (.linear .L13_epsilonAction (contextualLinearKey item)) candidate
+              epsilonFresh
+        have insertFreshActioned : (.linear .L09_frontierInsert
+            (contextualLinearKey item) : UnitAddress tokens) ∉
+              actioned.counter.usedRev := by
+          unfold chargePhaseCCompletedCandidate? at actionedEq
+          cases candidateKind : candidate.kind with
+          | duplicate =>
+              simp only [candidateKind, Option.some.injEq] at actionedEq
+              cases actionedEq
+              exact insertFresh
+          | insertedIncomplete =>
+              simp only [candidateKind, Option.some.injEq] at actionedEq
+              cases actionedEq
+              exact insertFresh
+          | insertedComplete =>
+              simp only [candidateKind] at actionedEq
+              rw [runMappedPrimitive?_usedRev attempted _ id actioned
+                actionedEq]
+              simp [insertFresh]
+        rw [actionedEq]
+        exact publishPhaseCValueCandidate?_total actioned item candidate
+          insertFreshActioned
+      · rw [if_neg recognized]
+        exact ⟨attempted, rfl⟩
+
+/-- One semantic prediction attempt preserves every address outside its exact
+R02/L09/L13 footprint. -/
+private theorem attemptPhaseCValuePrediction?_preserves_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (target : UnitAddress tokens)
+    (notAttempt : target ≠
+      (.prediction .R02_frontierPrediction
+        (contextualPredictionKey waiting predicted) : UnitAddress tokens))
+    (notCandidate : ∀ item productionInstance,
+      contextualPredictedItem? waiting predicted =
+          some (item, productionInstance) →
+        target ≠ (.linear .L09_frontierInsert
+          (contextualLinearKey item) : UnitAddress tokens) ∧
+        target ≠ (.linear .L13_epsilonAction
+          (contextualLinearKey item) : UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    target ∉ result.counter.usedRev := by
+  unfold attemptPhaseCValuePrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact fresh
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+      have attemptedFresh : target ∉ attempted.counter.usedRev := by
+        rw [runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+        simp only [List.mem_cons, not_or]
+        exact ⟨notAttempt, fresh⟩
+      split at remainderEq
+      next recognized =>
+        split at remainderEq
+        next atZero =>
+          cases candidateEq : ContextualValueFrontierState.insertCandidate?
+              owned attempted.payload.frontier item
+                (ContextualPrefixValue.zero item atZero) with
+          | none => simp [candidateEq] at remainderEq
+          | some candidate =>
+              rw [candidateEq] at remainderEq
+              simp only [Option.bind_some] at remainderEq
+              cases actionedEq : chargePhaseCCompletedCandidate? attempted
+                  (.linear .L13_epsilonAction (contextualLinearKey item))
+                    candidate with
+              | none => simp [actionedEq] at remainderEq
+              | some actioned =>
+                  rw [actionedEq] at remainderEq
+                  have distinct := notCandidate item productionInstance
+                    predictedEq
+                  apply publishPhaseCValueCandidate?_preserves_fresh actioned
+                    result item candidate target distinct.1 _ remainderEq
+                  exact chargePhaseCCompletedCandidate?_preserves_fresh
+                    attempted actioned _ target candidate distinct.2
+                      attemptedFresh actionedEq
+        next notZero => contradiction
+      next notRecognized =>
+        cases remainderEq
+        exact attemptedFresh
+
+/-- Folding over a duplicate-free production list is total when every exact
+R02 address and every builder-selected L09/L13 address starts fresh. -/
+private theorem attemptPhaseCValuePredictions?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current : CountedState tokens (PhaseCValueWorklist file tokens)),
+      productions.Nodup →
+      (∀ predicted, predicted ∈ productions →
+        (.prediction .R02_frontierPrediction
+          (contextualPredictionKey waiting predicted) : UnitAddress tokens) ∉
+            current.counter.usedRev) →
+      (∀ predicted, predicted ∈ productions →
+        ∀ item productionInstance,
+          contextualPredictedItem? waiting predicted =
+              some (item, productionInstance) →
+            (.linear .L09_frontierInsert (contextualLinearKey item) :
+                UnitAddress tokens) ∉ current.counter.usedRev ∧
+            (.linear .L13_epsilonAction (contextualLinearKey item) :
+                UnitAddress tokens) ∉ current.counter.usedRev) →
+      ∃ result, attemptPhaseCValuePredictions? owned waiting productions
+        current = some result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current _unique _attemptFresh _candidateFresh
+      exact ⟨current, rfl⟩
+  | cons head rest induction =>
+      intro current unique attemptFresh candidateFresh
+      rw [List.nodup_cons] at unique
+      obtain ⟨next, nextEq⟩ := attemptPhaseCValuePrediction?_total owned
+        current waiting head (attemptFresh head (by simp))
+          (candidateFresh head (by simp))
+      have restAttemptFresh : ∀ predicted, predicted ∈ rest →
+          (.prediction .R02_frontierPrediction
+            (contextualPredictionKey waiting predicted) : UnitAddress tokens) ∉
+              next.counter.usedRev := by
+        intro predicted member
+        apply attemptPhaseCValuePrediction?_preserves_fresh owned current next
+          waiting head _ _ _
+          (attemptFresh predicted (by simp [member])) nextEq
+        · intro equal
+          simp only [UnitAddress.prediction.injEq] at equal
+          have productionEqual := congrArg ChartPredictionKey.production
+            equal.2
+          change predicted = head at productionEqual
+          exact unique.1 (productionEqual ▸ member)
+        · intro item productionInstance selected
+          constructor <;> simp
+      have restCandidateFresh : ∀ predicted, predicted ∈ rest →
+          ∀ item productionInstance,
+            contextualPredictedItem? waiting predicted =
+                some (item, productionInstance) →
+              (.linear .L09_frontierInsert (contextualLinearKey item) :
+                  UnitAddress tokens) ∉ next.counter.usedRev ∧
+              (.linear .L13_epsilonAction (contextualLinearKey item) :
+                  UnitAddress tokens) ∉ next.counter.usedRev := by
+        intro predicted member item productionInstance selected
+        have different : predicted ≠ head := by
+          intro equal
+          exact unique.1 (equal ▸ member)
+        have initial := candidateFresh predicted (by simp [member]) item
+          productionInstance selected
+        constructor
+        · apply attemptPhaseCValuePrediction?_preserves_fresh owned current
+            next waiting head _ (by simp) _ initial.1 nextEq
+          intro headItem headInstance headSelected
+          exact ⟨contextualPredictedItem?_linearAddress_ne waiting predicted
+            head item headItem productionInstance headInstance
+              .L09_frontierInsert different selected headSelected, by simp⟩
+        · apply attemptPhaseCValuePrediction?_preserves_fresh owned current
+            next waiting head _ (by simp) _ initial.2 nextEq
+          intro headItem headInstance headSelected
+          exact ⟨by simp,
+            contextualPredictedItem?_linearAddress_ne waiting predicted head
+              item headItem productionInstance headInstance
+                .L13_epsilonAction different selected headSelected⟩
+      obtain ⟨result, restEq⟩ := induction next unique.2
+        restAttemptFresh restCandidateFresh
+      exact ⟨result, by
+        simp [attemptPhaseCValuePredictions?, nextEq, restEq]⟩
+
+/-- Folding successful semantic predictions preserves recognition exactly. -/
+private theorem attemptPhaseCValuePredictions?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        result.payload.recognition = current.payload.recognition := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      simp only [attemptPhaseCValuePredictions?, Option.some.injEq] at selected
+      cases selected
+      rfl
+  | cons predicted rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (induction next result restEq).trans
+        (attemptPhaseCValuePrediction?_exact owned current next waiting
+          predicted nextEq).1
+
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
