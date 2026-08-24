@@ -12769,6 +12769,252 @@ theorem dequeue?_wellFormed
       exact queueSubset candidate
         (queueEq.symm ▸ List.mem_cons_of_mem _ member)
 
+private instance completeItemDecidable
+    {tokens : List Token} (item : DottedItem tokens) :
+    Decidable (CompleteItem item) := by
+  unfold CompleteItem
+  infer_instance
+
+/-- Strong persistent form of the requested queue invariant. -/
+def CompletePrefixesReduced
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) : Prop :=
+  ∀ item, item ∈ state.prefixKeys → CompleteItem item.raw →
+    item ∈ state.reductionKeys
+
+/-- The executable semantic frontier invariant. -/
+def ExecutableWellFormed
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens) : Prop :=
+  state.WellFormed ∧ CompletePrefixesReduced state
+
+/-- The persistent invariant implies the exact requested queue condition. -/
+theorem queued_complete_has_reduction
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (wellFormed : ExecutableWellFormed state)
+    (item : ContextualItemKey tokens)
+    (queued : item ∈ state.queue)
+    (complete : CompleteItem item.raw) :
+    item ∈ state.reductionKeys := by
+  exact wellFormed.2 item (wellFormed.1.2.2.2.1 item queued) complete
+@[simp] theorem empty_executableWellFormed
+    (file : WorkspaceFile) (tokens : List Token) :
+    ExecutableWellFormed
+      (ContextualValueFrontierState.empty file tokens) := by
+  constructor
+  · exact ContextualValueFrontierState.empty_wellFormed file tokens
+  · intro item member _complete
+    simp [ContextualValueFrontierState.prefixKeys,
+      ContextualValueFrontierState.empty] at member
+
+private theorem insertPrefix_prefixKeys_of_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (absent : state.prefixMemberBool item = false) :
+    (state.insertPrefix item prior).prefixKeys =
+      state.prefixKeys ++ [item] := by
+  simp [ContextualValueFrontierState.prefixKeys,
+    ContextualValueFrontierState.insertPrefix, absent]
+
+private theorem insertPrefix_reductionKeys_of_absent
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (absent : state.prefixMemberBool item = false) :
+    (state.insertPrefix item prior).reductionKeys = state.reductionKeys := by
+  simp [ContextualValueFrontierState.reductionKeys,
+    ContextualValueFrontierState.insertPrefix, absent]
+
+private theorem insertReduction_prefixKeys
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualReductionValue file tokens item) :
+    (state.insertReduction item value).prefixKeys = state.prefixKeys := by
+  by_cases present : state.reductionMemberBool item = true
+  · rw [ContextualValueFrontierState.insertReduction_of_present
+      state item value present]
+  · have absent : state.reductionMemberBool item = false := by
+      cases equal : state.reductionMemberBool item <;> simp_all
+    simp [ContextualValueFrontierState.prefixKeys,
+      ContextualValueFrontierState.insertReduction, absent]
+
+private theorem insertReduction_contains
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualReductionValue file tokens item) :
+    item ∈ (state.insertReduction item value).reductionKeys := by
+  by_cases present : state.reductionMemberBool item = true
+  · rw [ContextualValueFrontierState.insertReduction_of_present
+      state item value present]
+    exact (ContextualValueFrontierState.reductionMemberBool_eq_true_iff
+      state item).mp present
+  · have absent : state.reductionMemberBool item = false := by
+      cases equal : state.reductionMemberBool item <;> simp_all
+    simp [ContextualValueFrontierState.reductionKeys,
+      ContextualValueFrontierState.insertReduction, absent]
+
+private theorem insertReduction_retains
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualReductionValue file tokens item)
+    (candidate : ContextualItemKey tokens)
+    (member : candidate ∈ state.reductionKeys) :
+    candidate ∈ (state.insertReduction item value).reductionKeys := by
+  by_cases present : state.reductionMemberBool item = true
+  · rw [ContextualValueFrontierState.insertReduction_of_present
+      state item value present]
+    exact member
+  · have absent : state.reductionMemberBool item = false := by
+      cases equal : state.reductionMemberBool item <;> simp_all
+    simp only [ContextualValueFrontierState.reductionKeys,
+      ContextualValueFrontierState.insertReduction, absent,
+      Bool.false_eq_true, ↓reduceIte, List.map_append, List.map_cons,
+      List.map_nil, List.mem_append]
+    exact Or.inl member
+
+private theorem prefix_present_after_fresh_insert
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (absent : state.prefixMemberBool item = false) :
+    (state.insertPrefix item prior).prefixMemberBool item = true := by
+  rw [ContextualValueFrontierState.prefixMemberBool_eq_true_iff]
+  simp [ContextualValueFrontierState.prefixKeys,
+    ContextualValueFrontierState.insertPrefix, absent]
+
+private theorem completePrefixesReduced_insertPrefix_incomplete
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (reduced : CompletePrefixesReduced state)
+    (absent : state.prefixMemberBool item = false)
+    (incomplete : ¬ CompleteItem item.raw) :
+    CompletePrefixesReduced (state.insertPrefix item prior) := by
+  intro candidate member complete
+  rw [insertPrefix_prefixKeys_of_absent state item prior absent] at member
+  rw [insertPrefix_reductionKeys_of_absent state item prior absent]
+  rw [List.mem_append] at member
+  rcases member with old | equal
+  · exact reduced candidate old complete
+  · have candidateEq : candidate = item := by simpa using equal
+    subst candidate
+    exact False.elim (incomplete complete)
+
+private theorem completePrefixesReduced_insertReduction
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualReductionValue file tokens item)
+    (reduced : CompletePrefixesReduced state) :
+    CompletePrefixesReduced (state.insertReduction item value) := by
+  intro candidate member complete
+  rw [insertReduction_prefixKeys state item value] at member
+  exact insertReduction_retains state item value candidate
+    (reduced candidate member complete)
+
+private theorem completePrefixesReduced_insertComplete
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (value : ContextualReductionValue file tokens item)
+    (reduced : CompletePrefixesReduced state)
+    (absent : state.prefixMemberBool item = false) :
+    CompletePrefixesReduced
+      ((state.insertPrefix item prior).insertReduction item value) := by
+  let withPrefix := state.insertPrefix item prior
+  intro candidate member complete
+  rw [insertReduction_prefixKeys withPrefix item value] at member
+  rw [insertPrefix_prefixKeys_of_absent state item prior absent] at member
+  rw [List.mem_append] at member
+  rcases member with old | new
+  · have oldReduction : candidate ∈ state.reductionKeys :=
+      reduced candidate old complete
+    have retainedByPrefix : candidate ∈ withPrefix.reductionKeys := by
+      rw [insertPrefix_reductionKeys_of_absent state item prior absent]
+      exact oldReduction
+    exact insertReduction_retains withPrefix item value candidate
+      retainedByPrefix
+  · have candidateEq : candidate = item := by simpa using new
+    subst candidate
+    exact insertReduction_contains withPrefix item value
+
+/-- The pure helper preserves both key discipline and complete-value
+availability in all success branches, including the duplicate no-op. -/
+theorem insertCandidate?_preserves
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (before : ExecutableWellFormed state)
+    (result : CandidateInsertResult file tokens)
+    (selected : insertCandidate? owned state item prior = some result) :
+    ExecutableWellFormed result.state := by
+  by_cases present : state.prefixMemberBool item = true
+  · simp [insertCandidate?, present] at selected
+    subst result
+    exact before
+  · have absent : state.prefixMemberBool item = false := by
+      cases equal : state.prefixMemberBool item <;> simp_all
+    by_cases complete : CompleteItem item.raw
+    · cases reductionEq : ContextualReductionValue.reduce? owned item prior with
+      | none =>
+          simp [insertCandidate?, absent, complete, reductionEq] at selected
+      | some reduction =>
+          have resultEq :
+              ({ kind := CandidateInsertKind.insertedComplete
+                 state := (state.insertPrefix item prior).insertReduction
+                   item reduction } : CandidateInsertResult file tokens) =
+                result := by
+            exact Option.some.inj (by
+              simpa [insertCandidate?, absent, complete, reductionEq]
+                using selected)
+          subst result
+          constructor
+          · apply ContextualValueFrontierState.insertReduction_wellFormed
+            · exact ContextualValueFrontierState.insertPrefix_wellFormed
+                state item prior before.1
+            · exact prefix_present_after_fresh_insert state item prior absent
+          · exact completePrefixesReduced_insertComplete state item prior
+              reduction before.2 absent
+    · simp [insertCandidate?, present, complete] at selected
+      subst result
+      exact ⟨ContextualValueFrontierState.insertPrefix_wellFormed
+          state item prior before.1,
+        completePrefixesReduced_insertPrefix_incomplete state item prior
+          before.2 absent complete⟩
+
+/-- Queue consumption keeps the persistent reduction availability needed by
+later completion traversals. -/
+theorem dequeue?_preserves
+    {file : WorkspaceFile} {tokens : List Token}
+    (state next : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (before : ExecutableWellFormed state)
+    (selected : state.dequeue? = some (item, next)) :
+    ExecutableWellFormed next := by
+  constructor
+  · exact ContextualValueFrontierState.dequeue?_wellFormed
+      state next item before.1 selected
+  · unfold ContextualValueFrontierState.dequeue? at selected
+    cases queueEq : state.queue with
+    | nil => simp [queueEq] at selected
+    | cons head tail =>
+        simp only [queueEq, Option.some.injEq, Prod.mk.injEq] at selected
+        rcases selected with ⟨_headEq, nextEq⟩
+        subst next
+        exact before.2
+
 end ContextualValueFrontierState
 
 end Chart
