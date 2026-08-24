@@ -30873,6 +30873,33 @@ private theorem executeObservedPhaseABCWorklistMulti?_total_drained
   rcases selected with ⟨phaseB, _phaseBEq, phaseCEq⟩
   exact executePhaseCWorklistMulti?_queues_empty owned phaseB result phaseCEq
 
+/-- Observed recognition always reaches a drained chart whose shared counter
+can initialize the semantic frontier with its causal address invariant. -/
+private theorem
+    executeObservedPhaseABCWorklistMulti?_beginValue_total_addressSafe
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ recognition entered,
+      executeObservedPhaseABCWorklistMulti? file tokens owned =
+          some recognition ∧
+        beginPhaseCValueWorklist? recognition = some entered ∧
+        PhaseCValueAddressSafe entered ∧
+        entered.payload.frontier.queue.Nodup ∧
+        entered.payload.frontier.queuePrefixesAvailable = true := by
+  obtain ⟨recognition, recognitionEq, itemsEmpty, edgesEmpty⟩ :=
+    executeObservedPhaseABCWorklistMulti?_total_drained file tokens owned
+  obtain ⟨entered, enteredEq, safe⟩ :=
+    beginPhaseCValueWorklist?_total_addressSafe recognition
+      ⟨itemsEmpty, edgesEmpty⟩
+      (executeObservedPhaseABCWorklistMulti?_valueAddressesFresh
+        file tokens owned recognition recognitionEq)
+  have enteredExact :=
+    beginPhaseCValueWorklist?_exact recognition entered enteredEq
+  exact ⟨recognition, entered, recognitionEq, enteredEq, safe, by
+    rw [enteredExact.2.2.2]
+    simp, beginPhaseCValueWorklist?_queuePrefixesAvailable recognition entered
+      enteredEq⟩
+
 end Solcore.Surface.Multi.Chart
 
 namespace Solcore.Surface.Multi.Chart
