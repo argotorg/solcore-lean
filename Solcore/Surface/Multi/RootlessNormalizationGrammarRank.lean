@@ -523,6 +523,61 @@ theorem contextualReach_completeModule_interval
         (contextual_moduleRootSequence_complete_current finishedReached
           finishedProduction childComplete)
 
+/-- A reached module-root item always retains the plain guard context. -/
+theorem contextualReach_moduleRoot_context
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (production : item.raw.production = .root .module) :
+    item.context = .plain := by
+  rcases contextualReach_rootOrActivationParent reached with
+    root | ⟨parent, activated⟩
+  · exact root.2.2
+  · have selected :
+        parent.raw.production.rhs[parent.raw.dot.val]? =
+          some (.nonterminal (.rule .module)) := by
+      calc
+        _ = some (.nonterminal item.raw.production.lhs) :=
+          activated.2.1.2
+        _ = _ := by rw [production]; rfl
+    exact (ProductionId.rhs_no_moduleRule parent.raw.production
+      (List.mem_of_getElem? selected)).elim
+
+/-- Every reached complete module root is the canonical whole-file root key. -/
+theorem contextualReach_completeModule_eq_canonical
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (production : item.raw.production = .root .module)
+    (complete : CompleteItem item.raw) :
+    item = CanonicalCompleteRootItem tokens .module
+      (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain := by
+  have interval := contextualReach_completeModule_interval
+    reached production complete
+  have context := contextualReach_moduleRoot_context reached production
+  cases item with
+  | mk raw itemContext =>
+      cases raw with
+      | mk itemProduction itemDot itemOrigin itemCurrent =>
+          dsimp only at production complete interval context ⊢
+          subst itemProduction
+          rcases interval with ⟨originEq, currentEq⟩
+          cases originEq
+          cases currentEq
+          cases context
+          have dotEq : itemDot = {
+              val := (ProductionId.root .module).rhs.length
+              isLt := Nat.lt_succ_self _
+            } := Fin.ext complete
+          cases dotEq
+          rfl
+
 /-- An epsilon production cannot move its cursor after prediction. -/
 theorem contextualReach_epsilon_current_eq_origin
     {file : WorkspaceFile} {tokens : List Token}
