@@ -35445,4 +35445,89 @@ theorem executeObservedContextualWorklistMulti?_edges_nodup
   exact executeObservedPhaseABCWorklistMulti?_edgesNodup
     file tokens owned internal internalEq
 
+/-- A drained recognition chart with its proved semantic prerequisites starts
+and completely runs the bounded value-frontier executor. -/
+private theorem executePhaseCValueWorklist?_total_runner
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (queuesEmpty : current.payload.phaseC.itemQueue = [] ∧
+      current.payload.phaseC.edgeQueue = [])
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (edgesNodup : current.payload.phaseC.contextualEdges.Nodup)
+    (operational : PhaseCOperationalInvariant file tokens current.payload)
+    (closed : OperationalContextualClosure file tokens
+      current.payload.phaseC.memo current.payload.phaseC.contextualItems
+      current.payload.phaseC.contextualEdges) :
+    ∃ result, executePhaseCValueWorklist? owned current = some result := by
+  obtain ⟨entered, enteredEq, enteredSafe⟩ :=
+    beginPhaseCValueWorklist?_total_addressSafe current queuesEmpty fresh
+  have enteredExact :=
+    beginPhaseCValueWorklist?_exact current entered enteredEq
+  have enteredInvariant : PhaseCValueRunnerInvariant entered := by
+    constructor
+    · rw [enteredExact.2.2.1]
+      exact edgesNodup
+    · rw [enteredExact.2.2.1]
+      exact operational
+    · rw [enteredExact.2.2.1]
+      exact closed
+    · exact enteredSafe
+    · rw [enteredExact.2.2.2]
+      simp
+    · exact beginPhaseCValueWorklist?_queuePrefixesAvailable current entered
+        enteredEq
+    · apply beginPhaseCValueWorklist?_queueRecognized current entered
+        (by simpa [contextualRoot] using closed.root_mem) enteredEq
+  have enteredUnits := beginPhaseCValueWorklist?_units current entered enteredEq
+  have positive : 0 < entered.counter.units := by omega
+  obtain ⟨result, runEq, _resultInvariant⟩ :=
+    runPhaseCValueQueue?_total_of_budget owned
+      (chartGBound (tokens.length + 1)) entered (by omega) enteredInvariant
+  exact ⟨result, by
+    simp [executePhaseCValueWorklist?, enteredEq, runEq]⟩
+
+/-- The internal observed multi-ledger semantic worklist succeeds for every
+owned token stream. -/
+private theorem executeObservedPhaseABCValueWorklist?_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executeObservedPhaseABCValueWorklist? file tokens owned =
+      some result := by
+  obtain ⟨recognition, recognitionEq, itemsEmpty, edgesEmpty⟩ :=
+    executeObservedPhaseABCWorklistMulti?_total_drained file tokens owned
+  obtain ⟨result, valueEq⟩ :=
+    executePhaseCValueWorklist?_total_runner owned recognition
+      ⟨itemsEmpty, edgesEmpty⟩
+      (executeObservedPhaseABCWorklistMulti?_valueAddressesFresh
+        file tokens owned recognition recognitionEq)
+      (executeObservedPhaseABCWorklistMulti?_edgesNodup
+        file tokens owned recognition recognitionEq)
+      (executeObservedPhaseABCWorklistMulti?_operationalInvariant
+        file tokens owned recognition recognitionEq)
+      (executeObservedPhaseABCWorklistMulti?_operationalClosure
+        file tokens owned recognition recognitionEq)
+  exact ⟨result, by
+    simp [executeObservedPhaseABCValueWorklist?, recognitionEq, valueEq]⟩
+
+/-- The public semantic contextual executor is total for every owned token
+stream. Its successful result is already known to have an empty frontier
+queue by `executeObservedContextualValueWorklistMulti?_queue_empty`. -/
+theorem executeObservedContextualValueWorklistMulti?_total
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ∃ result, executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result := by
+  obtain ⟨internal, internalEq⟩ :=
+    executeObservedPhaseABCValueWorklist?_total file tokens owned
+  refine ⟨{
+    recognition := {
+      memo := internal.payload.recognition.phaseC.memo
+      items := internal.payload.recognition.phaseC.contextualItems
+      edges := internal.payload.recognition.phaseC.contextualEdges
+    }
+    frontier := internal.payload.frontier
+  }, ?_⟩
+  simp [executeObservedContextualValueWorklistMulti?, internalEq]
+
 end Solcore.Surface.Multi.Chart
