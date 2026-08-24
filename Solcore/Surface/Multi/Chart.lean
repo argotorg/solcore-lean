@@ -25652,6 +25652,75 @@ private theorem attemptPhaseCValuePrediction?_preserves_scanFresh
     intro item productionInstance predictedEq
     exact ⟨by simp, by simp⟩
 
+private theorem attemptPhaseCValuePredictions?_preserves_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      PhaseCValueAddressSafe current →
+      current.payload.frontier.prefixMemberBool waiting = true →
+      waiting ∉ current.payload.frontier.queue →
+      PhaseCValueScanFresh current.counter waiting →
+      attemptPhaseCValuePredictions? owned waiting productions current =
+        some result →
+      PhaseCValueAddressSafe result ∧
+        result.payload.frontier.prefixMemberBool waiting = true ∧
+        waiting ∉ result.payload.frontier.queue ∧
+        PhaseCValueScanFresh result.counter waiting := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result safe present notQueued fresh selected
+      cases selected
+      exact ⟨safe, present, notQueued, fresh⟩
+  | cons predicted rest induction =>
+      intro current result safe present notQueued fresh selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCValuePrediction?_addressSafe owned current next waiting
+          predicted safe present notQueued nextEq)
+        (attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+          next waiting waiting predicted present nextEq)
+        (attemptPhaseCValuePrediction?_preserves_sourceNotQueued owned current
+          next waiting predicted present notQueued nextEq)
+        (attemptPhaseCValuePrediction?_preserves_scanFresh owned current next
+          waiting predicted fresh nextEq) restEq
+
+/-- All semantic predictions for one dequeued source execute from the causal
+invariant and its exact post-dequeue freshness bundle. -/
+private theorem attemptPhaseCValuePredictions?_total_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens)
+    (safe : PhaseCValueAddressSafe current)
+    (present : current.payload.frontier.prefixMemberBool waiting = true)
+    (notQueued : waiting ∉ current.payload.frontier.queue)
+    (fresh : PhaseCValueProcessingFresh current.counter waiting) :
+    ∃ result,
+      attemptPhaseCValuePredictions? owned waiting allProductionIds current =
+          some result ∧
+        PhaseCValueAddressSafe result ∧
+        result.payload.frontier.prefixMemberBool waiting = true ∧
+        waiting ∉ result.payload.frontier.queue ∧
+        PhaseCValueScanFresh result.counter waiting := by
+  obtain ⟨result, selected⟩ :=
+    attemptPhaseCValuePredictions?_total_conditional owned waiting
+      allProductionIds current allProductionIds_nodup fresh.1 (by
+        intro predicted member item productionInstance predictedEq absent
+        have candidate := safe.candidateFresh_of_absent item absent
+        exact ⟨candidate.1, fun _complete => candidate.2⟩)
+  have scanFresh : PhaseCValueScanFresh current.counter waiting := fresh.2
+  obtain ⟨resultSafe, resultPresent, resultNotQueued, resultFresh⟩ :=
+    attemptPhaseCValuePredictions?_preserves_processing owned waiting
+      allProductionIds current result safe present notQueued scanFresh selected
+  exact ⟨result, selected, resultSafe, resultPresent, resultNotQueued,
+    resultFresh⟩
+
 private theorem chargeContextualPrediction_itemSafe
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
