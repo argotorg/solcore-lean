@@ -10847,6 +10847,7 @@ structure ContextualPrefixValue
 structure ContextualReductionValue
     (file : WorkspaceFile) (tokens : List Token)
     (item : ContextualItemKey tokens) where
+  complete : CompleteItem item.raw
   value : NonterminalValue file tokens item.raw.production.lhs
 
 namespace ContextualPrefixValue
@@ -10891,7 +10892,8 @@ def reduce
     (isComplete : CompleteItem item.raw)
     (prior : ContextualPrefixValue file tokens item) :
     ContextualReductionValue file tokens item :=
-  ⟨executeProductionAction file tokens item.raw.origin item.raw.current
+  ⟨isComplete,
+    executeProductionAction file tokens item.raw.origin item.raw.current
     item.raw.production owned ordered
     (PrefixValues.fullValue item isComplete prior.value)⟩
 
