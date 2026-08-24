@@ -26331,6 +26331,19 @@ private def executeObservedPhaseABCValueWorklist?
     executeObservedPhaseABCWorklistMulti? file tokens owned
   executePhaseCValueWorklist? owned recognition
 
+private theorem executeObservedPhaseABCValueWorklist?_queue_empty
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : executeObservedPhaseABCValueWorklist? file tokens owned =
+      some result) :
+    result.payload.frontier.queue = [] := by
+  unfold executeObservedPhaseABCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨recognition, _recognitionEq, valueEq⟩
+  exact executePhaseCValueWorklist?_queue_empty
+    owned recognition result valueEq
+
 /-- Unconditional totality of the observed A/B prefix followed by the bounded
 multi-ledger Phase-C executor. -/
 private theorem executeObservedPhaseABCWorklistMulti?_total
@@ -26761,6 +26774,22 @@ def executeObservedContextualValueWorklistMulti?
     }
     frontier := result.payload.frontier
   }
+
+/-- Every successful public semantic execution has consumed its entire
+internal value frontier. -/
+theorem executeObservedContextualValueWorklistMulti?_queue_empty
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualValueWorklistResult file tokens)
+    (selected : executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    result.frontier.queue = [] := by
+  unfold executeObservedContextualValueWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  exact executeObservedPhaseABCValueWorklist?_queue_empty
+    file tokens owned internal internalEq
 
 /-- Public proof-free view of the total Phase-C executor.  Internally it uses
 the multi-valued completion ledger, so distinct completed edges targeting the
