@@ -34355,6 +34355,29 @@ structure ContextualValueWorklistResult
 
 namespace ContextualValueWorklistResult
 
+/-- Every item retained by recognition has acquired a semantic prefix. This
+is the liveness boundary between a saturated recognition chart and its
+proof-free semantic frontier. -/
+def RecognitionPrefixesMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens) : Prop :=
+  ∀ item, item ∈ result.recognition.items →
+    result.frontier.prefixMemberBool item = true
+
+/-- Materialization exposes the semantic prefix at the canonical completed
+module item whenever recognition reports that item. -/
+theorem completeModuleRoot_prefixMemberBool_eq_true
+    {file : WorkspaceFile} {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens)
+    (materialized : result.RecognitionPrefixesMaterialized)
+    (present : result.recognition.containsCompleteModuleRootItem = true) :
+    result.frontier.prefixMemberBool
+      (CanonicalCompleteRootItem tokens .module
+        (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain) =
+      true := by
+  exact materialized _
+    (result.recognition.containsCompleteModuleRootItem_eq_true_iff.mp present)
+
 /-- Project the AST only from the canonical complete whole-input module key. -/
 def parsedModule?
     {file : WorkspaceFile} {tokens : List Token}
