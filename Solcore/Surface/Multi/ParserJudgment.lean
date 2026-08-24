@@ -18181,6 +18181,69 @@ def FrontierReach
     ContextualReach file tokens memo correct final item ∧
     item.raw.current = cursor
 
+/-- An enabled epsilon production advances a frontier item through prediction
+and immediate completion without moving the greatest reached cursor. -/
+theorem frontierReach_advance_of_enabledEpsilon
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    {waiting : ContextualItemKey tokens}
+    (frontier : FrontierReach
+      file tokens memo correct final cursor waiting)
+    (production : ProductionId)
+    (next : NextSymbol waiting.raw (.nonterminal production.lhs))
+    (enabled : EnabledProductionInstance file tokens memo correct final {
+      production := production
+      origin := waiting.raw.current
+      context := descendContext waiting production
+    })
+    (epsilon : production.rhs = []) :
+    ∃ after : ContextualItemKey tokens,
+      FrontierReach file tokens memo correct final cursor after ∧
+        AdvanceItem waiting.raw waiting.raw.current after.raw := by
+  let finished : ContextualItemKey tokens := {
+    raw := {
+      production := production
+      dot := ⟨0, by simp [epsilon]⟩
+      origin := waiting.raw.current
+      current := waiting.raw.current
+    }
+    context := descendContext waiting production
+  }
+  let after : ContextualItemKey tokens := {
+    raw := {
+      production := waiting.raw.production
+      dot := ⟨waiting.raw.dot.val + 1, Nat.succ_lt_succ next.1⟩
+      origin := waiting.raw.origin
+      current := waiting.raw.current
+    }
+    context := waiting.context
+  }
+  have finishedReached :
+      ContextualReach file tokens memo correct final finished := by
+    exact .predict waiting production frontier.2.1 next enabled
+  have finishedComplete : CompleteItem finished.raw := by
+    simp only [finished, CompleteItem]
+    simp [epsilon]
+  have advance :
+      AdvanceItem waiting.raw waiting.raw.current after.raw := by
+    exact ⟨rfl, rfl, rfl, rfl⟩
+  have structural :
+      ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.completed waiting finished after waiting.raw.current) := by
+    constructor
+    · exact ⟨production.lhs, next, finishedComplete, rfl, rfl, rfl,
+        advance⟩
+    · exact ⟨rfl, rfl⟩
+  have afterReached :
+      ContextualReach file tokens memo correct final after := by
+    exact .complete waiting finished after waiting.raw.current
+      frontier.2.1 finishedReached structural
+  refine ⟨after, ⟨frontier.1, afterReached, ?_⟩, advance⟩
+  exact frontier.2.2
+
 /-- One enabled terminal expected by a contextual frontier item. -/
 def ExpectedMember
     (file : WorkspaceFile) (tokens : List Token)
