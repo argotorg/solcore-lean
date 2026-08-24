@@ -472,6 +472,74 @@ theorem frontierCompletionRank_of_table
     have facts := (frontierLowerRankCell_eq_true_iff
       owned correct final cursor potential waiting after).mp lower
     exact Or.inr ⟨after, ⟨frontier.1, facts.1, facts.2.1⟩, facts.2.2⟩
+
+/-- Number of finite grammar/span coordinates available to a potential. -/
+def frontierGrammarFrameCount (tokens : List Token) : Nat :=
+  allProductionIds.length * (tokens.length + 2) * (tokens.length + 2)
+
+/-- Stable mixed-radix index of one grammar/span coordinate. -/
+def frontierGrammarFrameIndex {tokens : List Token}
+    (production : ProductionId) (origin current : Boundary tokens) : Nat :=
+  (production.index * (tokens.length + 2) + origin.val) *
+      (tokens.length + 2) + current.val
+
+/-- Interpret one natural number as a bounded value at every finite
+grammar/span coordinate. -/
+def frontierGrammarPotentialOfCode
+    (tokens : List Token) (code : Nat) : FrontierGrammarPotential tokens :=
+  fun production origin current =>
+    let base := frontierGrammarFrameCount tokens + 1
+    (code / base ^ frontierGrammarFrameIndex production origin current) % base
+
+/-- Exhaustively search the finite bounded potential space for a code whose
+completion and prediction tables both accept. -/
+def boundedFrontierGrammarPotential?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) :
+    Option (FrontierGrammarPotential tokens) :=
+  let count := frontierGrammarFrameCount tokens
+  let base := count + 1
+  ((List.range (base ^ count)).find? fun code =>
+    let potential := frontierGrammarPotentialOfCode tokens code
+    frontierCompletionRankTable owned correct final cursor potential &&
+      frontierPredictionRankTable owned correct final cursor potential).map
+    (frontierGrammarPotentialOfCode tokens)
+
+/-- Every potential returned by the bounded search satisfies both exact
+finite rank tables. -/
+theorem boundedFrontierGrammarPotential?_sound
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    {potential : FrontierGrammarPotential tokens}
+    (selected : boundedFrontierGrammarPotential?
+      owned correct final cursor = some potential) :
+    frontierCompletionRankTable
+        owned correct final cursor potential = true ∧
+      frontierPredictionRankTable
+        owned correct final cursor potential = true := by
+  unfold boundedFrontierGrammarPotential? at selected
+  simp only [Option.map_eq_some_iff] at selected
+  rcases selected with ⟨code, found, rfl⟩
+  have accepted := List.find?_some found
+  rw [Bool.and_eq_true] at accepted
+  exact accepted
+
+/-- The single exact residual left by bounded potential synthesis. -/
+def BoundedFrontierGrammarRankSearchSucceeds
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens) : Prop :=
+  (boundedFrontierGrammarPotential?
+    owned correct final cursor).isSome = true
+
 /-- The two finite tables and structural epsilon descent construct all three
 fields of the abstract normalization ranking. -/
 theorem frontierNormalizationRanking_of_grammarPotential
@@ -510,6 +578,26 @@ def GrammarRankedFrontierNormalization
   ∃ potential : FrontierGrammarPotential tokens,
     frontierCompletionRankTable owned correct final cursor potential = true ∧
     frontierPredictionRankTable owned correct final cursor potential = true
+
+/-- Successful bounded synthesis discharges the entire grammar-ranked
+frontier residual without requiring a caller-supplied potential. -/
+theorem grammarRankedFrontierNormalization_of_boundedSearch
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo} {cursor : Boundary tokens}
+    (success : BoundedFrontierGrammarRankSearchSucceeds
+      owned correct final cursor) :
+    GrammarRankedFrontierNormalization
+      file tokens owned memo correct final cursor := by
+  unfold BoundedFrontierGrammarRankSearchSucceeds at success
+  rw [Option.isSome_iff_exists] at success
+  rcases success with ⟨potential, selected⟩
+  exact ⟨potential,
+    boundedFrontierGrammarPotential?_sound
+      owned correct final cursor selected⟩
+
 theorem rankedFrontierNormalization_of_grammarRanked
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
