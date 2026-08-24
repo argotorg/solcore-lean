@@ -37723,4 +37723,70 @@ private theorem attemptPhaseCCompletedEdge?_target_present_of_ready
                 current.payload.frontier edge.after _ candidate candidateEq
   next irrelevant => exact (irrelevant relevant).elim
 
+/-- A retained completion touching the dequeued source is materialized by its
+position in the immutable completion fold once both values are available. -/
+private theorem attemptPhaseCRetainedCompletedEdges?_target_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      (⟨.completed edge.waiting edge.finished edge.after edge.shared,
+          edge.structural⟩ : StructurallyValidContextualPackedEdge
+            file tokens) ∈ edges →
+      (⟨.completed edge.waiting edge.finished edge.after edge.shared,
+          edge.structural⟩ : StructurallyValidContextualPackedEdge
+            file tokens) ∈
+        current.payload.recognition.phaseC.contextualEdges →
+      (edge.waiting = source ∨ edge.finished = source) →
+      current.payload.frontier.prefixMemberBool edge.waiting = true →
+      (current.payload.frontier.lookupReduction? edge.finished).isSome = true →
+      PhaseCValueCompletionAttemptMaterialized current →
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        result.payload.frontier.prefixMemberBool edge.after = true := by
+  intro edges
+  induction edges with
+  | nil => simp
+  | cons head rest induction =>
+      intro current result member recognized relevant waitingPresent
+        childPresent materialized selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      rw [List.mem_cons] at member
+      rcases member with same | member
+      · subst head
+        have edgeEq : attemptPhaseCCompletedEdge? owned source edge current =
+            some next := by
+          simpa [attemptPhaseCPackedCompletedEdge?] using nextEq
+        have nextPresent :=
+          attemptPhaseCCompletedEdge?_target_present_of_ready owned source edge
+            current next relevant waitingPresent childPresent
+              (fun used => materialized
+                ⟨.completed edge.waiting edge.finished edge.after edge.shared,
+                  edge.structural⟩ edge.waiting edge.finished edge.after
+                    edge.shared recognized rfl used) edgeEq
+        exact attemptPhaseCRetainedCompletedEdges?_preserves_prefix_present
+          owned source edge.after rest next result nextPresent restEq
+      · have recognitionEq :=
+          attemptPhaseCPackedCompletedEdge?_recognition owned source head
+            current next nextEq
+        have nextRecognized :
+            (⟨.completed edge.waiting edge.finished edge.after edge.shared,
+                edge.structural⟩ : StructurallyValidContextualPackedEdge
+                  file tokens) ∈
+              next.payload.recognition.phaseC.contextualEdges := by
+          rw [recognitionEq]
+          exact recognized
+        exact induction next result member nextRecognized relevant
+          (attemptPhaseCPackedCompletedEdge?_preserves_prefix_present owned
+            source edge.waiting head current next waitingPresent nextEq)
+          (attemptPhaseCPackedCompletedEdge?_preserves_reduction_some owned
+            source edge.finished head current next childPresent nextEq)
+          (attemptPhaseCPackedCompletedEdge?_completionAttemptMaterialized owned
+            source head current next materialized nextEq) restEq
+
 end Solcore.Surface.Multi.Chart
