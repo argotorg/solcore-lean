@@ -9399,6 +9399,96 @@ theorem executeHidingClauseRoot_reduces
         rawName).identifierProjection_projects)
     witness
 
+/-- The type executor realizes every exact compile-time or arrow reduction. -/
+theorem executeTypeRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .type origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .type)) :
+    RuleReduction file tokens .type origin finish input
+      (executeTypeRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let atomAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let arrowAtom : EbnfExpr := .atom (.terminal (.symbol .arrow))
+  let arrowSeq : EbnfExpr := .sequence [arrowAtom, typeAtom]
+  let comptimeBranch : EbnfExpr := .sequence [comptimeAtom, typeAtom]
+  let plainBranch : EbnfExpr :=
+    .sequence [atomAtom, .optional arrowSeq]
+  change EbnfValue file tokens
+    (.choice [comptimeBranch, plainBranch]) at input
+  generalize choiceEq : EbnfValue.choice2View
+    comptimeBranch plainBranch input = selected
+  have inputEq := EbnfValue.choice2_of_view
+    comptimeBranch plainBranch input
+  rw [choiceEq] at inputEq
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  cases selected with
+  | inl raw =>
+      let viewed := EbnfValue.sequence2View comptimeAtom typeAtom raw
+      let comptime := EbnfValue.terminalView
+        (.contextualKeyword .comptimeKw) viewed.1
+      let inner := EbnfValue.ruleView .type viewed.2
+      have sequenceEq := EbnfValue.sequence2_of_view
+        comptimeAtom typeAtom raw
+      have comptimeEq := EbnfValue.terminal_of_view
+        (.contextualKeyword .comptimeKw) viewed.1
+      have innerEq := EbnfValue.rule_of_view .type viewed.2
+      have resultEq : executeTypeRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness (.comptime
+            { span := comptime.span, payload := .comptimeModifier } inner) := by
+        simp only [executeTypeRoot, comptimeBranch, plainBranch,
+          comptimeAtom, typeAtom, atomAtom, arrowAtom, arrowSeq,
+          choiceEq, viewed, comptime, inner, witness]
+      rw [resultEq, ← inputEq, ← sequenceEq, ← comptimeEq, ← innerEq]
+      exact .typeComptime origin finish comptime inner
+        (.comptimeModifier comptime) witness
+  | inr raw =>
+      let viewed := EbnfValue.sequence2View
+        atomAtom (.optional arrowSeq) raw
+      let domain := EbnfValue.ruleView .typeAtom viewed.1
+      generalize optionalEq : EbnfValue.optionalView
+        arrowSeq viewed.2 = selectedArrow
+      have sequenceEq := EbnfValue.sequence2_of_view
+        atomAtom (.optional arrowSeq) raw
+      have domainEq := EbnfValue.rule_of_view .typeAtom viewed.1
+      have optionalRebuild := EbnfValue.optional_of_view arrowSeq viewed.2
+      rw [optionalEq] at optionalRebuild
+      cases selectedArrow with
+      | none =>
+          have resultEq : executeTypeRoot file tokens origin finish
+              ready.1 ready.2.1 input = domain := by
+            simp only [executeTypeRoot, comptimeBranch, plainBranch,
+              comptimeAtom, typeAtom, atomAtom, arrowAtom, arrowSeq,
+              choiceEq, viewed, domain, optionalEq]
+          rw [resultEq, ← inputEq, ← sequenceEq, ← domainEq,
+            ← optionalRebuild]
+          exact .typeAtomOnly origin finish domain
+      | some rawArrow =>
+          let arrowViewed := EbnfValue.sequence2View
+            arrowAtom typeAtom rawArrow
+          let arrow := EbnfValue.terminalView (.symbol .arrow) arrowViewed.1
+          let codomain := EbnfValue.ruleView .type arrowViewed.2
+          have arrowSequenceEq := EbnfValue.sequence2_of_view
+            arrowAtom typeAtom rawArrow
+          have arrowEq := EbnfValue.terminal_of_view
+            (.symbol .arrow) arrowViewed.1
+          have codomainEq := EbnfValue.rule_of_view .type arrowViewed.2
+          have resultEq : executeTypeRoot file tokens origin finish
+              ready.1 ready.2.1 input =
+                sourceLoc witness (.function domain codomain) := by
+            simp only [executeTypeRoot, comptimeBranch, plainBranch,
+              comptimeAtom, typeAtom, atomAtom, arrowAtom, arrowSeq,
+              choiceEq, viewed, domain, optionalEq, arrowViewed, codomain,
+              witness]
+          rw [resultEq, ← inputEq, ← sequenceEq, ← domainEq,
+            ← optionalRebuild, ← arrowSequenceEq, ← arrowEq,
+            ← codomainEq]
+          exact .typeFunction origin finish domain arrow codomain witness
+
 /-- Align one dotted module path tail with its parsed path component. -/
 private def moduleRefTailData
     {file : WorkspaceFile} {tokens : List Token}
@@ -9827,6 +9917,7 @@ theorem executeRootRule_reduces
   | hidingClause =>
       exact executeHidingClauseRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
+  | «type» => exact executeTypeRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
   | forInitItem =>
