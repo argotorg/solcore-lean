@@ -26735,6 +26735,197 @@ private theorem attemptPhaseCValuePredictions?_total_processing
   exact ⟨result, selected, resultSafe, resultPresent, resultNotQueued,
     resultFresh⟩
 
+/-- Completion publication retains every old queued key and can append only
+its exact previously absent target. -/
+private theorem attemptPhaseCCompletedEdge?_queue_member
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result)
+    (member : target ∈ result.payload.frontier.queue) :
+    target ∈ current.payload.frontier.queue ∨
+      current.payload.frontier.prefixMemberBool edge.after = false ∧
+        target = edge.after := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with rfl | active
+  · exact Or.inl member
+  · rcases active with ⟨prior, child, rebuilt, candidate, relevant, prefixEq,
+      reductionEq, attemptFresh, rebuiltEq, candidateEq, frontierEq⟩
+    cases kindEq : candidate.kind with
+    | duplicate =>
+        rw [frontierEq] at member
+        simp only [kindEq] at member
+        exact Or.inl member
+    | insertedIncomplete =>
+        rw [frontierEq] at member
+        simp only [kindEq] at member
+        exact insertCandidate?_queue_member owned current.payload.frontier
+          edge.after target _ candidate candidateEq member
+    | insertedComplete =>
+        rw [frontierEq] at member
+        simp only [kindEq] at member
+        exact insertCandidate?_queue_member owned current.payload.frontier
+          edge.after target _ candidate candidateEq member
+
+private theorem attemptPhaseCCompletedEdge?_preserves_sourceFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (fresh : PhaseCValueSourceFresh current.counter target)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    PhaseCValueSourceFresh result.counter target := by
+  unfold PhaseCValueSourceFresh at fresh ⊢
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · apply attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned source edge
+      current result _ (by simp) (by simp) (by simp) (by simp) fresh.1 selected
+  · intro predicted member
+    apply attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned source edge
+      current result _ (by simp) (by simp) (by simp) (by simp)
+        (fresh.2.1 predicted member) selected
+  · apply attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned source edge
+      current result _ (by simp) (by simp) (by simp) (by simp) fresh.2.2.1
+        selected
+  · apply attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned source edge
+      current result _ (by simp) (by simp) (by simp) (by simp) fresh.2.2.2
+        selected
+
+/-- A newly used completion address lies in the exact U06/U07/U05/L09
+footprint; the L09 branch leaves its target prefix present. -/
+private theorem attemptPhaseCCompletedEdge?_new_used
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (target : UnitAddress tokens)
+    (fresh : target ∉ current.counter.usedRev)
+    (used : target ∈ result.counter.usedRev)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    target = .cubic .U06_frontierCompletion
+        (contextualCompletionKey edge.waiting edge.finished) ∨
+      target = .cubic .U07_frontierCompletedTraversal
+        (contextualCompletionKey edge.waiting edge.finished) ∨
+      target = .cubic .U05_completedAction
+        (contextualCompletionKey edge.waiting edge.finished) ∨
+      (target = .linear .L09_frontierInsert
+          (contextualLinearKey edge.after) ∧
+        result.payload.frontier.prefixMemberBool edge.after = true) := by
+  by_cases attempt : target = .cubic .U06_frontierCompletion
+      (contextualCompletionKey edge.waiting edge.finished)
+  · exact Or.inl attempt
+  by_cases traversal : target = .cubic .U07_frontierCompletedTraversal
+      (contextualCompletionKey edge.waiting edge.finished)
+  · exact Or.inr (Or.inl traversal)
+  by_cases action : target = .cubic .U05_completedAction
+      (contextualCompletionKey edge.waiting edge.finished)
+  · exact Or.inr (Or.inr (Or.inl action))
+  by_cases insert : target = .linear .L09_frontierInsert
+      (contextualLinearKey edge.after)
+  · cases present : result.payload.frontier.prefixMemberBool edge.after with
+    | true => exact Or.inr (Or.inr (Or.inr ⟨insert, rfl⟩))
+    | false =>
+        have initial : (.linear .L09_frontierInsert
+            (contextualLinearKey edge.after) : UnitAddress tokens) ∉
+              current.counter.usedRev := by simpa [insert] using fresh
+        have retained :=
+          attemptPhaseCCompletedEdge?_preserves_insert_fresh_of_absent owned
+            source edge.after edge current result initial present selected
+        exact (retained (insert ▸ used)).elim
+  have retained := attemptPhaseCCompletedEdge?_preserves_unrelated_fresh owned
+    source edge current result target attempt traversal action insert fresh selected
+  exact (retained used).elim
+
+/-- The completion's own downstream U07/U05 charges remain causally dominated
+by its U06 attempt. -/
+private theorem attemptPhaseCCompletedEdge?_preserves_head_completionCausal
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (traversalCausal :
+      (.cubic .U07_frontierCompletedTraversal
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ current.counter.usedRev →
+      (.cubic .U06_frontierCompletion
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ current.counter.usedRev)
+    (actionCausal :
+      (.cubic .U05_completedAction
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ current.counter.usedRev →
+      (.cubic .U06_frontierCompletion
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ current.counter.usedRev)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    ((.cubic .U07_frontierCompletedTraversal
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ result.counter.usedRev →
+      (.cubic .U06_frontierCompletion
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ result.counter.usedRev) ∧
+    ((.cubic .U05_completedAction
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ result.counter.usedRev →
+      (.cubic .U06_frontierCompletion
+          (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ result.counter.usedRev) := by
+  unfold attemptPhaseCCompletedEdge? at selected
+  split at selected
+  next relevant =>
+    cases prefixEq : current.payload.frontier.lookupPrefix? edge.waiting with
+    | none =>
+      simp only [prefixEq, Option.some.injEq] at selected
+      cases selected
+      exact ⟨traversalCausal, actionCausal⟩
+    | some prior =>
+      simp only [prefixEq] at selected
+      cases reductionEq :
+          current.payload.frontier.lookupReduction? edge.finished with
+      | none =>
+        simp only [reductionEq, Option.some.injEq] at selected
+        cases selected
+        exact ⟨traversalCausal, actionCausal⟩
+      | some child =>
+        simp only [reductionEq] at selected
+        split at selected
+        next used =>
+          cases selected
+          exact ⟨traversalCausal, actionCausal⟩
+        next fresh =>
+          simp only [Option.bind_eq_bind,
+            Option.bind_eq_some_iff] at selected
+          rcases selected with ⟨attempted, attemptedEq, rebuilt, rebuiltEq,
+            candidate, candidateEq, traversed, traversedEq, actioned,
+            actionedEq, publishedEq⟩
+          have attemptUsed : (.cubic .U06_frontierCompletion
+              (contextualCompletionKey edge.waiting edge.finished) :
+                UnitAddress tokens) ∈ attempted.counter.usedRev := by
+            rw [runMappedPrimitive?_usedRev current _ id attempted attemptedEq]
+            simp
+          have resultAttempt := publishPhaseCValueCandidate?_used_mono actioned
+            result edge.after candidate publishedEq
+              (chargePhaseCCompletedCandidate?_used_mono traversed actioned _
+                candidate actionedEq
+                  (runMappedPrimitive?_used_mono_value attempted _ id traversed
+                    traversedEq attemptUsed))
+          exact ⟨fun _ => resultAttempt, fun _ => resultAttempt⟩
+  next irrelevant =>
+    cases selected
+    exact ⟨traversalCausal, actionCausal⟩
+
 private theorem chargeContextualPrediction_itemSafe
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
