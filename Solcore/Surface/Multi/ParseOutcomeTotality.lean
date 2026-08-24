@@ -17,13 +17,17 @@ def RootlessExecutableProgress
     (final : AllGuardsFinal memo) : Prop :=
   ∀ cursor,
     GreatestReachableCursor file tokens memo correct final cursor →
-      cursor.val ≤ tokens.length ∧
-        (∀ waiting,
-          FrontierReach file tokens memo correct final cursor waiting →
-            EnabledNonterminalCoverageAt
-              file tokens memo correct final waiting) ∧
-        RankedFrontierNormalization
-          file tokens memo correct final cursor
+      (¬ ContextualReach file tokens memo correct final
+        (CanonicalCompleteRootItem tokens .module
+          (Boundary.start tokens) (Boundary.afterLogicalEOF tokens)
+          .plain)) →
+        cursor.val ≤ tokens.length ∧
+          (∀ waiting,
+            FrontierReach file tokens memo correct final cursor waiting →
+              EnabledNonterminalCoverageAt
+                file tokens memo correct final waiting) ∧
+          RankedFrontierNormalization
+            file tokens memo correct final cursor
 
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
@@ -94,7 +98,8 @@ theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_pro
                 rootReached
             rw [rootAbsentBit] at rootPresent
             contradiction
-          rcases progress cursor greatest with ⟨atMost, coverage, ranked⟩
+          rcases progress cursor greatest rootAbsent with
+            ⟨atMost, coverage, ranked⟩
           have waiting :=
             terminalFrontierWait_of_rootless_rankedNormalization
               greatest coverage ranked rootAbsent
