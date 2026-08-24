@@ -5923,6 +5923,17 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | literalValue : ExecutableRootRule .literal
   | lambdaExpr : ExecutableRootRule .lambda
 
+/-- The canonical executable witness carried by every source grammar rule. -/
+def executableRootRule
+    (rule : GrammarRuleId) : ExecutableRootRule rule := by
+  cases rule <;> constructor
+
+/-- A source rule has only its canonical executable witness. -/
+theorem ExecutableRootRule.eq_executableRootRule
+    {rule : GrammarRuleId} (executable : ExecutableRootRule rule) :
+    executable = executableRootRule rule := by
+  cases executable <;> rfl
+
 /-- Build the complete source-located module value from its ordered items. -/
 def executableModuleValue
     (file : WorkspaceFile) (items : List TopItem) : ParsedModuleV1 := {
@@ -9470,5 +9481,30 @@ def executeRootAction
     NonterminalValue file tokens (ProductionId.root rule).lhs :=
   executeRootRule file tokens origin finish rule executable owned ordered
     (RootAction.unpack rule input)
+
+/-- Execute any generated production action, including every source-rule
+root, from its typed right-hand-side tuple. -/
+def executeProductionAction
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (production : ProductionId)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : GrammarSymbolValues file tokens production.rhs) :
+    NonterminalValue file tokens production.lhs :=
+  match production with
+  | .root rule =>
+      executeRootAction file tokens origin finish rule
+        (executableRootRule rule) owned ordered input
+  | .atom site => AtomSite.pack site input
+  | .seq site => SequenceSite.pack site input
+  | .group site => GroupSite.pack site input
+  | .choice site branch => ChoiceSite.pack site branch input
+  | .opt site branch => OptionalSite.pack site branch input
+  | .star site branch => StarSite.pack site branch input
+  | .plus site branch => PlusSite.pack site branch input
+  | .list0 site branch => List0Site.pack site branch input
+  | .list1 site => List1Site.pack site input
+  | .tail site branch => ListSite.pack site branch input
 
 end Solcore.Surface.Multi
