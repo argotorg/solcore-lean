@@ -17439,25 +17439,24 @@ theorem g10ContextualItem_eq_of_fields
   subst_vars
   rfl
 
-/-- Backpointer uniqueness upgrades two completions with a common target to
-equality of their complete child items. -/
-theorem g10CompletedEdge_finished_eq
+/-- Equality of the two erased completion coordinates upgrades completions
+with a common target to equality of their complete child items. -/
+theorem g10CompletedEdge_finished_eq_of_coordinates
     {file : WorkspaceFile} {tokens : List Token}
     {memo : GuardMemo tokens}
     {correct : PhaseBCorrect file tokens memo}
     {final : AllGuardsFinal memo}
-    (backpointer : CompletionBackpointerUnique
-      file tokens memo correct final)
     {after leftWaiting leftFinished rightWaiting rightFinished :
       ContextualItemKey tokens}
     {leftShared rightShared : Boundary tokens}
     (leftEdge : ContextualEdgeReach file tokens memo correct final
       (.completed leftWaiting leftFinished after leftShared))
     (rightEdge : ContextualEdgeReach file tokens memo correct final
-      (.completed rightWaiting rightFinished after rightShared)) :
+      (.completed rightWaiting rightFinished after rightShared))
+    (sharedEq : leftShared = rightShared)
+    (finishedProductionEq :
+      leftFinished.raw.production = rightFinished.raw.production) :
     leftFinished = rightFinished := by
-  rcases backpointer leftEdge rightEdge with
-    ⟨sharedEq, finishedProductionEq⟩
   rcases leftEdge.1.1 with
     ⟨_, _, leftComplete, _, leftWaitingAt, leftFinishedAt, leftAdvance⟩
   rcases rightEdge.1.1 with
@@ -17488,6 +17487,28 @@ theorem g10CompletedEdge_finished_eq
       leftFinished.context = rightFinished.context := by
     rw [leftEdge.1.2.1, rightEdge.1.2.1, waitingEq, finishedRawEq]
   exact g10ContextualItem_eq_of_fields finishedRawEq finishedContextEq
+
+/-- Backpointer uniqueness supplies the two erased coordinates needed to
+identify complete child items. -/
+theorem g10CompletedEdge_finished_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (backpointer : CompletionBackpointerUnique
+      file tokens memo correct final)
+    {after leftWaiting leftFinished rightWaiting rightFinished :
+      ContextualItemKey tokens}
+    {leftShared rightShared : Boundary tokens}
+    (leftEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed leftWaiting leftFinished after leftShared))
+    (rightEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed rightWaiting rightFinished after rightShared)) :
+    leftFinished = rightFinished := by
+  rcases backpointer leftEdge rightEdge with
+    ⟨sharedEq, finishedProductionEq⟩
+  exact g10CompletedEdge_finished_eq_of_coordinates leftEdge rightEdge
+    sharedEq finishedProductionEq
 
 /-- A scan and completion cannot have the same advanced item. -/
 theorem g10ScannedCompleted_false
