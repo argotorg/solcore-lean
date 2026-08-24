@@ -23250,6 +23250,65 @@ private theorem insertCandidate?_nonduplicate_absent
     exact (nonduplicate rfl).elim
   next absent => exact Bool.eq_false_iff.mpr absent
 
+/-- Candidate preparation preserves a duplicate-free semantic queue whenever
+every old queued key still has its exact prefix. -/
+private theorem insertCandidate?_queueNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (queueNodup : state.queue.Nodup)
+    (available : state.queuePrefixesAvailable = true)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    candidate.state.queue.Nodup := by
+  have queueEq := insertCandidate?_queue_eq owned state item prior candidate
+    selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      rw [kindEq] at queueEq
+      rwa [queueEq]
+  | insertedIncomplete =>
+      have absent := insertCandidate?_nonduplicate_absent owned state item
+        prior candidate selected (by simp [kindEq])
+      have fresh : item ∉ state.queue := by
+        intro member
+        have lookup :=
+          (ContextualValueFrontierState.queuePrefixesAvailable_eq_true_iff
+            state).1 available item member
+        have present :=
+          (ContextualValueFrontierState.prefixMemberBool_eq_true_iff_lookupPrefix?_isSome
+            state item).2 lookup
+        rw [absent] at present
+        contradiction
+      rw [kindEq] at queueEq
+      rw [queueEq, List.nodup_append]
+      refine ⟨queueNodup, by simp, ?_⟩
+      intro old oldMember inserted insertedMember equal
+      simp only [List.mem_singleton] at insertedMember
+      exact fresh (by simpa [equal, insertedMember] using oldMember)
+  | insertedComplete =>
+      have absent := insertCandidate?_nonduplicate_absent owned state item
+        prior candidate selected (by simp [kindEq])
+      have fresh : item ∉ state.queue := by
+        intro member
+        have lookup :=
+          (ContextualValueFrontierState.queuePrefixesAvailable_eq_true_iff
+            state).1 available item member
+        have present :=
+          (ContextualValueFrontierState.prefixMemberBool_eq_true_iff_lookupPrefix?_isSome
+            state item).2 lookup
+        rw [absent] at present
+        contradiction
+      rw [kindEq] at queueEq
+      rw [queueEq, List.nodup_append]
+      refine ⟨queueNodup, by simp, ?_⟩
+      intro old oldMember inserted insertedMember equal
+      simp only [List.mem_singleton] at insertedMember
+      exact fresh (by simpa [equal, insertedMember] using oldMember)
+
 /-- Every queued key after candidate preparation is old, except for the one
 newly appended key, which was absent before preparation. -/
 private theorem insertCandidate?_queue_member
@@ -23287,6 +23346,65 @@ private theorem insertCandidate?_queue_member
       exact queued.imp_right fun equal =>
         ⟨insertCandidate?_nonduplicate_absent owned state item prior candidate
           selected (by simp [kindEq]), equal⟩
+
+/-- One semantic prediction preserves duplicate-free frontier scheduling. -/
+private theorem attemptPhaseCValuePrediction?_queueNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (queueNodup : current.payload.frontier.queue.Nodup)
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    result.payload.frontier.queue.Nodup := by
+  rcases (attemptPhaseCValuePrediction?_exact owned current result waiting
+    predicted selected).2 with unchanged | inserted
+  · rw [unchanged]
+    exact queueNodup
+  · rcases inserted with ⟨item, productionInstance, atZero, candidate,
+      predictedEq, member, candidateEq, frontierEq⟩
+    have prepared := insertCandidate?_queueNodup owned
+      current.payload.frontier item (ContextualPrefixValue.zero item atZero)
+        candidate queueNodup available candidateEq
+    rw [frontierEq]
+    cases kindEq : candidate.kind with
+    | duplicate => simpa [kindEq] using queueNodup
+    | insertedIncomplete => simpa [kindEq] using prepared
+    | insertedComplete => simpa [kindEq] using prepared
+
+/-- Folding any prediction list preserves duplicate-free frontier
+scheduling. -/
+private theorem attemptPhaseCValuePredictions?_queueNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.queue.Nodup →
+      current.payload.frontier.queuePrefixesAvailable = true →
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        result.payload.frontier.queue.Nodup := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result queueNodup available selected
+      cases selected
+      exact queueNodup
+  | cons predicted rest induction =>
+      intro current result queueNodup available selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCValuePrediction?_queueNodup owned current next waiting
+          predicted queueNodup available nextEq)
+        (attemptPhaseCValuePrediction?_queuePrefixesAvailable owned current
+          next waiting predicted available nextEq) restEq
+
 /-- A semantic prediction can only grow prefix membership. -/
 private theorem attemptPhaseCValuePrediction?_preserves_prefix_present
     {file : WorkspaceFile} {tokens : List Token}
