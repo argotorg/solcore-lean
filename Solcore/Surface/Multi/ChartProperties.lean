@@ -15179,3 +15179,188 @@ theorem executeObservedContextualWorklistMulti?_rootlessUnexpectedDiagnosticCand
     greatest canonical foundAt (notRepeated expectedFrontier.cursor)
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+@[simp] theorem Chart.nonAssociativeRootRule_eq_rule
+    (level : NonAssociativeLevel) :
+    Chart.nonAssociativeRootRule level = level.rule := by
+  cases level <;> rfl
+
+/-- The executable semantic classifier is exactly the declarative completed
+operation predicate, with the selected first operator exposed. -/
+theorem Chart.completedNonAssociativeValueBool_eq_true_iff
+    (level : NonAssociativeLevel)
+    (value : RuleValue (Chart.nonAssociativeRootRule level)) :
+    Chart.completedNonAssociativeValueBool level value = true ↔
+      ∃ first, CompletedNonAssociativeValue level
+        (Chart.nonAssociativeRootRule_eq_rule level ▸ value) first := by
+  cases level <;> cases value with
+  | mk span payload =>
+      cases payload <;>
+        simp [Chart.completedNonAssociativeValueBool,
+          CompletedNonAssociativeValue]
+      all_goals
+        rename_i first left right
+        cases first with
+        | mk firstSpan firstPayload =>
+            cases firstPayload <;>
+              simp
+
+/-- Transport one coherent canonical root reduction when two executable rule
+classifiers select propositionally equal grammar rules. -/
+private theorem coherentCanonicalRootReduction_castRule
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {left right : GrammarRuleId}
+    (same : left = right)
+    (origin finish : Boundary tokens) (context : GuardContext tokens)
+    (value : RuleValue left)
+    (coherent : CoherentReduction file tokens memo correct final
+      (CanonicalCompleteRootItem tokens left origin finish context) value) :
+    CoherentReduction file tokens memo correct final
+      (CanonicalCompleteRootItem tokens right origin finish context)
+      (same ▸ value) := by
+  cases same
+  exact coherent
+
+/-- A rootless semantic G10 candidate emitted by the total multi-ledger
+executor is declaratively applicable.  The proof uses the selected semantic
+reduction directly and therefore needs no completion-backpointer uniqueness. -/
+theorem executeObservedContextualValueWorklistMulti?_repeatedNonAssociativeDiagnosticCandidate?_applies
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (absent : result.recognition.containsCompleteModuleRootItem = false)
+    (diagnostic : ParseDiagnostic)
+    (candidate : result.repeatedNonAssociativeDiagnosticCandidate? file =
+      some diagnostic) :
+    ParseDiagnostic.Applies file tokens diagnostic := by
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  have correspondence := executeObservedContextualWorklistMulti?_correspondence
+    file tokens owned result.recognition recognitionSelected
+  unfold Chart.ContextualValueWorklistResult.repeatedNonAssociativeDiagnosticCandidate?
+    at candidate
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at candidate
+  rcases candidate with ⟨frontier, frontierEq, diagnosticEq⟩
+  let accepts := fun root : ContextualItemKey tokens =>
+    result.frontier.completedNonAssociativeAtBool
+      frontier.cursor frontier.level root.raw.origin root.context
+  change frontier.repeatedDiagnosticCandidate? accepts = some diagnostic
+    at diagnosticEq
+  rcases
+      (Chart.NonAssociativeFrontierCandidates.repeatedDiagnosticCandidate?_eq_some_iff
+        frontier accepts diagnostic).mp diagnosticEq with
+    ⟨⟨root, rootMember, accepted⟩, diagnosticShape⟩
+  have exactFrontier :=
+    (Chart.ContextualWorklistResult.nonAssociativeFrontierCandidates?_eq_some_iff
+      file result.recognition frontier).mp frontierEq
+  rcases
+      (Chart.ContextualWorklistResult.greatestCurrent?_eq_some_iff
+        result.recognition frontier.cursor).mp exactFrontier.1 with
+    ⟨⟨greatestItem, greatestMember, greatestCurrent⟩, upper⟩
+  have greatest : GreatestReachableCursor file tokens
+      result.recognition.memo correct final frontier.cursor := by
+    refine ⟨⟨greatestItem,
+      (correspondence.1 greatestItem).mp greatestMember,
+      greatestCurrent⟩, ?_⟩
+    intro item reached
+    exact upper item ((correspondence.1 item).mpr reached)
+  have found : FoundNonAssociativeOperatorAt file tokens frontier.cursor
+      frontier.level frontier.operator :=
+    (chart_observedNonAssociativeOperatorAt?_eq_some_iff owned
+      frontier.cursor {
+        level := frontier.level
+        operator := frontier.operator
+      }).mp exactFrontier.2.1
+  have inRoots : root ∈ result.recognition.nonAssociativeRootItemsAt
+      frontier.cursor frontier.level := by
+    rw [← exactFrontier.2.2]
+    exact rootMember
+  rcases
+      (Chart.ContextualWorklistResult.nonAssociativeRootItemsAt_mem_iff
+        result.recognition frontier.cursor frontier.level root).mp inRoots with
+    ⟨rootRetained, rootEq⟩
+  have reachedRoot : ContextualReach file tokens result.recognition.memo
+      correct final root := (correspondence.1 root).mp rootRetained
+  have reachedItem : ContextualReach file tokens result.recognition.memo
+      correct final
+      (CanonicalCompleteRootItem tokens
+        (Chart.nonAssociativeRootRule frontier.level) root.raw.origin
+          frontier.cursor root.context) :=
+    Eq.mp (congrArg
+      (fun item => ContextualReach file tokens result.recognition.memo
+        correct final item) rootEq) reachedRoot
+  change result.frontier.completedNonAssociativeAtBool
+      frontier.cursor frontier.level root.raw.origin root.context = true
+    at accepted
+  rcases
+      (Chart.ContextualValueFrontierState.completedNonAssociativeAtBool_eq_true_iff
+        result.frontier frontier.cursor frontier.level root.raw.origin
+          root.context).mp accepted with
+    ⟨reduction, reductionEq, completedBool⟩
+  have valuesCoherent :=
+    executeObservedContextualValueWorklistMulti?_valuesCoherent
+      file tokens owned result selected
+  have coherentItem := result.frontier.lookupReduction?_coherent
+    (CanonicalCompleteRootItem tokens
+      (Chart.nonAssociativeRootRule frontier.level) root.raw.origin
+        frontier.cursor root.context)
+    reduction valuesCoherent reductionEq
+  let value : RuleValue frontier.level.rule :=
+    Chart.nonAssociativeRootRule_eq_rule frontier.level ▸ reduction.value
+  have reachedCanonical : ContextualReach file tokens result.recognition.memo
+      correct final
+      (CanonicalCompleteRootItem tokens frontier.level.rule root.raw.origin
+        frontier.cursor root.context) := by
+    simpa only [Chart.nonAssociativeRootRule_eq_rule] using reachedItem
+  have coherentCanonical := coherentCanonicalRootReduction_castRule
+    (Chart.nonAssociativeRootRule_eq_rule frontier.level)
+    root.raw.origin frontier.cursor root.context reduction.value coherentItem
+  obtain ⟨first, completedValue⟩ :=
+    (Chart.completedNonAssociativeValueBool_eq_true_iff
+      frontier.level reduction.value).mp completedBool
+  let semanticCandidate : NonAssociativeFrontierValue file tokens
+      result.recognition.memo correct final frontier.cursor frontier.level := {
+    origin := root.raw.origin
+    context := root.context
+    value := value
+    frontier := ⟨greatest, reachedCanonical, rfl⟩
+    root := ⟨reachedCanonical,
+      canonicalCompleteRootItem_complete frontier.level.rule root.raw.origin
+        frontier.cursor root.context,
+      coherentCanonical⟩
+  }
+  have completed : CompletedNonAssociative frontier.level semanticCandidate
+      first :=
+    (completedNonAssociative_iff_value frontier.level semanticCandidate first).mpr
+      completedValue
+  have ungrouped : ¬ ExplicitGroupBoundary frontier.level semanticCandidate := by
+    intro grouped
+    exact explicit_group_resets_nonassociative_level semanticCandidate grouped
+      first completed
+  have repeated : RepeatedNonAssociativeAt file tokens result.recognition.memo
+      correct final frontier.cursor frontier.level frontier.operator :=
+    ⟨semanticCandidate, first, completed, ungrouped, found⟩
+  have noRoot : ¬ ∃ module, SourceBackedRoot file tokens module :=
+    executeObservedContextualWorklistMulti?_noSourceBackedRoot_of_completeModuleRootItem_eq_false
+      file tokens owned result.recognition recognitionSelected absent
+  subst diagnostic
+  exact .repeatedNonAssociative file tokens result.recognition.memo correct
+    final frontier.cursor frontier.level frontier.operator noRoot greatest
+      repeated
+
+end Solcore.Surface.Multi

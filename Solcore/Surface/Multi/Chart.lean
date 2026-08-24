@@ -30142,6 +30142,60 @@ def nonAssociativeRootRule : NonAssociativeLevel → GrammarRuleId
   | .relational => .relational
   | .equality => .equality
 
+/-- Proof-free recognition of an ungrouped completed operation in the
+semantic value of one relational or equality root. -/
+def completedNonAssociativeValueBool :
+    (level : NonAssociativeLevel) →
+      RuleValue (nonAssociativeRootRule level) → Bool
+  | .relational, value =>
+      match value.payload with
+      | .infix first _ _ =>
+          match first.payload with
+          | .less | .greater | .lessEqual | .greaterEqual => true
+          | _ => false
+      | _ => false
+  | .equality, value =>
+      match value.payload with
+      | .infix first _ _ =>
+          match first.payload with
+          | .equal | .notEqual => true
+          | _ => false
+      | _ => false
+
+namespace ContextualValueFrontierState
+
+/-- Inspect the selected semantic reduction at one exact canonical
+nonassociative root coordinate. -/
+def completedNonAssociativeAtBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel)
+    (origin : Boundary tokens) (context : GuardContext tokens) : Bool :=
+  match state.lookupReduction?
+      (CanonicalCompleteRootItem tokens (nonAssociativeRootRule level)
+        origin cursor context) with
+  | none => false
+  | some reduction =>
+      completedNonAssociativeValueBool level reduction.value
+
+/-- The coordinate classifier succeeds exactly when lookup selects a
+completed same-level semantic value. -/
+theorem completedNonAssociativeAtBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel)
+    (origin : Boundary tokens) (context : GuardContext tokens) :
+    state.completedNonAssociativeAtBool cursor level origin context = true ↔
+      ∃ reduction,
+        state.lookupReduction?
+            (CanonicalCompleteRootItem tokens (nonAssociativeRootRule level)
+              origin cursor context) = some reduction ∧
+          completedNonAssociativeValueBool level reduction.value = true := by
+  unfold completedNonAssociativeAtBool
+  split <;> simp_all
+
+end ContextualValueFrontierState
+
 /-- Decide whether one contextual item is the canonical completed root of a
 nonassociative level at the displayed boundary. -/
 def isNonAssociativeRootItemAt
@@ -38392,5 +38446,27 @@ private theorem processPhaseCValueItem?_completion_target_present
           source allProductionIds current predicted materialized predictedEq)
         scannedEq
   · exact completedEq
+
+end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Solcore.Workspace
+
+namespace ContextualValueWorklistResult
+
+/-- Compute the G10 candidate from the semantic reduction selected at each
+canonical recognition-frontier root. -/
+def repeatedNonAssociativeDiagnosticCandidate?
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens) :
+    Option ParseDiagnostic := do
+  let candidates ←
+    result.recognition.nonAssociativeFrontierCandidates? file
+  candidates.repeatedDiagnosticCandidate? fun root =>
+    result.frontier.completedNonAssociativeAtBool
+      candidates.cursor candidates.level root.raw.origin root.context
+
+end ContextualValueWorklistResult
 
 end Solcore.Surface.Multi.Chart
