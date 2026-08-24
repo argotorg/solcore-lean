@@ -409,6 +409,261 @@ theorem frontierGrammarRank_continuation_lt_of_complete_epsilonBand
   simp only [production, origin, current, frontierSpanPotential,
     if_pos finishedAtOrigin.symm]
   exact parentBelow
+/-- An activation caller starts no later than the child that it introduced. -/
+theorem contextualActivationParent_origin_le
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {parent child : ContextualItemKey tokens}
+    (activated : ContextualActivationParent
+      file tokens memo correct final parent child) :
+    parent.raw.origin.val ≤ child.raw.origin.val := by
+  have ordered := contextualReach_ordered activated.1
+  rw [activated.2.2.1] at ordered
+  exact ordered
+
+/-- Returning to a caller from a strictly later child-origin decreases the
+span row, independently of the productions' relative local weights. -/
+theorem frontierSpanPotential_continuation_lt_of_earlierOrigin
+    {tokens : List Token}
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (parent finished after : ContextualItemKey tokens)
+    (bounded : positive parent.raw.production < width)
+    (progress : finished.raw.origin.val < finished.raw.current.val)
+    (earlier : parent.raw.origin.val < finished.raw.origin.val)
+    (advance : AdvanceItem parent.raw finished.raw.current after.raw) :
+    frontierSpanPotential width zero positive after.raw.production
+        after.raw.origin after.raw.current <
+      frontierSpanPotential width zero positive finished.raw.production
+        finished.raw.origin finished.raw.current := by
+  have afterDifferent : parent.raw.origin ≠ finished.raw.current := by
+    intro equal
+    have valueEqual := congrArg Fin.val equal
+    omega
+  have finishedDifferent :
+      finished.raw.origin ≠ finished.raw.current := by
+    intro equal
+    have valueEqual := congrArg Fin.val equal
+    omega
+  have rows : (parent.raw.origin.val + 2) * width ≤
+      (finished.raw.origin.val + 1) * width := by
+    apply Nat.mul_le_mul_right
+    omega
+  rcases advance with ⟨production, dot, origin, current⟩
+  simp only [production, origin, current, frontierSpanPotential,
+    if_neg afterDifferent, if_neg finishedDifferent]
+  calc
+    (parent.raw.origin.val + 1) * width +
+          positive parent.raw.production <
+        (parent.raw.origin.val + 1) * width + width :=
+      Nat.add_lt_add_left bounded _
+    _ = (parent.raw.origin.val + 2) * width := by
+      simp [Nat.add_mul, Nat.add_assoc]
+      omega
+    _ ≤ (finished.raw.origin.val + 1) * width := rows
+    _ ≤ (finished.raw.origin.val + 1) * width +
+          positive finished.raw.production := Nat.le_add_right _ _
+
+/-- When caller and completed child share an origin, their local positive
+weights are exactly the remaining coarse comparison. -/
+theorem frontierSpanPotential_continuation_lt_of_equalOrigin
+    {tokens : List Token}
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (parent finished after : ContextualItemKey tokens)
+    (progress : finished.raw.origin.val < finished.raw.current.val)
+    (sameOrigin : parent.raw.origin = finished.raw.origin)
+    (decreases : positive parent.raw.production <
+      positive finished.raw.production)
+    (advance : AdvanceItem parent.raw finished.raw.current after.raw) :
+    frontierSpanPotential width zero positive after.raw.production
+        after.raw.origin after.raw.current <
+      frontierSpanPotential width zero positive finished.raw.production
+        finished.raw.origin finished.raw.current := by
+  have finishedDifferent :
+      finished.raw.origin ≠ finished.raw.current := by
+    intro equal
+    have valueEqual := congrArg Fin.val equal
+    omega
+  rcases advance with ⟨production, dot, origin, current⟩
+  simp only [production, origin, current, frontierSpanPotential,
+    if_neg finishedDifferent, sameOrigin]
+  exact Nat.add_lt_add_left decreases _
+
+/-- Positive-span completion reduces to a finite same-origin production
+comparison; strictly earlier callers are discharged by the span rows. -/
+theorem frontierGrammarRank_continuation_lt_of_complete_positiveSpan
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens} {finished : ContextualItemKey tokens}
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (positiveBound : ∀ production, positive production < width)
+    (frontier : FrontierReach
+      file tokens memo correct final cursor finished)
+    (complete : CompleteItem finished.raw)
+    (nonroot : finished.raw.production ≠ .root .module)
+    (progress : finished.raw.origin.val < finished.raw.current.val)
+    (sameOriginDecreases : ∀ parent,
+      ContextualActivationParent
+        file tokens memo correct final parent finished →
+      parent.raw.origin = finished.raw.origin →
+      positive parent.raw.production < positive finished.raw.production) :
+    ∃ after : ContextualItemKey tokens,
+      FrontierReach file tokens memo correct final cursor after ∧
+      frontierGrammarRank (frontierSpanPotential width zero positive) after <
+        frontierGrammarRank (frontierSpanPotential width zero positive)
+          finished := by
+  rcases frontierReach_continuation_of_complete_nonroot
+      frontier complete nonroot with
+    ⟨parent, after, activated, afterFrontier, advance⟩
+  refine ⟨after, afterFrontier, ?_⟩
+  apply frontierRawGrammarRank_lt_of_potential_lt
+  have ordered := contextualActivationParent_origin_le activated
+  by_cases earlier :
+      parent.raw.origin.val < finished.raw.origin.val
+  · exact frontierSpanPotential_continuation_lt_of_earlierOrigin
+      width zero positive parent finished after
+      (positiveBound _) progress earlier advance
+  · have valueEqual : parent.raw.origin.val =
+        finished.raw.origin.val := by omega
+    have sameOrigin : parent.raw.origin = finished.raw.origin :=
+      Fin.ext valueEqual
+    exact frontierSpanPotential_continuation_lt_of_equalOrigin
+      width zero positive parent finished after progress sameOrigin
+      (sameOriginDecreases parent activated sameOrigin) advance
+
+/-- One exact same-origin completion cell. Only reached completed frontier
+children and their activation callers impose a local production-weight edge. -/
+def frontierSameOriginCompletionRankCell
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (positive : ProductionId → Nat)
+    (finished parent : ContextualItemKey tokens) : Bool :=
+  letI : Decidable
+      (ContextualReach file tokens memo correct final finished) :=
+    contextualReachDecision owned correct final finished
+  letI : Decidable
+      (ContextualReach file tokens memo correct final parent) :=
+    contextualReachDecision owned correct final parent
+  letI : Decidable
+      (NextSymbol parent.raw
+        (.nonterminal finished.raw.production.lhs)) :=
+    by unfold NextSymbol; exact inferInstance
+  letI : Decidable (CompleteItem finished.raw) := by
+    unfold CompleteItem
+    exact inferInstance
+  letI : Decidable (ContextualActivationParent
+      file tokens memo correct final parent finished) := by
+    unfold ContextualActivationParent
+    exact inferInstance
+  if ContextualReach file tokens memo correct final finished then
+    if finished.raw.current = cursor then
+      if CompleteItem finished.raw then
+        if ContextualActivationParent
+            file tokens memo correct final parent finished then
+          if parent.raw.origin = finished.raw.origin then
+            decide (positive parent.raw.production <
+              positive finished.raw.production)
+          else true
+        else true
+      else true
+    else true
+  else true
+
+/-- Finite exact dependency graph for same-origin completion on one
+frontier. -/
+def frontierSameOriginCompletionRankTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (positive : ProductionId → Nat) : Bool :=
+  (allContextualItems tokens).all fun finished =>
+    (allContextualItems tokens).all fun parent =>
+      frontierSameOriginCompletionRankCell
+        owned correct final cursor positive finished parent
+
+/-- An accepted same-origin completion table supplies every selected local
+production-weight edge. -/
+theorem frontierSameOriginCompletionRank_lt_of_table
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (positive : ProductionId → Nat)
+    (checked : frontierSameOriginCompletionRankTable
+      owned correct final cursor positive = true)
+    (finished parent : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final finished)
+    (current : finished.raw.current = cursor)
+    (complete : CompleteItem finished.raw)
+    (activated : ContextualActivationParent
+      file tokens memo correct final parent finished)
+    (sameOrigin : parent.raw.origin = finished.raw.origin) :
+    positive parent.raw.production < positive finished.raw.production := by
+  have row := (List.all_eq_true.mp checked) finished
+    (allContextualItems_complete finished)
+  have cell := (List.all_eq_true.mp row) parent
+    (allContextualItems_complete parent)
+  letI : Decidable
+      (ContextualReach file tokens memo correct final finished) :=
+    contextualReachDecision owned correct final finished
+  letI : Decidable
+      (ContextualReach file tokens memo correct final parent) :=
+    contextualReachDecision owned correct final parent
+  letI : Decidable
+      (NextSymbol parent.raw
+        (.nonterminal finished.raw.production.lhs)) :=
+    by unfold NextSymbol; exact inferInstance
+  letI : Decidable (CompleteItem finished.raw) := by
+    unfold CompleteItem
+    exact inferInstance
+  letI : Decidable (ContextualActivationParent
+      file tokens memo correct final parent finished) := by
+    unfold ContextualActivationParent
+    exact inferInstance
+  simp only [frontierSameOriginCompletionRankCell] at cell
+  rw [if_pos reached, if_pos current, if_pos complete,
+    if_pos activated, if_pos sameOrigin] at cell
+  exact decide_eq_true_iff.mp cell
+
+/-- A checked finite same-origin graph discharges every positive-span
+completion continuation. -/
+theorem frontierGrammarRank_continuation_lt_of_positiveSpanTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens) (finished : ContextualItemKey tokens)
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (positiveBound : ∀ production, positive production < width)
+    (checked : frontierSameOriginCompletionRankTable
+      owned correct final cursor positive = true)
+    (frontier : FrontierReach
+      file tokens memo correct final cursor finished)
+    (complete : CompleteItem finished.raw)
+    (nonroot : finished.raw.production ≠ .root .module)
+    (progress : finished.raw.origin.val < finished.raw.current.val) :
+    ∃ after : ContextualItemKey tokens,
+      FrontierReach file tokens memo correct final cursor after ∧
+      frontierGrammarRank (frontierSpanPotential width zero positive) after <
+        frontierGrammarRank (frontierSpanPotential width zero positive)
+          finished := by
+  apply frontierGrammarRank_continuation_lt_of_complete_positiveSpan
+    width zero positive positiveBound frontier complete nonroot progress
+  intro parent activated sameOrigin
+  exact frontierSameOriginCompletionRank_lt_of_table
+    owned correct final cursor positive checked finished parent
+    frontier.2.1 frontier.2.2 complete activated sameOrigin
+
 
 
 /-- Boundary-free rank of one dotted production in the zero-span mode. -/
