@@ -11535,9 +11535,8 @@ private def phaseCItemMemberBool
     (item : ContextualItemKey tokens) : Bool :=
   items.any fun candidate => decide (candidate = item)
 
-/-- Publish one prepared semantic candidate. A fresh complete candidate
-consumes its epsilon-action unit before the prefix/reduction pair becomes
-visible atomically under the single frontier-insertion unit. -/
+/-- Publish one prepared semantic candidate under its single frontier-
+insertion unit. Duplicate candidates remain a no-op. -/
 private def publishPhaseCValueCandidate?
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseCValueWorklist file tokens))
@@ -11551,12 +11550,23 @@ private def publishPhaseCValueCandidate?
       runMappedPrimitive? current
         (.linear .L09_frontierInsert (contextualLinearKey item))
         fun state => { state with frontier := candidate.state }
-  | .insertedComplete => do
-      let actioned ← runMappedPrimitive? current
-        (.linear .L13_epsilonAction (contextualLinearKey item)) id
-      runMappedPrimitive? actioned
+  | .insertedComplete =>
+      runMappedPrimitive? current
         (.linear .L09_frontierInsert (contextualLinearKey item))
         fun state => { state with frontier := candidate.state }
+
+/-- Charge a source-specific production action exactly for a fresh complete
+candidate. -/
+private def chargePhaseCCompletedCandidate?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (completeAction : UnitAddress tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  match candidate.kind with
+  | .insertedComplete => runMappedPrimitive? current completeAction id
+  | .duplicate | .insertedIncomplete => some current
 
 /-- Attempt one syntactically applicable semantic prediction. Recognition
 membership prevents a disabled production from entering the value frontier;
@@ -11580,7 +11590,9 @@ private def attemptPhaseCValuePrediction?
           let prior := ContextualPrefixValue.zero item atZero
           let candidate ← ContextualValueFrontierState.insertCandidate?
             owned attempted.payload.frontier item prior
-          publishPhaseCValueCandidate? attempted item candidate
+          let actioned ← chargePhaseCCompletedCandidate? attempted
+            (.linear .L13_epsilonAction (contextualLinearKey item)) candidate
+          publishPhaseCValueCandidate? actioned item candidate
         else
           none
       else
@@ -11599,6 +11611,64 @@ private def attemptPhaseCValuePredictions?
       let next ← attemptPhaseCValuePrediction?
         owned current waiting predicted
       attemptPhaseCValuePredictions? owned waiting rest next
+
+/-- Rebuild one retained structural scan, retrieve its exact source prefix,
+compute and classify its target, then charge traversal before publication. -/
+private def attemptPhaseCScannedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  if _sameSource : edge.before = source then do
+    let rebuilt ← rebuildContextualScannedEdge? owned edge
+    let prior ← current.payload.frontier.lookupPrefix? edge.before
+    let next := rebuilt.scan prior
+    let candidate ← current.payload.frontier.insertCandidate?
+      owned edge.after next
+    let traversed ← runMappedPrimitive? current
+      (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey edge.before)) id
+    let actioned ← runMappedPrimitive? traversed
+      (.linear .L12_scannedAction (contextualLinearKey edge.before)) id
+    publishPhaseCValueCandidate? actioned edge.after candidate
+  else
+    some current
+
+/-- Ignore completed edges in this slice and expose the constructor-specific
+structural scan proof directly from the retained packed subtype. -/
+private def attemptPhaseCPackedScannedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  match packed with
+  | ⟨.scanned before after cursor, structural⟩ =>
+      attemptPhaseCScannedEdge? owned source {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      } current
+  | ⟨.completed _ _ _ _, _⟩ => some current
+
+/-- Fold the immutable retained recognition edge list for one dequeued source
+item. Exactly matching scan sources can consume L14. -/
+private def attemptPhaseCRetainedScannedEdges?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    List (StructurallyValidContextualPackedEdge file tokens) →
+      CountedState tokens (PhaseCValueWorklist file tokens) →
+      Option (CountedState tokens (PhaseCValueWorklist file tokens))
+  | [], current => some current
+  | edge :: rest, current => do
+      let next ← attemptPhaseCPackedScannedEdge?
+        owned source edge current
+      attemptPhaseCRetainedScannedEdges? owned source rest next
 
 private def phaseCEdgeMemberBool
     {file : WorkspaceFile} {tokens : List Token}
