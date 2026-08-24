@@ -5870,6 +5870,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | functionDecl : ExecutableRootRule .functionDecl
   | classMethod : ExecutableRootRule .classMethod
   | letStatement : ExecutableRootRule .letStatement
+  | letBinding : ExecutableRootRule .letBinding
   | breakStatement : ExecutableRootRule .breakStatement
   | continueStatement : ExecutableRootRule .continueStatement
   | assemblyStatement : ExecutableRootRule .assemblyStatement
@@ -6734,6 +6735,48 @@ def executeLetStatementRoot
     (.atom (.terminal (.symbol .semicolon))) input
   sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
     (.letBinding (EbnfValue.ruleView .letBinding viewed.1))
+
+/-- Execute every let-binding form and both initializer states. -/
+def executeLetBindingRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .letBinding)) : LetBinding :=
+  let letAtom : EbnfExpr := .atom (.terminal (.hardKeyword .letKw))
+  let nameAtom : EbnfExpr := .atom (.terminal (.category .identifier))
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let typeSeq : EbnfExpr := .sequence [colonAtom, .optional comptimeAtom,
+    typeAtom]
+  let equalAtom : EbnfExpr := .atom (.terminal (.symbol .equal))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let initSeq : EbnfExpr := .sequence [equalAtom, expressionAtom]
+  let children := [letAtom, nameAtom, .optional typeSeq, .optional initSeq]
+  let ⟨_, rawName, rawType, rawInit, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let typeData := (EbnfValue.optionalView typeSeq rawType).map fun raw =>
+    let values := EbnfValue.sequenceFlatView
+      [colonAtom, .optional comptimeAtom, typeAtom] raw
+    let comptime := (EbnfValue.optionalView comptimeAtom values.2.1).map
+      (EbnfValue.terminalView (.contextualKeyword .comptimeKw))
+    (comptime, EbnfValue.ruleView .type values.2.2.1)
+  let initializer := (EbnfValue.optionalView initSeq rawInit).map fun raw =>
+    let values := EbnfValue.sequenceFlatView
+      [equalAtom, expressionAtom] raw
+    (EbnfValue.terminalView (.symbol .equal) values.1,
+      EbnfValue.ruleView .expression values.2.1)
+  sourceLoc (ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered) {
+    comptime := typeData.bind fun value => value.1.map fun terminal =>
+      { span := terminal.span, payload := .comptimeModifier }
+    name := { span := name.span, payload := name.identifierProjection.2 }
+    type := typeData.map Prod.snd
+    initializer := initializer.map Prod.snd
+  }
 
 /-- Execute a break statement, retaining its terminator span. -/
 def executeBreakStatementRoot
@@ -8810,6 +8853,8 @@ def executeRootRule
       executeClassMethodRoot file tokens origin finish owned ordered input
   | .letStatement =>
       executeLetStatementRoot file tokens origin finish owned ordered input
+  | .letBinding =>
+      executeLetBindingRoot file tokens origin finish owned ordered input
   | .breakStatement =>
       executeBreakStatementRoot file tokens origin finish owned ordered input
   | .continueStatement =>
