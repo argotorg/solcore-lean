@@ -17,6 +17,150 @@ def ContextualRecognizes
     CompleteItem item.raw ∧ item.raw.production.lhs = symbol ∧
     item.raw.origin = start ∧ item.raw.current = finish
 
+private def contextualRecognizingItemDecision
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens)
+    (item : ContextualItemKey tokens) :
+    Decidable
+      (ContextualReach file tokens memo correct final item ∧
+        CompleteItem item.raw ∧ item.raw.production.lhs = symbol ∧
+        item.raw.origin = start ∧ item.raw.current = finish) := by
+  unfold CompleteItem
+  letI : Decidable
+      (ContextualReach file tokens memo correct final item) :=
+    contextualReachDecision owned correct final item
+  infer_instance
+
+/-- Executable recognition test for one exact contextual interval. -/
+def contextualRecognizesBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) : Bool :=
+  (allContextualItems tokens).any fun item =>
+    @decide
+      (ContextualReach file tokens memo correct final item ∧
+        CompleteItem item.raw ∧ item.raw.production.lhs = symbol ∧
+        item.raw.origin = start ∧ item.raw.current = finish)
+      (contextualRecognizingItemDecision
+        owned correct final symbol start finish item)
+
+/-- The executable interval test accepts exactly contextual recognition. -/
+theorem contextualRecognizesBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) :
+    contextualRecognizesBool file tokens owned correct final
+        symbol start finish = true ↔
+      ContextualRecognizes file tokens memo correct final
+        symbol start finish := by
+  unfold contextualRecognizesBool ContextualRecognizes
+  rw [List.any_eq_true]
+  constructor
+  · rintro ⟨item, _member, accepted⟩
+    letI : Decidable
+        (ContextualReach file tokens memo correct final item ∧
+          CompleteItem item.raw ∧ item.raw.production.lhs = symbol ∧
+          item.raw.origin = start ∧ item.raw.current = finish) :=
+      contextualRecognizingItemDecision
+        owned correct final symbol start finish item
+    exact ⟨item, of_decide_eq_true accepted⟩
+  · rintro ⟨item, evidence⟩
+    letI : Decidable
+        (ContextualReach file tokens memo correct final item ∧
+          CompleteItem item.raw ∧ item.raw.production.lhs = symbol ∧
+          item.raw.origin = start ∧ item.raw.current = finish) :=
+      contextualRecognizingItemDecision
+        owned correct final symbol start finish item
+    exact ⟨item, allContextualItems_complete item,
+      decide_eq_true evidence⟩
+
+private theorem symbolAtBoundary_of_matched
+    {file : WorkspaceFile} {tokens : List Token}
+    {cursor : Boundary tokens} {symbol : Symbol}
+    (terminal : MatchedTerminal file tokens (.symbol symbol))
+    (atCursor : terminal.cursor.beforeBoundary = cursor) :
+    SymbolAtBoundary file tokens cursor symbol := by
+  rcases terminal with
+    ⟨terminalCursor, value, span, terminalAt, matchedEvidence⟩
+  cases value with
+  | retained token =>
+      have payload : token.payload = .symbol symbol := by
+        simpa [TerminalMatches] using matchedEvidence
+      cases terminalAt with
+      | retained token inRange lookup valid =>
+          exact ⟨terminalCursor, token, atCursor,
+            .retained terminalCursor token inRange lookup valid, payload⟩
+  | endOfFile => simp [TerminalMatches] at matchedEvidence
+
+/-- Executable observation that a token at one boundary belongs to a
+nonassociative operator level. -/
+def nonAssociativeOperatorAtBool
+    (tokens : List Token) (cursor : Boundary tokens) :
+    NonAssociativeLevel → Bool
+  | .relational =>
+      symbolAtBoundaryBool tokens cursor .less ||
+      symbolAtBoundaryBool tokens cursor .greater ||
+      symbolAtBoundaryBool tokens cursor .lessEqual ||
+      symbolAtBoundaryBool tokens cursor .greaterEqual
+  | .equality =>
+      symbolAtBoundaryBool tokens cursor .equalEqual ||
+      symbolAtBoundaryBool tokens cursor .notEqual
+
+/-- Every declaratively found nonassociative operator is accepted by its
+level observation. -/
+theorem nonAssociativeOperatorAtBool_eq_true_of_found
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {cursor : Boundary tokens} {level : NonAssociativeLevel}
+    {operator : Located InfixOperator}
+    (found : FoundNonAssociativeOperatorAt
+      file tokens cursor level operator) :
+    nonAssociativeOperatorAtBool tokens cursor level = true := by
+  cases found with
+  | less terminal atCursor =>
+      have accepted := (symbolAtBoundaryBool_eq_true_iff
+        owned cursor .less).mpr
+          (symbolAtBoundary_of_matched terminal atCursor)
+      simp [nonAssociativeOperatorAtBool, accepted]
+  | greater terminal atCursor =>
+      have accepted := (symbolAtBoundaryBool_eq_true_iff
+        owned cursor .greater).mpr
+          (symbolAtBoundary_of_matched terminal atCursor)
+      simp [nonAssociativeOperatorAtBool, accepted]
+  | lessEqual terminal atCursor =>
+      have accepted := (symbolAtBoundaryBool_eq_true_iff
+        owned cursor .lessEqual).mpr
+          (symbolAtBoundary_of_matched terminal atCursor)
+      simp [nonAssociativeOperatorAtBool, accepted]
+  | greaterEqual terminal atCursor =>
+      have accepted := (symbolAtBoundaryBool_eq_true_iff
+        owned cursor .greaterEqual).mpr
+          (symbolAtBoundary_of_matched terminal atCursor)
+      simp [nonAssociativeOperatorAtBool, accepted]
+  | equal terminal atCursor =>
+      have accepted := (symbolAtBoundaryBool_eq_true_iff
+        owned cursor .equalEqual).mpr
+          (symbolAtBoundary_of_matched terminal atCursor)
+      simp [nonAssociativeOperatorAtBool, accepted]
+  | notEqual terminal atCursor =>
+      have accepted := (symbolAtBoundaryBool_eq_true_iff
+        owned cursor .notEqual).mpr
+          (symbolAtBoundary_of_matched terminal atCursor)
+      simp [nonAssociativeOperatorAtBool, accepted]
+
 /-- Forget contextual guard bookkeeping from one reached chart item. -/
 theorem ContextualReach.toUnguarded
     {file : WorkspaceFile} {tokens : List Token}
