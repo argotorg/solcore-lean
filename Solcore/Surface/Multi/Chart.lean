@@ -10883,6 +10883,12 @@ end ContextualPrefixValue
 
 namespace ContextualReductionValue
 
+private instance completeItemDecidable
+    {tokens : List Token} (item : DottedItem tokens) :
+    Decidable (CompleteItem item) := by
+  unfold CompleteItem
+  infer_instance
+
 /-- Apply the generated production action to one exact complete prefix. -/
 def reduce
     {file : WorkspaceFile} {tokens : List Token}
@@ -10896,6 +10902,86 @@ def reduce
     executeProductionAction file tokens item.raw.origin item.raw.current
     item.raw.production owned ordered
     (PrefixValues.fullValue item isComplete prior.value)⟩
+
+/-- Apply a production action only at a complete ordered item. The module
+root additionally requires the canonical whole-token interval. -/
+def reduce?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item) :
+    Option (ContextualReductionValue file tokens item) :=
+  if ordered : item.raw.origin.val ≤ item.raw.current.val then
+    if isComplete : CompleteItem item.raw then
+      if _moduleInterval : item.raw.production = .root .module →
+          item.raw.origin = Boundary.start tokens ∧
+            item.raw.current = Boundary.afterLogicalEOF tokens then
+        some (reduce owned item ordered isComplete prior)
+      else
+        none
+    else
+      none
+  else
+    none
+
+/-- Selection exposes exactly the three checked readiness witnesses and the
+canonical computed carrier. -/
+theorem reduce?_eq_some_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (result : ContextualReductionValue file tokens item) :
+    reduce? owned item prior = some result ↔
+      ∃ ordered : item.raw.origin.val ≤ item.raw.current.val,
+      ∃ complete : CompleteItem item.raw,
+      ∃ _moduleInterval : item.raw.production = .root .module →
+        item.raw.origin = Boundary.start tokens ∧
+          item.raw.current = Boundary.afterLogicalEOF tokens,
+        result = reduce owned item ordered complete prior := by
+  by_cases ordered : item.raw.origin.val ≤ item.raw.current.val
+  · by_cases complete : CompleteItem item.raw
+    · by_cases moduleInterval : item.raw.production = .root .module →
+          item.raw.origin = Boundary.start tokens ∧
+            item.raw.current = Boundary.afterLogicalEOF tokens
+      · constructor
+        · intro selected
+          have computed : reduce? owned item prior =
+              some (reduce owned item ordered complete prior) := by
+            unfold reduce?
+            rw [dif_pos ordered, dif_pos complete, dif_pos moduleInterval]
+          have resultEq := Option.some.inj (computed.symm.trans selected)
+          exact ⟨ordered, complete, moduleInterval, resultEq.symm⟩
+        · rintro ⟨otherOrdered, otherComplete,
+            otherModuleInterval, rfl⟩
+          unfold reduce?
+          rw [dif_pos ordered, dif_pos complete, dif_pos moduleInterval]
+      · simp [reduce?, ordered, complete, moduleInterval]
+    · simp [reduce?, ordered, complete]
+  · simp [reduce?, ordered]
+
+/-- Success is equivalent to proof-free readiness, independently of the
+computed semantic payload. -/
+theorem reduce?_isSome_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item) :
+    (reduce? owned item prior).isSome = true ↔
+      item.raw.origin.val ≤ item.raw.current.val ∧
+      CompleteItem item.raw ∧
+      (item.raw.production = .root .module →
+        item.raw.origin = Boundary.start tokens ∧
+          item.raw.current = Boundary.afterLogicalEOF tokens) := by
+  by_cases ordered : item.raw.origin.val ≤ item.raw.current.val
+  · by_cases complete : CompleteItem item.raw
+    · by_cases moduleInterval : item.raw.production = .root .module →
+          item.raw.origin = Boundary.start tokens ∧
+            item.raw.current = Boundary.afterLogicalEOF tokens
+      · simp [reduce?, ordered, complete]
+      · simp [reduce?, ordered, complete, moduleInterval]
+    · simp [reduce?, ordered, complete]
+  · simp [reduce?, ordered]
 
 end ContextualReductionValue
 
