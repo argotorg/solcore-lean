@@ -16092,6 +16092,46 @@ def OperationalContextualEdgeReach
           OperationalContextualReach file tokens memo finished ∧
           OperationalContextualReach file tokens memo after
 
+/-- Completing the only child of the module root necessarily completes the
+one-symbol root production. -/
+private theorem StructurallyValidContextualCompletedEdge.complete_of_module
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (production : edge.after.raw.production = .root .module) :
+    CompleteItem edge.after.raw := by
+  obtain ⟨witness⟩ := packedEdge_completed_valid_iff.mp edge.structural.1
+  rcases witness with
+    ⟨next, _childComplete, _waitingAtShared, _finishedAtShared, advance⟩
+  have waitingProduction : edge.waiting.raw.production = .root .module :=
+    advance.1.symm.trans production
+  have waitingDot : edge.waiting.raw.dot.val = 0 := by
+    have rhsEq : edge.waiting.raw.production.rhs =
+        (ProductionId.root .module).rhs :=
+      congrArg ProductionId.rhs waitingProduction
+    have lengthEq : edge.waiting.raw.production.rhs.length = 1 := by
+      rw [rhsEq]
+      simp [ProductionId.rhs]
+    have bound := next.1
+    omega
+  unfold CompleteItem
+  rw [advance.2.1, waitingDot, production]
+  simp [ProductionId.rhs]
+
+/-- Operational reach of a retained completion supplies the exact module
+interval demanded by semantic reduction. -/
+private theorem OperationalContextualEdgeReach.completedModule_interval
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (reached : OperationalContextualEdgeReach file tokens memo
+      (.completed edge.waiting edge.finished edge.after edge.shared))
+    (production : edge.after.raw.production = .root .module) :
+    edge.after.raw.origin = Boundary.start tokens ∧
+      edge.after.raw.current = Boundary.afterLogicalEOF tokens := by
+  exact reached.2.2.2.completeModule_interval production
+    (StructurallyValidContextualCompletedEdge.complete_of_module edge
+      production)
+
 /-- Public proof-free observation of a successful checked contextual drain. -/
 structure ContextualWorklistResult
     (file : WorkspaceFile) (tokens : List Token) where
