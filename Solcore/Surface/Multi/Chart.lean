@@ -11731,6 +11731,94 @@ private structure PhaseCValueAddressesFresh
         (contextualCompletionKey waiting finished) : UnitAddress tokens) ∉
           counter.usedRev
 
+/-- Exact semantic-only address family. Recognition may consume other tags
+over the same contextual coordinates without entering this family. -/
+private inductive PhaseCValueAddress
+    {tokens : List Token} : UnitAddress tokens → Prop where
+  | dequeue (item : ContextualItemKey tokens) :
+      PhaseCValueAddress (.linear .L08_frontierDequeue
+        (contextualLinearKey item))
+  | prediction (item : ContextualItemKey tokens) (predicted : ProductionId)
+      (member : predicted ∈ allProductionIds) :
+      PhaseCValueAddress (.prediction .R02_frontierPrediction
+        (contextualPredictionKey item predicted))
+  | scanTraversal (item : ContextualItemKey tokens) :
+      PhaseCValueAddress (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey item))
+  | scanAction (item : ContextualItemKey tokens) :
+      PhaseCValueAddress (.linear .L12_scannedAction
+        (contextualLinearKey item))
+  | insert (item : ContextualItemKey tokens) :
+      PhaseCValueAddress (.linear .L09_frontierInsert
+        (contextualLinearKey item))
+  | epsilonAction (item : ContextualItemKey tokens) :
+      PhaseCValueAddress (.linear .L13_epsilonAction
+        (contextualLinearKey item))
+  | completionTraversal (waiting finished : ContextualItemKey tokens) :
+      PhaseCValueAddress (.cubic .U07_frontierCompletedTraversal
+        (contextualCompletionKey waiting finished))
+  | completionAction (waiting finished : ContextualItemKey tokens) :
+      PhaseCValueAddress (.cubic .U05_completedAction
+        (contextualCompletionKey waiting finished))
+
+/-- Structured semantic freshness is pointwise freshness on the exact tagged
+semantic address family. -/
+private theorem PhaseCValueAddressesFresh.addressFresh
+    {tokens : List Token} {counter : Counter tokens}
+    (fresh : PhaseCValueAddressesFresh counter)
+    {address : UnitAddress tokens}
+    (semantic : PhaseCValueAddress address) :
+    address ∉ counter.usedRev := by
+  cases semantic with
+  | dequeue item => exact (fresh.source item).1
+  | prediction item predicted member =>
+      exact (fresh.source item).2.1 predicted member
+  | scanTraversal item => exact (fresh.source item).2.2.1
+  | scanAction item => exact (fresh.source item).2.2.2
+  | insert item => exact (fresh.candidate item).1
+  | epsilonAction item => exact (fresh.candidate item).2
+  | completionTraversal waiting finished =>
+      exact (fresh.completion waiting finished).1
+  | completionAction waiting finished =>
+      exact (fresh.completion waiting finished).2
+
+/-- Pointwise freshness on every semantic address reconstructs the structured
+bundle used at the recognition/value boundary. -/
+private theorem PhaseCValueAddressesFresh.of_addressFresh
+    {tokens : List Token} {counter : Counter tokens}
+    (fresh : ∀ address : UnitAddress tokens,
+      PhaseCValueAddress address → address ∉ counter.usedRev) :
+    PhaseCValueAddressesFresh counter := by
+  constructor
+  · intro item
+    exact ⟨fresh _ (.dequeue item),
+      fun predicted member => fresh _ (.prediction item predicted member),
+      fresh _ (.scanTraversal item), fresh _ (.scanAction item)⟩
+  · intro item
+    exact ⟨fresh _ (.insert item), fresh _ (.epsilonAction item)⟩
+  · intro waiting finished
+    exact ⟨fresh _ (.completionTraversal waiting finished),
+      fresh _ (.completionAction waiting finished)⟩
+
+/-- Charging a recognition-only address preserves all semantic-only address
+freshness, independently of the payload transition. -/
+private theorem runMappedPrimitive?_valueAddressesFresh_of_not_value
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    (result : CountedState tokens after)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (notValue : ¬ PhaseCValueAddress address)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  apply PhaseCValueAddressesFresh.of_addressFresh
+  intro target semantic used
+  rw [runMappedPrimitive?_usedRev current address transition result selected,
+    List.mem_cons] at used
+  rcases used with equal | old
+  · exact notValue (equal ▸ semantic)
+  · exact fresh.addressFresh semantic old
+
 /-- Causal membership turns prefix absence into freshness for every future
 source charge of that item. -/
 private theorem PhaseCValueAddressSafe.sourceFresh_of_absent
