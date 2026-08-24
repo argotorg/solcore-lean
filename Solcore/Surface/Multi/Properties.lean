@@ -1,4 +1,4 @@
-import Solcore.Surface.Multi.ChartProperties
+import Solcore.Surface.Multi.DiagnosticExhaustiveness
 import Solcore.Surface.Multi.LexicalJudgment
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Measure
