@@ -354,6 +354,26 @@ theorem rootlessRankCertificateBool_eq_true_iff
           owned correct final cursor potential = true := by
   simp [rootlessRankCertificateBool]
 
+/-- A potential selected by bounded synthesis automatically satisfies the
+reduced two-table rank certificate at the computed greatest cursor. -/
+theorem rootlessRankCertificateBool_eq_true_of_boundedSearch
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    {potential : FrontierGrammarPotential tokens}
+    (selected : boundedFrontierGrammarPotential? owned correct final
+      (computedGreatestReachableCursor owned correct final) =
+        some potential) :
+    rootlessRankCertificateBool
+      owned correct final potential = true := by
+  apply (rootlessRankCertificateBool_eq_true_iff
+    owned correct final potential).mpr
+  exact boundedFrontierGrammarPotential?_sound
+    owned correct final
+      (computedGreatestReachableCursor owned correct final) selected
+
 /-- Reached match-arm readiness, two accepted rank tables, and post-EOF
 closure construct the full progress interface. -/
 theorem rootlessExecutableProgress_of_computedRankTables
@@ -420,6 +440,83 @@ def executeObservedContextualRankCertificateBool
     file tokens owned result.recognition recognitionSelected
   rootlessRankCertificateBool owned correct final potential
 
+/-- Bounded synthesis of a rank potential for the concrete value-carrying
+recognition ledger and its computed greatest cursor. -/
+def executeObservedContextualBoundedPotential?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (FrontierGrammarPotential tokens) :=
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  boundedFrontierGrammarPotential? owned correct final
+    (computedGreatestReachableCursor owned correct final)
+
+/-- Exact remaining success condition for concrete bounded rank synthesis. -/
+def ExecuteObservedContextualBoundedPotentialSearchSucceeds
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) : Prop :=
+  (executeObservedContextualBoundedPotential?
+    file tokens owned).isSome = true
+
+/-- The concrete potential selected by a successful bounded search. -/
+def executeObservedContextualBoundedPotential
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
+      file tokens owned) : FrontierGrammarPotential tokens :=
+  (executeObservedContextualBoundedPotential?
+    file tokens owned).get success
+
+theorem executeObservedContextualBoundedPotential?_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
+      file tokens owned) :
+    executeObservedContextualBoundedPotential? file tokens owned =
+      some (executeObservedContextualBoundedPotential
+        file tokens owned success) := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨success, rfl⟩
+
+/-- Successful concrete synthesis accepts the exact two-table rank
+certificate used by direct parsing. -/
+theorem executeObservedContextualRankCertificateBool_eq_true_of_boundedSearch
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
+      file tokens owned) :
+    executeObservedContextualRankCertificateBool file tokens owned
+        (executeObservedContextualBoundedPotential
+          file tokens owned success) = true := by
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  change rootlessRankCertificateBool owned correct final
+      (executeObservedContextualBoundedPotential
+        file tokens owned success) = true
+  apply rootlessRankCertificateBool_eq_true_of_boundedSearch
+  exact executeObservedContextualBoundedPotential?_selected
+    file tokens owned success
+
 /-- Fully executable operand-prefix certificate for the concrete
 value-carrying recognition ledger. -/
 def executeObservedContextualNonAssociativeCertificateBool
@@ -462,6 +559,26 @@ theorem executeObservedContextualFormalCertificateBool_eq_true_iff
         executeObservedContextualNonAssociativeCertificateBool
           file tokens owned = true := by
   simp [executeObservedContextualFormalCertificateBool]
+
+/-- Successful bounded rank synthesis and an accepted G10 table discharge
+the combined formal certificate without a caller-supplied potential. -/
+theorem executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
+      file tokens owned)
+    (nonAssociativeAccepted :
+      executeObservedContextualNonAssociativeCertificateBool
+        file tokens owned = true) :
+    executeObservedContextualFormalCertificateBool file tokens owned
+        (executeObservedContextualBoundedPotential
+          file tokens owned success) = true := by
+  apply (executeObservedContextualFormalCertificateBool_eq_true_iff
+    file tokens owned _).mpr
+  exact ⟨
+    executeObservedContextualRankCertificateBool_eq_true_of_boundedSearch
+      file tokens owned success,
+    nonAssociativeAccepted⟩
 
 /-- On the concrete executor ledger, coherent pass-through safety plus the
 accepted operand-prefix table constructs the complete G10 invariant. -/
@@ -1024,6 +1141,39 @@ def executeObservedContextualParseOfFormalCertificate
   executeObservedContextualParseOfRankCertificate
     file tokens owned ready potential checks.1
 
+/-- Direct parse outcome using the potential synthesized by the bounded
+frontier search. -/
+def executeObservedContextualParseOfBoundedSearch
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
+      file tokens owned)
+    (nonAssociativeAccepted :
+      executeObservedContextualNonAssociativeCertificateBool
+        file tokens owned = true) :
+    Except ParseDiagnostic ParsedModuleV1 :=
+  executeObservedContextualParseOfFormalCertificate file tokens owned ready
+    (executeObservedContextualBoundedPotential file tokens owned success)
+    (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
+      file tokens owned success nonAssociativeAccepted)
+
 /-- The certificate-driven executable outcome is exactly the value selected
 by the option-based implementation. -/
 theorem executeObservedContextualParseOfProgress_selected
@@ -1157,6 +1307,44 @@ theorem executeObservedContextualParseOfFormalCertificate_selected
   simpa [executeObservedContextualParseOfFormalCertificate] using
     executeObservedContextualParseOfRankCertificate_selected
       file tokens owned ready potential checks.1
+
+/-- Bounded synthesis preserves exact selection of the implementation's
+option result. -/
+theorem executeObservedContextualParseOfBoundedSearch_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
+      file tokens owned)
+    (nonAssociativeAccepted :
+      executeObservedContextualNonAssociativeCertificateBool
+        file tokens owned = true) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    result.parseOutcome? file =
+      some (executeObservedContextualParseOfBoundedSearch
+        file tokens owned ready success nonAssociativeAccepted) := by
+  exact executeObservedContextualParseOfFormalCertificate_selected
+    file tokens owned ready
+      (executeObservedContextualBoundedPotential file tokens owned success)
+      (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
+        file tokens owned success nonAssociativeAccepted)
 
 /-- The certificate-driven executable result is declaratively sound: modules
 parse, and diagnostics apply to the supplied source. -/
@@ -1419,5 +1607,59 @@ theorem executeObservedContextualParseOfFormalCertificate_sound
   exact
     executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeCertificate
       file tokens owned ready potential checks.1 safe checks.2
+
+/-- Bounded synthesis yields a declaratively sound direct parse once
+coherent pass-through safety is available. -/
+theorem executeObservedContextualParseOfBoundedSearch_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
+      file tokens owned)
+    (nonAssociativeAccepted :
+      executeObservedContextualNonAssociativeCertificateBool
+        file tokens owned = true)
+    (safe :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      CoherentNonAssociativePassThroughSafe
+        file tokens result.recognition.memo correct final) :
+    match executeObservedContextualParseOfBoundedSearch
+        file tokens owned ready success nonAssociativeAccepted with
+    | .ok module => Parses file tokens module
+    | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
+  exact executeObservedContextualParseOfFormalCertificate_sound
+    file tokens owned ready
+      (executeObservedContextualBoundedPotential file tokens owned success)
+      (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
+        file tokens owned success nonAssociativeAccepted)
+      safe
 
 end Solcore.Surface.Multi
