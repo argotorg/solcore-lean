@@ -15536,6 +15536,88 @@ private theorem contextualCompletedEdge?_complete
   split <;> simp_all [expected, expectedRaw]
   exact ⟨_, ⟨structural.2.1, rfl⟩, rfl, rfl, rfl, rfl⟩
 
+/-- Every structurally valid contextual scan can recover its exact
+Type-valued witness. -/
+theorem rebuildContextualScannedEdge?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens) :
+    ∃ rebuilt, rebuildContextualScannedEdge? owned edge = some rebuilt := by
+  obtain ⟨computed, computedEq, beforeEq, afterEq, cursorEq⟩ :=
+    contextualScannedEdge?_complete owned edge.before edge.after edge.cursor
+      edge.structural
+  have erased := witnessedContextualScannedEdge?_erase owned edge.before
+  rw [computedEq] at erased
+  cases selected : witnessedContextualScannedEdge? owned edge.before with
+  | none =>
+      simp [selected] at erased
+  | some result =>
+      rcases result with ⟨generatedAfter, witnessed⟩
+      have pairEq :
+          (generatedAfter, witnessed.toStructural) =
+            (edge.after, computed) := by
+        simpa [selected] using erased
+      have structuralEq : witnessed.toStructural = computed :=
+        congrArg Prod.snd pairEq
+      subst computed
+      change witnessed.before = edge.before at beforeEq
+      change witnessed.after = edge.after at afterEq
+      change witnessed.cursor = edge.cursor at cursorEq
+      have exactKey : witnessed.toPacked.val =
+          .scanned edge.before edge.after edge.cursor := by
+        simp only [WitnessedContextualScannedEdge.toPacked_val]
+        rw [beforeEq, afterEq, cursorEq]
+      refine ⟨⟨witnessed, exactKey⟩, ?_⟩
+      unfold rebuildContextualScannedEdge?
+      rw [selected]
+      change (if exactKey' : witnessed.toPacked.val =
+          .scanned edge.before edge.after edge.cursor then
+        some (⟨witnessed, exactKey'⟩ : RebuiltContextualScannedEdge edge)
+      else none) = some ⟨witnessed, exactKey⟩
+      rw [dif_pos exactKey]
+
+/-- Every structurally valid contextual completion can recover its exact
+Type-valued witness. -/
+theorem rebuildContextualCompletedEdge?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    ∃ rebuilt, rebuildContextualCompletedEdge? edge = some rebuilt := by
+  obtain ⟨computed, computedEq, waitingEq, finishedEq, afterEq, sharedEq⟩ :=
+    contextualCompletedEdge?_complete edge.waiting edge.finished edge.after
+      edge.shared edge.structural
+  have erased := witnessedContextualCompletedEdge?_erase (file := file)
+    edge.waiting edge.finished
+  rw [computedEq] at erased
+  cases selected : witnessedContextualCompletedEdge? (file := file)
+      edge.waiting edge.finished with
+  | none =>
+      simp [selected] at erased
+  | some result =>
+      rcases result with ⟨generatedAfter, witnessed⟩
+      have pairEq :
+          (generatedAfter, witnessed.toStructural) =
+            (edge.after, computed) := by
+        simpa [selected] using erased
+      have structuralEq : witnessed.toStructural = computed :=
+        congrArg Prod.snd pairEq
+      subst computed
+      change witnessed.waiting = edge.waiting at waitingEq
+      change witnessed.finished = edge.finished at finishedEq
+      change witnessed.after = edge.after at afterEq
+      change witnessed.shared = edge.shared at sharedEq
+      have exactKey : witnessed.toPacked.val =
+          .completed edge.waiting edge.finished edge.after edge.shared := by
+        simp only [WitnessedContextualCompletedEdge.toPacked_val]
+        rw [waitingEq, finishedEq, afterEq, sharedEq]
+      refine ⟨⟨witnessed, exactKey⟩, ?_⟩
+      unfold rebuildContextualCompletedEdge?
+      rw [selected]
+      change (if exactKey' : witnessed.toPacked.val =
+          .completed edge.waiting edge.finished edge.after edge.shared then
+        some (⟨witnessed, exactKey'⟩ : RebuiltContextualCompletedEdge edge)
+      else none) = some ⟨witnessed, exactKey⟩
+      rw [dif_pos exactKey]
+
 end Chart
 
 namespace Chart
