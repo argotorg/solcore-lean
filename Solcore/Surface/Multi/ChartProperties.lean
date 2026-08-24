@@ -11947,6 +11947,286 @@ theorem executeClassDeclRoot_reduces
   have inputReduces := rebuiltEq ▸ normalizedReduces
   exact resultEq.symm ▸ inputReduces
 
+/-- The instance-declaration executor realizes its exact root reduction. -/
+theorem executeInstanceDeclRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .instanceDecl origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .instanceDecl)) :
+    RuleReduction file tokens .instanceDecl origin finish input
+      (executeInstanceDeclRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let genericAtom : EbnfExpr := .atom (.nonterminal .genericPrefix)
+  let defaultAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .defaultKw))
+  let instanceAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .instanceKw))
+  let mainAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let colonAtom : EbnfExpr := .atom (.terminal (.symbol .colon))
+  let classAtom : EbnfExpr := .atom (.nonterminal .qualifiedName)
+  let parameterChild := EbnfValue.typeArgumentsExpr
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftBrace))
+  let methodAtom : EbnfExpr := .atom (.nonterminal .instanceMethod)
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightBrace))
+  let children : List EbnfExpr := [.optional genericAtom,
+    .optional defaultAtom, instanceAtom, mainAtom, colonAtom, classAtom,
+    .optional parameterChild, openAtom, .star methodAtom, closeAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize sequenceEq : EbnfValue.sequenceFlatView children input = values
+  rcases values with ⟨rawGeneric, rawDefault, rawInstance, rawMain,
+    rawColon, rawClass, rawParameters, rawOpen, rawMethods, rawClose, ⟨⟩⟩
+  have inputEq := EbnfValue.sequence_of_flat_view children input
+  rw [sequenceEq] at inputEq
+  let rawGenericValue := EbnfValue.optionalView genericAtom rawGeneric
+  let genericPrefix := rawGenericValue.map
+    (EbnfValue.ruleView .genericPrefix)
+  let rawDefaultValue := EbnfValue.optionalView defaultAtom rawDefault
+  let defaultToken := rawDefaultValue.map
+    (EbnfValue.terminalView (.hardKeyword .defaultKw))
+  let instanceKw := EbnfValue.terminalView
+    (.hardKeyword .instanceKw) rawInstance
+  let main := EbnfValue.ruleView .typeAtom rawMain
+  let colon := EbnfValue.terminalView (.symbol .colon) rawColon
+  let className := EbnfValue.ruleView .qualifiedName rawClass
+  let rawParameterValue := EbnfValue.optionalView
+    parameterChild rawParameters
+  let parameterData := rawParameterValue.map EbnfValue.typeArgumentsView
+  let openBrace := EbnfValue.terminalView (.symbol .leftBrace) rawOpen
+  let rawMethodValues := EbnfValue.starView methodAtom rawMethods
+  let methods := rawMethodValues.map (EbnfValue.ruleView .instanceMethod)
+  let closeBrace := EbnfValue.terminalView
+    (.symbol .rightBrace) rawClose
+  have genericValuesEq : genericPrefix.map
+      (EbnfValue.ruleAtom .genericPrefix) = rawGenericValue := by
+    cases selected : rawGenericValue with
+    | none => simp [genericPrefix, selected]
+    | some raw =>
+        simp [genericPrefix, selected, EbnfValue.rule_of_view]
+  have genericEq : EbnfValue.optional genericAtom
+      (genericPrefix.map (EbnfValue.ruleAtom .genericPrefix)) =
+        rawGeneric := by
+    rw [genericValuesEq]
+    exact EbnfValue.optional_of_view genericAtom rawGeneric
+  have defaultValuesEq : defaultToken.map
+      (EbnfValue.terminalAtom (.hardKeyword .defaultKw)) =
+        rawDefaultValue := by
+    cases selected : rawDefaultValue with
+    | none => simp [defaultToken, selected]
+    | some raw =>
+        simp [defaultToken, selected, EbnfValue.terminal_of_view]
+  have defaultEq : EbnfValue.optional defaultAtom
+      (defaultToken.map
+        (EbnfValue.terminalAtom (.hardKeyword .defaultKw))) =
+        rawDefault := by
+    rw [defaultValuesEq]
+    exact EbnfValue.optional_of_view defaultAtom rawDefault
+  have parameterValuesEq : parameterData.map
+      EbnfValue.typeArgumentsValue = rawParameterValue := by
+    cases selected : rawParameterValue with
+    | none => simp [parameterData, selected]
+    | some raw =>
+        simp [parameterData, selected,
+          EbnfValue.typeArgumentsValue_of_view]
+  have parametersEq : EbnfValue.optional parameterChild
+      (parameterData.map EbnfValue.typeArgumentsValue) = rawParameters := by
+    rw [parameterValuesEq]
+    exact EbnfValue.optional_of_view parameterChild rawParameters
+  have methodValuesEq : methods.map
+      (EbnfValue.ruleAtom .instanceMethod) = rawMethodValues :=
+    ruleAtoms_of_views .instanceMethod rawMethodValues
+  have methodsEq : EbnfValue.star methodAtom
+      (methods.map (EbnfValue.ruleAtom .instanceMethod)) = rawMethods := by
+    rw [methodValuesEq]
+    exact EbnfValue.star_of_view methodAtom rawMethods
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  let parameterInput :
+      (MatchedTerminal file tokens (.symbol .leftParen) ×
+        (NonemptyList TypeExpr ×
+          (MatchedTerminal file tokens (.symbol .rightParen) × Unit))) →
+        EbnfValue file tokens EbnfValue.typeArgumentsExpr := fun value =>
+    EbnfValue.sequence [
+      .atom (.terminal (.symbol .leftParen)),
+      .list1 (.atom (.nonterminal .type)),
+      .atom (.terminal (.symbol .rightParen))]
+      (EbnfValues.cons _ _
+        (EbnfValue.terminalAtom (.symbol .leftParen) value.1)
+        (EbnfValues.cons _ _
+          (EbnfValue.list1 _
+            (value.2.1.map (EbnfValue.ruleAtom .type)))
+          (EbnfValues.cons _ _
+            (EbnfValue.terminalAtom
+              (.symbol .rightParen) value.2.2.1)
+            EbnfValues.nil)))
+  have parameterInputEq : parameterInput =
+      @EbnfValue.typeArgumentsValue file tokens := by
+    funext value
+    rfl
+  have constructorParametersEq : EbnfValue.optional parameterChild
+      (parameterData.map parameterInput) = rawParameters := by
+    rw [parameterInputEq]
+    exact parametersEq
+  let rebuilt : EbnfValue file tokens (.sequence children) :=
+    EbnfValue.sequence children
+      (EbnfValue.sequenceValuesBuild children
+        (EbnfValue.optional genericAtom
+            (genericPrefix.map (EbnfValue.ruleAtom .genericPrefix)),
+          EbnfValue.optional defaultAtom
+            (defaultToken.map
+              (EbnfValue.terminalAtom (.hardKeyword .defaultKw))),
+          EbnfValue.terminalAtom (.hardKeyword .instanceKw) instanceKw,
+          EbnfValue.ruleAtom .typeAtom main,
+          EbnfValue.terminalAtom (.symbol .colon) colon,
+          EbnfValue.ruleAtom .qualifiedName className,
+          EbnfValue.optional parameterChild
+            (parameterData.map parameterInput),
+          EbnfValue.terminalAtom (.symbol .leftBrace) openBrace,
+          EbnfValue.star methodAtom
+            (methods.map (EbnfValue.ruleAtom .instanceMethod)),
+          EbnfValue.terminalAtom (.symbol .rightBrace) closeBrace, ()))
+  have rebuiltEq : rebuilt = input := by
+    dsimp only [rebuilt]
+    rw [genericEq, defaultEq,
+      EbnfValue.terminal_of_view (.hardKeyword .instanceKw) rawInstance,
+      EbnfValue.rule_of_view .typeAtom rawMain,
+      EbnfValue.terminal_of_view (.symbol .colon) rawColon,
+      EbnfValue.rule_of_view .qualifiedName rawClass,
+      constructorParametersEq,
+      EbnfValue.terminal_of_view (.symbol .leftBrace) rawOpen,
+      methodsEq,
+      EbnfValue.terminal_of_view (.symbol .rightBrace) rawClose]
+    exact inputEq
+  let executorParameters := rawParameterValue.map fun raw =>
+    let viewed := EbnfValue.sequence3View
+      (.atom (.terminal (.symbol .leftParen)))
+      (.list1 (.atom (.nonterminal .type)))
+      (.atom (.terminal (.symbol .rightParen))) raw
+    (EbnfValue.list1View (.atom (.nonterminal .type))
+      viewed.2.1).map (EbnfValue.ruleView .type)
+  have executorParametersEq : executorParameters =
+      parameterData.map fun value => value.2.1 := by
+    cases selected : rawParameterValue with
+    | none =>
+        simp only [executorParameters, parameterData, selected, Option.map]
+        rfl
+    | some raw =>
+        simp only [executorParameters, parameterData, selected, Option.map]
+        rfl
+  have resultEq : executeInstanceDeclRoot file tokens origin finish
+      ready.1 ready.2.1 input = sourceLoc witness {
+        genericPrefix := genericPrefix
+        «default» := defaultToken.map fun terminal =>
+          RuleReduction.terminalLoc terminal .defaultModifier
+        main := main
+        className := className
+        parameters := parameterData.map fun value => value.2.1
+        methods := methods
+      } := by
+    calc
+      _ = sourceLoc witness ({
+          genericPrefix := genericPrefix
+          «default» := defaultToken.map fun terminal =>
+            RuleReduction.terminalLoc terminal .defaultModifier
+          main := main
+          className := className
+          parameters := executorParameters
+          methods := methods
+        } : InstanceDeclPayload) := by
+          have sequenceEq' := sequenceEq
+          simp only [children, genericAtom, defaultAtom, instanceAtom,
+            mainAtom, colonAtom, classAtom, parameterChild, openAtom,
+            methodAtom, closeAtom, EbnfValue.typeArgumentsExpr] at sequenceEq'
+          simp only [executeInstanceDeclRoot, sequenceEq']
+          rfl
+      _ = _ := by
+        rw [executorParametersEq]
+  have transportSelf
+      (value : EbnfValue file tokens (.sequence [
+        .optional (.atom (.nonterminal .genericPrefix)),
+        .optional (.atom (.terminal (.hardKeyword .defaultKw))),
+        .atom (.terminal (.hardKeyword .instanceKw)),
+        .atom (.nonterminal .typeAtom),
+        .atom (.terminal (.symbol .colon)),
+        .atom (.nonterminal .qualifiedName),
+        .optional (.sequence [
+          .atom (.terminal (.symbol .leftParen)),
+          .list1 (.atom (.nonterminal .type)),
+          .atom (.terminal (.symbol .rightParen))]),
+        .atom (.terminal (.symbol .leftBrace)),
+        .star (.atom (.nonterminal .instanceMethod)),
+        .atom (.terminal (.symbol .rightBrace))]))
+      (shape : (.sequence [
+        .optional (.atom (.nonterminal .genericPrefix)),
+        .optional (.atom (.terminal (.hardKeyword .defaultKw))),
+        .atom (.terminal (.hardKeyword .instanceKw)),
+        .atom (.nonterminal .typeAtom),
+        .atom (.terminal (.symbol .colon)),
+        .atom (.nonterminal .qualifiedName),
+        .optional (.sequence [
+          .atom (.terminal (.symbol .leftParen)),
+          .list1 (.atom (.nonterminal .type)),
+          .atom (.terminal (.symbol .rightParen))]),
+        .atom (.terminal (.symbol .leftBrace)),
+        .star (.atom (.nonterminal .instanceMethod)),
+        .atom (.terminal (.symbol .rightBrace))]) =
+          m2cV1.rhs .instanceDecl) :
+      EbnfValue.transport shape value = value := by
+    rw [show shape = (by rfl) from Subsingleton.elim _ _]
+    rfl
+  have argumentsEq : RuleReduction.arguments parameterData =
+      parameterData.map fun value => value.2.1 := by
+    cases parameterData <;> rfl
+  cases selectedDefault : defaultToken with
+  | none =>
+      have reduces := RuleReduction.instanceDecl origin finish genericPrefix
+        none instanceKw main colon className parameterData openBrace methods
+        closeBrace (fun terminal _ => .defaultModifier terminal) witness
+      rw [transportSelf, argumentsEq] at reduces
+      have normalizedReduces : RuleReduction file tokens .instanceDecl
+          origin finish rebuilt (sourceLoc witness {
+            genericPrefix := genericPrefix
+            «default» := none
+            main := main
+            className := className
+            parameters := parameterData.map fun value => value.2.1
+            methods := methods
+          }) := by
+        simpa [rebuilt, children, genericAtom, defaultAtom, instanceAtom,
+          mainAtom, colonAtom, classAtom, parameterChild, openAtom,
+          methodAtom, closeAtom, parameterInput, selectedDefault,
+          EbnfValue.typeArgumentsValue, EbnfValue.typeArgumentsExpr,
+          EbnfValue.sequenceValuesBuild] using reduces
+      have inputReduces := rebuiltEq ▸ normalizedReduces
+      have resultEq' := resultEq
+      rw [selectedDefault] at resultEq'
+      exact resultEq'.symm ▸ inputReduces
+  | some terminal =>
+      have reduces := RuleReduction.instanceDecl origin finish genericPrefix
+        (some terminal) instanceKw main colon className parameterData
+        openBrace methods closeBrace
+        (fun value _ => .defaultModifier value) witness
+      rw [transportSelf, argumentsEq] at reduces
+      have normalizedReduces : RuleReduction file tokens .instanceDecl
+          origin finish rebuilt (sourceLoc witness {
+            genericPrefix := genericPrefix
+            «default» := some
+              (RuleReduction.terminalLoc terminal .defaultModifier)
+            main := main
+            className := className
+            parameters := parameterData.map fun value => value.2.1
+            methods := methods
+          }) := by
+        simpa [rebuilt, children, genericAtom, defaultAtom, instanceAtom,
+          mainAtom, colonAtom, classAtom, parameterChild, openAtom,
+          methodAtom, closeAtom, parameterInput, selectedDefault,
+          EbnfValue.typeArgumentsValue, EbnfValue.typeArgumentsExpr,
+          EbnfValue.sequenceValuesBuild, RuleReduction.marker,
+          RuleReduction.terminalLoc] using reduces
+      have inputReduces := rebuiltEq ▸ normalizedReduces
+      have resultEq' := resultEq
+      rw [selectedDefault] at resultEq'
+      exact resultEq'.symm ▸ inputReduces
+
 /-- Every supported root executor realizes its exact source-rule reduction. -/
 theorem executeRootRule_reduces
     {file : WorkspaceFile} {tokens : List Token}
@@ -12034,6 +12314,8 @@ theorem executeRootRule_reduces
       exact executeTypeAliasDeclRoot_reduces origin finish ready input
   | classDecl =>
       exact executeClassDeclRoot_reduces origin finish ready input
+  | instanceDecl =>
+      exact executeInstanceDeclRoot_reduces origin finish ready input
   | fieldDecl => exact executeFieldDeclRoot_reduces origin finish ready input
   | fallbackDecl =>
       exact executeFallbackDeclRoot_reduces origin finish ready input
