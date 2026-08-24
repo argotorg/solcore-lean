@@ -4134,6 +4134,34 @@ private instance : LawfulBEq GrammarRuleId where
     intro left right equal
     cases left <;> cases right <;> first | rfl | contradiction
 
+namespace ChoiceSite
+
+/-- The root choice of the source `type` rule has its exact arity. -/
+theorem branchCount_eq_two_of_isAt_type
+    (site : ChoiceSite)
+    (located : site.site.isAt .type [] = true) :
+    site.branchCount = 2 := by
+  rcases site with ⟨⟨⟨rule, path⟩, valid⟩, hasKind⟩
+  simp [GrammarSite.isAt] at located
+  rcases located with ⟨rfl, rfl⟩
+  unfold ChoiceSite.branchCount GrammarSite.expression m2cV1
+    m2cV1Rhs EbnfExpr.nodeAt? EbnfExpr.choiceBranchCount
+  rfl
+
+/-- The root choice of the source `postfixPart` rule has its exact arity. -/
+theorem branchCount_eq_three_of_isAt_postfixPart
+    (site : ChoiceSite)
+    (located : site.site.isAt .postfixPart [] = true) :
+    site.branchCount = 3 := by
+  rcases site with ⟨⟨⟨rule, path⟩, valid⟩, hasKind⟩
+  simp [GrammarSite.isAt] at located
+  rcases located with ⟨rfl, rfl⟩
+  unfold ChoiceSite.branchCount GrammarSite.expression m2cV1
+    m2cV1Rhs EbnfExpr.nodeAt? EbnfExpr.choiceBranchCount
+  rfl
+
+end ChoiceSite
+
 private def keyMem (key : GuardedProductionKey) :
     List GuardedProductionKey → Bool
   | [] => false
@@ -4309,5 +4337,156 @@ theorem H_eq_eighteen : H = 18 := by
     _ = guardedProductions.length :=
       guardedProductionFilter_perm.length_eq
     _ = 18 := rfl
+
+/-- The guards whose structural context start is the prediction origin. -/
+def OriginAnchoredGuard (guard : PriorityGuardId) : Prop :=
+  guard = .G03_parameterComptime ∨
+    guard = .G04_letComptime ∨
+    guard = .G05_typeComptime ∨
+    guard = .G09_genericContext
+
+/-- Finite static coverage of one expanded nonterminal: a guardless
+production, an origin-anchored pair, the postfix pair, or the match-arm pair. -/
+inductive StaticNonterminalCoverage
+    (symbol : NonterminalSymbol) : Prop where
+  | guardless
+      (production : ProductionId)
+      (lhs : production.lhs = symbol)
+      (guards : guardOf production = [])
+  | originPair
+      (guard : PriorityGuardId)
+      (originGuard : OriginAnchoredGuard guard)
+      (positive negative : ProductionId)
+      (positiveLhs : positive.lhs = symbol)
+      (negativeLhs : negative.lhs = symbol)
+      (positiveOnly : guardOf positive = [(guard, .positive)])
+      (negativeOnly : guardOf negative = [(guard, .negative)])
+  | postfixPair
+      (positive negative : ProductionId)
+      (positiveLhs : positive.lhs = symbol)
+      (negativeLhs : negative.lhs = symbol)
+      (positiveOnly : guardOf positive =
+        [(.G07_leadingDotArguments, .positive)])
+      (negativeOnly : guardOf negative =
+        [(.G07_leadingDotArguments, .negative)])
+  | armPair
+      (positive negative : ProductionId)
+      (positiveLhs : positive.lhs = symbol)
+      (negativeLhs : negative.lhs = symbol)
+      (positiveOnly : guardOf positive =
+        [(.G02_matchArmBoundary, .positive)])
+      (negativeOnly : guardOf negative =
+        [(.G02_matchArmBoundary, .negative)])
+
+/-- Every expanded nonterminal has one of the finite static coverage forms. -/
+theorem staticNonterminalCoverage
+    (symbol : NonterminalSymbol) :
+    StaticNonterminalCoverage symbol := by
+  cases symbol with
+  | rule rule =>
+      exact .guardless (.root rule) rfl (by simp [guardOf])
+  | tail site =>
+      exact .guardless (.tail site .nil) rfl (by simp [guardOf])
+  | aux site =>
+      cases expression : site.expression with
+      | atom atom =>
+          let atomSite : AtomSite := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          exact .guardless (.atom atomSite) rfl (by simp [guardOf])
+      | sequence children =>
+          let sequenceSite : SequenceSite := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          exact .guardless (.seq sequenceSite) rfl (by simp [guardOf])
+      | group child =>
+          let groupSite : GroupSite := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          exact .guardless (.group groupSite) rfl (by simp [guardOf])
+      | choice branches =>
+          let choiceSite : ChoiceSite := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          by_cases typeLocated : site.isAt .type [] = true
+          · have count := ChoiceSite.branchCount_eq_two_of_isAt_type
+              choiceSite typeLocated
+            let positive : Fin choiceSite.branchCount := ⟨0, by omega⟩
+            let negative : Fin choiceSite.branchCount := ⟨1, by omega⟩
+            refine .originPair .G05_typeComptime
+              (Or.inr (Or.inr (Or.inl rfl)))
+              (.choice choiceSite positive) (.choice choiceSite negative)
+              rfl rfl ?_ ?_
+            · simp [guardOf, choiceSite, typeLocated, positive]
+            · simp [guardOf, choiceSite, typeLocated, negative]
+          · by_cases postfixLocated :
+                site.isAt .postfixPart [] = true
+            · have count :=
+                ChoiceSite.branchCount_eq_three_of_isAt_postfixPart
+                  choiceSite postfixLocated
+              let branch : Fin choiceSite.branchCount := ⟨2, by omega⟩
+              exact .guardless (.choice choiceSite branch) rfl
+                (by simp [guardOf, choiceSite, branch])
+            · let branch : Fin choiceSite.branchCount :=
+                ⟨0, ChoiceSite.branchCount_pos choiceSite⟩
+              exact .guardless (.choice choiceSite branch) rfl
+                (by simp [guardOf, choiceSite, typeLocated,
+                  postfixLocated, branch])
+      | optional child =>
+          let optionalSite : OptionalSite := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          by_cases parameterLocated : site.isAt .parameter [0] = true
+          · refine .originPair .G03_parameterComptime (Or.inl rfl)
+              (.opt optionalSite .some) (.opt optionalSite .none)
+              rfl rfl ?_ ?_
+            · simp [guardOf, optionalSite, parameterLocated]
+            · simp [guardOf, optionalSite, parameterLocated]
+          · by_cases letLocated :
+                site.isAt .letBinding [2, 0, 1] = true
+            · refine .originPair .G04_letComptime
+                (Or.inr (Or.inl rfl))
+                (.opt optionalSite .some) (.opt optionalSite .none)
+                rfl rfl ?_ ?_
+              · simp [guardOf, optionalSite, parameterLocated, letLocated]
+              · simp [guardOf, optionalSite, parameterLocated, letLocated]
+            · by_cases atomLocated : site.isAt .atom [2, 2] = true
+              · refine .postfixPair
+                  (.opt optionalSite .some) (.opt optionalSite .none)
+                  rfl rfl ?_ ?_
+                · simp [guardOf, optionalSite, parameterLocated, letLocated,
+                    atomLocated]
+                · simp [guardOf, optionalSite, parameterLocated, letLocated,
+                    atomLocated]
+              · by_cases genericLocated :
+                    site.isAt .genericPrefix [1] = true
+                · refine .originPair .G09_genericContext
+                    (Or.inr (Or.inr (Or.inr rfl)))
+                    (.opt optionalSite .some) (.opt optionalSite .none)
+                    rfl rfl ?_ ?_
+                  · simp [guardOf, optionalSite, parameterLocated, letLocated,
+                      atomLocated, genericLocated]
+                  · simp [guardOf, optionalSite, parameterLocated, letLocated,
+                      atomLocated, genericLocated]
+                · exact .guardless (.opt optionalSite .none) rfl
+                    (by simp [guardOf, optionalSite, parameterLocated, letLocated,
+                      atomLocated, genericLocated])
+      | star child =>
+          let starSite : StarSite := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          by_cases matchArmLocated : site.isAt .matchArm [3] = true
+          · refine .armPair (.star starSite .nil) (.star starSite .cons)
+              rfl rfl ?_ ?_
+            · simp [guardOf, starSite, matchArmLocated]
+            · simp [guardOf, starSite, matchArmLocated]
+          · exact .guardless (.star starSite .nil) rfl
+              (by simp [guardOf, starSite, matchArmLocated])
+      | plus child =>
+          let plusSite : PlusSite := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          exact .guardless (.plus plusSite .one) rfl (by simp [guardOf])
+      | list0 child =>
+          let listSite : List0Site := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          exact .guardless (.list0 listSite .nil) rfl (by simp [guardOf])
+      | list1 child =>
+          let listSite : List1Site := ⟨site, by
+            simp [expression, EbnfExpr.kind]⟩
+          exact .guardless (.list1 listSite) rfl (by simp [guardOf])
 
 end Solcore.Surface.Multi.Grammar
