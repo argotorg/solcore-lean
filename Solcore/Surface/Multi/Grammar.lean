@@ -1063,6 +1063,86 @@ private theorem hasRuleRef_of_nodeAt?_eq_some
 
 mutual
 
+private def choicesNonempty : EbnfExpr → Bool
+  | .atom _ => true
+  | .sequence children => choicesNonemptyValues children
+  | .choice branches => !branches.isEmpty && choicesNonemptyValues branches
+  | .group child
+  | .optional child
+  | .star child
+  | .plus child
+  | .list0 child
+  | .list1 child => choicesNonempty child
+
+private def choicesNonemptyValues : List EbnfExpr → Bool
+  | [] => true
+  | child :: rest =>
+      choicesNonempty child && choicesNonemptyValues rest
+
+end
+
+private theorem choicesNonemptyValues_of_mem
+    {child : EbnfExpr} {children : List EbnfExpr}
+    (member : child ∈ children)
+    (valid : choicesNonemptyValues children = true) :
+    choicesNonempty child = true := by
+  induction children with
+  | nil => simp at member
+  | cons head rest induction =>
+      simp only [List.mem_cons] at member
+      simp only [choicesNonemptyValues, Bool.and_eq_true] at valid
+      rcases member with rfl | member
+      · exact valid.1
+      · exact induction member valid.2
+
+private theorem choicesNonempty_of_child_mem
+    {root child : EbnfExpr}
+    (member : child ∈ root.children)
+    (valid : choicesNonempty root = true) :
+    choicesNonempty child = true := by
+  cases root with
+  | atom atom => simp [children] at member
+  | sequence children =>
+      exact choicesNonemptyValues_of_mem member valid
+  | choice branches =>
+      simp only [choicesNonempty, Bool.and_eq_true] at valid
+      exact choicesNonemptyValues_of_mem member valid.2
+  | group selected
+  | optional selected
+  | star selected
+  | plus selected
+  | list0 selected
+  | list1 selected =>
+      simp only [children, List.mem_singleton] at member
+      subst child
+      exact valid
+
+private theorem choicesNonempty_of_nodeAt?_eq_some
+    {root selected : EbnfExpr} {path : List Nat}
+    (lookup : root.nodeAt? path = some selected)
+    (valid : choicesNonempty root = true) :
+    choicesNonempty selected = true := by
+  induction path generalizing root with
+  | nil =>
+      simp only [nodeAt?, Option.some.injEq] at lookup
+      subst selected
+      exact valid
+  | cons index rest induction =>
+      simp only [nodeAt?] at lookup
+      cases selectedChild : root.children[index]? with
+      | none => simp [selectedChild] at lookup
+      | some child =>
+          rw [selectedChild] at lookup
+          exact induction lookup
+            (choicesNonempty_of_child_mem
+              (List.mem_of_getElem? selectedChild) valid)
+
+private theorem m2cV1_choicesNonempty (rule : GrammarRuleId) :
+    choicesNonempty (m2cV1.rhs rule) = true := by
+  cases rule <;> decide
+
+mutual
+
 private def paths : EbnfExpr → List (List Nat)
   | .atom _ => [[]]
   | .sequence children
@@ -1551,6 +1631,29 @@ theorem expression_eq_choice (site : ChoiceSite) :
   cases expression : site.site.expression <;>
     simp [EbnfExpr.kind, expression] at hasKind
   simp [branchExpressions, EbnfExpr.children, expression, Vector.toList]
+
+/-- Every checked choice site in the fixed source grammar has at least one
+displayed branch. -/
+theorem branchCount_pos (site : ChoiceSite) : 0 < site.branchCount := by
+  have valid :
+      ((m2cV1.rhs site.site.val.rule).nodeAt?
+        site.site.val.path).isSome = true := by
+    simpa [GrammarSiteKey.valid] using site.site.property
+  have selected :
+      (m2cV1.rhs site.site.val.rule).nodeAt? site.site.val.path =
+        some site.site.expression := by
+    apply Option.eq_some_iff_get_eq.mpr
+    exact ⟨valid, rfl⟩
+  have choices := EbnfExpr.choicesNonempty_of_nodeAt?_eq_some selected
+    (EbnfExpr.m2cV1_choicesNonempty site.site.val.rule)
+  have expression := expression_eq_choice site
+  have nonempty : site.branchExpressions.toList ≠ [] := by
+    intro empty
+    rw [expression, empty] at choices
+    simp [EbnfExpr.choicesNonempty] at choices
+  unfold ChoiceSite.branchCount
+  rw [expression]
+  exact List.length_pos_iff.mpr nonempty
 
 private def branchChildIndex
     (site : ChoiceSite) (branch : Fin site.branchCount) :
