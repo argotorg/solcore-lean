@@ -11230,6 +11230,48 @@ private structure PhaseCWorklist
   phaseC : PhaseCOpen file tokens
   completionBackpointers : CompletionBackpointerLedger tokens
 
+/-- The saturated recognition chart paired with its item-keyed semantic
+frontier. -/
+private structure PhaseCValueWorklist
+    (file : WorkspaceFile) (tokens : List Token) where
+  recognition : PhaseCWorklist file tokens
+  frontier : ContextualValueFrontierState file tokens
+
+/-- Start semantic evaluation only after both recognition queues drain. The
+canonical dot-zero root is inserted and charged as the first frontier key. -/
+private def beginPhaseCValueWorklist?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  match current.payload.phaseC.itemQueue,
+      current.payload.phaseC.edgeQueue with
+  | [], [] =>
+      let root := contextualRoot tokens
+      let value := ContextualPrefixValue.zero root rfl
+      runMappedPrimitive? current
+        (.linear .L09_frontierInsert (contextualLinearKey root))
+        fun recognition => {
+          recognition := recognition
+          frontier :=
+            (ContextualValueFrontierState.empty file tokens).insertPrefix
+              root value
+        }
+  | _, _ => none
+
+/-- Dequeue one semantic item in FIFO order under its exact L08 address. -/
+private def dequeuePhaseCValueFrontier?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    Option (ContextualItemKey tokens ×
+      CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  match current.payload.frontier.dequeue? with
+  | none => none
+  | some (item, frontier) => do
+      let next ← runMappedPrimitive? current
+        (.linear .L08_frontierDequeue (contextualLinearKey item))
+        fun state => { state with frontier := frontier }
+      pure (item, next)
+
 private def beginPhaseCWorklist?
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseBSealed file tokens)) :
