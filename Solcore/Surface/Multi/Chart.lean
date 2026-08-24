@@ -12515,6 +12515,188 @@ private theorem attemptPhaseCScannedEdge?_units
       cases selected
       exact Or.inl rfl
 
+/-- A successful contextual prediction builder returns exactly the requested
+production at dot zero and the waiting current boundary at both endpoints. -/
+private theorem contextualPredictedItem?_valueShape
+    {tokens : List Token}
+    (waiting item : ContextualItemKey tokens)
+    (predicted : ProductionId)
+    (productionInstance : ProductionInstanceKey tokens)
+    (selected : contextualPredictedItem? waiting predicted =
+      some (item, productionInstance)) :
+    item.raw.production = predicted ∧
+      item.raw.dot.val = 0 ∧
+      item.raw.origin = waiting.raw.current ∧
+      item.raw.current = waiting.raw.current := by
+  unfold contextualPredictedItem? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  next sameLhs =>
+    cases selected
+    exact ⟨rfl, rfl, rfl, rfl⟩
+
+/-- Predictions for distinct productions construct distinct linear addresses,
+independently of which linear unit family is selected. -/
+private theorem contextualPredictedItem?_linearAddress_ne
+    {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (left right : ProductionId)
+    (leftItem rightItem : ContextualItemKey tokens)
+    (leftInstance rightInstance : ProductionInstanceKey tokens)
+    (kind : ChartLinearUnitKind)
+    (different : left ≠ right)
+    (leftSelected : contextualPredictedItem? waiting left =
+      some (leftItem, leftInstance))
+    (rightSelected : contextualPredictedItem? waiting right =
+      some (rightItem, rightInstance)) :
+    (.linear kind (contextualLinearKey leftItem) : UnitAddress tokens) ≠
+      .linear kind (contextualLinearKey rightItem) := by
+  intro equal
+  simp only [UnitAddress.linear.injEq] at equal
+  have productionEqual := congrArg
+    (fun key : ChartLinearKey tokens => key.dotted.production) equal.2
+  change leftItem.raw.production = rightItem.raw.production at productionEqual
+  have leftShape := contextualPredictedItem?_valueShape waiting leftItem
+    left leftInstance leftSelected
+  have rightShape := contextualPredictedItem?_valueShape waiting rightItem
+    right rightInstance rightSelected
+  exact different (leftShape.1.symm.trans (productionEqual.trans rightShape.1))
+
+/-- A dot-zero prefix at equal endpoints always prepares a candidate. In the
+complete case, root productions are impossible because their RHS is nonempty,
+so the checked action is ready without a module-interval exception. -/
+private theorem insertCandidate?_total_atZero
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (atZero : item.raw.dot.val = 0)
+    (sameBoundary : item.raw.origin = item.raw.current) :
+    ∃ result, ContextualValueFrontierState.insertCandidate?
+      owned state item prior = some result := by
+  unfold ContextualValueFrontierState.insertCandidate?
+  split
+  next present => simp
+  next absent =>
+    split
+    next complete =>
+      have ordered : item.raw.origin.val ≤ item.raw.current.val := by
+        simp [sameBoundary]
+      have moduleInterval : item.raw.production = .root .module →
+          item.raw.origin = Boundary.start tokens ∧
+            item.raw.current = Boundary.afterLogicalEOF tokens := by
+        intro root
+        have impossible := complete
+        unfold CompleteItem at impossible
+        rw [atZero, root] at impossible
+        simp [ProductionId.rhs] at impossible
+      let reduction := ContextualReductionValue.reduce owned item ordered
+        complete prior
+      have reductionEq : ContextualReductionValue.reduce? owned item prior =
+          some reduction := by
+        unfold ContextualReductionValue.reduce?
+        rw [dif_pos ordered, dif_pos complete, dif_pos moduleInterval]
+      rw [reductionEq]
+      exact ⟨_, rfl⟩
+    next incomplete => simp
+
+/-- Publishing a prepared candidate is total when its insertion address is
+fresh. Duplicate candidates consume no address. -/
+private theorem publishPhaseCValueCandidate?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (insertFresh : (.linear .L09_frontierInsert
+      (contextualLinearKey item) : UnitAddress tokens) ∉
+        current.counter.usedRev) :
+    ∃ result, publishPhaseCValueCandidate? current item candidate =
+      some result := by
+  cases candidate with
+  | mk kind state =>
+      cases kind <;>
+        simp [publishPhaseCValueCandidate?, runMappedPrimitive?,
+          Counter.charge, insertFresh]
+
+/-- Only a freshly inserted complete candidate consumes its source-specific
+action address. -/
+private theorem chargePhaseCCompletedCandidate?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (completeAction : UnitAddress tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (fresh : completeAction ∉ current.counter.usedRev) :
+    ∃ result, chargePhaseCCompletedCandidate? current completeAction
+      candidate = some result := by
+  cases candidate with
+  | mk kind state =>
+      cases kind <;>
+        simp [chargePhaseCCompletedCandidate?, runMappedPrimitive?, fresh]
+
+/-- Publishing cannot consume a distinct address. -/
+private theorem publishPhaseCValueCandidate?_preserves_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (target : UnitAddress tokens)
+    (notInsert : target ≠
+      (.linear .L09_frontierInsert (contextualLinearKey item) :
+        UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : publishPhaseCValueCandidate? current item candidate =
+      some result) :
+    target ∉ result.counter.usedRev := by
+  unfold publishPhaseCValueCandidate? at selected
+  cases candidateKind : candidate.kind with
+  | duplicate =>
+      simp only [candidateKind, Option.some.injEq] at selected
+      cases selected
+      exact fresh
+  | insertedIncomplete =>
+      simp only [candidateKind] at selected
+      rw [runMappedPrimitive?_usedRev current _ _ result selected]
+      simp only [List.mem_cons, not_or]
+      exact ⟨notInsert, fresh⟩
+  | insertedComplete =>
+      simp only [candidateKind] at selected
+      rw [runMappedPrimitive?_usedRev current _ _ result selected]
+      simp only [List.mem_cons, not_or]
+      exact ⟨notInsert, fresh⟩
+
+/-- Charging a complete candidate cannot consume a distinct address. -/
+private theorem chargePhaseCCompletedCandidate?_preserves_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (completeAction target : UnitAddress tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (notAction : target ≠ completeAction)
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : chargePhaseCCompletedCandidate? current completeAction
+      candidate = some result) :
+    target ∉ result.counter.usedRev := by
+  unfold chargePhaseCCompletedCandidate? at selected
+  cases candidateKind : candidate.kind with
+  | duplicate =>
+      simp only [candidateKind, Option.some.injEq] at selected
+      cases selected
+      exact fresh
+  | insertedIncomplete =>
+      simp only [candidateKind, Option.some.injEq] at selected
+      cases selected
+      exact fresh
+  | insertedComplete =>
+      simp only [candidateKind] at selected
+      rw [runMappedPrimitive?_usedRev current completeAction id result selected]
+      simp only [List.mem_cons, not_or]
+      exact ⟨notAction, fresh⟩
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
