@@ -328,4 +328,107 @@ theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_error_sound
               cases frontierExpected <;>
                 simp [Chart.ObservedFrontier.unexpected?] at impossible
 
+/-- The exact declarative progress witnesses produce an executable rootless
+ordinary diagnostic on a saturated multi-ledger result.  This is the direct
+consumer of the remaining rootless-frontier progress theorem. -/
+theorem executeObservedContextualWorklistMulti?_rootlessUnexpectedDiagnosticCandidate?_isSome_of_progress
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result)
+    (absent : result.containsCompleteModuleRootItem = false)
+    (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor file tokens result.memo
+      (executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result selected)
+      (Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+        file tokens owned result selected)
+      cursor)
+    (atMost : cursor.val ≤ tokens.length)
+    (waiting : TerminalFrontierWait file tokens result.memo
+      (executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result selected)
+      (Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+        file tokens owned result selected)
+      cursor) :
+    (result.rootlessUnexpectedDiagnosticCandidate? file).isSome = true := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  change GreatestReachableCursor file tokens result.memo correct final cursor
+    at greatest
+  change TerminalFrontierWait file tokens result.memo correct final cursor
+    at waiting
+  have correspondence := executeObservedContextualWorklistMulti?_correspondence
+    file tokens owned result selected
+  have greatestSelected : result.greatestCurrent? = some cursor := by
+    apply (Chart.ContextualWorklistResult.greatestCurrent?_eq_some_iff
+      result cursor).mpr
+    rcases greatest.1 with ⟨item, reached, current⟩
+    refine ⟨⟨item, (correspondence.1 item).mpr reached, current⟩, ?_⟩
+    intro candidate member
+    exact greatest.2 candidate ((correspondence.1 candidate).mp member)
+  rcases waiting with
+    ⟨waitingItem, terminal, waitingFrontier, next, _enabled⟩
+  have expectedMember : terminal.expected ∈
+      result.expectedAtCurrent cursor :=
+    (Chart.ContextualWorklistResult.expectedAtCurrent_mem_iff
+      result cursor terminal.expected).mpr
+      ⟨waitingItem,
+        (correspondence.1 waitingItem).mpr waitingFrontier.2.1,
+        waitingFrontier.2.2, terminal, next, rfl⟩
+  cases expectedEq : result.expectedAtCurrent cursor with
+  | nil =>
+      rw [expectedEq] at expectedMember
+      contradiction
+  | cons head tail =>
+      let expectedFrontier : Chart.ExpectedFrontier tokens := {
+        cursor := cursor
+        expected := head :: tail
+      }
+      have expectedFrontierEq : result.expectedFrontier? =
+          some expectedFrontier := by
+        apply
+          (Chart.ContextualWorklistResult.expectedFrontier?_eq_some_iff
+            result expectedFrontier).mpr
+        exact ⟨greatestSelected, by simpa [expectedFrontier] using
+          expectedEq.symm⟩
+      have observationSome :
+          (Chart.observedFoundAt? file tokens cursor).isSome = true := by
+        unfold Chart.observedFoundAt?
+        split <;> rename_i inRange
+        · simp
+        · split <;> rename_i atEnd
+          · simp
+          · omega
+      obtain ⟨observation, observationEq⟩ :=
+        Option.isSome_iff_exists.mp observationSome
+      let frontier : Chart.ObservedFrontier tokens := {
+        cursor := cursor
+        span := observation.span
+        found := observation.found
+        expected := head :: tail
+      }
+      have frontierEq : result.observedFrontier? file = some frontier := by
+        unfold Chart.ContextualWorklistResult.observedFrontier?
+        simp [expectedFrontierEq, observationEq, expectedFrontier, frontier]
+      let expected : NonemptyList Expected := { head := head, tail := tail }
+      let diagnostic : ParseDiagnostic :=
+        .unexpected observation.span observation.found expected
+      have unexpectedEq : frontier.unexpected? = some diagnostic := by
+        simp [Chart.ObservedFrontier.unexpected?, frontier, diagnostic,
+          expected]
+      have ordinaryEq : result.unexpectedDiagnosticCandidate? file =
+          some diagnostic := by
+        unfold Chart.ContextualWorklistResult.unexpectedDiagnosticCandidate?
+        simp [frontierEq, unexpectedEq]
+      have rootlessEq : result.rootlessUnexpectedDiagnosticCandidate? file =
+          some diagnostic := by
+        unfold
+          Chart.ContextualWorklistResult.rootlessUnexpectedDiagnosticCandidate?
+        simp [absent, ordinaryEq]
+      exact Option.isSome_iff_exists.mpr ⟨diagnostic, rootlessEq⟩
+
 end Solcore.Surface.Multi
