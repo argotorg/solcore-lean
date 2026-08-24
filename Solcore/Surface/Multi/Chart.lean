@@ -23021,6 +23021,180 @@ private theorem attemptPhaseCCompletedEdge?_preserves_completion_fresh
       · exact currentU05Fresh complete
       · exact selected
 
+/-- Static readiness for one retained packed edge, relative to the dequeued
+source and the state at the current fold position. Irrelevant completions and
+all scanned edges require no premises. -/
+private def PhaseCCompletionFoldReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens) : Prop :=
+  match packed with
+  | ⟨.scanned _ _ _, _⟩ => True
+  | ⟨.completed waiting finished after _, _⟩ =>
+      waiting = source ∨ finished = source →
+        waiting.raw.origin.val ≤ waiting.raw.current.val ∧
+        finished.raw.origin.val ≤ finished.raw.current.val ∧
+        ((.cubic .U06_frontierCompletion
+            (contextualCompletionKey waiting finished) :
+              UnitAddress tokens) ∉ current.counter.usedRev →
+          (current.payload.frontier.prefixMemberBool after = false →
+            after.raw.production = .root .module →
+            after.raw.origin = Boundary.start tokens ∧
+              after.raw.current = Boundary.afterLogicalEOF tokens) ∧
+          (.cubic .U07_frontierCompletedTraversal
+              (contextualCompletionKey waiting finished) :
+            UnitAddress tokens) ∉ current.counter.usedRev ∧
+          (current.payload.frontier.prefixMemberBool after = false →
+            (.linear .L09_frontierInsert
+                (contextualLinearKey after) : UnitAddress tokens) ∉
+              current.counter.usedRev ∧
+            (CompleteItem after.raw →
+              (.cubic .U05_completedAction
+                  (contextualCompletionKey waiting finished) :
+                UnitAddress tokens) ∉ current.counter.usedRev)))
+
+/-- The retained completion fold is total from per-edge structural readiness
+and the exact conditional freshness bundle. No semantic lookup success is
+assumed: missing dependencies are executable no-op branches. -/
+private theorem attemptPhaseCRetainedCompletedEdges?_total_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges (current : CountedState tokens
+      (PhaseCValueWorklist file tokens)),
+      edges.Nodup →
+      (∀ packed, packed ∈ edges →
+        PhaseCCompletionFoldReady current source packed) →
+      ∃ result, attemptPhaseCRetainedCompletedEdges? owned source edges
+        current = some result := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current _unique _ready
+      exact ⟨current, rfl⟩
+  | cons head rest induction =>
+      intro current unique ready
+      rw [List.nodup_cons] at unique
+      have headReady := ready head (by simp)
+      rcases head with ⟨key, structural⟩
+      cases key with
+      | scanned before after cursor =>
+          obtain ⟨result, resultEq⟩ := induction current unique.2 (by
+            intro packed member
+            exact ready packed (by simp [member]))
+          exact ⟨result, by
+            simpa [attemptPhaseCRetainedCompletedEdges?,
+              attemptPhaseCPackedCompletedEdge?] using resultEq⟩
+      | completed waiting finished after shared =>
+          let edge : StructurallyValidContextualCompletedEdge file tokens := {
+            waiting := waiting
+            finished := finished
+            after := after
+            shared := shared
+            structural := structural
+          }
+          by_cases relevant : waiting = source ∨ finished = source
+          · obtain ⟨waitingOrdered, finishedOrdered, conditional⟩ :=
+              headReady relevant
+            let attemptAddress : UnitAddress tokens :=
+              .cubic .U06_frontierCompletion
+                (contextualCompletionKey waiting finished)
+            by_cases used : attemptAddress ∈ current.counter.usedRev
+            · have nextEq : attemptPhaseCCompletedEdge? owned source edge
+                  current = some current := by
+                apply attemptPhaseCCompletedEdge?_of_used
+                · exact relevant
+                · simpa [attemptAddress, edge] using used
+              obtain ⟨result, resultEq⟩ := induction current unique.2 (by
+                intro packed member
+                exact ready packed (by simp [member]))
+              exact ⟨result, by
+                simpa [attemptPhaseCRetainedCompletedEdges?,
+                  attemptPhaseCPackedCompletedEdge?, edge, nextEq]
+                    using resultEq⟩
+            · obtain ⟨moduleReady, traversalFresh, tailFresh⟩ :=
+                conditional (by simpa [attemptAddress, edge] using used)
+              obtain ⟨next, nextEq⟩ :=
+                attemptPhaseCCompletedEdge?_total owned source edge current
+                  waitingOrdered finishedOrdered moduleReady
+                    (fun _ => traversalFresh)
+                    (fun _ absent complete => (tailFresh absent).2 complete)
+                    (fun _ absent => (tailFresh absent).1)
+              have restReady : ∀ packed, packed ∈ rest →
+                  PhaseCCompletionFoldReady next source packed := by
+                intro packed member
+                have initial := ready packed (by simp [member])
+                rcases packed with ⟨futureKey, futureStructural⟩
+                cases futureKey with
+                | scanned => trivial
+                | completed futureWaiting futureFinished futureAfter
+                    futureShared =>
+                    intro futureRelevant
+                    obtain ⟨futureWaitingOrdered, futureFinishedOrdered,
+                      futureConditional⟩ := initial futureRelevant
+                    refine ⟨futureWaitingOrdered, futureFinishedOrdered, ?_⟩
+                    intro resultU06Fresh
+                    have currentU06Fresh :
+                        (.cubic .U06_frontierCompletion
+                            (contextualCompletionKey futureWaiting
+                              futureFinished) : UnitAddress tokens) ∉
+                          current.counter.usedRev := by
+                      intro old
+                      exact resultU06Fresh
+                        (attemptPhaseCCompletedEdge?_used_mono owned source
+                          edge current next nextEq old)
+                    have futureModuleReady :=
+                      (futureConditional currentU06Fresh).1
+                    have different : contextualCompletionKey futureWaiting
+                        futureFinished ≠
+                        contextualCompletionKey waiting finished := by
+                      intro same
+                      have equal := retainedCompletedKey?_injective
+                        (⟨.completed futureWaiting futureFinished futureAfter
+                            futureShared, futureStructural⟩ :
+                          StructurallyValidContextualPackedEdge file tokens)
+                        (⟨.completed waiting finished after shared,
+                            structural⟩ :
+                          StructurallyValidContextualPackedEdge file tokens)
+                        (contextualCompletionKey waiting finished)
+                        (by simp [retainedCompletedKey?, same]) rfl
+                      exact unique.1 (equal ▸ member)
+                    constructor
+                    · intro resultAbsent root
+                      have currentAbsent :=
+                        attemptPhaseCCompletedEdge?_prefix_absent_before owned
+                          source futureAfter edge current next resultAbsent
+                            nextEq
+                      exact futureModuleReady currentAbsent root
+                    · exact
+                        attemptPhaseCCompletedEdge?_preserves_completion_fresh
+                          owned source edge {
+                            waiting := futureWaiting
+                            finished := futureFinished
+                            after := futureAfter
+                            shared := futureShared
+                            structural := futureStructural
+                          } current next different
+                            (fun fresh => (futureConditional fresh).2) nextEq
+                            resultU06Fresh
+              obtain ⟨result, resultEq⟩ := induction next unique.2 restReady
+              exact ⟨result, by
+                simpa [attemptPhaseCRetainedCompletedEdges?,
+                  attemptPhaseCPackedCompletedEdge?, edge, nextEq]
+                    using resultEq⟩
+          · have nextEq : attemptPhaseCCompletedEdge? owned source edge
+                current = some current := by
+              unfold attemptPhaseCCompletedEdge?
+              rw [dif_neg (by simpa [edge] using relevant)]
+            obtain ⟨result, resultEq⟩ := induction current unique.2 (by
+              intro packed member
+              exact ready packed (by simp [member]))
+            exact ⟨result, by
+              simpa [attemptPhaseCRetainedCompletedEdges?,
+                attemptPhaseCPackedCompletedEdge?, edge, nextEq]
+                  using resultEq⟩
+
 
 private structure PhaseCItemSafe
     {file : WorkspaceFile} {tokens : List Token}
