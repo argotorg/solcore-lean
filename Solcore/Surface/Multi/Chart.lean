@@ -11670,6 +11670,79 @@ private def attemptPhaseCRetainedScannedEdges?
         owned source edge current
       attemptPhaseCRetainedScannedEdges? owned source rest next
 
+/-- Traverse one retained completion when the dequeued source is one of its
+semantic endpoints and both prerequisite values are available. -/
+private def attemptPhaseCCompletedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  if _relevant : edge.waiting = source ∨ edge.finished = source then
+    match current.payload.frontier.lookupPrefix? edge.waiting with
+    | none => some current
+    | some prior =>
+        match current.payload.frontier.lookupReduction? edge.finished with
+        | none => some current
+        | some child =>
+            let attemptAddress : UnitAddress tokens :=
+              .cubic .U06_frontierCompletion
+                (contextualCompletionKey edge.waiting edge.finished)
+            if attemptAddress ∈ current.counter.usedRev then
+              some current
+            else do
+              let attempted ← runMappedPrimitive? current attemptAddress id
+              let rebuilt ← rebuildContextualCompletedEdge? edge
+              let next := rebuilt.complete prior child
+              let candidate ← attempted.payload.frontier.insertCandidate?
+                owned edge.after next
+              let traversed ← runMappedPrimitive? attempted
+                (.cubic .U07_frontierCompletedTraversal
+                  (contextualCompletionKey edge.waiting edge.finished)) id
+              let actioned ← chargePhaseCCompletedCandidate? traversed
+                (.cubic .U05_completedAction
+                  (contextualCompletionKey edge.waiting edge.finished))
+                candidate
+              publishPhaseCValueCandidate? actioned edge.after candidate
+  else
+    some current
+
+/-- Ignore scanned edges in this slice and expose the constructor-specific
+structural completion proof directly from the retained packed subtype. -/
+private def attemptPhaseCPackedCompletedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  match packed with
+  | ⟨.scanned _ _ _, _⟩ => some current
+  | ⟨.completed waiting finished after shared, structural⟩ =>
+      attemptPhaseCCompletedEdge? owned source {
+        waiting := waiting
+        finished := finished
+        after := after
+        shared := shared
+        structural := structural
+      } current
+
+/-- Fold the immutable retained recognition edge list for completions touching
+one dequeued semantic endpoint. -/
+private def attemptPhaseCRetainedCompletedEdges?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    List (StructurallyValidContextualPackedEdge file tokens) →
+      CountedState tokens (PhaseCValueWorklist file tokens) →
+      Option (CountedState tokens (PhaseCValueWorklist file tokens))
+  | [], current => some current
+  | edge :: rest, current => do
+      let next ← attemptPhaseCPackedCompletedEdge?
+        owned source edge current
+      attemptPhaseCRetainedCompletedEdges? owned source rest next
+
 private def phaseCEdgeMemberBool
     {file : WorkspaceFile} {tokens : List Token}
     (edges : List (StructurallyValidContextualPackedEdge file tokens))
