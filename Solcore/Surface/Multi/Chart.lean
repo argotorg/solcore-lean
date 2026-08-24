@@ -24564,6 +24564,163 @@ private theorem insertContextualScannedEdge?_valueAddressesFresh
     exact runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
       result fresh (by intro semantic; cases semantic) selected
 
+/-- One recognition prediction charges only R01, production/guard witnesses,
+and possibly L03; all semantic-only addresses remain reserved. -/
+private theorem attemptContextualPrediction?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact fresh
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+      have attemptedFresh :=
+        runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
+          attempted fresh (by intro semantic; cases semantic) attemptedEq
+      split at remainderEq
+      next used =>
+        cases remainderEq
+        exact attemptedFresh
+      next unused =>
+        simp only [Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨activated, activatedEq, acceptedEq⟩
+        have activatedFresh :=
+          activateWorklistProduction?_valueAddressesFresh attempted
+            productionInstance activated attemptedFresh activatedEq
+        cases accepted : activated.2 with
+        | false =>
+            simp only [accepted, Bool.false_eq_true, ↓reduceIte,
+              Option.some.injEq] at acceptedEq
+            cases acceptedEq
+            exact activatedFresh
+        | true =>
+            simp only [accepted, ↓reduceIte] at acceptedEq
+            exact insertContextualItem?_valueAddressesFresh activated.1 result
+              .prediction item activatedFresh acceptedEq
+
+/-- Folding recognition predictions preserves the semantic-only reserve. -/
+private theorem attemptContextualPredictions?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      PhaseCValueAddressesFresh current.counter →
+      attemptContextualPredictions? waiting productions current = some result →
+      PhaseCValueAddressesFresh result.counter := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result fresh selected
+      cases selected
+      exact fresh
+  | cons predicted rest induction =>
+      intro current result fresh selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptContextualPrediction?_valueAddressesFresh current next waiting
+          predicted fresh nextEq) restEq
+
+/-- Recognition scanning charges only L04/L05/L06 and preserves every
+semantic-only address. -/
+private theorem attemptContextualScan?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : attemptContextualScan? owned current before = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  next applicable =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedFresh :=
+      runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
+        attempted fresh (by intro semantic; cases semantic) attemptedEq
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq, Option.some.injEq] at remainderEq
+        cases remainderEq
+        exact attemptedFresh
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        exact insertContextualScannedEdge?_valueAddressesFresh withItem result
+          edge (insertContextualItem?_valueAddressesFresh attempted withItem
+            .scan after attemptedFresh itemEq) edgeEq
+  next inapplicable =>
+    cases selected
+    exact fresh
+
+/-- Recognition item dequeue consumes only L01 and preserves every semantic
+address for the later value queue. -/
+private theorem dequeueContextualItem?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : ContextualItemKey tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : dequeueContextualItem? current = some result) :
+    PhaseCValueAddressesFresh result.2.counter := by
+  unfold dequeueContextualItem? at selected
+  cases queue : current.payload.phaseC.itemQueue with
+  | nil => simp [queue] at selected
+  | cons item rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
+        next fresh (by intro semantic; cases semantic) nextEq
+
+/-- Recognition edge dequeue consumes only L02 or U02 and preserves every
+semantic address for the later value queue. -/
+private theorem dequeueContextualEdge?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : StructurallyValidContextualPackedEdge file tokens ×
+      CountedState tokens (PhaseCWorklist file tokens))
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : dequeueContextualEdge? current = some result) :
+    PhaseCValueAddressesFresh result.2.counter := by
+  unfold dequeueContextualEdge? at selected
+  cases queue : current.payload.phaseC.edgeQueue with
+  | nil => simp [queue] at selected
+  | cons edge rest =>
+      simp only [queue, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      let address : UnitAddress tokens :=
+        match edge.val with
+        | .scanned before _ _ =>
+            .linear .L02_scannedEdgeDequeue (contextualLinearKey before)
+        | .completed waiting finished _ _ =>
+            .cubic .U02_completedEdgeDequeue
+              (contextualCompletionKey waiting finished)
+      have addressNotValue : ¬ PhaseCValueAddress address := by
+        intro semantic
+        rcases edge with ⟨key, structural⟩
+        cases key <;> simp only [address] at semantic <;> cases semantic
+      exact runMappedPrimitive?_valueAddressesFresh_of_not_value current
+        address _ next fresh addressNotValue (by
+          simpa [address] using nextEq)
+
 private theorem processGuardCell?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseCOpen file tokens))
@@ -27883,6 +28040,26 @@ private theorem insertContextualCompletedEdgeMulti?_total
   split
   · exact ⟨current, rfl⟩
   · simp [runMappedPrimitive?, fresh]
+
+/-- Multi-ledger completion insertion consumes only recognition U04 and
+preserves the disjoint semantic address reserve. -/
+private theorem insertContextualCompletedEdgeMulti?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : insertContextualCompletedEdgeMulti? current edge =
+      some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold insertContextualCompletedEdgeMulti? at selected
+  simp only at selected
+  split at selected
+  next present =>
+    cases selected
+    exact fresh
+  next absent =>
+    exact runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
+      result fresh (by intro semantic; cases semantic) selected
 
 private theorem insertContextualCompletedEdgeMulti?_coverage
     {file : WorkspaceFile} {tokens : List Token}
