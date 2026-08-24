@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.OperandBoundaryExclusion
+import Solcore.Surface.Multi.NonAssociativeOptionalStrict
 
 namespace Solcore.Surface.Multi
 
@@ -6,7 +7,7 @@ open Grammar Solcore.Workspace
 
 /-- The local fact produced by inversion of a reached present optional: its
 first token is the level operator, and the optional consumes input. -/
-def NonAssociativeOptionalSomeFrontierProducer
+def NonAssociativeOptionalSomeOperatorProducer
     (file : WorkspaceFile) (tokens : List Token)
     (memo : GuardMemo tokens)
     (correct : PhaseBCorrect file tokens memo)
@@ -18,7 +19,7 @@ def NonAssociativeOptionalSomeFrontierProducer
     site.site.expression = .optional level.tailExpr →
     CompleteItem item.raw →
     ∃ operator, FoundNonAssociativeOperatorAt file tokens item.raw.origin
-        level operator ∧ item.raw.origin.val < item.raw.current.val
+      level operator
 
 /-- A production whose auxiliary left-hand side is an optional grammar site
 is one of that site's two optional productions. -/
@@ -119,7 +120,7 @@ theorem g10NonAssociativeOptional_finished_eq
     {final : AllGuardsFinal memo}
     (exclusive : NonAssociativeOperandPrefixExclusive
       file tokens memo correct final)
-    (producer : NonAssociativeOptionalSomeFrontierProducer
+    (producer : NonAssociativeOptionalSomeOperatorProducer
       file tokens memo correct final)
     (level : NonAssociativeLevel)
     (sequenceSite : SequenceSite) (firstSite secondSite : GrammarSite)
@@ -171,9 +172,12 @@ theorem g10NonAssociativeOptional_finished_eq
   have fixedShape : site.site.expression =
       .optional level.tailExpr :=
     (congrArg GrammarSite.expression siteEq).trans secondShape
-  obtain ⟨leftOperator, leftFound, leftStrict⟩ :=
+  obtain ⟨leftOperator, leftFound⟩ :=
     producer level site leftFinished leftEdge.2.2.1
       leftProduction fixedShape leftWitness.complete
+  have leftStrict :=
+    contextualReach_complete_nonAssociativeOptionalSome_strict level site
+      leftEdge.2.2.1 leftProduction fixedShape leftWitness.complete
   have foundAtLeft : FoundNonAssociativeOperatorAt file tokens
       leftWaiting.raw.current level leftOperator := by
     rw [leftWitness.waitingAtShared, ← leftWitness.finishedAtShared]
@@ -208,7 +212,7 @@ theorem g10NonAssociativeOptional_finished_eq
       have rightZeroVal := congrArg Fin.val rightOriginCurrent
       omega
   | some =>
-      obtain ⟨rightOperator, rightFound, rightStrict⟩ :=
+      obtain ⟨rightOperator, rightFound⟩ :=
         producer level site rightFinished rightEdge.2.2.1
           rightProduction fixedShape rightWitness.complete
       have foundAtRight : FoundNonAssociativeOperatorAt file tokens
@@ -226,5 +230,92 @@ theorem g10NonAssociativeOptional_finished_eq
           (waitingCurrentEq.trans leftWitness.waitingAtShared)
       exact g10CompletedEdge_finished_eq_of_coordinates rightEdge leftEdge
         sharedEq (rightProduction.trans leftProduction.symm)
+
+/-- A structural present-optional completion forces every coherent semantic
+reduction of the same canonical root to expose a completed operation, using
+only root-local and optional-local completion alignment. -/
+theorem g10CompletedValue_of_presentCompletionEdges_of_operandPrefixExclusive
+    {file : WorkspaceFile} {tokens : List Token} {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo} {final : AllGuardsFinal memo}
+    (exclusive : NonAssociativeOperandPrefixExclusive
+      file tokens memo correct final)
+    (producer : NonAssociativeOptionalSomeOperatorProducer
+      file tokens memo correct final)
+    {cursor : Boundary tokens} {level : NonAssociativeLevel}
+    {origin : Boundary tokens} {context : GuardContext tokens}
+    {output : RuleValue level.rule}
+    (rootReduction : CoherentReduction file tokens memo correct final
+      (CanonicalCompleteRootItem tokens level.rule origin cursor context) output)
+    {rootWaiting sequence : ContextualItemKey tokens}
+    {rootShared : Boundary tokens}
+    (rootReached : ContextualEdgeReach file tokens memo correct final
+      (.completed rootWaiting sequence (CanonicalCompleteRootItem tokens
+        level.rule origin cursor context) rootShared))
+    {sequenceWaiting optional : ContextualItemKey tokens}
+    {optionalShared : Boundary tokens} {site : OptionalSite}
+    (optionalReached : ContextualEdgeReach file tokens memo correct final
+      (.completed sequenceWaiting optional sequence optionalShared))
+    (optionalProduction : optional.raw.production = .opt site .some) :
+    ∃ first, CompletedNonAssociativeValue level output first := by
+  obtain ⟨rootWitness⟩ := packedEdge_completed_valid_iff.mp rootReached.1.1
+  have rootWaitingProduction : rootWaiting.raw.production = .root level.rule :=
+    rootWitness.advance.1.symm
+  have rootWaitingDot : rootWaiting.raw.dot.val = 0 := by
+    have advanced := rootWitness.advance.2.1
+    change 1 = rootWaiting.raw.dot.val + 1 at advanced
+    omega
+  have sequenceLhs : sequence.raw.production.lhs =
+      .aux (GrammarSite.root level.rule) := by
+    have selected : some (GrammarSymbol.nonterminal
+          sequence.raw.production.lhs) =
+        some (GrammarSymbol.nonterminal
+          (.aux (GrammarSite.root level.rule))) := by
+      calc
+        _ = rootWaiting.raw.production.rhs[rootWaiting.raw.dot.val]? :=
+          rootWitness.next.2.symm
+        _ = (ProductionId.root level.rule).rhs[0]? := by
+          rw [rootWaitingDot, rootWaitingProduction]
+        _ = _ := by simp [ProductionId.rhs]
+    exact GrammarSymbol.nonterminal.inj (Option.some.inj selected)
+  obtain ⟨sequenceSite, sequenceProduction⟩ :=
+    g10NonAssociativeRootChild_isSequence level sequence.raw.production
+      sequenceLhs
+  have sequenceSiteRoot : sequenceSite.site = GrammarSite.root level.rule := by
+    rw [sequenceProduction] at sequenceLhs
+    exact NonterminalSymbol.aux.inj sequenceLhs
+  have childrenExpressions := SequenceSite.children_expression sequenceSite
+  rw [sequenceSiteRoot, GrammarSite.root_expression,
+    g10NonAssociative_rhs_eq] at childrenExpressions
+  simp only [EbnfExpr.children] at childrenExpressions
+  have childrenLength : sequenceSite.children.length = 2 := by
+    have exactLength := congrArg List.length childrenExpressions
+    simpa using exactLength
+  obtain ⟨firstSite, secondSite, children⟩ :=
+    g10List_eq_pair_of_length_two sequenceSite.children childrenLength
+  have shapes : firstSite.expression =
+        .atom (.nonterminal level.operandRule) ∧
+      secondSite.expression = .optional level.tailExpr := by
+    simpa [children] using childrenExpressions
+  obtain ⟨viewSite, branch, viewProduction, viewSiteEq,
+      _, _⟩ := g10OptionalCompletionView level sequenceSite firstSite
+    secondSite children shapes.2 sequenceProduction rootWitness.complete
+      optionalReached
+  have viewSiteIsSite : viewSite = site :=
+    (ProductionId.opt.inj
+      (viewProduction.symm.trans optionalProduction)).1
+  have siteEq : site.site = secondSite :=
+    (congrArg GrammarSiteOfKind.site viewSiteIsSite).symm.trans viewSiteEq
+  apply g10CompletedValue_of_presentCompletionEdges_of_aligned rootReduction
+    rootReached optionalReached optionalProduction
+  · intro waiting finished shared edge
+    rcases g10NonAssociativeRoot_completion_backpointer edge rootReached with
+      ⟨sharedEq, productionEq⟩
+    exact g10CompletedEdge_finished_eq_of_coordinates edge rootReached
+      sharedEq productionEq
+  · intro waiting finished shared edge
+    exact g10NonAssociativeOptional_finished_eq exclusive producer level
+      sequenceSite firstSite secondSite children shapes.1 shapes.2
+      sequenceProduction rootWitness.complete optionalReached siteEq
+      optionalProduction edge
 
 end Solcore.Surface.Multi
