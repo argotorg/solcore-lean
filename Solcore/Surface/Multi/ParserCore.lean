@@ -4582,6 +4582,92 @@ structure StructurallyValidContextualCompletedEdge
   structural : ContextualPackedEdgeKey.StructurallyValid file tokens
     (.completed waiting finished after shared)
 
+/-- A contextual scan retaining the Type-level terminal witness needed to
+compute its semantic prefix value. -/
+structure WitnessedContextualScannedEdge
+    (file : WorkspaceFile) (tokens : List Token) where
+  before : ContextualItemKey tokens
+  after : ContextualItemKey tokens
+  cursor : TerminalCursor tokens
+  witness : ScannedEdgeWitness file tokens before.raw after.raw cursor
+  sameContext : before.context = after.context
+  deriving Repr, DecidableEq
+
+instance {file : WorkspaceFile} {tokens : List Token} :
+    BEq (WitnessedContextualScannedEdge file tokens) :=
+  ⟨fun left right => decide (left = right)⟩
+
+/-- A contextual completion retaining the Type-level child/value transport
+witness and its exact context equations. -/
+structure WitnessedContextualCompletedEdge
+    (file : WorkspaceFile) (tokens : List Token) where
+  waiting : ContextualItemKey tokens
+  finished : ContextualItemKey tokens
+  after : ContextualItemKey tokens
+  shared : Boundary tokens
+  witness : CompletedEdgeWitness tokens waiting.raw finished.raw after.raw shared
+  finishedContext : finished.context =
+    descendContext waiting finished.raw.production
+  afterContext : after.context = waiting.context
+  deriving Repr, DecidableEq
+
+instance {file : WorkspaceFile} {tokens : List Token} :
+    BEq (WitnessedContextualCompletedEdge file tokens) :=
+  ⟨fun left right => decide (left = right)⟩
+
+/-- Erase a witnessed scan to the existing proof-irrelevant structural edge. -/
+def WitnessedContextualScannedEdge.toStructural
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualScannedEdge file tokens) :
+    StructurallyValidContextualScannedEdge file tokens := {
+  before := edge.before
+  after := edge.after
+  cursor := edge.cursor
+  structural :=
+    ⟨packedEdge_scanned_valid_iff.mpr ⟨edge.witness⟩, edge.sameContext⟩
+}
+
+/-- Pack a witnessed scan while retaining its exact contextual key. -/
+def WitnessedContextualScannedEdge.toPacked
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualScannedEdge file tokens) :
+    StructurallyValidContextualPackedEdge file tokens :=
+  ⟨.scanned edge.before edge.after edge.cursor,
+    edge.toStructural.structural⟩
+
+/-- Erase a witnessed completion to the existing proof-irrelevant edge. -/
+def WitnessedContextualCompletedEdge.toStructural
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualCompletedEdge file tokens) :
+    StructurallyValidContextualCompletedEdge file tokens := {
+  waiting := edge.waiting
+  finished := edge.finished
+  after := edge.after
+  shared := edge.shared
+  structural := ⟨packedEdge_completed_valid_iff.mpr ⟨edge.witness⟩,
+    edge.finishedContext, edge.afterContext⟩
+}
+
+/-- Pack a witnessed completion while retaining its exact contextual key. -/
+def WitnessedContextualCompletedEdge.toPacked
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualCompletedEdge file tokens) :
+    StructurallyValidContextualPackedEdge file tokens :=
+  ⟨.completed edge.waiting edge.finished edge.after edge.shared,
+    edge.toStructural.structural⟩
+
+@[simp] theorem WitnessedContextualScannedEdge.toPacked_val
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualScannedEdge file tokens) :
+    edge.toPacked.val =
+      .scanned edge.before edge.after edge.cursor := rfl
+
+@[simp] theorem WitnessedContextualCompletedEdge.toPacked_val
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : WitnessedContextualCompletedEdge file tokens) :
+    edge.toPacked.val =
+      .completed edge.waiting edge.finished edge.after edge.shared := rfl
+
 private theorem advanceItem_after_functional
     {tokens : List Token}
     {before afterLeft afterRight : DottedItem tokens}
