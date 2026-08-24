@@ -11763,6 +11763,36 @@ private theorem dequeuePhaseCValueFrontier?_units
       cases resultEq
       exact runMappedPrimitive?_units current _ _ nextEq
 
+private theorem beginPhaseCValueWorklist?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  have exact := beginPhaseCValueWorklist?_exact current result selected
+  rw [exact.2.2.2]
+  rfl
+
+private theorem dequeuePhaseCValueFrontier?_queuePrefixesAvailable
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : dequeuePhaseCValueFrontier? current = some (item, result)) :
+    result.payload.frontier.queuePrefixesAvailable = true := by
+  obtain ⟨rest, queueEq, _recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current item result selected
+  have pureSelected := ContextualValueFrontierState.dequeue?_of_cons
+    current.payload.frontier item rest queueEq
+  have preserved :=
+    ContextualValueFrontierState.queuePrefixesAvailable_dequeue?
+      current.payload.frontier
+        { current.payload.frontier with queue := rest }
+        item available pureSelected
+  rw [frontierEq]
+  exact preserved
+
 private def beginPhaseCWorklist?
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseBSealed file tokens)) :
