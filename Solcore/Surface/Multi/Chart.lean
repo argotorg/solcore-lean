@@ -33307,6 +33307,171 @@ private theorem dequeuePhaseCValueFrontier?_process_units_lt
     processedEq
   omega
 
+/-- The semantic runner state needed at every queue iteration. Recognition is
+immutable; the remaining fields are preserved by dequeue plus source
+processing. -/
+private structure PhaseCValueRunnerInvariant
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens)) : Prop where
+  edgesNodup : current.payload.recognition.phaseC.contextualEdges.Nodup
+  operational : PhaseCOperationalInvariant file tokens
+    current.payload.recognition
+  closed : OperationalContextualClosure file tokens
+    current.payload.recognition.phaseC.memo
+    current.payload.recognition.phaseC.contextualItems
+    current.payload.recognition.phaseC.contextualEdges
+  addressSafe : PhaseCValueAddressSafe current
+  queueNodup : current.payload.frontier.queue.Nodup
+  prefixesAvailable : current.payload.frontier.queuePrefixesAvailable = true
+  queueRecognized : PhaseCValueQueueRecognized current
+
+/-- Removing the unique queue head preserves duplicate-free scheduling. -/
+private theorem dequeuePhaseCValueFrontier?_queueNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (source : ContextualItemKey tokens)
+    (queueNodup : current.payload.frontier.queue.Nodup)
+    (selected : dequeuePhaseCValueFrontier? current = some (source, result)) :
+    result.payload.frontier.queue.Nodup := by
+  obtain ⟨rest, queueEq, _recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source result selected
+  rw [frontierEq]
+  exact (List.nodup_cons.mp (queueEq ▸ queueNodup)).2
+
+/-- Removing the queue head preserves closure over immutable recognition. -/
+private theorem dequeuePhaseCValueFrontier?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (source : ContextualItemKey tokens)
+    (recognized : PhaseCValueQueueRecognized current)
+    (selected : dequeuePhaseCValueFrontier? current = some (source, result)) :
+    PhaseCValueQueueRecognized result := by
+  obtain ⟨rest, queueEq, recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source result selected
+  intro target member
+  rw [recognitionEq]
+  apply recognized target
+  rw [queueEq]
+  apply List.mem_cons_of_mem source
+  rwa [frontierEq] at member
+
+/-- A nonempty runner queue can be dequeued with all recursive invariants and
+the exact source-local premises required by semantic processing. -/
+private theorem dequeuePhaseCValueFrontier?_total_runner
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (source : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (queueEq : current.payload.frontier.queue = source :: rest)
+    (invariant : PhaseCValueRunnerInvariant current) :
+    ∃ result,
+      dequeuePhaseCValueFrontier? current = some (source, result) ∧
+        PhaseCValueRunnerInvariant result ∧
+        source ∈ result.payload.recognition.phaseC.contextualItems ∧
+        PhaseCValueProcessingFresh result.counter source ∧
+        result.payload.frontier.prefixMemberBool source = true ∧
+        source ∉ result.payload.frontier.queue := by
+  obtain ⟨result, selected, resultSafe, processing, present, notQueued⟩ :=
+    dequeuePhaseCValueFrontier?_total_processing current source rest queueEq
+      invariant.queueNodup invariant.prefixesAvailable invariant.addressSafe
+  obtain ⟨_exactRest, _exactQueue, recognitionEq, _frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source result selected
+  have sourceMember := invariant.queueRecognized.head source rest queueEq
+  refine ⟨result, selected, ?_, ?_, processing, present, notQueued⟩
+  · constructor
+    · rw [recognitionEq]
+      exact invariant.edgesNodup
+    · rw [recognitionEq]
+      exact invariant.operational
+    · rw [recognitionEq]
+      exact invariant.closed
+    · exact resultSafe
+    · exact dequeuePhaseCValueFrontier?_queueNodup current result source
+        invariant.queueNodup selected
+    · exact dequeuePhaseCValueFrontier?_queuePrefixesAvailable current source
+        result invariant.prefixesAvailable selected
+    · exact dequeuePhaseCValueFrontier?_queueRecognized current result source
+        invariant.queueRecognized selected
+  · rwa [recognitionEq]
+
+/-- The total source processor closes the runner invariant for the recursive
+queue call. -/
+private theorem processPhaseCValueItem?_total_runner
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (invariant : PhaseCValueRunnerInvariant current)
+    (sourceMember : source ∈
+      current.payload.recognition.phaseC.contextualItems)
+    (fresh : PhaseCValueProcessingFresh current.counter source)
+    (present : current.payload.frontier.prefixMemberBool source = true)
+    (notQueued : source ∉ current.payload.frontier.queue) :
+    ∃ result, processPhaseCValueItem? owned source current = some result ∧
+      PhaseCValueRunnerInvariant result := by
+  obtain ⟨result, selected, recognitionEq, resultSafe, _resultPresent,
+      _resultNotQueued, resultNodup, resultAvailable, resultRecognized⟩ :=
+    processPhaseCValueItem?_total_processing owned source current
+      invariant.edgesNodup invariant.operational invariant.closed sourceMember
+      invariant.addressSafe present notQueued fresh invariant.queueNodup
+      invariant.prefixesAvailable invariant.queueRecognized
+  refine ⟨result, selected, ?_⟩
+  constructor
+  · rw [recognitionEq]
+    exact invariant.edgesNodup
+  · rw [recognitionEq]
+    exact invariant.operational
+  · rw [recognitionEq]
+    exact invariant.closed
+  · exact resultSafe
+  · exact resultNodup
+  · exact resultAvailable
+  · exact resultRecognized
+
+/-- Consumed-unit budget is sufficient to run and preserve the entire
+semantic value queue. -/
+private theorem runPhaseCValueQueue?_total_of_budget
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel (current : CountedState tokens
+      (PhaseCValueWorklist file tokens)),
+      chartGBound (tokens.length + 1) < current.counter.units + fuel →
+      PhaseCValueRunnerInvariant current →
+      ∃ result, runPhaseCValueQueue? owned fuel current = some result ∧
+        PhaseCValueRunnerInvariant result := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current budget invariant
+      have bound := current.counter.units_le_chartGBound
+      omega
+  | succ fuel induction =>
+      intro current budget invariant
+      cases queueEq : current.payload.frontier.queue with
+      | nil =>
+          exact ⟨current, by simp [runPhaseCValueQueue?, queueEq], invariant⟩
+      | cons source rest =>
+          obtain ⟨dequeued, dequeuedEq, dequeuedInvariant, sourceMember,
+              fresh, present, notQueued⟩ :=
+            dequeuePhaseCValueFrontier?_total_runner current source rest queueEq
+              invariant
+          obtain ⟨processed, processedEq, processedInvariant⟩ :=
+            processPhaseCValueItem?_total_runner owned source dequeued
+              dequeuedInvariant sourceMember fresh present notQueued
+          have progress : current.counter.units < processed.counter.units :=
+            dequeuePhaseCValueFrontier?_process_units_lt owned current dequeued
+              processed source dequeuedEq processedEq
+          obtain ⟨result, runEq, resultInvariant⟩ :=
+            induction processed (by omega) processedInvariant
+          exact ⟨result, by
+            simp [runPhaseCValueQueue?, queueEq, dequeuedEq, processedEq,
+              runEq], resultInvariant⟩
+
 private theorem insertContextualScannedEdge?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
