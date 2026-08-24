@@ -14739,3 +14739,34 @@ end ContextualValueFrontierState
 end Chart
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+
+/-- Once execution-level coherence is supplied, every projected canonical
+module from the semantic executor satisfies the final public parse judgment. -/
+theorem executeObservedContextualValueWorklistMulti?_parses_of_valuesCoherent
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (module : ParsedModuleV1)
+    (parsed : result.parsedModule? = some module) :
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final :=
+      Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+        file tokens owned result.recognition recognitionSelected
+    result.frontier.ValuesCoherent result.recognition.memo correct final →
+      Parses file tokens module := by
+  dsimp only
+  intro coherent
+  exact result.frontier.lookupParsedModule?_parses owned coherent module
+    (by simpa [Chart.ContextualValueWorklistResult.parsedModule?] using parsed)
+
+end Solcore.Surface.Multi
