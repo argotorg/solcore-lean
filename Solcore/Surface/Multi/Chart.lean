@@ -36147,4 +36147,63 @@ private theorem runPhaseCValueQueue?_valueTrace
           exact induction processed result processedItemsEq processedEdgesEq
             processedTrace runEq
 
+/-- Beginning from a recognized root and draining the bounded value queue
+constructs a trace over the recognition chart's exact public projection. -/
+private theorem executePhaseCValueWorklist?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (rootMember : contextualRoot tokens ∈
+      current.payload.phaseC.contextualItems)
+    (selected : executePhaseCValueWorklist? owned current = some result) :
+    ContextualValueFrontierTrace owned {
+      memo := current.payload.phaseC.memo
+      items := current.payload.phaseC.contextualItems
+      edges := current.payload.phaseC.contextualEdges
+    } result.payload.frontier := by
+  unfold executePhaseCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  have enteredTrace := beginPhaseCValueWorklist?_valueTrace owned current
+    entered rootMember enteredEq
+  have exact := beginPhaseCValueWorklist?_exact current entered enteredEq
+  apply runPhaseCValueQueue?_valueTrace owned {
+    memo := current.payload.phaseC.memo
+    items := current.payload.phaseC.contextualItems
+    edges := current.payload.phaseC.contextualEdges
+  } (chartGBound (tokens.length + 1)) entered result
+  · rw [exact.2.2.1]
+  · rw [exact.2.2.1]
+  · exact enteredTrace
+  · exact runEq
+
+/-- Every successful public semantic execution exposes the construction trace
+that produced its dependent value frontier. -/
+theorem executeObservedContextualValueWorklistMulti?_valueTrace
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : ContextualValueWorklistResult file tokens)
+    (selected : executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    ContextualValueFrontierTrace owned result.recognition result.frontier := by
+  unfold executeObservedContextualValueWorklistMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨internal, internalEq, resultEq⟩
+  cases resultEq
+  unfold executeObservedPhaseABCValueWorklist? at internalEq
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at internalEq
+  rcases internalEq with ⟨recognition, recognitionEq, valueEq⟩
+  have closed := executeObservedPhaseABCWorklistMulti?_operationalClosure
+    file tokens owned recognition recognitionEq
+  have rootMember : contextualRoot tokens ∈
+      recognition.payload.phaseC.contextualItems := by
+    simpa [contextualRoot] using closed.root_mem
+  have trace := executePhaseCValueWorklist?_valueTrace owned recognition
+    internal rootMember valueEq
+  have recognitionExact := executePhaseCValueWorklist?_recognition owned
+    recognition internal valueEq
+  rw [recognitionExact]
+  exact trace
+
 end Solcore.Surface.Multi.Chart
