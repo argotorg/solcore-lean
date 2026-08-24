@@ -214,13 +214,15 @@ theorem grammarDelimiterChoice_member
           · exact grammarDelimiterEffectsAgree_member agrees member
 
 theorem grammarRepeatedEffect_exact
-    {child : EbnfExpr} {before after : DelimiterStack}
-    (computed :
+    {expression child : EbnfExpr} {before after : DelimiterStack}
+    (unfolded : grammarDelimiterEffect? expression before =
       (match grammarDelimiterEffect? child before with
        | some childAfter =>
            if childAfter = before then some before else none
-       | none => none) = some after) :
+       | none => none))
+    (computed : grammarDelimiterEffect? expression before = some after) :
     after = before ∧ grammarDelimiterEffect? child before = some before := by
+  rw [unfolded] at computed
   generalize childEq : grammarDelimiterEffect? child before = result at computed
   cases result with
   | none => contradiction
