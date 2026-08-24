@@ -143,6 +143,31 @@ theorem rootlessExecutableProgress_of_grammarComponentsAt
     (rankedFrontierNormalization_of_grammarRanked owned ranked)
     postEof
 
+/-- A concrete grammar/span potential is accepted by computation: the two
+displayed Boolean equalities are the complete normalization-rank certificate. -/
+theorem rootlessExecutableProgress_of_checkedGrammarPotentialAt
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (anchored : ∀ waiting,
+      FrontierReach file tokens memo correct final cursor waiting →
+        AnchoredNonterminalCoverageAt tokens waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (completion : frontierCompletionRankTable
+      owned correct final cursor potential = true)
+    (prediction : frontierPredictionRankTable
+      owned correct final cursor potential = true)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  exact rootlessExecutableProgress_of_grammarComponentsAt
+    owned greatest anchored ⟨potential, completion, prediction⟩ postEof
+
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
