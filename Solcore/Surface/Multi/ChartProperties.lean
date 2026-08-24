@@ -12395,6 +12395,54 @@ theorem executeRootAction_reduces
     (executeRootRule_reduces rule executable origin finish ready
       (RootAction.unpack rule input))
 
+/-- The total production executor realizes the exact declarative action for
+all eleven generated production shapes. -/
+theorem executeProductionAction_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (production : ProductionId)
+    (origin finish : Boundary tokens)
+    (ready : ActionReductionReady file tokens (.actionFor production)
+      origin finish)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : GrammarSymbolValues file tokens production.rhs) :
+    ActionReduces file tokens (.actionFor production) origin finish input
+      (executeProductionAction file tokens origin finish production
+        owned ordered input) := by
+  cases production with
+  | root rule =>
+      exact executeRootAction_reduces rule (executableRootRule rule)
+        origin finish ready input
+  | atom site => exact .atom site origin finish input
+  | seq site => exact .seq site origin finish input
+  | group site => exact .group site origin finish input
+  | choice site branch => exact .choice site branch origin finish input
+  | opt site branch => exact .opt site branch origin finish input
+  | star site branch => exact .star site branch origin finish input
+  | plus site branch => exact .plus site branch origin finish input
+  | list0 site branch => exact .list0 site branch origin finish input
+  | list1 site => exact .list1 site origin finish input
+  | tail site branch => exact .tail site branch origin finish input
+
+/-- Every declarative production action returns the total executor's result. -/
+theorem ActionReduces.eq_executeProductionAction
+    {file : WorkspaceFile} {tokens : List Token}
+    {production : ProductionId}
+    {origin finish : Boundary tokens}
+    (ready : ActionReductionReady file tokens (.actionFor production)
+      origin finish)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    {input : GrammarSymbolValues file tokens production.rhs}
+    {output : NonterminalValue file tokens production.lhs}
+    (reduces : ActionReduces file tokens (.actionFor production)
+      origin finish input output) :
+    output = executeProductionAction file tokens origin finish production
+      owned ordered input :=
+  ActionReduces.functional reduces
+    (executeProductionAction_reduces production origin finish ready owned
+      ordered input)
+
 /-- The executable root result is the unique declarative action result. -/
 theorem ActionReduces.eq_executeRootAction
     {file : WorkspaceFile} {tokens : List Token}
