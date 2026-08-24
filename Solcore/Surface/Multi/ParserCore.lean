@@ -5886,6 +5886,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | dataConstructor : ExecutableRootRule .dataConstructor
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | classDecl : ExecutableRootRule .classDecl
+  | instanceDecl : ExecutableRootRule .instanceDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
   | fallbackDecl : ExecutableRootRule .fallbackDecl
   | contractConstructorDecl : ExecutableRootRule .contractConstructorDecl
@@ -9394,6 +9395,8 @@ def executeRootRule
       executeTypeAliasDeclRoot file tokens origin finish owned ordered input
   | .classDecl =>
       executeClassDeclRoot file tokens origin finish owned ordered input
+  | .instanceDecl =>
+      executeInstanceDeclRoot file tokens origin finish owned ordered input
   | .fieldDecl =>
       executeFieldDeclRoot file tokens origin finish owned ordered input
   | .fallbackDecl =>
