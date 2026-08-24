@@ -12459,6 +12459,115 @@ theorem ActionReduces.eq_executeRootAction
   ActionReduces.functional reduces
     (executeRootAction_reduces rule executable origin finish ready input)
 
+private theorem actionReductionReady_of_moduleInterval
+    {file : WorkspaceFile} {tokens : List Token}
+    {production : ProductionId}
+    {origin finish : Boundary tokens}
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (moduleInterval : production = .root .module →
+      origin = Boundary.start tokens ∧
+        finish = Boundary.afterLogicalEOF tokens) :
+    ActionReductionReady file tokens (.actionFor production)
+      origin finish := by
+  cases production with
+  | root rule =>
+      exact ⟨owned, ordered, fun ruleEq =>
+        moduleInterval (by simp [ruleEq])⟩
+  | atom site => trivial
+  | seq site => trivial
+  | group site => trivial
+  | choice site branch => trivial
+  | opt site branch => trivial
+  | star site branch => trivial
+  | plus site branch => trivial
+  | list0 site branch => trivial
+  | list1 site => trivial
+  | tail site branch => trivial
+
+namespace Chart
+
+/-- The computed dot-zero prefix is declaratively coherent. -/
+theorem ContextualPrefixValue.zero_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (item : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final item)
+    (atZero : item.raw.dot.val = 0) :
+    CoherentPrefix file tokens memo correct final item
+      (ContextualPrefixValue.zero item atZero).value := by
+  exact .zero item reached atZero
+
+/-- A computed witnessed scan preserves declarative prefix coherence. -/
+theorem ContextualPrefixValue.scan_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (edge : WitnessedContextualScannedEdge file tokens)
+    (edgeReached : ContextualEdgeReach file tokens memo correct final
+      edge.toPacked.val)
+    (prior : ContextualPrefixValue file tokens edge.before)
+    (priorCoherent : CoherentPrefix file tokens memo correct final
+      edge.before prior.value) :
+    CoherentPrefix file tokens memo correct final edge.after
+      (ContextualPrefixValue.scan edge prior).value := by
+  exact .scan edge.before edge.after edge.cursor prior.value edge.witness
+    (by simpa using edgeReached) priorCoherent
+
+/-- A computed witnessed completion preserves declarative prefix coherence. -/
+theorem ContextualPrefixValue.complete_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (edge : WitnessedContextualCompletedEdge file tokens)
+    (edgeReached : ContextualEdgeReach file tokens memo correct final
+      edge.toPacked.val)
+    (prior : ContextualPrefixValue file tokens edge.waiting)
+    (child : ContextualReductionValue file tokens edge.finished)
+    (priorCoherent : CoherentPrefix file tokens memo correct final
+      edge.waiting prior.value)
+    (childCoherent : CoherentReduction file tokens memo correct final
+      edge.finished child.value) :
+    CoherentPrefix file tokens memo correct final edge.after
+      (ContextualPrefixValue.complete edge prior child).value := by
+  exact .complete edge.waiting edge.finished edge.after edge.shared
+    prior.value child.value edge.witness (by simpa using edgeReached)
+    priorCoherent childCoherent
+
+/-- Applying the total action to a coherent complete prefix computes a
+declaratively coherent reduction. -/
+theorem ContextualReductionValue.reduce_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final item)
+    (isComplete : CompleteItem item.raw)
+    (prior : ContextualPrefixValue file tokens item)
+    (priorCoherent : CoherentPrefix file tokens memo correct final
+      item prior.value)
+    (moduleInterval : item.raw.production = .root .module →
+      item.raw.origin = Boundary.start tokens ∧
+        item.raw.current = Boundary.afterLogicalEOF tokens) :
+    CoherentReduction file tokens memo correct final item
+      (ContextualReductionValue.reduce owned item
+        (contextualReach_ordered reached) isComplete prior).value := by
+  let ordered := contextualReach_ordered reached
+  let ready := actionReductionReady_of_moduleInterval owned ordered
+    moduleInterval
+  exact .reduce item prior.value _ reached isComplete priorCoherent
+    (executeProductionAction_reduces item.raw.production item.raw.origin
+      item.raw.current ready owned ordered
+      (PrefixValues.fullValue item isComplete prior.value))
+
+end Chart
+
 end Solcore.Surface.Multi
 namespace Solcore.Surface.Multi
 
