@@ -5864,6 +5864,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | matchArm : ExecutableRootRule .matchArm
   | statement : ExecutableRootRule .statement
   | terminalExpression : ExecutableRootRule .terminalExpression
+  | pattern : ExecutableRootRule .pattern
   | expression : ExecutableRootRule .expression
   | annotation : ExecutableRootRule .annotation
   | conditional : ExecutableRootRule .conditional
@@ -9021,6 +9022,104 @@ def executeMultiplicativeRoot
       | .inr (.inl slash) => executableTerminalLoc slash .divide
       | .inr (.inr percent) => executableTerminalLoc percent .modulo), value.2))
 
+/-- Execute every pattern form from its selected typed branch. -/
+def executePatternRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .pattern)) : Pattern :=
+  let underscoreAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .underscore))
+  let literalAtom : EbnfExpr := .atom (.nonterminal .literal)
+  let dotAtom : EbnfExpr := .atom (.terminal (.symbol .dot))
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let comptimeAtom : EbnfExpr :=
+    .atom (.terminal (.contextualKeyword .comptimeKw))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let nameAtom : EbnfExpr := .atom (.nonterminal .qualifiedName)
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let commaAtom : EbnfExpr := .atom (.terminal (.symbol .comma))
+  let patternAtom : EbnfExpr := .atom (.nonterminal .pattern)
+  let argumentsExpr : EbnfExpr :=
+    .sequence [openAtom, .list1 patternAtom, closeAtom]
+  let tupleTail := EbnfValue.fixedInfixTailExpr
+    (.symbol .comma) .pattern
+  let branches : List EbnfExpr := [
+    underscoreAtom,
+    literalAtom,
+    .sequence [dotAtom, identifierAtom, .optional argumentsExpr],
+    .sequence [comptimeAtom, expressionAtom],
+    .sequence [nameAtom, .optional argumentsExpr],
+    .sequence [openAtom, closeAtom],
+    .sequence [openAtom, patternAtom, closeAtom],
+    .sequence [openAtom, patternAtom, commaAtom, patternAtom,
+      .star tupleTail, closeAtom]]
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choiceView branches input with
+  | ⟨⟨0, _⟩, raw⟩ =>
+      let underscore := EbnfValue.terminalView
+        (.symbol .underscore) raw
+      sourceLoc witness (.wildcard
+        (executableTerminalLoc underscore .wildcard))
+  | ⟨⟨1, _⟩, raw⟩ =>
+      sourceLoc witness (.literal (EbnfValue.ruleView .literal raw))
+  | ⟨⟨2, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        dotAtom identifierAtom (.optional argumentsExpr) raw
+      let dot := EbnfValue.terminalView (.symbol .dot) viewed.1
+      let name := EbnfValue.terminalView
+        (.category .identifier) viewed.2.1
+      let arguments := (EbnfValue.optionalView argumentsExpr
+        viewed.2.2).map fun argumentRaw =>
+          let argumentView := EbnfValue.sequence3View
+            openAtom (.list1 patternAtom) closeAtom argumentRaw
+          (EbnfValue.list1View patternAtom argumentView.2.1).map
+            (EbnfValue.ruleView .pattern)
+      sourceLoc witness (.dotConstructor
+        (executableTerminalLoc dot ())
+        (executableTerminalLoc name name.identifierProjection.2)
+        arguments)
+  | ⟨⟨3, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View
+        comptimeAtom expressionAtom raw
+      let comptime := EbnfValue.terminalView
+        (.contextualKeyword .comptimeKw) viewed.1
+      sourceLoc witness (.comptime
+        (executableTerminalLoc comptime .comptimeModifier)
+        (EbnfValue.ruleView .expression viewed.2))
+  | ⟨⟨4, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence2View
+        nameAtom (.optional argumentsExpr) raw
+      let name := EbnfValue.ruleView .qualifiedName viewed.1
+      let arguments := (EbnfValue.optionalView argumentsExpr
+        viewed.2).map fun argumentRaw =>
+          let argumentView := EbnfValue.sequence3View
+            openAtom (.list1 patternAtom) closeAtom argumentRaw
+          (EbnfValue.list1View patternAtom argumentView.2.1).map
+            (EbnfValue.ruleView .pattern)
+      sourceLoc witness (.named name arguments)
+  | ⟨⟨5, _⟩, _raw⟩ => sourceLoc witness (.tuple [])
+  | ⟨⟨6, _⟩, raw⟩ =>
+      let viewed := EbnfValue.sequence3View
+        openAtom patternAtom closeAtom raw
+      sourceLoc witness
+        (.group (EbnfValue.ruleView .pattern viewed.2.1))
+  | ⟨⟨7, _⟩, raw⟩ =>
+      let children : List EbnfExpr := [openAtom, patternAtom,
+        commaAtom, patternAtom, .star tupleTail, closeAtom]
+      let viewed := EbnfValue.sequenceFlatView children raw
+      let first := EbnfValue.ruleView .pattern viewed.2.1
+      let second := EbnfValue.ruleView .pattern viewed.2.2.2.1
+      let rest := (EbnfValue.starView tupleTail
+        viewed.2.2.2.2.1).map fun tail =>
+          (EbnfValue.fixedInfixTailView
+            (.symbol .comma) .pattern tail).2
+      sourceLoc witness (.tuple (first :: second :: rest))
+
 /-- Execute every atomic type form from its selected typed branch. -/
 def executeTypeAtomRoot
     (file : WorkspaceFile) (tokens : List Token)
@@ -9118,6 +9217,8 @@ def executeRootRule
       executeMatchArmRoot file tokens origin finish owned ordered input
   | .statement => executeStatementRoot input
   | .terminalExpression => executeTerminalExpressionRoot input
+  | .pattern =>
+      executePatternRoot file tokens origin finish owned ordered input
   | .expression => executeExpressionRoot input
   | .annotation =>
       executeAnnotationRoot file tokens origin finish owned ordered input
