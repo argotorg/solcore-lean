@@ -52,10 +52,13 @@ at base depth and checking only an explicitly closed source-rule set there. -/
 def grammarOperatorEffect? :
     NonAssociativeLevel → EbnfExpr → DelimiterStack → Option DelimiterStack
   | level, .atom (.terminal terminal), before =>
-      if before = [] ∧ grammarForbiddenTerminal level terminal = true then
+      if terminal = .endOfFile then
         none
-      else
-        grammarTerminalDelimiterStep? before terminal
+      else if before = [] ∧
+          grammarForbiddenTerminal level terminal = true then
+          none
+        else
+          grammarTerminalDelimiterStep? before terminal
   | level, .atom (.nonterminal rule), before =>
       if rule = .module then
         none

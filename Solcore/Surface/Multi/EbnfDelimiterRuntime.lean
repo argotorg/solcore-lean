@@ -69,7 +69,7 @@ theorem DelimiterRun.append
       exact .cons before next after cursor start last token atStart lookup step
         (induction right)
 
-private theorem DelimiterStep.append
+theorem DelimiterStep.append
     {before after : DelimiterStack} {token : TokenKind}
     (step : DelimiterStep before token after) (suffix : DelimiterStack) :
     DelimiterStep (before ++ suffix) token (after ++ suffix) := by
