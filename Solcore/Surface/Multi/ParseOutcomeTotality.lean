@@ -1,5 +1,5 @@
 import Solcore.Surface.Multi.DiagnosticExhaustiveness
-import Solcore.Surface.Multi.RootlessNormalizationRank
+import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
 
 set_option autoImplicit false
 
@@ -57,6 +57,35 @@ theorem rootlessExecutableProgress_of_components
       postEof greatest waiting rootAbsent,
     coverage cursor greatest,
     ranked cursor greatest⟩
+
+/-- Static anchor coverage and the two finite grammar-rank tables discharge
+the abstract coverage and normalization components of rootless progress. -/
+theorem rootlessExecutableProgress_of_grammarComponents
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (anchored : ∀ cursor,
+      GreatestReachableCursor file tokens memo correct final cursor →
+        ∀ waiting,
+          FrontierReach file tokens memo correct final cursor waiting →
+            AnchoredNonterminalCoverageAt tokens waiting)
+    (ranked : ∀ cursor,
+      GreatestReachableCursor file tokens memo correct final cursor →
+        GrammarRankedFrontierNormalization
+          file tokens owned memo correct final cursor)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  apply rootlessExecutableProgress_of_components
+      (fun cursor greatest waiting frontier =>
+        enabledNonterminalCoverageAt_of_anchored correct final waiting
+          (anchored cursor greatest waiting frontier))
+      (fun cursor greatest =>
+        rankedFrontierNormalization_of_grammarRanked owned
+          (ranked cursor greatest))
+      postEof
 
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
