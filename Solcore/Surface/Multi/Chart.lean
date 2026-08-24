@@ -22846,6 +22846,215 @@ namespace Solcore.Surface.Multi.Chart
 open Grammar
 open Solcore.Workspace
 
+/-- Public name for the canonical dot-zero contextual module root used to
+initialize semantic evaluation. -/
+def contextualValueRoot (tokens : List Token) : ContextualItemKey tokens := {
+  raw := {
+    production := .root .module
+    dot := ⟨0, Nat.zero_lt_succ _⟩
+    origin := Boundary.start tokens
+    current := Boundary.start tokens
+  }
+  context := .plain
+}
+
+namespace ContextualValueFrontierState.CandidateInsertResult
+
+/-- The frontier exposed by candidate publication. Duplicate preparation
+retains the prior frontier; both insertion classes expose the prepared one. -/
+def publishedState
+    {file : WorkspaceFile} {tokens : List Token}
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (before : ContextualValueFrontierState file tokens) :
+    ContextualValueFrontierState file tokens :=
+  match candidate.kind with
+  | .duplicate => before
+  | .insertedIncomplete => candidate.state
+  | .insertedComplete => candidate.state
+
+end ContextualValueFrontierState.CandidateInsertResult
+
+/-- A successfully prepared candidate's published frontier is extensionally
+its classified state, including the duplicate class. -/
+theorem ContextualValueFrontierState.insertCandidate?_publishedState_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    candidate.publishedState state = candidate.state := by
+  unfold ContextualValueFrontierState.insertCandidate? at selected
+  split at selected
+  next present =>
+    cases selected
+    rfl
+  next absent =>
+    split at selected
+    next complete =>
+      cases reductionEq : ContextualReductionValue.reduce? owned item prior with
+      | none => simp [reductionEq] at selected
+      | some reduction =>
+          simp only [reductionEq, Option.some.injEq] at selected
+          cases selected
+          rfl
+    next incomplete =>
+      cases selected
+      rfl
+
+/-- Prop-valued construction trace for one semantic frontier over an immutable
+public recognition result. It records only executable state transitions and
+their retained recognition membership, so downstream declarative proofs can
+eliminate it solely into `Prop`. -/
+inductive ContextualValueFrontierTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens) :
+    ContextualValueFrontierState file tokens → Prop where
+  | root
+      {item : ContextualItemKey tokens}
+      {atZero : item.raw.dot.val = 0}
+      {candidate : ContextualValueFrontierState.CandidateInsertResult
+        file tokens}
+      (member : item ∈ recognition.items)
+      (selected : ContextualValueFrontierState.insertCandidate? owned
+        (ContextualValueFrontierState.empty file tokens) item
+          (ContextualPrefixValue.zero item atZero) = some candidate) :
+      ContextualValueFrontierTrace owned recognition candidate.state
+  | same
+      {before after : ContextualValueFrontierState file tokens}
+      (trace : ContextualValueFrontierTrace owned recognition before)
+      (equal : before = after) :
+      ContextualValueFrontierTrace owned recognition after
+  | dequeue
+      {before after : ContextualValueFrontierState file tokens}
+      {item : ContextualItemKey tokens}
+      (trace : ContextualValueFrontierTrace owned recognition before)
+      (selected : before.dequeue? = some (item, after)) :
+      ContextualValueFrontierTrace owned recognition after
+  | prediction
+      {before : ContextualValueFrontierState file tokens}
+      {item : ContextualItemKey tokens}
+      (trace : ContextualValueFrontierTrace owned recognition before)
+      (member : item ∈ recognition.items)
+      (atZero : item.raw.dot.val = 0)
+      (candidate : ContextualValueFrontierState.CandidateInsertResult
+        file tokens)
+      (selected : before.insertCandidate? owned item
+        (ContextualPrefixValue.zero item atZero) = some candidate) :
+      ContextualValueFrontierTrace owned recognition candidate.state
+  | scan
+      {before : ContextualValueFrontierState file tokens}
+      {retained : StructurallyValidContextualPackedEdge file tokens}
+      {edge : StructurallyValidContextualScannedEdge file tokens}
+      (trace : ContextualValueFrontierTrace owned recognition before)
+      (member : retained ∈ recognition.edges)
+      (shape : retained.val =
+        .scanned edge.before edge.after edge.cursor)
+      (rebuilt : RebuiltContextualScannedEdge edge)
+      (prior : ContextualPrefixValue file tokens edge.before)
+      (priorEq : before.lookupPrefix? edge.before = some prior)
+      (candidate : ContextualValueFrontierState.CandidateInsertResult
+        file tokens)
+      (selected : before.insertCandidate? owned edge.after
+        (rebuilt.scan prior) = some candidate) :
+      ContextualValueFrontierTrace owned recognition candidate.state
+  | completion
+      {before : ContextualValueFrontierState file tokens}
+      {retained : StructurallyValidContextualPackedEdge file tokens}
+      {edge : StructurallyValidContextualCompletedEdge file tokens}
+      (trace : ContextualValueFrontierTrace owned recognition before)
+      (member : retained ∈ recognition.edges)
+      (shape : retained.val = .completed edge.waiting edge.finished
+        edge.after edge.shared)
+      (rebuilt : RebuiltContextualCompletedEdge edge)
+      (prior : ContextualPrefixValue file tokens edge.waiting)
+      (priorEq : before.lookupPrefix? edge.waiting = some prior)
+      (child : ContextualReductionValue file tokens edge.finished)
+      (childEq : before.lookupReduction? edge.finished = some child)
+      (candidate : ContextualValueFrontierState.CandidateInsertResult
+        file tokens)
+      (selected : before.insertCandidate? owned edge.after
+        (rebuilt.complete prior child) = some candidate) :
+      ContextualValueFrontierTrace owned recognition candidate.state
+
+/-- Semantic initialization establishes the public root trace over the exact
+recognition result being evaluated. -/
+private theorem beginPhaseCValueWorklist?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (rootMember : contextualRoot tokens ∈
+      current.payload.phaseC.contextualItems)
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    ContextualValueFrontierTrace owned {
+      memo := current.payload.phaseC.memo
+      items := current.payload.phaseC.contextualItems
+      edges := current.payload.phaseC.contextualEdges
+    } result.payload.frontier := by
+  let root := contextualValueRoot tokens
+  let value : ContextualPrefixValue file tokens root :=
+    ContextualPrefixValue.zero root rfl
+  let candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens := {
+    kind := .insertedIncomplete
+    state := (ContextualValueFrontierState.empty file tokens).insertPrefix
+      root value
+  }
+  have recognized : root ∈ current.payload.phaseC.contextualItems := by
+    simpa [root, contextualValueRoot, contextualRoot] using rootMember
+  have prepared : ContextualValueFrontierState.insertCandidate? owned
+      (ContextualValueFrontierState.empty file tokens) root value =
+        some candidate := by
+    simp [candidate, root, value,
+      ContextualValueFrontierState.insertCandidate?,
+      ContextualValueFrontierState.empty,
+      ContextualValueFrontierState.prefixMemberBool,
+      CompleteItem, contextualValueRoot, ProductionId.rhs]
+  have trace := ContextualValueFrontierTrace.root
+    (owned := owned)
+    (recognition := {
+      memo := current.payload.phaseC.memo
+      items := current.payload.phaseC.contextualItems
+      edges := current.payload.phaseC.contextualEdges
+    }) recognized prepared
+  have exact := beginPhaseCValueWorklist?_exact current result selected
+  rw [exact.2.2.2]
+  simpa [candidate, root, value, contextualValueRoot, contextualRoot,
+    ContextualValueFrontierState.empty,
+    ContextualValueFrontierState.insertPrefix,
+    ContextualValueFrontierState.prefixMemberBool] using trace
+
+/-- Semantic dequeue is exactly the trace's queue-only transition. -/
+private theorem dequeuePhaseCValueFrontier?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (trace : ContextualValueFrontierTrace owned recognition
+      current.payload.frontier)
+    (selected : dequeuePhaseCValueFrontier? current = some (item, result)) :
+    ContextualValueFrontierTrace owned recognition result.payload.frontier := by
+  obtain ⟨rest, queueEq, _recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current item result selected
+  rw [frontierEq]
+  exact .dequeue trace
+    (ContextualValueFrontierState.dequeue?_of_cons
+      current.payload.frontier item rest queueEq)
+
+end Solcore.Surface.Multi.Chart
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
 /-- Every executable backpointer row is witnessed by the exact retained
 completed edge that introduced its coordinates. -/
 private def PhaseCBackpointerLedgerExact
