@@ -2745,6 +2745,116 @@ theorem allProductionIds_complete (production : ProductionId) :
         apply List.mem_flatMap.mpr
         exact ⟨site, allListSites_complete site, by simp⟩
 
+private def grammarSitesForRule
+    (rule : GrammarRuleId) : List GrammarSite :=
+  (grammarSiteKeysForRule rule).filterMap GrammarSite.ofKey?
+
+private theorem grammarSitesForRule_complete (site : GrammarSite) :
+    site ∈ grammarSitesForRule site.val.rule := by
+  apply List.mem_filterMap.mpr
+  refine ⟨site.val, grammarSiteKeysForRule_complete site, ?_⟩
+  unfold GrammarSite.ofKey?
+  simp only [site.property, ↓reduceDIte]
+
+private def sitesOfKindForRule
+    (kind : EbnfNodeKind) (rule : GrammarRuleId) :
+    List (GrammarSiteOfKind kind) :=
+  (grammarSitesForRule rule).filterMap
+    (GrammarSiteOfKind.ofSite? kind)
+
+private theorem sitesOfKindForRule_complete
+    {kind : EbnfNodeKind} (site : GrammarSiteOfKind kind) :
+    site ∈ sitesOfKindForRule kind site.site.val.rule := by
+  apply List.mem_filterMap.mpr
+  refine ⟨site.site, grammarSitesForRule_complete site.site, ?_⟩
+  unfold GrammarSiteOfKind.ofSite?
+  simp only [site.hasKind, ↓reduceDIte]
+
+private def listSitesForRule
+    (rule : GrammarRuleId) : List ListSite :=
+  (grammarSitesForRule rule).filterMap listSiteOfGrammarSite?
+
+private theorem listSitesForRule_complete (site : ListSite) :
+    site ∈ listSitesForRule site.owner.val.rule := by
+  apply List.mem_filterMap.mpr
+  cases site with
+  | list0 site =>
+      refine ⟨site.site, grammarSitesForRule_complete site.site, ?_⟩
+      simp [listSiteOfGrammarSite?, GrammarSiteOfKind.ofSite?, site.hasKind]
+  | list1 site =>
+      refine ⟨site.site, grammarSitesForRule_complete site.site, ?_⟩
+      simp [listSiteOfGrammarSite?, GrammarSiteOfKind.ofSite?, site.hasKind]
+
+private def productionIdsForRule
+    (rule : GrammarRuleId) : List ProductionId :=
+  [.root rule] ++
+  (sitesOfKindForRule .atom rule).map .atom ++
+  (sitesOfKindForRule .sequence rule).map .seq ++
+  (sitesOfKindForRule .group rule).map .group ++
+  ((sitesOfKindForRule .choice rule).flatMap fun site =>
+    (List.finRange (ChoiceSite.branchCount site)).map fun branch =>
+      .choice site branch) ++
+  ((sitesOfKindForRule .optional rule).flatMap fun site =>
+    [.opt site .none, .opt site .some]) ++
+  ((sitesOfKindForRule .star rule).flatMap fun site =>
+    [.star site .nil, .star site .cons]) ++
+  ((sitesOfKindForRule .plus rule).flatMap fun site =>
+    [.plus site .one, .plus site .cons]) ++
+  ((sitesOfKindForRule .list0 rule).flatMap fun site =>
+    [.list0 site .nil, .list0 site .cons]) ++
+  (sitesOfKindForRule .list1 rule).map .list1 ++
+  ((listSitesForRule rule).flatMap fun site =>
+    [.tail site .nil, .tail site .cons])
+
+private theorem productionIdsForRule_complete (production : ProductionId) :
+    production ∈ productionIdsForRule production.sourceRule := by
+  cases production with
+  | root rule => simp [productionIdsForRule, ProductionId.sourceRule]
+  | atom site =>
+      simp [productionIdsForRule, ProductionId.sourceRule,
+        sitesOfKindForRule_complete site]
+  | seq site =>
+      simp [productionIdsForRule, ProductionId.sourceRule,
+        sitesOfKindForRule_complete site]
+  | group site =>
+      simp [productionIdsForRule, ProductionId.sourceRule,
+        sitesOfKindForRule_complete site]
+  | choice site branch =>
+      have member : ProductionId.choice site branch ∈
+          (sitesOfKindForRule .choice site.site.val.rule).flatMap
+            fun choiceSite =>
+              (List.finRange (ChoiceSite.branchCount choiceSite)).map
+                fun choiceBranch =>
+                .choice choiceSite choiceBranch := by
+        apply List.mem_flatMap.mpr
+        refine ⟨site, sitesOfKindForRule_complete site, ?_⟩
+        apply List.mem_map.mpr
+        exact ⟨branch, List.mem_finRange branch, rfl⟩
+      simp only [productionIdsForRule, ProductionId.sourceRule,
+        List.mem_append, member, or_true, true_or]
+  | opt site branch =>
+      cases branch <;> simp [productionIdsForRule,
+        ProductionId.sourceRule, sitesOfKindForRule_complete site]
+  | star site branch =>
+      cases branch <;> simp [productionIdsForRule,
+        ProductionId.sourceRule, sitesOfKindForRule_complete site]
+  | plus site branch =>
+      cases branch <;> simp [productionIdsForRule,
+        ProductionId.sourceRule, sitesOfKindForRule_complete site]
+  | list0 site branch =>
+      cases branch <;> simp [productionIdsForRule,
+        ProductionId.sourceRule, sitesOfKindForRule_complete site]
+  | list1 site =>
+      simp [productionIdsForRule, ProductionId.sourceRule,
+        sitesOfKindForRule_complete site]
+  | tail site branch =>
+      cases branch <;> simp only [productionIdsForRule,
+        ProductionId.sourceRule, List.mem_append]
+      all_goals
+        right
+        apply List.mem_flatMap.mpr
+        exact ⟨site, listSitesForRule_complete site, by simp⟩
+
 /-- The root EBNF sequence site of the source module rule. -/
 def moduleRootSequenceSite : SequenceSite := {
   site := GrammarSite.root .module
@@ -3424,6 +3534,31 @@ instance : Ord DottedRhs := ⟨DottedRhs.compare⟩
 
 end DottedRhs
 
+private def dottedRhsForRule
+    (rule : GrammarRuleId) : List DottedRhs :=
+  (productionIdsForRule rule).flatMap fun production =>
+    (List.ofFn fun dot : Fin (production.rhs.length + 1) => dot).map
+      fun dot => ({ production, dot } : DottedRhs)
+
+private theorem dottedRhsForRule_complete (dotted : DottedRhs) :
+    dotted ∈ dottedRhsForRule dotted.production.sourceRule := by
+  rw [dottedRhsForRule, List.mem_flatMap]
+  refine ⟨dotted.production, productionIdsForRule_complete _, ?_⟩
+  rw [List.mem_map]
+  refine ⟨dotted.dot, ?_, rfl⟩
+  rw [List.mem_ofFn]
+  exact ⟨dotted.dot, rfl⟩
+
+private theorem m2cV1_rhs_matchArm :
+    m2cV1.rhs .matchArm =
+      sequence [
+        symbol .pipe,
+        list1 (nonterminal .pattern),
+        symbol .fatArrow,
+        star (nonterminal .armStatement)
+      ] := by
+  rfl
+
 /-- The dotted-production name used by chart consumers. -/
 abbrev DottedProduction := DottedRhs
 
@@ -3999,7 +4134,38 @@ private def genericPrefixOptional : OptionalSite := {
 }
 
 set_option linter.unusedSimpArgs false in
-private def matchArmStar : StarSite := {
+/-- The fixed root sequence containing a match arm. -/
+def matchArmSequenceSite : SequenceSite := {
+  site := ⟨{ rule := .matchArm, path := [] }, by
+    simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs,
+      EbnfExpr.nodeAt?]⟩
+  hasKind := by
+    simp [GrammarSite.expression, m2cV1, m2cV1Rhs,
+      EbnfExpr.nodeAt?, EbnfExpr.kind, sequence]
+}
+
+/-- The match-arm root sequence has its displayed grammar key. -/
+theorem matchArmSequenceSite_key :
+    matchArmSequenceSite.site.val =
+      { rule := GrammarRuleId.matchArm, path := [] } := by
+  rfl
+
+/-- The match-arm root sequence has four displayed children. -/
+theorem matchArmSequenceSite_children_length :
+    matchArmSequenceSite.children.length = 4 := by
+  unfold matchArmSequenceSite SequenceSite.children
+    GrammarSite.directChildren
+  simp [GrammarSite.expression, m2cV1, m2cV1Rhs,
+    EbnfExpr.nodeAt?, EbnfExpr.children, sequence]
+
+/-- The expanded match-arm root sequence has four RHS symbols. -/
+@[simp] theorem ProductionId.rhs_matchArmSequenceSite_length :
+    (ProductionId.seq matchArmSequenceSite).rhs.length = 4 := by
+  simp [ProductionId.rhs, matchArmSequenceSite_children_length]
+
+set_option linter.unusedSimpArgs false in
+/-- The fixed star site containing a match arm's repeated statements. -/
+def matchArmBodyStarSite : StarSite := {
   site := ⟨{ rule := .matchArm, path := [3] }, by
     simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
       EbnfExpr.children, terminal, hardKeyword, contextualKeyword,
@@ -4012,6 +4178,12 @@ private def matchArmStar : StarSite := {
       sequence, choice, group, optional, star, plus, list0, list1,
       identifier, pathComponent]
 }
+
+/-- The match-arm body star has its displayed grammar key. -/
+theorem matchArmBodyStarSite_key :
+    matchArmBodyStarSite.site.val =
+      { rule := GrammarRuleId.matchArm, path := [3] } := by
+  rfl
 
 private theorem statementChoice_branchCount :
     statementChoice.branchCount = 11 := by
@@ -4060,8 +4232,8 @@ private def guardedProductions : List ProductionId := [
   .opt atomOptional .some,
   .opt genericPrefixOptional .none,
   .opt genericPrefixOptional .some,
-  .star matchArmStar .nil,
-  .star matchArmStar .cons
+  .star matchArmBodyStarSite .nil,
+  .star matchArmBodyStarSite .cons
 ]
 
 private def guardedKeys : List GuardedProductionKey := [
@@ -4161,6 +4333,113 @@ theorem branchCount_eq_three_of_isAt_postfixPart
   rfl
 
 end ChoiceSite
+
+/-- A checked match-arm root sequence site is the canonical fixed site. -/
+theorem SequenceSite.eq_matchArmSequenceSite
+    (site : SequenceSite)
+    (located : site.site.isAt .matchArm [] = true) :
+    site = matchArmSequenceSite := by
+  have fields :
+      site.site.val.rule = .matchArm ∧ site.site.val.path = [] := by
+    simpa [GrammarSite.isAt, beq_iff_eq] using located
+  apply site_eq_of_fields site matchArmSequenceSite
+  · simpa [matchArmSequenceSite_key] using fields.1
+  · simpa [matchArmSequenceSite_key] using fields.2
+
+/-- A checked match-arm body star site is the canonical fixed site. -/
+theorem StarSite.eq_matchArmBodyStarSite
+    (site : StarSite)
+    (located : site.site.isAt .matchArm [3] = true) :
+    site = matchArmBodyStarSite := by
+  have fields :
+      site.site.val.rule = .matchArm ∧ site.site.val.path = [3] := by
+    simpa [GrammarSite.isAt, beq_iff_eq] using located
+  apply site_eq_of_fields site matchArmBodyStarSite
+  · simpa [matchArmBodyStarSite_key] using fields.1
+  · simpa [matchArmBodyStarSite_key] using fields.2
+
+/-- Any checked match-arm root sequence expands as the canonical one. -/
+@[simp] theorem ProductionId.rhs_seq_isAt_matchArm
+    (site : SequenceSite)
+    (located : site.site.isAt .matchArm [] = true) :
+    (ProductionId.seq site).rhs =
+      (ProductionId.seq matchArmSequenceSite).rhs := by
+  rw [site.eq_matchArmSequenceSite located]
+
+/-- The direct match-arm sequence position that first predicts its body star. -/
+def matchArmBodyEntryDotted : DottedRhs := {
+  production := .seq matchArmSequenceSite
+  dot := ⟨3, by
+    simp only [ProductionId.rhs, List.length_map,
+      matchArmSequenceSite_children_length]
+    omega⟩
+}
+
+/-- The recursive star position that predicts the next match-arm statement. -/
+def matchArmBodyRepeatDotted : DottedRhs := {
+  production := .star matchArmBodyStarSite .cons
+  dot := ⟨1, by decide⟩
+}
+
+private theorem AtomSite.symbol_ne_aux
+    (site : AtomSite) (target : GrammarSite) :
+    site.symbol ≠ .nonterminal (.aux target) := by
+  cases selected : site.atom <;>
+    simp [AtomSite.symbol, EbnfAtom.grammarSymbol, selected]
+
+set_option linter.unusedSimpArgs false in
+/-- A match-arm dotted production waiting for the body star has one of the
+two grammar-generated predecessor shapes. -/
+theorem matchArmBodyWaitingDotted_cases
+    (dotted : DottedRhs)
+    (source : dotted.production.sourceRule = .matchArm)
+    (next : dotted.production.rhs[dotted.dot.val]? =
+      some (.nonterminal (.aux matchArmBodyStarSite.site))) :
+    dotted = matchArmBodyEntryDotted ∨
+      dotted = matchArmBodyRepeatDotted := by
+  have member := dottedRhsForRule_complete dotted
+  rw [source] at member
+  simp [dottedRhsForRule, productionIdsForRule,
+    sitesOfKindForRule, listSitesForRule, grammarSitesForRule,
+    grammarSiteKeysForRule, m2cV1_rhs_matchArm, EbnfExpr.sitePaths,
+    EbnfExpr.paths, EbnfExpr.indexedChildPaths, GrammarSite.ofKey?,
+    GrammarSiteKey.valid, GrammarSiteOfKind.ofSite?,
+    GrammarSite.expression, EbnfExpr.nodeAt?, EbnfExpr.children,
+    EbnfExpr.kind, ChoiceSite.branchCount, SequenceSite.children,
+    GrammarSite.directChildren, GrammarSite.childAt, unaryChild,
+    unaryChildExpression, StarSite.child, List1Site.element,
+    listSiteOfGrammarSite?, GrammarSite.isAt,
+    ProductionId.rhs_seq_isAt_matchArm, matchArmSequenceSite,
+    matchArmBodyStarSite, GrammarSite.root, AtomSite.symbol,
+    AtomSite.atom, EbnfAtom.grammarSymbol, EbnfExpr.atom?, sequence,
+    terminal, symbol, list1, star, nonterminal, List.ofFn,
+    Fin.foldr_succ, Fin.ext_iff, Fin.val_cast, Fin.val_succ,
+    ProductionId.rhs_matchArmSequenceSite_length] at member
+  rcases member with
+    h | h | h | h | h | h | h | h | h | h |
+    h | h | h | h | h | h | h | h | h | h |
+    h | h | h | h | h | h | h
+  all_goals
+    subst dotted
+    simp only [ProductionId.rhs, List.getElem?_cons_zero,
+      List.getElem?_cons_succ, List.getElem?_nil, Fin.val_zero,
+      Fin.val_one, Fin.val_succ, Fin.val_cast, Fin.val_ofNat] at next
+  all_goals try simp at next
+  all_goals try
+    simp [AtomSite.symbol_ne_aux, matchArmBodyStarSite,
+      GrammarSite.root, StarSite.child, List1Site.element,
+      ListSite.element, SequenceSite.children,
+      GrammarSite.directChildren, GrammarSite.childAt,
+      unaryChild, unaryChildExpression] at next
+  all_goals try omega
+  all_goals try
+    have index : (↑(3 : Fin 4) : Nat) = 3 := by decide
+    simp only [index, List.getElem?_cons_succ,
+      List.getElem?_nil] at next
+  all_goals first
+    | exact Or.inl rfl
+    | exact Or.inr rfl
+    | contradiction
 
 private def keyMem (key : GuardedProductionKey) :
     List GuardedProductionKey → Bool
