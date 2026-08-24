@@ -1230,6 +1230,15 @@ namespace SequenceSite
 def children (site : SequenceSite) : List GrammarSite :=
   GrammarSite.directChildren site.site
 
+/-- Every expanded sequence child remains inside its source rule. -/
+theorem child_rule
+    (site : SequenceSite) (child : GrammarSite)
+    (member : child ∈ site.children) :
+    child.val.rule = site.site.val.rule := by
+  obtain ⟨index, rfl⟩ := List.get_of_mem member
+  simp [children, GrammarSite.directChildren,
+    GrammarSite.childAt]
+
 /-- Sequence child sites select exactly the displayed child expressions. -/
 theorem children_expression (site : SequenceSite) :
     (site.children.map GrammarSite.expression) =
@@ -1330,6 +1339,11 @@ namespace GroupSite
 def child (site : GroupSite) : GrammarSite :=
   unaryChild .group site
 
+/-- A grouping child remains inside its source rule. -/
+@[simp] theorem child_rule (site : GroupSite) :
+    site.child.val.rule = site.site.val.rule :=
+  rfl
+
 /-- A grouping site has the expected outer shape and child. -/
 theorem expression_eq_group (site : GroupSite) :
     site.site.expression = EbnfExpr.group site.child.expression :=
@@ -1342,6 +1356,11 @@ namespace OptionalSite
 /-- The unique direct child of an optional site. -/
 def child (site : OptionalSite) : GrammarSite :=
   unaryChild .optional site
+
+/-- An optional child remains inside its source rule. -/
+@[simp] theorem child_rule (site : OptionalSite) :
+    site.child.val.rule = site.site.val.rule :=
+  rfl
 
 /-- An optional site has the expected outer shape and child. -/
 theorem expression_eq_optional (site : OptionalSite) :
@@ -1356,6 +1375,11 @@ namespace StarSite
 def child (site : StarSite) : GrammarSite :=
   unaryChild .star site
 
+/-- A star child remains inside its source rule. -/
+@[simp] theorem child_rule (site : StarSite) :
+    site.child.val.rule = site.site.val.rule :=
+  rfl
+
 /-- A star site has the expected outer shape and child. -/
 theorem expression_eq_star (site : StarSite) :
     site.site.expression = EbnfExpr.star site.child.expression :=
@@ -1368,6 +1392,11 @@ namespace PlusSite
 /-- The unique repeated child of a plus site. -/
 def child (site : PlusSite) : GrammarSite :=
   unaryChild .plus site
+
+/-- A plus child remains inside its source rule. -/
+@[simp] theorem child_rule (site : PlusSite) :
+    site.child.val.rule = site.site.val.rule :=
+  rfl
 
 /-- A plus site has the expected outer shape and child. -/
 theorem expression_eq_plus (site : PlusSite) :
@@ -1382,6 +1411,11 @@ namespace List0Site
 def element (site : List0Site) : GrammarSite :=
   unaryChild .list0 site
 
+/-- A list-zero element remains inside its source rule. -/
+@[simp] theorem element_rule (site : List0Site) :
+    site.element.val.rule = site.site.val.rule :=
+  rfl
+
 /-- A zero-or-more list site has the expected outer shape and element. -/
 theorem expression_eq_list0 (site : List0Site) :
     site.site.expression = EbnfExpr.list0 site.element.expression :=
@@ -1394,6 +1428,11 @@ namespace List1Site
 /-- The repeated element site of a one-or-more comma list. -/
 def element (site : List1Site) : GrammarSite :=
   unaryChild .list1 site
+
+/-- A list-one element remains inside its source rule. -/
+@[simp] theorem element_rule (site : List1Site) :
+    site.element.val.rule = site.site.val.rule :=
+  rfl
 
 /-- A one-or-more list site has the expected outer shape and element. -/
 theorem expression_eq_list1 (site : List1Site) :
@@ -1471,6 +1510,12 @@ def branch (site : ChoiceSite)
   GrammarSite.childAt site.site branch.val
     (site.branchExpressions.get branch)
     (branch_selected_eq_some site branch)
+
+/-- A selected choice branch remains inside its source rule. -/
+@[simp] theorem branch_rule
+    (site : ChoiceSite) (selected : Fin site.branchCount) :
+    (site.branch selected).val.rule = site.site.val.rule :=
+  rfl
 
 /-- A selected branch site has exactly the indexed branch expression. -/
 theorem branch_expression
@@ -1835,9 +1880,28 @@ def owner : ListSite → GrammarSite
   | .list0 site => site.site
   | .list1 site => site.site
 
+/-- A comma-list element remains inside the rule owning its tail. -/
+@[simp] theorem element_rule (site : ListSite) :
+    site.element.val.rule = site.owner.val.rule := by
+  cases site <;> rfl
+
 end ListSite
 
 namespace ProductionId
+
+/-- The source EBNF rule owning an expanded production. -/
+def sourceRule : ProductionId → GrammarRuleId
+  | .root rule => rule
+  | .atom site => site.site.val.rule
+  | .seq site => site.site.val.rule
+  | .group site => site.site.val.rule
+  | .choice site _ => site.site.val.rule
+  | .opt site _ => site.site.val.rule
+  | .star site _ => site.site.val.rule
+  | .plus site _ => site.site.val.rule
+  | .list0 site _ => site.site.val.rule
+  | .list1 site => site.site.val.rule
+  | .tail site _ => site.owner.val.rule
 
 /-- The exact expanded left-hand side. -/
 def lhs : ProductionId → NonterminalSymbol
@@ -1984,6 +2048,129 @@ def rhs : ProductionId → List GrammarSymbol
         .nonterminal (.aux site.element),
         .nonterminal (.tail site)] :=
   rfl
+
+/-- Following an auxiliary nonterminal in an expanded right-hand side stays
+inside the same source EBNF rule. -/
+theorem sourceRule_eq_of_aux_mem_rhs
+    (parent : ProductionId) (site : GrammarSite)
+    (member : GrammarSymbol.nonterminal (.aux site) ∈ parent.rhs) :
+    parent.sourceRule = site.val.rule := by
+  cases parent with
+  | root rule =>
+      simp [rhs, sourceRule] at member ⊢
+      subst site
+      rfl
+  | atom atomSite =>
+      cases atomEq : atomSite.atom <;>
+        simp [rhs, AtomSite.symbol,
+          EbnfAtom.grammarSymbol, atomEq] at member
+  | seq sequenceSite =>
+      simp only [rhs, List.mem_map] at member
+      rcases member with ⟨child, childMember, symbolEq⟩
+      have siteEq : child = site := by
+        exact NonterminalSymbol.aux.inj
+          (GrammarSymbol.nonterminal.inj symbolEq)
+      subst site
+      exact (SequenceSite.child_rule sequenceSite child childMember).symm
+  | group groupSite =>
+      simp [rhs] at member
+      subst site
+      exact (GroupSite.child_rule groupSite).symm
+  | choice choiceSite branch =>
+      simp [rhs] at member
+      subst site
+      exact (ChoiceSite.branch_rule choiceSite branch).symm
+  | opt optionalSite branch =>
+      cases branch
+      · simp [rhs] at member
+      · simp [rhs] at member
+        subst site
+        exact (OptionalSite.child_rule optionalSite).symm
+  | star starSite branch =>
+      cases branch
+      · simp [rhs] at member
+      · simp only [rhs, List.mem_cons] at member
+        rcases member with childEq | selfEq
+        · simp at childEq
+          subst site
+          exact (StarSite.child_rule starSite).symm
+        · simp at selfEq
+          subst site
+          rfl
+  | plus plusSite branch =>
+      cases branch
+      · simp [rhs] at member
+        subst site
+        exact (PlusSite.child_rule plusSite).symm
+      · simp only [rhs, List.mem_cons] at member
+        rcases member with childEq | selfEq
+        · simp at childEq
+          subst site
+          exact (PlusSite.child_rule plusSite).symm
+        · simp at selfEq
+          subst site
+          rfl
+  | list0 listSite branch =>
+      cases branch
+      · simp [rhs] at member
+      · simp only [rhs, List.mem_cons] at member
+        rcases member with elementEq | tailEq
+        · simp at elementEq
+          subst site
+          exact (List0Site.element_rule listSite).symm
+        · simp at tailEq
+  | list1 listSite =>
+      simp only [rhs, List.mem_cons] at member
+      rcases member with elementEq | tailEq
+      · simp at elementEq
+        subst site
+        exact (List1Site.element_rule listSite).symm
+      · simp at tailEq
+  | tail listSite branch =>
+      cases branch
+      · simp [rhs] at member
+      · simp only [rhs, List.mem_cons] at member
+        rcases member with terminalEq | elementEq | tailEq
+        · simp at terminalEq
+        · simp at elementEq
+          subst site
+          exact (ListSite.element_rule listSite).symm
+        · simp at tailEq
+
+/-- Following a comma-tail nonterminal in an expanded right-hand side stays
+inside the same source EBNF rule. -/
+theorem sourceRule_eq_of_tail_mem_rhs
+    (parent : ProductionId) (site : ListSite)
+    (member : GrammarSymbol.nonterminal (.tail site) ∈ parent.rhs) :
+    parent.sourceRule = site.owner.val.rule := by
+  cases parent with
+  | root rule => simp [rhs] at member
+  | atom atomSite =>
+      cases atomEq : atomSite.atom <;>
+        simp [rhs, AtomSite.symbol,
+          EbnfAtom.grammarSymbol, atomEq] at member
+  | seq sequenceSite => simp [rhs] at member
+  | group groupSite => simp [rhs] at member
+  | choice choiceSite branch => simp [rhs] at member
+  | opt optionalSite branch => cases branch <;> simp [rhs] at member
+  | star starSite branch => cases branch <;> simp [rhs] at member
+  | plus plusSite branch => cases branch <;> simp [rhs] at member
+  | list0 listSite branch =>
+      cases branch
+      · simp [rhs] at member
+      · simp [rhs] at member
+        subst site
+        rfl
+  | list1 listSite =>
+      simp [rhs] at member
+      subst site
+      rfl
+  | tail listSite branch =>
+      cases branch
+      · simp [rhs] at member
+      · simp [rhs] at member
+        subst site
+        rfl
 
 end ProductionId
 
