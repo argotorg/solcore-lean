@@ -5861,6 +5861,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | functionSignature : ExecutableRootRule .functionSignature
   | instanceMethod : ExecutableRootRule .instanceMethod
   | armStatement : ExecutableRootRule .armStatement
+  | matchArm : ExecutableRootRule .matchArm
   | statement : ExecutableRootRule .statement
   | terminalExpression : ExecutableRootRule .terminalExpression
   | expression : ExecutableRootRule .expression
@@ -6339,6 +6340,64 @@ theorem rulePairTailValue_of_view
   exact groupEq
 
 end EbnfValue
+
+/-- Construct the exact empty or nonempty body of one executable match arm. -/
+def executableMatchArmBody
+    {tokens : List Token}
+    (file : WorkspaceFile)
+    (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow)) :
+    List Statement → Body
+  | [] => {
+      span := {
+        source := file.id
+        startByte := fatArrow.span.endByte
+        endByte := fatArrow.span.endByte
+      }
+      payload := {
+        origin := .matchArm fatArrow.span
+        statements := []
+      }
+    }
+  | first :: rest =>
+      let last := rest.getLastD first
+      {
+        span := {
+          source := file.id
+          startByte := first.span.startByte
+          endByte := last.span.endByte
+        }
+        payload := {
+          origin := .matchArm fatArrow.span
+          statements := first :: rest
+        }
+      }
+
+/-- Execute a match-arm root from its pattern list and ordered statements. -/
+def executeMatchArmRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .matchArm)) : MatchArm :=
+  let pipeAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .pipe))
+  let patternAtom : EbnfExpr := .atom (.nonterminal .pattern)
+  let arrowAtom : EbnfExpr :=
+    .atom (.terminal (.symbol .fatArrow))
+  let statementAtom : EbnfExpr := .atom (.nonterminal .armStatement)
+  let children : List EbnfExpr := [pipeAtom, .list1 patternAtom,
+    arrowAtom, .star statementAtom]
+  let viewed := EbnfValue.sequenceFlatView children input
+  let patterns := (EbnfValue.list1View patternAtom viewed.2.1).map
+    (EbnfValue.ruleView .pattern)
+  let arrow := EbnfValue.terminalView (.symbol .fatArrow) viewed.2.2.1
+  let statements := (EbnfValue.starView statementAtom
+    viewed.2.2.2.1).map (EbnfValue.ruleView .armStatement)
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      patterns := patterns
+      body := executableMatchArmBody file arrow statements
+    }
 
 /-- Execute all three import-declaration forms. -/
 def executeImportDeclRoot
@@ -8927,6 +8986,8 @@ def executeRootRule
       executeFunctionSignatureRoot file tokens origin finish owned ordered input
   | .instanceMethod => executeInstanceMethodRoot input
   | .armStatement => executeArmStatementRoot input
+  | .matchArm =>
+      executeMatchArmRoot file tokens origin finish owned ordered input
   | .statement => executeStatementRoot input
   | .terminalExpression => executeTerminalExpressionRoot input
   | .expression => executeExpressionRoot input
