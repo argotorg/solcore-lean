@@ -24198,6 +24198,144 @@ private theorem attemptPhaseCScannedEdge?_addressSafe
       · simp at action
       · simp at insert
 
+private theorem attemptPhaseCScannedEdge?_preserves_sourceNotQueued
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (sourcePresent : current.payload.frontier.prefixMemberBool source = true)
+    (sourceNotQueued : source ∉ current.payload.frontier.queue)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    source ∉ result.payload.frontier.queue := by
+  intro member
+  rcases attemptPhaseCScannedEdge?_queue_member owned source source edge
+    current result selected member with old | new
+  · exact sourceNotQueued old
+  · rcases new with ⟨absent, equal⟩
+    rw [← equal, sourcePresent] at absent
+    contradiction
+
+private theorem attemptPhaseCPackedScannedEdge?_preserves_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (safe : PhaseCValueAddressSafe current)
+    (sourcePresent : current.payload.frontier.prefixMemberBool source = true)
+    (sourceNotQueued : source ∉ current.payload.frontier.queue)
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    PhaseCValueAddressSafe result ∧
+      result.payload.frontier.prefixMemberBool source = true ∧
+      source ∉ result.payload.frontier.queue := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | completed =>
+      cases selected
+      exact ⟨safe, sourcePresent, sourceNotQueued⟩
+  | scanned before after cursor =>
+      let edge : StructurallyValidContextualScannedEdge file tokens := {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      }
+      change attemptPhaseCScannedEdge? owned source edge current =
+        some result at selected
+      by_cases sameSource : before = source
+      · exact ⟨attemptPhaseCScannedEdge?_addressSafe owned source edge current
+          result sameSource safe sourcePresent sourceNotQueued selected,
+          attemptPhaseCScannedEdge?_preserves_prefix_present owned source source
+            edge current result sourcePresent selected,
+          attemptPhaseCScannedEdge?_preserves_sourceNotQueued owned source edge
+            current result sourcePresent sourceNotQueued selected⟩
+      · have unchanged : attemptPhaseCScannedEdge? owned source edge current =
+            some current := by
+          simp [attemptPhaseCScannedEdge?, edge, sameSource]
+        rw [unchanged] at selected
+        cases selected
+        exact ⟨safe, sourcePresent, sourceNotQueued⟩
+
+private theorem attemptPhaseCRetainedScannedEdges?_preserves_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens)),
+      PhaseCValueAddressSafe current →
+      current.payload.frontier.prefixMemberBool source = true →
+      source ∉ current.payload.frontier.queue →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+        some result →
+      PhaseCValueAddressSafe result ∧
+        result.payload.frontier.prefixMemberBool source = true ∧
+        source ∉ result.payload.frontier.queue := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result safe present notQueued selected
+      cases selected
+      exact ⟨safe, present, notQueued⟩
+  | cons head rest induction =>
+      intro current result safe present notQueued selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      obtain ⟨nextSafe, nextPresent, nextNotQueued⟩ :=
+        attemptPhaseCPackedScannedEdge?_preserves_processing owned source head
+          current next safe present notQueued nextEq
+      exact induction next result nextSafe nextPresent nextNotQueued restEq
+
+/-- Retained semantic scans execute from the post-prediction causal bundle
+and preserve it through the complete immutable edge fold. -/
+private theorem attemptPhaseCRetainedScannedEdges?_total_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (unique : edges.Nodup)
+    (ordered : source.raw.origin.val ≤ source.raw.current.val)
+    (safe : PhaseCValueAddressSafe current)
+    (sourcePresent : current.payload.frontier.prefixMemberBool source = true)
+    (sourceNotQueued : source ∉ current.payload.frontier.queue)
+    (fresh :
+      (.linear .L14_frontierScannedTraversal (contextualLinearKey source) :
+          UnitAddress tokens) ∉ current.counter.usedRev ∧
+      (.linear .L12_scannedAction (contextualLinearKey source) :
+          UnitAddress tokens) ∉ current.counter.usedRev) :
+    ∃ result,
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result ∧
+        PhaseCValueAddressSafe result ∧
+        result.payload.frontier.prefixMemberBool source = true ∧
+        source ∉ result.payload.frontier.queue := by
+  have lookupSome :=
+    (ContextualValueFrontierState.prefixMemberBool_eq_true_iff_lookupPrefix?_isSome
+      current.payload.frontier source).1 sourcePresent
+  cases priorEq : current.payload.frontier.lookupPrefix? source with
+  | none => simp [priorEq] at lookupSome
+  | some prior =>
+      obtain ⟨result, selected⟩ :=
+        attemptPhaseCRetainedScannedEdges?_total owned source edges current
+          prior unique priorEq ordered fresh.1 fresh.2 (by
+            intro packed member sourceEq
+            rcases packed with ⟨key, structural⟩
+            cases key with
+            | completed => trivial
+            | scanned before after cursor =>
+                intro absent
+                exact (safe.candidateFresh_of_absent after absent).1)
+      have retained :=
+        attemptPhaseCRetainedScannedEdges?_preserves_processing owned source
+          edges current result safe sourcePresent sourceNotQueued selected
+      exact ⟨result, selected, retained⟩
+
 /-- If one completion leaves a target absent, it could not have selected that
 target's L09 insertion; hence a previously fresh target L09 remains fresh. -/
 private theorem attemptPhaseCCompletedEdge?_preserves_insert_fresh_of_absent
