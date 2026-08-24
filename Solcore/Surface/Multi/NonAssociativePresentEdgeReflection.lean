@@ -1,4 +1,4 @@
-import Solcore.Surface.Multi.NonAssociativePassThroughSafety
+import Solcore.Surface.Multi.NonAssociativePassThroughCoherence
 set_option autoImplicit false
 namespace Solcore.Surface.Multi
 open Grammar Solcore.Workspace
@@ -275,4 +275,20 @@ theorem coherentNonAssociativeRootCompletedInvariant_of_safe_and_table
       owned correct final accepted)
     (coherentNonAssociativeCompletedHasPresentCompletion_of_safe safe
       coherentNonAssociativePresentInputHasPresentCompletion)
+
+/-- One accepted finite operand-boundary table constructs the complete
+coherent G10 invariant; pass-through safety follows from coherence. -/
+theorem coherentNonAssociativeRootCompletedInvariant_of_table
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (accepted : nonAssociativeOperandPrefixExclusiveTable
+      file tokens owned correct final = true) :
+    CoherentNonAssociativeRootCompletedInvariant
+      file tokens memo correct final := by
+  exact coherentNonAssociativeRootCompletedInvariant_of_safe_and_table
+    owned correct final
+    (coherentNonAssociativePassThroughSafe (memo := memo)) accepted
 end Solcore.Surface.Multi

@@ -621,6 +621,31 @@ theorem executeObservedContextualCoherentNonAssociativeInvariant_of_safe_and_cer
   exact coherentNonAssociativeRootCompletedInvariant_of_safe_and_table
     owned _ _ safe accepted
 
+/-- On the concrete executor ledger, one accepted operand-prefix table
+constructs the complete G10 invariant. -/
+theorem executeObservedContextualCoherentNonAssociativeInvariant_of_certificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (accepted : executeObservedContextualNonAssociativeCertificateBool
+      file tokens owned = true) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    let selected :=
+      Chart.executeObservedContextualValueWorklistMulti_selected
+        file tokens owned
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final :=
+      Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+        file tokens owned result.recognition recognitionSelected
+    CoherentNonAssociativeRootCompletedInvariant
+      file tokens result.recognition.memo correct final := by
+  exact coherentNonAssociativeRootCompletedInvariant_of_table
+    owned _ _ accepted
+
 /-- For an observed recognition result, all remaining frontier components are
 four executable checks: coverage, two rank tables, and post-EOF closure. -/
 theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_checkedTablesAt
@@ -1502,8 +1527,8 @@ theorem executeObservedContextualParseOfRankCertificate_sound
         ready potential accepted)
     invariant
 
-/-- The rank-certificate entry point is sound from two executable tables and
-coherent pass-through safety, without a separately supplied G10 invariant. -/
+/-- The rank-certificate entry point is sound from its executable rank and
+nonassociative tables, without a separately supplied G10 invariant. -/
 theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeCertificate
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
@@ -1527,22 +1552,6 @@ theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeC
     (potential : FrontierGrammarPotential tokens)
     (rankAccepted : executeObservedContextualRankCertificateBool
       file tokens owned potential = true)
-    (safe :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      CoherentNonAssociativePassThroughSafe
-        file tokens result.recognition.memo correct final)
     (nonAssociativeAccepted :
       executeObservedContextualNonAssociativeCertificateBool
         file tokens owned = true) :
@@ -1552,11 +1561,10 @@ theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeC
     | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
   exact executeObservedContextualParseOfRankCertificate_sound
     file tokens owned ready potential rankAccepted
-      (executeObservedContextualCoherentNonAssociativeInvariant_of_safe_and_certificate
-        file tokens owned safe nonAssociativeAccepted)
+      (executeObservedContextualCoherentNonAssociativeInvariant_of_certificate
+        file tokens owned nonAssociativeAccepted)
 
-/-- The combined finite-certificate entry point is declaratively sound once
-coherent pass-through safety is available. -/
+/-- The combined finite-certificate entry point is declaratively sound. -/
 theorem executeObservedContextualParseOfFormalCertificate_sound
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
@@ -1579,23 +1587,7 @@ theorem executeObservedContextualParseOfFormalCertificate_sound
           MatchArmPairContextReadyAt waiting)
     (potential : FrontierGrammarPotential tokens)
     (accepted : executeObservedContextualFormalCertificateBool
-      file tokens owned potential = true)
-    (safe :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      CoherentNonAssociativePassThroughSafe
-        file tokens result.recognition.memo correct final) :
+      file tokens owned potential = true) :
     match executeObservedContextualParseOfFormalCertificate
         file tokens owned ready potential accepted with
     | .ok module => Parses file tokens module
@@ -1606,10 +1598,9 @@ theorem executeObservedContextualParseOfFormalCertificate_sound
   unfold executeObservedContextualParseOfFormalCertificate
   exact
     executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeCertificate
-      file tokens owned ready potential checks.1 safe checks.2
+      file tokens owned ready potential checks.1 checks.2
 
-/-- Bounded synthesis yields a declaratively sound direct parse once
-coherent pass-through safety is available. -/
+/-- Bounded synthesis yields a declaratively sound direct parse. -/
 theorem executeObservedContextualParseOfBoundedSearch_sound
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
@@ -1634,23 +1625,7 @@ theorem executeObservedContextualParseOfBoundedSearch_sound
       file tokens owned)
     (nonAssociativeAccepted :
       executeObservedContextualNonAssociativeCertificateBool
-        file tokens owned = true)
-    (safe :
-      let result := Chart.executeObservedContextualValueWorklistMulti
-        file tokens owned
-      let selected :=
-        Chart.executeObservedContextualValueWorklistMulti_selected
-          file tokens owned
-      let recognitionSelected :=
-        Chart.executeObservedContextualValueWorklistMulti?_recognition
-          file tokens owned result selected
-      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
-        file tokens owned result.recognition recognitionSelected
-      let final :=
-        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
-          file tokens owned result.recognition recognitionSelected
-      CoherentNonAssociativePassThroughSafe
-        file tokens result.recognition.memo correct final) :
+        file tokens owned = true) :
     match executeObservedContextualParseOfBoundedSearch
         file tokens owned ready success nonAssociativeAccepted with
     | .ok module => Parses file tokens module
@@ -1660,6 +1635,5 @@ theorem executeObservedContextualParseOfBoundedSearch_sound
       (executeObservedContextualBoundedPotential file tokens owned success)
       (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
         file tokens owned success nonAssociativeAccepted)
-      safe
 
 end Solcore.Surface.Multi
