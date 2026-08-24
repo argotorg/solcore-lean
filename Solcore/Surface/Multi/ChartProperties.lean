@@ -12591,6 +12591,162 @@ theorem ContextualReductionValue.reduce?_coherent
 
 namespace ContextualValueFrontierState
 
+/-- Every dependent semantic value retained by the executable frontier has
+the matching declarative coherence derivation. -/
+def ValuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (state : ContextualValueFrontierState file tokens) : Prop :=
+  (∀ entry, entry ∈ state.prefixes →
+    CoherentPrefix file tokens memo correct final
+      entry.item entry.value.value) ∧
+  ∀ entry, entry ∈ state.reductions →
+    CoherentReduction file tokens memo correct final
+      entry.item entry.reduction.value
+
+/-- The empty frontier contains no incoherent semantic value. -/
+@[simp] theorem empty_valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    ValuesCoherent memo correct final
+      (ContextualValueFrontierState.empty file tokens) := by
+  simp [ValuesCoherent, ContextualValueFrontierState.empty]
+
+/-- Retaining one coherent prefix preserves coherence of both ledgers. -/
+theorem insertPrefix_valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualPrefixValue file tokens item)
+    (before : ValuesCoherent memo correct final state)
+    (valueCoherent : CoherentPrefix file tokens memo correct final
+      item value.value) :
+    ValuesCoherent memo correct final (state.insertPrefix item value) := by
+  by_cases present : state.prefixMemberBool item = true
+  · rw [ContextualValueFrontierState.insertPrefix_of_present
+      state item value present]
+    exact before
+  · have absent : state.prefixMemberBool item = false := by
+      cases selected : state.prefixMemberBool item <;> simp_all
+    constructor
+    · intro entry member
+      simp only [ContextualValueFrontierState.insertPrefix, absent,
+        Bool.false_eq_true, ↓reduceIte] at member
+      rw [List.mem_append] at member
+      rcases member with old | new
+      · exact before.1 entry old
+      · simp only [List.mem_singleton] at new
+        cases new
+        exact valueCoherent
+    · intro entry member
+      simp only [ContextualValueFrontierState.insertPrefix, absent,
+        Bool.false_eq_true, ↓reduceIte] at member
+      exact before.2 entry member
+
+/-- Retaining one coherent reduction preserves coherence of both ledgers. -/
+theorem insertReduction_valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (value : ContextualReductionValue file tokens item)
+    (before : ValuesCoherent memo correct final state)
+    (valueCoherent : CoherentReduction file tokens memo correct final
+      item value.value) :
+    ValuesCoherent memo correct final
+      (state.insertReduction item value) := by
+  by_cases present : state.reductionMemberBool item = true
+  · rw [ContextualValueFrontierState.insertReduction_of_present
+      state item value present]
+    exact before
+  · have absent : state.reductionMemberBool item = false := by
+      cases selected : state.reductionMemberBool item <;> simp_all
+    constructor
+    · intro entry member
+      simp only [ContextualValueFrontierState.insertReduction, absent,
+        Bool.false_eq_true, ↓reduceIte] at member
+      exact before.1 entry member
+    · intro entry member
+      simp only [ContextualValueFrontierState.insertReduction, absent,
+        Bool.false_eq_true, ↓reduceIte] at member
+      rw [List.mem_append] at member
+      rcases member with old | new
+      · exact before.2 entry old
+      · simp only [List.mem_singleton] at new
+        cases new
+        exact valueCoherent
+
+/-- Atomic candidate preparation preserves declarative coherence in every
+successful classification branch. -/
+theorem insertCandidate?_valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final item)
+    (prior : ContextualPrefixValue file tokens item)
+    (before : ValuesCoherent memo correct final state)
+    (priorCoherent : CoherentPrefix file tokens memo correct final
+      item prior.value)
+    (result : CandidateInsertResult file tokens)
+    (selected : insertCandidate? owned state item prior = some result) :
+    ValuesCoherent memo correct final result.state := by
+  unfold insertCandidate? at selected
+  split at selected
+  next present =>
+      cases selected
+      exact before
+  next absent =>
+      split at selected
+      next complete =>
+        cases reductionEq : ContextualReductionValue.reduce? owned item prior with
+        | none => simp [reductionEq] at selected
+        | some reduction =>
+            simp only [reductionEq, Option.some.injEq] at selected
+            cases selected
+            exact insertReduction_valuesCoherent
+              (state.insertPrefix item prior) item reduction
+              (insertPrefix_valuesCoherent state item prior before
+                priorCoherent)
+              (ContextualReductionValue.reduce?_coherent owned item reached
+                prior priorCoherent reduction reductionEq)
+      next incomplete =>
+        cases selected
+        exact insertPrefix_valuesCoherent state item prior before
+          priorCoherent
+
+/-- Queue consumption changes no persistent semantic value. -/
+theorem dequeue?_valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (state next : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (before : ValuesCoherent memo correct final state)
+    (selected : state.dequeue? = some (item, next)) :
+    ValuesCoherent memo correct final next := by
+  unfold ContextualValueFrontierState.dequeue? at selected
+  cases queueEq : state.queue with
+  | nil => simp [queueEq] at selected
+  | cons head tail =>
+      simp only [queueEq, Option.some.injEq, Prod.mk.injEq] at selected
+      rcases selected with ⟨_headEq, nextEq⟩
+      subst next
+      exact before
+
 /-- Item identities present in the dependent prefix ledger. -/
 def prefixKeys
     {file : WorkspaceFile} {tokens : List Token}
