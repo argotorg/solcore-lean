@@ -17481,6 +17481,305 @@ theorem rebuildContextualScannedEdge?_total
       else none) = some ⟨witnessed, exactKey⟩
       rw [dif_pos exactKey]
 
+private theorem structuralScan_target_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (beforeOrdered : edge.before.raw.origin.val ≤
+      edge.before.raw.current.val) :
+    edge.after.raw.origin.val ≤ edge.after.raw.current.val ∧
+      edge.after.raw.production ≠ .root .module := by
+  obtain ⟨witness⟩ := packedEdge_scanned_valid_iff.mp edge.structural.1
+  have advance := witness.advance
+  constructor
+  · have afterCurrent : edge.after.raw.current = edge.cursor.afterBoundary :=
+      advance.2.2.2.trans (congrArg TerminalCursor.afterBoundary witness.sameCursor)
+    rw [advance.2.2.1, afterCurrent]
+    calc
+      edge.before.raw.origin.val ≤ edge.before.raw.current.val :=
+        beforeOrdered
+      _ = edge.cursor.beforeBoundary.val :=
+        congrArg Fin.val witness.atCurrent.symm
+      _ ≤ edge.cursor.afterBoundary.val := by
+        have values := terminalCursor_boundary_coercions_exact edge.cursor; omega
+  · intro root
+    have beforeRoot : edge.before.raw.production = .root .module :=
+      advance.1.symm.trans root
+    rcases witness.next with ⟨dotBound, next⟩
+    have rhsLength : edge.before.raw.production.rhs.length = 1 := by simp [beforeRoot]
+    have dotZero : edge.before.raw.dot.val = 0 := by omega
+    simp [beforeRoot, ProductionId.rhs, dotZero] at next
+private theorem insertCandidate?_total_ordered_nonroot
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (ordered : item.raw.origin.val ≤ item.raw.current.val)
+    (nonroot : item.raw.production ≠ .root .module) :
+    ∃ candidate, ContextualValueFrontierState.insertCandidate?
+      owned state item prior = some candidate := by
+  unfold ContextualValueFrontierState.insertCandidate?
+  split
+  next present => exact ⟨_, rfl⟩
+  next absent =>
+    split
+    next complete =>
+      have moduleInterval : item.raw.production = .root .module →
+          item.raw.origin = Boundary.start tokens ∧
+            item.raw.current = Boundary.afterLogicalEOF tokens := by
+        intro root; exact (nonroot root).elim
+      let reduction := ContextualReductionValue.reduce owned item ordered
+        complete prior
+      have reductionEq : ContextualReductionValue.reduce? owned item prior =
+          some reduction := by
+        unfold ContextualReductionValue.reduce?; rw [dif_pos ordered, dif_pos complete, dif_pos moduleInterval]
+      rw [reductionEq]
+      exact ⟨_, rfl⟩
+    next incomplete => exact ⟨_, rfl⟩
+private theorem attemptPhaseCScannedEdge?_total_of_sameSource
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (sameSource : edge.before = source)
+    (prior : ContextualPrefixValue file tokens edge.before)
+    (priorEq : current.payload.frontier.lookupPrefix? edge.before =
+      some prior)
+    (beforeOrdered : edge.before.raw.origin.val ≤
+      edge.before.raw.current.val)
+    (traversalFresh : (.linear .L14_frontierScannedTraversal
+      (contextualLinearKey edge.before) : UnitAddress tokens) ∉
+        current.counter.usedRev)
+    (actionFresh : (.linear .L12_scannedAction
+      (contextualLinearKey edge.before) : UnitAddress tokens) ∉
+        current.counter.usedRev)
+    (insertFresh : current.payload.frontier.prefixMemberBool edge.after = false →
+      (.linear .L09_frontierInsert (contextualLinearKey edge.after) : UnitAddress tokens) ∉ current.counter.usedRev) :
+    ∃ result, attemptPhaseCScannedEdge? owned source edge current = some result := by
+  obtain ⟨rebuilt, rebuiltEq⟩ := rebuildContextualScannedEdge?_total
+    owned edge
+  have ready := structuralScan_target_ready edge beforeOrdered
+  let next := rebuilt.scan prior
+  obtain ⟨candidate, candidateEq⟩ :=
+    insertCandidate?_total_ordered_nonroot owned current.payload.frontier
+      edge.after next ready.1 ready.2
+  let traversed : CountedState tokens
+      (PhaseCValueWorklist file tokens) := {
+    payload := current.payload
+    counter := current.counter.charge
+      (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey edge.before)) traversalFresh
+  }
+  have traversedEq : runMappedPrimitive? current
+      (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey edge.before)) id = some traversed := by
+    simp [runMappedPrimitive?, traversalFresh, traversed]
+  have actionFresh' : (.linear .L12_scannedAction
+      (contextualLinearKey edge.before) : UnitAddress tokens) ∉
+        traversed.counter.usedRev := by
+    simp [traversed, Counter.charge, actionFresh]
+  let actioned : CountedState tokens
+      (PhaseCValueWorklist file tokens) := {
+    payload := traversed.payload
+    counter := traversed.counter.charge
+      (.linear .L12_scannedAction (contextualLinearKey edge.before))
+        actionFresh'
+  }
+  have actionedEq : runMappedPrimitive? traversed
+      (.linear .L12_scannedAction (contextualLinearKey edge.before)) id =
+        some actioned := by
+    simp [runMappedPrimitive?, actionFresh', actioned]
+  obtain ⟨result, resultEq⟩ : ∃ result,
+      publishPhaseCValueCandidate? actioned edge.after candidate = some result := by
+    cases present : current.payload.frontier.prefixMemberBool edge.after with
+    | false =>
+        apply publishPhaseCValueCandidate?_total
+        simp [actioned, traversed, Counter.charge, insertFresh present]
+    | true =>
+        unfold ContextualValueFrontierState.insertCandidate? at candidateEq
+        simp [present] at candidateEq
+        cases candidateEq
+        exact ⟨actioned, rfl⟩
+  have candidateEq' : ContextualValueFrontierState.insertCandidate? owned
+      current.payload.frontier edge.after (rebuilt.scan prior) =
+        some candidate := by
+    simpa [next] using candidateEq
+  refine ⟨result, ?_⟩
+  unfold attemptPhaseCScannedEdge?
+  rw [dif_pos sameSource, rebuiltEq, priorEq]
+  change (do
+    let candidate ← ContextualValueFrontierState.insertCandidate? owned
+      current.payload.frontier edge.after (rebuilt.scan prior)
+    let traversed ← runMappedPrimitive? current
+      (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey edge.before)) id
+    let actioned ← runMappedPrimitive? traversed
+      (.linear .L12_scannedAction (contextualLinearKey edge.before)) id
+    publishPhaseCValueCandidate? actioned edge.after candidate) = some result
+  simp only [candidateEq']
+  simp only [traversedEq]
+  change Option.bind (runMappedPrimitive? traversed (.linear .L12_scannedAction (contextualLinearKey edge.before)) id) (fun actioned => publishPhaseCValueCandidate? actioned edge.after candidate) = some result
+  rw [actionedEq]; exact resultEq
+private def retainedScannedSource?
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualPackedEdge file tokens) :
+    Option (ContextualItemKey tokens) :=
+  match edge.val with
+  | .scanned before _ _ => some before
+  | .completed _ _ _ _ => none
+private theorem retainedScannedSource?_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (left right : StructurallyValidContextualPackedEdge file tokens)
+    (source : ContextualItemKey tokens)
+    (leftSource : retainedScannedSource? left = some source)
+    (rightSource : retainedScannedSource? right = some source) :
+    left = right := by
+  rcases left with ⟨leftKey, leftStructural⟩
+  rcases right with ⟨rightKey, rightStructural⟩
+  cases leftKey with
+  | completed => simp [retainedScannedSource?] at leftSource
+  | scanned leftBefore leftAfter leftCursor =>
+    cases rightKey with
+    | completed => simp [retainedScannedSource?] at rightSource
+    | scanned rightBefore rightAfter rightCursor =>
+      simp only [retainedScannedSource?, Option.some.injEq] at leftSource
+      simp only [retainedScannedSource?, Option.some.injEq] at rightSource
+      subst source
+      subst rightBefore
+      obtain ⟨leftComputed, leftEq, _leftBeforeEq, leftAfterEq,
+        leftCursorEq⟩ := contextualScannedEdge?_complete owned leftBefore
+          leftAfter leftCursor leftStructural
+      obtain ⟨rightComputed, rightEq, _rightBeforeEq, rightAfterEq,
+        rightCursorEq⟩ := contextualScannedEdge?_complete owned leftBefore
+          rightAfter rightCursor rightStructural
+      have pairEq : (leftAfter, leftComputed) =
+          (rightAfter, rightComputed) :=
+        Option.some.inj (leftEq.symm.trans rightEq)
+      cases pairEq
+      have cursorEq : leftCursor = rightCursor :=
+        leftCursorEq.symm.trans rightCursorEq
+      apply Subtype.ext
+      simp only
+      rw [cursorEq]
+private theorem attemptPhaseCRetainedScannedEdges?_no_source
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges (current : CountedState tokens
+      (PhaseCValueWorklist file tokens)),
+      (∀ edge, edge ∈ edges →
+        retainedScannedSource? edge ≠ some source) →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+        some current := by
+  intro edges
+  induction edges with
+  | nil => intro current _none; rfl
+  | cons head rest induction =>
+      intro current none
+      have headNone := none head (by simp)
+      have restNone : ∀ edge, edge ∈ rest →
+          retainedScannedSource? edge ≠ some source := by
+        intro edge member
+        exact none edge (by simp [member])
+      rcases head with ⟨key, structural⟩
+      cases key with
+      | completed =>
+          simpa [attemptPhaseCRetainedScannedEdges?,
+            attemptPhaseCPackedScannedEdge?] using induction current restNone
+      | scanned before after cursor =>
+          have different : before ≠ source := by
+            intro same
+            apply headNone
+            simp [retainedScannedSource?, same]
+          simpa [attemptPhaseCRetainedScannedEdges?,
+            attemptPhaseCPackedScannedEdge?, attemptPhaseCScannedEdge?,
+            different] using induction current restNone
+private theorem attemptPhaseCRetainedScannedEdges?_total
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges (current : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+      (prior : ContextualPrefixValue file tokens source),
+      edges.Nodup →
+      current.payload.frontier.lookupPrefix? source = some prior →
+      source.raw.origin.val ≤ source.raw.current.val →
+      (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey source) : UnitAddress tokens) ∉
+          current.counter.usedRev →
+      (.linear .L12_scannedAction
+        (contextualLinearKey source) : UnitAddress tokens) ∉
+          current.counter.usedRev →
+      (∀ edge, edge ∈ edges →
+        retainedScannedSource? edge = some source →
+        match edge.val with
+        | .scanned _ after _ =>
+            current.payload.frontier.prefixMemberBool after = false →
+              (.linear .L09_frontierInsert (contextualLinearKey after) : UnitAddress tokens) ∉ current.counter.usedRev
+        | .completed _ _ _ _ => True) →
+      ∃ result, attemptPhaseCRetainedScannedEdges? owned source edges
+        current = some result := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current prior _unique _priorEq _ordered _traversalFresh
+        _actionFresh _insertFresh
+      exact ⟨current, rfl⟩
+  | cons head rest induction =>
+      intro current prior unique priorEq ordered traversalFresh actionFresh
+        insertFresh
+      rw [List.nodup_cons] at unique
+      rcases head with ⟨key, structural⟩
+      cases key with
+      | completed waiting finished after shared =>
+          obtain ⟨result, resultEq⟩ := induction current prior unique.2
+            priorEq ordered traversalFresh actionFresh (by
+              intro edge member sourceEq
+              exact insertFresh edge (by simp [member]) sourceEq)
+          exact ⟨result, by
+            simpa [attemptPhaseCRetainedScannedEdges?,
+              attemptPhaseCPackedScannedEdge?] using resultEq⟩
+      | scanned before after cursor =>
+          by_cases sameSource : before = source
+          · subst before
+            let edge : StructurallyValidContextualScannedEdge file tokens := {
+              before := source
+              after := after
+              cursor := cursor
+              structural := structural
+            }
+            have headSource : retainedScannedSource?
+                (⟨.scanned source after cursor, structural⟩ :
+                  StructurallyValidContextualPackedEdge file tokens) =
+                  some source := by rfl
+            have headInsertFresh := insertFresh _ (by simp) headSource
+            obtain ⟨next, nextEq⟩ :=
+              attemptPhaseCScannedEdge?_total_of_sameSource owned source edge
+                current rfl prior priorEq ordered traversalFresh actionFresh
+                  headInsertFresh
+            have restNone : ∀ candidate, candidate ∈ rest →
+                retainedScannedSource? candidate ≠ some source := by
+              intro candidate member candidateSource
+              have equal := retainedScannedSource?_injective owned candidate
+                (⟨.scanned source after cursor, structural⟩ :
+                  StructurallyValidContextualPackedEdge file tokens)
+                source candidateSource headSource
+              exact unique.1 (equal.symm ▸ member)
+            have restEq := attemptPhaseCRetainedScannedEdges?_no_source owned
+              source rest next restNone
+            exact ⟨next, by
+              simpa [attemptPhaseCRetainedScannedEdges?,
+                attemptPhaseCPackedScannedEdge?, edge, nextEq] using restEq⟩
+          · obtain ⟨result, resultEq⟩ := induction current prior
+              unique.2 priorEq ordered traversalFresh actionFresh (by
+                intro candidate member sourceEq
+                exact insertFresh candidate (by simp [member]) sourceEq)
+            exact ⟨result, by
+              simpa [attemptPhaseCRetainedScannedEdges?,
+                attemptPhaseCPackedScannedEdge?, attemptPhaseCScannedEdge?,
+                sameSource] using resultEq⟩
 /-- Every structurally valid contextual completion can recover its exact
 Type-valued witness. -/
 theorem rebuildContextualCompletedEdge?_total
