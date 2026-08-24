@@ -26926,6 +26926,146 @@ private theorem attemptPhaseCCompletedEdge?_preserves_head_completionCausal
     cases selected
     exact ⟨traversalCausal, actionCausal⟩
 
+/-- One completion attempt preserves the stable causal semantic-address
+invariant. -/
+private theorem attemptPhaseCCompletedEdge?_addressSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (safe : PhaseCValueAddressSafe current)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    PhaseCValueAddressSafe result := by
+  have headCausal := attemptPhaseCCompletedEdge?_preserves_head_completionCausal
+    owned source edge current result
+      (safe.completionTraversalAttempted edge.waiting edge.finished)
+      (safe.completionActionAttempted edge.waiting edge.finished) selected
+  constructor
+  · intro target member
+    rcases attemptPhaseCCompletedEdge?_queue_member owned source target edge
+      current result selected member with old | new
+    · exact attemptPhaseCCompletedEdge?_preserves_sourceFresh owned source target
+        edge current result (safe.queuedSourceFresh target old) selected
+    · simpa [new.2] using
+        attemptPhaseCCompletedEdge?_preserves_sourceFresh owned source
+          edge.after edge current result
+            (safe.sourceFresh_of_absent edge.after new.1) selected
+  · intro item used
+    by_cases old : (.linear .L08_frontierDequeue
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.dequeueUsedPresent item old) selected
+    · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current result
+        _ old used selected with attempt | traversal | action | inserted <;>
+          simp_all
+  · intro item predicted member used
+    by_cases old : (.prediction .R02_frontierPrediction
+        (contextualPredictionKey item predicted) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.predictionUsedPresent item predicted member old)
+          selected
+    · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current result
+        _ old used selected with attempt | traversal | action | inserted <;>
+          simp_all
+  · intro item used
+    by_cases old : (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.scanTraversalUsedPresent item old) selected
+    · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current result
+        _ old used selected with attempt | traversal | action | inserted <;>
+          simp_all
+  · intro item used
+    by_cases old : (.linear .L12_scannedAction
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.scanActionUsedPresent item old) selected
+    · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current result
+        _ old used selected with attempt | traversal | action | inserted <;>
+          simp_all
+  · intro item used
+    by_cases old : (.linear .L09_frontierInsert
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.insertUsedPresent item old) selected
+    · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current result
+        _ old used selected with attempt | traversal | action | inserted
+      · simp at attempt
+      · simp at traversal
+      · simp at action
+      · simp only [UnitAddress.linear.injEq] at inserted
+        simpa [contextualLinearKey_injective inserted.1.2] using inserted.2
+  · intro item used
+    by_cases old : (.linear .L13_epsilonAction
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.epsilonActionUsedPresent item old) selected
+    · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current result
+        _ old used selected with attempt | traversal | action | inserted <;>
+          simp_all
+  · intro waiting finished used
+    by_cases same : contextualCompletionKey waiting finished =
+        contextualCompletionKey edge.waiting edge.finished
+    · have headUsed : (.cubic .U07_frontierCompletedTraversal
+          (contextualCompletionKey edge.waiting edge.finished) :
+            UnitAddress tokens) ∈ result.counter.usedRev := by simpa [same] using used
+      simpa [same] using headCausal.1 headUsed
+    · by_cases old : (.cubic .U07_frontierCompletedTraversal
+          (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+            current.counter.usedRev
+      · exact attemptPhaseCCompletedEdge?_used_mono owned source edge current
+          result selected (safe.completionTraversalAttempted waiting finished old)
+      · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current
+          result _ old used selected with attempt | traversal | action | inserted
+        · simp at attempt
+        · simp only [UnitAddress.cubic.injEq] at traversal
+          exact (same traversal.2).elim
+        · simp at action
+        · simp at inserted
+  · intro waiting finished used
+    by_cases same : contextualCompletionKey waiting finished =
+        contextualCompletionKey edge.waiting edge.finished
+    · have headUsed : (.cubic .U05_completedAction
+          (contextualCompletionKey edge.waiting edge.finished) :
+            UnitAddress tokens) ∈ result.counter.usedRev := by simpa [same] using used
+      simpa [same] using headCausal.2 headUsed
+    · by_cases old : (.cubic .U05_completedAction
+          (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+            current.counter.usedRev
+      · exact attemptPhaseCCompletedEdge?_used_mono owned source edge current
+          result selected (safe.completionActionAttempted waiting finished old)
+      · rcases attemptPhaseCCompletedEdge?_new_used owned source edge current
+          result _ old used selected with attempt | traversal | action | inserted
+        · simp at attempt
+        · simp at traversal
+        · simp only [UnitAddress.cubic.injEq] at action
+          exact (same action.2).elim
+        · simp at inserted
+
+private theorem attemptPhaseCCompletedEdge?_preserves_sourceNotQueued
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : current.payload.frontier.prefixMemberBool source = true)
+    (notQueued : source ∉ current.payload.frontier.queue)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    source ∉ result.payload.frontier.queue := by
+  intro member
+  rcases attemptPhaseCCompletedEdge?_queue_member owned source source edge
+    current result selected member with old | new
+  · exact notQueued old
+  · have absent := new.1
+    rw [← new.2, present] at absent
+    contradiction
+
 private theorem chargeContextualPrediction_itemSafe
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
