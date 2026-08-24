@@ -11106,6 +11106,39 @@ def dequeue?
   | [] => none
   | item :: rest => some (item, { state with queue := rest })
 
+/-- The item-key effect of preparing one semantic frontier candidate. -/
+inductive CandidateInsertKind where
+  | duplicate
+  | insertedIncomplete
+  | insertedComplete
+
+/-- A prepared semantic candidate together with its proof-free insertion
+classification. -/
+structure CandidateInsertResult
+    (file : WorkspaceFile) (tokens : List Token) where
+  kind : CandidateInsertKind
+  state : ContextualValueFrontierState file tokens
+
+/-- Prepare an item-key-deduplicated candidate. A fresh complete prefix is
+reduced before the returned state exposes its new queue entry. -/
+def insertCandidate?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item) :
+    Option (CandidateInsertResult file tokens) :=
+  if state.prefixMemberBool item then
+    some ⟨.duplicate, state⟩
+  else if _complete : CompleteItem item.raw then
+    match ContextualReductionValue.reduce? owned item prior with
+    | none => none
+    | some reduction =>
+        some ⟨.insertedComplete,
+          (state.insertPrefix item prior).insertReduction item reduction⟩
+  else
+    some ⟨.insertedIncomplete, state.insertPrefix item prior⟩
+
 @[simp] theorem empty_lookupPrefix?
     (file : WorkspaceFile) (tokens : List Token)
     (item : ContextualItemKey tokens) :
