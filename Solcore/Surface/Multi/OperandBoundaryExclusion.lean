@@ -161,6 +161,74 @@ theorem nonAssociativeOperatorAtBool_eq_true_of_found
           (symbolAtBoundary_of_matched terminal atCursor)
       simp [nonAssociativeOperatorAtBool, accepted]
 
+private theorem matchedSymbolAtBoundary_exists
+    {file : WorkspaceFile} {tokens : List Token}
+    {cursor : Boundary tokens} {symbol : Symbol}
+    (evidence : SymbolAtBoundary file tokens cursor symbol) :
+    ∃ terminal : MatchedTerminal file tokens (.symbol symbol),
+      terminal.cursor.beforeBoundary = cursor := by
+  rcases evidence with
+    ⟨terminalCursor, token, atCursor, terminalAt, payload⟩
+  refine ⟨{
+    cursor := terminalCursor
+    value := .retained token
+    span := token.span
+    «at» := terminalAt
+    «matches» := ?_
+  }, atCursor⟩
+  simpa [TerminalMatches] using payload
+
+/-- The level observation is exact: acceptance exposes one declaratively
+found operator, and every found operator is accepted. -/
+theorem nonAssociativeOperatorAtBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (cursor : Boundary tokens) (level : NonAssociativeLevel) :
+    nonAssociativeOperatorAtBool tokens cursor level = true ↔
+      ∃ operator : Located InfixOperator,
+        FoundNonAssociativeOperatorAt
+          file tokens cursor level operator := by
+  constructor
+  · intro accepted
+    cases level with
+    | relational =>
+        simp only [nonAssociativeOperatorAtBool, Bool.or_eq_true]
+            at accepted
+        rw [symbolAtBoundaryBool_eq_true_iff owned cursor .less,
+          symbolAtBoundaryBool_eq_true_iff owned cursor .greater,
+          symbolAtBoundaryBool_eq_true_iff owned cursor .lessEqual,
+          symbolAtBoundaryBool_eq_true_iff owned cursor .greaterEqual]
+            at accepted
+        rcases accepted with
+          ((less | greater) | lessEqual) | greaterEqual
+        · obtain ⟨terminal, atCursor⟩ := matchedSymbolAtBoundary_exists
+            less
+          exact ⟨_, .less terminal atCursor⟩
+        · obtain ⟨terminal, atCursor⟩ := matchedSymbolAtBoundary_exists
+            greater
+          exact ⟨_, .greater terminal atCursor⟩
+        · obtain ⟨terminal, atCursor⟩ := matchedSymbolAtBoundary_exists
+            lessEqual
+          exact ⟨_, .lessEqual terminal atCursor⟩
+        · obtain ⟨terminal, atCursor⟩ := matchedSymbolAtBoundary_exists
+            greaterEqual
+          exact ⟨_, .greaterEqual terminal atCursor⟩
+    | equality =>
+        simp only [nonAssociativeOperatorAtBool, Bool.or_eq_true]
+            at accepted
+        rw [symbolAtBoundaryBool_eq_true_iff owned cursor .equalEqual,
+          symbolAtBoundaryBool_eq_true_iff owned cursor .notEqual]
+            at accepted
+        rcases accepted with equal | notEqual
+        · obtain ⟨terminal, atCursor⟩ := matchedSymbolAtBoundary_exists
+            equal
+          exact ⟨_, .equal terminal atCursor⟩
+        · obtain ⟨terminal, atCursor⟩ := matchedSymbolAtBoundary_exists
+            notEqual
+          exact ⟨_, .notEqual terminal atCursor⟩
+  · rintro ⟨operator, found⟩
+    exact nonAssociativeOperatorAtBool_eq_true_of_found owned found
+
 /-- Forget contextual guard bookkeeping from one reached chart item. -/
 theorem ContextualReach.toUnguarded
     {file : WorkspaceFile} {tokens : List Token}
@@ -441,6 +509,55 @@ def nonAssociativeOperandPrefixExclusiveCell
     nonAssociativeOperatorAtBool tokens split level &&
     decide (split.val < finish.val))
 
+/-- One cell is exact for its fixed origin, split, finish, and level. -/
+theorem nonAssociativeOperandPrefixExclusiveCell_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (level : NonAssociativeLevel)
+    (origin split finish : Boundary tokens) :
+    nonAssociativeOperandPrefixExclusiveCell
+        file tokens owned correct final level origin split finish = true ↔
+      ¬ (ContextualRecognizes file tokens memo correct final
+            (.rule level.operandRule) origin split ∧
+          ContextualRecognizes file tokens memo correct final
+            (.rule level.operandRule) origin finish ∧
+          (∃ operator : Located InfixOperator,
+            FoundNonAssociativeOperatorAt
+              file tokens split level operator) ∧
+          split.val < finish.val) := by
+  let bad :=
+    contextualRecognizesBool file tokens owned correct final
+        (.rule level.operandRule) origin split &&
+      contextualRecognizesBool file tokens owned correct final
+        (.rule level.operandRule) origin finish &&
+      nonAssociativeOperatorAtBool tokens split level &&
+      decide (split.val < finish.val)
+  have badTrue : bad = true ↔
+      ContextualRecognizes file tokens memo correct final
+          (.rule level.operandRule) origin split ∧
+        ContextualRecognizes file tokens memo correct final
+          (.rule level.operandRule) origin finish ∧
+        (∃ operator : Located InfixOperator,
+          FoundNonAssociativeOperatorAt
+            file tokens split level operator) ∧
+        split.val < finish.val := by
+    simp [bad, contextualRecognizesBool_eq_true_iff
+      owned correct final,
+      nonAssociativeOperatorAtBool_eq_true_iff owned, and_assoc]
+  unfold nonAssociativeOperandPrefixExclusiveCell
+  change Bool.not bad = true ↔ _
+  constructor
+  · intro accepted evidence
+    have badAccepted := badTrue.mpr evidence
+    simp [badAccepted] at accepted
+  · intro excluded
+    cases badEq : bad with
+    | false => simp
+    | true => exact (excluded (badTrue.mp badEq)).elim
+
 /-- Finite executable certificate for every origin, split, finish, and
 nonassociative level in one contextual ledger. -/
 def nonAssociativeOperandPrefixExclusiveTable
@@ -489,6 +606,37 @@ theorem nonAssociativeOperandPrefixExclusive_of_table
     decide_eq_true later
   simp [nonAssociativeOperandPrefixExclusiveCell, shortAccepted,
     longAccepted, foundAccepted, laterAccepted] at cellAccepted
+
+/-- The finite table is equivalent to the declarative operand-prefix
+exclusion property. -/
+theorem nonAssociativeOperandPrefixExclusiveTable_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    nonAssociativeOperandPrefixExclusiveTable
+        file tokens owned correct final = true ↔
+      NonAssociativeOperandPrefixExclusive
+        file tokens memo correct final := by
+  constructor
+  · exact nonAssociativeOperandPrefixExclusive_of_table
+      owned correct final
+  · intro exclusive
+    unfold nonAssociativeOperandPrefixExclusiveTable
+    apply List.all_eq_true.mpr
+    intro level _levelMember
+    apply List.all_eq_true.mpr
+    intro origin _originMember
+    apply List.all_eq_true.mpr
+    intro split _splitMember
+    apply List.all_eq_true.mpr
+    intro finish _finishMember
+    apply (nonAssociativeOperandPrefixExclusiveCell_eq_true_iff
+      owned correct final level origin split finish).mpr
+    rintro ⟨short, long, ⟨operator, found⟩, later⟩
+    exact exclusive level origin split finish operator
+      short long found later
 
 /-- The pure prefix-exclusion fact bounds any competing reached sequence
 prefix by the operand frontier immediately before the same-level operator. -/
