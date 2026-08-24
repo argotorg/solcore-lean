@@ -1,0 +1,299 @@
+import Solcore.Surface.Multi.ParserJudgment
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+/-- Recognition by one complete contextual item over an exact interval. -/
+def ContextualRecognizes
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) : Prop :=
+  ∃ item : ContextualItemKey tokens,
+    ContextualReach file tokens memo correct final item ∧
+    CompleteItem item.raw ∧ item.raw.production.lhs = symbol ∧
+    item.raw.origin = start ∧ item.raw.current = finish
+
+/-- Forget contextual guard bookkeeping from one reached chart item. -/
+theorem ContextualReach.toUnguarded
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    UnguardedReach file tokens item.raw := by
+  induction reached with
+  | root => exact .seed (.root .module) (Boundary.start tokens)
+  | predict waiting predicted waitingReached next enabled induction =>
+      exact .predict waiting.raw predicted induction next
+  | scan before after cursor beforeReached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      exact .scan before.raw after.raw cursor terminal value span induction
+        next atCurrent terminalAt terminalMatches advance
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, complete, lhs, waitingAtShared,
+          finishedAtShared, advance⟩
+      have exactNext : NextSymbol waiting.raw
+          (.nonterminal finished.raw.production.lhs) := by
+        rw [lhs]
+        exact next
+      exact .complete waiting.raw finished.raw after.raw waitingInduction
+        finishedInduction exactNext complete
+        (waitingAtShared.trans finishedAtShared.symm) advance
+
+/-- Every reached complete source root recognizes its exact interval after
+guard erasure. -/
+theorem contextualCompleteRoot_unguardedRecognizes
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    {context : GuardContext tokens}
+    (reached : ContextualReach file tokens memo correct final
+      (CanonicalCompleteRootItem tokens rule origin finish context)) :
+    UnguardedRecognizes file tokens (.rule rule) origin finish := by
+  refine ⟨(CanonicalCompleteRootItem tokens rule origin finish context).raw,
+    reached.toUnguarded, ?_, rfl, rfl, rfl⟩
+  exact canonicalCompleteRootItem_complete rule origin finish context
+
+/-- A reached item immediately after its first nonterminal recovers the exact
+completed child which advanced that first symbol. -/
+theorem contextualReach_one_firstNonterminal
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    {childLhs : NonterminalSymbol} {rest : List GrammarSymbol}
+    (reached : ContextualReach file tokens memo correct final item)
+    (rhs : item.raw.production.rhs =
+      GrammarSymbol.nonterminal childLhs :: rest)
+    (one : item.raw.dot.val = 1) :
+    ∃ child : ContextualItemKey tokens,
+      ContextualReach file tokens memo correct final child ∧
+      CompleteItem child.raw ∧
+      child.raw.production.lhs = childLhs ∧
+      child.raw.origin = item.raw.origin ∧
+      child.raw.current = item.raw.current := by
+  cases reached with
+  | root => contradiction
+  | predict => contradiction
+  | scan before after cursor beforeReached structural =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      have beforeZero : before.raw.dot.val = 0 := by omega
+      let index : Nat := before.raw.dot.val
+      have impossible : some (GrammarSymbol.nonterminal childLhs) =
+          some (GrammarSymbol.terminal terminal) := by
+        calc
+          _ = item.raw.production.rhs[index]? := by
+            rw [rhs]
+            simp [index, beforeZero]
+          _ = before.raw.production.rhs[index]? :=
+            congrArg (fun production : ProductionId =>
+              production.rhs[index]?) productionEq
+          _ = before.raw.production.rhs[before.raw.dot.val]? := rfl
+          _ = _ := next.2
+      exact GrammarSymbol.noConfusion (Option.some.inj impossible)
+  | complete waiting finished after shared waitingReached finishedReached
+      structural =>
+      rcases structural.1 with
+        ⟨symbol, next, finishedComplete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      have waitingZero : waiting.raw.dot.val = 0 := by omega
+      have waitingOriginCurrent := contextualReach_zero_origin_eq_current
+        waitingReached waitingZero
+      have exactNext : NextSymbol waiting.raw
+          (.nonterminal finished.raw.production.lhs) := by
+        rw [lhsEq]
+        exact next
+      let index : Nat := waiting.raw.dot.val
+      have selected : some (GrammarSymbol.nonterminal childLhs) =
+          some (GrammarSymbol.nonterminal finished.raw.production.lhs) := by
+        calc
+          _ = item.raw.production.rhs[index]? := by
+            rw [rhs]
+            simp [index, waitingZero]
+          _ = waiting.raw.production.rhs[index]? :=
+            congrArg (fun production : ProductionId =>
+              production.rhs[index]?) productionEq
+          _ = waiting.raw.production.rhs[waiting.raw.dot.val]? := rfl
+          _ = _ := exactNext.2
+      have finishedLhs : finished.raw.production.lhs = childLhs :=
+        (GrammarSymbol.nonterminal.inj (Option.some.inj selected)).symm
+      have finishedOrigin : finished.raw.origin = item.raw.origin := by
+        calc
+          finished.raw.origin = shared := finishedAtShared
+          _ = waiting.raw.current := waitingAtShared.symm
+          _ = waiting.raw.origin := waitingOriginCurrent.symm
+          _ = item.raw.origin := originEq.symm
+      exact ⟨finished, finishedReached, finishedComplete, finishedLhs,
+        finishedOrigin, currentEq.symm⟩
+
+/-- An auxiliary item for an atom site can only use that site's atom
+production. -/
+theorem production_eq_atom_of_lhs
+    (site : AtomSite) (production : ProductionId)
+    (lhs : production.lhs = .aux site.site) :
+    production = .atom site := by
+  have impossible {kind : EbnfNodeKind}
+      (other : GrammarSiteOfKind kind) (different : kind ≠ .atom)
+      (same : other.site = site.site) : False := by
+    have otherKind := other.hasKind
+    have siteKind := site.hasKind
+    rw [same, siteKind] at otherKind
+    exact different otherKind.symm
+  cases production with
+  | root rule => cases lhs
+  | atom other =>
+      have same : other.site = site.site := NonterminalSymbol.aux.inj lhs
+      have exactSite : other = site := by
+        cases other
+        cases site
+        simp only at same ⊢
+        subst_vars
+        rfl
+      subst other
+      rfl
+  | seq other => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | group other => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | choice other branch => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | opt other branch => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | star other branch => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | plus other branch => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | list0 other branch => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | list1 other => exact (impossible other (by decide)
+      (NonterminalSymbol.aux.inj lhs)).elim
+  | tail other branch => cases lhs
+
+/-- A reached nonassociative sequence prefix immediately after its first
+child contains an unguarded recognition of the lower-precedence operand over
+exactly the prefix interval. -/
+theorem g10SequencePrefix_contextualOperand
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (level : NonAssociativeLevel)
+    (sequenceSite : SequenceSite) (firstSite secondSite : GrammarSite)
+    (children : sequenceSite.children = [firstSite, secondSite])
+    (firstShape : firstSite.expression =
+      .atom (.nonterminal level.operandRule))
+    (item : ContextualItemKey tokens)
+    (production : item.raw.production = .seq sequenceSite)
+    (one : item.raw.dot.val = 1)
+    (reached : ContextualReach file tokens memo correct final item) :
+    ContextualRecognizes file tokens memo correct final
+      (.rule level.operandRule)
+      item.raw.origin item.raw.current := by
+  let atomSite : AtomSite := ⟨firstSite, by
+    rw [firstShape]
+    rfl⟩
+  have atomSiteEq : atomSite.site = firstSite := rfl
+  have itemRhs : item.raw.production.rhs =
+      GrammarSymbol.nonterminal (.aux firstSite) ::
+        [GrammarSymbol.nonterminal (.aux secondSite)] := by
+    rw [production, ProductionId.rhs_seq, children]
+    rfl
+  obtain ⟨atomItem, atomReached, atomComplete, atomLhs,
+      atomOrigin, atomCurrent⟩ :=
+    contextualReach_one_firstNonterminal reached itemRhs one
+  have exactAtomLhs : atomItem.raw.production.lhs = .aux atomSite.site := by
+    simpa only [atomSiteEq] using atomLhs
+  have atomProduction : atomItem.raw.production = .atom atomSite :=
+    production_eq_atom_of_lhs atomSite atomItem.raw.production exactAtomLhs
+  have selectedAtom : atomSite.atom = .nonterminal level.operandRule := by
+    exact EbnfExpr.atom.inj
+      (atomSite.expression_eq_atom.symm.trans firstShape)
+  have atomRhs : atomItem.raw.production.rhs =
+      [GrammarSymbol.nonterminal (.rule level.operandRule)] := by
+    rw [atomProduction, ProductionId.rhs_atom]
+    simp [AtomSite.symbol, selectedAtom, EbnfAtom.grammarSymbol]
+  obtain ⟨operand, operandReached, operandComplete, operandLhs,
+      operandOrigin, operandCurrent⟩ :=
+    contextualReach_complete_singleNonterminal atomReached atomRhs atomComplete
+  refine ⟨operand, operandReached, operandComplete,
+    operandLhs, ?_, ?_⟩
+  · exact operandOrigin.trans atomOrigin
+  · exact operandCurrent.trans atomCurrent
+
+/-- The remaining context-free grammar fact needed by G10: once a lower
+precedence operand has completed immediately before a same-level operator, a
+second operand from the same origin cannot absorb that operator and finish
+later.  Delimiter-protected recursive expressions are intentionally allowed;
+the shorter recognition at the operator frontier is what makes this the exact
+prefix-exclusion statement. -/
+def NonAssociativeOperandPrefixExclusive
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) : Prop :=
+  ∀ (level : NonAssociativeLevel)
+      (origin split finish : Boundary tokens)
+      (operator : Located InfixOperator),
+    ContextualRecognizes file tokens memo correct final
+      (.rule level.operandRule) origin split →
+    ContextualRecognizes file tokens memo correct final
+      (.rule level.operandRule) origin finish →
+    FoundNonAssociativeOperatorAt file tokens split level operator →
+    split.val < finish.val → False
+
+/-- The pure prefix-exclusion fact bounds any competing reached sequence
+prefix by the operand frontier immediately before the same-level operator. -/
+theorem g10SequencePrefix_competitor_le
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (exclusive : NonAssociativeOperandPrefixExclusive
+      file tokens memo correct final)
+    (level : NonAssociativeLevel)
+    (sequenceSite : SequenceSite) (firstSite secondSite : GrammarSite)
+    (children : sequenceSite.children = [firstSite, secondSite])
+    (firstShape : firstSite.expression =
+      .atom (.nonterminal level.operandRule))
+    (left right : ContextualItemKey tokens)
+    (leftProduction : left.raw.production = .seq sequenceSite)
+    (rightProduction : right.raw.production = .seq sequenceSite)
+    (leftOne : left.raw.dot.val = 1)
+    (rightOne : right.raw.dot.val = 1)
+    (leftReached : ContextualReach file tokens memo correct final left)
+    (rightReached : ContextualReach file tokens memo correct final right)
+    (sameOrigin : left.raw.origin = right.raw.origin)
+    {operator : Located InfixOperator}
+    (found : FoundNonAssociativeOperatorAt file tokens left.raw.current
+      level operator) :
+    right.raw.current.val ≤ left.raw.current.val := by
+  apply Nat.le_of_not_gt
+  intro later
+  have leftOperand := g10SequencePrefix_contextualOperand level sequenceSite
+    firstSite secondSite children firstShape left leftProduction leftOne
+      leftReached
+  have rightOperand := g10SequencePrefix_contextualOperand level sequenceSite
+    firstSite secondSite children firstShape right rightProduction rightOne
+      rightReached
+  exact exclusive level left.raw.origin left.raw.current right.raw.current
+    operator leftOperand (sameOrigin ▸ rightOperand) found later
+
+end Solcore.Surface.Multi
