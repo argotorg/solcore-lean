@@ -255,4 +255,24 @@ theorem coherentNonAssociativePresentInputHasPresentCompletion {file : Workspace
               | some =>
                   exact ⟨rootWaiting, sequenceItem, rootShared, sequenceWaiting, optional, optionalShared, site,
                     rootEdge, optionalEdge, optionalProduction⟩
+
+/-- Pass-through safety and one accepted finite operand-boundary table
+construct the complete coherent G10 invariant. -/
+theorem coherentNonAssociativeRootCompletedInvariant_of_safe_and_table
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (safe : CoherentNonAssociativePassThroughSafe
+      file tokens memo correct final)
+    (accepted : nonAssociativeOperandPrefixExclusiveTable
+      file tokens owned correct final = true) :
+    CoherentNonAssociativeRootCompletedInvariant
+      file tokens memo correct final := by
+  exact coherentNonAssociativeRootCompletedInvariant_of_operandPrefixExclusive
+    (nonAssociativeOperandPrefixExclusive_of_table
+      owned correct final accepted)
+    (coherentNonAssociativeCompletedHasPresentCompletion_of_safe safe
+      coherentNonAssociativePresentInputHasPresentCompletion)
 end Solcore.Surface.Multi

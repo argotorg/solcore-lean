@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.DiagnosticExhaustiveness
+import Solcore.Surface.Multi.NonAssociativePresentEdgeReflection
 import Solcore.Surface.Multi.PostLogicalEofClosure
 import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
 
@@ -418,6 +419,67 @@ def executeObservedContextualRankCertificateBool
   let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
     file tokens owned result.recognition recognitionSelected
   rootlessRankCertificateBool owned correct final potential
+
+/-- Fully executable operand-prefix certificate for the concrete
+value-carrying recognition ledger. -/
+def executeObservedContextualNonAssociativeCertificateBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) : Bool :=
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  nonAssociativeOperandPrefixExclusiveTable
+    file tokens owned correct final
+
+/-- On the concrete executor ledger, coherent pass-through safety plus the
+accepted operand-prefix table constructs the complete G10 invariant. -/
+theorem executeObservedContextualCoherentNonAssociativeInvariant_of_safe_and_certificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (safe :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      CoherentNonAssociativePassThroughSafe
+        file tokens result.recognition.memo correct final)
+    (accepted : executeObservedContextualNonAssociativeCertificateBool
+      file tokens owned = true) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    let selected :=
+      Chart.executeObservedContextualValueWorklistMulti_selected
+        file tokens owned
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final :=
+      Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+        file tokens owned result.recognition recognitionSelected
+    CoherentNonAssociativeRootCompletedInvariant
+      file tokens result.recognition.memo correct final := by
+  exact coherentNonAssociativeRootCompletedInvariant_of_safe_and_table
+    owned _ _ safe accepted
 
 /-- For an observed recognition result, all remaining frontier components are
 four executable checks: coverage, two rank tables, and post-EOF closure. -/
@@ -1159,5 +1221,58 @@ theorem executeObservedContextualParseOfRankCertificate_sound
           file tokens owned)
         ready potential accepted)
     invariant
+
+/-- The rank-certificate entry point is sound from two executable tables and
+coherent pass-through safety, without a separately supplied G10 invariant. -/
+theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (rankAccepted : executeObservedContextualRankCertificateBool
+      file tokens owned potential = true)
+    (safe :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      CoherentNonAssociativePassThroughSafe
+        file tokens result.recognition.memo correct final)
+    (nonAssociativeAccepted :
+      executeObservedContextualNonAssociativeCertificateBool
+        file tokens owned = true) :
+    match executeObservedContextualParseOfRankCertificate
+        file tokens owned ready potential rankAccepted with
+    | .ok module => Parses file tokens module
+    | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
+  exact executeObservedContextualParseOfRankCertificate_sound
+    file tokens owned ready potential rankAccepted
+      (executeObservedContextualCoherentNonAssociativeInvariant_of_safe_and_certificate
+        file tokens owned safe nonAssociativeAccepted)
 
 end Solcore.Surface.Multi
