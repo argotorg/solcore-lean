@@ -12153,6 +12153,238 @@ private theorem runMappedPrimitive?_payload
     rfl
   · contradiction
 
+private theorem publishPhaseCValueCandidate?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : publishPhaseCValueCandidate? current item candidate =
+      some result) :
+    result.payload.recognition = current.payload.recognition ∧
+      result.payload.frontier =
+        match candidate.kind with
+        | .duplicate => current.payload.frontier
+        | .insertedIncomplete => candidate.state
+        | .insertedComplete => candidate.state := by
+  unfold publishPhaseCValueCandidate? at selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      simp only [kindEq] at selected
+      cases selected
+      exact ⟨rfl, by simp⟩
+  | insertedIncomplete =>
+      simp only [kindEq] at selected
+      have payload := runMappedPrimitive?_payload current _ _ selected
+      rw [payload]
+      exact ⟨rfl, by simp⟩
+  | insertedComplete =>
+      simp only [kindEq] at selected
+      have payload := runMappedPrimitive?_payload current _ _ selected
+      rw [payload]
+      exact ⟨rfl, by simp⟩
+
+private theorem publishPhaseCValueCandidate?_units
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : publishPhaseCValueCandidate? current item candidate =
+      some result) :
+    result.counter.units = current.counter.units +
+      match candidate.kind with
+      | .duplicate => 0
+      | .insertedIncomplete => 1
+      | .insertedComplete => 1 := by
+  unfold publishPhaseCValueCandidate? at selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      simp only [kindEq] at selected
+      cases selected
+      simp
+  | insertedIncomplete =>
+      simp only [kindEq] at selected
+      simpa [kindEq] using
+        runMappedPrimitive?_units current _ _ selected
+  | insertedComplete =>
+      simp only [kindEq] at selected
+      simpa [kindEq] using
+        runMappedPrimitive?_units current _ _ selected
+
+private theorem chargePhaseCCompletedCandidate?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (completeAction : UnitAddress tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : chargePhaseCCompletedCandidate? current completeAction
+      candidate = some result) :
+    result.payload = current.payload := by
+  unfold chargePhaseCCompletedCandidate? at selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      simp only [kindEq] at selected
+      cases selected
+      rfl
+  | insertedIncomplete =>
+      simp only [kindEq] at selected
+      cases selected
+      rfl
+  | insertedComplete =>
+      simp only [kindEq] at selected
+      simpa using runMappedPrimitive?_payload current _ _ selected
+
+private theorem chargePhaseCCompletedCandidate?_units
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (completeAction : UnitAddress tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : chargePhaseCCompletedCandidate? current completeAction
+      candidate = some result) :
+    result.counter.units = current.counter.units +
+      match candidate.kind with
+      | .duplicate => 0
+      | .insertedIncomplete => 0
+      | .insertedComplete => 1 := by
+  unfold chargePhaseCCompletedCandidate? at selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      simp only [kindEq] at selected
+      cases selected
+      simp
+  | insertedIncomplete =>
+      simp only [kindEq] at selected
+      cases selected
+      simp
+  | insertedComplete =>
+      simp only [kindEq] at selected
+      simpa [kindEq] using
+        runMappedPrimitive?_units current _ _ selected
+
+private theorem attemptPhaseCValuePrediction?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    result.payload.recognition = current.payload.recognition ∧
+      (result.payload.frontier = current.payload.frontier ∨
+        ∃ (item : ContextualItemKey tokens)
+          (productionInstance : ProductionInstanceKey tokens)
+          (atZero : item.raw.dot.val = 0)
+          (candidate : ContextualValueFrontierState.CandidateInsertResult
+            file tokens),
+          contextualPredictedItem? waiting predicted =
+              some (item, productionInstance) ∧
+            phaseCItemMemberBool
+              current.payload.recognition.phaseC.contextualItems item = true ∧
+            ContextualValueFrontierState.insertCandidate? owned
+                current.payload.frontier item
+                  (ContextualPrefixValue.zero item atZero) = some candidate ∧
+            result.payload.frontier =
+              match candidate.kind with
+              | .duplicate => current.payload.frontier
+              | .insertedIncomplete => candidate.state
+              | .insertedComplete => candidate.state) := by
+  unfold attemptPhaseCValuePrediction? at selected
+  cases predictionEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictionEq] at selected
+      cases selected
+      exact ⟨rfl, Or.inl rfl⟩
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictionEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, remainder⟩
+      have attemptedPayload := runMappedPrimitive?_payload current _ _
+        attemptedEq
+      split at remainder
+      next member =>
+        split at remainder
+        next atZero =>
+          simp only [Option.bind_eq_some_iff] at remainder
+          rcases remainder with ⟨candidate, candidateEq, actioned,
+            actionEq, publishedEq⟩
+          have actionPayload := chargePhaseCCompletedCandidate?_exact
+            attempted actioned
+              (.linear .L13_epsilonAction (contextualLinearKey item))
+              candidate actionEq
+          have publishedExact := publishPhaseCValueCandidate?_exact
+            actioned result item candidate publishedEq
+          rw [attemptedPayload] at candidateEq member
+          rw [actionPayload, attemptedPayload] at publishedExact
+          refine ⟨publishedExact.1, Or.inr ⟨item,
+            productionInstance, atZero, candidate, rfl, member,
+            candidateEq, ?_⟩⟩
+          exact publishedExact.2
+        next notZero => contradiction
+      next absent =>
+        cases remainder
+        rw [attemptedPayload]
+        exact ⟨rfl, Or.inl rfl⟩
+
+private theorem attemptPhaseCValuePrediction?_units
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    result.counter.units = current.counter.units ∨
+      result.counter.units = current.counter.units + 1 ∨
+      result.counter.units = current.counter.units + 2 ∨
+      result.counter.units = current.counter.units + 3 := by
+  unfold attemptPhaseCValuePrediction? at selected
+  cases predictionEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictionEq] at selected
+      cases selected
+      exact Or.inl rfl
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictionEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, remainder⟩
+      have attemptedUnits := runMappedPrimitive?_units current _ _ attemptedEq
+      split at remainder
+      next member =>
+        split at remainder
+        next atZero =>
+          simp only [Option.bind_eq_some_iff] at remainder
+          rcases remainder with ⟨candidate, candidateEq, actioned,
+            actionEq, publishedEq⟩
+          have actionUnits := chargePhaseCCompletedCandidate?_units
+            attempted actioned
+              (.linear .L13_epsilonAction (contextualLinearKey item))
+              candidate actionEq
+          have publishedUnits := publishPhaseCValueCandidate?_units
+            actioned result item candidate publishedEq
+          rw [actionUnits, attemptedUnits] at publishedUnits
+          cases kindEq : candidate.kind with
+          | duplicate =>
+              simp [kindEq] at publishedUnits
+              exact Or.inr (Or.inl publishedUnits)
+          | insertedIncomplete =>
+              simp [kindEq] at publishedUnits
+              exact Or.inr (Or.inr (Or.inl publishedUnits))
+          | insertedComplete =>
+              simp [kindEq] at publishedUnits
+              exact Or.inr (Or.inr (Or.inr publishedUnits))
+        next notZero => contradiction
+      next absent =>
+        cases remainder
+        exact Or.inr (Or.inl attemptedUnits)
+
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
