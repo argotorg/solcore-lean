@@ -37479,4 +37479,248 @@ private theorem processPhaseCValueItem?_frontierGrowth
         (attemptPhaseCRetainedCompletedEdges?_frontierGrowth owned source _
           scanned result completedEq))
 
+/-- Candidate preparation never removes an existing dependent reduction. -/
+private theorem insertCandidate?_preserves_reduction_some
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item target : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (present : (state.lookupReduction? target).isSome = true)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    (candidate.state.lookupReduction? target).isSome = true := by
+  have oldMember :=
+    (ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+      state target).2 present
+  unfold ContextualValueFrontierState.insertCandidate? at selected
+  split at selected
+  next duplicate =>
+    cases selected
+    exact present
+  next fresh =>
+    split at selected
+    next complete =>
+      cases reduced : ContextualReductionValue.reduce? owned item prior with
+      | none => simp [reduced] at selected
+      | some reduction =>
+          rw [reduced] at selected
+          cases selected
+          apply
+            (ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+              _ target).1
+          rw [insertReduction_reductionMemberBool_eq_true_iff,
+            insertPrefix_reductionMemberBool]
+          exact Or.inl oldMember
+    next incomplete =>
+      cases selected
+      apply
+        (ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
+          _ target).1
+      rw [insertPrefix_reductionMemberBool]
+      exact oldMember
+
+/-- One packed completion-dispatch step preserves every old prefix. -/
+private theorem attemptPhaseCPackedCompletedEdge?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : current.payload.frontier.prefixMemberBool target = true)
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    result.payload.frontier.prefixMemberBool target = true := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned =>
+      cases selected
+      exact present
+  | completed waiting finished after shared =>
+      exact attemptPhaseCCompletedEdge?_preserves_prefix_present owned source
+        target {
+          waiting := waiting
+          finished := finished
+          after := after
+          shared := shared
+          structural := structural
+        } current result present selected
+
+/-- Folding completion dispatch preserves every old prefix. -/
+private theorem attemptPhaseCRetainedCompletedEdges?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.prefixMemberBool target = true →
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        result.payload.frontier.prefixMemberBool target = true := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result present selected
+      cases selected
+      exact present
+  | cons packed rest induction =>
+      intro current result present selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCPackedCompletedEdge?_preserves_prefix_present owned source
+          target packed current next present nextEq) restEq
+
+/-- One completion attempt preserves every old dependent reduction. -/
+private theorem attemptPhaseCCompletedEdge?_preserves_reduction_some
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : (current.payload.frontier.lookupReduction? target).isSome = true)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    (result.payload.frontier.lookupReduction? target).isSome = true := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with unchanged | inserted
+  · cases unchanged
+    exact present
+  · rcases inserted with ⟨prior, child, rebuilt, candidate, relevant,
+      priorEq, childEq, attemptFresh, rebuiltEq, candidateEq, frontierEq⟩
+    have publishedEq :=
+      ContextualValueFrontierState.insertCandidate?_publishedState_eq owned
+        current.payload.frontier edge.after (rebuilt.complete prior child)
+          candidate candidateEq
+    rw [frontierEq]
+    change ((candidate.publishedState current.payload.frontier).lookupReduction?
+      target).isSome = true
+    rw [publishedEq]
+    exact insertCandidate?_preserves_reduction_some owned
+      current.payload.frontier edge.after target (rebuilt.complete prior child)
+        candidate present candidateEq
+
+private theorem attemptPhaseCPackedCompletedEdge?_preserves_reduction_some
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : (current.payload.frontier.lookupReduction? target).isSome = true)
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    (result.payload.frontier.lookupReduction? target).isSome = true := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned =>
+      cases selected
+      exact present
+  | completed waiting finished after shared =>
+      exact attemptPhaseCCompletedEdge?_preserves_reduction_some owned source
+        target {
+          waiting := waiting
+          finished := finished
+          after := after
+          shared := shared
+          structural := structural
+        } current result present selected
+
+private theorem attemptPhaseCRetainedCompletedEdges?_preserves_reduction_some
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      (current.payload.frontier.lookupReduction? target).isSome = true →
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        (result.payload.frontier.lookupReduction? target).isSome = true := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result present selected
+      cases selected
+      exact present
+  | cons packed rest induction =>
+      intro current result present selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCPackedCompletedEdge?_preserves_reduction_some owned source
+          target packed current next present nextEq) restEq
+
+/-- A relevant completion with both semantic prerequisites available leaves
+its target present, whether its guarded U06 attempt is old or newly charged. -/
+private theorem attemptPhaseCCompletedEdge?_target_present_of_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (relevant : edge.waiting = source ∨ edge.finished = source)
+    (waitingPresent : current.payload.frontier.prefixMemberBool edge.waiting =
+      true)
+    (childPresent :
+      (current.payload.frontier.lookupReduction? edge.finished).isSome = true)
+    (oldAttemptMaterialized :
+      (.cubic .U06_frontierCompletion
+        (contextualCompletionKey edge.waiting edge.finished) :
+          UnitAddress tokens) ∈ current.counter.usedRev →
+      current.payload.frontier.prefixMemberBool edge.after = true)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.prefixMemberBool edge.after = true := by
+  unfold attemptPhaseCCompletedEdge? at selected
+  split at selected
+  next actualRelevant =>
+    cases prefixEq : current.payload.frontier.lookupPrefix? edge.waiting with
+    | none =>
+        have waitingSome :=
+          (ContextualValueFrontierState.prefixMemberBool_eq_true_iff_lookupPrefix?_isSome
+            current.payload.frontier edge.waiting).1 waitingPresent
+        simp [prefixEq] at waitingSome
+    | some prior =>
+        simp only [prefixEq] at selected
+        cases reductionEq :
+            current.payload.frontier.lookupReduction? edge.finished with
+        | none => simp [reductionEq] at childPresent
+        | some child =>
+            simp only [reductionEq] at selected
+            split at selected
+            next used =>
+              cases selected
+              exact oldAttemptMaterialized used
+            next fresh =>
+              simp only [Option.bind_eq_bind,
+                Option.bind_eq_some_iff] at selected
+              rcases selected with ⟨attempted, attemptedEq, rebuilt, rebuiltEq,
+                candidate, candidateEq, traversed, traversedEq, actioned,
+                actionedEq, publishedEq⟩
+              have attemptedPayload :=
+                runMappedPrimitive?_payload current _ id attemptedEq
+              have traversedPayload :=
+                runMappedPrimitive?_payload attempted _ id traversedEq
+              have actionedPayload :=
+                chargePhaseCCompletedCandidate?_exact traversed actioned _
+                  candidate actionedEq
+              have published :=
+                (publishPhaseCValueCandidate?_exact actioned result edge.after
+                  candidate publishedEq).2
+              rw [attemptedPayload] at candidateEq
+              rw [actionedPayload, traversedPayload, attemptedPayload]
+                at published
+              rw [published]
+              exact insertCandidate?_published_item_present owned
+                current.payload.frontier edge.after _ candidate candidateEq
+  next irrelevant => exact (irrelevant relevant).elim
+
 end Solcore.Surface.Multi.Chart
