@@ -33136,6 +33136,37 @@ private theorem processPhaseCValueItem?_used_mono
             (attemptPhaseCValuePredictions?_used_mono owned source _ current
               predicted predictedEq member))
 
+/-- Semantic source processing cannot decrease the consumed unit count. -/
+private theorem processPhaseCValueItem?_units_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : processPhaseCValueItem? owned source current = some result) :
+    current.counter.units ≤ result.counter.units := by
+  exact Counter.units_le_of_used_subset current.counter result.counter
+    (processPhaseCValueItem?_used_mono owned source current result selected)
+
+/-- A dequeue followed by successful source processing strictly advances the
+global consumed-unit count, independently of how many semantic actions fire. -/
+private theorem dequeuePhaseCValueFrontier?_process_units_lt
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current dequeued result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (source : ContextualItemKey tokens)
+    (dequeuedEq : dequeuePhaseCValueFrontier? current =
+      some (source, dequeued))
+    (processedEq : processPhaseCValueItem? owned source dequeued =
+      some result) :
+    current.counter.units < result.counter.units := by
+  have exactUnits := dequeuePhaseCValueFrontier?_units current source dequeued
+    dequeuedEq
+  have mono := processPhaseCValueItem?_units_mono owned source dequeued result
+    processedEq
+  omega
+
 private theorem insertContextualScannedEdge?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
