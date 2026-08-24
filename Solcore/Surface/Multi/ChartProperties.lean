@@ -13234,6 +13234,142 @@ end ContextualValueFrontierState
 end Chart
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi.Chart
+
+open Grammar
+open Solcore.Workspace
+
+private theorem contextualPrefixValue_transport_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {left right : ContextualItemKey tokens}
+    (equal : left = right)
+    (value : ContextualPrefixValue file tokens left)
+    (coherent : CoherentPrefix file tokens memo correct final
+      left value.value) :
+    CoherentPrefix file tokens memo correct final right
+      (Eq.mp (congrArg (ContextualPrefixValue file tokens) equal)
+        value).value := by
+  cases equal
+  exact coherent
+
+private theorem contextualReductionValue_transport_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {left right : ContextualItemKey tokens}
+    (equal : left = right)
+    (value : ContextualReductionValue file tokens left)
+    (coherent : CoherentReduction file tokens memo correct final
+      left value.value) :
+    CoherentReduction file tokens memo correct final right
+      (Eq.mp (congrArg (ContextualReductionValue file tokens) equal)
+        value).value := by
+  cases equal
+  exact coherent
+
+namespace RebuiltContextualScannedEdge
+
+/-- Replaying an exact retained scan preserves declarative prefix
+coherence at the structural target key. -/
+theorem scan_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {edge : StructurallyValidContextualScannedEdge file tokens}
+    (rebuilt : RebuiltContextualScannedEdge edge)
+    (edgeReached : ContextualEdgeReach file tokens memo correct final
+      (.scanned edge.before edge.after edge.cursor))
+    (prior : ContextualPrefixValue file tokens edge.before)
+    (priorCoherent : CoherentPrefix file tokens memo correct final
+      edge.before prior.value) :
+    CoherentPrefix file tokens memo correct final edge.after
+      (rebuilt.scan prior).value := by
+  have fields := ContextualPackedEdgeKey.scanned.inj rebuilt.exactKey
+  have witnessedReached : ContextualEdgeReach file tokens memo correct final
+      rebuilt.witnessed.toPacked.val := by
+    rw [rebuilt.exactKey]
+    exact edgeReached
+  let witnessedPrior : ContextualPrefixValue file tokens
+      rebuilt.witnessed.before :=
+    Eq.mp (congrArg (ContextualPrefixValue file tokens) fields.1.symm) prior
+  have witnessedPriorCoherent :=
+    contextualPrefixValue_transport_coherent fields.1.symm prior priorCoherent
+  have computed := ContextualPrefixValue.scan_coherent
+    rebuilt.witnessed witnessedReached witnessedPrior
+      witnessedPriorCoherent
+  have transported := contextualPrefixValue_transport_coherent fields.2.1
+    (ContextualPrefixValue.scan rebuilt.witnessed witnessedPrior) computed
+  change CoherentPrefix file tokens memo correct final edge.after
+    (Eq.mp (congrArg (ContextualPrefixValue file tokens) fields.2.1)
+      (ContextualPrefixValue.scan rebuilt.witnessed
+        (Eq.mp (congrArg (ContextualPrefixValue file tokens)
+          fields.1.symm) prior))).value
+  simpa [witnessedPrior] using transported
+
+end RebuiltContextualScannedEdge
+
+namespace RebuiltContextualCompletedEdge
+
+/-- Replaying an exact retained completion preserves declarative prefix
+coherence at the structural target key. -/
+theorem complete_coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {edge : StructurallyValidContextualCompletedEdge file tokens}
+    (rebuilt : RebuiltContextualCompletedEdge edge)
+    (edgeReached : ContextualEdgeReach file tokens memo correct final
+      (.completed edge.waiting edge.finished edge.after edge.shared))
+    (prior : ContextualPrefixValue file tokens edge.waiting)
+    (child : ContextualReductionValue file tokens edge.finished)
+    (priorCoherent : CoherentPrefix file tokens memo correct final
+      edge.waiting prior.value)
+    (childCoherent : CoherentReduction file tokens memo correct final
+      edge.finished child.value) :
+    CoherentPrefix file tokens memo correct final edge.after
+      (rebuilt.complete prior child).value := by
+  have fields := ContextualPackedEdgeKey.completed.inj rebuilt.exactKey
+  have witnessedReached : ContextualEdgeReach file tokens memo correct final
+      rebuilt.witnessed.toPacked.val := by
+    rw [rebuilt.exactKey]
+    exact edgeReached
+  let witnessedPrior : ContextualPrefixValue file tokens
+      rebuilt.witnessed.waiting :=
+    Eq.mp (congrArg (ContextualPrefixValue file tokens) fields.1.symm) prior
+  let witnessedChild : ContextualReductionValue file tokens
+      rebuilt.witnessed.finished :=
+    Eq.mp (congrArg (ContextualReductionValue file tokens)
+      fields.2.1.symm) child
+  have witnessedPriorCoherent :=
+    contextualPrefixValue_transport_coherent fields.1.symm prior priorCoherent
+  have witnessedChildCoherent :=
+    contextualReductionValue_transport_coherent fields.2.1.symm child
+      childCoherent
+  have computed := ContextualPrefixValue.complete_coherent
+    rebuilt.witnessed witnessedReached witnessedPrior witnessedChild
+      witnessedPriorCoherent witnessedChildCoherent
+  have transported := contextualPrefixValue_transport_coherent fields.2.2.1
+    (ContextualPrefixValue.complete rebuilt.witnessed witnessedPrior
+      witnessedChild) computed
+  change CoherentPrefix file tokens memo correct final edge.after
+    (Eq.mp (congrArg (ContextualPrefixValue file tokens) fields.2.2.1)
+      (ContextualPrefixValue.complete rebuilt.witnessed
+        (Eq.mp (congrArg (ContextualPrefixValue file tokens)
+          fields.1.symm) prior)
+        (Eq.mp (congrArg (ContextualReductionValue file tokens)
+          fields.2.1.symm) child))).value
+  simpa [witnessedPrior, witnessedChild] using transported
+
+end RebuiltContextualCompletedEdge
+
+end Solcore.Surface.Multi.Chart
 namespace Solcore.Surface.Multi
 
 open Grammar
