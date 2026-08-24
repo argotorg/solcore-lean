@@ -7064,6 +7064,47 @@ def executeDataDeclRoot
       constructors := constructors
     }
 
+/-- Execute a contract declaration and preserve its ordered members. -/
+def executeContractDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .contractDecl)) :
+    ContractDecl :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let memberAtom : EbnfExpr := .atom (.nonterminal .contractMember)
+  let parameterChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .contractKw)), identifierAtom,
+    .optional parameterChild,
+    .atom (.terminal (.symbol .leftBrace)), .star memberAtom,
+    .atom (.terminal (.symbol .rightBrace))]
+  let ⟨_, rawName, rawParameters, _, rawMembers, _, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let parameters := (EbnfValue.optionalView
+    parameterChild rawParameters).map fun raw =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .leftParen)))
+        (.list1 identifierAtom)
+        (.atom (.terminal (.symbol .rightParen))) raw
+      (EbnfValue.list1View identifierAtom viewed.2.1).map fun value =>
+        let terminal := EbnfValue.terminalView
+          (.category .identifier) value
+        { span := terminal.span, payload := terminal.identifierProjection.2 }
+  let members := (EbnfValue.starView memberAtom rawMembers).map
+    (EbnfValue.ruleView .contractMember)
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      name := { span := name.span, payload := name.identifierProjection.2 }
+      parameters := parameters
+      members := members
+    }
+
 /-- Execute one algebraic-data constructor and its optional field types. -/
 def executeDataConstructorRoot
     (file : WorkspaceFile) (tokens : List Token)
