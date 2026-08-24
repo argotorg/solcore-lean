@@ -12605,6 +12605,27 @@ def reductionKeys
     List (ContextualItemKey tokens) :=
   state.reductions.map ContextualReductionLedgerEntry.item
 
+/-- Dependent prefix lookup is total exactly on the persistent prefix-key
+ledger. -/
+theorem lookupPrefix?_isSome_eq_true_iff_member
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    (state.lookupPrefix? item).isSome = true ↔ item ∈ state.prefixKeys := by
+  rw [lookupPrefix?_isSome_iff]
+  simp [prefixKeys, eq_comm]
+
+/-- Dependent reduction lookup is total exactly on the persistent
+reduction-key ledger. -/
+theorem lookupReduction?_isSome_eq_true_iff_member
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    (state.lookupReduction? item).isSome = true ↔
+      item ∈ state.reductionKeys := by
+  rw [lookupReduction?_isSome_iff]
+  simp [reductionKeys, eq_comm]
+
 /-- Every semantic item identity is stored at most once, and every queued
 identity denotes an already retained prefix. -/
 def WellFormed

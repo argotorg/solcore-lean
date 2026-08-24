@@ -11052,6 +11052,62 @@ def lookupReduction?
     Option (ContextualReductionValue file tokens item) :=
   lookupReductionIn? item state.reductions
 
+/-- Prefix lookup succeeds exactly for a retained entry with the requested
+contextual item key. -/
+theorem lookupPrefix?_isSome_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    (state.lookupPrefix? item).isSome = true ↔
+      ∃ entry, entry ∈ state.prefixes ∧ entry.item = item := by
+  change (lookupPrefixIn? item state.prefixes).isSome = true ↔ _
+  induction state.prefixes with
+  | nil => simp [lookupPrefixIn?]
+  | cons entry rest induction =>
+      simp only [lookupPrefixIn?]
+      split
+      next same =>
+        simp only [Option.isSome_some]
+        exact ⟨fun _ => ⟨entry, by simp, same⟩, fun _ => trivial⟩
+      next different =>
+        rw [induction]
+        constructor
+        · rintro ⟨candidate, member, equal⟩
+          exact ⟨candidate, by simp [member], equal⟩
+        · rintro ⟨candidate, member, equal⟩
+          simp only [List.mem_cons] at member
+          rcases member with rfl | member
+          · exact False.elim (different equal)
+          · exact ⟨candidate, member, equal⟩
+
+/-- Reduction lookup succeeds exactly for a retained entry with the requested
+contextual item key. -/
+theorem lookupReduction?_isSome_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens) :
+    (state.lookupReduction? item).isSome = true ↔
+      ∃ entry, entry ∈ state.reductions ∧ entry.item = item := by
+  change (lookupReductionIn? item state.reductions).isSome = true ↔ _
+  induction state.reductions with
+  | nil => simp [lookupReductionIn?]
+  | cons entry rest induction =>
+      simp only [lookupReductionIn?]
+      split
+      next same =>
+        simp only [Option.isSome_some]
+        exact ⟨fun _ => ⟨entry, by simp, same⟩, fun _ => trivial⟩
+      next different =>
+        rw [induction]
+        constructor
+        · rintro ⟨candidate, member, equal⟩
+          exact ⟨candidate, by simp [member], equal⟩
+        · rintro ⟨candidate, member, equal⟩
+          simp only [List.mem_cons] at member
+          rcases member with rfl | member
+          · exact False.elim (different equal)
+          · exact ⟨candidate, member, equal⟩
+
 /-- Look up the reduction at the one canonical whole-input module item. -/
 def lookupModuleReduction?
     {file : WorkspaceFile} {tokens : List Token}
