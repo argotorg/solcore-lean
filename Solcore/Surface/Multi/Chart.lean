@@ -23405,6 +23405,93 @@ private theorem attemptPhaseCValuePredictions?_queueNodup
         (attemptPhaseCValuePrediction?_queuePrefixesAvailable owned current
           next waiting predicted available nextEq) restEq
 
+/-- One matching retained scan preserves duplicate-free frontier
+scheduling. -/
+private theorem attemptPhaseCScannedEdge?_queueNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (queueNodup : current.payload.frontier.queue.Nodup)
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.queue.Nodup := by
+  rcases (attemptPhaseCScannedEdge?_exact owned source edge current result
+    selected).2 with unchanged | inserted
+  · rw [unchanged]
+    exact queueNodup
+  · rcases inserted with ⟨rebuilt, prior, candidate, rebuiltEq, priorEq,
+      candidateEq, frontierEq⟩
+    have prepared := insertCandidate?_queueNodup owned
+      current.payload.frontier edge.after (rebuilt.scan prior) candidate
+        queueNodup available candidateEq
+    rw [frontierEq]
+    cases kindEq : candidate.kind with
+    | duplicate => simpa [kindEq] using queueNodup
+    | insertedIncomplete => simpa [kindEq] using prepared
+    | insertedComplete => simpa [kindEq] using prepared
+
+/-- Constructor dispatch preserves duplicate-free scheduling for the scan
+slice of one retained packed edge. -/
+private theorem attemptPhaseCPackedScannedEdge?_queueNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (queueNodup : current.payload.frontier.queue.Nodup)
+    (available : current.payload.frontier.queuePrefixesAvailable = true)
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    result.payload.frontier.queue.Nodup := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact attemptPhaseCScannedEdge?_queueNodup owned source {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      } current result queueNodup available selected
+  | completed waiting finished after shared =>
+      cases selected
+      exact queueNodup
+
+/-- Folding the retained scan slice preserves duplicate-free frontier
+scheduling. -/
+private theorem attemptPhaseCRetainedScannedEdges?_queueNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      current.payload.frontier.queue.Nodup →
+      current.payload.frontier.queuePrefixesAvailable = true →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        result.payload.frontier.queue.Nodup := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result queueNodup available selected
+      cases selected
+      exact queueNodup
+  | cons edge rest induction =>
+      intro current result queueNodup available selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCPackedScannedEdge?_queueNodup owned source edge current
+          next queueNodup available nextEq)
+        (attemptPhaseCPackedScannedEdge?_queuePrefixesAvailable owned source
+          edge current next available nextEq) restEq
+
 /-- A semantic prediction can only grow prefix membership. -/
 private theorem attemptPhaseCValuePrediction?_preserves_prefix_present
     {file : WorkspaceFile} {tokens : List Token}
