@@ -5881,6 +5881,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | parameter : ExecutableRootRule .parameter
   | dataDecl : ExecutableRootRule .dataDecl
+  | contractDecl : ExecutableRootRule .contractDecl
   | dataConstructor : ExecutableRootRule .dataConstructor
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
@@ -9150,6 +9151,8 @@ def executeRootRule
       executeParameterRoot file tokens origin finish owned ordered input
   | .dataDecl =>
       executeDataDeclRoot file tokens origin finish owned ordered input
+  | .contractDecl =>
+      executeContractDeclRoot file tokens origin finish owned ordered input
   | .dataConstructor =>
       executeDataConstructorRoot file tokens origin finish owned ordered input
   | .typeAliasDecl =>
