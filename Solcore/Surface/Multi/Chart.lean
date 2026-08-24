@@ -11358,6 +11358,88 @@ private def dequeuePhaseCValueFrontier?
         fun state => { state with frontier := frontier }
       pure (item, next)
 
+private theorem beginPhaseCValueWorklist?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    current.payload.phaseC.itemQueue = [] ∧
+      current.payload.phaseC.edgeQueue = [] ∧
+      result.payload.recognition = current.payload ∧
+      result.payload.frontier = {
+        prefixes := [⟨contextualRoot tokens,
+          ContextualPrefixValue.zero (contextualRoot tokens) rfl⟩]
+        reductions := []
+        queue := [contextualRoot tokens]
+      } := by
+  unfold beginPhaseCValueWorklist? at selected
+  split at selected
+  next itemQueueEq edgeQueueEq =>
+    unfold runMappedPrimitive? at selected
+    simp only at selected
+    split at selected
+    · cases selected
+      exact ⟨itemQueueEq, edgeQueueEq, rfl, rfl⟩
+    · contradiction
+  next itemQueueEq edgeQueueEq => contradiction
+
+private theorem beginPhaseCValueWorklist?_units
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    result.counter.units = current.counter.units + 1 := by
+  unfold beginPhaseCValueWorklist? at selected
+  split at selected
+  · exact runMappedPrimitive?_units current _ _ selected
+  · contradiction
+
+private theorem dequeuePhaseCValueFrontier?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected :
+      dequeuePhaseCValueFrontier? current = some (item, result)) :
+    ∃ rest,
+      current.payload.frontier.queue = item :: rest ∧
+      result.payload.recognition = current.payload.recognition ∧
+      result.payload.frontier =
+        { current.payload.frontier with queue := rest } := by
+  unfold dequeuePhaseCValueFrontier? at selected
+  cases queueEq : current.payload.frontier.queue with
+  | nil =>
+      simp [ContextualValueFrontierState.dequeue?, queueEq] at selected
+  | cons head rest =>
+      simp only [ContextualValueFrontierState.dequeue?, queueEq,
+        Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      unfold runMappedPrimitive? at nextEq
+      split at nextEq
+      · cases nextEq
+        exact ⟨rest, rfl, rfl, rfl⟩
+      · contradiction
+
+private theorem dequeuePhaseCValueFrontier?_units
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected :
+      dequeuePhaseCValueFrontier? current = some (item, result)) :
+    result.counter.units = current.counter.units + 1 := by
+  unfold dequeuePhaseCValueFrontier? at selected
+  cases queueEq : current.payload.frontier.queue with
+  | nil =>
+      simp [ContextualValueFrontierState.dequeue?, queueEq] at selected
+  | cons head rest =>
+      simp only [ContextualValueFrontierState.dequeue?, queueEq,
+        Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, resultEq⟩
+      cases resultEq
+      exact runMappedPrimitive?_units current _ _ nextEq
+
 private def beginPhaseCWorklist?
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseBSealed file tokens)) :
