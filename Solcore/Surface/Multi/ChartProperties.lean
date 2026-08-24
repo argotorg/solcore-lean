@@ -14770,3 +14770,100 @@ theorem executeObservedContextualValueWorklistMulti?_parses_of_valuesCoherent
     (by simpa [Chart.ContextualValueWorklistResult.parsedModule?] using parsed)
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Grammar
+open Solcore.Workspace
+
+/-- The semantic construction trace derives coherence of every retained
+dependent prefix and reduction value. -/
+theorem Chart.ContextualValueFrontierTrace.valuesCoherent
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : Chart.ContextualWorklistResult file tokens)
+    (recognitionSelected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some recognition)
+    {frontier : Chart.ContextualValueFrontierState file tokens}
+    (trace : Chart.ContextualValueFrontierTrace owned recognition frontier) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned recognition recognitionSelected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned recognition recognitionSelected
+    frontier.ValuesCoherent recognition.memo correct final := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned recognition recognitionSelected
+  have sound := executeObservedContextualWorklistMulti?_sound
+    file tokens owned recognition recognitionSelected
+  induction trace with
+  | root recognized selected =>
+      have reached := sound.1 _ recognized
+      exact Chart.ContextualValueFrontierState.insertCandidate?_valuesCoherent
+        owned _ _ reached _
+          (Chart.ContextualValueFrontierState.empty_valuesCoherent
+            recognition.memo correct final)
+          (Chart.ContextualPrefixValue.zero_coherent _ reached _) _ selected
+  | same prior equal induction =>
+      exact equal ▸ induction
+  | dequeue prior selected induction =>
+      exact Chart.ContextualValueFrontierState.dequeue?_valuesCoherent
+        _ _ _ induction selected
+  | prediction prior recognized atZero candidate selected induction =>
+      have reached := sound.1 _ recognized
+      exact Chart.ContextualValueFrontierState.insertCandidate?_valuesCoherent
+        owned _ _ reached _ induction
+          (Chart.ContextualPrefixValue.zero_coherent _ reached _) _ selected
+  | scan prior retainedMember retainedShape rebuilt value valueSelected
+      candidate candidateSelected induction =>
+      have edgeReached := sound.2 _ retainedMember
+      rw [retainedShape] at edgeReached
+      exact Chart.RebuiltContextualScannedEdge.insertCandidate?_valuesCoherent
+        owned _ rebuilt edgeReached induction value valueSelected candidate
+          candidateSelected
+  | completion prior retainedMember retainedShape rebuilt priorValue
+      priorSelected childValue childSelected candidate candidateSelected
+      induction =>
+      have edgeReached := sound.2 _ retainedMember
+      rw [retainedShape] at edgeReached
+      exact
+        Chart.RebuiltContextualCompletedEdge.insertCandidate?_valuesCoherent
+          owned _ rebuilt edgeReached induction priorValue priorSelected
+            childValue childSelected candidate candidateSelected
+
+/-- The same semantic trace carries the duplicate-free queue and complete
+prefix reduction discipline needed by later semantic consumers. -/
+theorem Chart.ContextualValueFrontierTrace.executableWellFormed
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : Chart.ContextualWorklistResult file tokens)
+    {frontier : Chart.ContextualValueFrontierState file tokens}
+    (trace : Chart.ContextualValueFrontierTrace owned recognition frontier) :
+    frontier.ExecutableWellFormed := by
+  induction trace with
+  | root recognized selected =>
+      exact Chart.ContextualValueFrontierState.insertCandidate?_preserves
+        owned _ _ _
+          (Chart.ContextualValueFrontierState.empty_executableWellFormed
+            file tokens)
+          _ selected
+  | same prior equal induction =>
+      exact equal ▸ induction
+  | dequeue prior selected induction =>
+      exact Chart.ContextualValueFrontierState.dequeue?_preserves
+        _ _ _ induction selected
+  | prediction prior recognized atZero candidate selected induction =>
+      exact Chart.ContextualValueFrontierState.insertCandidate?_preserves
+        owned _ _ _ induction _ selected
+  | scan prior retainedMember retainedShape rebuilt value valueSelected
+      candidate candidateSelected induction =>
+      exact Chart.ContextualValueFrontierState.insertCandidate?_preserves
+        owned _ _ _ induction _ candidateSelected
+  | completion prior retainedMember retainedShape rebuilt priorValue
+      priorSelected childValue childSelected candidate candidateSelected
+      induction =>
+      exact Chart.ContextualValueFrontierState.insertCandidate?_preserves
+        owned _ _ _ induction _ candidateSelected
+
+end Solcore.Surface.Multi
