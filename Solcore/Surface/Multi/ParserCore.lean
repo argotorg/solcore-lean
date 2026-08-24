@@ -5865,6 +5865,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | terminalExpression : ExecutableRootRule .terminalExpression
   | expression : ExecutableRootRule .expression
   | annotation : ExecutableRootRule .annotation
+  | conditional : ExecutableRootRule .conditional
   | blockStatement : ExecutableRootRule .blockStatement
   | functionDecl : ExecutableRootRule .functionDecl
   | classMethod : ExecutableRootRule .classMethod
@@ -6627,6 +6628,55 @@ def executeAnnotationRoot
       sourceLoc (ConsumedSpanWitness.compute
         file tokens origin finish owned ordered)
         (.annotation expression (EbnfValue.ruleView .type suffixView.2))
+
+/-- Execute keyword and ternary conditional-expression roots. -/
+def executeConditionalRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .conditional)) : Expression :=
+  let keywordChildren : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .ifKw)),
+    .atom (.nonterminal .conditional),
+    .atom (.terminal (.contextualKeyword .thenKw)),
+    .atom (.nonterminal .conditional),
+    .atom (.terminal (.hardKeyword .elseKw)),
+    .atom (.nonterminal .conditional)]
+  let ternaryChildren : List EbnfExpr := [
+    .atom (.terminal (.symbol .question)),
+    .atom (.nonterminal .conditional),
+    .atom (.terminal (.symbol .colon)),
+    .atom (.nonterminal .conditional)]
+  let logicalOrAtom : EbnfExpr := .atom (.nonterminal .logicalOr)
+  let ternaryBranch : EbnfExpr := .sequence ternaryChildren
+  let logicalBranch : EbnfExpr :=
+    .sequence [logicalOrAtom, .optional ternaryBranch]
+  let keywordBranch : EbnfExpr := .sequence keywordChildren
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish owned ordered
+  match EbnfValue.choice2View keywordBranch logicalBranch input with
+  | .inl rawKeyword =>
+      let values := EbnfValue.sequenceFlatView keywordChildren rawKeyword
+      sourceLoc witness (.keywordConditional
+        (EbnfValue.ruleView .conditional values.2.1)
+        (EbnfValue.ruleView .conditional values.2.2.2.1)
+        (EbnfValue.ruleView .conditional values.2.2.2.2.2.1))
+  | .inr rawLogical =>
+      let viewed := EbnfValue.sequence2View
+        logicalOrAtom (.optional ternaryBranch) rawLogical
+      let condition := EbnfValue.ruleView .logicalOr viewed.1
+      match EbnfValue.optionalView ternaryBranch viewed.2 with
+      | none => condition
+      | some rawTernary =>
+          let values := EbnfValue.sequence4View
+            (.atom (.terminal (.symbol .question)))
+            (.atom (.nonterminal .conditional))
+            (.atom (.terminal (.symbol .colon)))
+            (.atom (.nonterminal .conditional)) rawTernary
+          sourceLoc witness (.ternaryConditional condition
+            (EbnfValue.ruleView .conditional values.2.1)
+            (EbnfValue.ruleView .conditional values.2.2.2))
 
 /-- Execute a block-statement root from its body value. -/
 def executeBlockStatementRoot
@@ -8658,6 +8708,8 @@ def executeRootRule
   | .expression => executeExpressionRoot input
   | .annotation =>
       executeAnnotationRoot file tokens origin finish owned ordered input
+  | .conditional =>
+      executeConditionalRoot file tokens origin finish owned ordered input
   | .blockStatement =>
       executeBlockStatementRoot file tokens origin finish owned ordered input
   | .functionDecl =>
