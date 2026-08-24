@@ -2249,6 +2249,224 @@ theorem allProductionIds_complete (production : ProductionId) :
         apply List.mem_flatMap.mpr
         exact ⟨site, allListSites_complete site, by simp⟩
 
+/-- The root EBNF sequence site of the source module rule. -/
+def moduleRootSequenceSite : SequenceSite := {
+  site := GrammarSite.root .module
+  hasKind := by
+    rw [GrammarSite.root_expression]
+    rfl
+}
+
+/-- The repeated top-item child of the source module sequence. -/
+def moduleItemsGrammarSite : GrammarSite :=
+  ⟨{ rule := .module, path := [0] }, by
+    unfold GrammarSiteKey.valid m2cV1
+    simp [m2cV1Rhs, EbnfExpr.nodeAt?, EbnfExpr.children,
+      sequence, star, nonterminal, terminal]⟩
+
+/-- The logical-EOF child of the source module sequence. -/
+def moduleEofGrammarSite : GrammarSite :=
+  ⟨{ rule := .module, path := [1] }, by
+    unfold GrammarSiteKey.valid m2cV1
+    simp [m2cV1Rhs, EbnfExpr.nodeAt?, EbnfExpr.children,
+      sequence, star, nonterminal, terminal]⟩
+
+/-- The atom refinement of the source module's logical-EOF child. -/
+def moduleEofAtomSite : AtomSite := {
+  site := moduleEofGrammarSite
+  hasKind := by
+    unfold moduleEofGrammarSite GrammarSite.expression m2cV1
+    simp [m2cV1Rhs, EbnfExpr.nodeAt?, EbnfExpr.kind,
+      EbnfExpr.children, sequence, star, nonterminal, terminal]
+}
+
+/-- The expanded module sequence has exactly its item-star and EOF children. -/
+theorem ProductionId.rhs_moduleRootSequence :
+    (ProductionId.seq moduleRootSequenceSite).rhs =
+      [.nonterminal (.aux moduleItemsGrammarSite),
+        .nonterminal (.aux moduleEofGrammarSite)] := by
+  simp [ProductionId.rhs, moduleRootSequenceSite, SequenceSite.children,
+    GrammarSite.directChildren, GrammarSite.childAt,
+    moduleItemsGrammarSite, moduleEofGrammarSite, GrammarSite.expression,
+    GrammarSite.root, GrammarSiteKey.valid, m2cV1, m2cV1Rhs,
+    EbnfExpr.nodeAt?, EbnfExpr.children, sequence, nonterminal,
+    terminal, List.ofFn, Fin.foldr_succ]
+
+/-- The module EOF atom expands to the one logical-EOF terminal. -/
+theorem ProductionId.rhs_moduleEofAtom :
+    (ProductionId.atom moduleEofAtomSite).rhs =
+      [.terminal .endOfFile] := by
+  simp [ProductionId.rhs, moduleEofAtomSite, moduleEofGrammarSite,
+    AtomSite.symbol, AtomSite.atom, GrammarSite.expression,
+    GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+    EbnfExpr.children, EbnfExpr.atom?, EbnfAtom.grammarSymbol,
+    sequence, nonterminal, terminal]
+
+/-- An auxiliary production at the module root site is its exact sequence. -/
+theorem ProductionId.eq_moduleRootSequence_of_lhs
+    (production : ProductionId)
+    (lhs : production.lhs = .aux (GrammarSite.root .module)) :
+    production = .seq moduleRootSequenceSite := by
+  cases production with
+  | root rule => simp [ProductionId.lhs] at lhs
+  | atom site =>
+      simp only [ProductionId.lhs, NonterminalSymbol.aux.injEq] at lhs
+      rcases site with ⟨site, kind⟩
+      simp only at lhs
+      subst site
+      rw [GrammarSite.root_expression] at kind
+      contradiction
+  | seq site =>
+      simp only [ProductionId.lhs, NonterminalSymbol.aux.injEq] at lhs
+      rcases site with ⟨site, kind⟩
+      simp only at lhs
+      subst site
+      rfl
+  | group site | choice site _ | opt site _ | star site _ | plus site _
+      | list0 site _ | list1 site =>
+      simp only [ProductionId.lhs, NonterminalSymbol.aux.injEq] at lhs
+      rcases site with ⟨site, kind⟩
+      simp only at lhs
+      subst site
+      rw [GrammarSite.root_expression] at kind
+      contradiction
+  | tail site branch => simp [ProductionId.lhs] at lhs
+
+/-- An auxiliary production at the module EOF site is its exact atom. -/
+theorem ProductionId.eq_moduleEofAtom_of_lhs
+    (production : ProductionId)
+    (lhs : production.lhs = .aux moduleEofGrammarSite) :
+    production = .atom moduleEofAtomSite := by
+  cases production with
+  | root rule => simp [ProductionId.lhs] at lhs
+  | atom site =>
+      simp only [ProductionId.lhs, NonterminalSymbol.aux.injEq] at lhs
+      rcases site with ⟨site, kind⟩
+      simp only at lhs
+      subst site
+      rfl
+  | seq site | group site | choice site _ | opt site _ | star site _
+      | plus site _ | list0 site _ | list1 site =>
+      simp only [ProductionId.lhs, NonterminalSymbol.aux.injEq] at lhs
+      rcases site with ⟨site, kind⟩
+      simp only at lhs
+      subst site
+      have atomKind : moduleEofGrammarSite.expression.kind = .atom :=
+        moduleEofAtomSite.hasKind
+      rw [atomKind] at kind
+      contradiction
+  | tail site branch => simp [ProductionId.lhs] at lhs
+
+mutual
+
+private def EbnfExpr.containsModuleReference : EbnfExpr → Bool
+  | .atom (.nonterminal .module) => true
+  | .atom _ => false
+  | .sequence children | .choice children =>
+      containsModuleReferenceList children
+  | .group child | .optional child | .star child | .plus child
+      | .list0 child | .list1 child => child.containsModuleReference
+
+private def EbnfExpr.containsModuleReferenceList : List EbnfExpr → Bool
+  | [] => false
+  | child :: rest =>
+      child.containsModuleReference || containsModuleReferenceList rest
+
+end
+
+private theorem EbnfExpr.containsModuleReferenceList_of_mem
+    {child : EbnfExpr} : ∀ {children : List EbnfExpr},
+    child ∈ children →
+    child.containsModuleReference = true →
+    EbnfExpr.containsModuleReferenceList children = true := by
+  intro children member contains
+  induction children with
+  | nil => contradiction
+  | cons head rest induction =>
+      simp only [List.mem_cons] at member
+      simp only [EbnfExpr.containsModuleReferenceList, Bool.or_eq_true]
+      cases member with
+      | inl equal =>
+          left
+          simpa [equal] using contains
+      | inr member =>
+          right
+          exact induction member
+
+private theorem EbnfExpr.containsModuleReference_child
+    {root child : EbnfExpr}
+    (member : child ∈ root.children)
+    (contains : child.containsModuleReference = true) :
+    root.containsModuleReference = true := by
+  cases root <;>
+    simp [EbnfExpr.children, EbnfExpr.containsModuleReference] at member ⊢
+  all_goals
+    first
+    | exact EbnfExpr.containsModuleReferenceList_of_mem member contains
+    | simp_all
+
+private theorem EbnfExpr.containsModuleReference_nodeAt
+    (root selected : EbnfExpr) : ∀ path,
+    root.nodeAt? path = some selected →
+    selected.containsModuleReference = true →
+    root.containsModuleReference = true := by
+  intro path
+  induction path generalizing root with
+  | nil =>
+      simp only [EbnfExpr.nodeAt?, Option.some.injEq]
+      intro equal contains
+      subst selected
+      exact contains
+  | cons index rest induction =>
+      simp only [EbnfExpr.nodeAt?]
+      cases childEq : root.children[index]? with
+      | none => simp
+      | some child =>
+          simp only
+          intro selectedEq contains
+          exact EbnfExpr.containsModuleReference_child
+            (List.mem_of_getElem? childEq)
+            (induction child selectedEq contains)
+
+private theorem m2cV1Rhs_containsModuleReference_false
+    (rule : GrammarRuleId) :
+    (m2cV1Rhs rule).containsModuleReference = false := by
+  cases rule <;> rfl
+
+private theorem AtomSite.symbol_ne_moduleRule (site : AtomSite) :
+    site.symbol ≠ .nonterminal (.rule .module) := by
+  intro equal
+  have atomEq : site.atom = .nonterminal .module := by
+    unfold AtomSite.symbol EbnfAtom.grammarSymbol at equal
+    cases atom : site.atom <;> simp_all
+  have expressionEq : site.site.expression =
+      .atom (.nonterminal .module) := by
+    rw [AtomSite.expression_eq_atom, atomEq]
+  have selected := GrammarSite.selected_eq_some site.site
+  have rootContains := EbnfExpr.containsModuleReference_nodeAt
+    (m2cV1Rhs site.site.val.rule) site.site.expression site.site.val.path
+      selected (by rw [expressionEq]; rfl)
+  rw [m2cV1Rhs_containsModuleReference_false] at rootContains
+  contradiction
+
+/-- No generated production refers recursively to the source module rule. -/
+theorem ProductionId.rhs_no_moduleRule (production : ProductionId) :
+    .nonterminal (.rule .module) ∉ production.rhs := by
+  cases production with
+  | root rule => simp [ProductionId.rhs]
+  | atom site =>
+      simp only [ProductionId.rhs, List.mem_singleton]
+      exact fun equal => AtomSite.symbol_ne_moduleRule site equal.symm
+  | seq site => simp [ProductionId.rhs]
+  | group site => simp [ProductionId.rhs]
+  | choice site branch => simp [ProductionId.rhs]
+  | opt site branch => cases branch <;> simp [ProductionId.rhs]
+  | star site branch => cases branch <;> simp [ProductionId.rhs]
+  | plus site branch => cases branch <;> simp [ProductionId.rhs]
+  | list0 site branch => cases branch <;> simp [ProductionId.rhs]
+  | list1 site => simp [ProductionId.rhs]
+  | tail site branch => cases branch <;> simp [ProductionId.rhs]
+
 private theorem filterMap_nodup_of_functional
     {α β : Type} (parse : α → Option β) (values : List α)
     (unique : values.Nodup)
