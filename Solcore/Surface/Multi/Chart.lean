@@ -15009,6 +15009,42 @@ inductive OperationalContextualReach
         (.completed waiting finished after shared)) :
       OperationalContextualReach file tokens memo after
 
+/-- Every item reached by the executable worklist spans an ordered boundary
+interval. -/
+private theorem OperationalContextualReach.ordered
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens} {item : ContextualItemKey tokens}
+    (reached : OperationalContextualReach file tokens memo item) :
+    item.raw.origin.val ≤ item.raw.current.val := by
+  induction reached with
+  | root => exact Nat.le_refl _
+  | predict => exact Nat.le_refl _
+  | scan before after cursor reached structural ordered =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      rw [originEq, currentEq]
+      calc
+        before.raw.origin.val ≤ before.raw.current.val := ordered
+        _ = cursor.val := by rw [← atCurrent]; rfl
+        _ ≤ cursor.val + 1 := Nat.le_succ _
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingOrdered finishedOrdered =>
+      rcases structural.1 with
+        ⟨symbol, next, complete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      rw [originEq, currentEq]
+      calc
+        waiting.raw.origin.val ≤ waiting.raw.current.val := waitingOrdered
+        _ = shared.val := congrArg Fin.val waitingAtShared
+        _ = finished.raw.origin.val :=
+          (congrArg Fin.val finishedAtShared).symm
+        _ ≤ finished.raw.current.val := finishedOrdered
+
 /-- Operational reachability of every endpoint of one checked worklist edge. -/
 def OperationalContextualEdgeReach
     (file : WorkspaceFile)
