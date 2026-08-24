@@ -11085,6 +11085,136 @@ theorem dequeue?_of_cons
 
 end ContextualValueFrontierState
 
+/-- A rebuilt scan witness whose packed key is exactly the stored structural
+edge key. -/
+structure RebuiltContextualScannedEdge
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualScannedEdge file tokens) where
+  witnessed : WitnessedContextualScannedEdge file tokens
+  exactKey : witnessed.toPacked.val =
+    .scanned edge.before edge.after edge.cursor
+
+/-- A rebuilt completion witness whose packed key is exactly the stored
+structural edge key. -/
+structure RebuiltContextualCompletedEdge
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens) where
+  witnessed : WitnessedContextualCompletedEdge file tokens
+  exactKey : witnessed.toPacked.val =
+    .completed edge.waiting edge.finished edge.after edge.shared
+
+/-- Re-run the Type-valued scan builder and retain it only when its computed
+key is the exact stored structural key. -/
+def rebuildContextualScannedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens) :
+    Option (RebuiltContextualScannedEdge edge) := do
+  let (_, witnessed) ← witnessedContextualScannedEdge? owned edge.before
+  if exactKey : witnessed.toPacked.val =
+      .scanned edge.before edge.after edge.cursor then
+    some ⟨witnessed, exactKey⟩
+  else
+    none
+
+/-- Re-run the Type-valued completion builder and retain it only when its
+computed key is the exact stored structural key. -/
+def rebuildContextualCompletedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens) :
+    Option (RebuiltContextualCompletedEdge edge) := do
+  let (_, witnessed) ← witnessedContextualCompletedEdge?
+    (file := file) edge.waiting edge.finished
+  if exactKey : witnessed.toPacked.val =
+      .completed edge.waiting edge.finished edge.after edge.shared then
+    some ⟨witnessed, exactKey⟩
+  else
+    none
+
+namespace RebuiltContextualScannedEdge
+
+private def transportPrefix
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : ContextualItemKey tokens}
+    (equal : left = right) :
+    ContextualPrefixValue file tokens left →
+      ContextualPrefixValue file tokens right :=
+  Eq.mp (congrArg (ContextualPrefixValue file tokens) equal)
+
+/-- Extend a prefix stored at the structural source and return a value indexed
+by the structural target. Only checked key equality is eliminated. -/
+def scan
+    {file : WorkspaceFile} {tokens : List Token}
+    {edge : StructurallyValidContextualScannedEdge file tokens}
+    (rebuilt : RebuiltContextualScannedEdge edge)
+    (prior : ContextualPrefixValue file tokens edge.before) :
+    ContextualPrefixValue file tokens edge.after := by
+  have fields := ContextualPackedEdgeKey.scanned.inj rebuilt.exactKey
+  let witnessedPrior := transportPrefix fields.1.symm prior
+  exact transportPrefix fields.2.1
+    (ContextualPrefixValue.scan rebuilt.witnessed witnessedPrior)
+
+/-- Look up the structural source and insert the computed structural target
+into the value frontier. -/
+def insert?
+    {file : WorkspaceFile} {tokens : List Token}
+    {edge : StructurallyValidContextualScannedEdge file tokens}
+    (rebuilt : RebuiltContextualScannedEdge edge)
+    (state : ContextualValueFrontierState file tokens) :
+    Option (ContextualValueFrontierState file tokens) := do
+  let prior ← state.lookupPrefix? edge.before
+  pure (state.insertPrefix edge.after (rebuilt.scan prior))
+
+end RebuiltContextualScannedEdge
+
+namespace RebuiltContextualCompletedEdge
+
+private def transportPrefix
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : ContextualItemKey tokens}
+    (equal : left = right) :
+    ContextualPrefixValue file tokens left →
+      ContextualPrefixValue file tokens right :=
+  Eq.mp (congrArg (ContextualPrefixValue file tokens) equal)
+
+private def transportReduction
+    {file : WorkspaceFile} {tokens : List Token}
+    {left right : ContextualItemKey tokens}
+    (equal : left = right) :
+    ContextualReductionValue file tokens left →
+      ContextualReductionValue file tokens right :=
+  Eq.mp (congrArg (ContextualReductionValue file tokens) equal)
+
+/-- Extend a prefix stored at the structural waiting key with the reduction
+stored at the structural finished key, returning the structural target. -/
+def complete
+    {file : WorkspaceFile} {tokens : List Token}
+    {edge : StructurallyValidContextualCompletedEdge file tokens}
+    (rebuilt : RebuiltContextualCompletedEdge edge)
+    (prior : ContextualPrefixValue file tokens edge.waiting)
+    (child : ContextualReductionValue file tokens edge.finished) :
+    ContextualPrefixValue file tokens edge.after := by
+  have fields := ContextualPackedEdgeKey.completed.inj rebuilt.exactKey
+  let witnessedPrior := transportPrefix fields.1.symm prior
+  let witnessedChild := transportReduction fields.2.1.symm child
+  exact transportPrefix fields.2.2.1
+    (ContextualPrefixValue.complete rebuilt.witnessed
+      witnessedPrior witnessedChild)
+
+/-- Look up both structural sources and insert the computed structural target
+into the value frontier. -/
+def insert?
+    {file : WorkspaceFile} {tokens : List Token}
+    {edge : StructurallyValidContextualCompletedEdge file tokens}
+    (rebuilt : RebuiltContextualCompletedEdge edge)
+    (state : ContextualValueFrontierState file tokens) :
+    Option (ContextualValueFrontierState file tokens) := do
+  let prior ← state.lookupPrefix? edge.waiting
+  let child ← state.lookupReduction? edge.finished
+  pure (state.insertPrefix edge.after (rebuilt.complete prior child))
+
+end RebuiltContextualCompletedEdge
+
 end Chart
 
 namespace Chart
