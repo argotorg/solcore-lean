@@ -87,6 +87,62 @@ theorem rootlessExecutableProgress_of_grammarComponents
           (ranked cursor greatest))
       postEof
 
+/-- Greatest-cursor functionality lets callers certify coverage and ranking at
+one selected maximum instead of quantifying over extensionally equal maxima. -/
+theorem rootlessExecutableProgress_of_componentsAt
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (coverage : ∀ waiting,
+      FrontierReach file tokens memo correct final cursor waiting →
+        EnabledNonterminalCoverageAt
+          file tokens memo correct final waiting)
+    (ranked : RankedFrontierNormalization
+      file tokens memo correct final cursor)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  apply rootlessExecutableProgress_of_components
+  · intro other otherGreatest waiting frontier
+    have same := GreatestReachableCursor.functional otherGreatest greatest
+    subst other
+    exact coverage waiting frontier
+  · intro other otherGreatest
+    have same := GreatestReachableCursor.functional otherGreatest greatest
+    subst other
+    exact ranked
+  · exact postEof
+
+/-- One greatest cursor with anchored coverage and accepted grammar-rank tables
+is a complete finite normalization certificate, modulo post-EOF closure. -/
+theorem rootlessExecutableProgress_of_grammarComponentsAt
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (anchored : ∀ waiting,
+      FrontierReach file tokens memo correct final cursor waiting →
+        AnchoredNonterminalCoverageAt tokens waiting)
+    (ranked : GrammarRankedFrontierNormalization
+      file tokens owned memo correct final cursor)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  exact rootlessExecutableProgress_of_componentsAt greatest
+    (fun waiting frontier =>
+      enabledNonterminalCoverageAt_of_anchored correct final waiting
+        (anchored waiting frontier))
+    (rankedFrontierNormalization_of_grammarRanked owned ranked)
+    postEof
+
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
 theorem executeObservedContextualValueWorklistMulti?_parseOutcome?_isSome_of_progress
