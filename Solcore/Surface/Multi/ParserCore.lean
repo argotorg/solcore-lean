@@ -5873,6 +5873,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | breakStatement : ExecutableRootRule .breakStatement
   | continueStatement : ExecutableRootRule .continueStatement
   | assemblyStatement : ExecutableRootRule .assemblyStatement
+  | ifStatement : ExecutableRootRule .ifStatement
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | parameter : ExecutableRootRule .parameter
@@ -6774,6 +6775,34 @@ def executeAssemblyStatementRoot
   let assembly := EbnfValue.terminalView (.category .assemblyBlock) viewed.2
   sourceLoc (shallowRootWitness file tokens origin finish owned ordered)
     (.assembly assembly.assemblyProjection)
+
+/-- Execute an if statement, preserving the optional else body. -/
+def executeIfStatementRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .ifStatement)) : Statement :=
+  let ifAtom : EbnfExpr := .atom (.terminal (.hardKeyword .ifKw))
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let bodyAtom : EbnfExpr := .atom (.nonterminal .body)
+  let elseAtom : EbnfExpr := .atom (.terminal (.hardKeyword .elseKw))
+  let elseChildren : List EbnfExpr := [elseAtom, bodyAtom]
+  let elseSeq : EbnfExpr := .sequence elseChildren
+  let children : List EbnfExpr := [ifAtom, openAtom, expressionAtom,
+    closeAtom, bodyAtom, .optional elseSeq]
+  let ⟨_, _, rawCondition, _, rawThen, rawElse, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let condition := EbnfValue.ruleView .expression rawCondition
+  let thenBody := EbnfValue.ruleView .body rawThen
+  let elseBody := (EbnfValue.optionalView elseSeq rawElse).map fun raw =>
+    let viewed := EbnfValue.sequence2View elseAtom bodyAtom raw
+    EbnfValue.ruleView .body viewed.2
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered)
+    (.ifThenElse condition thenBody elseBody)
 
 /-- Execute a return statement from its optional value and terminator. -/
 def executeReturnStatementRoot
@@ -8787,6 +8816,8 @@ def executeRootRule
       executeContinueStatementRoot file tokens origin finish owned ordered input
   | .assemblyStatement =>
       executeAssemblyStatementRoot file tokens origin finish owned ordered input
+  | .ifStatement =>
+      executeIfStatementRoot file tokens origin finish owned ordered input
   | .returnStatement =>
       executeReturnStatementRoot file tokens origin finish owned ordered input
   | .assignmentStatement =>
