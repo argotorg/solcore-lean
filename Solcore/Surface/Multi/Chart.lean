@@ -36073,4 +36073,78 @@ private theorem processPhaseCValueItem?_valueTrace
     scanned.payload.recognition.phaseC.contextualEdges scanned result
       completedSubset scannedTrace completedEq
 
+/-- Every successful bounded queue drain preserves the fixed recognition
+trace while alternating exact dequeue and item-processing transitions. -/
+private theorem runPhaseCValueQueue?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens) :
+    ∀ fuel
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      current.payload.recognition.phaseC.contextualItems =
+          recognition.items →
+      current.payload.recognition.phaseC.contextualEdges =
+          recognition.edges →
+      ContextualValueFrontierTrace owned recognition
+          current.payload.frontier →
+      runPhaseCValueQueue? owned fuel current = some result →
+      ContextualValueFrontierTrace owned recognition
+        result.payload.frontier := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result _itemsEq _edgesEq trace selected
+      rw [runPhaseCValueQueue?] at selected
+      split at selected
+      · cases selected
+        exact trace
+      · contradiction
+  | succ previous induction =>
+      intro current result itemsEq edgesEq trace selected
+      rw [runPhaseCValueQueue?] at selected
+      cases queueEq : current.payload.frontier.queue with
+      | nil =>
+          simp only [queueEq, Option.some.injEq] at selected
+          subst result
+          exact trace
+      | cons item rest =>
+          simp only [queueEq, Option.bind_eq_bind,
+            Option.bind_eq_some_iff] at selected
+          rcases selected with ⟨dequeued, dequeuedEq, processed,
+            processedEq, runEq⟩
+          rcases dequeued with ⟨dequeuedItem, afterDequeue⟩
+          have dequeuedTrace := dequeuePhaseCValueFrontier?_valueTrace owned
+            recognition current afterDequeue dequeuedItem trace dequeuedEq
+          obtain ⟨remaining, _queue, dequeueRecognition, _frontier⟩ :=
+            dequeuePhaseCValueFrontier?_exact current dequeuedItem
+              afterDequeue dequeuedEq
+          have dequeuedItemsEq :
+              afterDequeue.payload.recognition.phaseC.contextualItems =
+                recognition.items := by
+            rw [dequeueRecognition]
+            exact itemsEq
+          have dequeuedEdgesEq :
+              afterDequeue.payload.recognition.phaseC.contextualEdges =
+                recognition.edges := by
+            rw [dequeueRecognition]
+            exact edgesEq
+          have processedTrace := processPhaseCValueItem?_valueTrace owned
+            recognition dequeuedItem afterDequeue processed dequeuedItemsEq
+              dequeuedEdgesEq dequeuedTrace processedEq
+          have processedRecognition := processPhaseCValueItem?_recognition
+            owned dequeuedItem afterDequeue processed processedEq
+          have processedItemsEq :
+              processed.payload.recognition.phaseC.contextualItems =
+                recognition.items := by
+            rw [processedRecognition]
+            exact dequeuedItemsEq
+          have processedEdgesEq :
+              processed.payload.recognition.phaseC.contextualEdges =
+                recognition.edges := by
+            rw [processedRecognition]
+            exact dequeuedEdgesEq
+          exact induction processed result processedItemsEq processedEdgesEq
+            processedTrace runEq
+
 end Solcore.Surface.Multi.Chart
