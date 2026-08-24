@@ -19596,6 +19596,160 @@ private theorem contextualCompletedEdge?_eq_of_contextualCompletionKey_eq
   rw [leftSelected] at rightSelected
   exact Prod.mk.inj (Option.some.inj rightSelected)
 
+/-- Structural completion preserves boundary ordering from its two ordered
+source intervals. -/
+private theorem structuralCompletion_target_ordered
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (waitingOrdered : edge.waiting.raw.origin.val ≤
+      edge.waiting.raw.current.val)
+    (finishedOrdered : edge.finished.raw.origin.val ≤
+      edge.finished.raw.current.val) :
+    edge.after.raw.origin.val ≤ edge.after.raw.current.val := by
+  obtain ⟨witness⟩ := packedEdge_completed_valid_iff.mp edge.structural.1
+  rcases witness with
+    ⟨_next, _complete, waitingAtShared, finishedAtShared, advance⟩
+  rw [advance.2.2.1, advance.2.2.2]
+  calc
+    edge.waiting.raw.origin.val ≤ edge.waiting.raw.current.val :=
+      waitingOrdered
+    _ = edge.shared.val := congrArg Fin.val waitingAtShared
+    _ = edge.finished.raw.origin.val :=
+      (congrArg Fin.val finishedAtShared).symm
+    _ ≤ edge.finished.raw.current.val := finishedOrdered
+
+/-- Candidate preparation is total at every ordered item whose module-root
+case, when present, spans the canonical whole-input interval. -/
+private theorem insertCandidate?_total_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (ordered : item.raw.origin.val ≤ item.raw.current.val)
+    (moduleInterval : item.raw.production = .root .module →
+      item.raw.origin = Boundary.start tokens ∧
+        item.raw.current = Boundary.afterLogicalEOF tokens) :
+    ∃ candidate, ContextualValueFrontierState.insertCandidate?
+      owned state item prior = some candidate := by
+  unfold ContextualValueFrontierState.insertCandidate?
+  split
+  next present => exact ⟨_, rfl⟩
+  next absent =>
+    split
+    next complete =>
+      let reduction := ContextualReductionValue.reduce owned item ordered
+        complete prior
+      have reductionEq : ContextualReductionValue.reduce? owned item prior =
+          some reduction := by
+        unfold ContextualReductionValue.reduce?
+        rw [dif_pos ordered, dif_pos complete, dif_pos moduleInterval]
+      rw [reductionEq]
+      exact ⟨_, rfl⟩
+    next incomplete => exact ⟨_, rfl⟩
+
+/-- The exact U06 membership guard makes a relevant completion attempt a
+proof-free no-op, independently of semantic lookup availability. -/
+private theorem attemptPhaseCCompletedEdge?_of_used
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (relevant : edge.waiting = source ∨ edge.finished = source)
+    (used : (.cubic .U06_frontierCompletion
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens) ∈ current.counter.usedRev) :
+    attemptPhaseCCompletedEdge? owned source edge current = some current := by
+  unfold attemptPhaseCCompletedEdge?
+  rw [dif_pos relevant]
+  cases prefixEq : current.payload.frontier.lookupPrefix? edge.waiting with
+  | none => rfl
+  | some prior =>
+      cases reductionEq :
+          current.payload.frontier.lookupReduction? edge.finished with
+      | none => rfl
+      | some child => simp only [if_pos used]
+
+/-- Project the exact completion-unit key from one retained packed edge. -/
+private def retainedCompletedKey?
+    {file : WorkspaceFile} {tokens : List Token}
+    (edge : StructurallyValidContextualPackedEdge file tokens) :
+    Option (ChartCubicKey tokens) :=
+  match edge.val with
+  | .scanned _ _ _ => none
+  | .completed waiting finished _ _ =>
+      some (contextualCompletionKey waiting finished)
+
+/-- A structurally retained completion is uniquely determined by its exact
+completion-unit key. -/
+private theorem retainedCompletedKey?_injective
+    {file : WorkspaceFile} {tokens : List Token}
+    (left right : StructurallyValidContextualPackedEdge file tokens)
+    (key : ChartCubicKey tokens)
+    (leftKey : retainedCompletedKey? left = some key)
+    (rightKey : retainedCompletedKey? right = some key) :
+    left = right := by
+  rcases left with ⟨leftPacked, leftStructural⟩
+  rcases right with ⟨rightPacked, rightStructural⟩
+  cases leftPacked with
+  | scanned => simp [retainedCompletedKey?] at leftKey
+  | completed leftWaiting leftFinished leftAfter leftShared =>
+      cases rightPacked with
+      | scanned => simp [retainedCompletedKey?] at rightKey
+      | completed rightWaiting rightFinished rightAfter rightShared =>
+          simp only [retainedCompletedKey?, Option.some.injEq] at leftKey rightKey
+          have keys : contextualCompletionKey leftWaiting leftFinished =
+              contextualCompletionKey rightWaiting rightFinished :=
+            leftKey.trans rightKey.symm
+          obtain ⟨leftEdge, leftSelected, _leftWaiting, _leftFinished,
+            leftAfterEq, leftSharedEq⟩ := contextualCompletedEdge?_complete
+              leftWaiting leftFinished leftAfter leftShared leftStructural
+          obtain ⟨rightEdge, rightSelected, _rightWaiting, _rightFinished,
+            rightAfterEq, rightSharedEq⟩ := contextualCompletedEdge?_complete
+              rightWaiting rightFinished rightAfter rightShared rightStructural
+          have endpoints :=
+            contextualCompletedEdge?_eq_of_contextualCompletionKey_eq
+              leftWaiting leftFinished leftAfter leftEdge
+              rightWaiting rightFinished rightAfter rightEdge
+              leftSelected rightSelected keys
+          have waitingRaw : leftWaiting.raw = rightWaiting.raw :=
+            dottedItem_eq_of_fields
+              (congrArg (fun key => key.waiting.production) keys)
+              (congrArg (fun key => key.waiting.dot.val) keys)
+              (congrArg (fun key => key.origin) keys)
+              (congrArg (fun key => key.shared) keys)
+          have waitingContext : leftWaiting.context = rightWaiting.context := by
+            have source := congrArg ChartCubicKey.source keys
+            simpa only [contextualCompletionKey,
+              ChartSourceTag.contextual.injEq] using source
+          have waitingEq : leftWaiting = rightWaiting :=
+            contextualItem_eq_of_fields waitingRaw waitingContext
+          have leftShape := contextualCompletedEdge?_finished_shape
+            leftWaiting leftFinished leftAfter leftEdge leftSelected
+          have rightShape := contextualCompletedEdge?_finished_shape
+            rightWaiting rightFinished rightAfter rightEdge rightSelected
+          have finishedOrigin : leftFinished.raw.origin =
+              rightFinished.raw.origin := by
+            rw [leftShape.1, rightShape.1, waitingEq]
+          have finishedRaw : leftFinished.raw = rightFinished.raw :=
+            dottedItem_eq_of_fields
+              (congrArg (fun key => key.finished.production) keys)
+              (congrArg (fun key => key.finished.dot.val) keys)
+              finishedOrigin
+              (congrArg (fun key => key.current) keys)
+          have finishedContext : leftFinished.context =
+              rightFinished.context := by
+            rw [leftShape.2, rightShape.2, waitingEq,
+              congrArg DottedItem.production finishedRaw]
+          have finishedEq : leftFinished = rightFinished :=
+            contextualItem_eq_of_fields finishedRaw finishedContext
+          have sharedEq : leftShared = rightShared := by
+            rw [← leftSharedEq, ← rightSharedEq, endpoints.2]
+          apply Subtype.ext
+          simp only
+          rw [waitingEq, finishedEq, endpoints.1, sharedEq]
+
 private theorem attemptContextualPrediction?_materialization_boundary
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
