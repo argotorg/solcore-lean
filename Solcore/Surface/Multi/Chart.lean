@@ -17614,6 +17614,44 @@ theorem OperationalContextualClosure.edge_complete
         (closed.reach_complete endpoints.1)
         (closed.reach_complete endpoints.2.1) structural).2
 
+/-- The immutable recognition item set contains the target of one retained
+edge.  This is the endpoint fact needed when semantic processing can append
+that target to its frontier queue. -/
+private def PhaseCRecognitionEdgeTargetMember
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (packed : StructurallyValidContextualPackedEdge file tokens) : Prop :=
+  match packed.val with
+  | .scanned _ after _ =>
+      after ∈ current.payload.recognition.phaseC.contextualItems
+  | .completed _ _ after _ =>
+      after ∈ current.payload.recognition.phaseC.contextualItems
+
+/-- Operational edge reach plus recognition closure proves target membership
+for every retained checked edge. -/
+private theorem PhaseCOperationalInvariant.retained_target_member
+    {file : WorkspaceFile} {tokens : List Token}
+    {current : CountedState tokens
+      (PhaseCValueWorklist file tokens)}
+    (operational : PhaseCOperationalInvariant file tokens
+      current.payload.recognition)
+    (closed : OperationalContextualClosure file tokens
+      current.payload.recognition.phaseC.memo
+      current.payload.recognition.phaseC.contextualItems
+      current.payload.recognition.phaseC.contextualEdges)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (member : packed ∈
+      current.payload.recognition.phaseC.contextualEdges) :
+    PhaseCRecognitionEdgeTargetMember current packed := by
+  have reached := operational.2.2.1 packed member
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact closed.reach_complete reached.2.2
+  | completed waiting finished after shared =>
+      exact closed.reach_complete reached.2.2.2
+
 end Chart
 
 namespace Chart
@@ -24095,6 +24133,97 @@ private theorem attemptPhaseCScannedEdge?_queue_member
         rw [frontierEq, kindEq] at member
         exact insertCandidate?_queue_member owned current.payload.frontier
           edge.after target _ candidate candidateEq member
+
+/-- One retained scan preserves closure of the semantic frontier queue over
+recognition when recognition contains the scan target. -/
+private theorem attemptPhaseCScannedEdge?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (recognized : PhaseCValueQueueRecognized current)
+    (targetMember : edge.after ∈
+      current.payload.recognition.phaseC.contextualItems)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    PhaseCValueQueueRecognized result := by
+  have recognitionEq :=
+    (attemptPhaseCScannedEdge?_exact owned source edge current result
+      selected).1
+  intro target member
+  rw [recognitionEq]
+  rcases attemptPhaseCScannedEdge?_queue_member owned source target edge
+      current result selected member with old | inserted
+  · exact recognized target old
+  · exact inserted.2 ▸ targetMember
+
+/-- Constructor dispatch preserves queue recognition for one packed edge. -/
+private theorem attemptPhaseCPackedScannedEdge?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (recognized : PhaseCValueQueueRecognized current)
+    (targetMember : PhaseCRecognitionEdgeTargetMember current packed)
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    PhaseCValueQueueRecognized result := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact attemptPhaseCScannedEdge?_queueRecognized owned source {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      } current result recognized targetMember selected
+  | completed waiting finished after shared =>
+      cases selected
+      exact recognized
+
+/-- Folding retained scans preserves queue recognition when every immutable
+edge target belongs to the starting recognition item set. -/
+private theorem attemptPhaseCRetainedScannedEdges?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      PhaseCValueQueueRecognized current →
+      (∀ packed, packed ∈ edges →
+        PhaseCRecognitionEdgeTargetMember current packed) →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        PhaseCValueQueueRecognized result := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result recognized targets selected
+      cases selected
+      exact recognized
+  | cons packed rest induction =>
+      intro current result recognized targets selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      have nextRecognized :=
+        attemptPhaseCPackedScannedEdge?_queueRecognized owned source packed
+          current next recognized (targets packed (by simp)) nextEq
+      apply induction next result nextRecognized
+      · intro future member
+        have target := targets future (by simp [member])
+        have recognitionEq :=
+          attemptPhaseCPackedScannedEdge?_recognition owned source packed
+            current next nextEq
+        unfold PhaseCRecognitionEdgeTargetMember at target ⊢
+        rw [recognitionEq]
+        exact target
+      · exact restEq
 
 /-- A scan attempt preserves freshness outside its exact L14/L12/L09
 footprint. -/
