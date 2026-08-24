@@ -23667,6 +23667,117 @@ private theorem attemptPhaseCRetainedCompletedEdges?_queueNodup
         (attemptPhaseCPackedCompletedEdge?_queuePrefixesAvailable owned source
           edge current next available nextEq) restEq
 
+/-- Candidate preparation preserves closure of its queue over any immutable
+recognition item set that already contains the candidate target. -/
+private theorem insertCandidate?_queue_subset
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (items : List (ContextualItemKey tokens))
+    (old : state.queue ⊆ items)
+    (inserted : item ∈ items)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    candidate.state.queue ⊆ items := by
+  intro target member
+  rcases insertCandidate?_queue_member owned state item target prior candidate
+      selected member with oldMember | newMember
+  · exact old oldMember
+  · exact newMember.2 ▸ inserted
+
+/-- Semantic initialization queues only the canonical root already retained
+by saturated recognition. -/
+private theorem beginPhaseCValueWorklist?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (rootMember : contextualRoot tokens ∈
+      current.payload.phaseC.contextualItems)
+    (selected : beginPhaseCValueWorklist? current = some result) :
+    PhaseCValueQueueRecognized result := by
+  have exact := beginPhaseCValueWorklist?_exact current result selected
+  intro item member
+  rw [exact.2.2.2] at member
+  simp only [List.mem_singleton] at member
+  subst item
+  rw [exact.2.2.1]
+  exact rootMember
+
+/-- One semantic prediction keeps every queued key inside the immutable
+recognition item set. -/
+private theorem attemptPhaseCValuePrediction?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (recognized : PhaseCValueQueueRecognized current)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    PhaseCValueQueueRecognized result := by
+  have exact := attemptPhaseCValuePrediction?_exact owned current result
+    waiting predicted selected
+  rcases exact.2 with unchanged | prepared
+  · intro item member
+    rw [unchanged] at member
+    rw [exact.1]
+    exact recognized item member
+  · rcases prepared with ⟨item, productionInstance, atZero, candidate,
+      predictedEq, itemMember, candidateEq, frontierEq⟩
+    have retained : item ∈
+        current.payload.recognition.phaseC.contextualItems :=
+      (phaseCItemMemberBool_true_iff _ item).mp itemMember
+    have candidateClosed := insertCandidate?_queue_subset owned
+      current.payload.frontier item (ContextualPrefixValue.zero item atZero)
+        candidate current.payload.recognition.phaseC.contextualItems recognized
+          retained candidateEq
+    intro target member
+    rw [exact.1]
+    cases kindEq : candidate.kind with
+    | duplicate =>
+        rw [kindEq] at frontierEq
+        rw [frontierEq] at member
+        exact recognized target member
+    | insertedIncomplete =>
+        rw [kindEq] at frontierEq
+        rw [frontierEq] at member
+        exact candidateClosed member
+    | insertedComplete =>
+        rw [kindEq] at frontierEq
+        rw [frontierEq] at member
+        exact candidateClosed member
+
+/-- Folding semantic predictions preserves recognition closure of the
+frontier queue. -/
+private theorem attemptPhaseCValuePredictions?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      PhaseCValueQueueRecognized current →
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        PhaseCValueQueueRecognized result := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result recognized selected
+      cases selected
+      exact recognized
+  | cons predicted rest induction =>
+      intro current result recognized selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptPhaseCValuePrediction?_queueRecognized owned current next
+          waiting predicted recognized nextEq) restEq
+
 /-- A semantic prediction can only grow prefix membership. -/
 private theorem attemptPhaseCValuePrediction?_preserves_prefix_present
     {file : WorkspaceFile} {tokens : List Token}
