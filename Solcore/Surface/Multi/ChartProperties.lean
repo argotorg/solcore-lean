@@ -4891,6 +4891,91 @@ theorem executeAssemblyStatementRoot_reduces
   exact .assemblyStatement origin finish keyword assembly slice
     assembly.assemblyProjection_projects witness
 
+/-- The if-statement executor realizes both optional-else reductions. -/
+theorem executeIfStatementRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .ifStatement origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .ifStatement)) :
+    RuleReduction file tokens .ifStatement origin finish input
+      (executeIfStatementRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let ifAtom : EbnfExpr := .atom (.terminal (.hardKeyword .ifKw))
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let bodyAtom : EbnfExpr := .atom (.nonterminal .body)
+  let elseAtom : EbnfExpr := .atom (.terminal (.hardKeyword .elseKw))
+  let elseChildren : List EbnfExpr := [elseAtom, bodyAtom]
+  let elseSeq : EbnfExpr := .sequence elseChildren
+  let children : List EbnfExpr := [ifAtom, openAtom, expressionAtom,
+    closeAtom, bodyAtom, .optional elseSeq]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize rootEq : EbnfValue.sequenceFlatView children input = root
+  rcases root with ⟨rawIf, rawOpen, rawCondition, rawClose, rawThen,
+    rawElse, ⟨⟩⟩
+  let ifKeyword := EbnfValue.terminalView (.hardKeyword .ifKw) rawIf
+  let openParen := EbnfValue.terminalView (.symbol .leftParen) rawOpen
+  let condition := EbnfValue.ruleView .expression rawCondition
+  let closeParen := EbnfValue.terminalView (.symbol .rightParen) rawClose
+  let thenBody := EbnfValue.ruleView .body rawThen
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  generalize optionalEq : EbnfValue.optionalView elseSeq rawElse = viewed
+  cases viewed with
+  | none =>
+      have optionalRebuild := EbnfValue.optional_of_view elseSeq rawElse
+      rw [optionalEq] at optionalRebuild
+      have resultEq : executeIfStatementRoot file tokens origin finish
+          ready.1 ready.2.1 input =
+            sourceLoc witness (.ifThenElse condition thenBody none) := by
+        simp [executeIfStatementRoot, children, elseChildren, elseSeq,
+          ifAtom, openAtom, expressionAtom, closeAtom, bodyAtom, elseAtom,
+          rootEq, optionalEq, condition, thenBody, witness]
+        rfl
+      rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+        rootEq,
+        ← EbnfValue.terminal_of_view (.hardKeyword .ifKw) rawIf,
+        ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+        ← EbnfValue.rule_of_view .expression rawCondition,
+        ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose,
+        ← EbnfValue.rule_of_view .body rawThen, ← optionalRebuild]
+      exact .ifStatementWithoutElse origin finish ifKeyword openParen
+        condition closeParen thenBody witness
+  | some rawElseSeq =>
+      generalize elseEq : EbnfValue.sequence2View
+        elseAtom bodyAtom rawElseSeq = elseView
+      rcases elseView with ⟨rawElseKeyword, rawElseBody⟩
+      let elseKeyword := EbnfValue.terminalView
+        (.hardKeyword .elseKw) rawElseKeyword
+      let elseBody := EbnfValue.ruleView .body rawElseBody
+      have elseRebuild := EbnfValue.sequence2_of_view
+        elseAtom bodyAtom rawElseSeq
+      rw [elseEq] at elseRebuild
+      have optionalRebuild := EbnfValue.optional_of_view elseSeq rawElse
+      rw [optionalEq] at optionalRebuild
+      have resultEq : executeIfStatementRoot file tokens origin finish
+          ready.1 ready.2.1 input = sourceLoc witness
+            (.ifThenElse condition thenBody (some elseBody)) := by
+        simp [executeIfStatementRoot, children, elseChildren, elseSeq,
+          ifAtom, openAtom, expressionAtom, closeAtom, bodyAtom, elseAtom,
+          rootEq, optionalEq, elseEq, condition, thenBody, elseBody,
+          witness]
+        rfl
+      rw [resultEq, ← EbnfValue.sequence_of_flat_view children input,
+        rootEq,
+        ← EbnfValue.terminal_of_view (.hardKeyword .ifKw) rawIf,
+        ← EbnfValue.terminal_of_view (.symbol .leftParen) rawOpen,
+        ← EbnfValue.rule_of_view .expression rawCondition,
+        ← EbnfValue.terminal_of_view (.symbol .rightParen) rawClose,
+        ← EbnfValue.rule_of_view .body rawThen, ← optionalRebuild,
+        ← elseRebuild,
+        ← EbnfValue.terminal_of_view
+          (.hardKeyword .elseKw) rawElseKeyword,
+        ← EbnfValue.rule_of_view .body rawElseBody]
+      exact .ifStatementWithElse origin finish ifKeyword openParen
+        condition closeParen thenBody elseKeyword elseBody witness
+
 private theorem shortRuleAtoms_of_views
     {file : WorkspaceFile} {tokens : List Token}
     (rule : GrammarRuleId)
@@ -10279,6 +10364,8 @@ theorem executeRootRule_reduces
       exact executeContinueStatementRoot_reduces origin finish ready input
   | assemblyStatement =>
       exact executeAssemblyStatementRoot_reduces origin finish ready input
+  | ifStatement =>
+      exact executeIfStatementRoot_reduces origin finish ready input
   | returnStatement =>
       exact executeReturnStatementRoot_reduces origin finish ready input
   | assignmentStatement =>
