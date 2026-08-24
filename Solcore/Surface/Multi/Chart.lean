@@ -10779,6 +10779,64 @@ theorem witnessedContextualCompletedEdge?_erase
   split <;> try rfl
   split <;> rfl
 
+/-- A selected witnessed scan has exactly the requested source and returned
+target. -/
+theorem witnessedContextualScannedEdge?_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before after : ContextualItemKey tokens)
+    (edge : WitnessedContextualScannedEdge file tokens)
+    (selected : witnessedContextualScannedEdge? owned before =
+      some (after, edge)) :
+    edge.before = before ∧ edge.after = after := by
+  unfold witnessedContextualScannedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  simp only at selected
+  split at selected <;> try contradiction
+  next matched matchEq =>
+    have pairEq := Option.some.inj selected
+    have beforeEq : before = edge.before := by
+      simpa only using congrArg (fun pair => pair.2.before) pairEq
+    have generatedAfterEq : after = edge.after := by
+      have first := congrArg (fun pair => pair.1) pairEq
+      have second := congrArg (fun pair => pair.2.after) pairEq
+      exact first.symm.trans second
+    exact ⟨beforeEq.symm, generatedAfterEq.symm⟩
+
+/-- A selected witnessed completion has exactly the requested endpoints and
+the waiting cursor as its shared boundary. -/
+theorem witnessedContextualCompletedEdge?_shape
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : ContextualItemKey tokens)
+    (edge : WitnessedContextualCompletedEdge file tokens)
+    (selected : witnessedContextualCompletedEdge? (file := file)
+      waiting finished = some (after, edge)) :
+    edge.waiting = waiting ∧ edge.finished = finished ∧
+      edge.after = after ∧ edge.shared = waiting.raw.current := by
+  unfold witnessedContextualCompletedEdge? at selected
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  split at selected <;> try contradiction
+  next sameContext =>
+    have pairEq := Option.some.inj selected
+    have waitingEq : waiting = edge.waiting := by
+      simpa only using congrArg (fun pair => pair.2.waiting) pairEq
+    have finishedEq : finished = edge.finished := by
+      simpa only using congrArg (fun pair => pair.2.finished) pairEq
+    have generatedAfterEq : after = edge.after := by
+      have first := congrArg (fun pair => pair.1) pairEq
+      have second := congrArg (fun pair => pair.2.after) pairEq
+      exact first.symm.trans second
+    have sharedEq : waiting.raw.current = edge.shared := by
+      simpa only using congrArg (fun pair => pair.2.shared) pairEq
+    exact ⟨waitingEq.symm, finishedEq.symm,
+      generatedAfterEq.symm, sharedEq.symm⟩
+
 /-- The semantic value attached to one exact consumed contextual prefix. -/
 structure ContextualPrefixValue
     (file : WorkspaceFile) (tokens : List Token)
