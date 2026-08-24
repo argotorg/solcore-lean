@@ -164,13 +164,19 @@ def CoherentNonAssociativePresentInputHasPresentCompletion
     (correct : PhaseBCorrect file tokens memo)
     (final : AllGuardsFinal memo) : Prop :=
   ∀ (level : NonAssociativeLevel) (origin cursor : Boundary tokens)
-      (context : GuardContext tokens) (output : RuleValue level.rule)
-      (_reduction : CoherentReduction file tokens memo correct final
+      (context : GuardContext tokens)
+      (priorValues : PrefixValues file tokens
+        (CanonicalCompleteRootItem tokens level.rule origin cursor context))
+      (complete : CompleteItem
+        (CanonicalCompleteRootItem tokens level.rule origin cursor context).raw),
+    CoherentPrefix file tokens memo correct final
         (CanonicalCompleteRootItem tokens level.rule origin cursor context)
-        output)
-      (input : EbnfValue file tokens (m2cV1.rhs level.rule)),
-    RuleReduction file tokens level.rule origin cursor input output →
-    NonAssociativeInputPresent level input →
+        priorValues →
+    NonAssociativeInputPresent level
+      (RootAction.unpack level.rule
+        (PrefixValues.fullValue
+          (CanonicalCompleteRootItem tokens level.rule origin cursor context)
+          complete priorValues)) →
     ∃ (rootWaiting sequence : ContextualItemKey tokens)
         (rootShared : Boundary tokens)
         (sequenceWaiting optional : ContextualItemKey tokens)
@@ -197,10 +203,20 @@ theorem coherentNonAssociativeCompletedHasPresentCompletion_of_safe
     CoherentNonAssociativeCompletedHasPresentCompletion
       file tokens memo correct final := by
   intro level origin cursor context output reduction completed
-  rcases coherentReduction_nonAssociative_inputPresent_of_completed
-      safe level origin cursor context output reduction completed with
-    ⟨input, reduces, present⟩
-  exact inversion level origin cursor context output reduction input
-    reduces present
+  rcases completed with ⟨first, completed⟩
+  cases reduction with
+  | reduce _ priorValues _ _ complete coherent action =>
+      have inputSafe := safe level origin cursor context priorValues
+        complete coherent
+      have reduces := actionReduces_eleven_shapes_exact.mp action
+      have exactReduces : RuleReduction file tokens level.rule origin cursor
+          (RootAction.unpack level.rule
+            (PrefixValues.fullValue
+              (CanonicalCompleteRootItem tokens level.rule origin cursor context)
+              complete priorValues)) output := by
+        simpa [CanonicalCompleteRootItem] using reduces
+      exact inversion level origin cursor context priorValues complete coherent
+        (exactReduces.nonAssociative_input_present_of_completed_of_safe
+          inputSafe completed)
 
 end Solcore.Surface.Multi

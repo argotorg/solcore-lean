@@ -6,6 +6,7 @@ import Solcore.Surface.Multi.NonAssociativeCompletionAlignment
 import Solcore.Surface.Multi.NonAssociativeInvariantBridge
 import Solcore.Surface.Multi.NonAssociativeOptionalStrict
 import Solcore.Surface.Multi.NonAssociativePassThroughSafety
+import Solcore.Surface.Multi.NonAssociativePresentEdgeReflection
 import Solcore.Surface.Multi.OperandBoundaryExclusion
 import Solcore.Surface.Multi.ParseOutcomeTotality
 import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
