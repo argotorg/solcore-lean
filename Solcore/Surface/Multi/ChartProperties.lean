@@ -15072,6 +15072,66 @@ theorem executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_com
           file tokens owned result selected)
         present
 
+/-- Every successful semantic execution fully materializes every item retained
+by recognition; no liveness premise remains for callers. -/
+theorem executeObservedContextualValueWorklistMulti?_recognitionPrefixesMaterialized
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    result.RecognitionPrefixesMaterialized := by
+  exact result.recognitionPrefixesMaterialized_of_pending file tokens owned
+    selected
+      (Chart.executeObservedContextualValueWorklistMulti?_materializationPending
+        file tokens owned result selected)
+      (executeObservedContextualValueWorklistMulti?_executableWellFormed
+        file tokens owned result selected)
+
+/-- A recognized complete module root from an actual semantic execution always
+projects an AST, with no external semantic premise. -/
+theorem executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_completeModuleRoot_of_execution
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (present : result.recognition.containsCompleteModuleRootItem = true) :
+    ∃ module, result.parsedModule? = some module := by
+  exact
+    executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_completeModuleRoot_of_pending
+      file tokens owned result selected
+        (Chart.executeObservedContextualValueWorklistMulti?_materializationPending
+          file tokens owned result selected)
+        present
+
+/-- On an executed semantic frontier, the proof-free recognition success bit
+is exact for executable AST projection. -/
+theorem executeObservedContextualValueWorklistMulti?_parsedModule?_isSome_eq_true_iff_completeModuleRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    result.parsedModule?.isSome = true ↔
+      result.recognition.containsCompleteModuleRootItem = true := by
+  constructor
+  · intro parsedSome
+    obtain ⟨module, parsed⟩ := Option.isSome_iff_exists.mp parsedSome
+    have recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    exact
+      executeObservedContextualWorklistMulti?_containsCompleteModuleRootItem_eq_true_of_parses
+        file tokens owned result.recognition recognitionSelected module
+          (executeObservedContextualValueWorklistMulti?_parses file tokens owned
+            result selected module parsed)
+  · intro present
+    obtain ⟨module, parsed⟩ :=
+      executeObservedContextualValueWorklistMulti?_parsedModule?_exists_of_completeModuleRoot_of_execution
+        file tokens owned result selected present
+    exact Option.isSome_iff_exists.mpr ⟨module, parsed⟩
+
 end Solcore.Surface.Multi
 
 namespace Solcore.Surface.Multi
