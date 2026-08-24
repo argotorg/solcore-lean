@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.DiagnosticExhaustiveness
+import Solcore.Surface.Multi.NonAssociativeOperandPrefixExclusive
 import Solcore.Surface.Multi.NonAssociativePresentEdgeReflection
 import Solcore.Surface.Multi.PostLogicalEofClosure
 import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
@@ -533,6 +534,16 @@ def executeObservedContextualNonAssociativeCertificateBool
   nonAssociativeOperandPrefixExclusiveTable
     file tokens owned correct final
 
+/-- The fixed grammar accepts the concrete G10 operand-prefix certificate for
+every observed token stream. -/
+theorem executeObservedContextualNonAssociativeCertificateBool_eq_true
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    executeObservedContextualNonAssociativeCertificateBool
+      file tokens owned = true := by
+  unfold executeObservedContextualNonAssociativeCertificateBool
+  exact nonAssociativeOperandPrefixExclusiveTable_eq_true owned _ _
+
 /-- One concrete executable certificate combines rootless rank progress and
 the G10 operand-boundary condition. -/
 def executeObservedContextualFormalCertificateBool
@@ -556,16 +567,13 @@ theorem executeObservedContextualFormalCertificateBool_eq_true_iff
           file tokens owned = true := by
   simp [executeObservedContextualFormalCertificateBool]
 
-/-- Successful bounded rank synthesis and an accepted G10 table discharge
-the combined formal certificate without a caller-supplied potential. -/
+/-- Successful bounded rank synthesis discharges the combined formal
+certificate; G10 acceptance follows unconditionally from the fixed grammar. -/
 theorem executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
     (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
-      file tokens owned)
-    (nonAssociativeAccepted :
-      executeObservedContextualNonAssociativeCertificateBool
-        file tokens owned = true) :
+      file tokens owned) :
     executeObservedContextualFormalCertificateBool file tokens owned
         (executeObservedContextualBoundedPotential
           file tokens owned success) = true := by
@@ -574,7 +582,8 @@ theorem executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
   exact ⟨
     executeObservedContextualRankCertificateBool_eq_true_of_boundedSearch
       file tokens owned success,
-    nonAssociativeAccepted⟩
+    executeObservedContextualNonAssociativeCertificateBool_eq_true
+      file tokens owned⟩
 
 /-- On the concrete executor ledger, coherent pass-through safety plus the
 accepted operand-prefix table constructs the complete G10 invariant. -/
@@ -1122,15 +1131,12 @@ def executeObservedContextualParseOfBoundedSearch
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
     (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
-      file tokens owned)
-    (nonAssociativeAccepted :
-      executeObservedContextualNonAssociativeCertificateBool
-        file tokens owned = true) :
+      file tokens owned) :
     Except ParseDiagnostic ParsedModuleV1 :=
   executeObservedContextualParseOfFormalCertificate file tokens owned
     (executeObservedContextualBoundedPotential file tokens owned success)
     (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
-      file tokens owned success nonAssociativeAccepted)
+      file tokens owned success)
 
 /-- The certificate-driven executable outcome is exactly the value selected
 by the option-based implementation. -/
@@ -1238,20 +1244,17 @@ theorem executeObservedContextualParseOfBoundedSearch_selected
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
     (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
-      file tokens owned)
-    (nonAssociativeAccepted :
-      executeObservedContextualNonAssociativeCertificateBool
-        file tokens owned = true) :
+      file tokens owned) :
     let result := Chart.executeObservedContextualValueWorklistMulti
       file tokens owned
     result.parseOutcome? file =
       some (executeObservedContextualParseOfBoundedSearch
-        file tokens owned success nonAssociativeAccepted) := by
+        file tokens owned success) := by
   exact executeObservedContextualParseOfFormalCertificate_selected
     file tokens owned
       (executeObservedContextualBoundedPotential file tokens owned success)
       (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
-        file tokens owned success nonAssociativeAccepted)
+        file tokens owned success)
 
 /-- The certificate-driven executable result is declaratively sound: modules
 parse, and diagnostics apply to the supplied source. -/
@@ -1436,18 +1439,15 @@ theorem executeObservedContextualParseOfBoundedSearch_sound
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens)
     (success : ExecuteObservedContextualBoundedPotentialSearchSucceeds
-      file tokens owned)
-    (nonAssociativeAccepted :
-      executeObservedContextualNonAssociativeCertificateBool
-        file tokens owned = true) :
+      file tokens owned) :
     match executeObservedContextualParseOfBoundedSearch
-        file tokens owned success nonAssociativeAccepted with
+        file tokens owned success with
     | .ok module => Parses file tokens module
     | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
   exact executeObservedContextualParseOfFormalCertificate_sound
     file tokens owned
       (executeObservedContextualBoundedPotential file tokens owned success)
       (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
-        file tokens owned success nonAssociativeAccepted)
+        file tokens owned success)
 
 end Solcore.Surface.Multi
