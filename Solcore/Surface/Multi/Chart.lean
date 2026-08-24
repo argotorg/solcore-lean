@@ -36878,10 +36878,42 @@ theorem executeObservedContextualValueWorklistMulti?_total
       memo := internal.payload.recognition.phaseC.memo
       items := internal.payload.recognition.phaseC.contextualItems
       edges := internal.payload.recognition.phaseC.contextualEdges
-    }
+  }
     frontier := internal.payload.frontier
   }, ?_⟩
   simp [executeObservedContextualValueWorklistMulti?, internalEq]
+
+/-- The optional public semantic executor always returns a result on owned
+tokens. -/
+theorem executeObservedContextualValueWorklistMulti?_isSome_eq_true
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    (executeObservedContextualValueWorklistMulti?
+      file tokens owned).isSome = true := by
+  exact Option.isSome_iff_exists.mpr
+    (executeObservedContextualValueWorklistMulti?_total file tokens owned)
+
+/-- Total proof-free semantic execution, obtained computationally from the
+now-proved-total optional worklist. -/
+def executeObservedContextualValueWorklistMulti
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ContextualValueWorklistResult file tokens :=
+  (executeObservedContextualValueWorklistMulti?
+    file tokens owned).get
+      (executeObservedContextualValueWorklistMulti?_isSome_eq_true
+        file tokens owned)
+
+/-- The total semantic result is exactly the value returned by its optional
+implementation. -/
+theorem executeObservedContextualValueWorklistMulti_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    executeObservedContextualValueWorklistMulti? file tokens owned =
+      some (executeObservedContextualValueWorklistMulti file tokens owned) := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨executeObservedContextualValueWorklistMulti?_isSome_eq_true
+    file tokens owned, rfl⟩
 
 end Solcore.Surface.Multi.Chart
 
@@ -38842,6 +38874,70 @@ theorem repeatedNonAssociativeDiagnosticCandidate?_eq_some_iff
           result.frontier.completedNonAssociativeAtBool
             candidates.cursor candidates.level root.raw.origin root.context)
         diagnostic).mpr ⟨accepted, shape⟩⟩
+
+/-- Proof-free parse-phase projection with the specified precedence: a
+complete module succeeds first, otherwise G10 overrides the ordinary frontier
+diagnostic.  Remaining `none` records exactly the still-open diagnostic
+progress obligation. -/
+def parseOutcome?
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens) :
+    Option (Except ParseDiagnostic ParsedModuleV1) :=
+  match result.parsedModule? with
+  | some module => some (.ok module)
+  | none =>
+      match result.repeatedNonAssociativeDiagnosticCandidate? file with
+      | some diagnostic => some (.error diagnostic)
+      | none =>
+          match result.recognition.rootlessUnexpectedDiagnosticCandidate? file
+          with
+          | some diagnostic => some (.error diagnostic)
+          | none => none
+
+/-- A successful partial outcome is exactly the canonical module projection;
+error candidates cannot mask it. -/
+theorem parseOutcome?_eq_some_ok_iff
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens)
+    (module : ParsedModuleV1) :
+  result.parseOutcome? file = some (.ok module) ↔
+      result.parsedModule? = some module := by
+  unfold parseOutcome?
+  split <;> simp_all
+  split <;> try simp_all
+  split <;> simp_all
+
+/-- Exact precedence split for an emitted parse diagnostic. -/
+theorem parseOutcome?_eq_some_error_iff
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens)
+    (diagnostic : ParseDiagnostic) :
+    result.parseOutcome? file = some (.error diagnostic) ↔
+      result.parsedModule? = none ∧
+        (result.repeatedNonAssociativeDiagnosticCandidate? file =
+            some diagnostic ∨
+          result.repeatedNonAssociativeDiagnosticCandidate? file = none ∧
+            result.recognition.rootlessUnexpectedDiagnosticCandidate? file =
+              some diagnostic) := by
+  unfold parseOutcome?
+  split <;> simp_all
+  split <;> simp_all
+  split <;> simp_all
+
+/-- The partial outcome remains empty exactly when all three executable
+projections are empty. -/
+theorem parseOutcome?_eq_none_iff
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens) :
+    result.parseOutcome? file = none ↔
+      result.parsedModule? = none ∧
+        result.repeatedNonAssociativeDiagnosticCandidate? file = none ∧
+          result.recognition.rootlessUnexpectedDiagnosticCandidate? file =
+            none := by
+  unfold parseOutcome?
+  split <;> simp_all
+  split <;> simp_all
+  split <;> simp_all
 
 end ContextualValueWorklistResult
 
