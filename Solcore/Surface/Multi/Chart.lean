@@ -16462,6 +16462,93 @@ private def PhaseCOperationalInvariant
   (∀ edge, edge ∈ state.phaseC.edgeQueue →
     OperationalContextualEdgeReach file tokens state.phaseC.memo edge.val)
 
+/-- The semantic queue is closed over the immutable recognition item set.
+This is the missing cross-state fact not implied by dependent prefix lookup
+availability alone. -/
+private def PhaseCValueQueueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens
+      (PhaseCValueWorklist file tokens)) : Prop :=
+  ∀ item, item ∈ current.payload.frontier.queue →
+    item ∈ current.payload.recognition.phaseC.contextualItems
+
+/-- Queue closure supplies recognition membership for the next semantic
+source before it is dequeued. -/
+private theorem PhaseCValueQueueRecognized.head
+    {file : WorkspaceFile} {tokens : List Token}
+    {current : CountedState tokens
+      (PhaseCValueWorklist file tokens)}
+    (recognized : PhaseCValueQueueRecognized current)
+    (source : ContextualItemKey tokens)
+    (rest : List (ContextualItemKey tokens))
+    (queueEq : current.payload.frontier.queue = source :: rest) :
+    source ∈ current.payload.recognition.phaseC.contextualItems := by
+  exact recognized source (by rw [queueEq]; simp)
+
+/-- Operational recognition orders every semantic source whose key is
+known to occur in the immutable recognition item set. -/
+private theorem PhaseCOperationalInvariant.source_ordered
+    {file : WorkspaceFile} {tokens : List Token}
+    {current : CountedState tokens
+      (PhaseCValueWorklist file tokens)}
+    (operational : PhaseCOperationalInvariant file tokens
+      current.payload.recognition)
+    (source : ContextualItemKey tokens)
+    (member : source ∈
+      current.payload.recognition.phaseC.contextualItems) :
+    source.raw.origin.val ≤ source.raw.current.val :=
+  (operational.1 source member).ordered
+
+/-- Frontier-independent geometry supplied by operational reach for one
+retained packed completion.  It is deliberately stronger than the later
+absence-conditional semantic readiness predicate. -/
+private def PhaseCOperationalCompletionReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens) : Prop :=
+  match packed.val with
+  | .scanned _ _ _ => True
+  | .completed waiting finished after _ =>
+      (waiting = source ∨ finished = source) →
+        waiting.raw.origin.val ≤ waiting.raw.current.val ∧
+          finished.raw.origin.val ≤ finished.raw.current.val ∧
+          (after.raw.production = .root .module →
+            after.raw.origin = Boundary.start tokens ∧
+              after.raw.current = Boundary.afterLogicalEOF tokens)
+
+/-- Operational reach of every retained edge supplies the ordering and
+canonical module geometry required by the semantic completion fold. -/
+private theorem PhaseCOperationalInvariant.completion_ready
+    {file : WorkspaceFile} {tokens : List Token}
+    {current : CountedState tokens
+      (PhaseCValueWorklist file tokens)}
+    (operational : PhaseCOperationalInvariant file tokens
+      current.payload.recognition)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (member : packed ∈
+      current.payload.recognition.phaseC.contextualEdges) :
+    PhaseCOperationalCompletionReady source packed := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor => trivial
+  | completed waiting finished after shared =>
+      intro relevant
+      let edge : StructurallyValidContextualCompletedEdge file tokens := {
+        waiting := waiting
+        finished := finished
+        after := after
+        shared := shared
+        structural := structural
+      }
+      have reached : OperationalContextualEdgeReach file tokens
+          current.payload.recognition.phaseC.memo
+          (.completed waiting finished after shared) :=
+        operational.2.2.1 ⟨.completed waiting finished after shared,
+          structural⟩ member
+      exact ⟨reached.2.1.ordered, reached.2.2.1.ordered,
+        OperationalContextualEdgeReach.completedModule_interval edge reached⟩
+
 private theorem PhaseCOperationalInvariant.of_reachCarrier_eq
     {file : WorkspaceFile} {tokens : List Token}
     {before after : PhaseCWorklist file tokens}
