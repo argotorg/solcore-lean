@@ -11662,6 +11662,20 @@ private def PhaseCValueSourceFresh
   (.linear .L12_scannedAction (contextualLinearKey item) :
       UnitAddress tokens) ∉ counter.usedRev
 
+/-- Source-local charges that remain after dequeue and are consumed while the
+dequeued item is processed. -/
+private def PhaseCValueProcessingFresh
+    {tokens : List Token} (counter : Counter tokens)
+    (item : ContextualItemKey tokens) : Prop :=
+  (∀ predicted, predicted ∈ allProductionIds →
+    (.prediction .R02_frontierPrediction
+      (contextualPredictionKey item predicted) : UnitAddress tokens) ∉
+        counter.usedRev) ∧
+  (.linear .L14_frontierScannedTraversal (contextualLinearKey item) :
+      UnitAddress tokens) ∉ counter.usedRev ∧
+  (.linear .L12_scannedAction (contextualLinearKey item) :
+      UnitAddress tokens) ∉ counter.usedRev
+
 /-- Stable semantic states relate every consumed item address to persistent
 prefix membership. Queue freshness records the one remaining temporal fact:
 a retained prefix has not necessarily been processed yet. Completion actions
@@ -23630,6 +23644,63 @@ private theorem dequeuePhaseCValueFrontier?_total_addressSafe
     rcases member with equal | old
     · simp [address] at equal
     · exact Or.inr (safe.completionActionAttempted waiting finished old)
+
+/-- A successful dequeue exposes every remaining source-local charge, keeps
+the dequeued prefix present, and removes that source from the unique queue. -/
+private theorem dequeuePhaseCValueFrontier?_total_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens) (rest : List (ContextualItemKey tokens))
+    (queueEq : current.payload.frontier.queue = item :: rest)
+    (queueNodup : current.payload.frontier.queue.Nodup)
+    (prefixesAvailable :
+      current.payload.frontier.queuePrefixesAvailable = true)
+    (safe : PhaseCValueAddressSafe current) :
+    ∃ result, dequeuePhaseCValueFrontier? current = some (item, result) ∧
+      PhaseCValueAddressSafe result ∧
+      PhaseCValueProcessingFresh result.counter item ∧
+      result.payload.frontier.prefixMemberBool item = true ∧
+      item ∉ result.payload.frontier.queue := by
+  obtain ⟨result, selected, resultSafe⟩ :=
+    dequeuePhaseCValueFrontier?_total_addressSafe current item rest queueEq
+      queueNodup prefixesAvailable safe
+  let address : UnitAddress tokens :=
+    .linear .L08_frontierDequeue (contextualLinearKey item)
+  have dequeuedEq := ContextualValueFrontierState.dequeue?_of_cons
+    current.payload.frontier item rest queueEq
+  have mappedEq := selected
+  unfold dequeuePhaseCValueFrontier? at mappedEq
+  rw [dequeuedEq] at mappedEq
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at mappedEq
+  rcases mappedEq with ⟨next, nextEq, pairEq⟩
+  cases pairEq
+  have usedEq := runMappedPrimitive?_usedRev current address _ result nextEq
+  obtain ⟨exactRest, exactQueue, _recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current item result selected
+  have restEq : exactRest = rest :=
+    (List.cons.inj (exactQueue.symm.trans queueEq)).2
+  subst exactRest
+  have processing : PhaseCValueProcessingFresh result.counter item := by
+    have initial := (safe.queuedSourceFresh item (by rw [queueEq]; simp)).2
+    unfold PhaseCValueProcessingFresh
+    rw [usedEq]
+    refine ⟨?_, ?_, ?_⟩
+    · intro predicted member
+      simp [address, initial.1 predicted member]
+    · simp [address, initial.2.1]
+    · simp [address, initial.2.2]
+  have itemPresent : result.payload.frontier.prefixMemberBool item = true := by
+    rw [frontierEq]
+    change current.payload.frontier.prefixMemberBool item = true
+    rw [ContextualValueFrontierState.prefixMemberBool_eq_true_iff_lookupPrefix?_isSome]
+    exact (ContextualValueFrontierState.queuePrefixesAvailable_eq_true_iff
+      current.payload.frontier).mp prefixesAvailable item (by
+        rw [queueEq]
+        simp)
+  have itemNotQueued : item ∉ result.payload.frontier.queue := by
+    rw [frontierEq]
+    exact (List.nodup_cons.mp (queueEq ▸ queueNodup)).1
+  exact ⟨result, selected, resultSafe, processing, itemPresent, itemNotQueued⟩
 
 /-- Static readiness for one retained packed edge, relative to the dequeued
 source and the state at the current fold position. Irrelevant completions and
