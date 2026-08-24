@@ -13225,6 +13225,174 @@ private theorem attemptPhaseCCompletedEdge?_unitAlternatives
         simp [kindEq] at unitsEq
         exact Or.inr (Or.inr (Or.inr unitsEq))
 
+private theorem attemptPhaseCPackedScannedEdge?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    result.payload.recognition = current.payload.recognition := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact (attemptPhaseCScannedEdge?_exact owned source {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      } current result selected).1
+  | completed waiting finished after shared =>
+      cases selected
+      rfl
+
+private theorem attemptPhaseCRetainedScannedEdges?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        result.payload.recognition = current.payload.recognition := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result selected
+      cases selected
+      rfl
+  | cons edge rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (induction next result restEq).trans
+        (attemptPhaseCPackedScannedEdge?_recognition owned source edge
+          current next nextEq)
+
+private theorem attemptPhaseCPackedCompletedEdge?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    result.payload.recognition = current.payload.recognition := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      cases selected
+      rfl
+  | completed waiting finished after shared =>
+      exact (attemptPhaseCCompletedEdge?_exact owned source {
+        waiting := waiting
+        finished := finished
+        after := after
+        shared := shared
+        structural := structural
+      } current result selected).1
+
+private theorem attemptPhaseCRetainedCompletedEdges?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        result.payload.recognition = current.payload.recognition := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result selected
+      cases selected
+      rfl
+  | cons edge rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (induction next result restEq).trans
+        (attemptPhaseCPackedCompletedEdge?_recognition owned source edge
+          current next nextEq)
+
+private theorem processPhaseCValueItem?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : processPhaseCValueItem? owned item current = some result) :
+    result.payload.recognition = current.payload.recognition := by
+  unfold processPhaseCValueItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  exact (attemptPhaseCRetainedCompletedEdges?_recognition owned item _
+    scanned result completedEq).trans
+      ((attemptPhaseCRetainedScannedEdges?_recognition owned item _ predicted
+        scanned scannedEq).trans
+          (attemptPhaseCValuePredictions?_recognition owned item _ current
+            predicted predictedEq))
+
+private theorem runPhaseCValueQueue?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ∀ fuel
+      (current result :
+        CountedState tokens (PhaseCValueWorklist file tokens)),
+      runPhaseCValueQueue? owned fuel current = some result →
+        result.payload.recognition = current.payload.recognition := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current result selected
+      rw [runPhaseCValueQueue?] at selected
+      split at selected
+      · cases selected
+        rfl
+      · contradiction
+  | succ previous induction =>
+      intro current result selected
+      rw [runPhaseCValueQueue?] at selected
+      cases queueEq : current.payload.frontier.queue with
+      | nil =>
+          simp only [queueEq] at selected
+          cases selected
+          rfl
+      | cons item rest =>
+          simp only [queueEq, Option.bind_eq_bind,
+            Option.bind_eq_some_iff] at selected
+          rcases selected with ⟨dequeued, dequeuedEq, processed,
+            processedEq, runEq⟩
+          rcases dequeued with ⟨dequeuedItem, afterDequeue⟩
+          obtain ⟨_remaining, _queue, dequeueRecognition, _frontier⟩ :=
+            dequeuePhaseCValueFrontier?_exact current dequeuedItem
+              afterDequeue dequeuedEq
+          exact (induction processed result runEq).trans
+            ((processPhaseCValueItem?_recognition owned dequeuedItem
+              afterDequeue processed processedEq).trans dequeueRecognition)
+
+private theorem executePhaseCValueWorklist?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (result : CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : executePhaseCValueWorklist? owned current = some result) :
+    result.payload.recognition = current.payload := by
+  unfold executePhaseCValueWorklist? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨entered, enteredEq, runEq⟩
+  exact (runPhaseCValueQueue?_recognition owned
+    (chartGBound (tokens.length + 1)) entered result runEq).trans
+      (beginPhaseCValueWorklist?_exact current entered enteredEq).2.2.1
+
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
