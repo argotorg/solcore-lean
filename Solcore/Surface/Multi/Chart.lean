@@ -38806,6 +38806,43 @@ def repeatedNonAssociativeDiagnosticCandidate?
     result.frontier.completedNonAssociativeAtBool
       candidates.cursor candidates.level root.raw.origin root.context
 
+/-- Exact proof-free meaning of the semantic G10 candidate: execution has
+selected a greatest nonassociative frontier containing at least one root whose
+selected semantic reduction exposes a completed same-level operation. -/
+theorem repeatedNonAssociativeDiagnosticCandidate?_eq_some_iff
+    (file : WorkspaceFile) {tokens : List Token}
+    (result : ContextualValueWorklistResult file tokens)
+    (diagnostic : ParseDiagnostic) :
+    result.repeatedNonAssociativeDiagnosticCandidate? file = some diagnostic ↔
+      ∃ candidates : NonAssociativeFrontierCandidates tokens,
+        result.recognition.nonAssociativeFrontierCandidates? file =
+            some candidates ∧
+          (∃ root, root ∈ candidates.roots ∧
+            result.frontier.completedNonAssociativeAtBool
+              candidates.cursor candidates.level root.raw.origin
+                root.context = true) ∧
+          diagnostic = .repeatedNonAssociative candidates.operator.span
+            candidates.level candidates.operator := by
+  unfold repeatedNonAssociativeDiagnosticCandidate?
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨candidates, selected, candidate⟩
+    rcases
+        (NonAssociativeFrontierCandidates.repeatedDiagnosticCandidate?_eq_some_iff
+          candidates (fun root =>
+            result.frontier.completedNonAssociativeAtBool
+              candidates.cursor candidates.level root.raw.origin root.context)
+          diagnostic).mp candidate with
+      ⟨accepted, shape⟩
+    exact ⟨candidates, selected, accepted, shape⟩
+  · rintro ⟨candidates, selected, accepted, shape⟩
+    exact ⟨candidates, selected,
+      (NonAssociativeFrontierCandidates.repeatedDiagnosticCandidate?_eq_some_iff
+        candidates (fun root =>
+          result.frontier.completedNonAssociativeAtBool
+            candidates.cursor candidates.level root.raw.origin root.context)
+        diagnostic).mpr ⟨accepted, shape⟩⟩
+
 end ContextualValueWorklistResult
 
 end Solcore.Surface.Multi.Chart
