@@ -7105,6 +7105,58 @@ def executeContractDeclRoot
       members := members
     }
 
+/-- Execute an instance declaration with all modifiers, arguments, and methods. -/
+def executeInstanceDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .instanceDecl)) :
+    InstanceDecl :=
+  let genericAtom : EbnfExpr := .atom (.nonterminal .genericPrefix)
+  let defaultAtom : EbnfExpr :=
+    .atom (.terminal (.hardKeyword .defaultKw))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let argumentChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)), .list1 typeAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let methodAtom : EbnfExpr := .atom (.nonterminal .instanceMethod)
+  let children : List EbnfExpr := [
+    .optional genericAtom, .optional defaultAtom,
+    .atom (.terminal (.hardKeyword .instanceKw)),
+    .atom (.nonterminal .typeAtom),
+    .atom (.terminal (.symbol .colon)),
+    .atom (.nonterminal .qualifiedName), .optional argumentChild,
+    .atom (.terminal (.symbol .leftBrace)), .star methodAtom,
+    .atom (.terminal (.symbol .rightBrace))]
+  let ⟨rawGeneric, rawDefault, _, rawMain, _, rawClassName,
+    rawArguments, _, rawMethods, _, ⟨⟩⟩ :=
+      EbnfValue.sequenceFlatView children input
+  let genericPrefix := (EbnfValue.optionalView
+    genericAtom rawGeneric).map (EbnfValue.ruleView .genericPrefix)
+  let defaultToken := (EbnfValue.optionalView
+    defaultAtom rawDefault).map
+      (EbnfValue.terminalView (.hardKeyword .defaultKw))
+  let parameters := (EbnfValue.optionalView
+    argumentChild rawArguments).map fun raw =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .leftParen))) (.list1 typeAtom)
+        (.atom (.terminal (.symbol .rightParen))) raw
+      (EbnfValue.list1View typeAtom viewed.2.1).map
+        (EbnfValue.ruleView .type)
+  let methods := (EbnfValue.starView methodAtom rawMethods).map
+    (EbnfValue.ruleView .instanceMethod)
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      genericPrefix := genericPrefix
+      «default» := defaultToken.map fun terminal =>
+        { span := terminal.span, payload := .defaultModifier }
+      main := EbnfValue.ruleView .typeAtom rawMain
+      className := EbnfValue.ruleView .qualifiedName rawClassName
+      parameters := parameters
+      methods := methods
+    }
+
 /-- Execute one algebraic-data constructor and its optional field types. -/
 def executeDataConstructorRoot
     (file : WorkspaceFile) (tokens : List Token)
