@@ -10635,6 +10635,118 @@ private def contextualCompletedEdge?
   else
     none
 
+/-- Construct a contextual scan while retaining the checked terminal witness
+needed by the semantic value frontier. -/
+def witnessedContextualScannedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (before : ContextualItemKey tokens) :
+    Option (ContextualItemKey tokens ×
+      WitnessedContextualScannedEdge file tokens) :=
+  if nextInRange :
+      before.raw.dot.val < before.raw.production.rhs.length then
+    match nextEq : before.raw.production.rhs[before.raw.dot.val] with
+    | .terminal terminal =>
+        if currentInRange : before.raw.current.val < tokens.length + 1 then
+          let cursor : TerminalCursor tokens :=
+            ⟨before.raw.current.val, currentInRange⟩
+          match MatchedTerminal.atCursor?
+              file tokens owned terminal cursor with
+          | none => none
+          | some matched =>
+              let afterRaw : DottedItem tokens := {
+                production := before.raw.production
+                dot := ⟨before.raw.dot.val + 1, by omega⟩
+                origin := before.raw.origin
+                current := cursor.afterBoundary
+              }
+              let after : ContextualItemKey tokens := {
+                raw := afterRaw
+                context := before.context
+              }
+              let witness : ScannedEdgeWitness
+                  file tokens before.raw after.raw cursor := {
+                terminal := terminal
+                matched := matched.val
+                sameCursor := matched.property
+                next := by
+                  constructor
+                  · exact nextInRange
+                  · rw [List.getElem?_eq_getElem nextInRange, nextEq]
+                atCurrent := Fin.ext rfl
+                advance := by
+                  rw [matched.property]
+                  simp [AdvanceItem, after, afterRaw]
+              }
+              some (after, {
+                before := before
+                after := after
+                cursor := cursor
+                witness := witness
+                sameContext := rfl
+              })
+        else
+          none
+    | _ => none
+  else
+    none
+
+/-- Construct a contextual completion while retaining the checked dependent
+transport witness needed by the semantic value frontier. -/
+def witnessedContextualCompletedEdge?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished : ContextualItemKey tokens) :
+    Option (ContextualItemKey tokens ×
+      WitnessedContextualCompletedEdge file tokens) :=
+  if nextInRange :
+      waiting.raw.dot.val < waiting.raw.production.rhs.length then
+    match nextEq : waiting.raw.production.rhs[waiting.raw.dot.val] with
+    | .nonterminal symbol =>
+        if sameLhs : symbol = finished.raw.production.lhs then
+          if complete :
+              finished.raw.dot.val = finished.raw.production.rhs.length then
+            if sameCursor : waiting.raw.current = finished.raw.origin then
+              if sameContext : finished.context =
+                  descendContext waiting finished.raw.production then
+                let afterRaw : DottedItem tokens := {
+                  production := waiting.raw.production
+                  dot := ⟨waiting.raw.dot.val + 1, by omega⟩
+                  origin := waiting.raw.origin
+                  current := finished.raw.current
+                }
+                let after : ContextualItemKey tokens := {
+                  raw := afterRaw
+                  context := waiting.context
+                }
+                let witness : CompletedEdgeWitness tokens waiting.raw
+                    finished.raw after.raw waiting.raw.current := {
+                  next := by
+                    constructor
+                    · exact nextInRange
+                    · rw [List.getElem?_eq_getElem nextInRange,
+                        nextEq, sameLhs]
+                  complete := complete
+                  waitingAtShared := rfl
+                  finishedAtShared := sameCursor.symm
+                  advance := by simp [AdvanceItem, after, afterRaw]
+                }
+                some (after, {
+                  waiting := waiting
+                  finished := finished
+                  after := after
+                  shared := waiting.raw.current
+                  witness := witness
+                  finishedContext := sameContext
+                  afterContext := rfl
+                })
+              else none
+            else none
+          else none
+        else none
+    | _ => none
+  else
+    none
+
 end Chart
 
 namespace Chart
