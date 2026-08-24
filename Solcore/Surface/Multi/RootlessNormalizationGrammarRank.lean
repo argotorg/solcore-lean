@@ -49,6 +49,119 @@ theorem frontierGrammarRank_lt_of_advance_withPotential
   unfold frontierGrammarRank frontierRawGrammarRank frontierRhsRemaining
   rw [potentialEq]
   omega
+
+private theorem sublist_flatMap_of_mem
+    {alpha beta : Type} (f : alpha → List beta)
+    {value : alpha} {values : List alpha} (member : value ∈ values) :
+    (f value).Sublist (values.flatMap f) := by
+  induction values with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact List.sublist_append_left _ _
+      · exact (induction member).trans (List.sublist_append_right _ _)
+
+/-- Every expanded RHS is bounded by the public dotted-position count. -/
+theorem productionRhsLength_le_D (production : ProductionId) :
+    production.rhs.length ≤ D := by
+  let block : List DottedRhs :=
+    (List.ofFn fun dot : Fin (production.rhs.length + 1) => dot).map
+      fun dot => ({ production, dot } : DottedRhs)
+  have sublist : block.Sublist allDottedRhs := by
+    exact sublist_flatMap_of_mem
+      (fun selected =>
+        (List.ofFn fun dot : Fin (selected.rhs.length + 1) => dot).map
+          fun dot => ({ production := selected, dot } : DottedRhs))
+      (allProductionIds_complete production)
+  have lengthLe := sublist.length_le
+  have blockLength : block.length = production.rhs.length + 1 := by
+    simp [block]
+  rw [blockLength, allDottedRhs_length] at lengthLe
+  omega
+
+/-- Strict descent of a coarse grammar/span potential dominates every
+possible dotted-RHS remainder. -/
+theorem frontierRawGrammarRank_lt_of_potential_lt
+    {tokens : List Token} (potential : FrontierGrammarPotential tokens)
+    {before after : DottedItem tokens}
+    (decreases : potential after.production after.origin after.current <
+      potential before.production before.origin before.current) :
+    frontierRawGrammarRank potential after <
+      frontierRawGrammarRank potential before := by
+  have remainingLe : frontierRhsRemaining after ≤ D :=
+    Nat.le_trans (Nat.sub_le _ _) (productionRhsLength_le_D _)
+  have potentialStep :
+      potential after.production after.origin after.current + 1 ≤
+        potential before.production before.origin before.current :=
+    Nat.succ_le_of_lt decreases
+  unfold frontierRawGrammarRank
+  calc
+    (D + 1) * potential after.production after.origin after.current +
+          frontierRhsRemaining after ≤
+        (D + 1) * potential after.production after.origin after.current + D :=
+      Nat.add_le_add_left remainingLe _
+    _ < (D + 1) * potential after.production after.origin after.current +
+          (D + 1) := by omega
+    _ = (D + 1) *
+          (potential after.production after.origin after.current + 1) := by
+      rw [Nat.mul_add, Nat.mul_one]
+    _ ≤ (D + 1) *
+          potential before.production before.origin before.current :=
+      Nat.mul_le_mul_left _ potentialStep
+    _ ≤ (D + 1) *
+          potential before.production before.origin before.current +
+          frontierRhsRemaining before := Nat.le_add_right _ _
+
+/-- A two-mode potential separates zero-span predictions from already
+progressed frames, while retaining a finite production-local weight. -/
+def frontierSpanPotential
+    (width : Nat) (zero positive : ProductionId → Nat)
+    {tokens : List Token} : FrontierGrammarPotential tokens :=
+  fun production origin current =>
+    if origin = current then zero production
+    else (origin.val + 1) * width + positive production
+
+/-- Once a waiting item has consumed input, its predicted zero-span child has
+strictly smaller coarse potential whenever zero weights fit the production
+carrier. -/
+theorem frontierSpanPotential_predicted_lt_of_positiveSpan
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (zeroBound : ∀ production, zero production < width)
+    {tokens : List Token} (waiting : ContextualItemKey tokens)
+    (production : ProductionId)
+    (progress : waiting.raw.origin.val < waiting.raw.current.val) :
+    frontierSpanPotential width zero positive production
+        waiting.raw.current waiting.raw.current <
+      frontierSpanPotential width zero positive waiting.raw.production
+        waiting.raw.origin waiting.raw.current := by
+  have different : waiting.raw.origin ≠ waiting.raw.current := by
+    intro equal
+    rw [equal] at progress
+    omega
+  simp only [frontierSpanPotential, if_neg different]
+  exact Nat.lt_of_lt_of_le (zeroBound production)
+    (calc
+      width ≤ width + (waiting.raw.origin.val * width +
+          positive waiting.raw.production) := Nat.le_add_right _ _
+      _ = (waiting.raw.origin.val + 1) * width +
+          positive waiting.raw.production := by
+        simp [Nat.add_mul, Nat.add_comm, Nat.add_left_comm])
+
+/-- Positive-span frontier prediction decreases the full grammar rank. -/
+theorem frontierGrammarRank_lt_predicted_of_positiveSpan
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (zeroBound : ∀ production, zero production < width)
+    {tokens : List Token} (waiting : ContextualItemKey tokens)
+    (production : ProductionId)
+    (progress : waiting.raw.origin.val < waiting.raw.current.val) :
+    frontierGrammarRank (frontierSpanPotential width zero positive)
+        (FrontierPredictedItem waiting production) <
+      frontierGrammarRank (frontierSpanPotential width zero positive)
+        waiting := by
+  apply frontierRawGrammarRank_lt_of_potential_lt
+  exact frontierSpanPotential_predicted_lt_of_positiveSpan
+    width zero positive zeroBound waiting production progress
 private def nextSymbolDecision
     {tokens : List Token} (item : DottedItem tokens)
     (symbol : GrammarSymbol) : Decidable (NextSymbol item symbol) := by
@@ -352,6 +465,100 @@ def frontierPredictionRankTable
     allProductionIds.all fun production =>
       frontierPredictionRankCell owned correct final cursor potential
         waiting production
+
+/-- For the span-separated potential, only zero-span prediction cells remain
+to be established: every positive-span cell decreases automatically. -/
+theorem frontierPredictionRankTable_eq_true_of_zeroSpan
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (width : Nat) (zero positive : ProductionId → Nat)
+    (zeroBound : ∀ production, zero production < width)
+    (zeroSpan : ∀ waiting production,
+      ContextualReach file tokens memo correct final waiting →
+      waiting.raw.current = cursor →
+      waiting.raw.origin = waiting.raw.current →
+      NextSymbol waiting.raw (.nonterminal production.lhs) →
+      EnabledProductionInstance file tokens memo correct final {
+        production := production
+        origin := waiting.raw.current
+        context := descendContext waiting production
+      } →
+      production.rhs ≠ [] →
+      frontierGrammarRank (frontierSpanPotential width zero positive)
+          (FrontierPredictedItem waiting production) <
+        frontierGrammarRank (frontierSpanPotential width zero positive)
+          waiting) :
+    frontierPredictionRankTable owned correct final cursor
+      (frontierSpanPotential width zero positive) = true := by
+  apply List.all_eq_true.mpr
+  intro waiting _waitingMember
+  apply List.all_eq_true.mpr
+  intro production _productionMember
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  letI : Decidable
+      (NextSymbol waiting.raw (.nonterminal production.lhs)) :=
+    nextSymbolDecision waiting.raw (.nonterminal production.lhs)
+  letI : Decidable
+      (EnabledProductionInstance file tokens memo correct final {
+        production := production
+        origin := waiting.raw.current
+        context := descendContext waiting production
+      }) := enabledProductionInstanceDecision correct final _
+  letI : Decidable (waiting.raw.current = cursor) := inferInstance
+  letI : Decidable (production.rhs ≠ []) := inferInstance
+  letI : Decidable
+      (frontierGrammarRank (frontierSpanPotential width zero positive)
+          (FrontierPredictedItem waiting production) <
+        frontierGrammarRank (frontierSpanPotential width zero positive)
+          waiting) := inferInstance
+  by_cases reached : ContextualReach file tokens memo correct final waiting
+  · by_cases current : waiting.raw.current = cursor
+    · by_cases next :
+          NextSymbol waiting.raw (.nonterminal production.lhs)
+      · by_cases enabled : EnabledProductionInstance file tokens memo
+            correct final {
+              production := production
+              origin := waiting.raw.current
+              context := descendContext waiting production
+            }
+        · by_cases nonempty : production.rhs ≠ []
+          · simp only [frontierPredictionRankCell, if_pos reached,
+              if_pos current, if_pos next, if_pos enabled,
+              if_pos nonempty, decide_eq_true_iff]
+            by_cases atOrigin :
+                waiting.raw.origin = waiting.raw.current
+            · exact zeroSpan waiting production reached current atOrigin
+                next enabled nonempty
+            · have ordered := contextualReach_ordered reached
+              have valueNe : waiting.raw.origin.val ≠
+                  waiting.raw.current.val := by
+                intro equal
+                exact atOrigin (Fin.ext equal)
+              exact frontierGrammarRank_lt_predicted_of_positiveSpan
+                width zero positive zeroBound waiting production
+                  (Nat.lt_of_le_of_ne ordered valueNe)
+          · simp [frontierPredictionRankCell, reached, current, next,
+              nonempty]
+        · have disabledAtCursor : ¬ EnabledProductionInstance file tokens
+              memo correct final {
+                production := production
+                origin := cursor
+                context := descendContext waiting production
+              } := by
+            intro enabledAtCursor
+            apply enabled
+            rw [current]
+            exact enabledAtCursor
+          simp [frontierPredictionRankCell, reached, current, next,
+            disabledAtCursor]
+      · simp [frontierPredictionRankCell, reached, current, next]
+    · simp [frontierPredictionRankCell, reached, current]
+  · simp [frontierPredictionRankCell, reached]
 theorem frontierPredictionRank_lt_of_table
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
