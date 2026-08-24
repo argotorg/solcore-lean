@@ -10567,6 +10567,63 @@ theorem executeMatchArmRoot_reduces
     ← rawStatementsEq]
   exact .matchArm origin finish pipe patterns arrow statements witness
 
+private theorem patternRuleAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (inputs : List
+      (EbnfValue file tokens (.atom (.nonterminal .pattern)))) :
+    (inputs.map (EbnfValue.ruleView .pattern)).map
+        (EbnfValue.ruleAtom .pattern) = inputs := by
+  induction inputs with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [EbnfValue.rule_of_view, induction]
+
+private theorem patternRuleList1_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens
+      (.list1 (.atom (.nonterminal .pattern)))) :
+    EbnfValue.list1 (.atom (.nonterminal .pattern))
+      ((EbnfValue.list1View (.atom (.nonterminal .pattern)) input).map
+        (EbnfValue.ruleView .pattern) |>.map
+          (EbnfValue.ruleAtom .pattern)) = input := by
+  let viewed := EbnfValue.list1View
+    (.atom (.nonterminal .pattern)) input
+  have mapEq : (viewed.map (EbnfValue.ruleView .pattern)).map
+      (EbnfValue.ruleAtom .pattern) = viewed := by
+    cases viewed with
+    | mk head tail =>
+        simp only [NonemptyList.map, NonemptyList.mk.injEq]
+        exact ⟨EbnfValue.rule_of_view .pattern head,
+          patternRuleAtoms_of_views tail⟩
+  rw [mapEq]
+  exact EbnfValue.list1_of_view
+    (.atom (.nonterminal .pattern)) input
+
+private theorem patternTupleStar_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens (.star
+      (EbnfValue.fixedInfixTailExpr (.symbol .comma) .pattern))) :
+    EbnfValue.star
+      (EbnfValue.fixedInfixTailExpr (.symbol .comma) .pattern)
+      (((EbnfValue.starView
+        (EbnfValue.fixedInfixTailExpr (.symbol .comma) .pattern) input).map
+          (EbnfValue.fixedInfixTailView (.symbol .comma) .pattern)).map
+        (EbnfValue.fixedInfixTailValue (.symbol .comma) .pattern)) = input := by
+  let rawRest := EbnfValue.starView
+    (EbnfValue.fixedInfixTailExpr (.symbol .comma) .pattern) input
+  have mapEq : ((rawRest.map (EbnfValue.fixedInfixTailView
+      (.symbol .comma) .pattern)).map (EbnfValue.fixedInfixTailValue
+        (.symbol .comma) .pattern)) = rawRest := by
+    induction rawRest with
+    | nil => rfl
+    | cons head tail induction =>
+        simp only [List.map_cons, List.cons.injEq]
+        exact ⟨EbnfValue.fixedInfixTailValue_of_view
+          (.symbol .comma) .pattern head, induction⟩
+  rw [mapEq]
+  exact EbnfValue.star_of_view
+    (EbnfValue.fixedInfixTailExpr (.symbol .comma) .pattern) input
+
 /-- Align one dotted module path tail with its parsed path component. -/
 private def moduleRefTailData
     {file : WorkspaceFile} {tokens : List Token}
