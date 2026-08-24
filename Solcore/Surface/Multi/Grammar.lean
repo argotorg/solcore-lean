@@ -990,6 +990,79 @@ termination_by path => path.length
 
 mutual
 
+/-- Test whether a source rule occurs as a nonterminal atom in an EBNF tree. -/
+private def hasRuleRef (target : GrammarRuleId) : EbnfExpr → Bool
+  | .atom (.terminal _) => false
+  | .atom (.nonterminal rule) => rule == target
+  | .sequence children
+  | .choice children => hasRuleRefs target children
+  | .group child
+  | .optional child
+  | .star child
+  | .plus child
+  | .list0 child
+  | .list1 child => hasRuleRef target child
+
+private def hasRuleRefs (target : GrammarRuleId) : List EbnfExpr → Bool
+  | [] => false
+  | child :: rest => hasRuleRef target child || hasRuleRefs target rest
+
+end
+
+private theorem hasRuleRefs_of_mem
+    {target : GrammarRuleId} {child : EbnfExpr} {children : List EbnfExpr}
+    (member : child ∈ children)
+    (references : hasRuleRef target child = true) :
+    hasRuleRefs target children = true := by
+  induction children with
+  | nil => simp at member
+  | cons head rest induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · simp [hasRuleRefs, references]
+      · simp [hasRuleRefs, induction member]
+
+private theorem hasRuleRef_of_child_mem
+    {target : GrammarRuleId} {root child : EbnfExpr}
+    (member : child ∈ root.children)
+    (references : hasRuleRef target child = true) :
+    hasRuleRef target root = true := by
+  cases root with
+  | atom atom => simp [children] at member
+  | sequence children => exact hasRuleRefs_of_mem member references
+  | choice branches => exact hasRuleRefs_of_mem member references
+  | group selected
+  | optional selected
+  | star selected
+  | plus selected
+  | list0 selected
+  | list1 selected =>
+      simp only [children, List.mem_singleton] at member
+      subst child
+      exact references
+
+private theorem hasRuleRef_of_nodeAt?_eq_some
+    {target : GrammarRuleId} {root selected : EbnfExpr} {path : List Nat}
+    (lookup : root.nodeAt? path = some selected)
+    (references : hasRuleRef target selected = true) :
+    hasRuleRef target root = true := by
+  induction path generalizing root with
+  | nil =>
+      simp only [nodeAt?, Option.some.injEq] at lookup
+      subst selected
+      exact references
+  | cons index rest induction =>
+      simp only [nodeAt?] at lookup
+      cases selectedChild : root.children[index]? with
+      | none => simp [selectedChild] at lookup
+      | some child =>
+          rw [selectedChild] at lookup
+          exact hasRuleRef_of_child_mem
+            (List.mem_of_getElem? selectedChild)
+            (induction lookup)
+
+mutual
+
 private def paths : EbnfExpr → List (List Nat)
   | .atom _ => [[]]
   | .sequence children
@@ -1871,6 +1944,45 @@ theorem symbol_eq (site : AtomSite) :
     site.symbol = site.atom.grammarSymbol :=
   rfl
 
+private theorem rule_eq_postfix_of_references_atom
+    (rule : GrammarRuleId) :
+    EbnfExpr.hasRuleRef .atom (m2cV1.rhs rule) = true →
+      rule = .postfix := by
+  cases rule <;> decide
+
+/-- The only atom site referring to the source `atom` rule belongs to the
+source `postfix` rule. -/
+theorem rule_eq_postfix_of_symbol_atom
+    (site : AtomSite)
+    (symbol : site.symbol =
+      GrammarSymbol.nonterminal (.rule .atom)) :
+    site.site.val.rule = .postfix := by
+  have atom : site.atom = EbnfAtom.nonterminal .atom := by
+    cases selected : site.atom with
+    | terminal value =>
+        simp [AtomSite.symbol, EbnfAtom.grammarSymbol, selected] at symbol
+    | nonterminal rule =>
+        have ruleEq : rule = .atom := by
+          simpa [AtomSite.symbol, EbnfAtom.grammarSymbol, selected]
+            using symbol
+        simp [ruleEq]
+  have expression : site.site.expression =
+      EbnfExpr.atom (.nonterminal .atom) := by
+    rw [AtomSite.expression_eq_atom, atom]
+  have valid :
+      ((m2cV1.rhs site.site.val.rule).nodeAt?
+        site.site.val.path).isSome = true := by
+    simpa [GrammarSiteKey.valid] using site.site.property
+  have selected :
+      (m2cV1.rhs site.site.val.rule).nodeAt? site.site.val.path =
+        some site.site.expression := by
+    apply Option.eq_some_iff_get_eq.mpr
+    exact ⟨valid, rfl⟩
+  exact rule_eq_postfix_of_references_atom _
+    (EbnfExpr.hasRuleRef_of_nodeAt?_eq_some
+      (selected.trans (congrArg some expression))
+      rfl)
+
 end AtomSite
 
 namespace ListSite
@@ -2171,6 +2283,100 @@ theorem sourceRule_eq_of_tail_mem_rhs
       · simp [rhs] at member
         subst site
         rfl
+
+/-- An expanded right-hand side can refer to the source `atom` rule only from
+a production owned by the source `postfix` rule. -/
+theorem sourceRule_eq_postfix_of_rule_atom_mem_rhs
+    (parent : ProductionId)
+    (member : GrammarSymbol.nonterminal (.rule .atom) ∈ parent.rhs) :
+    parent.sourceRule = .postfix := by
+  cases parent with
+  | root rule => simp [rhs] at member
+  | atom site =>
+      simp [rhs] at member
+      exact AtomSite.rule_eq_postfix_of_symbol_atom site member.symm
+  | seq site => simp [rhs] at member
+  | group site => simp [rhs] at member
+  | choice site branch => simp [rhs] at member
+  | opt site branch => cases branch <;> simp [rhs] at member
+  | star site branch => cases branch <;> simp [rhs] at member
+  | plus site branch => cases branch <;> simp [rhs] at member
+  | list0 site branch => cases branch <;> simp [rhs] at member
+  | list1 site => simp [rhs] at member
+  | tail site branch => cases branch <;> simp [rhs] at member
+
+/-- A prediction entering the `postfix`/`atom` expansion region either starts
+the postfix root or comes from a production already inside that region. -/
+theorem enters_postfix_region_of_lhs_mem_rhs
+    (parent predicted : ProductionId)
+    (member : GrammarSymbol.nonterminal predicted.lhs ∈ parent.rhs)
+    (inRegion : predicted.sourceRule = .postfix ∨
+      predicted.sourceRule = .atom) :
+    predicted = .root .postfix ∨
+      parent.sourceRule = .postfix ∨
+      parent.sourceRule = .atom := by
+  cases predicted with
+  | root rule =>
+      rcases inRegion with inPostfix | inAtom
+      · left
+        simpa [sourceRule] using congrArg ProductionId.root inPostfix
+      · right
+        left
+        have atomRule : rule = .atom := by
+          simpa [sourceRule] using inAtom
+        subst rule
+        exact sourceRule_eq_postfix_of_rule_atom_mem_rhs parent
+          (by simpa [lhs] using member)
+  | atom site =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | seq site =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | group site =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | choice site branch =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | opt site branch =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | star site branch =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | plus site branch =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | list0 site branch =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | list1 site =>
+      right
+      rw [sourceRule_eq_of_aux_mem_rhs parent site.site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
+  | tail site branch =>
+      right
+      rw [sourceRule_eq_of_tail_mem_rhs parent site
+        (by simpa [lhs] using member)]
+      simpa [sourceRule] using inRegion
 
 end ProductionId
 
