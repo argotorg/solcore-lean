@@ -34850,4 +34850,193 @@ private theorem beginPhaseCWorklist?_edgesNodup
   rw [runMappedPrimitive?_payload current _ _ enteredEq]
   simp
 
+private theorem attemptContextualPrediction?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : attemptContextualPrediction? current waiting predicted =
+      some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold attemptContextualPrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq] at selected
+      cases selected
+      exact unique
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq] at selected
+      cases attemptedEq : runMappedPrimitive? current
+          (.prediction .R01_predictionAttempt
+            (contextualPredictionKey waiting predicted)) id with
+      | none => simp [attemptedEq] at selected
+      | some attempted =>
+          have attemptedUnique := phaseC_runMappedPrimitive?_edgesNodup
+            current attempted _ unique attemptedEq
+          by_cases used : (UnitAddress.production productionInstance) ∈
+              attempted.counter.usedRev
+          · simp [attemptedEq, used] at selected
+            cases selected
+            exact attemptedUnique
+          · cases activatedEq :
+                activateWorklistProduction? attempted productionInstance with
+            | none => simp [attemptedEq, used, activatedEq] at selected
+            | some activated =>
+                have activatedUnique := activateWorklistProduction?_edgesNodup
+                  attempted productionInstance activated attemptedUnique
+                    activatedEq
+                cases acceptedEq : activated.2
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  cases selected
+                  exact activatedUnique
+                · simp [attemptedEq, used, activatedEq, acceptedEq]
+                    at selected
+                  exact insertContextualItem?_edgesNodup activated.1 result
+                    .prediction item activatedUnique selected
+
+private theorem attemptContextualPredictions?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ (productions : List ProductionId)
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      current.payload.phaseC.contextualEdges.Nodup →
+      attemptContextualPredictions? waiting productions current = some result →
+      result.payload.phaseC.contextualEdges.Nodup := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result unique selected
+      cases selected
+      exact unique
+  | cons predicted rest induction =>
+      intro current result unique selected
+      rw [attemptContextualPredictions?] at selected
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact induction next result
+        (attemptContextualPrediction?_edgesNodup current next waiting predicted
+          unique nextEq) restEq
+
+private theorem attemptContextualScan?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (before : ContextualItemKey tokens)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : attemptContextualScan? owned current before = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold attemptContextualScan? at selected
+  split at selected
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨attempted, attemptedEq, remainderEq⟩
+    have attemptedUnique := phaseC_runMappedPrimitive?_edgesNodup current
+      attempted _ unique attemptedEq
+    cases scannedEq : contextualScannedEdge? owned before with
+    | none =>
+        simp only [scannedEq] at remainderEq
+        cases remainderEq
+        exact attemptedUnique
+    | some pair =>
+        rcases pair with ⟨after, edge⟩
+        simp only [scannedEq, Option.bind_eq_some_iff] at remainderEq
+        rcases remainderEq with ⟨withItem, itemEq, edgeEq⟩
+        exact insertContextualScannedEdge?_edgesNodup withItem result edge
+          (insertContextualItem?_edgesNodup attempted withItem .scan after
+            attemptedUnique itemEq) edgeEq
+  · cases selected
+    exact unique
+
+private theorem attemptContextualCompletionMulti?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting finished : ContextualItemKey tokens)
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : attemptContextualCompletionMulti? current waiting finished =
+      some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold attemptContextualCompletionMulti? at selected
+  cases completionEq : contextualCompletedEdge?
+      (file := file) waiting finished with
+  | none =>
+      simp only [completionEq] at selected
+      cases selected
+      exact unique
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      simp only [completionEq] at selected
+      split at selected
+      · cases selected
+        exact unique
+      · simp only [Option.bind_eq_bind,
+          Option.bind_eq_some_iff] at selected
+        rcases selected with
+          ⟨attempted, attemptedEq, withItem, itemEq, edgeEq⟩
+        have attemptedUnique := phaseC_runMappedPrimitive?_edgesNodup current
+          attempted _ unique attemptedEq
+        have withItemUnique := insertContextualItem?_edgesNodup attempted
+          withItem .completion after attemptedUnique itemEq
+        exact insertContextualCompletedEdgeMulti?_edgesNodup withItem result
+          edge withItemUnique edgeEq
+
+private theorem attemptContextualCompletionsWithMulti?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : ContextualItemKey tokens) :
+    ∀ (others : List (ContextualItemKey tokens))
+      (current result : CountedState tokens (PhaseCWorklist file tokens)),
+      current.payload.phaseC.contextualEdges.Nodup →
+      attemptContextualCompletionsWithMulti? pivot others current =
+        some result →
+      result.payload.phaseC.contextualEdges.Nodup := by
+  intro others
+  induction others with
+  | nil =>
+      intro current result unique selected
+      cases selected
+      exact unique
+  | cons other rest induction =>
+      intro current result unique selected
+      rw [attemptContextualCompletionsWithMulti?] at selected
+      cases forwardEq :
+          attemptContextualCompletionMulti? current pivot other with
+      | none => simp [forwardEq] at selected
+      | some forward =>
+          rw [forwardEq] at selected
+          have forwardUnique := attemptContextualCompletionMulti?_edgesNodup
+            current forward pivot other unique forwardEq
+          split at selected
+          next same =>
+            exact induction forward result forwardUnique selected
+          next different =>
+            simp only [Option.bind_eq_bind, Option.bind_some] at selected
+            cases reverseEq :
+                attemptContextualCompletionMulti? forward other pivot with
+            | none => simp [reverseEq] at selected
+            | some reverse =>
+                rw [reverseEq] at selected
+                exact induction reverse result
+                  (attemptContextualCompletionMulti?_edgesNodup forward
+                    reverse other pivot forwardUnique reverseEq) selected
+
+private theorem processContextualItemMulti?_edgesNodup
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (item : ContextualItemKey tokens)
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (unique : current.payload.phaseC.contextualEdges.Nodup)
+    (selected : processContextualItemMulti? owned item current = some result) :
+    result.payload.phaseC.contextualEdges.Nodup := by
+  unfold processContextualItemMulti? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with
+    ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
+  have predictedUnique := attemptContextualPredictions?_edgesNodup item
+    allProductionIds current predicted unique predictedEq
+  have scannedUnique := attemptContextualScan?_edgesNodup owned predicted
+    scanned item predictedUnique scannedEq
+  exact attemptContextualCompletionsWithMulti?_edgesNodup item
+    scanned.payload.phaseC.contextualItems scanned result scannedUnique
+      completedEq
+
 end Solcore.Surface.Multi.Chart
