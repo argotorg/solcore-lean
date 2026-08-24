@@ -5878,6 +5878,7 @@ inductive ExecutableRootRule : GrammarRuleId → Type where
   | returnStatement : ExecutableRootRule .returnStatement
   | assignmentStatement : ExecutableRootRule .assignmentStatement
   | parameter : ExecutableRootRule .parameter
+  | dataDecl : ExecutableRootRule .dataDecl
   | dataConstructor : ExecutableRootRule .dataConstructor
   | typeAliasDecl : ExecutableRootRule .typeAliasDecl
   | fieldDecl : ExecutableRootRule .fieldDecl
@@ -6915,6 +6916,64 @@ def executeParameterRoot
     name := { span := name.span, payload := name.identifierProjection.2 }
     type := typeValue.map fun value => value.2.1
   }
+
+/-- Execute an algebraic-data declaration and its optional parameters and constructors. -/
+def executeDataDeclRoot
+    (file : WorkspaceFile) (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (owned : TokensOwnedBy file tokens)
+    (ordered : origin.val ≤ finish.val)
+    (input : EbnfValue file tokens (m2cV1.rhs .dataDecl)) : DataDecl :=
+  let identifierAtom : EbnfExpr :=
+    .atom (.terminal (.category .identifier))
+  let constructorAtom : EbnfExpr :=
+    .atom (.nonterminal .dataConstructor)
+  let parameterChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .leftParen)), .list1 identifierAtom,
+    .atom (.terminal (.symbol .rightParen))]
+  let constructorTail : EbnfExpr := .group (.sequence [
+    .atom (.terminal (.symbol .pipe)), constructorAtom])
+  let constructorChild : EbnfExpr := .sequence [
+    .atom (.terminal (.symbol .equal)), constructorAtom,
+    .star constructorTail]
+  let children : List EbnfExpr := [
+    .atom (.terminal (.hardKeyword .dataKw)), identifierAtom,
+    .optional parameterChild, .optional constructorChild,
+    .atom (.terminal (.symbol .semicolon))]
+  let ⟨_, rawName, rawParameters, rawConstructors, _, ⟨⟩⟩ :=
+    EbnfValue.sequenceFlatView children input
+  let name := EbnfValue.terminalView (.category .identifier) rawName
+  let parameters := (EbnfValue.optionalView
+    parameterChild rawParameters).map fun raw =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .leftParen)))
+        (.list1 identifierAtom)
+        (.atom (.terminal (.symbol .rightParen))) raw
+      (EbnfValue.list1View identifierAtom viewed.2.1).map fun value =>
+        let terminal := EbnfValue.terminalView
+          (.category .identifier) value
+        { span := terminal.span, payload := terminal.identifierProjection.2 }
+  let constructors := (EbnfValue.optionalView
+    constructorChild rawConstructors).map fun raw =>
+      let viewed := EbnfValue.sequence3View
+        (.atom (.terminal (.symbol .equal))) constructorAtom
+        (.star constructorTail) raw
+      let head := EbnfValue.ruleView .dataConstructor viewed.2.1
+      let tail := (EbnfValue.starView constructorTail viewed.2.2).map
+        fun rawTail =>
+          let sequence := EbnfValue.groupView
+            (.sequence [.atom (.terminal (.symbol .pipe)),
+              constructorAtom]) rawTail
+          let pair := EbnfValue.sequence2View
+            (.atom (.terminal (.symbol .pipe))) constructorAtom sequence
+          EbnfValue.ruleView .dataConstructor pair.2
+      { head := head, tail := tail }
+  sourceLoc
+    (ConsumedSpanWitness.compute file tokens origin finish owned ordered) {
+      name := { span := name.span, payload := name.identifierProjection.2 }
+      parameters := parameters
+      constructors := constructors
+    }
 
 /-- Execute one algebraic-data constructor and its optional field types. -/
 def executeDataConstructorRoot
@@ -8899,6 +8958,8 @@ def executeRootRule
       executeAssignmentStatementRoot file tokens origin finish owned ordered input
   | .parameter =>
       executeParameterRoot file tokens origin finish owned ordered input
+  | .dataDecl =>
+      executeDataDeclRoot file tokens origin finish owned ordered input
   | .dataConstructor =>
       executeDataConstructorRoot file tokens origin finish owned ordered input
   | .typeAliasDecl =>
