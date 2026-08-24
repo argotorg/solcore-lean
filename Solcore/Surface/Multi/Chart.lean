@@ -25462,6 +25462,196 @@ private theorem attemptPhaseCValuePrediction?_new_used
         rw [attemptedUsed, List.mem_cons] at used
         exact used.elim Or.inl fun old => (fresh old).elim
 
+/-- One prediction preserves the stable causal address invariant once its
+dequeued source is known present and no longer queued. -/
+private theorem attemptPhaseCValuePrediction?_addressSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (safe : PhaseCValueAddressSafe current)
+    (sourcePresent : current.payload.frontier.prefixMemberBool waiting = true)
+    (sourceNotQueued : waiting ∉ current.payload.frontier.queue)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    PhaseCValueAddressSafe result := by
+  constructor
+  · intro target member
+    rcases attemptPhaseCValuePrediction?_queue_member owned current result
+      waiting target predicted selected member with old | new
+    · exact attemptPhaseCValuePrediction?_preserves_sourceFresh owned current
+        result waiting target predicted (by
+          intro equal
+          exact sourceNotQueued (equal ▸ old))
+            (safe.queuedSourceFresh target old) selected
+    · rcases new with ⟨item, productionInstance, predictedEq, absent, equal⟩
+      subst item
+      apply attemptPhaseCValuePrediction?_preserves_sourceFresh owned current
+        result waiting target predicted
+      · intro equal
+        subst target
+        rw [sourcePresent] at absent
+        contradiction
+      · exact safe.sourceFresh_of_absent target absent
+      · exact selected
+  · intro item used
+    by_cases old : (.linear .L08_frontierDequeue
+        (contextualLinearKey item) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+        result waiting item predicted (safe.dequeueUsedPresent item old) selected
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp at attempt
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          footprint⟩
+        cases footprint <;> simp_all
+  · intro item production productionMember used
+    by_cases old : (.prediction .R02_frontierPrediction
+        (contextualPredictionKey item production) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+        result waiting item predicted
+          (safe.predictionUsedPresent item production productionMember old) selected
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp only [UnitAddress.prediction.injEq] at attempt
+        have itemEq := contextualPredictionKey_waiting_eq attempt.2
+        subst item
+        exact attemptPhaseCValuePrediction?_preserves_prefix_present owned
+          current result waiting waiting predicted sourcePresent selected
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          footprint⟩
+        cases footprint <;> simp_all
+  · intro item used
+    by_cases old : (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+        result waiting item predicted (safe.scanTraversalUsedPresent item old)
+          selected
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp at attempt
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          footprint⟩
+        cases footprint <;> simp_all
+  · intro item used
+    by_cases old : (.linear .L12_scannedAction
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+        result waiting item predicted (safe.scanActionUsedPresent item old) selected
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp at attempt
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          footprint⟩
+        cases footprint <;> simp_all
+  · intro item used
+    by_cases old : (.linear .L09_frontierInsert
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+        result waiting item predicted (safe.insertUsedPresent item old) selected
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp at attempt
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          insert | action⟩
+        · simp only [UnitAddress.linear.injEq] at insert
+          simpa [contextualLinearKey_injective insert.2] using present
+        · simp at action
+  · intro item used
+    by_cases old : (.linear .L13_epsilonAction
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_preserves_prefix_present owned current
+        result waiting item predicted (safe.epsilonActionUsedPresent item old)
+          selected
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp at attempt
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          insert | action⟩
+        · simp at insert
+        · simp only [UnitAddress.linear.injEq] at action
+          simpa [contextualLinearKey_injective action.2] using present
+  · intro waitingKey finished used
+    by_cases old : (.cubic .U07_frontierCompletedTraversal
+        (contextualCompletionKey waitingKey finished) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_used_mono owned current result waiting
+        predicted selected
+          (safe.completionTraversalAttempted waitingKey finished old)
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp at attempt
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          footprint⟩
+        cases footprint <;> simp_all
+  · intro waitingKey finished used
+    by_cases old : (.cubic .U05_completedAction
+        (contextualCompletionKey waitingKey finished) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCValuePrediction?_used_mono owned current result waiting
+        predicted selected (safe.completionActionAttempted waitingKey finished old)
+    · rcases attemptPhaseCValuePrediction?_new_used owned current result waiting
+        predicted _ old used selected with attempt | candidate
+      · simp at attempt
+      · rcases candidate with ⟨target, productionInstance, predictedEq, present,
+          footprint⟩
+        cases footprint <;> simp_all
+
+/-- A present dequeued source cannot be re-enqueued by prediction. -/
+private theorem attemptPhaseCValuePrediction?_preserves_sourceNotQueued
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (present : current.payload.frontier.prefixMemberBool waiting = true)
+    (notQueued : waiting ∉ current.payload.frontier.queue)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    waiting ∉ result.payload.frontier.queue := by
+  intro member
+  rcases attemptPhaseCValuePrediction?_queue_member owned current result waiting
+    waiting predicted selected member with old | new
+  · exact notQueued old
+  · rcases new with ⟨item, productionInstance, predictedEq, absent, equal⟩
+    subst item
+    rw [present] at absent
+    contradiction
+
+/-- The two source-local scan charges that follow prediction processing. -/
+private def PhaseCValueScanFresh
+    {tokens : List Token} (counter : Counter tokens)
+    (item : ContextualItemKey tokens) : Prop :=
+  (.linear .L14_frontierScannedTraversal (contextualLinearKey item) :
+      UnitAddress tokens) ∉ counter.usedRev ∧
+  (.linear .L12_scannedAction (contextualLinearKey item) :
+      UnitAddress tokens) ∉ counter.usedRev
+
+/-- Prediction charging leaves the source's two later scan addresses fresh. -/
+private theorem attemptPhaseCValuePrediction?_preserves_scanFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (fresh : PhaseCValueScanFresh current.counter waiting)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    PhaseCValueScanFresh result.counter waiting := by
+  unfold PhaseCValueScanFresh at fresh ⊢
+  constructor
+  · apply attemptPhaseCValuePrediction?_preserves_fresh owned current result
+      waiting predicted _ (by simp) _ fresh.1 selected
+    intro item productionInstance predictedEq
+    exact ⟨by simp, by simp⟩
+  · apply attemptPhaseCValuePrediction?_preserves_fresh owned current result
+      waiting predicted _ (by simp) _ fresh.2 selected
+    intro item productionInstance predictedEq
+    exact ⟨by simp, by simp⟩
+
 private theorem chargeContextualPrediction_itemSafe
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
