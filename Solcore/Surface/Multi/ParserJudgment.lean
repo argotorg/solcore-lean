@@ -18450,6 +18450,151 @@ def enabledNonterminalCoverageAtDecision
               rw [table]
               simp
 
+/-- Static production coverage at one prediction site: every selected
+nonterminal has either a guardless production or a positive/negative singleton
+guard pair sharing the same structural anchor. -/
+def AnchoredNonterminalCoverageAt
+    (tokens : List Token)
+    (waiting : ContextualItemKey tokens) : Prop :=
+  ∀ symbol,
+    NextSymbol waiting.raw (.nonterminal symbol) →
+      (∃ production : ProductionId,
+        production.lhs = symbol ∧ guardOf production = []) ∨
+      ∃ guard : PriorityGuardId,
+        ∃ positive negative : ProductionId,
+          ∃ key : GuardInstanceKey tokens,
+            positive.lhs = symbol ∧
+            negative.lhs = symbol ∧
+            guardOf positive = [(guard, .positive)] ∧
+            guardOf negative = [(guard, .negative)] ∧
+            GuardAnchor {
+              production := positive
+              origin := waiting.raw.current
+              context := descendContext waiting positive
+            } (guard, .positive) key ∧
+            GuardAnchor {
+              production := negative
+              origin := waiting.raw.current
+              context := descendContext waiting negative
+            } (guard, .negative) key
+
+private theorem enabledProductionInstance_of_guardless
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (productionInstance : ProductionInstanceKey tokens)
+    (guardless : guardOf productionInstance.production = []) :
+    EnabledProductionInstance
+      file tokens memo correct final productionInstance := by
+  intro guard polarity member
+  rw [guardless] at member
+  simp at member
+
+private theorem enabledProductionInstance_of_singletonGuard
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (productionInstance : ProductionInstanceKey tokens)
+    (guard : PriorityGuardId)
+    (polarity : Polarity)
+    (only : guardOf productionInstance.production = [(guard, polarity)])
+    (key : GuardInstanceKey tokens)
+    (anchor : GuardAnchor productionInstance (guard, polarity) key)
+    (decision : GuardDecision)
+    (stored : memo key = .final decision)
+    (allowed : decision.allows polarity = true) :
+    EnabledProductionInstance
+      file tokens memo correct final productionInstance := by
+  intro otherGuard otherPolarity member
+  have cellEq :
+      (otherGuard, otherPolarity) = (guard, polarity) := by
+    rw [only] at member
+    simpa using member
+  cases cellEq
+  let raw : GuardWitnessKey.Raw tokens := {
+    productionInstance := productionInstance
+    guardInstance := key
+    polarity := polarity
+  }
+  have valid : GuardWitnessKey.Valid raw := by
+    unfold GuardWitnessKey.Valid
+    simpa only [raw, anchor.2.1] using ⟨anchor.1, anchor⟩
+  let witnessKey : GuardWitnessKey tokens := ⟨raw, valid⟩
+  refine ⟨witnessKey, rfl, ?_, rfl, ?_⟩
+  · exact anchor.2.1
+  · exact ⟨decision, stored, (correct key decision).mp stored,
+      allowed⟩
+
+/-- An anchored positive/negative grammar alternative is enabled on exactly
+one compatible side of every finalized guard decision; neutral permits both. -/
+theorem enabledNonterminalCoverageAt_of_anchored
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens)
+    (anchored : AnchoredNonterminalCoverageAt tokens waiting) :
+    EnabledNonterminalCoverageAt
+      file tokens memo correct final waiting := by
+  intro symbol next
+  rcases anchored symbol next with guardless | guarded
+  · rcases guardless with ⟨production, lhs, noGuards⟩
+    refine ⟨production, lhs, ?_⟩
+    exact enabledProductionInstance_of_guardless {
+      production := production
+      origin := waiting.raw.current
+      context := descendContext waiting production
+    } noGuards
+  · rcases guarded with
+      ⟨guard, positive, negative, key, positiveLhs, negativeLhs,
+        positiveOnly, negativeOnly, positiveAnchor, negativeAnchor⟩
+    rcases final key with ⟨decision, stored⟩
+    cases decision with
+    | positive =>
+        refine ⟨positive, positiveLhs, ?_⟩
+        exact enabledProductionInstance_of_singletonGuard {
+          production := positive
+          origin := waiting.raw.current
+          context := descendContext waiting positive
+        } guard .positive positiveOnly key positiveAnchor .positive
+          stored rfl
+    | negative =>
+        refine ⟨negative, negativeLhs, ?_⟩
+        exact enabledProductionInstance_of_singletonGuard {
+          production := negative
+          origin := waiting.raw.current
+          context := descendContext waiting negative
+        } guard .negative negativeOnly key negativeAnchor .negative
+          stored rfl
+    | neutral =>
+        refine ⟨positive, positiveLhs, ?_⟩
+        exact enabledProductionInstance_of_singletonGuard {
+          production := positive
+          origin := waiting.raw.current
+          context := descendContext waiting positive
+        } guard .positive positiveOnly key positiveAnchor .neutral
+          stored rfl
+
+/-- Anchored grammar coverage forces the exact finite enabled-production table
+to be nonempty at every selected nonterminal. -/
+theorem enabledProductionsForNonterminal_ne_nil_of_anchored
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens)
+    (anchored : AnchoredNonterminalCoverageAt tokens waiting) :
+    ∀ symbol,
+      NextSymbol waiting.raw (.nonterminal symbol) →
+        enabledProductionsForNonterminal
+          correct final waiting symbol ≠ [] :=
+  (enabledNonterminalCoverageAt_iff_finite_nonempty
+    correct final waiting).mp
+      (enabledNonterminalCoverageAt_of_anchored
+        correct final waiting anchored)
+
 /-- One frontier item is either complete, waits for a terminal, advances
 through an enabled epsilon child, or predicts an enabled nonempty child. -/
 def FrontierNormalizationStep
