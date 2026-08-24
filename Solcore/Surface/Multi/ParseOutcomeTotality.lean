@@ -288,6 +288,42 @@ theorem rootlessProgressCertificateBool_eq_true_iff
   · rintro ⟨coverage, completion, prediction, postEof⟩
     exact ⟨⟨⟨coverage, completion⟩, prediction⟩, postEof⟩
 
+/-- After post-EOF closure has been proved for the executor, only the three
+frontier checks remain in its executable progress certificate. -/
+def rootlessFrontierCertificateBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (potential : FrontierGrammarPotential tokens) : Bool :=
+  let cursor := computedGreatestReachableCursor owned correct final
+  frontierCoverageTable owned correct final cursor &&
+    frontierCompletionRankTable owned correct final cursor potential &&
+    frontierPredictionRankTable owned correct final cursor potential
+
+/-- The reduced certificate accepts exactly when its three finite tables do. -/
+theorem rootlessFrontierCertificateBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (potential : FrontierGrammarPotential tokens) :
+    rootlessFrontierCertificateBool owned correct final potential = true ↔
+      let cursor := computedGreatestReachableCursor owned correct final
+      frontierCoverageTable owned correct final cursor = true ∧
+        frontierCompletionRankTable
+          owned correct final cursor potential = true ∧
+        frontierPredictionRankTable
+          owned correct final cursor potential = true := by
+  simp only [rootlessFrontierCertificateBool, Bool.and_eq_true]
+  constructor
+  · rintro ⟨⟨coverage, completion⟩, prediction⟩
+    exact ⟨coverage, completion, prediction⟩
+  · rintro ⟨coverage, completion, prediction⟩
+    exact ⟨⟨coverage, completion⟩, prediction⟩
+
 /-- For an observed recognition result, all remaining frontier components are
 four executable checks: coverage, two rank tables, and post-EOF closure. -/
 theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_checkedTablesAt
@@ -458,6 +494,40 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_ce
     executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_computedTables
       file tokens owned result selected potential
       checks.1 checks.2.1 checks.2.2.1 checks.2.2.2
+
+/-- The saturated executor closes logical EOF internally, so one accepted
+three-table certificate is sufficient for complete rootless progress. -/
+theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_frontierCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+    ∀ potential : FrontierGrammarPotential tokens,
+      rootlessFrontierCertificateBool owned correct final potential = true →
+      RootlessExecutableProgress
+        file tokens result.memo correct final := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  change ∀ potential : FrontierGrammarPotential tokens,
+    rootlessFrontierCertificateBool owned correct final potential = true →
+    RootlessExecutableProgress file tokens result.memo correct final
+  intro potential accepted
+  have checks :=
+    (rootlessFrontierCertificateBool_eq_true_iff owned correct final
+      potential).mp accepted
+  exact
+    executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_computedTables
+      file tokens owned result selected potential
+      checks.1 checks.2.1 checks.2.2
+      (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true
+        file tokens owned result selected)
 
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/
