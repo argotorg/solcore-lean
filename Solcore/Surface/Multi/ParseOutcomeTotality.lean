@@ -440,6 +440,29 @@ def executeObservedContextualNonAssociativeCertificateBool
   nonAssociativeOperandPrefixExclusiveTable
     file tokens owned correct final
 
+/-- One concrete executable certificate combines rootless rank progress and
+the G10 operand-boundary condition. -/
+def executeObservedContextualFormalCertificateBool
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (potential : FrontierGrammarPotential tokens) : Bool :=
+  executeObservedContextualRankCertificateBool
+      file tokens owned potential &&
+    executeObservedContextualNonAssociativeCertificateBool
+      file tokens owned
+
+theorem executeObservedContextualFormalCertificateBool_eq_true_iff
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (potential : FrontierGrammarPotential tokens) :
+    executeObservedContextualFormalCertificateBool
+        file tokens owned potential = true ↔
+      executeObservedContextualRankCertificateBool
+          file tokens owned potential = true ∧
+        executeObservedContextualNonAssociativeCertificateBool
+          file tokens owned = true := by
+  simp [executeObservedContextualFormalCertificateBool]
+
 /-- On the concrete executor ledger, coherent pass-through safety plus the
 accepted operand-prefix table constructs the complete G10 invariant. -/
 theorem executeObservedContextualCoherentNonAssociativeInvariant_of_safe_and_certificate
@@ -969,6 +992,38 @@ def executeObservedContextualParseOfRankCertificate
     (executeObservedContextualValueWorklistMulti?_rootlessExecutableProgress_of_rankCertificate
       file tokens owned result selected ready potential accepted)
 
+/-- Executable parse outcome driven by the combined rank and G10 finite
+certificate. -/
+def executeObservedContextualParseOfFormalCertificate
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted : executeObservedContextualFormalCertificateBool
+      file tokens owned potential = true) :
+    Except ParseDiagnostic ParsedModuleV1 :=
+  let checks :=
+    (executeObservedContextualFormalCertificateBool_eq_true_iff
+      file tokens owned potential).mp accepted
+  executeObservedContextualParseOfRankCertificate
+    file tokens owned ready potential checks.1
+
 /-- The certificate-driven executable outcome is exactly the value selected
 by the option-based implementation. -/
 theorem executeObservedContextualParseOfProgress_selected
@@ -1065,6 +1120,43 @@ theorem executeObservedContextualParseOfRankCertificate_selected
         (Chart.executeObservedContextualValueWorklistMulti_selected
           file tokens owned)
         ready potential accepted)
+
+/-- The combined-certificate entry point selects exactly the implementation's
+option result. -/
+theorem executeObservedContextualParseOfFormalCertificate_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted : executeObservedContextualFormalCertificateBool
+      file tokens owned potential = true) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    result.parseOutcome? file =
+      some (executeObservedContextualParseOfFormalCertificate
+        file tokens owned ready potential accepted) := by
+  let checks :=
+    (executeObservedContextualFormalCertificateBool_eq_true_iff
+      file tokens owned potential).mp accepted
+  simpa [executeObservedContextualParseOfFormalCertificate] using
+    executeObservedContextualParseOfRankCertificate_selected
+      file tokens owned ready potential checks.1
 
 /-- The certificate-driven executable result is declaratively sound: modules
 parse, and diagnostics apply to the supplied source. -/
@@ -1274,5 +1366,58 @@ theorem executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeC
     file tokens owned ready potential rankAccepted
       (executeObservedContextualCoherentNonAssociativeInvariant_of_safe_and_certificate
         file tokens owned safe nonAssociativeAccepted)
+
+/-- The combined finite-certificate entry point is declaratively sound once
+coherent pass-through safety is available. -/
+theorem executeObservedContextualParseOfFormalCertificate_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (ready :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      ∀ waiting : ContextualItemKey tokens,
+        ContextualReach file tokens result.recognition.memo correct final waiting →
+          MatchArmPairContextReadyAt waiting)
+    (potential : FrontierGrammarPotential tokens)
+    (accepted : executeObservedContextualFormalCertificateBool
+      file tokens owned potential = true)
+    (safe :
+      let result := Chart.executeObservedContextualValueWorklistMulti
+        file tokens owned
+      let selected :=
+        Chart.executeObservedContextualValueWorklistMulti_selected
+          file tokens owned
+      let recognitionSelected :=
+        Chart.executeObservedContextualValueWorklistMulti?_recognition
+          file tokens owned result selected
+      let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+        file tokens owned result.recognition recognitionSelected
+      let final :=
+        Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+          file tokens owned result.recognition recognitionSelected
+      CoherentNonAssociativePassThroughSafe
+        file tokens result.recognition.memo correct final) :
+    match executeObservedContextualParseOfFormalCertificate
+        file tokens owned ready potential accepted with
+    | .ok module => Parses file tokens module
+    | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
+  let checks :=
+    (executeObservedContextualFormalCertificateBool_eq_true_iff
+      file tokens owned potential).mp accepted
+  unfold executeObservedContextualParseOfFormalCertificate
+  exact
+    executeObservedContextualParseOfRankCertificate_sound_of_nonAssociativeCertificate
+      file tokens owned ready potential checks.1 safe checks.2
 
 end Solcore.Surface.Multi
