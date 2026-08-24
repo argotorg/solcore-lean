@@ -23632,6 +23632,172 @@ private theorem attemptPhaseCValuePrediction?_used_mono
         cases remainder
         exact attemptedMono
 
+private theorem attemptPhaseCScannedEdge?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold attemptPhaseCScannedEdge? at selected
+  split at selected
+  next sameSource =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨rebuilt, rebuiltEq, prior, priorEq, candidate,
+      candidateEq, traversed, traversedEq, actioned, actionedEq,
+      publishedEq⟩
+    exact fun address member =>
+      publishPhaseCValueCandidate?_used_mono actioned result edge.after
+        candidate publishedEq
+          (runMappedPrimitive?_used_mono_value traversed _ id actioned
+            actionedEq
+              (runMappedPrimitive?_used_mono_value current _ id traversed
+                traversedEq member))
+  next differentSource =>
+    cases selected
+    exact fun _ => id
+
+private theorem attemptPhaseCScannedEdge?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : current.payload.frontier.prefixMemberBool target = true)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.prefixMemberBool target = true := by
+  rcases (attemptPhaseCScannedEdge?_exact owned source edge current result
+    selected).2 with unchanged | active
+  · rw [unchanged]
+    exact present
+  · rcases active with ⟨rebuilt, prior, candidate, rebuiltEq, priorEq,
+      candidateEq, frontierEq⟩
+    rw [frontierEq]
+    cases kindEq : candidate.kind with
+    | duplicate => exact present
+    | insertedIncomplete =>
+        exact (insertCandidate?_prefixMemberBool_eq_true_iff owned
+          current.payload.frontier edge.after target _ candidate
+            candidateEq).2 (Or.inl present)
+    | insertedComplete =>
+        exact (insertCandidate?_prefixMemberBool_eq_true_iff owned
+          current.payload.frontier edge.after target _ candidate
+            candidateEq).2 (Or.inl present)
+
+/-- A scan can only retain an old queue key or append its exact target, which
+was absent before candidate preparation. -/
+private theorem attemptPhaseCScannedEdge?_queue_member
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result)
+    (member : target ∈ result.payload.frontier.queue) :
+    target ∈ current.payload.frontier.queue ∨
+      current.payload.frontier.prefixMemberBool edge.after = false ∧
+        target = edge.after := by
+  rcases (attemptPhaseCScannedEdge?_exact owned source edge current result
+    selected).2 with unchanged | active
+  · exact Or.inl (unchanged ▸ member)
+  · rcases active with ⟨rebuilt, prior, candidate, rebuiltEq, priorEq,
+      candidateEq, frontierEq⟩
+    cases kindEq : candidate.kind with
+    | duplicate =>
+        left
+        rw [frontierEq, kindEq] at member
+        exact member
+    | insertedIncomplete =>
+        rw [frontierEq, kindEq] at member
+        exact insertCandidate?_queue_member owned current.payload.frontier
+          edge.after target _ candidate candidateEq member
+    | insertedComplete =>
+        rw [frontierEq, kindEq] at member
+        exact insertCandidate?_queue_member owned current.payload.frontier
+          edge.after target _ candidate candidateEq member
+
+/-- A scan attempt preserves freshness outside its exact L14/L12/L09
+footprint. -/
+private theorem attemptPhaseCScannedEdge?_preserves_unrelated_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (target : UnitAddress tokens)
+    (notTraversal : target ≠ (.linear .L14_frontierScannedTraversal
+      (contextualLinearKey edge.before) : UnitAddress tokens))
+    (notAction : target ≠ (.linear .L12_scannedAction
+      (contextualLinearKey edge.before) : UnitAddress tokens))
+    (notInsert : target ≠ (.linear .L09_frontierInsert
+      (contextualLinearKey edge.after) : UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    target ∉ result.counter.usedRev := by
+  unfold attemptPhaseCScannedEdge? at selected
+  split at selected
+  next sameSource =>
+    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+    rcases selected with ⟨rebuilt, rebuiltEq, prior, priorEq, candidate,
+      candidateEq, traversed, traversedEq, actioned, actionedEq,
+      publishedEq⟩
+    have traversedFresh : target ∉ traversed.counter.usedRev := by
+      rw [runMappedPrimitive?_usedRev current _ id traversed traversedEq]
+      rw [List.mem_cons]
+      exact fun member => member.elim notTraversal fresh
+    have actionedFresh : target ∉ actioned.counter.usedRev := by
+      rw [runMappedPrimitive?_usedRev traversed _ id actioned actionedEq]
+      rw [List.mem_cons]
+      exact fun member => member.elim notAction traversedFresh
+    exact publishPhaseCValueCandidate?_preserves_fresh actioned result
+      edge.after candidate target notInsert actionedFresh publishedEq
+  next differentSource =>
+    cases selected
+    exact fresh
+
+/-- Every newly consumed scan address belongs to the exact traversal,
+action, or conditional publication footprint. -/
+private theorem attemptPhaseCScannedEdge?_used_old_or_footprint
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (target : UnitAddress tokens)
+    (used : target ∈ result.counter.usedRev)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    target ∈ current.counter.usedRev ∨
+      target = (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey edge.before) : UnitAddress tokens) ∨
+      target = (.linear .L12_scannedAction
+        (contextualLinearKey edge.before) : UnitAddress tokens) ∨
+      target = (.linear .L09_frontierInsert
+        (contextualLinearKey edge.after) : UnitAddress tokens) := by
+  by_cases old : target ∈ current.counter.usedRev
+  · exact Or.inl old
+  by_cases traversal : target = (.linear .L14_frontierScannedTraversal
+      (contextualLinearKey edge.before) : UnitAddress tokens)
+  · exact Or.inr (Or.inl traversal)
+  by_cases action : target = (.linear .L12_scannedAction
+      (contextualLinearKey edge.before) : UnitAddress tokens)
+  · exact Or.inr (Or.inr (Or.inl action))
+  by_cases insert : target = (.linear .L09_frontierInsert
+      (contextualLinearKey edge.after) : UnitAddress tokens)
+  · exact Or.inr (Or.inr (Or.inr insert))
+  exact (attemptPhaseCScannedEdge?_preserves_unrelated_fresh owned source edge
+    current result target traversal action insert old selected used).elim
+
 private theorem attemptPhaseCCompletedEdge?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
