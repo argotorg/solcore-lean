@@ -9624,6 +9624,260 @@ theorem executeTypeRoot_reduces
             ← codomainEq]
           exact .typeFunction origin finish domain arrow codomain witness
 
+private theorem typeAtomRuleAtoms_of_views
+    {file : WorkspaceFile} {tokens : List Token}
+    (inputs : List
+      (EbnfValue file tokens (.atom (.nonterminal .type)))) :
+    (inputs.map (EbnfValue.ruleView .type)).map
+        (EbnfValue.ruleAtom .type) = inputs := by
+  induction inputs with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [EbnfValue.rule_of_view, induction]
+
+private theorem typeAtomRuleList1_of_view
+    {file : WorkspaceFile} {tokens : List Token}
+    (input : EbnfValue file tokens
+      (.list1 (.atom (.nonterminal .type)))) :
+    EbnfValue.list1 (.atom (.nonterminal .type))
+      ((EbnfValue.list1View (.atom (.nonterminal .type)) input).map
+        (EbnfValue.ruleView .type) |>.map (EbnfValue.ruleAtom .type)) =
+      input := by
+  let viewed := EbnfValue.list1View
+    (.atom (.nonterminal .type)) input
+  have mapEq : (viewed.map (EbnfValue.ruleView .type)).map
+      (EbnfValue.ruleAtom .type) = viewed := by
+    cases viewed with
+    | mk head tail =>
+        simp only [NonemptyList.map, NonemptyList.mk.injEq]
+        exact ⟨EbnfValue.rule_of_view .type head,
+          typeAtomRuleAtoms_of_views tail⟩
+  rw [mapEq]
+  exact EbnfValue.list1_of_view (.atom (.nonterminal .type)) input
+
+/-- The atomic-type executor realizes every exact source-rule reduction. -/
+theorem executeTypeAtomRoot_reduces
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (ready : RuleReductionReady file tokens .typeAtom origin finish)
+    (input : EbnfValue file tokens (m2cV1.rhs .typeAtom)) :
+    RuleReduction file tokens .typeAtom origin finish input
+      (executeTypeAtomRoot file tokens origin finish
+        ready.1 ready.2.1 input) := by
+  let atAtom : EbnfExpr := .atom (.terminal (.symbol .at))
+  let atomAtom : EbnfExpr := .atom (.nonterminal .typeAtom)
+  let nameAtom : EbnfExpr := .atom (.nonterminal .qualifiedName)
+  let openAtom : EbnfExpr := .atom (.terminal (.symbol .leftParen))
+  let closeAtom : EbnfExpr := .atom (.terminal (.symbol .rightParen))
+  let commaAtom : EbnfExpr := .atom (.terminal (.symbol .comma))
+  let typeAtom : EbnfExpr := .atom (.nonterminal .type)
+  let argumentsExpr : EbnfExpr :=
+    .sequence [openAtom, .list1 typeAtom, closeAtom]
+  let tupleTail := EbnfValue.fixedInfixTailExpr (.symbol .comma) .type
+  let branches : List EbnfExpr := [
+    .sequence [atAtom, atomAtom],
+    .sequence [nameAtom, .optional argumentsExpr],
+    .sequence [openAtom, closeAtom],
+    .sequence [openAtom, typeAtom, closeAtom],
+    .sequence [openAtom, typeAtom, commaAtom, typeAtom,
+      .star tupleTail, closeAtom]]
+  change EbnfValue file tokens (.choice branches) at input
+  generalize viewEq : EbnfValue.choiceView branches input = viewed
+  rcases viewed with ⟨branch, raw⟩
+  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
+    calc
+      _ = EbnfValue.choice branches
+          (EbnfValue.choiceView branches input) := by rw [viewEq]
+      _ = input := EbnfValue.choice_of_view branches input
+  have branchCases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨
+      branch = 3 ∨ branch = 4 := by
+    have lengthEq : branches.length = 5 := by rfl
+    have bound : branch.val < 5 := by
+      simpa [lengthEq] using branch.isLt
+    have cases : branch.val = 0 ∨ branch.val = 1 ∨ branch.val = 2 ∨
+        branch.val = 3 ∨ branch.val = 4 := by omega
+    rcases cases with h | h | h | h | h
+    · exact Or.inl (Fin.ext h)
+    · exact Or.inr (Or.inl (Fin.ext h))
+    · exact Or.inr (Or.inr (Or.inl (Fin.ext h)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext h))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext h))))
+  let witness := ConsumedSpanWitness.compute
+    file tokens origin finish ready.1 ready.2.1
+  rcases branchCases with rfl | rfl | rfl | rfl | rfl
+  · let viewed := EbnfValue.sequence2View atAtom atomAtom raw
+    let marker := EbnfValue.terminalView (.symbol .at) viewed.1
+    let inner := EbnfValue.ruleView .typeAtom viewed.2
+    have rawEq := EbnfValue.sequence2_of_view atAtom atomAtom raw
+    have markerEq := EbnfValue.terminal_of_view (.symbol .at) viewed.1
+    have innerEq := EbnfValue.rule_of_view .typeAtom viewed.2
+    have resultEq : executeTypeAtomRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.proxy (RuleReduction.terminalLoc marker ()) inner) := by
+      rw [executeTypeAtomRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← markerEq, ← innerEq]
+    exact .typeAtomProxy origin finish marker inner witness
+  · let viewed := EbnfValue.sequence2View
+      nameAtom (.optional argumentsExpr) raw
+    let name := EbnfValue.ruleView .qualifiedName viewed.1
+    let rootArguments := (EbnfValue.optionalView argumentsExpr
+      viewed.2).map fun argumentRaw =>
+        let argumentView := EbnfValue.sequence3View
+          openAtom (.list1 typeAtom) closeAtom argumentRaw
+        (EbnfValue.list1View typeAtom argumentView.2.1).map
+          (EbnfValue.ruleView .type)
+    have rawEq := EbnfValue.sequence2_of_view
+      nameAtom (.optional argumentsExpr) raw
+    have nameEq := EbnfValue.rule_of_view .qualifiedName viewed.1
+    have rootResultEq : executeTypeAtomRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.named name rootArguments) := by
+      rw [executeTypeAtomRoot, viewEq]
+      rfl
+    generalize optionalEq : EbnfValue.optionalView argumentsExpr
+      viewed.2 = selected
+    cases selected with
+    | none =>
+        have selectedEq : EbnfValue.optional argumentsExpr none =
+            viewed.2 := by
+          calc
+            _ = EbnfValue.optional argumentsExpr
+                (EbnfValue.optionalView argumentsExpr viewed.2) := by
+              rw [optionalEq]
+            _ = viewed.2 :=
+              EbnfValue.optional_of_view argumentsExpr viewed.2
+        have rootArgumentsEq : rootArguments = none := by
+          simp [rootArguments, optionalEq]
+        rw [rootResultEq, rootArgumentsEq, ← inputEq, ← rawEq,
+          ← nameEq, ← selectedEq]
+        exact .typeAtomNamedWithoutArguments origin finish name witness
+    | some argumentRaw =>
+        let argumentView := EbnfValue.sequence3View
+          openAtom (.list1 typeAtom) closeAtom argumentRaw
+        let openParen := EbnfValue.terminalView
+          (.symbol .leftParen) argumentView.1
+        let rawArguments := EbnfValue.list1View
+          typeAtom argumentView.2.1
+        let arguments := rawArguments.map (EbnfValue.ruleView .type)
+        let closeParen := EbnfValue.terminalView
+          (.symbol .rightParen) argumentView.2.2
+        have selectedEq : EbnfValue.optional argumentsExpr
+            (some argumentRaw) = viewed.2 := by
+          calc
+            _ = EbnfValue.optional argumentsExpr
+                (EbnfValue.optionalView argumentsExpr viewed.2) := by
+              rw [optionalEq]
+            _ = viewed.2 :=
+              EbnfValue.optional_of_view argumentsExpr viewed.2
+        have argumentEq := EbnfValue.sequence3_of_view
+          openAtom (.list1 typeAtom) closeAtom argumentRaw
+        have openEq := EbnfValue.terminal_of_view
+          (.symbol .leftParen) argumentView.1
+        have argumentsEq : EbnfValue.list1 typeAtom
+            (arguments.map (EbnfValue.ruleAtom .type)) =
+              argumentView.2.1 := by
+          exact typeAtomRuleList1_of_view argumentView.2.1
+        have closeEq := EbnfValue.terminal_of_view
+          (.symbol .rightParen) argumentView.2.2
+        have rootArgumentsEq : rootArguments = some arguments := by
+          simp [rootArguments, optionalEq, arguments, rawArguments,
+            argumentView, openAtom, closeAtom]
+        rw [rootResultEq, rootArgumentsEq, ← inputEq, ← rawEq,
+          ← nameEq, ← selectedEq, ← argumentEq, ← openEq,
+          ← argumentsEq, ← closeEq]
+        exact .typeAtomNamedWithArguments origin finish name openParen
+          arguments closeParen witness
+  · let viewed := EbnfValue.sequence2View openAtom closeAtom raw
+    let openParen := EbnfValue.terminalView
+      (.symbol .leftParen) viewed.1
+    let closeParen := EbnfValue.terminalView
+      (.symbol .rightParen) viewed.2
+    have rawEq := EbnfValue.sequence2_of_view openAtom closeAtom raw
+    have openEq := EbnfValue.terminal_of_view
+      (.symbol .leftParen) viewed.1
+    have closeEq := EbnfValue.terminal_of_view
+      (.symbol .rightParen) viewed.2
+    have resultEq : executeTypeAtomRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.tuple []) := by
+      rw [executeTypeAtomRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← openEq, ← closeEq]
+    exact .typeAtomEmptyTuple origin finish openParen closeParen witness
+  · let viewed := EbnfValue.sequence3View
+      openAtom typeAtom closeAtom raw
+    let openParen := EbnfValue.terminalView
+      (.symbol .leftParen) viewed.1
+    let inner := EbnfValue.ruleView .type viewed.2.1
+    let closeParen := EbnfValue.terminalView
+      (.symbol .rightParen) viewed.2.2
+    have rawEq := EbnfValue.sequence3_of_view
+      openAtom typeAtom closeAtom raw
+    have openEq := EbnfValue.terminal_of_view
+      (.symbol .leftParen) viewed.1
+    have innerEq := EbnfValue.rule_of_view .type viewed.2.1
+    have closeEq := EbnfValue.terminal_of_view
+      (.symbol .rightParen) viewed.2.2
+    have resultEq : executeTypeAtomRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness (.group inner) := by
+      rw [executeTypeAtomRoot, viewEq]
+      rfl
+    rw [resultEq, ← inputEq, ← rawEq, ← openEq, ← innerEq,
+      ← closeEq]
+    exact .typeAtomGroup origin finish openParen inner closeParen witness
+  · let children : List EbnfExpr := [openAtom, typeAtom, commaAtom,
+      typeAtom, .star tupleTail, closeAtom]
+    let viewed := EbnfValue.sequenceFlatView children raw
+    let openParen := EbnfValue.terminalView
+      (.symbol .leftParen) viewed.1
+    let first := EbnfValue.ruleView .type viewed.2.1
+    let comma := EbnfValue.terminalView (.symbol .comma) viewed.2.2.1
+    let second := EbnfValue.ruleView .type viewed.2.2.2.1
+    let rawRest := EbnfValue.starView tupleTail viewed.2.2.2.2.1
+    let rest := rawRest.map (EbnfValue.fixedInfixTailView
+      (.symbol .comma) .type)
+    let closeParen := EbnfValue.terminalView
+      (.symbol .rightParen) viewed.2.2.2.2.2.1
+    have rawEq := EbnfValue.sequence_of_flat_view children raw
+    have openEq := EbnfValue.terminal_of_view
+      (.symbol .leftParen) viewed.1
+    have firstEq := EbnfValue.rule_of_view .type viewed.2.1
+    have commaEq := EbnfValue.terminal_of_view
+      (.symbol .comma) viewed.2.2.1
+    have secondEq := EbnfValue.rule_of_view .type viewed.2.2.2.1
+    have restValuesEq : rest.map (EbnfValue.fixedInfixTailValue
+        (.symbol .comma) .type) = rawRest := by
+      simp only [rest, List.map_map]
+      induction rawRest with
+      | nil => rfl
+      | cons head tail induction =>
+          simp only [List.map_cons, List.cons.injEq]
+          exact ⟨EbnfValue.fixedInfixTailValue_of_view
+            (.symbol .comma) .type head, induction⟩
+    have restEq : EbnfValue.star tupleTail
+        (rest.map (EbnfValue.fixedInfixTailValue
+          (.symbol .comma) .type)) = viewed.2.2.2.2.1 := by
+      rw [restValuesEq]
+      exact EbnfValue.star_of_view tupleTail viewed.2.2.2.2.1
+    have closeEq := EbnfValue.terminal_of_view
+      (.symbol .rightParen) viewed.2.2.2.2.2.1
+    let rootRest := rawRest.map fun tail =>
+      (EbnfValue.fixedInfixTailView
+        (.symbol .comma) .type tail).2
+    have resultEq : executeTypeAtomRoot file tokens origin finish
+        ready.1 ready.2.1 input = sourceLoc witness
+          (.tuple (first :: second :: rootRest)) := by
+      rw [executeTypeAtomRoot, viewEq]
+      rfl
+    have rootRestEq : rootRest = rest.map Prod.snd := by
+      simp [rootRest, rest, List.map_map]
+    rw [resultEq, rootRestEq, ← inputEq, ← rawEq]
+    simp only [children, EbnfValue.sequenceValuesBuild]
+    rw [← openEq, ← firstEq, ← commaEq, ← secondEq,
+      ← restEq, ← closeEq]
+    exact .typeAtomTuple origin finish openParen first comma second rest
+      closeParen witness
+
 /-- Align one dotted module path tail with its parsed path component. -/
 private def moduleRefTailData
     {file : WorkspaceFile} {tokens : List Token}
@@ -10055,6 +10309,8 @@ theorem executeRootRule_reduces
       exact executeHidingClauseRoot_reduces origin finish ready input
   | body => exact executeBodyRoot_reduces origin finish ready input
   | «type» => exact executeTypeRoot_reduces origin finish ready input
+  | typeAtom =>
+      exact executeTypeAtomRoot_reduces origin finish ready input
   | qualifiedName =>
       exact executeQualifiedNameRoot_reduces origin finish ready input
   | forInitItem =>
