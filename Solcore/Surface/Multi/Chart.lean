@@ -23983,6 +23983,221 @@ private theorem insertCandidate?_published_item_present
       exact (insertPrefix_prefixMemberBool_eq_true_iff
         state item item prior).2 (Or.inr rfl)
 
+/-- A successful scan of its exact source publishes or retains the target
+prefix before returning. -/
+private theorem attemptPhaseCScannedEdge?_target_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (sameSource : edge.before = source)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.prefixMemberBool edge.after = true := by
+  unfold attemptPhaseCScannedEdge? at selected
+  rw [dif_pos sameSource] at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨rebuilt, rebuiltEq, prior, priorEq, candidate,
+    candidateEq, traversed, traversedEq, actioned, actionedEq, publishedEq⟩
+  have traversedPayload := runMappedPrimitive?_payload current _ id traversedEq
+  have actionedPayload := runMappedPrimitive?_payload traversed _ id actionedEq
+  have published :=
+    (publishPhaseCValueCandidate?_exact actioned result edge.after candidate
+      publishedEq).2
+  rw [actionedPayload, traversedPayload] at published
+  rw [published]
+  exact insertCandidate?_published_item_present owned current.payload.frontier
+    edge.after _ candidate candidateEq
+
+private theorem attemptPhaseCScannedEdge?_preserves_sourceFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (different : target ≠ edge.before)
+    (fresh : PhaseCValueSourceFresh current.counter target)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    PhaseCValueSourceFresh result.counter target := by
+  unfold PhaseCValueSourceFresh at fresh ⊢
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · apply attemptPhaseCScannedEdge?_preserves_unrelated_fresh owned source edge
+      current result _ (by simp) (by simp) (by simp) fresh.1 selected
+  · intro production member
+    apply attemptPhaseCScannedEdge?_preserves_unrelated_fresh owned source edge
+      current result _ (by simp) (by simp) (by simp)
+        (fresh.2.1 production member) selected
+  · apply attemptPhaseCScannedEdge?_preserves_unrelated_fresh owned source edge
+      current result
+    · intro equal
+      simp only [UnitAddress.linear.injEq, true_and] at equal
+      exact different (contextualLinearKey_injective equal)
+    · simp
+    · simp
+    · exact fresh.2.2.1
+    · exact selected
+  · apply attemptPhaseCScannedEdge?_preserves_unrelated_fresh owned source edge
+      current result
+    · simp
+    · intro equal
+      simp only [UnitAddress.linear.injEq, true_and] at equal
+      exact different (contextualLinearKey_injective equal)
+    · simp
+    · exact fresh.2.2.2
+    · exact selected
+
+/-- One exact source scan preserves the causal semantic address invariant. -/
+private theorem attemptPhaseCScannedEdge?_addressSafe
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (sameSource : edge.before = source)
+    (safe : PhaseCValueAddressSafe current)
+    (sourcePresent : current.payload.frontier.prefixMemberBool source = true)
+    (sourceNotQueued : source ∉ current.payload.frontier.queue)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    PhaseCValueAddressSafe result := by
+  have resultSourcePresent :
+      result.payload.frontier.prefixMemberBool source = true :=
+    attemptPhaseCScannedEdge?_preserves_prefix_present owned source source edge
+      current result sourcePresent selected
+  have targetPresent :
+      result.payload.frontier.prefixMemberBool edge.after = true :=
+    attemptPhaseCScannedEdge?_target_present owned source edge current result
+      sameSource selected
+  constructor
+  · intro target member
+    rcases attemptPhaseCScannedEdge?_queue_member owned source target edge
+      current result selected member with old | new
+    · apply attemptPhaseCScannedEdge?_preserves_sourceFresh owned source target
+        edge current result
+      · intro equal
+        have targetSource : target = source := equal.trans sameSource
+        exact sourceNotQueued (targetSource ▸ old)
+      · exact safe.queuedSourceFresh target old
+      · exact selected
+    · rcases new with ⟨absent, rfl⟩
+      apply attemptPhaseCScannedEdge?_preserves_sourceFresh owned source
+        edge.after edge current result
+      · intro equal
+        have sourceAbsent :
+            current.payload.frontier.prefixMemberBool source = false := by
+          simpa [equal, sameSource] using absent
+        rw [sourcePresent] at sourceAbsent
+        contradiction
+      · exact safe.sourceFresh_of_absent edge.after absent
+      · exact selected
+  · intro item used
+    by_cases old : (.linear .L08_frontierDequeue
+        (contextualLinearKey item) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.dequeueUsedPresent item old) selected
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp at traversal
+      · simp at action
+      · simp at insert
+  · intro item production productionMember used
+    by_cases old : (.prediction .R02_frontierPrediction
+        (contextualPredictionKey item production) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_preserves_prefix_present owned source item
+        edge current result
+          (safe.predictionUsedPresent item production productionMember old)
+            selected
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp at traversal
+      · simp at action
+      · simp at insert
+  · intro item used
+    by_cases old : (.linear .L14_frontierScannedTraversal
+        (contextualLinearKey item) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.scanTraversalUsedPresent item old) selected
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp only [UnitAddress.linear.injEq, true_and] at traversal
+        have itemEq := contextualLinearKey_injective traversal
+        subst item
+        simpa [sameSource] using resultSourcePresent
+      · simp at action
+      · simp at insert
+  · intro item used
+    by_cases old : (.linear .L12_scannedAction
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.scanActionUsedPresent item old) selected
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp at traversal
+      · simp only [UnitAddress.linear.injEq, true_and] at action
+        have itemEq := contextualLinearKey_injective action
+        subst item
+        simpa [sameSource] using resultSourcePresent
+      · simp at insert
+  · intro item used
+    by_cases old : (.linear .L09_frontierInsert
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.insertUsedPresent item old) selected
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp at traversal
+      · simp at action
+      · simp only [UnitAddress.linear.injEq, true_and] at insert
+        simpa [contextualLinearKey_injective insert] using targetPresent
+  · intro item used
+    by_cases old : (.linear .L13_epsilonAction
+        (contextualLinearKey item) : UnitAddress tokens) ∈ current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_preserves_prefix_present owned source item
+        edge current result (safe.epsilonActionUsedPresent item old) selected
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp at traversal
+      · simp at action
+      · simp at insert
+  · intro waiting finished used
+    by_cases old : (.cubic .U07_frontierCompletedTraversal
+        (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_used_mono owned source edge current result
+        selected (safe.completionTraversalAttempted waiting finished old)
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp at traversal
+      · simp at action
+      · simp at insert
+  · intro waiting finished used
+    by_cases old : (.cubic .U05_completedAction
+        (contextualCompletionKey waiting finished) : UnitAddress tokens) ∈
+          current.counter.usedRev
+    · exact attemptPhaseCScannedEdge?_used_mono owned source edge current result
+        selected (safe.completionActionAttempted waiting finished old)
+    · rcases attemptPhaseCScannedEdge?_used_old_or_footprint owned source edge
+        current result _ used selected with previous | traversal | action | insert
+      · exact (old previous).elim
+      · simp at traversal
+      · simp at action
+      · simp at insert
+
 /-- If one completion leaves a target absent, it could not have selected that
 target's L09 insertion; hence a previously fresh target L09 remains fresh. -/
 private theorem attemptPhaseCCompletedEdge?_preserves_insert_fresh_of_absent
