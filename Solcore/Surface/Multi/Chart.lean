@@ -38447,6 +38447,222 @@ private theorem processPhaseCValueItem?_completion_target_present
         scannedEq
   · exact completedEq
 
+/-- The actual dequeue+process pair preserves public pending materialization;
+the dequeued endpoint is discharged by its exact prediction/scan/completion
+fold, while every other endpoint remains queued. -/
+private theorem dequeueProcessPhaseCValueItem?_materializationPending
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current dequeued result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (closed : OperationalContextualClosure file tokens
+      current.payload.recognition.phaseC.memo
+      current.payload.recognition.phaseC.contextualItems
+      current.payload.recognition.phaseC.contextualEdges)
+    (pending :
+      (phaseCValuePublicResult current).RecognitionMaterializationPending)
+    (materialized : PhaseCValueCompletionAttemptMaterialized dequeued)
+    (dequeueEq : dequeuePhaseCValueFrontier? current =
+      some (source, dequeued))
+    (processEq : processPhaseCValueItem? owned source dequeued = some result) :
+    (phaseCValuePublicResult result).RecognitionMaterializationPending ∧
+      PhaseCValueCompletionAttemptMaterialized result := by
+  have recognitionEq := dequeueProcessPhaseCValueItem?_recognition owned source
+    current dequeued result dequeueEq processEq
+  obtain ⟨rest, queueEq, dequeueRecognition, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source dequeued dequeueEq
+  constructor
+  · constructor
+    · change result.payload.frontier.prefixMemberBool _ = true
+      exact dequeueProcessPhaseCValueItem?_preserves_prefix_present owned source
+        _ current dequeued result dequeueEq processEq pending.root
+    · intro waiting predicted waitingMember waitingPresent next enabled
+      change waiting ∈ result.payload.recognition.phaseC.contextualItems
+        at waitingMember
+      change result.payload.frontier.prefixMemberBool waiting = true
+        at waitingPresent
+      change MemoEnablesProduction result.payload.recognition.phaseC.memo _
+        at enabled
+      rw [recognitionEq] at waitingMember enabled
+      rcases dequeueProcessPhaseCValueItem?_prefix_old_or_queued owned source
+          waiting current dequeued result dequeueEq processEq waitingPresent with
+        old | queued
+      · rcases pending.predict waiting predicted waitingMember old next enabled
+          with targetPresent | waitingQueued
+        · exact Or.inl
+            (dequeueProcessPhaseCValueItem?_preserves_prefix_present owned source
+              _ current dequeued result dequeueEq processEq targetPresent)
+        · rcases dequeueProcessPhaseCValueItem?_source_or_queued owned source
+              waiting current dequeued result dequeueEq processEq waitingQueued
+            with waitingEq | queued
+          · subst waiting
+            let item : ContextualItemKey tokens := {
+              raw := {
+                production := predicted
+                dot := ⟨0, Nat.zero_lt_succ _⟩
+                origin := source.raw.current
+                current := source.raw.current
+              }
+              context := descendContext source predicted
+            }
+            let productionInstance : ProductionInstanceKey tokens := {
+              production := predicted
+              origin := source.raw.current
+              context := descendContext source predicted
+            }
+            have computed : contextualPredictedItem? source predicted =
+                some (item, productionInstance) := by
+              simpa [item, productionInstance] using
+                contextualPredictedItem?_complete source predicted next
+            have itemMember : item ∈
+                dequeued.payload.recognition.phaseC.contextualItems := by
+              rw [dequeueRecognition]
+              exact closed.predict_mem source predicted waitingMember next enabled
+            have recognized : phaseCItemMemberBool
+                dequeued.payload.recognition.phaseC.contextualItems item = true :=
+              (phaseCItemMemberBool_true_iff _ item).2 itemMember
+            exact Or.inl (by
+              simpa [phaseCValuePublicResult, item] using
+                processPhaseCValueItem?_prediction_target_present owned source
+                  predicted item productionInstance computed dequeued result
+                    recognized processEq)
+          · exact Or.inr queued
+      · exact Or.inr queued
+    · intro retained before after cursor retainedMember shape beforePresent
+      change retained ∈ result.payload.recognition.phaseC.contextualEdges
+        at retainedMember
+      change result.payload.frontier.prefixMemberBool before = true
+        at beforePresent
+      rw [recognitionEq] at retainedMember
+      rcases dequeueProcessPhaseCValueItem?_prefix_old_or_queued owned source
+          before current dequeued result dequeueEq processEq beforePresent with
+        old | queued
+      · rcases pending.scan retained before after cursor retainedMember shape
+            old with targetPresent | beforeQueued
+        · exact Or.inl
+            (dequeueProcessPhaseCValueItem?_preserves_prefix_present owned source
+              after current dequeued result dequeueEq processEq targetPresent)
+        · rcases dequeueProcessPhaseCValueItem?_source_or_queued owned source
+              before current dequeued result dequeueEq processEq beforeQueued
+            with beforeEq | queued
+          · subst before
+            let edge : StructurallyValidContextualScannedEdge file tokens := {
+              before := source
+              after := after
+              cursor := cursor
+              structural := shape ▸ retained.property }
+            have packedEq :
+                (⟨.scanned edge.before edge.after edge.cursor,
+                  edge.structural⟩ :
+                    StructurallyValidContextualPackedEdge file tokens) =
+                  retained := by
+              apply Subtype.ext
+              simpa [edge] using shape.symm
+            have member :
+                (⟨.scanned edge.before edge.after edge.cursor,
+                  edge.structural⟩ :
+                    StructurallyValidContextualPackedEdge file tokens) ∈
+                dequeued.payload.recognition.phaseC.contextualEdges := by
+              rw [packedEq, dequeueRecognition]
+              exact retainedMember
+            exact Or.inl (by
+              simpa [phaseCValuePublicResult, edge] using
+                processPhaseCValueItem?_scan_target_present owned source edge
+                  dequeued result member rfl processEq)
+          · exact Or.inr queued
+      · exact Or.inr queued
+    · intro retained waiting finished after shared retainedMember shape
+        waitingPresent childPresent
+      change retained ∈ result.payload.recognition.phaseC.contextualEdges
+        at retainedMember
+      change result.payload.frontier.prefixMemberBool waiting = true
+        at waitingPresent
+      change (result.payload.frontier.lookupReduction? finished).isSome = true
+        at childPresent
+      rw [recognitionEq] at retainedMember
+      rcases dequeueProcessPhaseCValueItem?_prefix_old_or_queued owned source
+          waiting current dequeued result dequeueEq processEq waitingPresent with
+        oldWaiting | waitingQueued
+      · rcases dequeueProcessPhaseCValueItem?_reduction_old_or_queued owned
+            source finished current dequeued result dequeueEq processEq
+              childPresent with oldChild | finishedQueued
+        · rcases pending.complete retained waiting finished after shared
+              retainedMember shape oldWaiting oldChild with
+            targetPresent | queuedWaiting | queuedFinished
+          · exact Or.inl
+              (dequeueProcessPhaseCValueItem?_preserves_prefix_present owned
+                source after current dequeued result dequeueEq processEq
+                  targetPresent)
+          · rcases dequeueProcessPhaseCValueItem?_source_or_queued owned source
+                waiting current dequeued result dequeueEq processEq queuedWaiting
+              with waitingEq | queued
+            · subst waiting
+              let edge : StructurallyValidContextualCompletedEdge file tokens := {
+                waiting := source
+                finished := finished
+                after := after
+                shared := shared
+                structural := shape ▸ retained.property }
+              have packedEq :
+                  (⟨.completed edge.waiting edge.finished edge.after
+                    edge.shared, edge.structural⟩ :
+                      StructurallyValidContextualPackedEdge file tokens) =
+                    retained := by
+                apply Subtype.ext
+                simpa [edge] using shape.symm
+              have member :
+                  (⟨.completed edge.waiting edge.finished edge.after
+                    edge.shared, edge.structural⟩ :
+                      StructurallyValidContextualPackedEdge file tokens) ∈
+                  dequeued.payload.recognition.phaseC.contextualEdges := by
+                rw [packedEq, dequeueRecognition]
+                exact retainedMember
+              exact Or.inl (by
+                apply processPhaseCValueItem?_completion_target_present owned
+                  source edge dequeued result member (Or.inl rfl)
+                · rw [frontierEq]; exact oldWaiting
+                · rw [frontierEq]; exact oldChild
+                · exact materialized
+                · exact processEq)
+            · exact Or.inr (Or.inl queued)
+          · rcases dequeueProcessPhaseCValueItem?_source_or_queued owned source
+                finished current dequeued result dequeueEq processEq queuedFinished
+              with finishedEq | queued
+            · subst finished
+              let edge : StructurallyValidContextualCompletedEdge file tokens := {
+                waiting := waiting
+                finished := source
+                after := after
+                shared := shared
+                structural := shape ▸ retained.property }
+              have packedEq :
+                  (⟨.completed edge.waiting edge.finished edge.after
+                    edge.shared, edge.structural⟩ :
+                      StructurallyValidContextualPackedEdge file tokens) =
+                    retained := by
+                apply Subtype.ext
+                simpa [edge] using shape.symm
+              have member :
+                  (⟨.completed edge.waiting edge.finished edge.after
+                    edge.shared, edge.structural⟩ :
+                      StructurallyValidContextualPackedEdge file tokens) ∈
+                  dequeued.payload.recognition.phaseC.contextualEdges := by
+                rw [packedEq, dequeueRecognition]
+                exact retainedMember
+              exact Or.inl (by
+                apply processPhaseCValueItem?_completion_target_present owned
+                  source edge dequeued result member (Or.inr rfl)
+                · rw [frontierEq]; exact oldWaiting
+                · rw [frontierEq]; exact oldChild
+                · exact materialized
+                · exact processEq)
+            · exact Or.inr (Or.inr queued)
+        · exact Or.inr (Or.inr finishedQueued)
+      · exact Or.inr (Or.inl waitingQueued)
+  · exact processPhaseCValueItem?_completionAttemptMaterialized owned source
+      dequeued result materialized processEq
+
 end Solcore.Surface.Multi.Chart
 
 namespace Solcore.Surface.Multi.Chart
