@@ -18181,6 +18181,39 @@ def FrontierReach
     ContextualReach file tokens memo correct final item ∧
     item.raw.current = cursor
 
+private theorem contextualReach_enabledProductionInstance
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    EnabledProductionInstance file tokens memo correct final {
+      production := item.raw.production
+      origin := item.raw.origin
+      context := item.context
+    } := by
+  induction reached with
+  | root =>
+      intro guard polarity member
+      simp [guardOf] at member
+  | predict waiting predicted reached next enabled induction =>
+      exact enabled
+  | scan before after cursor reached structural induction =>
+      rcases structural with ⟨valid, context⟩
+      rcases valid with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      simpa only [production, origin, ← context] using induction
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural with ⟨valid, finishedContext, afterContext⟩
+      rcases valid with
+        ⟨symbol, next, complete, lhs, waitingAt, finishedAt, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      simpa only [production, origin, afterContext] using waitingInduction
+
 /-- An enabled epsilon production advances a frontier item through prediction
 and immediate completion without moving the greatest reached cursor. -/
 theorem frontierReach_advance_of_enabledEpsilon
@@ -18243,6 +18276,147 @@ theorem frontierReach_advance_of_enabledEpsilon
       frontier.2.1 finishedReached structural
   refine ⟨after, ⟨frontier.1, afterReached, ?_⟩, advance⟩
   exact frontier.2.2
+
+/-- Every nonterminal selected by one item has an enabled production instance
+at that prediction site. This isolates the finite grammar-table coverage still
+needed by frontier normalization. -/
+def EnabledNonterminalCoverageAt
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens) : Prop :=
+  ∀ symbol,
+    NextSymbol waiting.raw (.nonterminal symbol) →
+      ∃ production : ProductionId,
+        production.lhs = symbol ∧
+          EnabledProductionInstance file tokens memo correct final {
+            production := production
+            origin := waiting.raw.current
+            context := descendContext waiting production
+          }
+
+/-- One frontier item is either complete, waits for a terminal, advances
+through an enabled epsilon child, or predicts an enabled nonempty child. -/
+def FrontierNormalizationStep
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (cursor : Boundary tokens)
+    (waiting : ContextualItemKey tokens) : Prop :=
+  CompleteItem waiting.raw ∨
+    (∃ terminal : TerminalSymbol,
+      NextSymbol waiting.raw (.terminal terminal) ∧
+        EnabledProductionInstance file tokens memo correct final {
+          production := waiting.raw.production
+          origin := waiting.raw.origin
+          context := waiting.context
+        }) ∨
+    (∃ production : ProductionId,
+      ∃ after : ContextualItemKey tokens,
+        NextSymbol waiting.raw (.nonterminal production.lhs) ∧
+          EnabledProductionInstance file tokens memo correct final {
+            production := production
+            origin := waiting.raw.current
+            context := descendContext waiting production
+          } ∧
+          production.rhs = [] ∧
+          FrontierReach file tokens memo correct final cursor after ∧
+          AdvanceItem waiting.raw waiting.raw.current after.raw) ∨
+    ∃ production : ProductionId,
+      NextSymbol waiting.raw (.nonterminal production.lhs) ∧
+        EnabledProductionInstance file tokens memo correct final {
+          production := production
+          origin := waiting.raw.current
+          context := descendContext waiting production
+        } ∧
+        production.rhs ≠ [] ∧
+        FrontierReach file tokens memo correct final cursor {
+          raw := {
+            production := production
+            dot := ⟨0, Nat.zero_lt_succ _⟩
+            origin := waiting.raw.current
+            current := waiting.raw.current
+          }
+          context := descendContext waiting production
+        }
+
+/-- Enabled production coverage gives the exhaustive one-step frontier
+normalization split. The epsilon branch uses saturated completion, while the
+nonempty branch retains the predicted child at the same greatest cursor. -/
+theorem frontierNormalizationStep_of_coverage
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens}
+    {waiting : ContextualItemKey tokens}
+    (frontier : FrontierReach
+      file tokens memo correct final cursor waiting)
+    (coverage : EnabledNonterminalCoverageAt
+      file tokens memo correct final waiting) :
+    FrontierNormalizationStep
+      file tokens memo correct final cursor waiting := by
+  by_cases complete : CompleteItem waiting.raw
+  · exact Or.inl complete
+  · have inRange :
+        waiting.raw.dot.val < waiting.raw.production.rhs.length := by
+      have bounded := waiting.raw.dot.isLt
+      unfold CompleteItem at complete
+      omega
+    let symbol := waiting.raw.production.rhs[waiting.raw.dot.val]
+    have next : NextSymbol waiting.raw symbol := by
+      exact ⟨inRange, List.getElem?_eq_getElem inRange⟩
+    have waitingEnabled :
+        EnabledProductionInstance file tokens memo correct final {
+          production := waiting.raw.production
+          origin := waiting.raw.origin
+          context := waiting.context
+        } :=
+      contextualReach_enabledProductionInstance frontier.2.1
+    cases selected : symbol with
+    | terminal terminal =>
+        have terminalNext :
+            NextSymbol waiting.raw (.terminal terminal) := by
+          simpa only [selected] using next
+        exact Or.inr (Or.inl
+          ⟨terminal, terminalNext, waitingEnabled⟩)
+    | nonterminal nonterminal =>
+        have nonterminalNext :
+            NextSymbol waiting.raw (.nonterminal nonterminal) := by
+          simpa only [selected] using next
+        rcases coverage nonterminal nonterminalNext with
+          ⟨production, lhs, enabled⟩
+        have childNext :
+            NextSymbol waiting.raw (.nonterminal production.lhs) := by
+          rw [lhs]
+          exact nonterminalNext
+        by_cases epsilon : production.rhs = []
+        · rcases frontierReach_advance_of_enabledEpsilon
+              frontier production childNext enabled epsilon with
+            ⟨after, afterFrontier, advance⟩
+          exact Or.inr (Or.inr (Or.inl
+            ⟨production, after, childNext, enabled, epsilon,
+              afterFrontier, advance⟩))
+        · let predicted : ContextualItemKey tokens := {
+            raw := {
+              production := production
+              dot := ⟨0, Nat.zero_lt_succ _⟩
+              origin := waiting.raw.current
+              current := waiting.raw.current
+            }
+            context := descendContext waiting production
+          }
+          have predictedReached :
+              ContextualReach file tokens memo correct final predicted := by
+            exact .predict waiting production frontier.2.1 childNext enabled
+          have predictedFrontier :
+              FrontierReach file tokens memo correct final cursor predicted :=
+            ⟨frontier.1, predictedReached, frontier.2.2⟩
+          exact Or.inr (Or.inr (Or.inr
+            ⟨production, childNext, enabled, epsilon,
+              predictedFrontier⟩))
 
 /-- One enabled terminal expected by a contextual frontier item. -/
 def ExpectedMember
