@@ -14867,3 +14867,64 @@ theorem Chart.ContextualValueFrontierTrace.executableWellFormed
         owned _ _ _ induction _ candidateSelected
 
 end Solcore.Surface.Multi
+
+namespace Solcore.Surface.Multi
+
+open Solcore.Workspace
+
+/-- Every successful semantic execution carries coherent dependent values;
+callers no longer supply execution-level coherence as an external premise. -/
+theorem executeObservedContextualValueWorklistMulti?_valuesCoherent
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final :=
+      Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+        file tokens owned result.recognition recognitionSelected
+    result.frontier.ValuesCoherent result.recognition.memo correct final := by
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  exact Chart.ContextualValueFrontierTrace.valuesCoherent owned
+    result.recognition recognitionSelected
+      (Chart.executeObservedContextualValueWorklistMulti?_valueTrace
+        file tokens owned result selected)
+
+/-- Every successful semantic execution also exposes the persistent frontier
+discipline used by later projection and diagnostic proofs. -/
+theorem executeObservedContextualValueWorklistMulti?_executableWellFormed
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result) :
+    result.frontier.ExecutableWellFormed := by
+  exact Chart.ContextualValueFrontierTrace.executableWellFormed owned
+    result.recognition
+      (Chart.executeObservedContextualValueWorklistMulti?_valueTrace
+        file tokens owned result selected)
+
+/-- Every AST projected by a successful semantic executor satisfies the
+final public parse judgment, without an external coherence premise. -/
+theorem executeObservedContextualValueWorklistMulti?_parses
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualValueWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualValueWorklistMulti?
+      file tokens owned = some result)
+    (module : ParsedModuleV1)
+    (parsed : result.parsedModule? = some module) :
+    Parses file tokens module := by
+  apply executeObservedContextualValueWorklistMulti?_parses_of_valuesCoherent
+    file tokens owned result selected module parsed
+  exact executeObservedContextualValueWorklistMulti?_valuesCoherent
+    file tokens owned result selected
+
+end Solcore.Surface.Multi
