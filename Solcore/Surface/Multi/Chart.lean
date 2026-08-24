@@ -24284,6 +24284,66 @@ private theorem activateWorklistProduction?_nonActivationAddress
     List.mem_cons] at attemptedMember
   exact attemptedMember.elim (fun equal => (notProduction equal).elim) id
 
+/-- Guard activation charges only production and guard-witness addresses, so
+the semantic-only address reserve is unchanged. -/
+private theorem activateWorklistProduction?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (productionInstance : ProductionInstanceKey tokens)
+    (result : CountedState tokens (PhaseCWorklist file tokens) × Bool)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : activateWorklistProduction? current productionInstance =
+      some result) :
+    PhaseCValueAddressesFresh result.1.counter := by
+  apply PhaseCValueAddressesFresh.of_addressFresh
+  intro target semantic used
+  apply fresh.addressFresh semantic
+  exact activateWorklistProduction?_nonActivationAddress current
+    productionInstance result target
+      (by cases semantic <;> simp)
+      (by intro index slot; cases semantic <;> simp)
+      selected used
+
+/-- Recognition item insertion uses only L03/L05/L07 and therefore preserves
+the disjoint semantic address reserve. -/
+private theorem insertContextualItem?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (source : ContextualItemInsertSource)
+    (item : ContextualItemKey tokens)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : insertContextualItem? current source item = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold insertContextualItem? at selected
+  split at selected
+  next present =>
+    cases selected
+    exact fresh
+  next absent =>
+    exact runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
+      result fresh (by
+        intro semantic
+        cases source <;> cases semantic) selected
+
+/-- Recognition scan-edge insertion uses only L06 and therefore preserves
+the disjoint semantic address reserve. -/
+private theorem insertContextualScannedEdge?_valueAddressesFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseCWorklist file tokens))
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (fresh : PhaseCValueAddressesFresh current.counter)
+    (selected : insertContextualScannedEdge? current edge = some result) :
+    PhaseCValueAddressesFresh result.counter := by
+  unfold insertContextualScannedEdge? at selected
+  simp only at selected
+  split at selected
+  next present =>
+    cases selected
+    exact fresh
+  next absent =>
+    exact runMappedPrimitive?_valueAddressesFresh_of_not_value current _ _
+      result fresh (by intro semantic; cases semantic) selected
+
 private theorem processGuardCell?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseCOpen file tokens))
