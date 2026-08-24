@@ -38012,4 +38012,132 @@ private theorem attemptPhaseCRetainedScannedEdges?_target_present
               next sameSource edgeEq) restEq
       · exact induction next result member restEq
 
+private theorem processPhaseCValueItem?_completionAttemptMaterialized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (materialized : PhaseCValueCompletionAttemptMaterialized current)
+    (selected : processPhaseCValueItem? owned source current = some result) :
+    PhaseCValueCompletionAttemptMaterialized result := by
+  unfold processPhaseCValueItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  exact attemptPhaseCRetainedCompletedEdges?_completionAttemptMaterialized
+    owned source _ scanned result
+      (attemptPhaseCRetainedScannedEdges?_completionAttemptMaterialized owned
+        source _ predicted scanned
+          (attemptPhaseCValuePredictions?_completionAttemptMaterialized owned
+            source allProductionIds current predicted materialized predictedEq)
+          scannedEq)
+      completedEq
+
+/-- One dequeue followed by its mandatory process step preserves recognition
+exactly. -/
+private theorem dequeueProcessPhaseCValueItem?_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current dequeued result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (dequeueEq : dequeuePhaseCValueFrontier? current =
+      some (source, dequeued))
+    (processEq : processPhaseCValueItem? owned source dequeued = some result) :
+    result.payload.recognition = current.payload.recognition := by
+  obtain ⟨rest, queueEq, recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source dequeued dequeueEq
+  exact (processPhaseCValueItem?_recognition owned source dequeued result
+    processEq).trans recognitionEq
+
+/-- A value present after dequeue+process was already present before dequeue,
+or its newly inserted key is still queued in the result. -/
+private theorem dequeueProcessPhaseCValueItem?_prefix_old_or_queued
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (current dequeued result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (dequeueEq : dequeuePhaseCValueFrontier? current =
+      some (source, dequeued))
+    (processEq : processPhaseCValueItem? owned source dequeued = some result)
+    (present : result.payload.frontier.prefixMemberBool target = true) :
+    current.payload.frontier.prefixMemberBool target = true ∨
+      target ∈ result.payload.frontier.queue := by
+  obtain ⟨rest, queueEq, recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source dequeued dequeueEq
+  rcases (processPhaseCValueItem?_frontierGrowth owned source dequeued result
+    processEq).prefixPresent target present with old | queued
+  · left
+    rw [frontierEq] at old
+    exact old
+  · exact Or.inr queued
+
+/-- A reduction present after dequeue+process was already present before
+dequeue, or its atomically inserted key is still queued. -/
+private theorem dequeueProcessPhaseCValueItem?_reduction_old_or_queued
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (current dequeued result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (dequeueEq : dequeuePhaseCValueFrontier? current =
+      some (source, dequeued))
+    (processEq : processPhaseCValueItem? owned source dequeued = some result)
+    (present : (result.payload.frontier.lookupReduction? target).isSome = true) :
+    (current.payload.frontier.lookupReduction? target).isSome = true ∨
+      target ∈ result.payload.frontier.queue := by
+  obtain ⟨rest, queueEq, recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source dequeued dequeueEq
+  rcases (processPhaseCValueItem?_frontierGrowth owned source dequeued result
+    processEq).reduction target present with old | queued
+  · left
+    rw [frontierEq] at old
+    exact old
+  · exact Or.inr queued
+
+/-- A pre-step queued endpoint is either the exact dequeued source or remains
+queued after processing. -/
+private theorem dequeueProcessPhaseCValueItem?_source_or_queued
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (current dequeued result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (dequeueEq : dequeuePhaseCValueFrontier? current =
+      some (source, dequeued))
+    (processEq : processPhaseCValueItem? owned source dequeued = some result)
+    (member : target ∈ current.payload.frontier.queue) :
+    target = source ∨ target ∈ result.payload.frontier.queue := by
+  obtain ⟨rest, queueEq, recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source dequeued dequeueEq
+  rw [queueEq, List.mem_cons] at member
+  rcases member with rfl | member
+  · exact Or.inl rfl
+  · right
+    apply (processPhaseCValueItem?_frontierGrowth owned source dequeued result
+      processEq).queue
+    rw [frontierEq]
+    exact member
+
+/-- Every pre-step prefix survives dequeue+process. -/
+private theorem dequeueProcessPhaseCValueItem?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (current dequeued result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (dequeueEq : dequeuePhaseCValueFrontier? current =
+      some (source, dequeued))
+    (processEq : processPhaseCValueItem? owned source dequeued = some result)
+    (present : current.payload.frontier.prefixMemberBool target = true) :
+    result.payload.frontier.prefixMemberBool target = true := by
+  obtain ⟨rest, queueEq, recognitionEq, frontierEq⟩ :=
+    dequeuePhaseCValueFrontier?_exact current source dequeued dequeueEq
+  apply processPhaseCValueItem?_preserves_prefix_present owned source target
+    dequeued result _ processEq
+  rw [frontierEq]
+  exact present
+
 end Solcore.Surface.Multi.Chart
