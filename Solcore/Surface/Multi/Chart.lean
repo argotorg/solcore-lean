@@ -22413,6 +22413,284 @@ private theorem contextualLinearKey_injective {tokens : List Token} :
     have source := congrArg ChartLinearKey.source equal
     simpa [contextualLinearKey] using source
   exact contextualItem_eq_of_fields raw context
+private theorem insertPrefix_prefixMemberBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item target : ContextualItemKey tokens)
+    (value : ContextualPrefixValue file tokens item) :
+    (state.insertPrefix item value).prefixMemberBool target = true ↔
+      state.prefixMemberBool target = true ∨ target = item := by
+  cases present : state.prefixMemberBool item with
+  | true =>
+      rw [ContextualValueFrontierState.insertPrefix_of_present
+        state item value present]
+      constructor
+      · exact Or.inl
+      · rintro (old | rfl)
+        · exact old
+        · exact present
+  | false =>
+      unfold ContextualValueFrontierState.insertPrefix
+      rw [if_neg (Bool.eq_false_iff.mp present)]
+      unfold ContextualValueFrontierState.prefixMemberBool
+      rw [List.any_append, Bool.or_eq_true]
+      simp only [List.any_cons, decide_eq_true_eq, List.any_nil,
+        Bool.or_false]
+      constructor
+      · rintro (old | equal)
+        · exact Or.inl old
+        · exact Or.inr equal.symm
+      · rintro (old | equal)
+        · exact Or.inl old
+        · exact Or.inr equal.symm
+private theorem insertReduction_prefixMemberBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : ContextualValueFrontierState file tokens)
+    (item target : ContextualItemKey tokens)
+    (reduction : ContextualReductionValue file tokens item) :
+    (state.insertReduction item reduction).prefixMemberBool target =
+      state.prefixMemberBool target := by
+  unfold ContextualValueFrontierState.insertReduction
+  split <;> rfl
+private theorem insertCandidate?_prefixMemberBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (state : ContextualValueFrontierState file tokens)
+    (item target : ContextualItemKey tokens)
+    (prior : ContextualPrefixValue file tokens item)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : state.insertCandidate? owned item prior = some candidate) :
+    candidate.state.prefixMemberBool target = true ↔
+      state.prefixMemberBool target = true ∨ target = item := by
+  unfold ContextualValueFrontierState.insertCandidate? at selected
+  split at selected
+  next present =>
+    cases selected
+    constructor
+    · exact Or.inl
+    · rintro (old | rfl)
+      · exact old
+      · exact present
+  next absent =>
+    split at selected
+    next complete =>
+      cases reductionEq : ContextualReductionValue.reduce? owned item prior with
+      | none =>
+          rw [reductionEq] at selected
+          contradiction
+      | some reduction =>
+          rw [reductionEq] at selected
+          cases selected
+          rw [insertReduction_prefixMemberBool]
+          exact insertPrefix_prefixMemberBool_eq_true_iff state item target
+            prior
+    next incomplete =>
+      cases selected
+      exact insertPrefix_prefixMemberBool_eq_true_iff state item target prior
+private theorem runMappedPrimitive?_used_mono_value
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before) (address : UnitAddress tokens)
+    (transition : before → after) (result : CountedState tokens after)
+    (selected : runMappedPrimitive? current address transition = some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  rw [runMappedPrimitive?_usedRev current address transition result selected]
+  exact fun _ member => List.mem_cons_of_mem _ member
+private theorem publishPhaseCValueCandidate?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (item : ContextualItemKey tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : publishPhaseCValueCandidate? current item candidate =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold publishPhaseCValueCandidate? at selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      simp only [kindEq, Option.some.injEq] at selected
+      cases selected
+      exact fun _ => id
+  | insertedIncomplete =>
+      simp only [kindEq] at selected
+      exact runMappedPrimitive?_used_mono_value current _ _ result selected
+  | insertedComplete =>
+      simp only [kindEq] at selected
+      exact runMappedPrimitive?_used_mono_value current _ _ result selected
+private theorem chargePhaseCCompletedCandidate?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (address : UnitAddress tokens)
+    (candidate : ContextualValueFrontierState.CandidateInsertResult
+      file tokens)
+    (selected : chargePhaseCCompletedCandidate? current address candidate =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold chargePhaseCCompletedCandidate? at selected
+  cases kindEq : candidate.kind with
+  | duplicate =>
+      simp only [kindEq, Option.some.injEq] at selected
+      cases selected
+      exact fun _ => id
+  | insertedIncomplete =>
+      simp only [kindEq, Option.some.injEq] at selected
+      cases selected
+      exact fun _ => id
+  | insertedComplete =>
+      simp only [kindEq] at selected
+      exact runMappedPrimitive?_used_mono_value current _ id result selected
+
+private theorem attemptPhaseCCompletedEdge?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold attemptPhaseCCompletedEdge? at selected
+  split at selected
+  next relevant =>
+    cases prefixEq : current.payload.frontier.lookupPrefix? edge.waiting with
+    | none =>
+        simp only [prefixEq, Option.some.injEq] at selected
+        cases selected
+        exact fun _ => id
+    | some prior =>
+        simp only [prefixEq] at selected
+        cases reductionEq :
+            current.payload.frontier.lookupReduction? edge.finished with
+        | none =>
+            simp only [reductionEq, Option.some.injEq] at selected
+            cases selected
+            exact fun _ => id
+        | some child =>
+            simp only [reductionEq] at selected
+            split at selected
+            next used =>
+              cases selected
+              exact fun _ => id
+            next fresh =>
+              simp only [Option.bind_eq_bind,
+                Option.bind_eq_some_iff] at selected
+              rcases selected with ⟨attempted, attemptedEq, rebuilt,
+                rebuiltEq, candidate, candidateEq, traversed, traversedEq,
+                actioned, actionedEq, publishedEq⟩
+              exact fun address member =>
+                publishPhaseCValueCandidate?_used_mono actioned result
+                  edge.after candidate publishedEq
+                    (chargePhaseCCompletedCandidate?_used_mono traversed
+                      actioned _ candidate actionedEq
+                        (runMappedPrimitive?_used_mono_value attempted _ id
+                          traversed traversedEq
+                            (runMappedPrimitive?_used_mono_value current _ id
+                              attempted attemptedEq member)))
+  next irrelevant =>
+    cases selected
+    exact fun _ => id
+
+private theorem attemptPhaseCCompletedEdge?_preserves_prefix_present
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (present : current.payload.frontier.prefixMemberBool target = true)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    result.payload.frontier.prefixMemberBool target = true := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with rfl | active
+  · exact present
+  · rcases active with ⟨prior, child, rebuilt, candidate, relevant,
+      prefixEq, reductionEq, fresh, rebuiltEq, candidateEq, frontierEq⟩
+    rw [frontierEq]
+    cases kindEq : candidate.kind with
+    | duplicate => exact present
+    | insertedIncomplete =>
+        exact (insertCandidate?_prefixMemberBool_eq_true_iff owned
+          current.payload.frontier edge.after target _ candidate
+            candidateEq).2 (Or.inl present)
+    | insertedComplete =>
+        exact (insertCandidate?_prefixMemberBool_eq_true_iff owned
+          current.payload.frontier edge.after target _ candidate
+            candidateEq).2 (Or.inl present)
+
+private theorem attemptPhaseCCompletedEdge?_preserves_unrelated_fresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (target : UnitAddress tokens)
+    (notAttempt : target ≠ (.cubic .U06_frontierCompletion
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens))
+    (notTraversal : target ≠ (.cubic .U07_frontierCompletedTraversal
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens))
+    (notAction : target ≠ (.cubic .U05_completedAction
+      (contextualCompletionKey edge.waiting edge.finished) :
+        UnitAddress tokens))
+    (notInsert : target ≠ (.linear .L09_frontierInsert
+      (contextualLinearKey edge.after) : UnitAddress tokens))
+    (fresh : target ∉ current.counter.usedRev)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    target ∉ result.counter.usedRev := by
+  unfold attemptPhaseCCompletedEdge? at selected
+  split at selected
+  next relevant =>
+    cases prefixEq : current.payload.frontier.lookupPrefix? edge.waiting with
+    | none =>
+        simp only [prefixEq, Option.some.injEq] at selected
+        cases selected
+        exact fresh
+    | some prior =>
+        simp only [prefixEq] at selected
+        cases reductionEq :
+            current.payload.frontier.lookupReduction? edge.finished with
+        | none =>
+            simp only [reductionEq, Option.some.injEq] at selected
+            cases selected
+            exact fresh
+        | some child =>
+            simp only [reductionEq] at selected
+            split at selected
+            next used =>
+              cases selected
+              exact fresh
+            next attemptFresh =>
+              simp only [Option.bind_eq_bind,
+                Option.bind_eq_some_iff] at selected
+              rcases selected with ⟨attempted, attemptedEq, rebuilt,
+                rebuiltEq, candidate, candidateEq, traversed, traversedEq,
+                actioned, actionedEq, publishedEq⟩
+              have afterAttempt : target ∉ attempted.counter.usedRev := by
+                rw [runMappedPrimitive?_usedRev current _ id attempted
+                  attemptedEq]
+                simp only [List.mem_cons, not_or]
+                exact ⟨notAttempt, fresh⟩
+              have afterTraversal : target ∉ traversed.counter.usedRev := by
+                rw [runMappedPrimitive?_usedRev attempted _ id traversed
+                  traversedEq]
+                simp only [List.mem_cons, not_or]
+                exact ⟨notTraversal, afterAttempt⟩
+              exact publishPhaseCValueCandidate?_preserves_fresh actioned
+                result edge.after candidate target notInsert
+                  (chargePhaseCCompletedCandidate?_preserves_fresh traversed
+                    actioned _ target candidate notAction afterTraversal
+                      actionedEq) publishedEq
+  next irrelevant =>
+    cases selected
+    exact fresh
+
 
 private structure PhaseCItemSafe
     {file : WorkspaceFile} {tokens : List Token}
