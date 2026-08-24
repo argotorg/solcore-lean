@@ -19807,6 +19807,152 @@ theorem g10NonAssociativeRoot_completion_backpointer
   subst rightSite
   exact ⟨sharedEq, leftProduction.trans rightProduction.symm⟩
 
+/-- For two completions with one target and shared boundary, strict
+consumption by one child rules out the empty branch for the other child at a
+fixed optional site. -/
+theorem completedOptional_some_of_sameTarget_sameShared_strict
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {after leftWaiting leftFinished rightWaiting rightFinished :
+      ContextualItemKey tokens}
+    {leftShared rightShared : Boundary tokens}
+    {site : OptionalSite}
+    (leftEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed leftWaiting leftFinished after leftShared))
+    (rightEdge : ContextualEdgeReach file tokens memo correct final
+      (.completed rightWaiting rightFinished after rightShared))
+    (rightShape : ∃ branch, rightFinished.raw.production = .opt site branch)
+    (sharedEq : leftShared = rightShared)
+    (leftStrict :
+      leftFinished.raw.origin.val < leftFinished.raw.current.val) :
+    rightFinished.raw.production = .opt site .some := by
+  obtain ⟨leftWitness⟩ :=
+    packedEdge_completed_valid_iff.mp leftEdge.1.1
+  obtain ⟨rightWitness⟩ :=
+    packedEdge_completed_valid_iff.mp rightEdge.1.1
+  rcases rightShape with ⟨branch, rightProduction⟩
+  cases branch with
+  | none =>
+      have rightZero : rightFinished.raw.dot.val = 0 := by
+        have complete := rightWitness.complete
+        unfold CompleteItem at complete
+        calc
+          rightFinished.raw.dot.val =
+              rightFinished.raw.production.rhs.length := complete
+          _ = (ProductionId.opt site .none).rhs.length :=
+            congrArg (fun production : ProductionId => production.rhs.length)
+              rightProduction
+          _ = 0 := rfl
+      have rightOriginCurrent := contextualReach_zero_origin_eq_current
+        rightEdge.2.2.1 rightZero
+      have leftOriginShared := leftWitness.finishedAtShared
+      have rightOriginShared := rightWitness.finishedAtShared
+      have leftCurrentAfter := leftWitness.advance.2.2.2.symm
+      have rightCurrentAfter := rightWitness.advance.2.2.2.symm
+      exfalso
+      have leftOriginVal := congrArg Fin.val leftOriginShared
+      have rightOriginVal := congrArg Fin.val rightOriginShared
+      have leftCurrentVal := congrArg Fin.val leftCurrentAfter
+      have rightCurrentVal := congrArg Fin.val rightCurrentAfter
+      have sharedVal := congrArg Fin.val sharedEq
+      have rightZeroSpan := congrArg Fin.val rightOriginCurrent
+      omega
+  | some => exact rightProduction
+
+/-- A reached complete item whose production has exactly one nonterminal
+symbol recovers a reached complete child over the same source interval. -/
+theorem contextualReach_complete_singleNonterminal
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    {childLhs : NonterminalSymbol}
+    (reached : ContextualReach file tokens memo correct final item)
+    (rhs : item.raw.production.rhs =
+      [GrammarSymbol.nonterminal childLhs])
+    (complete : CompleteItem item.raw) :
+    ∃ child : ContextualItemKey tokens,
+      ContextualReach file tokens memo correct final child ∧
+      CompleteItem child.raw ∧
+      child.raw.production.lhs = childLhs ∧
+      child.raw.origin = item.raw.origin ∧
+      child.raw.current = item.raw.current := by
+  cases reached with
+  | root =>
+      change 0 = (ProductionId.root .module).rhs.length at complete
+      simp [ProductionId.rhs] at complete
+  | predict waiting predicted waitingReached next enabled =>
+      unfold CompleteItem at complete
+      have lengthEq := congrArg List.length rhs
+      simp only [List.length_cons, List.length_nil] at lengthEq
+      change 0 = predicted.rhs.length at complete
+      omega
+  | scan before after cursor beforeReached structural =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      unfold CompleteItem at complete
+      have lengthEq := congrArg List.length rhs
+      simp only [List.length_cons, List.length_nil] at lengthEq
+      have beforeDot : before.raw.dot.val = 0 := by omega
+      let index : Nat := before.raw.dot.val
+      have impossible : some (GrammarSymbol.nonterminal childLhs) =
+          some (GrammarSymbol.terminal terminal) := by
+        calc
+          _ = item.raw.production.rhs[index]? := by
+            rw [rhs]
+            simp [index, beforeDot]
+          _ = before.raw.production.rhs[index]? :=
+            congrArg (fun production : ProductionId =>
+              production.rhs[index]?) productionEq
+          _ = before.raw.production.rhs[before.raw.dot.val]? := rfl
+          _ = _ := next.2
+      exact GrammarSymbol.noConfusion (Option.some.inj impossible)
+  | complete waiting finished after shared waitingReached finishedReached
+      structural =>
+      rcases structural.1 with
+        ⟨symbol, next, finishedComplete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      unfold CompleteItem at complete
+      have lengthEq := congrArg List.length rhs
+      simp only [List.length_cons, List.length_nil] at lengthEq
+      have waitingDot : waiting.raw.dot.val = 0 := by omega
+      have waitingOriginCurrent :=
+        contextualReach_zero_origin_eq_current waitingReached waitingDot
+      have exactNext : NextSymbol waiting.raw
+          (GrammarSymbol.nonterminal finished.raw.production.lhs) := by
+        rw [lhsEq]
+        exact next
+      let index : Nat := waiting.raw.dot.val
+      have selected : some (GrammarSymbol.nonterminal childLhs) =
+          some (GrammarSymbol.nonterminal finished.raw.production.lhs) := by
+        calc
+          _ = item.raw.production.rhs[index]? := by
+            rw [rhs]
+            simp [index, waitingDot]
+          _ = waiting.raw.production.rhs[index]? :=
+            congrArg (fun production : ProductionId =>
+              production.rhs[index]?) productionEq
+          _ = waiting.raw.production.rhs[waiting.raw.dot.val]? := rfl
+          _ = _ := exactNext.2
+      have finishedLhs : finished.raw.production.lhs = childLhs :=
+        (GrammarSymbol.nonterminal.inj (Option.some.inj selected)).symm
+      have finishedOrigin : finished.raw.origin = item.raw.origin := by
+        calc
+          finished.raw.origin = shared := finishedAtShared
+          _ = waiting.raw.current := waitingAtShared.symm
+          _ = waiting.raw.origin := waitingOriginCurrent.symm
+          _ = item.raw.origin := originEq.symm
+      exact ⟨finished, finishedReached, finishedComplete, finishedLhs,
+        finishedOrigin, currentEq.symm⟩
+
 theorem g10NonAssociative_rhs_eq (level : NonAssociativeLevel) :
     m2cV1.rhs level.rule = .sequence [
       .atom (.nonterminal level.operandRule),
