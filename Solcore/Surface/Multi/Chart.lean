@@ -27066,6 +27066,135 @@ private theorem attemptPhaseCCompletedEdge?_preserves_sourceNotQueued
     rw [← new.2, present] at absent
     contradiction
 
+private theorem attemptPhaseCPackedCompletedEdge?_preserves_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (safe : PhaseCValueAddressSafe current)
+    (present : current.payload.frontier.prefixMemberBool source = true)
+    (notQueued : source ∉ current.payload.frontier.queue)
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    PhaseCValueAddressSafe result ∧
+      result.payload.frontier.prefixMemberBool source = true ∧
+      source ∉ result.payload.frontier.queue := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned =>
+      cases selected
+      exact ⟨safe, present, notQueued⟩
+  | completed waiting finished after shared =>
+      let edge : StructurallyValidContextualCompletedEdge file tokens := {
+        waiting := waiting
+        finished := finished
+        after := after
+        shared := shared
+        structural := structural
+      }
+      exact ⟨attemptPhaseCCompletedEdge?_addressSafe owned source edge current
+          result safe selected,
+        attemptPhaseCCompletedEdge?_preserves_prefix_present owned source source
+          edge current result present selected,
+        attemptPhaseCCompletedEdge?_preserves_sourceNotQueued owned source edge
+          current result present notQueued selected⟩
+
+private theorem attemptPhaseCRetainedCompletedEdges?_preserves_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      PhaseCValueAddressSafe current →
+      current.payload.frontier.prefixMemberBool source = true →
+      source ∉ current.payload.frontier.queue →
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+        some result →
+      PhaseCValueAddressSafe result ∧
+        result.payload.frontier.prefixMemberBool source = true ∧
+        source ∉ result.payload.frontier.queue := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result safe present notQueued selected
+      cases selected
+      exact ⟨safe, present, notQueued⟩
+  | cons head rest induction =>
+      intro current result safe present notQueued selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      obtain ⟨nextSafe, nextPresent, nextNotQueued⟩ :=
+        attemptPhaseCPackedCompletedEdge?_preserves_processing owned source head
+          current next safe present notQueued nextEq
+      exact induction next result nextSafe nextPresent nextNotQueued restEq
+
+/-- Geometry-only readiness for retained completion processing. Address
+freshness is supplied separately by the stable causal invariant. -/
+private def PhaseCCompletionGeometryReady
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens) : Prop :=
+  match packed with
+  | ⟨.scanned _ _ _, _⟩ => True
+  | ⟨.completed waiting finished after _, _⟩ =>
+      waiting = source ∨ finished = source →
+        waiting.raw.origin.val ≤ waiting.raw.current.val ∧
+        finished.raw.origin.val ≤ finished.raw.current.val ∧
+        (current.payload.frontier.prefixMemberBool after = false →
+          after.raw.production = .root .module →
+          after.raw.origin = Boundary.start tokens ∧
+            after.raw.current = Boundary.afterLogicalEOF tokens)
+
+/-- Retained completions are total from geometry plus causal address safety,
+and preserve the runner invariants needed by the next queue iteration. -/
+private theorem attemptPhaseCRetainedCompletedEdges?_total_processing
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edges : List (StructurallyValidContextualPackedEdge file tokens))
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (unique : edges.Nodup)
+    (safe : PhaseCValueAddressSafe current)
+    (present : current.payload.frontier.prefixMemberBool source = true)
+    (notQueued : source ∉ current.payload.frontier.queue)
+    (geometry : ∀ packed, packed ∈ edges →
+      PhaseCCompletionGeometryReady current source packed) :
+    ∃ result,
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result ∧
+        PhaseCValueAddressSafe result ∧
+        result.payload.frontier.prefixMemberBool source = true ∧
+        source ∉ result.payload.frontier.queue := by
+  have ready : ∀ packed, packed ∈ edges →
+      PhaseCCompletionFoldReady current source packed := by
+    intro packed member
+    rcases packed with ⟨key, structural⟩
+    cases key with
+    | scanned => trivial
+    | completed waiting finished after shared =>
+        intro relevant
+        obtain ⟨waitingOrdered, finishedOrdered, moduleReady⟩ :=
+          geometry ⟨.completed waiting finished after shared, structural⟩ member
+            relevant
+        refine ⟨waitingOrdered, finishedOrdered, fun attemptFresh => ?_⟩
+        have downstream := safe.completionFresh_of_attemptFresh waiting finished
+          attemptFresh
+        exact ⟨moduleReady, downstream.1, fun absent =>
+          ⟨(safe.candidateFresh_of_absent after absent).1,
+            fun _complete => downstream.2⟩⟩
+  obtain ⟨result, selected⟩ :=
+    attemptPhaseCRetainedCompletedEdges?_total_ready owned source edges current
+      unique ready
+  obtain ⟨resultSafe, resultPresent, resultNotQueued⟩ :=
+    attemptPhaseCRetainedCompletedEdges?_preserves_processing owned source edges
+      current result safe present notQueued selected
+  exact ⟨result, selected, resultSafe, resultPresent, resultNotQueued⟩
+
 private theorem chargeContextualPrediction_itemSafe
     {file : WorkspaceFile} {tokens : List Token}
     (current result : CountedState tokens (PhaseCWorklist file tokens))
