@@ -168,6 +168,249 @@ theorem frontierGrammarRank_lt_predicted_of_positiveSpan
   exact frontierSpanPotential_predicted_lt_of_positiveSpan
     width zero positive zeroBound waiting production nonempty progress
 
+/-- A concrete two-band zero-span weight. Epsilon productions occupy a band
+above every input boundary; nonempty productions reuse their local positive
+weight. -/
+def frontierEpsilonBandZero
+    (tokens : List Token) (width : Nat) (positive : ProductionId → Nat)
+    (production : ProductionId) : Nat :=
+  if production.rhs = [] then (tokens.length + 3) * width
+  else positive production
+
+/-- Nonempty productions in the two-band construction retain the bound used
+by positive-span prediction. -/
+theorem frontierEpsilonBandZero_lt_width
+    {tokens : List Token} {width : Nat}
+    {positive : ProductionId → Nat} {production : ProductionId}
+    (nonempty : production.rhs ≠ [])
+    (bounded : positive production < width) :
+    frontierEpsilonBandZero tokens width positive production < width := by
+  simp [frontierEpsilonBandZero, nonempty, bounded]
+
+/-- Every frame of a nonempty caller lies below an epsilon production's
+zero-span band when local positive weights fit inside one row. -/
+theorem frontierSpanPotential_nonempty_lt_epsilonBand
+    {tokens : List Token} (width : Nat) (positive : ProductionId → Nat)
+    (parent epsilon : ProductionId)
+    (parentNonempty : parent.rhs ≠ [])
+    (epsilonEmpty : epsilon.rhs = [])
+    (bounded : positive parent < width)
+    (origin current : Boundary tokens) :
+    frontierSpanPotential width
+        (frontierEpsilonBandZero tokens width positive) positive
+        parent origin current <
+      frontierEpsilonBandZero tokens width positive epsilon := by
+  have rowLe : (origin.val + 2) * width ≤
+      (tokens.length + 3) * width := by
+    apply Nat.mul_le_mul_right
+    omega
+  have widthLe : width ≤ (tokens.length + 3) * width := by
+    calc
+      width = 1 * width := by simp
+      _ ≤ (tokens.length + 3) * width :=
+        Nat.mul_le_mul_right width (by omega)
+  simp only [frontierSpanPotential, frontierEpsilonBandZero,
+    if_neg parentNonempty, if_pos epsilonEmpty]
+  split
+  · exact Nat.lt_of_lt_of_le bounded widthLe
+  · exact Nat.lt_of_lt_of_le
+      (calc
+        (origin.val + 1) * width + positive parent <
+            (origin.val + 1) * width + width :=
+          Nat.add_lt_add_left bounded _
+        _ = (origin.val + 2) * width := by
+          simp [Nat.add_mul, Nat.add_assoc]
+          omega)
+      rowLe
+
+/-- One reached caller that introduced a contextual production instance. -/
+def ContextualActivationParent
+    (file : WorkspaceFile) (tokens : List Token)
+    (memo : GuardMemo tokens)
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (parent child : ContextualItemKey tokens) : Prop :=
+  ContextualReach file tokens memo correct final parent ∧
+    NextSymbol parent.raw (.nonterminal child.raw.production.lhs) ∧
+    parent.raw.current = child.raw.origin ∧
+    child.context = descendContext parent child.raw.production
+
+/-- Every reached item either belongs to the top-level module activation or
+retains a reached caller. Scans and completions preserve that caller. -/
+theorem contextualReach_rootOrActivationParent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item) :
+    (item.raw.production = .root .module ∧
+      item.raw.origin = Boundary.start tokens ∧
+      item.context = .plain) ∨
+    ∃ parent, ContextualActivationParent
+      file tokens memo correct final parent item := by
+  induction reached with
+  | root => exact Or.inl ⟨rfl, rfl, rfl⟩
+  | predict waiting predicted reached next enabled induction =>
+      exact Or.inr ⟨waiting, reached, next, rfl, rfl⟩
+  | scan before after cursor reached structural induction =>
+      rcases structural with ⟨valid, context⟩
+      rcases valid with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      simpa only [ContextualActivationParent, production, origin,
+        ← context] using induction
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural with ⟨valid, finishedContext, afterContext⟩
+      rcases valid with
+        ⟨symbol, next, complete, lhs, waitingAt, finishedAt, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      simpa only [ContextualActivationParent, production, origin,
+        afterContext] using waitingInduction
+
+/-- An epsilon production cannot move its cursor after prediction. -/
+theorem contextualReach_epsilon_current_eq_origin
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (epsilon : item.raw.production.rhs = []) :
+    item.raw.current = item.raw.origin := by
+  induction reached with
+  | root => simp [ProductionId.rhs] at epsilon
+  | predict => rfl
+  | scan before after cursor reached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      have beforeEpsilon : before.raw.production.rhs = [] :=
+        (congrArg ProductionId.rhs advance.1).symm.trans epsilon
+      have zeroLength : before.raw.production.rhs.length = 0 :=
+        congrArg List.length beforeEpsilon
+      have bound := next.1
+      have positiveLength : 0 < before.raw.production.rhs.length :=
+        Nat.lt_of_le_of_lt (Nat.zero_le _) bound
+      omega
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, finishedComplete, lhs, waitingAt, finishedAt,
+          advance⟩
+      have waitingEpsilon : waiting.raw.production.rhs = [] :=
+        (congrArg ProductionId.rhs advance.1).symm.trans epsilon
+      have zeroLength : waiting.raw.production.rhs.length = 0 :=
+        congrArg List.length waitingEpsilon
+      have bound := next.1
+      have positiveLength : 0 < waiting.raw.production.rhs.length :=
+        Nat.lt_of_le_of_lt (Nat.zero_le _) bound
+      omega
+
+/-- Completing a reached non-root instance materializes its caller's
+continuation at the same frontier. -/
+theorem frontierReach_continuation_of_complete_nonroot
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens} {finished : ContextualItemKey tokens}
+    (frontier : FrontierReach
+      file tokens memo correct final cursor finished)
+    (complete : CompleteItem finished.raw)
+    (nonroot : finished.raw.production ≠ .root .module) :
+    ∃ parent after : ContextualItemKey tokens,
+      ContextualActivationParent
+        file tokens memo correct final parent finished ∧
+      FrontierReach file tokens memo correct final cursor after ∧
+      AdvanceItem parent.raw finished.raw.current after.raw := by
+  rcases contextualReach_rootOrActivationParent frontier.2.1 with
+      root | ⟨parent, activated⟩
+  · exact (nonroot root.1).elim
+  · let after : ContextualItemKey tokens := {
+      raw := {
+        production := parent.raw.production
+        dot := ⟨parent.raw.dot.val + 1,
+          Nat.succ_lt_succ activated.2.1.1⟩
+        origin := parent.raw.origin
+        current := finished.raw.current
+      }
+      context := parent.context
+    }
+    have advance :
+        AdvanceItem parent.raw finished.raw.current after.raw := by
+      exact ⟨rfl, rfl, rfl, rfl⟩
+    have structural : ContextualPackedEdgeKey.StructurallyValid file tokens
+        (.completed parent finished after parent.raw.current) := by
+      constructor
+      · exact ⟨finished.raw.production.lhs, activated.2.1, complete,
+          rfl, rfl, activated.2.2.1.symm, advance⟩
+      · exact ⟨activated.2.2.2, rfl⟩
+    have afterReached :
+        ContextualReach file tokens memo correct final after := by
+      exact .complete parent finished after parent.raw.current
+        activated.1 frontier.2.1 structural
+    refine ⟨parent, after, activated, ⟨frontier.1, afterReached, ?_⟩,
+      advance⟩
+    exact advance.2.2.2.trans frontier.2.2
+
+/-- A completed epsilon instance always hands control back to a lower caller
+frame under the concrete two-band potential. -/
+theorem frontierGrammarRank_continuation_lt_of_complete_epsilonBand
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {cursor : Boundary tokens} {finished : ContextualItemKey tokens}
+    (width : Nat) (positive : ProductionId → Nat)
+    (positiveBound : ∀ production, production.rhs ≠ [] →
+      positive production < width)
+    (frontier : FrontierReach
+      file tokens memo correct final cursor finished)
+    (complete : CompleteItem finished.raw)
+    (epsilon : finished.raw.production.rhs = []) :
+    ∃ after : ContextualItemKey tokens,
+      FrontierReach file tokens memo correct final cursor after ∧
+      frontierGrammarRank
+          (frontierSpanPotential width
+            (frontierEpsilonBandZero tokens width positive) positive)
+          after <
+        frontierGrammarRank
+          (frontierSpanPotential width
+            (frontierEpsilonBandZero tokens width positive) positive)
+          finished := by
+  have nonroot : finished.raw.production ≠ .root .module := by
+    intro root
+    rw [root] at epsilon
+    simp [ProductionId.rhs] at epsilon
+  rcases frontierReach_continuation_of_complete_nonroot
+      frontier complete nonroot with
+    ⟨parent, after, activated, afterFrontier, advance⟩
+  have parentNonempty : parent.raw.production.rhs ≠ [] := by
+    intro parentEmpty
+    have zeroLength : parent.raw.production.rhs.length = 0 :=
+      congrArg List.length parentEmpty
+    have bound := activated.2.1.1
+    have positiveLength : 0 < parent.raw.production.rhs.length :=
+      Nat.lt_of_le_of_lt (Nat.zero_le _) bound
+    omega
+  have finishedAtOrigin :
+      finished.raw.current = finished.raw.origin :=
+    contextualReach_epsilon_current_eq_origin frontier.2.1 epsilon
+  refine ⟨after, afterFrontier, ?_⟩
+  apply frontierRawGrammarRank_lt_of_potential_lt
+  have parentBelow := frontierSpanPotential_nonempty_lt_epsilonBand
+    width positive parent.raw.production finished.raw.production
+    parentNonempty epsilon (positiveBound _ parentNonempty)
+    parent.raw.origin finished.raw.current
+  rcases advance with ⟨production, dot, origin, current⟩
+  simp only [production, origin, current, frontierSpanPotential,
+    if_pos finishedAtOrigin.symm]
+  exact parentBelow
+
+
 /-- Boundary-free rank of one dotted production in the zero-span mode. -/
 def frontierZeroSpanGrammarRank
     (zero : ProductionId → Nat) (dotted : DottedRhs) : Nat :=
