@@ -37241,4 +37241,229 @@ private theorem insertCandidate?_frontierGrowth
             (ContextualValueFrontierState.reductionMemberBool_eq_true_iff_lookupReduction?_isSome
               state target).1 member)
 
+/-- One prediction grows the semantic frontier. -/
+private theorem attemptPhaseCValuePrediction?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    PhaseCValueFrontierGrowth current.payload.frontier
+      result.payload.frontier := by
+  rcases (attemptPhaseCValuePrediction?_exact owned current result waiting
+    predicted selected).2 with unchanged | inserted
+  · rw [unchanged]
+    exact .refl _
+  · rcases inserted with ⟨item, productionInstance, atZero, candidate,
+      predictedEq, member, candidateEq, frontierEq⟩
+    have publishedEq :=
+      ContextualValueFrontierState.insertCandidate?_publishedState_eq owned
+        current.payload.frontier item (ContextualPrefixValue.zero item atZero)
+          candidate candidateEq
+    rw [frontierEq]
+    change PhaseCValueFrontierGrowth current.payload.frontier
+      (candidate.publishedState current.payload.frontier)
+    rw [publishedEq]
+    exact insertCandidate?_frontierGrowth owned current.payload.frontier item
+      (ContextualPrefixValue.zero item atZero) candidate candidateEq
+
+/-- A finite prediction fold grows the semantic frontier. -/
+private theorem attemptPhaseCValuePredictions?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ productions
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      attemptPhaseCValuePredictions? owned waiting productions current =
+          some result →
+        PhaseCValueFrontierGrowth current.payload.frontier
+          result.payload.frontier := by
+  intro productions
+  induction productions with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl _
+  | cons predicted rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCValuePredictions?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (attemptPhaseCValuePrediction?_frontierGrowth owned current next
+        waiting predicted nextEq).trans (induction next result restEq)
+
+/-- One retained scan grows the semantic frontier. -/
+private theorem attemptPhaseCScannedEdge?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    PhaseCValueFrontierGrowth current.payload.frontier
+      result.payload.frontier := by
+  rcases (attemptPhaseCScannedEdge?_exact owned source edge current result
+    selected).2 with unchanged | inserted
+  · rw [unchanged]
+    exact .refl _
+  · rcases inserted with ⟨rebuilt, prior, candidate, rebuiltEq, priorEq,
+      candidateEq, frontierEq⟩
+    have publishedEq :=
+      ContextualValueFrontierState.insertCandidate?_publishedState_eq owned
+        current.payload.frontier edge.after (rebuilt.scan prior) candidate
+          candidateEq
+    rw [frontierEq]
+    change PhaseCValueFrontierGrowth current.payload.frontier
+      (candidate.publishedState current.payload.frontier)
+    rw [publishedEq]
+    exact insertCandidate?_frontierGrowth owned current.payload.frontier
+      edge.after (rebuilt.scan prior) candidate candidateEq
+
+private theorem attemptPhaseCPackedScannedEdge?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    PhaseCValueFrontierGrowth current.payload.frontier
+      result.payload.frontier := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact attemptPhaseCScannedEdge?_frontierGrowth owned source {
+        before := before, after := after, cursor := cursor,
+        structural := structural } current result selected
+  | completed =>
+      cases selected
+      exact .refl _
+
+private theorem attemptPhaseCRetainedScannedEdges?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+        PhaseCValueFrontierGrowth current.payload.frontier
+          result.payload.frontier := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl _
+  | cons edge rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (attemptPhaseCPackedScannedEdge?_frontierGrowth owned source edge
+        current next nextEq).trans (induction next result restEq)
+
+/-- One retained completion grows the semantic frontier. -/
+private theorem attemptPhaseCCompletedEdge?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    PhaseCValueFrontierGrowth current.payload.frontier
+      result.payload.frontier := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with unchanged | inserted
+  · cases unchanged
+    exact .refl _
+  · rcases inserted with ⟨prior, child, rebuilt, candidate, relevant,
+      priorEq, childEq, attemptFresh, rebuiltEq, candidateEq, frontierEq⟩
+    have publishedEq :=
+      ContextualValueFrontierState.insertCandidate?_publishedState_eq owned
+        current.payload.frontier edge.after (rebuilt.complete prior child)
+          candidate candidateEq
+    rw [frontierEq]
+    change PhaseCValueFrontierGrowth current.payload.frontier
+      (candidate.publishedState current.payload.frontier)
+    rw [publishedEq]
+    exact insertCandidate?_frontierGrowth owned current.payload.frontier
+      edge.after (rebuilt.complete prior child) candidate candidateEq
+
+private theorem attemptPhaseCPackedCompletedEdge?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    PhaseCValueFrontierGrowth current.payload.frontier
+      result.payload.frontier := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned =>
+      cases selected
+      exact .refl _
+  | completed waiting finished after shared =>
+      exact attemptPhaseCCompletedEdge?_frontierGrowth owned source {
+        waiting := waiting, finished := finished, after := after,
+        shared := shared, structural := structural } current result selected
+
+private theorem attemptPhaseCRetainedCompletedEdges?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        PhaseCValueFrontierGrowth current.payload.frontier
+          result.payload.frontier := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result selected
+      cases selected
+      exact .refl _
+  | cons edge rest induction =>
+      intro current result selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      exact (attemptPhaseCPackedCompletedEdge?_frontierGrowth owned source edge
+        current next nextEq).trans (induction next result restEq)
+
+/-- Processing one dequeued item grows the semantic frontier. -/
+private theorem processPhaseCValueItem?_frontierGrowth
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : processPhaseCValueItem? owned source current = some result) :
+    PhaseCValueFrontierGrowth current.payload.frontier
+      result.payload.frontier := by
+  unfold processPhaseCValueItem? at selected
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+  rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
+    completedEq⟩
+  exact (attemptPhaseCValuePredictions?_frontierGrowth owned source
+    allProductionIds current predicted predictedEq).trans
+      ((attemptPhaseCRetainedScannedEdges?_frontierGrowth owned source _
+        predicted scanned scannedEq).trans
+        (attemptPhaseCRetainedCompletedEdges?_frontierGrowth owned source _
+          scanned result completedEq))
+
 end Solcore.Surface.Multi.Chart
