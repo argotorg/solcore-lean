@@ -20643,10 +20643,9 @@ namespace Solcore.Surface.Multi
 open Grammar Solcore.Workspace
 /-- Two reached present-optional completions force the aligned canonical
 nonassociative root reduction to expose a completed source operation. -/
-theorem g10CompletedValue_of_presentCompletionEdges
+theorem g10CompletedValue_of_presentCompletionEdges_of_aligned
     {file : WorkspaceFile} {tokens : List Token} {memo : GuardMemo tokens}
     {correct : PhaseBCorrect file tokens memo} {final : AllGuardsFinal memo}
-    (backpointer : CompletionBackpointerUnique file tokens memo correct final)
     {cursor : Boundary tokens} {level : NonAssociativeLevel}
     {origin : Boundary tokens} {context : GuardContext tokens}
     {output : RuleValue level.rule}
@@ -20660,7 +20659,18 @@ theorem g10CompletedValue_of_presentCompletionEdges
     {optionalShared : Boundary tokens} {site : OptionalSite}
     (optionalReached : ContextualEdgeReach file tokens memo correct final
       (.completed sequenceWaiting optional sequence optionalShared))
-    (optionalProduction : optional.raw.production = .opt site .some) :
+    (optionalProduction : optional.raw.production = .opt site .some)
+    (rootAligned : ∀ {waiting finished : ContextualItemKey tokens}
+        {shared : Boundary tokens},
+      ContextualEdgeReach file tokens memo correct final
+        (.completed waiting finished (CanonicalCompleteRootItem tokens
+          level.rule origin cursor context) shared) →
+      finished = sequence)
+    (optionalAligned : ∀ {waiting finished : ContextualItemKey tokens}
+        {shared : Boundary tokens},
+      ContextualEdgeReach file tokens memo correct final
+        (.completed waiting finished sequence shared) →
+      finished = optional) :
     ∃ first, CompletedNonAssociativeValue level output first := by
   cases rootReduction with
   | reduce _ rootValues _ _ rootComplete rootCoherent rootAction =>
@@ -20673,8 +20683,8 @@ theorem g10CompletedValue_of_presentCompletionEdges
     | complete semanticRootWaiting semanticSequence _ semanticRootShared
         rootPriorValues sequenceValue rootWitness semanticRootEdge
         rootPrior sequenceReduction =>
-      have sequenceEq : semanticSequence = sequence := g10CompletedEdge_finished_eq
-        backpointer semanticRootEdge rootReached
+      have sequenceEq : semanticSequence = sequence :=
+        rootAligned semanticRootEdge
       subst semanticSequence
       cases sequenceReduction with
       | reduce _ sequenceValues _ _ sequenceComplete sequenceCoherent
@@ -20691,8 +20701,7 @@ theorem g10CompletedValue_of_presentCompletionEdges
             optionalWitness semanticOptionalEdge sequencePrior
             optionalReduction =>
           have optionalEq : semanticOptional = optional :=
-            g10CompletedEdge_finished_eq backpointer semanticOptionalEdge
-              optionalReached
+            optionalAligned semanticOptionalEdge
           subst semanticOptional
           cases optionalReduction with
           | reduce _ optionalValues _ _ optionalComplete optionalCoherent
@@ -20935,4 +20944,32 @@ theorem g10CompletedValue_of_presentCompletionEdges
                 childrenExpressions firstValue
                 (PrefixValues.fullValue optionalItem optionalComplete
                   optionalValues)
+
+/-- Global completion-backpointer uniqueness supplies both local alignments
+used by `g10CompletedValue_of_presentCompletionEdges_of_aligned`. -/
+theorem g10CompletedValue_of_presentCompletionEdges
+    {file : WorkspaceFile} {tokens : List Token} {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo} {final : AllGuardsFinal memo}
+    (backpointer : CompletionBackpointerUnique file tokens memo correct final)
+    {cursor : Boundary tokens} {level : NonAssociativeLevel}
+    {origin : Boundary tokens} {context : GuardContext tokens}
+    {output : RuleValue level.rule}
+    (rootReduction : CoherentReduction file tokens memo correct final
+      (CanonicalCompleteRootItem tokens level.rule origin cursor context) output)
+    {rootWaiting sequence : ContextualItemKey tokens} {rootShared : Boundary tokens}
+    (rootReached : ContextualEdgeReach file tokens memo correct final
+      (.completed rootWaiting sequence (CanonicalCompleteRootItem tokens
+        level.rule origin cursor context) rootShared))
+    {sequenceWaiting optional : ContextualItemKey tokens}
+    {optionalShared : Boundary tokens} {site : OptionalSite}
+    (optionalReached : ContextualEdgeReach file tokens memo correct final
+      (.completed sequenceWaiting optional sequence optionalShared))
+    (optionalProduction : optional.raw.production = .opt site .some) :
+    ∃ first, CompletedNonAssociativeValue level output first := by
+  apply g10CompletedValue_of_presentCompletionEdges_of_aligned rootReduction
+    rootReached optionalReached optionalProduction
+  · intro waiting finished shared edge
+    exact g10CompletedEdge_finished_eq backpointer edge rootReached
+  · intro waiting finished shared edge
+    exact g10CompletedEdge_finished_eq backpointer edge optionalReached
 end Solcore.Surface.Multi
