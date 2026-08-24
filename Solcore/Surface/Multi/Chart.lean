@@ -23121,6 +23121,103 @@ private theorem attemptPhaseCValuePredictions?_valueTrace
         exact itemsEq
       exact induction next result nextItemsEq nextTrace restEq
 
+/-- One retained structural scan preserves the public frontier trace. -/
+private theorem attemptPhaseCScannedEdge?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualScannedEdge file tokens)
+    (retained : StructurallyValidContextualPackedEdge file tokens)
+    (member : retained ∈ recognition.edges)
+    (shape : retained.val =
+      .scanned edge.before edge.after edge.cursor)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (trace : ContextualValueFrontierTrace owned recognition
+      current.payload.frontier)
+    (selected : attemptPhaseCScannedEdge? owned source edge current =
+      some result) :
+    ContextualValueFrontierTrace owned recognition result.payload.frontier := by
+  rcases (attemptPhaseCScannedEdge?_exact owned source edge current result
+    selected).2 with unchanged | inserted
+  · exact .same trace unchanged.symm
+  · rcases inserted with ⟨rebuilt, prior, candidate, rebuiltEq, priorEq,
+      candidateEq, frontierEq⟩
+    have candidateTrace : ContextualValueFrontierTrace owned recognition
+        candidate.state :=
+      .scan trace member shape rebuilt prior priorEq candidate candidateEq
+    have publishedEq :=
+      ContextualValueFrontierState.insertCandidate?_publishedState_eq
+        owned current.payload.frontier edge.after (rebuilt.scan prior)
+          candidate candidateEq
+    exact .same candidateTrace (frontierEq.trans publishedEq).symm
+
+/-- Constructor dispatch for one retained packed edge preserves the scan
+slice of the public frontier trace. -/
+private theorem attemptPhaseCPackedScannedEdge?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (member : packed ∈ recognition.edges)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (trace : ContextualValueFrontierTrace owned recognition
+      current.payload.frontier)
+    (selected : attemptPhaseCPackedScannedEdge? owned source packed current =
+      some result) :
+    ContextualValueFrontierTrace owned recognition result.payload.frontier := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      exact attemptPhaseCScannedEdge?_valueTrace owned recognition source {
+        before := before
+        after := after
+        cursor := cursor
+        structural := structural
+      } ⟨.scanned before after cursor, structural⟩ member rfl current result
+        trace selected
+  | completed waiting finished after shared =>
+      cases selected
+      exact trace
+
+/-- Folding any retained scan slice preserves the public frontier trace. -/
+private theorem attemptPhaseCRetainedScannedEdges?_valueTrace
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : ContextualWorklistResult file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      (∀ edge, edge ∈ edges → edge ∈ recognition.edges) →
+      ContextualValueFrontierTrace owned recognition
+        current.payload.frontier →
+      attemptPhaseCRetainedScannedEdges? owned source edges current =
+          some result →
+      ContextualValueFrontierTrace owned recognition
+        result.payload.frontier := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result _subset trace selected
+      cases selected
+      exact trace
+  | cons packed rest induction =>
+      intro current result subset trace selected
+      simp only [attemptPhaseCRetainedScannedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      have packedTrace := attemptPhaseCPackedScannedEdge?_valueTrace owned
+        recognition source packed (subset packed (by simp)) current next trace
+          nextEq
+      have restSubset : ∀ edge, edge ∈ rest → edge ∈ recognition.edges := by
+        intro edge member
+        exact subset edge (by simp [member])
+      exact induction next result restSubset packedTrace restEq
+
 end Solcore.Surface.Multi.Chart
 
 namespace Solcore.Surface.Multi.Chart
