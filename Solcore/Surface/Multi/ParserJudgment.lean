@@ -18563,6 +18563,75 @@ theorem contextualReach_guardContextOrderedAt
         _ ≤ finished.raw.current.val :=
           contextualReach_ordered finishedReached
 
+/-- A reached item carrying either G02 production cell retains the match-arm
+body context introduced by its enabled prediction. -/
+theorem contextualReach_g02_context
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (polarity : Polarity)
+    (member : (.G02_matchArmBoundary, polarity) ∈
+      guardOf item.raw.production) :
+    ∃ start,
+      item.context = .armBody start ∧
+      start.val ≤ item.raw.current.val := by
+  induction reached with
+  | root => simp [guardOf] at member
+  | predict waiting predicted reached next enabled induction =>
+      rcases enabled .G02_matchArmBoundary polarity member with
+        ⟨witnessKey, productionEq, guardEq, polarityEq, _witness⟩
+      have anchor := witnessKey.property.2
+      change GuardAnchor witnessKey.productionInstance
+        (witnessKey.guardInstance.guard, witnessKey.polarity)
+        witnessKey.guardInstance at anchor
+      rw [productionEq, guardEq, polarityEq] at anchor
+      simpa [GuardWitnessKey.productionInstance] using
+        GuardAnchor.armBody_of_g02 anchor
+  | scan before after cursor reached structural induction =>
+      rcases structural with ⟨valid, contextEq⟩
+      rcases valid with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      have beforeMember : (.G02_matchArmBoundary, polarity) ∈
+          guardOf before.raw.production := by
+        simpa only [production] using member
+      rcases induction beforeMember with
+        ⟨start, startContext, startOrdered⟩
+      refine ⟨start, ?_, ?_⟩
+      · rw [← contextEq]
+        exact startContext
+      · rw [current]
+        calc
+          start.val ≤ before.raw.current.val := startOrdered
+          _ = cursor.val := by rw [← atCurrent]; rfl
+          _ ≤ cursor.val + 1 := Nat.le_succ _
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural with ⟨valid, finishedContext, afterContext⟩
+      rcases valid with
+        ⟨symbol, next, complete, lhs, waitingAt, finishedAt, advance⟩
+      rcases advance with ⟨production, dot, origin, current⟩
+      have waitingMember : (.G02_matchArmBoundary, polarity) ∈
+          guardOf waiting.raw.production := by
+        simpa only [production] using member
+      rcases waitingInduction waitingMember with
+        ⟨start, startContext, startOrdered⟩
+      refine ⟨start, ?_, ?_⟩
+      · rw [afterContext]
+        exact startContext
+      · rw [current]
+        calc
+          start.val ≤ waiting.raw.current.val := startOrdered
+          _ = shared.val := congrArg Fin.val waitingAt
+          _ = finished.raw.origin.val :=
+            (congrArg Fin.val finishedAt).symm
+          _ ≤ finished.raw.current.val :=
+            contextualReach_ordered finishedReached
+
 private theorem descendContext_eq_of_postfixRegion_not_root
     {tokens : List Token}
     (waiting : ContextualItemKey tokens)
@@ -18661,6 +18730,66 @@ def MatchArmPairContextReadyAt {tokens : List Token}
       descendContext waiting positive = .armBody start ∧
       descendContext waiting negative = .armBody start ∧
       start.val ≤ waiting.raw.current.val
+
+/-- Reachability supplies the remaining match-arm pair context obligation:
+the finite grammar has only the direct body entry and recursive body-star
+predecessors, and the latter retains its enabled G02 anchor. -/
+theorem matchArmPairContextReadyAt_of_reached
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (waiting : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final waiting) :
+    MatchArmPairContextReadyAt waiting := by
+  intro positive negative positiveRule negativeRule
+    positiveOnly negativeOnly next lhsEq
+  have positiveEq :=
+    eq_matchArmBodyStar_nil_of_guardOf positive positiveOnly
+  have negativeEq :=
+    eq_matchArmBodyStar_cons_of_guardOf negative negativeOnly
+  subst positive
+  subst negative
+  let dotted : DottedRhs := {
+    production := waiting.raw.production
+    dot := waiting.raw.dot
+  }
+  have nextLookup : dotted.production.rhs[dotted.dot.val]? =
+      some (.nonterminal (.aux matchArmBodyStarSite.site)) := by
+    simpa [dotted, ProductionId.lhs] using next.2
+  have source : dotted.production.sourceRule = .matchArm := by
+    have sameRule := ProductionId.sourceRule_eq_of_aux_mem_rhs
+      dotted.production matchArmBodyStarSite.site
+      (List.mem_of_getElem? nextLookup)
+    change dotted.production.sourceRule = .matchArm
+    rw [sameRule, matchArmBodyStarSite_key]
+  rcases matchArmBodyWaitingDotted_cases dotted source nextLookup with
+    entry | recursive
+  · have productionEq := congrArg DottedRhs.production entry
+    have dotEq := congrArg (fun item : DottedRhs => item.dot.val) entry
+    change waiting.raw.production =
+      ProductionId.seq matchArmSequenceSite at productionEq
+    change waiting.raw.dot.val = 3 at dotEq
+    refine ⟨waiting.raw.current, ?_, ?_, Nat.le_refl _⟩
+    · simp [descendContext, productionEq, dotEq, ProductionId.lhs,
+        matchArmSequenceSite_key, matchArmBodyStarSite_key,
+        GrammarSite.isAt]
+    · simp [descendContext, productionEq, dotEq, ProductionId.lhs,
+        matchArmSequenceSite_key, matchArmBodyStarSite_key,
+        GrammarSite.isAt]
+  · have productionEq := congrArg DottedRhs.production recursive
+    change waiting.raw.production =
+      ProductionId.star matchArmBodyStarSite .cons at productionEq
+    have negativeMember :
+        (.G02_matchArmBoundary, .negative) ∈
+          guardOf waiting.raw.production := by
+      rw [productionEq]
+      simp [guardOf, matchArmBodyStarSite_key, GrammarSite.isAt]
+    rcases contextualReach_g02_context reached .negative negativeMember with
+      ⟨start, contextEq, startOrdered⟩
+    refine ⟨start, ?_, ?_, startOrdered⟩
+    · simpa [descendContext, productionEq] using contextEq
+    · simpa [descendContext, productionEq] using contextEq
 
 private theorem production_ne_postfixRoot_of_sourceRule_atom
     (production : ProductionId)
@@ -18782,6 +18911,19 @@ theorem anchoredNonterminalCoverageAt_of_reached_matchArmReady
       · exact GuardAnchor.atArmBody _ .negative start
           (by rw [negativeOnly]; simp) negativeDescend startOrdered
 
+/-- Every reached waiting item has all structural anchors required by the
+finite nonterminal-production table. -/
+theorem anchoredNonterminalCoverageAt_of_reached
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (waiting : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final waiting) :
+    AnchoredNonterminalCoverageAt tokens waiting :=
+  anchoredNonterminalCoverageAt_of_reached_matchArmReady waiting reached
+    (matchArmPairContextReadyAt_of_reached waiting reached)
+
 private theorem enabledProductionInstance_of_guardless
     {file : WorkspaceFile} {tokens : List Token}
     {memo : GuardMemo tokens}
@@ -18880,6 +19022,19 @@ theorem enabledNonterminalCoverageAt_of_anchored
           context := descendContext waiting positive
         } guard .positive positiveOnly key positiveAnchor .neutral
           stored rfl
+
+/-- Every reached waiting item has an enabled production for each selected
+nonterminal under any correct finalized guard memo. -/
+theorem enabledNonterminalCoverageAt_of_reached
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo)
+    (waiting : ContextualItemKey tokens)
+    (reached : ContextualReach file tokens memo correct final waiting) :
+    EnabledNonterminalCoverageAt file tokens memo correct final waiting :=
+  enabledNonterminalCoverageAt_of_anchored correct final waiting
+    (anchoredNonterminalCoverageAt_of_reached waiting reached)
 
 /-- Anchored grammar coverage forces the exact finite enabled-production table
 to be nonempty at every selected nonterminal. -/

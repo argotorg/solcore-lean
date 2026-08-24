@@ -4358,6 +4358,70 @@ theorem StarSite.eq_matchArmBodyStarSite
   · simpa [matchArmBodyStarSite_key] using fields.1
   · simpa [matchArmBodyStarSite_key] using fields.2
 
+private theorem g02_positive_shape
+    (production : ProductionId)
+    (only : guardOf production =
+      [(.G02_matchArmBoundary, .positive)]) :
+    ∃ site : StarSite,
+      production = .star site .nil ∧
+      site.site.isAt .matchArm [3] = true := by
+  cases production with
+  | root rule | atom rule | seq rule | group rule
+  | plus rule _ | list0 rule _ | list1 rule | tail rule _ =>
+      simp [guardOf] at only
+  | choice site branch | opt site branch =>
+      simp only [guardOf] at only
+      repeat first | split at only | simp_all
+  | star site branch =>
+      by_cases located : site.site.isAt .matchArm [3] = true
+      · cases branch with
+        | nil => exact ⟨site, rfl, located⟩
+        | cons => simp [guardOf, located] at only
+      · simp [guardOf, located] at only
+
+private theorem g02_negative_shape
+    (production : ProductionId)
+    (only : guardOf production =
+      [(.G02_matchArmBoundary, .negative)]) :
+    ∃ site : StarSite,
+      production = .star site .cons ∧
+      site.site.isAt .matchArm [3] = true := by
+  cases production with
+  | root rule | atom rule | seq rule | group rule
+  | plus rule _ | list0 rule _ | list1 rule | tail rule _ =>
+      simp [guardOf] at only
+  | choice site branch | opt site branch =>
+      simp only [guardOf] at only
+      repeat first | split at only | simp_all
+  | star site branch =>
+      by_cases located : site.site.isAt .matchArm [3] = true
+      · cases branch with
+        | nil => simp [guardOf, located] at only
+        | cons => exact ⟨site, rfl, located⟩
+      · simp [guardOf, located] at only
+
+/-- The positive G02 cell is the canonical empty match-arm body star. -/
+theorem eq_matchArmBodyStar_nil_of_guardOf
+    (production : ProductionId)
+    (only : guardOf production =
+      [(.G02_matchArmBoundary, .positive)]) :
+    production = .star matchArmBodyStarSite .nil := by
+  rcases g02_positive_shape production only with
+    ⟨site, productionEq, located⟩
+  rw [site.eq_matchArmBodyStarSite located] at productionEq
+  exact productionEq
+
+/-- The negative G02 cell is the canonical recursive match-arm body star. -/
+theorem eq_matchArmBodyStar_cons_of_guardOf
+    (production : ProductionId)
+    (only : guardOf production =
+      [(.G02_matchArmBoundary, .negative)]) :
+    production = .star matchArmBodyStarSite .cons := by
+  rcases g02_negative_shape production only with
+    ⟨site, productionEq, located⟩
+  rw [site.eq_matchArmBodyStarSite located] at productionEq
+  exact productionEq
+
 /-- Any checked match-arm root sequence expands as the canonical one. -/
 @[simp] theorem ProductionId.rhs_seq_isAt_matchArm
     (site : SequenceSite)
