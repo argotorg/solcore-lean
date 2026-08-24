@@ -11554,10 +11554,14 @@ theorem executeRootRule_reduces
   | assignmentStatement =>
       exact executeAssignmentStatementRoot_reduces origin finish ready input
   | parameter => exact executeParameterRoot_reduces origin finish ready input
+  | contractDecl =>
+      exact executeContractDeclRoot_reduces origin finish ready input
   | dataConstructor =>
       exact executeDataConstructorRoot_reduces origin finish ready input
   | typeAliasDecl =>
       exact executeTypeAliasDeclRoot_reduces origin finish ready input
+  | classDecl =>
+      exact executeClassDeclRoot_reduces origin finish ready input
   | fieldDecl => exact executeFieldDeclRoot_reduces origin finish ready input
   | fallbackDecl =>
       exact executeFallbackDeclRoot_reduces origin finish ready input
