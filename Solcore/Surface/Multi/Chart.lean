@@ -23186,6 +23186,44 @@ private theorem chargePhaseCCompletedCandidate?_used_mono
       simp only [kindEq] at selected
       exact runMappedPrimitive?_used_mono_value current _ id result selected
 
+private theorem attemptPhaseCValuePrediction?_used_mono
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    current.counter.usedRev ⊆ result.counter.usedRev := by
+  unfold attemptPhaseCValuePrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact fun _ => id
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, remainder⟩
+      have attemptedMono := runMappedPrimitive?_used_mono_value current _ id
+        attempted attemptedEq
+      split at remainder
+      next recognized =>
+        split at remainder
+        next atZero =>
+          simp only [Option.bind_eq_some_iff] at remainder
+          rcases remainder with ⟨candidate, candidateEq, actioned, actionedEq,
+            publishedEq⟩
+          exact fun address member =>
+            publishPhaseCValueCandidate?_used_mono actioned result item candidate
+              publishedEq (chargePhaseCCompletedCandidate?_used_mono attempted
+                actioned _ candidate actionedEq (attemptedMono member))
+        next notZero => contradiction
+      next notRecognized =>
+        cases remainder
+        exact attemptedMono
+
 private theorem attemptPhaseCCompletedEdge?_used_mono
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -25262,6 +25300,167 @@ private theorem contextualPredictionKey_waiting_eq
     have source := congrArg ChartPredictionKey.source equal
     simpa [contextualPredictionKey] using source
   exact contextualItem_eq_of_fields raw context
+
+/-- Prediction publication retains every old queued key and can add only the
+exact builder-selected item, which was absent beforehand. -/
+private theorem attemptPhaseCValuePrediction?_queue_member
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting target : ContextualItemKey tokens) (predicted : ProductionId)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result)
+    (member : target ∈ result.payload.frontier.queue) :
+    target ∈ current.payload.frontier.queue ∨
+      ∃ item productionInstance,
+        contextualPredictedItem? waiting predicted =
+            some (item, productionInstance) ∧
+        current.payload.frontier.prefixMemberBool item = false ∧ target = item := by
+  rcases (attemptPhaseCValuePrediction?_exact owned current result waiting
+    predicted selected).2 with unchanged | inserted
+  · rw [unchanged] at member
+    exact Or.inl member
+  · rcases inserted with ⟨item, productionInstance, atZero, candidate,
+      predictedEq, recognized, candidateEq, frontierEq⟩
+    cases kindEq : candidate.kind with
+    | duplicate =>
+        rw [frontierEq] at member
+        simp only [kindEq] at member
+        exact Or.inl member
+    | insertedIncomplete =>
+        rw [frontierEq] at member
+        simp only [kindEq] at member
+        exact (insertCandidate?_queue_member owned current.payload.frontier item
+          target _ candidate candidateEq member).imp_right fun new =>
+            ⟨item, productionInstance, predictedEq, new.1, new.2⟩
+    | insertedComplete =>
+        rw [frontierEq] at member
+        simp only [kindEq] at member
+        exact (insertCandidate?_queue_member owned current.payload.frontier item
+          target _ candidate candidateEq member).imp_right fun new =>
+            ⟨item, productionInstance, predictedEq, new.1, new.2⟩
+
+private theorem attemptPhaseCValuePrediction?_preserves_sourceFresh
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting target : ContextualItemKey tokens) (predicted : ProductionId)
+    (different : target ≠ waiting)
+    (fresh : PhaseCValueSourceFresh current.counter target)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    PhaseCValueSourceFresh result.counter target := by
+  unfold PhaseCValueSourceFresh at fresh ⊢
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · apply attemptPhaseCValuePrediction?_preserves_fresh owned current result
+      waiting predicted _ (by simp) _ fresh.1 selected
+    intro item productionInstance predictedEq
+    exact ⟨by simp, by simp⟩
+  · intro production member
+    apply attemptPhaseCValuePrediction?_preserves_fresh owned current result
+      waiting predicted _ _ _ (fresh.2.1 production member) selected
+    · intro equal
+      simp only [UnitAddress.prediction.injEq] at equal
+      exact different (contextualPredictionKey_waiting_eq equal.2)
+    · intro item productionInstance predictedEq
+      exact ⟨by simp, by simp⟩
+  · apply attemptPhaseCValuePrediction?_preserves_fresh owned current result
+      waiting predicted _ (by simp) _ fresh.2.2.1 selected
+    intro item productionInstance predictedEq
+    exact ⟨by simp, by simp⟩
+  · apply attemptPhaseCValuePrediction?_preserves_fresh owned current result
+      waiting predicted _ (by simp) _ fresh.2.2.2 selected
+    intro item productionInstance predictedEq
+    exact ⟨by simp, by simp⟩
+
+/-- Every address newly consumed by one prediction is in its exact
+R02/L09/L13 footprint; a new candidate-local charge also leaves that candidate
+prefix present. -/
+private theorem attemptPhaseCValuePrediction?_new_used
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (target : UnitAddress tokens)
+    (fresh : target ∉ current.counter.usedRev)
+    (used : target ∈ result.counter.usedRev)
+    (selected : attemptPhaseCValuePrediction? owned current waiting predicted =
+      some result) :
+    target = .prediction .R02_frontierPrediction
+        (contextualPredictionKey waiting predicted) ∨
+      ∃ item productionInstance,
+        contextualPredictedItem? waiting predicted =
+            some (item, productionInstance) ∧
+        result.payload.frontier.prefixMemberBool item = true ∧
+        (target = .linear .L09_frontierInsert (contextualLinearKey item) ∨
+          target = .linear .L13_epsilonAction (contextualLinearKey item)) := by
+  unfold attemptPhaseCValuePrediction? at selected
+  cases predictedEq : contextualPredictedItem? waiting predicted with
+  | none =>
+      simp only [predictedEq, Option.some.injEq] at selected
+      cases selected
+      exact (fresh used).elim
+  | some pair =>
+      rcases pair with ⟨item, productionInstance⟩
+      simp only [predictedEq, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨attempted, attemptedEq, remainder⟩
+      have attemptedUsed := runMappedPrimitive?_usedRev current _ id attempted
+        attemptedEq
+      split at remainder
+      next recognized =>
+        split at remainder
+        next atZero =>
+          simp only [Option.bind_eq_some_iff] at remainder
+          rcases remainder with ⟨candidate, candidateEq, actioned, actionedEq,
+            publishedEq⟩
+          have present : result.payload.frontier.prefixMemberBool item = true := by
+            rw [(publishPhaseCValueCandidate?_exact actioned result item candidate
+              publishedEq).2,
+              chargePhaseCCompletedCandidate?_exact attempted actioned _ candidate
+                actionedEq]
+            exact insertCandidate?_published_item_present owned
+              attempted.payload.frontier item _ candidate candidateEq
+          unfold chargePhaseCCompletedCandidate? at actionedEq
+          unfold publishPhaseCValueCandidate? at publishedEq
+          cases kindEq : candidate.kind with
+          | duplicate =>
+              simp only [kindEq, Option.some.injEq] at actionedEq publishedEq
+              cases actionedEq
+              cases publishedEq
+              rw [attemptedUsed, List.mem_cons] at used
+              exact used.elim Or.inl fun old => (fresh old).elim
+          | insertedIncomplete =>
+              simp only [kindEq, Option.some.injEq] at actionedEq
+              cases actionedEq
+              simp only [kindEq] at publishedEq
+              rw [runMappedPrimitive?_usedRev attempted _ _ result publishedEq,
+                attemptedUsed, List.mem_cons, List.mem_cons] at used
+              rcases used with insert | attempt | old
+              · exact Or.inr ⟨item, productionInstance, rfl, present,
+                  Or.inl insert⟩
+              · exact Or.inl attempt
+              · exact (fresh old).elim
+          | insertedComplete =>
+              simp only [kindEq] at actionedEq publishedEq
+              rw [runMappedPrimitive?_usedRev actioned _ _ result publishedEq,
+                runMappedPrimitive?_usedRev attempted _ id actioned actionedEq,
+                attemptedUsed, List.mem_cons, List.mem_cons, List.mem_cons] at used
+              rcases used with insert | action | attempt | old
+              · exact Or.inr ⟨item, productionInstance, rfl, present,
+                  Or.inl insert⟩
+              · exact Or.inr ⟨item, productionInstance, rfl, present,
+                  Or.inr action⟩
+              · exact Or.inl attempt
+              · exact (fresh old).elim
+        next notZero => contradiction
+      next notRecognized =>
+        cases remainder
+        rw [attemptedUsed, List.mem_cons] at used
+        exact used.elim Or.inl fun old => (fresh old).elim
 
 private theorem chargeContextualPrediction_itemSafe
     {file : WorkspaceFile} {tokens : List Token}
