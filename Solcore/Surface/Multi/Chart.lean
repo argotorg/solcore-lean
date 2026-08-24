@@ -12961,6 +12961,214 @@ private theorem attemptPhaseCValuePredictions?_recognition
         (attemptPhaseCValuePrediction?_exact owned current next waiting
           predicted nextEq).1
 
+private theorem attemptPhaseCCompletedEdge?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    result.payload.recognition = current.payload.recognition ∧
+      (result = current ∨
+        ∃ (prior : ContextualPrefixValue file tokens edge.waiting)
+          (child : ContextualReductionValue file tokens edge.finished)
+          (rebuilt : RebuiltContextualCompletedEdge edge)
+          (candidate : ContextualValueFrontierState.CandidateInsertResult
+            file tokens),
+          (edge.waiting = source ∨ edge.finished = source) ∧
+            current.payload.frontier.lookupPrefix? edge.waiting =
+              some prior ∧
+            current.payload.frontier.lookupReduction? edge.finished =
+              some child ∧
+            (.cubic .U06_frontierCompletion
+                (contextualCompletionKey edge.waiting edge.finished) :
+              UnitAddress tokens) ∉ current.counter.usedRev ∧
+            rebuildContextualCompletedEdge? edge = some rebuilt ∧
+            current.payload.frontier.insertCandidate? owned edge.after
+                (rebuilt.complete prior child) = some candidate ∧
+            result.payload.frontier =
+              match candidate.kind with
+              | .duplicate => current.payload.frontier
+              | .insertedIncomplete => candidate.state
+              | .insertedComplete => candidate.state) := by
+  unfold attemptPhaseCCompletedEdge? at selected
+  split at selected
+  next relevant =>
+      cases prefixEq :
+          current.payload.frontier.lookupPrefix? edge.waiting with
+      | none =>
+          simp only [prefixEq] at selected
+          cases selected
+          exact ⟨rfl, Or.inl rfl⟩
+      | some prior =>
+          simp only [prefixEq] at selected
+          cases reductionEq :
+              current.payload.frontier.lookupReduction? edge.finished with
+          | none =>
+              simp only [reductionEq] at selected
+              cases selected
+              exact ⟨rfl, Or.inl rfl⟩
+          | some child =>
+              simp only [reductionEq] at selected
+              split at selected
+              next used =>
+                  cases selected
+                  exact ⟨rfl, Or.inl rfl⟩
+              next fresh =>
+                  simp only [Option.bind_eq_bind,
+                    Option.bind_eq_some_iff] at selected
+                  rcases selected with ⟨attempted, attemptedEq, rebuilt,
+                    rebuiltEq, candidate, candidateEq, traversed,
+                    traversedEq, actioned, actionedEq, publishedEq⟩
+                  have attemptedPayload := runMappedPrimitive?_payload
+                    current _ id attemptedEq
+                  have traversedPayload := runMappedPrimitive?_payload
+                    attempted _ id traversedEq
+                  have actionedPayload :=
+                    chargePhaseCCompletedCandidate?_exact traversed actioned
+                      (.cubic .U05_completedAction
+                        (contextualCompletionKey edge.waiting edge.finished))
+                      candidate actionedEq
+                  have publishedExact :=
+                    publishPhaseCValueCandidate?_exact actioned result
+                      edge.after candidate publishedEq
+                  rw [attemptedPayload] at candidateEq
+                  rw [actionedPayload, traversedPayload, attemptedPayload]
+                    at publishedExact
+                  exact ⟨publishedExact.1, Or.inr ⟨prior, child, rebuilt,
+                    candidate, relevant, rfl, rfl, fresh,
+                    rebuiltEq, candidateEq, publishedExact.2⟩⟩
+  next irrelevant =>
+      cases selected
+      exact ⟨rfl, Or.inl rfl⟩
+
+private theorem attemptPhaseCCompletedEdge?_units
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    result = current ∨
+      ∃ (prior : ContextualPrefixValue file tokens edge.waiting)
+        (child : ContextualReductionValue file tokens edge.finished)
+        (rebuilt : RebuiltContextualCompletedEdge edge)
+        (candidate : ContextualValueFrontierState.CandidateInsertResult
+          file tokens),
+        (edge.waiting = source ∨ edge.finished = source) ∧
+          current.payload.frontier.lookupPrefix? edge.waiting = some prior ∧
+          current.payload.frontier.lookupReduction? edge.finished =
+            some child ∧
+          (.cubic .U06_frontierCompletion
+              (contextualCompletionKey edge.waiting edge.finished) :
+            UnitAddress tokens) ∉ current.counter.usedRev ∧
+          rebuildContextualCompletedEdge? edge = some rebuilt ∧
+          current.payload.frontier.insertCandidate? owned edge.after
+              (rebuilt.complete prior child) = some candidate ∧
+          result.counter.units = current.counter.units +
+            match candidate.kind with
+            | .duplicate => 2
+            | .insertedIncomplete => 3
+            | .insertedComplete => 4 := by
+  unfold attemptPhaseCCompletedEdge? at selected
+  split at selected
+  next relevant =>
+      cases prefixEq :
+          current.payload.frontier.lookupPrefix? edge.waiting with
+      | none =>
+          simp only [prefixEq] at selected
+          cases selected
+          exact Or.inl rfl
+      | some prior =>
+          simp only [prefixEq] at selected
+          cases reductionEq :
+              current.payload.frontier.lookupReduction? edge.finished with
+          | none =>
+              simp only [reductionEq] at selected
+              cases selected
+              exact Or.inl rfl
+          | some child =>
+              simp only [reductionEq] at selected
+              split at selected
+              next used =>
+                  cases selected
+                  exact Or.inl rfl
+              next fresh =>
+                  simp only [Option.bind_eq_bind,
+                    Option.bind_eq_some_iff] at selected
+                  rcases selected with ⟨attempted, attemptedEq, rebuilt,
+                    rebuiltEq, candidate, candidateEq, traversed,
+                    traversedEq, actioned, actionedEq, publishedEq⟩
+                  have attemptedPayload := runMappedPrimitive?_payload
+                    current _ id attemptedEq
+                  have attemptedUnits := runMappedPrimitive?_units
+                    current _ id attemptedEq
+                  have traversedUnits := runMappedPrimitive?_units
+                    attempted _ id traversedEq
+                  have actionedUnits :=
+                    chargePhaseCCompletedCandidate?_units traversed actioned
+                      (.cubic .U05_completedAction
+                        (contextualCompletionKey edge.waiting edge.finished))
+                      candidate actionedEq
+                  have publishedUnits := publishPhaseCValueCandidate?_units
+                    actioned result edge.after candidate publishedEq
+                  rw [actionedUnits, traversedUnits, attemptedUnits]
+                    at publishedUnits
+                  rw [attemptedPayload] at candidateEq
+                  cases kindEq : candidate.kind with
+                  | duplicate =>
+                      simp [kindEq] at publishedUnits
+                      refine Or.inr ⟨prior, child, rebuilt, candidate,
+                        relevant, rfl, rfl, fresh, rebuiltEq, candidateEq, ?_⟩
+                      simpa [kindEq] using publishedUnits
+                  | insertedIncomplete =>
+                      simp [kindEq] at publishedUnits
+                      refine Or.inr ⟨prior, child, rebuilt, candidate,
+                        relevant, rfl, rfl, fresh, rebuiltEq, candidateEq, ?_⟩
+                      simpa [kindEq] using publishedUnits
+                  | insertedComplete =>
+                      simp [kindEq] at publishedUnits
+                      refine Or.inr ⟨prior, child, rebuilt, candidate,
+                        relevant, rfl, rfl, fresh, rebuiltEq, candidateEq, ?_⟩
+                      simpa [kindEq] using publishedUnits
+  next irrelevant =>
+      cases selected
+      exact Or.inl rfl
+
+private theorem attemptPhaseCCompletedEdge?_unitAlternatives
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result :
+      CountedState tokens (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    result.counter.units = current.counter.units ∨
+      result.counter.units = current.counter.units + 2 ∨
+      result.counter.units = current.counter.units + 3 ∨
+      result.counter.units = current.counter.units + 4 := by
+  rcases attemptPhaseCCompletedEdge?_units owned source edge current result
+      selected with unchanged | active
+  · subst result
+    exact Or.inl rfl
+  · rcases active with ⟨prior, child, rebuilt, candidate, relevant,
+      prefixEq, reductionEq, fresh, rebuiltEq, candidateEq, unitsEq⟩
+    cases kindEq : candidate.kind with
+    | duplicate =>
+        simp [kindEq] at unitsEq
+        exact Or.inr (Or.inl unitsEq)
+    | insertedIncomplete =>
+        simp [kindEq] at unitsEq
+        exact Or.inr (Or.inr (Or.inl unitsEq))
+    | insertedComplete =>
+        simp [kindEq] at unitsEq
+        exact Or.inr (Or.inr (Or.inr unitsEq))
+
 private theorem chargeAddresses?_payload
     {tokens : List Token} {state : Type}
     (addresses : List (UnitAddress tokens))
