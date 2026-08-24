@@ -223,6 +223,28 @@ theorem rootlessExecutableProgress_of_checkedCursorAndFrontierTables
       owned correct final cursor).mp greatest)
     coverage potential completion prediction postEof
 
+/-- The greatest cursor is computed internally, leaving only the three
+frontier-table checks and post-EOF closure. -/
+theorem rootlessExecutableProgress_of_computedFrontierTables
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (coverage : frontierCoverageTable owned correct final
+      (computedGreatestReachableCursor owned correct final) = true)
+    (potential : FrontierGrammarPotential tokens)
+    (completion : frontierCompletionRankTable owned correct final
+      (computedGreatestReachableCursor owned correct final) potential = true)
+    (prediction : frontierPredictionRankTable owned correct final
+      (computedGreatestReachableCursor owned correct final) potential = true)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  exact rootlessExecutableProgress_of_checkedFrontierTablesAt owned
+    (computedGreatestReachableCursor_spec owned correct final)
+    coverage potential completion prediction postEof
+
 /-- For an observed recognition result, all remaining frontier components are
 four executable checks: coverage, two rank tables, and post-EOF closure. -/
 theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_checkedTablesAt
@@ -315,6 +337,50 @@ theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_ch
     file tokens result.memo correct final at forcesRoot
   exact rootlessExecutableProgress_of_checkedCursorAndFrontierTables
     owned cursor greatest coverage potential completion prediction forcesRoot
+
+/-- On a selected ledger the cursor is computed, so a potential and four
+accepted executable checks construct rootless progress. -/
+theorem executeObservedContextualWorklistMulti?_rootlessExecutableProgress_of_computedTables
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : Chart.ContextualWorklistResult file tokens)
+    (selected : Chart.executeObservedContextualWorklistMulti?
+      file tokens owned = some result) :
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result selected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result selected
+    let cursor := computedGreatestReachableCursor owned correct final
+    ∀ potential : FrontierGrammarPotential tokens,
+      frontierCoverageTable owned correct final cursor = true →
+      frontierCompletionRankTable
+        owned correct final cursor potential = true →
+      frontierPredictionRankTable
+        owned correct final cursor potential = true →
+      result.postLogicalEofTerminalClosedBool = true →
+        RootlessExecutableProgress
+          file tokens result.memo correct final := by
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result selected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result selected
+  let cursor := computedGreatestReachableCursor owned correct final
+  change ∀ potential : FrontierGrammarPotential tokens,
+    frontierCoverageTable owned correct final cursor = true →
+    frontierCompletionRankTable
+      owned correct final cursor potential = true →
+    frontierPredictionRankTable
+      owned correct final cursor potential = true →
+    result.postLogicalEofTerminalClosedBool = true →
+      RootlessExecutableProgress file tokens result.memo correct final
+  intro potential coverage completion prediction postEof
+  have forcesRoot :=
+    (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true_iff
+      file tokens owned result selected).mp postEof
+  change PostLogicalEofTerminalWaitForcesRoot
+    file tokens result.memo correct final at forcesRoot
+  exact rootlessExecutableProgress_of_computedFrontierTables
+    owned coverage potential completion prediction forcesRoot
 
 /-- Once grammar-specific frontier progress is supplied, semantic execution
 always selects either a module, a G10 diagnostic, or an ordinary diagnostic. -/

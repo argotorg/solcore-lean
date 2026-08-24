@@ -186,6 +186,70 @@ theorem greatestReachableCursorBool_eq_true_iff
       · simp [reached, greatest.2 item reached]
       · simp [reached]
 
+/-- Stable finite enumeration of all parser boundaries. -/
+def allParserBoundaries (tokens : List Token) : List (Boundary tokens) :=
+  List.ofFn id
+
+/-- Every parser boundary occurs in the stable enumeration. -/
+theorem allParserBoundaries_complete
+    {tokens : List Token} (cursor : Boundary tokens) :
+    cursor ∈ allParserBoundaries tokens := by
+  rw [allParserBoundaries, List.mem_ofFn]
+  exact ⟨cursor, rfl⟩
+
+/-- Select the first boundary accepted by the exact greatest-cursor check. -/
+def computedGreatestReachableCursor?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) : Option (Boundary tokens) :=
+  (allParserBoundaries tokens).find? fun cursor =>
+    greatestReachableCursorBool owned correct final cursor
+
+/-- The finite greatest-cursor search always succeeds. -/
+theorem computedGreatestReachableCursor?_isSome
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    (computedGreatestReachableCursor? owned correct final).isSome = true := by
+  unfold computedGreatestReachableCursor?
+  rw [List.find?_isSome]
+  rcases chart_greatest_cursor_exists owned correct final with
+    ⟨cursor, greatest⟩
+  exact ⟨cursor, allParserBoundaries_complete cursor,
+    (greatestReachableCursorBool_eq_true_iff
+      owned correct final cursor).mpr greatest⟩
+
+/-- Executable greatest reached boundary for the saturated chart. -/
+def computedGreatestReachableCursor
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) : Boundary tokens :=
+  (computedGreatestReachableCursor? owned correct final).get
+    (computedGreatestReachableCursor?_isSome owned correct final)
+
+/-- The computed boundary satisfies the declarative greatest-cursor relation. -/
+theorem computedGreatestReachableCursor_spec
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) :
+    GreatestReachableCursor file tokens memo correct final
+      (computedGreatestReachableCursor owned correct final) := by
+  have selected : computedGreatestReachableCursor? owned correct final =
+      some (computedGreatestReachableCursor owned correct final) := by
+    apply Option.eq_some_iff_get_eq.mpr
+    exact ⟨computedGreatestReachableCursor?_isSome owned correct final, rfl⟩
+  have accepted := List.find?_some selected
+  exact (greatestReachableCursorBool_eq_true_iff owned correct final _).mp
+    accepted
+
 /-- One executable prediction-rank cell.  Its antecedent is the exact
 frontier-local prediction premise, apart from greatest-cursor evidence shared
 by every row. -/
