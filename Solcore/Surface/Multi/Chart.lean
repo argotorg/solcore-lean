@@ -24379,6 +24379,134 @@ private theorem attemptPhaseCCompletedEdge?_preserves_prefix_present
           current.payload.frontier edge.after target _ candidate
             candidateEq).2 (Or.inl present)
 
+/-- A completion can only retain an old queue key or append its exact target. -/
+private theorem attemptPhaseCCompletedEdge?_queue_member_recognition
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source target : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result)
+    (member : target ∈ result.payload.frontier.queue) :
+    target ∈ current.payload.frontier.queue ∨ target = edge.after := by
+  rcases (attemptPhaseCCompletedEdge?_exact owned source edge current result
+    selected).2 with rfl | active
+  · exact Or.inl member
+  · rcases active with ⟨prior, child, rebuilt, candidate, relevant,
+      prefixEq, reductionEq, fresh, rebuiltEq, candidateEq, frontierEq⟩
+    cases kindEq : candidate.kind with
+    | duplicate =>
+        left
+        rw [frontierEq, kindEq] at member
+        exact member
+    | insertedIncomplete =>
+        rw [frontierEq, kindEq] at member
+        rcases insertCandidate?_queue_member owned current.payload.frontier
+          edge.after target _ candidate candidateEq member with old | inserted
+        · exact Or.inl old
+        · exact Or.inr inserted.2
+    | insertedComplete =>
+        rw [frontierEq, kindEq] at member
+        rcases insertCandidate?_queue_member owned current.payload.frontier
+          edge.after target _ candidate candidateEq member with old | inserted
+        · exact Or.inl old
+        · exact Or.inr inserted.2
+
+/-- One retained completion preserves closure of the semantic frontier queue
+when recognition contains the completion target. -/
+private theorem attemptPhaseCCompletedEdge?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (edge : StructurallyValidContextualCompletedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (recognized : PhaseCValueQueueRecognized current)
+    (targetMember : edge.after ∈
+      current.payload.recognition.phaseC.contextualItems)
+    (selected : attemptPhaseCCompletedEdge? owned source edge current =
+      some result) :
+    PhaseCValueQueueRecognized result := by
+  have recognitionEq :=
+    (attemptPhaseCCompletedEdge?_exact owned source edge current result
+      selected).1
+  intro target member
+  rw [recognitionEq]
+  rcases attemptPhaseCCompletedEdge?_queue_member_recognition owned source target edge
+      current result selected member with old | inserted
+  · exact recognized target old
+  · exact inserted ▸ targetMember
+
+/-- Constructor dispatch preserves queue recognition for one packed
+completion. -/
+private theorem attemptPhaseCPackedCompletedEdge?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens)
+    (packed : StructurallyValidContextualPackedEdge file tokens)
+    (current result : CountedState tokens
+      (PhaseCValueWorklist file tokens))
+    (recognized : PhaseCValueQueueRecognized current)
+    (targetMember : PhaseCRecognitionEdgeTargetMember current packed)
+    (selected : attemptPhaseCPackedCompletedEdge? owned source packed current =
+      some result) :
+    PhaseCValueQueueRecognized result := by
+  rcases packed with ⟨key, structural⟩
+  cases key with
+  | scanned before after cursor =>
+      cases selected
+      exact recognized
+  | completed waiting finished after shared =>
+      exact attemptPhaseCCompletedEdge?_queueRecognized owned source {
+        waiting := waiting
+        finished := finished
+        after := after
+        shared := shared
+        structural := structural
+      } current result recognized targetMember selected
+
+/-- Folding retained completions preserves queue recognition when every
+immutable edge target belongs to the starting recognition item set. -/
+private theorem attemptPhaseCRetainedCompletedEdges?_queueRecognized
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (source : ContextualItemKey tokens) :
+    ∀ edges
+      (current result : CountedState tokens
+        (PhaseCValueWorklist file tokens)),
+      PhaseCValueQueueRecognized current →
+      (∀ packed, packed ∈ edges →
+        PhaseCRecognitionEdgeTargetMember current packed) →
+      attemptPhaseCRetainedCompletedEdges? owned source edges current =
+          some result →
+        PhaseCValueQueueRecognized result := by
+  intro edges
+  induction edges with
+  | nil =>
+      intro current result recognized targets selected
+      cases selected
+      exact recognized
+  | cons packed rest induction =>
+      intro current result recognized targets selected
+      simp only [attemptPhaseCRetainedCompletedEdges?, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨next, nextEq, restEq⟩
+      have nextRecognized :=
+        attemptPhaseCPackedCompletedEdge?_queueRecognized owned source packed
+          current next recognized (targets packed (by simp)) nextEq
+      apply induction next result nextRecognized
+      · intro future member
+        have target := targets future (by simp [member])
+        have recognitionEq :=
+          attemptPhaseCPackedCompletedEdge?_recognition owned source packed
+            current next nextEq
+        unfold PhaseCRecognitionEdgeTargetMember at target ⊢
+        rw [recognitionEq]
+        exact target
+      · exact restEq
+
 private theorem attemptPhaseCCompletedEdge?_preserves_unrelated_fresh
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
