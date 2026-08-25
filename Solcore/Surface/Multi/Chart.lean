@@ -1508,6 +1508,67 @@ private def chargeAddresses?
       let next ← runMappedPrimitive? current address id
       chargeAddresses? next rest
 
+/-- Charge a proved-fresh address block without repeating ledger searches. -/
+private def chargeAddressesCertified
+    {tokens : List Token} {state : Type}
+    (current : CountedState tokens state)
+    (addresses : List (UnitAddress tokens))
+    (unique : addresses.Nodup)
+    (fresh : ∀ address, address ∈ addresses →
+      address ∉ current.counter.usedRev) :
+    CountedState tokens state := {
+  payload := current.payload
+  counter := {
+    usedRev := addresses.reverse ++ current.counter.usedRev
+    unique := by
+      rw [List.nodup_append]
+      refine ⟨(List.reverse_perm addresses).symm.nodup unique,
+        current.counter.unique, ?_⟩
+      intro used usedMember old oldMember equal
+      rw [List.mem_reverse] at usedMember
+      apply fresh used usedMember
+      simpa [equal] using oldMember
+  }
+}
+
+private theorem chargeAddresses?_eq_certified
+    {tokens : List Token} {state : Type} :
+    ∀ (addresses : List (UnitAddress tokens))
+      (current : CountedState tokens state)
+      (unique : addresses.Nodup)
+      (fresh : ∀ address, address ∈ addresses →
+        address ∉ current.counter.usedRev),
+      chargeAddresses? current addresses =
+        some (chargeAddressesCertified current addresses unique fresh) := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current unique fresh
+      simp [chargeAddresses?, chargeAddressesCertified]
+  | cons address rest induction =>
+      intro current unique pending
+      rw [List.nodup_cons] at unique
+      have headFresh := pending address (by simp)
+      let next : CountedState tokens state := {
+        payload := current.payload
+        counter := current.counter.charge address headFresh
+      }
+      have stepped : runMappedPrimitive? current address id = some next := by
+        simp [runMappedPrimitive?, headFresh, next]
+      have restFresh : ∀ candidate, candidate ∈ rest →
+          candidate ∉ next.counter.usedRev := by
+        intro candidate member used
+        simp only [next, Counter.charge, List.mem_cons] at used
+        rcases used with equal | old
+        · exact unique.1 (equal.symm ▸ member)
+        · exact pending candidate (by simp [member]) old
+      rw [chargeAddresses?, stepped]
+      change chargeAddresses? next rest = _
+      rw [induction next unique.2 restFresh]
+      congr 1
+      simp [chargeAddressesCertified, next, Counter.charge,
+        List.reverse_cons, List.append_assoc]
+
 private def allGuardInstanceKeys (tokens : List Token) :
     List (GuardInstanceKey tokens) :=
   allPriorityGuardIds.flatMap fun guard =>
@@ -2067,6 +2128,116 @@ private def attemptPredictions?
       let next ← attemptPrediction? current waiting predicted
       attemptPredictions? waiting rest next
 
+private def RawPredictionRoleCompatible
+    (waitingRole : RawCompletionRole) (predicted : ProductionId) : Prop :=
+  match waitingRole with
+  | .waiting expected => predicted.lhs = expected
+  | _ => False
+
+private instance rawPredictionRoleCompatibleDecidable
+    (waitingRole : RawCompletionRole) (predicted : ProductionId) :
+    Decidable (RawPredictionRoleCompatible waitingRole predicted) := by
+  cases waitingRole <;>
+    simp only [RawPredictionRoleCompatible] <;> infer_instance
+
+private theorem predictedItem?_eq_none_of_role_incompatible
+    {tokens : List Token} (waiting : DottedItem tokens)
+    (predicted : ProductionId)
+    (incompatible : ¬RawPredictionRoleCompatible
+      (rawCompletionRole waiting) predicted) :
+    predictedItem? waiting predicted = none := by
+  by_cases nextInRange :
+      waiting.dot.val < waiting.production.rhs.length
+  · have lookupEq :
+        waiting.production.rhs[waiting.dot.val]? =
+          some waiting.production.rhs[waiting.dot.val] :=
+      List.getElem?_eq_getElem nextInRange
+    cases nextEq : waiting.production.rhs[waiting.dot.val] with
+    | terminal terminal =>
+        simp [predictedItem?, lookupEq, nextEq]
+    | nonterminal expected =>
+        have lhsDifferent : predicted.lhs ≠ expected := by
+          simpa [rawCompletionRole, nextInRange, nextEq,
+            RawPredictionRoleCompatible] using incompatible
+        simp [predictedItem?, lookupEq, nextEq, lhsDifferent]
+  · have lookupEq :
+        waiting.production.rhs[waiting.dot.val]? = none := by
+      rw [List.getElem?_eq_none_iff]
+      omega
+    simp [predictedItem?, lookupEq]
+
+private def attemptPredictionForRole?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (predicted : ProductionId)
+    (waitingRole : RawCompletionRole) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  if RawPredictionRoleCompatible waitingRole predicted then
+    attemptPrediction? current waiting predicted
+  else
+    some current
+
+private theorem attemptPredictionForRole?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting : DottedItem tokens) (predicted : ProductionId) :
+    attemptPredictionForRole? current waiting predicted
+        (rawCompletionRole waiting) =
+      attemptPrediction? current waiting predicted := by
+  unfold attemptPredictionForRole?
+  split
+  · rfl
+  next incompatible =>
+    simp [attemptPrediction?,
+      predictedItem?_eq_none_of_role_incompatible waiting predicted
+        incompatible]
+
+private def attemptPredictionsForRole?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) (waitingRole : RawCompletionRole) :
+    List ProductionId → CountedState tokens (PhaseAOpen file tokens) →
+      Option (CountedState tokens (PhaseAOpen file tokens))
+  | [], current => some current
+  | predicted :: rest, current => do
+      let next ← attemptPredictionForRole? current waiting predicted waitingRole
+      attemptPredictionsForRole? waiting waitingRole rest next
+
+private theorem attemptPredictionsForRole?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) :
+    ∀ candidates (current : CountedState tokens (PhaseAOpen file tokens)),
+      attemptPredictionsForRole? waiting (rawCompletionRole waiting)
+          candidates current =
+        attemptPredictions? waiting candidates current := by
+  intro candidates
+  induction candidates with
+  | nil =>
+      intro current
+      rfl
+  | cons predicted rest induction =>
+      intro current
+      simp only [attemptPredictionsForRole?, attemptPredictions?]
+      rw [attemptPredictionForRole?_exact]
+      apply Option.bind_congr
+      intro next _nextEq
+      exact induction next
+
+private def attemptPredictionsFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  attemptPredictionsForRole? waiting (rawCompletionRole waiting)
+    allProductionIds current
+
+private theorem attemptPredictionsFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    attemptPredictionsFast? waiting current =
+      attemptPredictions? waiting allProductionIds current := by
+  exact attemptPredictionsForRole?_exact waiting allProductionIds current
+
 private def rawScanApplicable {tokens : List Token}
     (item : DottedItem tokens) : Bool :=
   match item.production.rhs[item.dot.val]? with
@@ -2341,7 +2512,7 @@ private def processRawItem?
     (item : DottedItem tokens)
     (current : CountedState tokens (PhaseAOpen file tokens)) :
     Option (CountedState tokens (PhaseAOpen file tokens)) := do
-  let predicted ← attemptPredictions? item allProductionIds current
+  let predicted ← attemptPredictionsFast? item current
   let scanned ← attemptScan? owned predicted item
   attemptCompletionsFastWith? item scanned
 
@@ -3047,6 +3218,7 @@ private theorem processRawItem?_rawSound
     (selected : processRawItem? owned item current = some result) :
     PhaseARawSound result.payload := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completionEq⟩
@@ -3540,6 +3712,7 @@ private theorem processRawItem?_units_mono
     (selected : processRawItem? owned item current = some result) :
     current.counter.units ≤ result.counter.units := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completionEq⟩
@@ -4342,6 +4515,7 @@ private theorem processRawItem?_completionLedger
     (selected : processRawItem? owned item current = some result) :
     CompletionAttemptLedgerMaterialized result := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
@@ -4822,6 +4996,7 @@ private theorem processRawItem?_itemGrowth
     (selected : processRawItem? owned item current = some result) :
     PhaseAItemGrowth current result := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
@@ -4841,6 +5016,7 @@ private theorem processRawItem?_prediction_materializes
     (selected : processRawItem? owned pivot current = some result) :
     after ∈ result.payload.rawItems := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
@@ -4862,6 +5038,7 @@ private theorem processRawItem?_scan_materializes
     (selected : processRawItem? owned pivot current = some result) :
     after ∈ result.payload.rawItems := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
@@ -4886,6 +5063,7 @@ private theorem processRawItem?_completion_materializes
       completedEdge? other pivot = some (after, edge) →
         after ∈ result.payload.rawItems) := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
@@ -7075,6 +7253,7 @@ private theorem processRawItem?_total_allSafe
   refine ⟨result, ?_, ⟨resultItemSafe, resultCompletionSafe,
     resultEdgeSafe⟩⟩
   unfold processRawItem?
+  rw [attemptPredictionsFast?_eq_reference]
   rw [predictedEq]
   simp only [Option.bind_eq_bind, Option.bind_some]
   rw [scannedEq]
@@ -7520,6 +7699,183 @@ private def rawGreatestEndBool
       else
         true
 
+/-- A complete raw recognition cell used by the local Phase-A index. -/
+private structure RawRecognitionHashKey (tokens : List Token) where
+  symbol : NonterminalSymbol
+  start : Boundary tokens
+  finish : Boundary tokens
+  deriving DecidableEq
+
+private def rawRecognitionHashKeyBEq {tokens : List Token}
+    (left right : RawRecognitionHashKey tokens) : Bool :=
+  decide (left = right)
+
+private instance {tokens : List Token} : BEq (RawRecognitionHashKey tokens) :=
+  ⟨rawRecognitionHashKeyBEq⟩
+
+private instance {tokens : List Token} : LawfulBEq
+    (RawRecognitionHashKey tokens) where
+  rfl := by
+    intro key
+    change decide (key = key) = true
+    exact of_decide_eq_self_eq_true key
+  eq_of_beq := by
+    intro left right equal
+    change rawRecognitionHashKeyBEq left right = true at equal
+    exact of_decide_eq_true equal
+
+private def nonterminalSymbolHash : NonterminalSymbol → UInt64
+  | .rule rule =>
+      mixHash (hash (0 : Nat)) (hash rule.index)
+  | .aux site =>
+      mixHash (hash (1 : Nat)) (hash site.index)
+  | .tail (.list0 site) =>
+      mixHash (hash (2 : Nat)) (hash site.site.index)
+  | .tail (.list1 site) =>
+      mixHash (hash (3 : Nat)) (hash site.site.index)
+
+private instance {tokens : List Token} : Hashable
+    (RawRecognitionHashKey tokens) where
+  hash key :=
+    mixHash (nonterminalSymbolHash key.symbol)
+      (mixHash (hash key.start.val) (hash key.finish.val))
+
+private def rawRecognitionHashKey
+    {tokens : List Token} (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) : RawRecognitionHashKey tokens :=
+  ⟨symbol, start, finish⟩
+
+private def completedRawRecognitionHashKey?
+    {tokens : List Token} (item : DottedItem tokens) :
+    Option (RawRecognitionHashKey tokens) :=
+  if _complete : item.dot.val = item.production.rhs.length then
+    some (rawRecognitionHashKey item.production.lhs
+      item.origin item.current)
+  else
+    none
+
+/-- Build the complete-item recognition set once after Phase A is frozen. -/
+private def rawRecognitionHashIndex
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens) :
+    Std.HashSet (RawRecognitionHashKey tokens) :=
+  Std.HashSet.ofList
+    (phaseA.rawItems.filterMap completedRawRecognitionHashKey?)
+
+private def rawRecognizesIndexedBool
+    {tokens : List Token}
+    (index : Std.HashSet (RawRecognitionHashKey tokens))
+    (symbol : NonterminalSymbol)
+    (start finish : Boundary tokens) : Bool :=
+  index.contains (rawRecognitionHashKey symbol start finish)
+
+private theorem completedRawRecognitionHashKey?_eq_some_iff
+    {tokens : List Token} (item : DottedItem tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    completedRawRecognitionHashKey? item =
+        some (rawRecognitionHashKey symbol start finish) ↔
+      item.dot.val = item.production.rhs.length ∧
+        item.production.lhs = symbol ∧
+        item.origin = start ∧ item.current = finish := by
+  unfold completedRawRecognitionHashKey?
+  split
+  next complete =>
+    simp only [Option.some.injEq]
+    constructor
+    · intro equal
+      exact ⟨complete,
+        congrArg RawRecognitionHashKey.symbol equal,
+        congrArg RawRecognitionHashKey.start equal,
+        congrArg RawRecognitionHashKey.finish equal⟩
+    · rintro ⟨_complete, symbolEq, startEq, finishEq⟩
+      cases symbolEq
+      cases startEq
+      cases finishEq
+      rfl
+  next incomplete =>
+    constructor
+    · intro impossible
+      contradiction
+    · rintro ⟨complete, _symbolEq, _startEq, _finishEq⟩
+      exact (incomplete complete).elim
+
+private theorem rawRecognitionHashKey_mem_filterMap_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    rawRecognitionHashKey symbol start finish ∈
+        phaseA.rawItems.filterMap completedRawRecognitionHashKey? ↔
+      ∃ item, item ∈ phaseA.rawItems ∧
+        item.dot.val = item.production.rhs.length ∧
+        item.production.lhs = symbol ∧
+        item.origin = start ∧ item.current = finish := by
+  rw [List.mem_filterMap]
+  constructor
+  · rintro ⟨item, member, selected⟩
+    exact ⟨item, member,
+      (completedRawRecognitionHashKey?_eq_some_iff
+        item symbol start finish).mp selected⟩
+  · rintro ⟨item, member, shape⟩
+    exact ⟨item, member,
+      (completedRawRecognitionHashKey?_eq_some_iff
+        item symbol start finish).mpr shape⟩
+
+private theorem rawRecognizesBool_eq_true_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    rawRecognizesBool phaseA symbol start finish = true ↔
+      ∃ item, item ∈ phaseA.rawItems ∧
+        item.dot.val = item.production.rhs.length ∧
+        item.production.lhs = symbol ∧
+        item.origin = start ∧ item.current = finish := by
+  unfold rawRecognizesBool
+  rw [List.any_eq_true]
+  simp only [Bool.and_eq_true, beq_iff_eq]
+  constructor
+  · rintro ⟨item, member, ⟨⟨⟨complete, lhs⟩, origin⟩, current⟩⟩
+    exact ⟨item, member, complete, lhs, origin, current⟩
+  · rintro ⟨item, member, complete, lhs, origin, current⟩
+    exact ⟨item, member, ⟨⟨⟨complete, lhs⟩, origin⟩, current⟩⟩
+
+private theorem rawRecognizesIndexedBool_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (symbol : NonterminalSymbol) (start finish : Boundary tokens) :
+    rawRecognizesIndexedBool (rawRecognitionHashIndex phaseA)
+        symbol start finish =
+      rawRecognizesBool phaseA symbol start finish := by
+  apply Bool.eq_iff_iff.mpr
+  rw [rawRecognizesIndexedBool, rawRecognitionHashIndex,
+    Std.HashSet.contains_ofList, List.contains_iff_mem,
+    rawRecognitionHashKey_mem_filterMap_iff,
+    rawRecognizesBool_eq_true_iff]
+
+private def rawGreatestEndIndexedBool
+    {tokens : List Token}
+    (index : Std.HashSet (RawRecognitionHashKey tokens))
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) : Bool :=
+  rawRecognizesIndexedBool index symbol start finish &&
+    decide (finish.val ≤ upperBound.val) &&
+    (List.finRange (tokens.length + 2)).all fun candidate =>
+      if candidate.val ≤ upperBound.val then
+        !rawRecognizesIndexedBool index symbol start candidate ||
+          decide (candidate.val ≤ finish.val)
+      else
+        true
+
+private theorem rawGreatestEndIndexedBool_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (phaseA : PhaseAOpen file tokens)
+    (symbol : NonterminalSymbol)
+    (start upperBound finish : Boundary tokens) :
+    rawGreatestEndIndexedBool (rawRecognitionHashIndex phaseA)
+        symbol start upperBound finish =
+      rawGreatestEndBool phaseA symbol start upperBound finish := by
+  simp only [rawGreatestEndIndexedBool, rawGreatestEndBool,
+    rawRecognizesIndexedBool_eq_reference phaseA]
+
 private def phaseAGreatestEndIndexEvaluator
     {file : WorkspaceFile} {tokens : List Token} :
     PhaseAIndexEvaluator file tokens :=
@@ -7943,6 +8299,43 @@ private def phaseAObservationIndexEvaluator
         phaseADelimiterOrRegionGuardBool phaseA guard
           address.contextStart address.siteCursor address.resultEnd
     | _, _ => false
+
+/-- The materialization evaluator with complete-item recognition indexed once. -/
+private def phaseAObservationIndexEvaluatorWithRecognitionIndex
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (recognition : Std.HashSet (RawRecognitionHashKey tokens)) :
+    PhaseAIndexEvaluator file tokens :=
+  fun phaseA address =>
+    match address.kind, address.subject with
+    | .terminalWindow, .inl guard =>
+        phaseATerminalWindowGuardBool owned guard
+          address.contextStart address.siteCursor address.resultEnd
+    | .exactSlice, .inl guard =>
+        phaseAExactSliceGuardBool tokens guard
+          address.contextStart address.siteCursor address.resultEnd
+    | .greatestEnd, .inr rule =>
+        rawGreatestEndIndexedBool recognition (.rule rule)
+          address.contextStart address.siteCursor address.resultEnd
+    | .delimiterOrRegion, .inl guard =>
+        phaseADelimiterOrRegionGuardBool phaseA guard
+          address.contextStart address.siteCursor address.resultEnd
+    | _, _ => false
+
+private theorem phaseAObservationIndexEvaluatorWithRecognitionIndex_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : PhaseAOpen file tokens)
+    (address : EvidenceIndexAddress tokens) :
+    phaseAObservationIndexEvaluatorWithRecognitionIndex owned
+        (rawRecognitionHashIndex phaseA) phaseA address =
+      phaseAObservationIndexEvaluator owned phaseA address := by
+  rcases address with
+    ⟨kind, subject, contextStart, siteCursor, resultEnd⟩
+  cases kind <;> cases subject <;>
+    simp [phaseAObservationIndexEvaluatorWithRecognitionIndex,
+      phaseAObservationIndexEvaluator,
+      rawGreatestEndIndexedBool_eq_reference]
 
 /-- Compare evidence addresses without exposing the private carrier. -/
 private def phaseAEvidenceAddressEqBool
@@ -8486,6 +8879,313 @@ private def finalizeNextIndexedGuard?
           indexes := state.indexes
         } : PhaseBIndexed file tokens)
 
+/-- Test freshness of every finalize slot for one key with one ledger pass. -/
+private def UnitAddress.outsideGuardFinalizeKey
+    {tokens : List Token} (key : GuardInstanceKey tokens) :
+    UnitAddress tokens → Bool
+  | .guardFinalize _ candidate => decide (candidate ≠ key)
+  | _ => true
+
+private def guardFinalizeKeyFreshBool
+    {tokens : List Token} (counter : Counter tokens)
+    (key : GuardInstanceKey tokens) : Bool :=
+  counter.usedRev.all (UnitAddress.outsideGuardFinalizeKey key)
+
+private theorem guardFinalizeAddress_fresh_of_keyFresh
+    {tokens : List Token} (counter : Counter tokens)
+    (key : GuardInstanceKey tokens)
+    (clean : guardFinalizeKeyFreshBool counter key = true)
+    (slot : GuardFinalizeSlot) :
+    UnitAddress.guardFinalize slot key ∉ counter.usedRev := by
+  intro member
+  have outside := (List.all_eq_true.mp clean)
+    (UnitAddress.guardFinalize slot key) member
+  simp [UnitAddress.outsideGuardFinalizeKey] at outside
+
+private theorem preFinalGuardAddresses_nodup_fast
+    {tokens : List Token} (key : GuardInstanceKey tokens) :
+    (preFinalGuardSlots.map fun slot =>
+      UnitAddress.guardFinalize slot key).Nodup := by
+  have slotsUnique : preFinalGuardSlots.Nodup := by decide
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_map]
+  exact slotsUnique.imp fun different equal =>
+    different (UnitAddress.guardFinalize.inj equal).1
+
+private def initializeIndexedGuardTransition
+    {file : WorkspaceFile} {tokens : List Token}
+    (key : GuardInstanceKey tokens)
+    (state : PhaseBIndexed file tokens) : PhaseBIndexed file tokens := {
+  phaseB := {
+    state.phaseB with
+    cells := fun candidate =>
+      if candidate = key then some .undecided
+      else state.phaseB.cells candidate
+  }
+  indexes := state.indexes
+}
+
+private def initializeIndexedGuardCertified
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (fresh : UnitAddress.guardFinalize .initializeUndecided key ∉
+      current.counter.usedRev) :
+    CountedState tokens (PhaseBIndexed file tokens) := {
+  payload := initializeIndexedGuardTransition key current.payload
+  counter := current.counter.charge
+    (.guardFinalize .initializeUndecided key) fresh
+}
+
+private abbrev guardFinalizeLookupAddresses
+    {tokens : List Token} (key : GuardInstanceKey tokens) :
+    List (UnitAddress tokens) :=
+  preFinalGuardSlots.map fun slot => .guardFinalize slot key
+
+private def finalizeIndexedGuardTransition
+    {file : WorkspaceFile} {tokens : List Token}
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (decision : GuardDecision)
+    (state : PhaseBIndexed file tokens) : PhaseBIndexed file tokens := {
+  phaseB := {
+    phaseA := state.phaseB.phaseA
+    cells := fun candidate =>
+      if candidate = key then some (.final decision)
+      else state.phaseB.cells candidate
+    remaining := rest
+    finalizedRev := key :: state.phaseB.finalizedRev
+  }
+  indexes := state.indexes
+}
+
+private def finalizeNextIndexedGuardCertifiedCore?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (initializeFresh :
+      UnitAddress.guardFinalize .initializeUndecided key ∉
+        current.counter.usedRev)
+    (lookupFresh : ∀ address,
+      address ∈ guardFinalizeLookupAddresses key →
+      address ∉ (initializeIndexedGuardCertified current key
+        initializeFresh).counter.usedRev)
+    (writeFresh :
+      UnitAddress.guardFinalize .writeFinalDecision key ∉
+        (chargeAddressesCertified
+          (initializeIndexedGuardCertified current key initializeFresh)
+          (guardFinalizeLookupAddresses key)
+          (preFinalGuardAddresses_nodup_fast key)
+          lookupFresh).counter.usedRev) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) := do
+  let initialized := initializeIndexedGuardCertified
+    current key initializeFresh
+  let lookedUp := chargeAddressesCertified initialized
+    (guardFinalizeLookupAddresses key)
+    (preFinalGuardAddresses_nodup_fast key) lookupFresh
+  let decision ← phaseBGuardDecisionFromIndexes?
+    lookedUp.payload.indexes key
+  pure {
+    payload := finalizeIndexedGuardTransition key rest decision
+      lookedUp.payload
+    counter := lookedUp.counter.charge
+      (.guardFinalize .writeFinalDecision key) writeFresh
+  }
+
+/-- Certified fast path for one known-fresh guard-finalization block. -/
+private def finalizeNextIndexedGuardCertified?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (clean : guardFinalizeKeyFreshBool current.counter key = true) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  let initializeFresh := guardFinalizeAddress_fresh_of_keyFresh
+    current.counter key clean .initializeUndecided
+  let initialized := initializeIndexedGuardCertified
+    current key initializeFresh
+  have lookupFresh : ∀ address,
+      address ∈ guardFinalizeLookupAddresses key →
+      address ∉ initialized.counter.usedRev := by
+    intro address member used
+    simp only [guardFinalizeLookupAddresses, List.mem_map] at member
+    rcases member with ⟨slot, slotMember, rfl⟩
+    simp only [initialized, initializeIndexedGuardCertified,
+      Counter.charge, List.mem_cons] at used
+    rcases used with equal | old
+    · have sameSlot := (UnitAddress.guardFinalize.inj equal).1
+      subst slot
+      simp [preFinalGuardSlots] at slotMember
+    · exact guardFinalizeAddress_fresh_of_keyFresh
+        current.counter key clean slot old
+  let lookedUp := chargeAddressesCertified initialized
+    (guardFinalizeLookupAddresses key)
+    (preFinalGuardAddresses_nodup_fast key) lookupFresh
+  have writeFresh : UnitAddress.guardFinalize .writeFinalDecision key ∉
+      lookedUp.counter.usedRev := by
+    intro used
+    simp only [lookedUp, chargeAddressesCertified, List.mem_append,
+      List.mem_reverse] at used
+    rcases used with lookup | initializedUsed
+    · simp only [guardFinalizeLookupAddresses, List.mem_map] at lookup
+      rcases lookup with ⟨slot, slotMember, equal⟩
+      have sameSlot := (UnitAddress.guardFinalize.inj equal).1
+      subst slot
+      simp [preFinalGuardSlots] at slotMember
+    · simp only [initialized, initializeIndexedGuardCertified,
+        Counter.charge, List.mem_cons] at initializedUsed
+      rcases initializedUsed with equal | old
+      · cases equal
+      · exact guardFinalizeAddress_fresh_of_keyFresh
+          current.counter key clean .writeFinalDecision old
+  finalizeNextIndexedGuardCertifiedCore? current key rest
+    initializeFresh lookupFresh writeFresh
+
+/-- Fast finalizer with an exact fallback for a previously used key. -/
+private def finalizeNextIndexedGuardFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  match current.payload.phaseB.remaining with
+  | [] => none
+  | key :: rest =>
+      if clean : guardFinalizeKeyFreshBool current.counter key = true then
+        finalizeNextIndexedGuardCertified? current key rest clean
+      else
+        finalizeNextIndexedGuard? current
+
+private theorem finalizeNextIndexedGuardCertifiedCore?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (remaining : current.payload.phaseB.remaining = key :: rest)
+    (initializeFresh :
+      UnitAddress.guardFinalize .initializeUndecided key ∉
+        current.counter.usedRev)
+    (lookupFresh : ∀ address,
+      address ∈ guardFinalizeLookupAddresses key →
+      address ∉ (initializeIndexedGuardCertified current key
+        initializeFresh).counter.usedRev)
+    (writeFresh :
+      UnitAddress.guardFinalize .writeFinalDecision key ∉
+        (chargeAddressesCertified
+          (initializeIndexedGuardCertified current key initializeFresh)
+          (guardFinalizeLookupAddresses key)
+          (preFinalGuardAddresses_nodup_fast key)
+          lookupFresh).counter.usedRev) :
+    finalizeNextIndexedGuardCertifiedCore? current key rest
+        initializeFresh lookupFresh writeFresh =
+      finalizeNextIndexedGuard? current := by
+  let initialized := initializeIndexedGuardCertified
+    current key initializeFresh
+  have initializedEq : runMappedPrimitive? current
+      (.guardFinalize .initializeUndecided key)
+      (fun (state : PhaseBIndexed file tokens) => ({
+        phaseB := {
+          state.phaseB with
+          cells := fun candidate =>
+            if candidate = key then some .undecided
+            else state.phaseB.cells candidate
+        }
+        indexes := state.indexes
+      } : PhaseBIndexed file tokens)) = some initialized := by
+    simp [runMappedPrimitive?, initializeFresh, initialized,
+      initializeIndexedGuardCertified,
+      initializeIndexedGuardTransition]
+  let lookedUp := chargeAddressesCertified initialized
+    (guardFinalizeLookupAddresses key)
+    (preFinalGuardAddresses_nodup_fast key) lookupFresh
+  have lookedUpEq : chargeAddresses? initialized
+      (preFinalGuardSlots.map fun slot =>
+        UnitAddress.guardFinalize slot key) = some lookedUp := by
+    simpa [guardFinalizeLookupAddresses] using
+      (chargeAddresses?_eq_certified
+        (guardFinalizeLookupAddresses key) initialized
+        (preFinalGuardAddresses_nodup_fast key) lookupFresh)
+  cases decisionEq : phaseBGuardDecisionFromIndexes?
+      lookedUp.payload.indexes key with
+  | none =>
+      unfold finalizeNextIndexedGuardCertifiedCore?
+      dsimp only
+      rw [decisionEq]
+      simp only [Option.bind_eq_bind, Option.bind_none]
+      unfold finalizeNextIndexedGuard?
+      rw [remaining]
+      dsimp only
+      rw [initializedEq]
+      simp only [Option.bind_eq_bind, Option.bind_some]
+      rw [lookedUpEq]
+      simp only [Option.bind_some]
+      rw [decisionEq]
+      rfl
+  | some decision =>
+      let result : CountedState tokens (PhaseBIndexed file tokens) := {
+        payload := finalizeIndexedGuardTransition key rest decision
+          lookedUp.payload
+        counter := lookedUp.counter.charge
+          (.guardFinalize .writeFinalDecision key) writeFresh
+      }
+      have finalEq : runMappedPrimitive? lookedUp
+          (.guardFinalize .writeFinalDecision key)
+          (fun (state : PhaseBIndexed file tokens) => ({
+            phaseB := {
+              phaseA := state.phaseB.phaseA
+              cells := fun candidate =>
+                if candidate = key then some (.final decision)
+                else state.phaseB.cells candidate
+              remaining := rest
+              finalizedRev := key :: state.phaseB.finalizedRev
+            }
+            indexes := state.indexes
+          } : PhaseBIndexed file tokens)) = some result := by
+        unfold runMappedPrimitive?
+        rw [dif_pos writeFresh]
+        simp [result, finalizeIndexedGuardTransition]
+      unfold finalizeNextIndexedGuardCertifiedCore?
+      dsimp only
+      rw [decisionEq]
+      simp only [Option.bind_eq_bind, Option.bind_some]
+      unfold finalizeNextIndexedGuard?
+      rw [remaining]
+      dsimp only
+      rw [initializedEq]
+      simp only [Option.bind_eq_bind, Option.bind_some]
+      rw [lookedUpEq]
+      simp only [Option.bind_some]
+      rw [decisionEq]
+      simp only [Option.bind_some]
+      rw [finalEq]
+      rfl
+
+private theorem finalizeNextIndexedGuardCertified?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (remaining : current.payload.phaseB.remaining = key :: rest)
+    (clean : guardFinalizeKeyFreshBool current.counter key = true) :
+    finalizeNextIndexedGuardCertified? current key rest clean =
+      finalizeNextIndexedGuard? current := by
+  unfold finalizeNextIndexedGuardCertified?
+  apply finalizeNextIndexedGuardCertifiedCore?_eq_reference
+  exact remaining
+
+private theorem finalizeNextIndexedGuardFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    finalizeNextIndexedGuardFast? current =
+      finalizeNextIndexedGuard? current := by
+  unfold finalizeNextIndexedGuardFast?
+  cases remaining : current.payload.phaseB.remaining with
+  | nil => simp [finalizeNextIndexedGuard?, remaining]
+  | cons key rest =>
+      simp only
+      split
+      · exact finalizeNextIndexedGuardCertified?_eq_reference
+          current key rest remaining ‹_›
+      · rfl
+
 /-- Run the external-decision-free Phase-B worklist. -/
 private def runIndexedPhaseB?
     {file : WorkspaceFile} {tokens : List Token} :
@@ -8499,6 +9199,41 @@ private def runIndexedPhaseB?
       | _ :: _ => do
           let next ← finalizeNextIndexedGuard? current
           runIndexedPhaseB? fuel next
+
+/-- Phase-B runner using one ledger scan per guard-finalization block. -/
+private def runIndexedPhaseBFast?
+    {file : WorkspaceFile} {tokens : List Token} :
+    Nat → CountedState tokens (PhaseBIndexed file tokens) →
+      Option (CountedState tokens (PhaseBIndexed file tokens))
+  | 0, current =>
+      if current.payload.phaseB.remaining = [] then some current else none
+  | fuel + 1, current =>
+      match current.payload.phaseB.remaining with
+      | [] => some current
+      | _ :: _ => do
+          let next ← finalizeNextIndexedGuardFast? current
+          runIndexedPhaseBFast? fuel next
+
+private theorem runIndexedPhaseBFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ fuel (current : CountedState tokens (PhaseBIndexed file tokens)),
+      runIndexedPhaseBFast? fuel current =
+        runIndexedPhaseB? fuel current := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current
+      rfl
+  | succ previous induction =>
+      intro current
+      rw [runIndexedPhaseBFast?, runIndexedPhaseB?]
+      cases remaining : current.payload.phaseB.remaining with
+      | nil => rfl
+      | cons key rest =>
+          rw [finalizeNextIndexedGuardFast?_eq_reference]
+          apply Option.bind_congr
+          intro next _selected
+          exact induction next
 
 /-- A successful Phase-B worklist run has consumed every guard key. -/
 private theorem runIndexedPhaseB?_remaining_empty
@@ -8609,7 +9344,7 @@ private def executeIndexedPhaseBOfCertifiedPhaseA?
     (indexed : CountedState tokens (PhaseAIndexed file tokens)) :
     Option (CountedState tokens (PhaseBSealed file tokens)) := do
   let entered ← enterIndexedPhaseBUnchecked? indexed
-  let finalized ← runIndexedPhaseB?
+  let finalized ← runIndexedPhaseBFast?
     (allGuardInstanceKeys tokens).length entered
   sealIndexedPhaseB? finalized
 
@@ -8857,6 +9592,80 @@ private theorem materializeAllPhaseAIndexesFast?_eq_reference
           clean address)).symm
   next => rfl
 
+private theorem materializePhaseAIndexesCertified_congr
+    {file : WorkspaceFile} {tokens : List Token}
+    (left right : PhaseAIndexEvaluator file tokens)
+    (addresses : List (EvidenceIndexAddress tokens))
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (unique : addresses.Nodup)
+    (fresh : ∀ address, address ∈ addresses →
+      UnitAddress.evidenceIndex address ∉ current.counter.usedRev)
+    (same : ∀ address, address ∈ addresses →
+      left current.payload.phaseA address =
+        right current.payload.phaseA address) :
+    materializePhaseAIndexesCertified left addresses current unique fresh =
+      materializePhaseAIndexesCertified right addresses current unique fresh := by
+  have mapped :
+      addresses.map (fun address => ({
+        address := address
+        selected := left current.payload.phaseA address
+      } : PhaseAEvidenceEntry tokens)) =
+        addresses.map (fun address => ({
+          address := address
+          selected := right current.payload.phaseA address
+        } : PhaseAEvidenceEntry tokens)) := by
+    apply List.map_congr_left
+    intro address member
+    simp only [PhaseAEvidenceEntry.mk.injEq, true_and]
+    exact same address member
+  unfold materializePhaseAIndexesCertified
+  rw [mapped]
+
+/-- Materialize the U01 table with one shared complete-item recognition set. -/
+private def materializeAllPhaseAObservationIndexesFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAIndexed file tokens)) :
+    Option (CountedState tokens (PhaseAIndexed file tokens)) :=
+  let recognition := rawRecognitionHashIndex current.payload.phaseA
+  let evaluate :=
+    phaseAObservationIndexEvaluatorWithRecognitionIndex owned recognition
+  if clean : evidenceIndexFamilyFreshBool current.counter = true then
+    some (materializePhaseAIndexesCertified evaluate
+      (allEvidenceIndexAddresses tokens) current
+      (allEvidenceIndexAddresses_nodup tokens)
+      (fun address _member =>
+        evidenceIndexAddress_fresh_of_familyFresh current.counter
+          clean address))
+  else
+    materializePhaseAIndexes? (phaseAObservationIndexEvaluator owned)
+      (allEvidenceIndexAddresses tokens) current
+
+private theorem materializeAllPhaseAObservationIndexesFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseAIndexed file tokens)) :
+    materializeAllPhaseAObservationIndexesFast? owned current =
+      materializePhaseAIndexes? (phaseAObservationIndexEvaluator owned)
+        (allEvidenceIndexAddresses tokens) current := by
+  unfold materializeAllPhaseAObservationIndexesFast?
+  dsimp only
+  split
+  next clean =>
+    rw [materializePhaseAIndexes?_eq_certified
+      (phaseAObservationIndexEvaluator owned)
+      (allEvidenceIndexAddresses tokens) current
+      (allEvidenceIndexAddresses_nodup tokens)
+      (fun address _member =>
+        evidenceIndexAddress_fresh_of_familyFresh current.counter
+          clean address)]
+    congr 1
+    apply materializePhaseAIndexesCertified_congr
+    intro address _member
+    exact phaseAObservationIndexEvaluatorWithRecognitionIndex_exact
+      owned current.payload.phaseA address
+  next => rfl
+
 /-- Execute Phase A once, materialize its certified evidence table in one
 pass, then enter Phase B through proof-erased certificates. -/
 private def executeObservedPhaseAB?
@@ -8872,8 +9681,7 @@ private def executeObservedPhaseAB?
       phaseA.payload.rawItems (rawSaturation tokens)).mpr
         (executePhaseA?_membership_eq file tokens owned phaseA phaseAEq)
   let normalized := normalizePhaseARawItems phaseA sameMembers
-  let indexed ← materializeAllPhaseAIndexesFast?
-    (phaseAObservationIndexEvaluator owned)
+  let indexed ← materializeAllPhaseAObservationIndexesFast? owned
     (beginPhaseAIndexing normalized)
   executeIndexedPhaseBOfCertifiedPhaseA?
     file tokens owned phaseA phaseAEq sameMembers indexed
@@ -9099,6 +9907,10 @@ private theorem executeIndexedPhaseBOfCertifiedPhaseA?_eq_reference
     rw [dif_pos itemsDone, dif_pos edgesDone, dif_pos saturated]
   unfold executeIndexedPhaseBOfCertifiedPhaseA? executeIndexedPhaseB?
   rw [enteredReference]
+  simp only [Option.bind_eq_bind]
+  apply Option.bind_congr
+  intro entered _enteredEq
+  rw [runIndexedPhaseBFast?_eq_reference]
 
 /-- The proof-erased fast Phase-A/B path selects exactly the original checked
 reference result. -/
@@ -9146,13 +9958,12 @@ private theorem executeObservedPhaseAB?_eq_reference
   simp only [Option.bind_eq_bind, Option.bind_some]
   rw [indexedReference]
   change
-    (materializeAllPhaseAIndexesFast?
-      (phaseAObservationIndexEvaluator owned)
+    (materializeAllPhaseAObservationIndexesFast? owned
       (beginPhaseAIndexing
         (normalizePhaseARawItems phaseA sameMembers))).bind
       (executeIndexedPhaseBOfCertifiedPhaseA?
         file tokens owned phaseA phaseAEq sameMembers) = _
-  rw [materializeAllPhaseAIndexesFast?_eq_reference]
+  rw [materializeAllPhaseAObservationIndexesFast?_eq_reference]
   cases indexedEq : materializePhaseAIndexes?
       (phaseAObservationIndexEvaluator owned)
       (allEvidenceIndexAddresses tokens)
@@ -10150,6 +10961,7 @@ private theorem processRawItem?_reservedFresh
     (selected : processRawItem? owned item current = some result) :
     PhaseAReservedFresh result.counter := by
   unfold processRawItem? at selected
+  rw [attemptPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completionEq⟩

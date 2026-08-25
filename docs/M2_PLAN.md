@@ -156,13 +156,16 @@ undeclared axiom.
 Formal totality is not a speed claim. An earlier development smoke run on empty
 input did not finish within 226 seconds. The first identified cause was a
 bounded Phase C runner continuing after both queues were empty; it now returns
-immediately. Phase A also re-used its certified worklist result instead of
-recomputing the complete saturation, caches completion classifications, and
-builds its evidence table in one linear pass. Exact-equivalence theorems relate
-each optimized path to the retained checked implementation. On the development
-host, the native `tiny` benchmark (`data A;`) improved from about 89.0 seconds
-to 16.20–17.48 seconds across three runs, and the latest `empty` elapsed time
-was 1.36 seconds.
+immediately. Phase A also re-uses its certified worklist result instead of
+recomputing the complete saturation, caches completion classifications, skips
+incompatible prediction candidates before rebuilding the waiting production,
+and indexes complete-item recognition. Its evidence table is built in one
+linear pass. Phase B batches each proved-fresh guard-finalization block after
+one ledger scan. Exact-equivalence theorems relate each optimized path to the
+retained checked implementation. On the development host, the native `tiny`
+benchmark (`data A;`) improved from about 89.0 seconds to 6.82–7.24 seconds
+across two fresh-process runs, and the latest `empty` elapsed time was 0.86
+seconds.
 This is a substantial improvement, but the two synthetic cases do not establish
 interactive or high-throughput readiness.
 

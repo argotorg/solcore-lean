@@ -115,17 +115,20 @@ that one bounded Phase C runner kept applying an empty transition until its
 multi-billion-step upper bound was exhausted. It now returns as soon as both
 queues are empty. Phase A also no longer recomputes the full saturation merely
 to validate a result it has already certified. Completion items are classified
-once so incompatible pairs can be skipped, and the Phase A evidence table is
-now materialized in one linear pass instead of repeatedly copying growing
-lists. Each faster path has an exact-equivalence theorem against the retained
-reference implementation.
+once so incompatible pairs can be skipped. Prediction candidates are rejected
+from that classification before rebuilding the waiting production, and
+complete-item recognition uses a local hash index. The Phase A evidence table
+is materialized in one linear pass instead of repeatedly copying growing
+lists. Phase B checks all eight finalization slots for one guard with one
+ledger pass and then charges the proved-fresh block directly. Each faster path
+has an exact-equivalence theorem against the retained reference implementation.
 
 On the development host, the native benchmark's `tiny` case (`data A;`) fell
-from about 89.0 seconds before this pass to 16.20–17.48 seconds across three
-later runs. The latest observed `empty` elapsed time was 1.36 seconds. These are
-machine-dependent observations, not language limits or performance guarantees.
-Representative-file and memory measurements are still needed before claiming
-interactive or fuzzing-speed readiness.
+from about 89.0 seconds before these passes to 6.82–7.24 seconds across two
+fresh-process runs. The latest observed `empty` elapsed time was 0.86 seconds.
+These are machine-dependent observations, not language limits or performance
+guarantees. Representative-file and memory measurements are still needed
+before claiming interactive or fuzzing-speed readiness.
 
 ## Next work
 

@@ -133,11 +133,10 @@ lake build m2cFrontendBench
 machine-readable line containing the elapsed nanoseconds and observed result.
 Use an external timeout when profiling an untrusted performance change. Do not
 turn these wall-clock measurements into normative language limits. On the
-development host, `empty` reported about 1.36 seconds and two fresh-process
-`tiny` runs reported 16.20 and 16.72 seconds, compared with a pre-optimization
-baseline of about 89.0 seconds. A third `tiny` run reported 17.48 seconds.
-These figures are useful for local regression checks, but none is a normative
-bound.
+development host, the latest `empty` run reported about 0.86 seconds and two
+fresh-process `tiny` runs reported 6.82 and 7.24 seconds, compared with a
+pre-optimization baseline of about 89.0 seconds. These figures are useful for
+local regression checks, but none is a normative bound.
 
 ## Documentation rule
 
