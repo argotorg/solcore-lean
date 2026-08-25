@@ -1293,6 +1293,18 @@ def executeObservedContextualParseOfBoundedSearch
     (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
       file tokens owned success)
 
+/-- Direct parse outcome using the dot-sensitive potential synthesized by the
+three-table bounded search. -/
+def executeObservedContextualParseOfBoundedDottedSearch
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned) :
+    Except ParseDiagnostic ParsedModuleV1 :=
+  executeObservedContextualParseOfProgress file tokens owned
+    (executeObservedContextualValueWorklistMulti_rootlessExecutableProgress_of_boundedDottedSearch
+      file tokens owned success)
+
 /-- The certificate-driven executable outcome is exactly the value selected
 by the option-based implementation. -/
 theorem executeObservedContextualParseOfProgress_selected
@@ -1410,6 +1422,22 @@ theorem executeObservedContextualParseOfBoundedSearch_selected
       (executeObservedContextualBoundedPotential file tokens owned success)
       (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
         file tokens owned success)
+
+/-- Dot-sensitive bounded synthesis preserves exact implementation
+selection. -/
+theorem executeObservedContextualParseOfBoundedDottedSearch_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    result.parseOutcome? file =
+      some (executeObservedContextualParseOfBoundedDottedSearch
+        file tokens owned success) := by
+  exact executeObservedContextualParseOfProgress_selected file tokens owned
+    (executeObservedContextualValueWorklistMulti_rootlessExecutableProgress_of_boundedDottedSearch
+      file tokens owned success)
 
 /-- The certificate-driven executable result is declaratively sound: modules
 parse, and diagnostics apply to the supplied source. -/
@@ -1604,5 +1632,24 @@ theorem executeObservedContextualParseOfBoundedSearch_sound
       (executeObservedContextualBoundedPotential file tokens owned success)
       (executeObservedContextualFormalCertificateBool_eq_true_of_boundedSearch
         file tokens owned success)
+
+/-- Dot-sensitive bounded synthesis yields a declaratively sound direct
+parse without a separate G10 premise. -/
+theorem executeObservedContextualParseOfBoundedDottedSearch_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned) :
+    match executeObservedContextualParseOfBoundedDottedSearch
+        file tokens owned success with
+    | .ok module => Parses file tokens module
+    | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
+  exact executeObservedContextualParseOfProgress_sound file tokens owned
+    (executeObservedContextualValueWorklistMulti_rootlessExecutableProgress_of_boundedDottedSearch
+      file tokens owned success)
+    (executeObservedContextualCoherentNonAssociativeInvariant_of_certificate
+      file tokens owned
+        (executeObservedContextualNonAssociativeCertificateBool_eq_true
+          file tokens owned))
 
 end Solcore.Surface.Multi
