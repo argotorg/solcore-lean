@@ -209,4 +209,22 @@ theorem boundedFrontierDottedGrammarRankSearchSucceeds_of_staticEdges
   · exact epsilonCertificate
   · exact completionCertificate
 
+/-- Acceptance of the fixed static table supplies every edge certificate
+needed by the bounded dotted-potential search. -/
+theorem boundedFrontierDottedGrammarRankSearchSucceeds_of_staticTable
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (tableAccepted : dottedStaticRankTable = true) :
+    BoundedFrontierDottedGrammarRankSearchSucceeds
+      owned correct final cursor := by
+  apply boundedFrontierDottedGrammarRankSearchSucceeds_of_staticEdges
+    owned correct final cursor greatest
+  · exact dottedStaticPredictionComponent_lt_of_table tableAccepted
+  · exact dottedStaticEpsilonComponent_lt_of_table tableAccepted
+  · exact dottedStaticCompletionDecrease_of_table tableAccepted
+
 end Solcore.Surface.Multi
