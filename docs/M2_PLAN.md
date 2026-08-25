@@ -17,7 +17,7 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 | M2c workspace identity | ADR-0014 Accepted | complete and proof-audited | internal only |
 | M2c Multi source/token/AST and lexer | ADR-0015 Accepted | complete for the current internal boundary | internal only |
 | M2c Multi full-token parser | ADR-0015 Accepted | unconditional parser and file-only lexer/parser wrapper implemented; selected-outcome and soundness theorems complete | internal only |
-| M2c structural acceptance | ADR-0015 Accepted | diagnostic algebra exists; validator, certified module, and frontend integration remain | none |
+| M2c structural acceptance | ADR-0015 Accepted | pure all-diagnostics validator implemented and fully fixture-tested; independent judgments, correspondence proofs, certified module, and frontend integration remain | none |
 | M2c structural syntax identity | ADR-0016 Accepted | design only; no implementation modules or tests yet | none |
 | M2c module and lexical resolution | ADR-0017 Proposed | blocked and not started | none |
 | M2d source checking and Core elaboration | decisions incomplete | not started | none |
@@ -25,9 +25,10 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 
 The **unconditional raw-parser milestone is complete**: callers can lex and
 parse one `WorkspaceFile` without supplying a termination proof. The full
-ADR-0015 parser delivery and the whole M2 frontend are not complete because
-structural certification, resolution, checking, and elaboration do not exist
-yet.
+ADR-0015 parser delivery and the whole M2 frontend are not complete because the
+implemented structural validator is not yet connected to its independent
+judgments and certified-module boundary, while resolution, checking, and
+elaboration do not exist yet.
 
 ## Published M2b boundary
 
@@ -152,19 +153,28 @@ undeclared axiom.
 
 ### Practical limitation
 
-Formal totality is not a speed claim. A current development smoke run on empty
-input did not finish within 226 seconds. The chart executor therefore needs
-optimization and explicit performance regression tests before it is suitable
-for interactive use or high-throughput differential fuzzing. Optimization
-must preserve the selected-outcome and soundness boundary.
+Formal totality is not a speed claim. An earlier development smoke run on empty
+input did not finish within 226 seconds. The first identified cause was a
+bounded Phase C runner continuing after both queues were empty; it now returns
+immediately. Phase A also re-used its certified worklist result instead of
+recomputing the complete saturation, with an exact-equivalence theorem against
+the retained checked path. Two native empty-module runs then completed in about
+3.22 and 3.30 seconds on the development host. The minimal `data A;` case still
+did not finish within 60 seconds. Further profiling and optimization are still
+required before the chart executor is suitable for interactive use or
+high-throughput differential fuzzing.
 
 ## Work still required to finish ADR-0015
 
-The current file-only wrapper stops after raw parsing. The remaining parser
-kernel work is:
+The current file-only wrapper stops after raw parsing. A pure structural
+executor now traverses the complete AST, emits all `MSS0001`–`MSS0020`
+diagnostics with their specified spans and payloads, canonicalizes the complete
+list, and accepts clean modules. The remaining parser-kernel work is:
 
-1. implement `StructurallyAccepts` and the pure structural validator;
-2. emit the canonical closed `MSS0001`–`MSS0020` structural diagnostics;
+1. implement the independent `StructurallyAccepts` and diagnostic-applicability
+   judgments;
+2. prove the structural executor sound, complete, canonical, and within its
+   fixed resource bound;
 3. define the proof-carrying `CertifiedParsedModule` and the final
    `parseModule` phase precedence;
 4. connect structural success/failure to independent judgments;
@@ -175,8 +185,9 @@ kernel work is:
 7. add the internal umbrella only after proof, test, kernel-policy, and axiom
    audits pass.
 
-The structural-diagnostic constructors already exist, but their presence is
-not implementation of the structural pass.
+The executable structural pass is implemented, but it is not yet a certified
+frontend boundary until the independent judgments and correspondence proofs
+are connected.
 
 ## Structural syntax identity: accepted design, no code yet
 

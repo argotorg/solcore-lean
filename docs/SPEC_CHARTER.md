@@ -15,7 +15,7 @@ profile” are deliberately different claims.
 | --- | --- | --- |
 | M1c Semantic Core | Closed checker and evaluator with correspondence proofs | Published by Oracle v3 as `solcore/0.1.0-draft.3` / `core-m1c-v1` |
 | M2b Surface | Closed one-file parser with lexer/parser correspondence proofs | Published by Oracle v4 as `solcore/0.1.0-draft.4` / `frontend-m2b-v1` |
-| M2c Multi Surface | Unconditional executable lexer/parser path with selected-result and soundness theorems | Internal Lean API; no new schema, profile, capability, or Oracle query |
+| M2c Multi Surface | Unconditional executable lexer/parser path with selected-result and soundness theorems; pure 20-rule structural validator awaiting judgment correspondence | Internal Lean API; no new schema, profile, capability, or Oracle query |
 | M2c workspace and syntax identity | Pure workspace validation and accepted structural-identity design | Internal only |
 | Resolution, checking, elaboration, execution | Not connected as one executable source frontend | Not published |
 
@@ -24,11 +24,13 @@ The [documentation guide](README.md) links the repository's reader paths. Use
 [architecture](ARCHITECTURE.md) for module and proof boundaries, and the
 [development guide](DEVELOPMENT.md) for reproducible build and audit commands.
 
-The newest implementation result is the M2c Multi parser. It matters because
-its executable entry point no longer requires a caller-supplied rank
-certificate or progress premise. It does **not** widen Oracle v4, certify a
-whole workspace, resolve a name, assign a type, elaborate to Core, or execute a
-contract.
+The newest implementation result is the M2c Multi parser and its separate
+structural validator. The parser entry point no longer requires a
+caller-supplied rank certificate or progress premise, and the validator emits
+the complete canonical structural diagnostic list. The validator has not yet
+been connected to independent judgments or a certified parsed result. None of
+this widens Oracle v4, certifies a whole workspace, resolves a name, assigns a
+type, elaborates to Core, or executes a contract.
 
 ## Purpose
 
@@ -141,19 +143,26 @@ proof is part of this chain.
 
 ### Performance status
 
-Logical totality is not a performance guarantee. In one development runtime
-smoke, an empty-input Multi parse had not completed after more than 226 seconds.
-This is neither a normative limit nor a stable benchmark. It is evidence that
-the proof-oriented chart representation, bounded search, and runtime data path
-still need practical optimization.
+Logical totality is not a performance guarantee. In one earlier development
+runtime smoke, an empty-input Multi parse had not completed after more than 226
+seconds. Investigation found a Phase C runner that continued after its queues
+were empty; that path now stops immediately. The executor also avoids
+recomputing Phase A saturation after the worklist result has already certified
+it, while an exact-equivalence theorem preserves the checked reference result.
+Two subsequent native empty-module runs completed in about 3.22 and 3.30
+seconds on the development host, while the minimal `data A;` case did not
+finish within 60 seconds. The historical timeout and these observations are
+neither normative limits nor stable benchmarks; broader runtime behavior still
+requires measurement.
 
 Therefore:
 
 - the current Multi executor is a formal reference path, not a production
   parser;
-- an end-to-end runtime smoke should not be added to the ordinary fast suite;
+- wall-clock parser measurements remain outside the ordinary fast suite;
 - static proof shards should be cached during routine verification; and
-- profiling, optimization, and a fast regression strategy remain incomplete.
+- profiling and optimization remain incomplete, while the native benchmark now
+  provides a reproducible regression entry point.
 
 ## Published version and profile boundaries
 

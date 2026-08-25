@@ -20,3 +20,7 @@ lean_exe solcoreOracle where
 lean_exe solcoreTests where
   root := `Tests.Main
   exeName := "solcore-tests"
+
+lean_exe m2cFrontendBench where
+  root := `Bench.M2cFrontend
+  exeName := "m2c-frontend-bench"

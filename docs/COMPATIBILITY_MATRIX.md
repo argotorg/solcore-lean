@@ -52,7 +52,7 @@ verdict spelling need not be identical for that phrase to apply.
 | Oracle v4 / Surface v1 | parser-level source fixtures can be shared | restricted parser differences can be measured; no resolution or semantic claim |
 | M2c workspace identity | internal Lean values only | logical identity and validation rules are specified/tested; no external protocol parity claim |
 | M2c Multi lexer | internal Lean API; six canonical files have fixed lexer fingerprints | lexical/source-shape investigations are possible; no published result schema |
-| M2c Multi parser | internal unconditional chart parser with selection/soundness proofs; not performance-ready | formal parser behavior is available; there is no completed structural/canonical-standard parse gate or external adapter |
+| M2c Multi parser | internal unconditional chart parser with selection/soundness proofs; executable 20-rule structural validator; performance work in progress | formal parser behavior and structural diagnostics are available internally; independent structural correspondence, the canonical-standard parse gate, and an external adapter are incomplete |
 | structural syntax identity | ADR-0016 design only | no executable comparison yet |
 | module/name resolution | ADR-0017 Proposed; no Lean implementation | every resolver classification remains unverified |
 
@@ -211,12 +211,14 @@ resolution rather than copying either compiler tree.
 | absent syntax | some bodies/branches are normalized | recovery and AST conveniences vary | `none` remains absent; parser invents no located node |
 | imports/exports | parser feeds implementation resolver forms | parser feeds implementation resolver forms | source-preserving syntax only; no target or visibility meaning |
 
-Lean tests currently fix every token map, maximal-munch cases, diagnostics,
-UTF-8 spans, assembly slices, grammar-table cardinalities, canonical raw
-metadata, and six-file lexer fingerprints. The proof build supplies the
-unconditional chart outcome and soundness boundary. Kernel-checked parsing and
-structural acceptance of all six canonical files, an external adapter, and
-runtime-performance regression tests remain open.
+Lean tests currently fix every token map, maximal-munch case, diagnostic,
+UTF-8 span, assembly slice, grammar-table cardinality, canonical raw metadata,
+and six-file lexer fingerprint. They also exercise all 20 structural
+diagnostics, their exact spans and payloads, canonical ordering, and loop/lambda
+behavior. The proof build supplies the unconditional chart outcome and
+soundness boundary. Independent structural correspondence, kernel-checked
+parsing and structural acceptance of all six canonical files, and an external
+adapter remain open; native runtime measurement now has a dedicated harness.
 
 ### Structural identity and resolution
 

@@ -12,9 +12,11 @@ published as the parse-only Oracle v4 boundary.
 
 The newer M2c path now has a validated workspace identity kernel and a
 source-preserving Multi lexer/parser. The parser has an unconditional,
-proof-argument-free file API and kernel-checked soundness theorems. This closes
-the **unconditional raw-parser milestone**; it does not complete the full
-ADR-0015 parser delivery, the whole frontend, or the whole formal specification.
+proof-argument-free file API and kernel-checked soundness theorems. A separate
+pure structural pass now checks all 20 accepted AST-shape rules and returns the
+complete diagnostic list in a deterministic order. The independent structural
+judgments and their correspondence proofs are still missing, so this does not
+yet complete the full ADR-0015 parser delivery or the whole frontend.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -32,8 +34,9 @@ or fuzzing-speed parser.
 | M2a single-file parser kernel | Yes | Yes | Via M2b | Complete |
 | M2b single-file parser publication | Yes | Yes | Oracle v4 / Surface v1 | Current public parse boundary |
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
-| M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome and soundness | No; internal API | Total but not performance-ready; the full ADR-0015 delivery remains incomplete |
-| M2c structural syntax certification | No standalone phase yet | No end-to-end theorem yet | No | Design accepted in ADR-0016 |
+| M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome and soundness | No; internal API | Total; first empty-queue performance defect fixed, broader optimization remains |
+| M2c structural acceptance | Pure validator and all 20 diagnostics | Canonical output shape; judgment correspondence pending | No; internal API | Executable and fully fixture-tested, not yet certified or connected to the frontend |
+| M2c structural syntax identity | No | No | No | Design accepted in ADR-0016 |
 | M2c module and name resolution | No | No | No | ADR-0017 is proposed |
 | M2d checking and Core elaboration | No | No | No | Planned |
 | M2e polymorphism, staging, and comptime | No | No | No | Planned |
@@ -60,6 +63,12 @@ satisfies the declarative applicability judgment for that parse diagnostic.
 For the file-only frontend, the corresponding soundness theorem covers lexical
 failure, parse failure, and successful parsing. This wrapper cannot emit a
 structural diagnostic: structural validation is a later phase.
+
+Call `validateStructure module` on a parsed module to run the new structural
+phase. It reports every applicable `MSS0001`–`MSS0020` diagnostic, ordered by
+code, source, byte range, and payload. Its tests cover exact diagnostic spans,
+duplicate handling, fallback rules, required parameter types, match arity, and
+the rule that a lambda cannot target an enclosing loop.
 
 Termination no longer depends on a proof supplied by the caller. A finite
 static certificate covers all 2,378 dotted grammar rows and supplies the rank
@@ -91,7 +100,7 @@ lake test
 node scripts/check-kernel.mjs
 ```
 
-The full build checks 176 jobs. The semantic-kernel audit rejects `sorry`,
+The full build checks 178 jobs. The semantic-kernel audit rejects `sorry`,
 `admit`, `partial`, `unsafe`, `axiom`, `noncomputable`, `extern`, and
 `implemented_by` in the audited roots. The final parser certificate is also
 checked at `trust = 0`; its dependencies use only Lean's expected logical
@@ -100,21 +109,27 @@ axioms (`propext`, `Quot.sound`, and, where executable selection requires it,
 
 ## Known limitation: runtime cost
 
-Formal totality and runtime speed are different claims. A development smoke
-run of the current Multi chart parser on empty input did not finish within
-226 seconds. This does not weaken the termination or soundness theorems, but it
-does mean the implementation is not yet ready for interactive parsing or
-high-throughput fuzzing. Performance work should preserve the proved boundary
-and add explicit runtime regression tests.
+Formal totality and runtime speed are different claims. An earlier development
+smoke run on empty input did not finish within 226 seconds. Investigation found
+that one bounded Phase C runner kept applying an empty transition until its
+multi-billion-step upper bound was exhausted. It now returns as soon as both
+queues are empty. Phase A also no longer recomputes the full saturation merely
+to validate a result it has already certified; the faster path is proved equal
+to the retained checked reference path. After these changes, two native empty-
+module runs completed in about 3.22 and 3.30 seconds on the development host.
+The minimal `data A;` case still did not finish within 60 seconds. These are
+machine-dependent observations, not language limits or performance guarantees.
+More profiling is still needed before claiming interactive or fuzzing-speed
+readiness.
 
 ## Next work
 
 The shortest path from the current state to an end-to-end executable frontend
 is:
 
-1. optimize and benchmark the Multi parser;
-2. implement structural syntax certification and connect its diagnostics to
-   the file frontend;
+1. continue profiling and optimizing the Multi parser with the native benchmark;
+2. define the independent structural judgments, prove correspondence with the
+   implemented validator, and connect structural diagnostics to the file frontend;
 3. accept and implement module/name resolution;
 4. implement source checking and elaboration into Semantic Core;
 5. expose a new versioned workspace Oracle only after its profile, schemas,

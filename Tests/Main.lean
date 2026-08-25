@@ -9,6 +9,7 @@ import Solcore.Standard.CanonicalData
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
+import Solcore.Test.SurfaceMultiStructure
 
 set_option autoImplicit false
 
@@ -4818,10 +4819,11 @@ def run : IO Unit := do
   testMultiLexerUtf8Spans
   testMultiLexerAssemblySlice
   testCanonicalRawLexing
+  testMultiStructuralValidation
 
 end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c-workspace/M2c-multi-lexer tests passed"
+  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c workspace, lexer, and structural tests passed"
   return 0

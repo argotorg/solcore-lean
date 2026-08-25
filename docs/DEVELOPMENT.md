@@ -67,7 +67,7 @@ Before treating a semantic change as complete, check all applicable items:
 
 For a proof-heavy change, also inspect the final theorem with Lean's
 `#print axioms` and, for the critical certificate boundary, compile an audit
-module with `set_option trust 0`.
+module with `lake env lean --trust=0 path/to/Audit.lean`.
 
 ## Semantic-kernel policy
 
@@ -115,10 +115,27 @@ changes, re-establish all of the following before claiming parser completion:
 5. the finite dotted-rank certificate for the new grammar; and
 6. file-only frontend selection and soundness.
 
-Runtime behavior must be measured separately. The current total parser is not
-yet fast enough for an interactive smoke-test expectation, so optimization
-changes should add benchmarks or bounded regression tests without weakening
-the proof boundary.
+Runtime behavior must be measured separately. Empty input now completes on the
+native development benchmark, but the minimal `data A;` case has exceeded a
+60-second smoke timeout. The parser is therefore not yet characterized for
+interactive nonempty use. Optimization changes should add benchmarks or
+bounded regression tests without weakening the proof boundary.
+
+The native frontend benchmark is deliberately outside the default build and
+test targets. Build it once, then run each case in a fresh process:
+
+```sh
+lake build m2cFrontendBench
+.lake/build/bin/m2c-frontend-bench empty
+.lake/build/bin/m2c-frontend-bench tiny
+```
+
+`empty` parses an empty module; `tiny` parses `data A;`. Each command prints one
+machine-readable line containing the elapsed nanoseconds and observed result.
+Use an external timeout when profiling an untrusted performance change. Do not
+turn these wall-clock measurements into normative language limits. Current
+development observations put `empty` near 3.2–3.3 seconds and show `tiny`
+exceeding 60 seconds; neither number is a normative bound.
 
 ## Documentation rule
 

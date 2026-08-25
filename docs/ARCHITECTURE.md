@@ -98,6 +98,7 @@ The implementation is organized around these responsibilities:
 | declarative parsing | `ParserJudgment` |
 | implementation/proof correspondence | `ChartProperties`, `Properties` |
 | total parse selection | `ParseOutcomeTotality` |
+| structural diagnostic order and pure AST validation | `Diagnostic`, `Structure` |
 | finite termination certificate | `RootlessNormalizationDottedStatic*` |
 
 The internal file-only API is
@@ -105,6 +106,13 @@ The internal file-only API is
 SurfaceDiagnostic ParsedModuleV1`. It returns lexical or parse diagnostics and
 does not perform the later structural phase. The lower-level parser accepts a
 token ownership proof internally derived by the lexer.
+
+`validateStructure : ParsedModuleV1 -> Except (NonemptyList
+StructuralDiagnostic) Unit` is the separate structural executor. It traverses
+the full AST, including expressions nested in patterns and lambda bodies,
+returns every applicable closed diagnostic, and canonicalizes the result. Its
+independent judgment and correspondence layer are the next unfinished proof
+boundary, so it is not yet part of a certified parsed-module facade.
 
 ## Why the parser has a static certificate
 
@@ -131,6 +139,7 @@ The common proof pattern is:
 | workspace | pure validator | validation/rejection judgments | soundness and completeness |
 | lexing | bounded lexer | lexical judgment and diagnostic applicability | accepted-token and rejection theorems |
 | parsing | bounded chart executor | `Parses` and parse-diagnostic applicability | selected-outcome and soundness theorems |
+| structural validation | complete pure diagnostic collector | independent acceptance/applicability judgments are pending | canonical list-shape lemmas exist; full correspondence is pending |
 | Core checking | Boolean/detailed checker | typing relation | soundness and completeness |
 | Core execution | fuelled CEK machine | big-step relation | two-way correspondence |
 

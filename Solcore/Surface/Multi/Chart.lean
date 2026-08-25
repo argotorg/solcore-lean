@@ -7667,6 +7667,45 @@ private theorem canonicalRawItems_eq_iff
     apply Bool.eq_iff_iff.mpr
     simpa only [rawMemberBool_eq_true_iff] using sameMembers item
 
+/-- Canonicalizing a filtered dotted-item carrier does not change its stable
+order. -/
+private theorem canonicalRawItems_filter
+    {tokens : List Token} (select : DottedItem tokens → Bool) :
+    canonicalRawItems tokens ((allDottedItems tokens).filter select) =
+      (allDottedItems tokens).filter select := by
+  unfold canonicalRawItems
+  apply List.filter_congr
+  intro item member
+  apply Bool.eq_iff_iff.mpr
+  rw [rawMemberBool_eq_true_iff, List.mem_filter]
+  exact and_iff_right member
+
+/-- The finite closure is itself one filtered presentation of the stable
+dotted-item carrier. -/
+private theorem rawSaturation_eq_filter
+    (tokens : List Token) :
+    ∃ known, rawSaturation tokens =
+      (allDottedItems tokens).filter (rawClosureBool tokens known) := by
+  have positive : 0 < (allDottedItems tokens).length := by
+    rw [allDottedItems_length]
+    have boundaryPositive : 0 < tokens.length + 2 := by omega
+    exact Nat.mul_pos (Nat.mul_pos dotted_count_positive boundaryPositive)
+      boundaryPositive
+  obtain ⟨fuel, lengthEq⟩ :=
+    Nat.exists_eq_succ_of_ne_zero (Nat.ne_of_gt positive)
+  refine ⟨closureIterate (rawClosureStep tokens) fuel, ?_⟩
+  unfold rawSaturation
+  rw [lengthEq]
+  rfl
+
+/-- The reference saturation already has the stable canonical order. -/
+private theorem canonicalRawItems_rawSaturation (tokens : List Token) :
+    canonicalRawItems tokens (rawSaturation tokens) =
+      rawSaturation tokens := by
+  obtain ⟨known, shape⟩ := rawSaturation_eq_filter tokens
+  rw [shape]
+  exact canonicalRawItems_filter _
+
 private def normalizePhaseARawItems
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseAOpen file tokens))
@@ -7677,9 +7716,21 @@ private def normalizePhaseARawItems
   current with
   payload := {
     current.payload with
-    rawItems := rawSaturation tokens
+    rawItems := canonicalRawItems tokens current.payload.rawItems
   }
 }
+
+/-- A certified normalization is exactly the reference saturation without
+evaluating the reference closure. -/
+private theorem normalizePhaseARawItems_eq_rawSaturation
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (same :
+      canonicalRawItems tokens current.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens)) :
+    (normalizePhaseARawItems current same).payload.rawItems =
+      rawSaturation tokens := by
+  exact same.trans (canonicalRawItems_rawSaturation tokens)
 
 /-- The checked normalization changes order only, never item membership. -/
 private theorem normalizePhaseARawItems_membership
@@ -7691,9 +7742,7 @@ private theorem normalizePhaseARawItems_membership
     (item : DottedItem tokens) :
     item ∈ (normalizePhaseARawItems current same).payload.rawItems ↔
       item ∈ current.payload.rawItems := by
-  have extensional := (canonicalRawItems_eq_iff
-    current.payload.rawItems (rawSaturation tokens)).mp same item
-  simpa only [normalizePhaseARawItems] using extensional.symm
+  exact mem_canonicalRawItems_iff current.payload.rawItems item
 
 /-- Order-insensitive Phase-A sealing through the existing exact gate. -/
 private def enterPhaseBCanonical?
@@ -8046,9 +8095,31 @@ private def executeIndexedPhaseB?
     (allGuardInstanceKeys tokens).length entered
   sealIndexedPhaseB? finalized
 
-/-- Execute the landed raw Phase A, materialize the proof-free observations,
-then derive and seal every Phase-B guard decision. -/
-private def executeObservedPhaseAB?
+private theorem executePhaseA?_isSome_eq_true
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    (executePhaseA? file tokens owned).isSome = true := by
+  exact Option.isSome_iff_exists.mpr
+    (executePhaseA?_total file tokens owned)
+
+/-- Total proof-free Phase-A result. -/
+private def executePhaseA
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    CountedState tokens (PhaseAOpen file tokens) :=
+  (executePhaseA? file tokens owned).get
+    (executePhaseA?_isSome_eq_true file tokens owned)
+
+private theorem executePhaseA_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    executePhaseA? file tokens owned =
+      some (executePhaseA file tokens owned) := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨executePhaseA?_isSome_eq_true file tokens owned, rfl⟩
+
+/-- Reference Phase-A/B execution retaining all dynamic saturation gates. -/
+private def executeObservedPhaseABReference?
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens) :
     Option (CountedState tokens (PhaseBSealed file tokens)) := do
@@ -8056,6 +8127,67 @@ private def executeObservedPhaseAB?
   let indexed ← indexSaturatedPhaseACanonicalWith?
     (phaseAObservationIndexEvaluator owned) phaseA
   executeIndexedPhaseB? indexed
+
+/-- Phase-B entry transition without the reference validation gates.  It is
+used only behind a Phase-A execution certificate. -/
+private def enterIndexedPhaseBUnchecked?
+    {file : WorkspaceFile} {tokens : List Token}
+    (indexed : CountedState tokens (PhaseAIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) := do
+  let enteredPhase ← runMappedPrimitive? {
+    payload := indexed.payload.phaseA
+    counter := indexed.counter
+  } (.phase .sealAEnterB) fun state => ({
+    phaseA := ⟨state.rawItems, state.rawEdges⟩
+    cells := fun _ => none
+    remaining := allGuardInstanceKeys tokens
+    finalizedRev := []
+  } : PhaseBOpen file tokens)
+  pure {
+    payload := ⟨enteredPhase.payload, indexed.payload.entries⟩
+    counter := enteredPhase.counter
+  }
+
+/-- Enter and run Phase B from an index result certified to come from the
+already-proved-total Phase-A worklist.  The proof arguments erase at runtime;
+the transition is the same one used by the checked reference gates. -/
+private def executeIndexedPhaseBOfCertifiedPhaseA?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : CountedState tokens (PhaseAOpen file tokens))
+    (_executed : executePhaseA? file tokens owned = some phaseA)
+    (_sameMembers :
+      canonicalRawItems tokens phaseA.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens))
+    (indexed : CountedState tokens (PhaseAIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) := do
+  let entered ← enterIndexedPhaseBUnchecked? indexed
+  let finalized ← runIndexedPhaseB?
+    (allGuardInstanceKeys tokens).length entered
+  sealIndexedPhaseB? finalized
+
+/-- Execute Phase A once, canonicalize its proved worklist result without
+re-evaluating the reference closure, then enter Phase B through proof-erased
+certificates. -/
+private def executeObservedPhaseAB?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) := do
+  let phaseA := executePhaseA file tokens owned
+  let phaseAEq := executePhaseA_selected file tokens owned
+  let sameMembers :
+      canonicalRawItems tokens phaseA.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens) :=
+    (canonicalRawItems_eq_iff
+      phaseA.payload.rawItems (rawSaturation tokens)).mpr
+        (executePhaseA?_membership_eq file tokens owned phaseA phaseAEq)
+  let normalized := normalizePhaseARawItems phaseA sameMembers
+  let indexed ← materializePhaseAIndexes?
+    (phaseAObservationIndexEvaluator owned)
+    (allEvidenceIndexAddresses tokens)
+    (beginPhaseAIndexing normalized)
+  executeIndexedPhaseBOfCertifiedPhaseA?
+    file tokens owned phaseA phaseAEq sameMembers indexed
 
 end Chart
 
@@ -8432,6 +8564,126 @@ private theorem materializePhaseAIndexes?_payload
           · exact phaseSame.trans nextPhase
           · rw [entriesSame, nextEntries, nextPhase]
             simp [List.append_assoc]
+
+private theorem executePhaseA?_queues_empty
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (result : CountedState tokens (PhaseAOpen file tokens))
+    (selected : executePhaseA? file tokens owned = some result) :
+    result.payload.itemQueue = [] ∧ result.payload.edgeQueue = [] := by
+  have execution := selected
+  unfold executePhaseA? at execution
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at execution
+  rcases execution with ⟨seeded, _seededEq, runEq⟩
+  exact runPhaseAQueues?_queues_empty owned
+    (chartGBound (tokens.length + 1)) seeded result runEq
+
+/-- The certified Phase-B entry is extensionally the checked reference entry;
+its proof arguments only remove repeated runtime validation. -/
+private theorem executeIndexedPhaseBOfCertifiedPhaseA?_eq_reference
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (phaseA : CountedState tokens (PhaseAOpen file tokens))
+    (executed : executePhaseA? file tokens owned = some phaseA)
+    (sameMembers :
+      canonicalRawItems tokens phaseA.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens))
+    (indexed : CountedState tokens (PhaseAIndexed file tokens))
+    (indexedEq : materializePhaseAIndexes?
+      (phaseAObservationIndexEvaluator owned)
+      (allEvidenceIndexAddresses tokens)
+      (beginPhaseAIndexing
+        (normalizePhaseARawItems phaseA sameMembers)) = some indexed) :
+    executeIndexedPhaseBOfCertifiedPhaseA?
+      file tokens owned phaseA executed sameMembers indexed =
+        executeIndexedPhaseB? indexed := by
+  have shape := materializePhaseAIndexes?_payload
+    (phaseAObservationIndexEvaluator owned)
+    (allEvidenceIndexAddresses tokens)
+    (beginPhaseAIndexing
+      (normalizePhaseARawItems phaseA sameMembers)) indexed indexedEq
+  have queues := executePhaseA?_queues_empty
+    file tokens owned phaseA executed
+  have itemsDone : indexed.payload.phaseA.itemQueue = [] := by
+    rw [shape.1]
+    simpa [beginPhaseAIndexing, normalizePhaseARawItems] using queues.1
+  have edgesDone : indexed.payload.phaseA.edgeQueue = [] := by
+    rw [shape.1]
+    simpa [beginPhaseAIndexing, normalizePhaseARawItems] using queues.2
+  have saturated : indexed.payload.phaseA.rawItems =
+      rawSaturation tokens := by
+    rw [shape.1]
+    exact normalizePhaseARawItems_eq_rawSaturation phaseA sameMembers
+  have enteredReference : enterIndexedPhaseB? indexed =
+      enterIndexedPhaseBUnchecked? indexed := by
+    unfold enterIndexedPhaseB? enterIndexedPhaseBUnchecked? enterPhaseB?
+    rw [dif_pos itemsDone, dif_pos edgesDone, dif_pos saturated]
+  unfold executeIndexedPhaseBOfCertifiedPhaseA? executeIndexedPhaseB?
+  rw [enteredReference]
+
+/-- The proof-erased fast Phase-A/B path selects exactly the original checked
+reference result. -/
+private theorem executeObservedPhaseAB?_eq_reference
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    executeObservedPhaseAB? file tokens owned =
+      executeObservedPhaseABReference? file tokens owned := by
+  let phaseA := executePhaseA file tokens owned
+  let phaseAEq : executePhaseA? file tokens owned = some phaseA :=
+    executePhaseA_selected file tokens owned
+  let sameMembers :
+      canonicalRawItems tokens phaseA.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens) :=
+    (canonicalRawItems_eq_iff
+      phaseA.payload.rawItems (rawSaturation tokens)).mpr
+        (executePhaseA?_membership_eq
+          file tokens owned phaseA phaseAEq)
+  have queues := executePhaseA?_queues_empty
+    file tokens owned phaseA phaseAEq
+  have normalizedItems :
+      (normalizePhaseARawItems phaseA sameMembers).payload.itemQueue = [] := by
+    simpa [normalizePhaseARawItems] using queues.1
+  have normalizedEdges :
+      (normalizePhaseARawItems phaseA sameMembers).payload.edgeQueue = [] := by
+    simpa [normalizePhaseARawItems] using queues.2
+  have normalizedSaturated :
+      (normalizePhaseARawItems phaseA sameMembers).payload.rawItems =
+        rawSaturation tokens :=
+    normalizePhaseARawItems_eq_rawSaturation phaseA sameMembers
+  have indexedReference :
+      indexSaturatedPhaseACanonicalWith?
+          (phaseAObservationIndexEvaluator owned) phaseA =
+        materializePhaseAIndexes?
+          (phaseAObservationIndexEvaluator owned)
+          (allEvidenceIndexAddresses tokens)
+          (beginPhaseAIndexing
+            (normalizePhaseARawItems phaseA sameMembers)) := by
+    unfold indexSaturatedPhaseACanonicalWith?
+    rw [dif_pos sameMembers]
+    unfold indexSaturatedPhaseAWith?
+    rw [dif_pos normalizedItems, dif_pos normalizedEdges,
+      dif_pos normalizedSaturated]
+  rw [executeObservedPhaseABReference?, phaseAEq]
+  simp only [Option.bind_eq_bind, Option.bind_some]
+  rw [indexedReference]
+  change
+    (materializePhaseAIndexes?
+      (phaseAObservationIndexEvaluator owned)
+      (allEvidenceIndexAddresses tokens)
+      (beginPhaseAIndexing
+        (normalizePhaseARawItems phaseA sameMembers))).bind
+      (executeIndexedPhaseBOfCertifiedPhaseA?
+        file tokens owned phaseA phaseAEq sameMembers) = _
+  cases indexedEq : materializePhaseAIndexes?
+      (phaseAObservationIndexEvaluator owned)
+      (allEvidenceIndexAddresses tokens)
+      (beginPhaseAIndexing
+        (normalizePhaseARawItems phaseA sameMembers)) with
+  | none => simp
+  | some indexed =>
+      simp only [Option.bind_some]
+      exact executeIndexedPhaseBOfCertifiedPhaseA?_eq_reference
+        file tokens owned phaseA phaseAEq sameMembers indexed indexedEq
 
 private theorem materializeAllPhaseAIndexes?_entries_eq_canonical
     {file : WorkspaceFile} {tokens : List Token}
@@ -9022,7 +9274,8 @@ private theorem executeObservedPhaseAB?_allFinal
     (result : CountedState tokens (PhaseBSealed file tokens))
     (selected : executeObservedPhaseAB? file tokens owned = some result) :
     AllGuardsFinal result.payload.memo := by
-  unfold executeObservedPhaseAB? at selected
+  rw [executeObservedPhaseAB?_eq_reference] at selected
+  unfold executeObservedPhaseABReference? at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨phaseA, phaseASelected,
     indexed, indexedSelected, phaseBSelected⟩
@@ -9655,7 +9908,8 @@ private theorem indexSaturatedPhaseACanonicalWith?_total_owned
     unfold indexSaturatedPhaseAWith?
     rw [dif_pos (by simpa [normalizePhaseARawItems] using itemsDone)]
     rw [dif_pos (by simpa [normalizePhaseARawItems] using edgesDone)]
-    rw [dif_pos (by rfl)]
+    rw [dif_pos
+      (normalizePhaseARawItems_eq_rawSaturation current sameMembers)]
     exact materialized
   have shape := materializePhaseAIndexes?_payload evaluate
     (allEvidenceIndexAddresses tokens)
@@ -9667,7 +9921,7 @@ private theorem indexSaturatedPhaseACanonicalWith?_total_owned
   · rw [shape.1]
     simpa [beginPhaseAIndexing, normalizePhaseARawItems] using edgesDone
   · rw [shape.1]
-    rfl
+    exact normalizePhaseARawItems_eq_rawSaturation current sameMembers
   · exact indexSaturatedPhaseACanonicalWith?_fullyMaterialized
       evaluate current result indexed
 
@@ -10199,7 +10453,8 @@ private theorem executeObservedPhaseAB?_total_of_phaseA_ready
   obtain ⟨result, phaseBEq⟩ :=
     executeIndexedPhaseB?_total_ready indexed indexedReady
   exact ⟨result, by
-    unfold executeObservedPhaseAB?
+    rw [executeObservedPhaseAB?_eq_reference]
+    unfold executeObservedPhaseABReference?
     rw [executed]
     simp only [Option.bind_eq_bind, Option.bind_some]
     rw [indexedEq]
@@ -10221,7 +10476,8 @@ private theorem executeObservedPhaseAB?_total_iff_prerequisites
       ObservedPhaseABPrerequisites file tokens owned := by
   constructor
   · rintro ⟨result, selected⟩
-    unfold executeObservedPhaseAB? at selected
+    rw [executeObservedPhaseAB?_eq_reference] at selected
+    unfold executeObservedPhaseABReference? at selected
     simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
     rcases selected with ⟨phaseA, phaseAEq,
       indexed, indexedEq, phaseBEq⟩
@@ -18218,7 +18474,8 @@ theorem executeObservedGuardWorklist?_memo_eq_saturated
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨internal, internalEq, resultEq⟩
   cases resultEq
-  unfold executeObservedPhaseAB? at internalEq
+  rw [executeObservedPhaseAB?_eq_reference] at internalEq
+  unfold executeObservedPhaseABReference? at internalEq
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at internalEq
   rcases internalEq with ⟨phaseA, phaseAEq,
     indexed, indexedEq, phaseBEq⟩
@@ -18229,6 +18486,7 @@ theorem executeObservedGuardWorklist?_memo_eq_saturated
       item ∈ (normalizePhaseARawItems phaseA sameMembers).payload.rawItems ↔
         SaturatedRawItem tokens item := by
     intro item
+    rw [normalizePhaseARawItems_eq_rawSaturation]
     rfl
   funext key
   obtain ⟨decision, decisionEq, memoEq⟩ :=
@@ -20229,7 +20487,8 @@ private theorem executeObservedPhaseAB?_phaseCInitialFresh
     (result : CountedState tokens (PhaseBSealed file tokens))
     (selected : executeObservedPhaseAB? file tokens owned = some result) :
     PhaseCInitialFresh result.counter := by
-  unfold executeObservedPhaseAB? at selected
+  rw [executeObservedPhaseAB?_eq_reference] at selected
+  unfold executeObservedPhaseABReference? at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨phaseA, phaseAEq,
     indexed, indexedEq, phaseBEq⟩
@@ -33383,17 +33642,22 @@ namespace Solcore.Surface.Multi.Chart
 open Grammar
 open Solcore.Workspace
 
-/-- A total bounded runner.  Fuel exhaustion returns the current safe state;
-whether it is drained remains an explicit, separately checkable property. -/
+/-- A total bounded runner.  A drained queue returns immediately; fuel
+exhaustion otherwise returns the current safe state.  Whether a fuel-exhausted
+state is drained remains an explicit, separately checkable property. -/
 private def runPhaseCQueueStepsMulti?
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens) :
     Nat → CountedState tokens (PhaseCWorklist file tokens) →
       Option (CountedState tokens (PhaseCWorklist file tokens))
   | 0, current => some current
-  | fuel + 1, current => do
-      let next ← phaseCQueueStepMulti? owned current
-      runPhaseCQueueStepsMulti? owned fuel next
+  | fuel + 1, current =>
+      if current.payload.phaseC.itemQueue.isEmpty &&
+          current.payload.phaseC.edgeQueue.isEmpty then
+        some current
+      else do
+        let next ← phaseCQueueStepMulti? owned current
+        runPhaseCQueueStepsMulti? owned fuel next
 
 /-- The bounded recognition runner preserves the full semantic reserve at
 every fuel depth. -/
@@ -33414,12 +33678,15 @@ private theorem runPhaseCQueueStepsMulti?_valueAddressesFresh
   | succ previous induction =>
       intro current result fresh selected
       rw [runPhaseCQueueStepsMulti?] at selected
-      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
-      rcases selected with ⟨next, nextEq, resultEq⟩
-      exact induction next result
-        (phaseCQueueStepMulti?_valueAddressesFresh owned current next fresh
-          nextEq)
-        resultEq
+      split at selected
+      · cases selected
+        exact fresh
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨next, nextEq, resultEq⟩
+        exact induction next result
+          (phaseCQueueStepMulti?_valueAddressesFresh owned current next fresh
+            nextEq)
+          resultEq
 
 private theorem runPhaseCQueueStepsMulti?_total_invariants
     {file : WorkspaceFile} {tokens : List Token}
@@ -33443,18 +33710,20 @@ private theorem runPhaseCQueueStepsMulti?_total_invariants
       exact ⟨current, rfl, safe, edgeSafe, covers, exact, operational⟩
   | succ previous induction =>
       intro current safe edgeSafe covers exact operational
-      obtain ⟨next, nextEq, nextSafe, nextEdgeSafe, nextCovers,
-          nextExact, nextOperational⟩ :=
-        phaseCQueueStepMulti?_total_invariants owned current safe edgeSafe
-          covers exact operational
-      obtain ⟨result, resultEq, resultSafe, resultEdgeSafe,
-          resultCovers, resultExact, resultOperational⟩ :=
-        induction next nextSafe nextEdgeSafe nextCovers nextExact
-          nextOperational
-      exact ⟨result, by
-        simp [runPhaseCQueueStepsMulti?, nextEq, resultEq],
-        resultSafe, resultEdgeSafe, resultCovers, resultExact,
-        resultOperational⟩
+      rw [runPhaseCQueueStepsMulti?]
+      split
+      · exact ⟨current, rfl, safe, edgeSafe, covers, exact, operational⟩
+      · obtain ⟨next, nextEq, nextSafe, nextEdgeSafe, nextCovers,
+            nextExact, nextOperational⟩ :=
+          phaseCQueueStepMulti?_total_invariants owned current safe edgeSafe
+            covers exact operational
+        obtain ⟨result, resultEq, resultSafe, resultEdgeSafe,
+            resultCovers, resultExact, resultOperational⟩ :=
+          induction next nextSafe nextEdgeSafe nextCovers nextExact
+            nextOperational
+        exact ⟨result, by simp [nextEq, resultEq],
+          resultSafe, resultEdgeSafe, resultCovers, resultExact,
+          resultOperational⟩
 
 end Solcore.Surface.Multi.Chart
 
@@ -33921,11 +34190,14 @@ private theorem runPhaseCQueueStepsMulti?_valueCompletionAttemptsFresh
   | succ previous induction =>
       intro current result fresh selected
       rw [runPhaseCQueueStepsMulti?] at selected
-      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
-      rcases selected with ⟨next, nextEq, resultEq⟩
-      exact induction next result
-        (phaseCQueueStepMulti?_valueCompletionAttemptsFresh owned current next
-          fresh nextEq) resultEq
+      split at selected
+      · cases selected
+        exact fresh
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨next, nextEq, resultEq⟩
+        exact induction next result
+          (phaseCQueueStepMulti?_valueCompletionAttemptsFresh owned current next
+            fresh nextEq) resultEq
 
 private theorem executePhaseCWorklistMulti?_valueCompletionAttemptsFresh
     {file : WorkspaceFile} {tokens : List Token}
@@ -35005,8 +35277,7 @@ private theorem runPhaseCQueueStepsMulti?_eq_of_drained
   induction fuel with
   | zero => rfl
   | succ fuel induction =>
-      simp [runPhaseCQueueStepsMulti?, phaseCQueueStepMulti?, items, edges,
-        induction]
+      simp [runPhaseCQueueStepsMulti?, items, edges]
 
 /-- The global address bound is also a queue-iteration bound: if the remaining
 fuel plus already consumed slots crosses the bound, every successful run ends
@@ -35029,18 +35300,24 @@ private theorem runPhaseCQueueStepsMulti?_drained_of_budget
   | succ fuel induction =>
       intro current result budget selected
       rw [runPhaseCQueueStepsMulti?] at selected
-      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
-      rcases selected with ⟨next, nextEq, runEq⟩
-      rcases phaseCQueueStepMulti?_fixed_or_units_lt owned current next nextEq
-        with fixed | progress
-      · rcases fixed with ⟨items, edges, nextEqCurrent⟩
-        subst next
-        have fixedRun := runPhaseCQueueStepsMulti?_eq_of_drained owned current
-          items edges fuel
-        rw [fixedRun] at runEq
-        cases runEq
-        exact ⟨items, edges⟩
-      · exact induction next result (by omega) runEq
+      split at selected
+      · rename_i drained
+        cases selected
+        have queues := Bool.and_eq_true_iff.mp drained
+        exact ⟨List.isEmpty_iff.mp queues.1,
+          List.isEmpty_iff.mp queues.2⟩
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨next, nextEq, runEq⟩
+        rcases phaseCQueueStepMulti?_fixed_or_units_lt owned current next nextEq
+          with fixed | progress
+        · rcases fixed with ⟨items, edges, nextEqCurrent⟩
+          subst next
+          have fixedRun := runPhaseCQueueStepsMulti?_eq_of_drained owned current
+            items edges fuel
+          rw [fixedRun] at runEq
+          cases runEq
+          exact ⟨items, edges⟩
+        · exact induction next result (by omega) runEq
 
 private theorem runPhaseCQueueStepsMulti?_chartGBound_drained
     {file : WorkspaceFile} {tokens : List Token}
@@ -35443,12 +35720,15 @@ private theorem runPhaseCQueueStepsMulti?_operationalInvariant_memo
   | succ fuel induction =>
       intro current result invariant selected
       rw [runPhaseCQueueStepsMulti?] at selected
-      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
-      rcases selected with ⟨next, nextEq, runEq⟩
-      have nextSound := phaseCQueueStepMulti?_operationalInvariant_memo owned
-        current next invariant nextEq
-      have resultSound := induction next result nextSound.1 runEq
-      exact ⟨resultSound.1, resultSound.2.trans nextSound.2⟩
+      split at selected
+      · cases selected
+        exact ⟨invariant, rfl⟩
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨next, nextEq, runEq⟩
+        have nextSound := phaseCQueueStepMulti?_operationalInvariant_memo owned
+          current next invariant nextEq
+        have resultSound := induction next result nextSound.1 runEq
+        exact ⟨resultSound.1, resultSound.2.trans nextSound.2⟩
 
 private theorem executePhaseCWorklistMulti?_operationalInvariant_memo
     {file : WorkspaceFile} {tokens : List Token}
@@ -36235,12 +36515,15 @@ private theorem runPhaseCQueueStepsMulti?_attemptLedger_fair
   | succ fuel induction =>
       intro current result ledger fair selected
       rw [runPhaseCQueueStepsMulti?] at selected
-      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
-      rcases selected with ⟨next, nextEq, runEq⟩
-      obtain ⟨nextLedger, nextFair⟩ :=
-        phaseCQueueStepMulti?_attemptLedger_fair owned current next ledger fair
-          nextEq
-      exact induction next result nextLedger nextFair runEq
+      split at selected
+      · cases selected
+        exact ⟨ledger, fair⟩
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨next, nextEq, runEq⟩
+        obtain ⟨nextLedger, nextFair⟩ :=
+          phaseCQueueStepMulti?_attemptLedger_fair owned current next ledger fair
+            nextEq
+        exact induction next result nextLedger nextFair runEq
 
 private theorem executePhaseCWorklistMulti?_fairPending
     {file : WorkspaceFile} {tokens : List Token}
@@ -36751,11 +37034,14 @@ private theorem runPhaseCQueueStepsMulti?_edgesNodup
   | succ previous induction =>
       intro current result unique selected
       rw [runPhaseCQueueStepsMulti?] at selected
-      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
-      rcases selected with ⟨next, nextEq, resultEq⟩
-      exact induction next result
-        (phaseCQueueStepMulti?_edgesNodup owned current next unique nextEq)
-        resultEq
+      split at selected
+      · cases selected
+        exact unique
+      · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨next, nextEq, resultEq⟩
+        exact induction next result
+          (phaseCQueueStepMulti?_edgesNodup owned current next unique nextEq)
+          resultEq
 
 private theorem executePhaseCWorklistMulti?_edgesNodup
     {file : WorkspaceFile} {tokens : List Token}
