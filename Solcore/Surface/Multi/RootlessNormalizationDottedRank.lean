@@ -293,6 +293,53 @@ theorem frontierDottedCompletionRank_of_table
       owned correct final cursor potential waiting after).mp lower
     exact Or.inr ⟨after, ⟨frontier.1, facts.1, facts.2.1⟩, facts.2.2⟩
 
+/-- Conversely, explicit normalization witnesses at a greatest frontier make
+the exact dotted completion table accept. -/
+theorem frontierDottedCompletionRankTable_eq_true_of_normalizes
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (normalizes : ∀ waiting,
+      FrontierReach file tokens memo correct final cursor waiting →
+      CompleteItem waiting.raw →
+      waiting = CanonicalCompleteRootItem tokens .module
+          (Boundary.start tokens) (Boundary.afterLogicalEOF tokens) .plain ∨
+        ∃ after : ContextualItemKey tokens,
+          FrontierReach file tokens memo correct final cursor after ∧
+          frontierDottedGrammarRank potential after <
+            frontierDottedGrammarRank potential waiting) :
+    frontierDottedCompletionRankTable
+      owned correct final cursor potential = true := by
+  apply List.all_eq_true.mpr
+  intro waiting _waitingMember
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  letI : Decidable (CompleteItem waiting.raw) :=
+    dottedCompleteItemDecision waiting.raw
+  by_cases reached : ContextualReach file tokens memo correct final waiting
+  · by_cases current : waiting.raw.current = cursor
+    · by_cases complete : CompleteItem waiting.raw
+      · simp only [frontierDottedCompletionRankCell, if_pos reached,
+          if_pos current, if_pos complete, Bool.or_eq_true]
+        rcases normalizes waiting ⟨greatest, reached, current⟩ complete with
+          root | ⟨after, afterFrontier, decreases⟩
+        · exact Or.inl (decide_eq_true_iff.mpr root)
+        · apply Or.inr
+          apply List.any_eq_true.mpr
+          refine ⟨after, allContextualItems_complete after, ?_⟩
+          apply (frontierDottedLowerRankCell_eq_true_iff
+            owned correct final cursor potential waiting after).mpr
+          exact ⟨afterFrontier.2.1, afterFrontier.2.2, decreases⟩
+      · simp [frontierDottedCompletionRankCell, reached, current, complete]
+    · simp [frontierDottedCompletionRankCell, reached, current]
+  · simp [frontierDottedCompletionRankCell, reached]
+
 private def dottedAdvanceItemDecision
     {tokens : List Token} (before : DottedItem tokens)
     (next : Boundary tokens) (after : DottedItem tokens) :
