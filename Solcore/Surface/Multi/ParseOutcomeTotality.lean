@@ -541,6 +541,134 @@ theorem executeObservedContextualRankCertificateBool_eq_true_of_boundedSearch
   exact executeObservedContextualBoundedPotential?_selected
     file tokens owned success
 
+/-- Bounded synthesis of a dot-sensitive rank potential for the concrete
+value-carrying recognition ledger. -/
+def executeObservedContextualBoundedDottedPotential?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (FrontierDottedGrammarPotential tokens) :=
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  boundedFrontierDottedGrammarPotential? owned correct final
+    (computedGreatestReachableCursor owned correct final)
+
+/-- Exact success condition for the concrete bounded dotted-rank search. -/
+def ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) : Prop :=
+  (executeObservedContextualBoundedDottedPotential?
+    file tokens owned).isSome = true
+
+/-- The concrete dot-sensitive potential selected by a successful search. -/
+def executeObservedContextualBoundedDottedPotential
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned) : FrontierDottedGrammarPotential tokens :=
+  (executeObservedContextualBoundedDottedPotential?
+    file tokens owned).get success
+
+theorem executeObservedContextualBoundedDottedPotential?_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned) :
+    executeObservedContextualBoundedDottedPotential? file tokens owned =
+      some (executeObservedContextualBoundedDottedPotential
+        file tokens owned success) := by
+  apply Option.eq_some_iff_get_eq.mpr
+  exact ⟨success, rfl⟩
+
+/-- Successful concrete dotted synthesis exposes all three accepted rank
+tables at the computed greatest cursor. -/
+theorem executeObservedContextualBoundedDottedPotential_tables
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    let selected :=
+      Chart.executeObservedContextualValueWorklistMulti_selected
+        file tokens owned
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result.recognition recognitionSelected
+    let cursor := computedGreatestReachableCursor owned correct final
+    let potential := executeObservedContextualBoundedDottedPotential
+      file tokens owned success
+    frontierDottedCompletionRankTable
+        owned correct final cursor potential = true ∧
+      frontierDottedEpsilonRankTable
+          owned correct final cursor potential = true ∧
+        frontierDottedPredictionRankTable
+          owned correct final cursor potential = true := by
+  exact boundedFrontierDottedGrammarPotential?_sound
+    owned _ _ _
+      (executeObservedContextualBoundedDottedPotential?_selected
+        file tokens owned success)
+
+/-- Successful concrete dotted synthesis supplies rootless progress for the
+selected value-carrying recognition ledger. -/
+theorem executeObservedContextualValueWorklistMulti_rootlessExecutableProgress_of_boundedDottedSearch
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens)
+    (success : ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    let selected :=
+      Chart.executeObservedContextualValueWorklistMulti_selected
+        file tokens owned
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result.recognition recognitionSelected
+    RootlessExecutableProgress
+      file tokens result.recognition.memo correct final := by
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  let potential := executeObservedContextualBoundedDottedPotential
+    file tokens owned success
+  have checks := executeObservedContextualBoundedDottedPotential_tables
+    file tokens owned success
+  have forcesRoot :=
+    (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true_iff
+      file tokens owned result.recognition recognitionSelected).mp
+      (executeObservedContextualWorklistMulti?_postLogicalEofTerminalClosedBool_eq_true
+        file tokens owned result.recognition recognitionSelected)
+  change PostLogicalEofTerminalWaitForcesRoot
+    file tokens result.recognition.memo correct final at forcesRoot
+  exact rootlessExecutableProgress_of_computedDottedRankTables
+    owned potential checks.1 checks.2.1 checks.2.2 forcesRoot
+
 /-- Fully executable operand-prefix certificate for the concrete
 value-carrying recognition ledger. -/
 def executeObservedContextualNonAssociativeCertificateBool
