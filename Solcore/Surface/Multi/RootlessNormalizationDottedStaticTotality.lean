@@ -168,4 +168,45 @@ theorem boundedFrontierDottedGrammarRankSearchSucceeds_of_staticCertificates
   · exact dottedStaticCompletionOrientation_of_certificate
       nullableClosed completionCertificate
 
+/-- The fixed rank bounds and nullability closure leave only the three
+static edge-orientation extractors to discharge. -/
+theorem boundedFrontierDottedGrammarRankSearchSucceeds_of_staticEdges
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (predictionCertificate : ∀ (waiting : DottedRhs)
+      (child : ProductionId),
+      waiting.production.rhs[waiting.dot.val]? =
+          some (.nonterminal child.lhs) →
+      child.rhs ≠ [] →
+      dottedStaticComponentRank (dottedStaticStart child) <
+        dottedStaticComponentRank waiting)
+    (epsilonCertificate : ∀ (waiting : DottedRhs)
+      (child : ProductionId)
+      (incomplete : waiting.dot.val < waiting.production.rhs.length),
+      waiting.production.rhs[waiting.dot.val]? =
+          some (.nonterminal child.lhs) →
+      child.rhs = [] →
+      dottedStaticComponentRank (dottedStaticAdvance waiting incomplete) <
+        dottedStaticComponentRank waiting)
+    (completionCertificate : ∀ (waiting : DottedRhs)
+      (child : ProductionId)
+      (incomplete : waiting.dot.val < waiting.production.rhs.length),
+      waiting.production.rhs[waiting.dot.val]? =
+          some (.nonterminal child.lhs) →
+        DottedStaticCompletionDecrease waiting child incomplete) :
+    BoundedFrontierDottedGrammarRankSearchSucceeds
+      owned correct final cursor := by
+  apply boundedFrontierDottedGrammarRankSearchSucceeds_of_staticCertificates
+    owned correct final cursor greatest dottedStaticComponentRank_le_max
+    dottedStaticPhase_lt_width dottedStaticCapacity
+    dottedStaticNullableSymbol_closed
+  · simpa only [dottedStaticStart, frontierZeroSpanPredictedDotted]
+      using predictionCertificate
+  · exact epsilonCertificate
+  · exact completionCertificate
+
 end Solcore.Surface.Multi
