@@ -115,10 +115,11 @@ changes, re-establish all of the following before claiming parser completion:
 5. the finite dotted-rank certificate for the new grammar; and
 6. file-only frontend selection and soundness.
 
-Runtime behavior must be measured separately. The native benchmark now
-completes both built-in cases, but they do not characterize representative
-programs or interactive use. Optimization changes should add benchmarks or
-bounded regression tests without weakening the proof boundary.
+Runtime behavior must be measured separately. The native benchmark covers an
+empty module, a minimal declaration, and four small examples of everyday
+syntax. These cases still do not characterize large programs or interactive
+use. Optimization changes should add benchmarks or bounded regression tests
+without weakening the proof boundary.
 
 The native frontend benchmark is deliberately outside the default build and
 test targets. Build it once, then run each case in a fresh process:
@@ -127,10 +128,24 @@ test targets. Build it once, then run each case in a fresh process:
 lake build m2cFrontendBench
 .lake/build/bin/m2c-frontend-bench empty
 .lake/build/bin/m2c-frontend-bench tiny
+.lake/build/bin/m2c-frontend-bench import-path
+.lake/build/bin/m2c-frontend-bench return-literal
+.lake/build/bin/m2c-frontend-bench data-constructors
+.lake/build/bin/m2c-frontend-bench contract-field
 ```
 
-`empty` parses an empty module; `tiny` parses `data A;`. Each command prints one
-machine-readable line containing the elapsed nanoseconds and observed result.
+The cases have deliberately short, readable inputs:
+
+- `empty` parses an empty module;
+- `tiny` parses the minimal declaration `data A;`;
+- `import-path` parses the dotted import `import lib.core;`;
+- `return-literal` parses a function that returns the literal `0`;
+- `data-constructors` parses a data declaration with two constructors; and
+- `contract-field` parses a contract containing one typed field.
+
+Each command prints one machine-readable line containing the elapsed
+nanoseconds and observed result.
+
 Use an external timeout when profiling an untrusted performance change. Do not
 turn these wall-clock measurements into normative language limits. On the
 development host, the latest `empty` run reported 0.016 seconds and five

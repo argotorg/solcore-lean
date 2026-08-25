@@ -50,6 +50,18 @@ def main (args : List String) : IO UInt32 :=
   match args with
   | ["empty"] => Bench.M2cFrontend.runCase "empty" "" 0
   | ["tiny"] => Bench.M2cFrontend.runCase "tiny" "data A;" 1
+  | ["import-path"] =>
+      Bench.M2cFrontend.runCase "import-path" "import lib.core;" 1
+  | ["return-literal"] =>
+      Bench.M2cFrontend.runCase
+        "return-literal" "function f() { return 0; }" 1
+  | ["data-constructors"] =>
+      Bench.M2cFrontend.runCase
+        "data-constructors" "data Bool = False | True;" 1
+  | ["contract-field"] =>
+      Bench.M2cFrontend.runCase
+        "contract-field" "contract C { value: word; }" 1
   | _ => do
-      IO.println "usage: m2c-frontend-bench (empty|tiny)"
+      IO.println
+        "usage: m2c-frontend-bench (empty|tiny|import-path|return-literal|data-constructors|contract-field)"
       return 2
