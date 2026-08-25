@@ -4,6 +4,18 @@
 - Decision date: 2026-07-23
 - Scope: M1b Semantic Core publication
 
+## Reader summary / Current implementation
+
+- **Decision:** Publish the completed M1a fragment as draft.2, profile
+  `core-m1a-v1`, Semantic Core v1, and Oracle v2 without widening Oracle v1.
+- **Current implementation:** The profile and feature matrix, strict Core v1
+  codec, Oracle v2 queries, diagnostics, limits, mixed streams, and golden tests
+  are present.
+- **Boundary:** M1b publishes no primitive operations and accepts no source
+  workspace; later versions are additive rather than in-place changes.
+- **Suggested reading:** Read “Decision” for the versioned boundary and
+  “Conformance requirements” for compatibility guarantees.
+
 ## Context
 
 M1a implemented declarative typing and evaluation, an executable checker and CEK

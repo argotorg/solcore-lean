@@ -1,216 +1,280 @@
-# M2: Frontend implementation plan
+# M2: Frontend plan and implementation record
 
-The objective of M2 is to convert a shared `.solc` workspace into the published
-Semantic Core through independently specified parsing, resolution, checking,
-and elaboration phases. M2 must make source-level differential testing possible
-without treating either existing compiler's lowering pipeline as the
-specification.
+M2 turns a closed `.solc` workspace into the published Semantic Core through
+separate parsing, structural certification, resolution, checking, and
+elaboration phases. Each executor must be paired with an independent
+declarative judgment; neither pinned compiler's frontend is the specification.
 
-## Current progress: M2c Workspace Identity Kernel complete
+For a short revision-local summary, see [current status](CURRENT_STATUS.md).
+For module boundaries, see [architecture](ARCHITECTURE.md).
 
-Following
-[ADR-0012](adr/0012-m2a-surface-parser-kernel.md), the repository contains an
-internal parse-only Surface kernel for a deliberately closed single-file
-fragment:
+## Current status
 
-- one zero-argument top-level function used only as a fixture envelope;
-- explicit return type `()`, `bool`, or `word`;
-- initialized, explicitly typed immutable `let` statements;
-- one final value-returning statement;
-- raw decimal and hexadecimal integers;
-- unresolved names and generic calls;
-- explicit grouping and unit syntax;
-- keyword conditionals;
-- unary `!` and the shared arithmetic, bitwise, relational, and equality
-  operators.
+| Phase | Decision status | Implementation and proof status | Publication |
+| --- | --- | --- | --- |
+| M2a restricted single-file parser kernel | ADR-0012 Accepted | complete | internal foundation for M2b |
+| M2b restricted parser publication | ADR-0013 Accepted | complete | draft.4, Surface v1, Oracle v4 |
+| M2c workspace identity | ADR-0014 Accepted | complete and proof-audited | internal only |
+| M2c Multi source/token/AST and lexer | ADR-0015 Accepted | complete for the current internal boundary | internal only |
+| M2c Multi full-token parser | ADR-0015 Accepted | unconditional parser and file-only lexer/parser wrapper implemented; selected-outcome and soundness theorems complete | internal only |
+| M2c structural acceptance | ADR-0015 Accepted | diagnostic algebra exists; validator, certified module, and frontend integration remain | none |
+| M2c structural syntax identity | ADR-0016 Accepted | design only; no implementation modules or tests yet | none |
+| M2c module and lexical resolution | ADR-0017 Proposed | blocked and not started | none |
+| M2d source checking and Core elaboration | decisions incomplete | not started | none |
+| M2e polymorphism, classes, and staging | direction accepted in part | not started | none |
 
-The lexer is pure and total, retains ordered comment spans, supports nested
-block comments, uses ASCII-only maximal munch, and records half-open UTF-8 byte
-spans. Its public success path validates a complete, ordered, non-overlapping
-source partition. The AST preserves grouping, operator spans, raw literal
-spelling, call boundaries, and keyword conditional syntax.
+The **unconditional raw-parser milestone is complete**: callers can lex and
+parse one `WorkspaceFile` without supplying a termination proof. The full
+ADR-0015 parser delivery and the whole M2 frontend are not complete because
+structural certification, resolution, checking, and elaboration do not exist
+yet.
 
-The proof layer now contains:
+## Published M2b boundary
 
-1. an independent maximal-munch lexical judgment and executable checker that
-   gates public lexer success;
-2. an independent full-token difference-list parser grammar;
-3. proof-carrying private parser results that construct a `FileParses`
-   derivation without using the public conformance gate;
-4. relational determinism for expressions, prefix and infix parsing,
-   arguments, types, statements, functions, and complete files;
-5. executable checks for span validity, grammar shape, and exact AST/token
-   correspondence;
-6. sufficient-fuel theorems for both lexer and parser input-derived bounds;
-7. global uniqueness of accepted lexical partitions and sound reachability for
-   every public source-level lexer failure; and
-8. reverse executor completeness for every `FileParses` derivation over the
-   exact lexer output.
+M2b remains the only published source frontend. It provides:
 
-Successful public parsing retains the exact lexer and parser results and proves
-the lexical judgment, complete token correspondence, source validity, grammar
-validity, and `FileParses`. Fuel exhaustion remains represented as an internal
-invariant for defensive classification, but public lexer and parser theorems
-prove it unreachable. The lexer's defensive output-validation invariant is
-also proved unreachable from the raw executor's lexical-soundness theorem.
+- the closed `solcore-surface/v1` wire AST;
+- `solcore-parse-result/v1` with stable phase, code, UTF-8 span, and arguments;
+- `solcore/0.1.0-draft.4` with `grammarVersion = 1`;
+- profile `frontend-m2b-v1`, enabling only `surfaceGrammar`; and
+- Oracle v4 `capabilities` and `parse` queries with positive, negative,
+  malformed-wire, resource, cross-version, and mixed-stream golden cases.
 
-The internal M2a proof obligations are discharged in both executor directions.
-Successful execution constructs the independent judgments, and every
-complete-file derivation for the exact lexer stream is accepted; its full
-source conformance follows from the lexical and grammatical derivations.
-Two accepted lexical partitions of one source are equal, and every public
-source-level lexer failure is connected to an implementation-reached cursor
-that satisfies the executable local rejection judgment. These results supplied
-the proof-kernel prerequisites for the M2b publication decision.
+One request contains source text and a nonempty opaque label. The label is
+copied into returned spans and is never interpreted as a path. `sourceBytes`
+measures only UTF-8 content bytes; exceeding it is `inconclusive` before
+lexing.
 
-[ADR-0013](adr/0013-m2b-surface-parser-publication.md) now publishes the exact
-fragment as `surfaceGrammar` under `solcore/0.1.0-draft.4` and the frontend-only
-`frontend-m2b-v1` profile. The publication adds the closed
-`solcore-surface/v1` and `solcore-parse-result/v1` schemas and Oracle v4, whose
-only queries are `capabilities` and `parse`.
+M2b does not load a workspace, resolve a name, type-check source, elaborate to
+Core, or evaluate. Draft.1 through draft.3, Core v1/v2, Oracle v1 through v3,
+and their existing bytes remain frozen.
 
-Oracle v4 accepts one source string paired with a nonempty opaque source label.
-It copies that label exactly into every returned span and does not interpret it
-as a filesystem path. Its `sourceBytes` limit measures only the UTF-8 byte
-length of the content: a content length at or below the requested limit reaches
-the parser, while a greater length is `inconclusive` at source preflight.
+## Completed M2c workspace identity kernel
 
-The M2b boundary is complementary to, rather than a replacement for, the M1c
-Core boundary. Oracle v3 continues to accept only frozen Semantic Core v2
-inputs. Oracle v1 through v3 and draft.1 through draft.3 artifacts retain their
-existing bytes. Because M2b does not resolve workspaces, names, types, or
-standard-library identities and does not elaborate or execute source, it does
-not yet establish full source-level semantic differential conformance.
+[ADR-0014](adr/0014-m2c-workspace-identity.md) implements a pure logical
+workspace boundary with no filesystem access:
 
-[ADR-0014](adr/0014-m2c-workspace-identity.md)'s internal Workspace Identity
-Kernel is now implemented. It defines exact ASCII logical paths, structured
-library/source/module identities, raw and proof-carrying validated workspace
-types, all eight canonical structural errors, independent validation and
-rejection judgments, and a pure total validator. The proof boundary establishes
-executor soundness and completeness, functional validated output and rejection,
-success/rejection exclusivity, lookup and entry invariants, preservation of
-source counts and UTF-8 byte measures, and validation invariance under the
-specified raw-workspace equivalence. The public Lean umbrella and its theorem
-dependencies pass the semantic-kernel audit.
+- ASCII canonical source paths of the form `segment(/segment)*.solc`;
+- case-sensitive structured `LibraryId`, `SourceId`, and `ModuleId` values;
+- raw and proof-carrying validated workspace types;
+- all eight validation-error families in canonical sorted order;
+- canonical, duplicate-free file and external-library ordering;
+- source lookup, unique entry, exact source-file count, and UTF-8 byte measures;
+  and
+- soundness, completeness, functional success/rejection, exclusivity, and
+  invariance under the specified raw-workspace equivalence.
 
-This completion is internal and additive. It does not reinterpret Oracle v4's
-opaque source label, publish a workspace wire format or profile, assemble the
-standard library, or implement module or name resolution. Resolution remains
-blocked until a separate Accepted ADR closes the multi-module Surface algebra,
-imports, exports, scopes, intrinsic identities, and standard-library interface.
+Equal content or equal relative paths in different libraries do not collapse.
+The kernel performs no normalization through cwd, symlinks, host roots, or
+file existence. It neither assembles the standard library nor resolves a
+module reference.
 
-## Phase boundaries
+## Implemented internal Multi frontend
 
-### M2b: parser publication
+[ADR-0015](adr/0015-m2c-multi-surface-parser.md) defines a separate internal
+grammar named `solcore-multi-surface/m2c-v1`. It does not extend Surface v1.
 
-Parsing is published with all of the following completed:
+### Source, tokens, and syntax
 
-1. a closed, version-local `solcore-surface/v1` wire AST;
-2. bounded decoder/encoder round-trip and canonicalization theorems;
-3. a parse-result schema with stable phase, code, UTF-8 span, and structured
-   arguments;
-4. `solcore/0.1.0-draft.4` with `grammarVersion = 1`;
-5. frontend-only profile `frontend-m2b-v1`, enabling only `surfaceGrammar`;
-6. Oracle v4 and capabilities v4, supporting only `capabilities` and `parse`;
-7. positive, negative, malformed-wire, resource, cross-version, and mixed
-   stream golden cases.
+The implemented algebra includes:
 
-The publication is additive. It does not modify draft.1 through draft.3,
-Semantic Core v1 or v2, Oracle v1 through v3, their profiles, or their existing
-golden bytes.
+- `SourceId`-owned half-open UTF-8 byte spans and source-located values;
+- 30 hard keywords, 2 contextual keywords, 4 pragma names, and 40 symbols;
+- source-preserving module references, imports, exports, declarations,
+  contracts, functions, classes, instances, data/type declarations, pragmas,
+  statements, patterns, types, and expressions;
+- explicit grouping, tuple shape, optional `else` and return values, exact
+  literal spelling, markers, operators, terminators, and assembly slices; and
+- a recovery-free `ParsedModuleV1` with no invented node for absent syntax.
 
-### M2c: workspace identity complete; resolution deferred
+This is a syntactic algebra only. A parsed import is not a resolved edge, and
+a parsed identifier is not a declaration or local identity.
 
-[ADR-0014](adr/0014-m2c-workspace-identity.md) fixes the first internal M2c
-subphase: canonical logical paths, structured library/source/module identities,
-the exact raw and validated user-workspace shapes, complete deterministic
-structural errors, and an independently specified pure validator. That subphase
-is implemented and proof-audited. It does not reinterpret the opaque Oracle v4
-path and does not publish a workspace profile.
+### Lexer guarantees
 
-Extension from validated source records to module and name resolution begins
-only after a separate Accepted resolver ADR fixes:
+The lexer is pure and total. Its declarative and executable sides establish:
 
-- safe canonical source paths and entry-file selection;
-- module path derivation;
-- import, export, alias, selection, and hiding behavior;
-- declaration order and structured declaration identities;
-- duplicate declarations and shadowing;
-- local scope, including independent conditional branches;
-- the identity and visibility of the canonical standard-library bundle.
+- ASCII maximal munch and exact hard/contextual-keyword behavior;
+- nested block comments and retained outer comment spans;
+- exact string spelling/decoding and closed lexical diagnostics;
+- UTF-8 boundary-valid, source-owned token and comment spans;
+- opaque balanced assembly blocks that ignore delimiters inside nested
+  comments and strings;
+- executor soundness and completeness against the lexical judgment; and
+- an input-derived sufficient work bound.
 
-That resolver ADR must also define the closed multi-module Surface algebra,
-separate lexically resolved occurrences from type-directed selectors, and fix
-the intrinsic dependencies needed to resolve the canonical standard-library
-sources. The Resolved layer uses structured identifiers derived from source
-paths, syntactic roles, and declaration indices. It must not replace identity
-with raw name strings. Successful resolution must construct a declarative
-resolution derivation and establish uniqueness and non-dangling references.
+Tests cover path/source ownership, all closed token maps, maximal munch,
+Unicode byte spans, lexical errors, opaque assembly scanning, exact grammar
+cardinalities, and lexer fingerprints for all six canonical standard files.
 
-### M2d: checking and Core elaboration
+### Grammar, chart, and parse diagnostics
 
-Typed elaboration requires separate Accepted decisions for:
+The fixed grammar contains 75 named rules, 737 EBNF sites, 1,040 expanded
+production/action IDs, 2,378 dotted rows (`D`), and 1,861 contextual frontier
+coordinates (`F`). The implementation provides typed action reductions,
+context-preserving chart items and edges, declarative `Parses`, closed
+unexpected/repeated-nonassociative diagnostics, and a three-phase chart
+executor.
 
-- the polymorphic type of source integer literals and their conversion to
-  `word`;
-- the status and shadowing behavior of `true` and `false`;
-- operator resolution through type classes versus profile-defined direct
-  rules;
-- canonical standard-library identities for `bnotWord`, `bshlWord`, and
-  `bshrWord`;
-- exactly-once source argument evaluation when a resolved helper must reorder
-  values for Core;
-- the fixture function's entry-envelope meaning;
-- short-circuit elaboration of `&&` and `||`;
-- source diagnostics and unsupported-feature classification.
+The parser preserves nonassociative relational/equality behavior, explicit
+group resets, contextual priorities, exact expected-token frontiers, complete
+input consumption, and source-backed AST reduction. Parser success and parser
+failure are related to independent declarative judgments rather than to
+presentation text.
 
-An elaborator may map only resolved identities, never a callee's spelling, to a
-Core primitive. The shift helpers take source arguments in `(shift, value)`
-order, while Core uses `(value, shift)`; elaboration must bind source arguments
-left to right before reordering the resulting values.
+### Unconditional parser and static certificate
 
-Successful checking must construct a declarative typing derivation.
-Elaboration must preserve type and stage/effect information and must target a
-published closed Core version without silently widening it.
+The current internal APIs are:
 
-### M2e: polymorphism, classes, and staging
+```text
+executeObservedContextualParse
+  : (file : WorkspaceFile) ->
+    (tokens : List Token) ->
+    TokensOwnedBy file tokens ->
+    Except ParseDiagnostic ParsedModuleV1
 
-General polymorphism, tabled class resolution, and comptime/runtime staging are
-added only after their rule sets and resource models are complete. Class search
-uses explicit fuel or another proved terminating decision procedure; exhaustion
-is `inconclusive`, not `rejected`.
+executeObservedContextualFrontend
+  : WorkspaceFile -> Except SurfaceDiagnostic ParsedModuleV1
+```
 
-## Implementation order
+The parser API returns exactly the chart-selected outcome. On success the
+result satisfies `Parses`; on failure its diagnostic satisfies
+`ParseDiagnostic.Applies`. The file-only wrapper obtains token ownership from
+the lexer and is sound for lexical failure, parse failure, and success. It
+cannot construct `.structural`, because structural checking is a later phase.
 
-1. Surface source ownership, tokens, syntax, lexer, parser, and correspondence.
-   Soundness, completeness, direct parser derivation, relational determinism,
-   lexical uniqueness, lexer-failure reachability, and fuel sufficiency are
-   implemented for the internal M2a fragment.
-2. Version-local Surface wire and parse-only Oracle publication. Implemented
-   in M2b as Surface v1, parse-result v1, and Oracle v4.
-3. Workspace identity and structural validation, as fixed by ADR-0014.
-   Implemented and proof-audited by the Workspace Identity Kernel.
-4. Multi-module Surface syntax and an Accepted resolver ADR.
-5. Module/import resolution, structured identifiers, and declarative
-   resolution correspondence.
-6. Source typing and typed elaboration for literals, immutable bindings,
-   conditionals, calls, and the operator-backed M1c subset.
-7. Standard-library identity refinement for word not and shifts.
-8. Polymorphism, tabled class resolution, and staging.
-9. Source-to-Core differential fixtures and shrinkable conformance corpora.
+Termination is no longer a caller premise. A kernel-checked Boolean table
+covers all 2,378 dotted rows, proves the grammar-specific decreasing rank, and
+closes bounded search. The certificate is checked as one 640-row shard,
+eighteen 96-row shards, and a 10-row tail, then composed by
+`dottedStaticRankTable_eq_true`. It uses neither `native_decide` nor an
+undeclared axiom.
 
-## Completion criteria for a frontend feature
+### Practical limitation
 
-- An Accepted ADR fixes every observable grammar or static-semantics choice.
-- A declarative judgment exists independently of the executor.
-- A pure, total decision procedure exists.
-- Soundness is proved; completeness is proved or its exact limitation is
-  recorded.
-- Successful phase output satisfies source ownership, span, uniqueness, and
-  non-dangling invariants as applicable.
-- Resource exhaustion is explicit and cannot become rejection.
-- A closed version-local wire representation and canonical codec exist before
-  Oracle publication.
-- Positive, negative, boundary, and upstream-difference witnesses exist.
-- The semantic kernel contains no `sorry`, `admit`, `partial`, `unsafe`,
-  undeclared axioms, or IO.
+Formal totality is not a speed claim. A current development smoke run on empty
+input did not finish within 226 seconds. The chart executor therefore needs
+optimization and explicit performance regression tests before it is suitable
+for interactive use or high-throughput differential fuzzing. Optimization
+must preserve the selected-outcome and soundness boundary.
+
+## Work still required to finish ADR-0015
+
+The current file-only wrapper stops after raw parsing. The remaining parser
+kernel work is:
+
+1. implement `StructurallyAccepts` and the pure structural validator;
+2. emit the canonical closed `MSS0001`–`MSS0020` structural diagnostics;
+3. define the proof-carrying `CertifiedParsedModule` and the final
+   `parseModule` phase precedence;
+4. connect structural success/failure to independent judgments;
+5. prove complete location, nesting, source, grouping, literal-spelling, and
+   no-normalization invariants at the certified boundary;
+6. construct and kernel-check parser plus structural certificates for the six
+   canonical standard files from the one shared raw-byte source; and
+7. add the internal umbrella only after proof, test, kernel-policy, and axiom
+   audits pass.
+
+The structural-diagnostic constructors already exist, but their presence is
+not implementation of the structural pass.
+
+## Structural syntax identity: accepted design, no code yet
+
+[ADR-0016](adr/0016-m2c-structural-syntax-identity.md) fixes the identity layer
+that must follow certified parsing:
+
+- role-tagged absolute addresses from the parsed module root;
+- exact direct/list child roles and virtual lexical-scope roles;
+- source-ordered, complete node/scope/occurrence enumeration;
+- module-local reference sites and prepared graph modules;
+- a policy-free canonical module index; and
+- injective lift from local to index-scoped identities with total primary
+  spans and non-dangling proofs.
+
+No `Solcore/Surface/Multi/Structural` implementation exists yet. The next
+implementation phase must follow the ADR's dependency order and prove
+selection soundness/completeness, inventory exactness, scope ownership,
+identity injectivity, enumeration completeness, and measure equations. A
+source span or untagged list index must not be substituted for identity.
+
+## Module resolution: proposed and blocked
+
+[ADR-0017](adr/0017-m2c-module-resolution.md) is still Proposed. There is no
+`Solcore/Resolution` implementation, no reachable module graph, no interface
+fixed point, no lexical scope resolver, no standard-bundle verifier, and no
+resolve query.
+
+Before acceptance, ADR-0017 requires:
+
+- the ADR-0015 canonical parser gate and ADR-0016 identity implementation;
+- a pure SHA-256 feasibility boundary;
+- exact six-file standard-bundle verification from shared bytes;
+- an actual canonical resolver run recording the required finite closure and
+  saturation counts; and
+- independent review of the interface-rule compiler, lookup automaton,
+  diagnostics, certificate replayers, and module DAG.
+
+Once accepted, the intended implementation order is standard verification,
+closed-workspace assembly, occurrence-preserving graph discovery, declaration
+catalogs, interface closure/saturation, import and module-binding environments,
+lexical scopes and lookup, intrinsics/pragmas/constructor shorthand, and the
+outer resolver correspondence theorem.
+
+## M2d checking and Core elaboration
+
+Resolution alone does not assign types or Core meaning. M2d must separately
+decide and implement:
+
+- source integer-literal typing and conversion to `word`;
+- the status and shadowing of `true` and `false`;
+- operator and type-class resolution;
+- canonical identities for word-not and shift helpers;
+- exactly-once left-to-right source argument evaluation before any Core
+  reordering;
+- receiver/member selection, callability, assignment targets, overload and
+  instance applicability;
+- short-circuit `&&` / `||` elaboration;
+- source diagnostics and unsupported-feature classification; and
+- type- and stage-preserving elaboration to one published closed Core version.
+
+An elaborator may map only resolved identities, never a callee spelling, to a
+Core primitive.
+
+## M2e and publication
+
+Polymorphism, tabled class resolution, and comptime/runtime staging follow only
+after their complete rule sets and resource models are accepted. Search
+exhaustion is `inconclusive`, not rejection.
+
+No internal M2c work changes Oracle v4. A future workspace frontend requires a
+separate publication ADR defining a new language/profile, Surface and result
+schemas, limits, capabilities, Oracle query, diagnostics, canonical encoding,
+golden streams, and compatibility classification.
+
+## Roadmap from the current revision
+
+| Order | Deliverable | Exit condition |
+| ---: | --- | --- |
+| 1 | parser performance pass | representative files have explicit runtime/memory regressions without weakening proofs |
+| 2 | ADR-0015 structural certification | `parseModule` returns only certified modules or canonical lexical/parse/structural diagnostics |
+| 3 | six-file canonical parse gate | all shared standard bytes lex, parse, structurally pass, and re-encode in the kernel |
+| 4 | ADR-0016 structural identity | prepared modules and all identity/selection/enumeration theorems complete |
+| 5 | ADR-0017 feasibility and acceptance | SHA and actual canonical resolver gates record reproducible counts |
+| 6 | module and lexical resolution | pure resolver is sound, complete, deterministic, and non-dangling |
+| 7 | M2d checking and elaboration | accepted source subset elaborates to a published Core with type preservation |
+| 8 | workspace publication | new versioned protocol and conformance corpus are frozen additively |
+
+## Completion criteria for every frontend phase
+
+- An Accepted ADR fixes every observable choice.
+- An independent declarative judgment exists.
+- The executor is pure and total at its stated input boundary.
+- Soundness is proved; completeness is proved or its exact limit is recorded.
+- Successful output preserves source ownership, valid spans, uniqueness, and
+  non-dangling identities as applicable.
+- Diagnostics are closed, deterministic, and tied to exact source spans.
+- Resource exhaustion is explicit and never becomes rejection.
+- Publication waits for a closed version-local wire representation, canonical
+  codec, limits, capabilities, mixed-version behavior, and golden cases.
+- The full build, tests, metadata validation, kernel policy, formatting, and
+  public-theorem axiom audits pass.

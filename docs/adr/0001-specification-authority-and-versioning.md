@@ -4,6 +4,19 @@
 - Decision date: 2026-07-23
 - Scope: `solcore/0.1.0-draft.1`
 
+## Reader summary / Current implementation
+
+- **Decision:** Versioned declarative Lean rules outrank executors, tests, and
+  comparison compilers; every published boundary is identified by explicit
+  language, profile, and implementation metadata.
+- **Current implementation:** Drafts 1 through 4, their profiles, schemas,
+  digests, pinned baselines, and metadata checks are present. Later ADRs publish
+  only the Core and Surface fragments whose proof boundaries are complete.
+- **Boundary:** Acceptance of this ADR does not promote an incomplete language
+  feature or make an existing compiler normative.
+- **Suggested reading:** Read “Decision” for the authority order, then
+  “Conformance Requirements” for the checks that make it operational.
+
 ## Context
 
 Solcore has a Haskell implementation, a Rust implementation, language

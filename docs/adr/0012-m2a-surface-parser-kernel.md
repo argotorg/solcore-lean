@@ -4,6 +4,19 @@
 - Decision date: 2026-07-23
 - Scope: M2 frontend
 
+## Reader summary / Current implementation
+
+- **Decision:** Define a pure, total, source-preserving lexer and parser for one
+  deliberately small Surface fragment, independently of resolution or compiler
+  lowering.
+- **Current implementation:** The M2a Surface syntax, lexer, parser, independent
+  judgments, correspondence, determinism, diagnostics, and fuel proofs are
+  complete; ADR-0013 publishes this exact kernel as M2b.
+- **Boundary:** The grammar has one opaque-labeled file and does not load a
+  workspace, resolve names, check types, elaborate Core, or evaluate source.
+- **Suggested reading:** Read the scope and grammar portions of “Decision”, then
+  “Conformance requirements” for the proof boundary.
+
 ## Context
 
 The published M1c reference boundary accepts a closed Semantic Core directly.

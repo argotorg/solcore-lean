@@ -4,6 +4,20 @@
 - Decision date: 2026-07-23
 - Scope: language version, standard library
 
+## Reader summary / Current implementation
+
+- **Decision:** Pin the six-file standard library by upstream revision and an
+  exact fileset digest, while keeping primitive semantics authoritative in Lean.
+- **Current implementation:** The manifest metadata and verifier are present,
+  and the six canonical byte sequences live in
+  `Solcore/Standard/CanonicalData.lean`. Lean checks strict UTF-8 and byte
+  round trips; the metadata verifier and tests check the recorded sizes and
+  digests.
+- **Boundary:** Standard-library module resolution and proofs that its ABI,
+  storage, and primitive definitions refine later semantics are not complete.
+- **Suggested reading:** Read “Decision” for the digest construction and
+  “Conformance requirements” for reproducibility checks.
+
 ## Context
 
 Many Solcore type classes, ABI dispatch mechanisms, and operations depend on

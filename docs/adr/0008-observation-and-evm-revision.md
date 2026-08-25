@@ -4,6 +4,18 @@
 - Decision date: 2026-07-23
 - Scope: dynamic semantics, differential oracle
 
+## Reader summary / Current implementation
+
+- **Decision:** Contract observations require an explicit EVM revision and
+  compare semantic state effects rather than compiler artifacts.
+- **Current implementation:** Current profiles intentionally omit an EVM
+  revision and publish only Core evaluation or parse observations. No contract
+  EVM execution profile is implemented.
+- **Boundary:** Gas belongs only to a separately versioned observation profile;
+  it is not part of the current gas-free Core observations.
+- **Suggested reading:** Read “Decision” for the observation envelope and
+  “Conformance requirements” for deterministic-host requirements.
+
 ## Context
 
 The Haskell and Rust EVM test environments do not implicitly use the same

@@ -4,6 +4,19 @@
 - Decision date: 2026-07-23
 - Scope: M1c Semantic Core
 
+## Reader summary / Current implementation
+
+- **Decision:** Add the closed boolean/word primitive set with exact arithmetic
+  edge cases and left-to-right, exactly-once evaluation, then publish it through
+  draft.3, Core v2, and Oracle v3.
+- **Current implementation:** Primitive typing and execution, Core v2 codecs,
+  correspondence and safety proofs, profile metadata, Oracle v3, and golden
+  tests are complete.
+- **Boundary:** Short-circuit source operators, functions, conversions, ADTs,
+  source elaboration, and unlisted primitives remain outside M1c.
+- **Suggested reading:** Read the primitive signature and operation tables in
+  “Decision”, then the publication and conformance subsections.
+
 ## Context
 
 M1a and M1b published a typed and executable Semantic Core containing literals,

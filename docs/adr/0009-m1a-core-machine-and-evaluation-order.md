@@ -4,6 +4,19 @@
 - Decision date: 2026-07-23
 - Scope: M1 Semantic Core
 
+## Reader summary / Current implementation
+
+- **Decision:** The first closed Core has unit, booleans, bounded words,
+  immutable de Bruijn bindings, and condition-first selected-branch-only
+  conditionals, with a fuelled CEK machine matching declarative evaluation.
+- **Current implementation:** The syntax, checker, big-step semantics, CEK
+  executor, correspondence, progress, preservation, and fuel theorems are
+  implemented and are published through ADR-0010.
+- **Boundary:** Functions, mutation, ADTs, primitives, source parsing, and
+  lowering are not part of M1a.
+- **Suggested reading:** Read “Decision” and “Not decided here” first, then use
+  “Conformance requirements” as the proof checklist.
+
 ## Context
 
 The first Semantic Core must support type checking and evaluation without passing

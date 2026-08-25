@@ -4,6 +4,18 @@
 - Decision date: 2026-07-23
 - Scope: ABI, contract dispatch
 
+## Reader summary / Current implementation
+
+- **Decision:** A public ABI type is supported only when metadata, signature,
+  decoding, and encoding are all defined consistently; duplicate signatures and
+  selector collisions are rejected before generation.
+- **Current implementation:** Published profiles carry no ABI version, and the
+  ABI support rule and collision checker remain planned or blocked. Unsupported
+  source shapes are recorded in the feature matrix.
+- **Boundary:** No current Oracle profile claims external contract dispatch.
+- **Suggested reading:** Read “Decision” for admissibility and
+  “Conformance requirements” for the future totality and collision checks.
+
 ## Context
 
 Existing implementations generate ABI metadata, spell selectors, decode calldata,

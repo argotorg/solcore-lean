@@ -4,11 +4,18 @@
 - Decision date: 2026-08-18
 - Scope: M2c workspace identity kernel
 
-Implementation status: complete and proof-audited. The independent judgments,
-pure validator, correspondence theorems, canonical error tests, permutation
-tests, measure tests, and public Lean umbrella are present. This status does not
-authorize or claim module or name resolution, standard-library assembly, a
-workspace wire format, or a new Oracle/profile publication.
+## Reader summary / Current implementation
+
+- **Decision:** Give a closed caller workspace canonical logical paths,
+  source/module identities, deterministic structural validation, and exact
+  finite measures without consulting the host filesystem.
+- **Current implementation:** Complete and proof-audited. Independent judgments,
+  the pure validator, correspondence and uniqueness theorems, canonical error,
+  permutation, and measure tests, and the public Workspace umbrella are present.
+- **Boundary:** This kernel does not parse a multi-file workspace, assemble the
+  standard library, resolve modules or names, or publish a new wire/profile.
+- **Suggested reading:** Read the identity and validation parts of “Decision”,
+  then “Conformance requirements”; resolver questions move to ADR-0017.
 
 ## Context
 

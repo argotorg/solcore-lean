@@ -4,6 +4,30 @@
 - Decision date: 2026-08-18
 - Scope: M2c internal multi-module Surface lexer and parser
 
+## Reader summary / Current implementation
+
+- **Decision:** Define the closed, source-preserving
+  `solcore-multi-surface/m2c-v1` language, its independent lexer/parser
+  judgments and executors, structural acceptance, diagnostics, and the
+  `CertifiedParsedModule` boundary. This is an internal specification, not a
+  published Oracle feature.
+- **Current implementation:** Source, token, syntax, diagnostics, measures,
+  grammar tables, `ParserCore`, the lexical judgment and lexer, the parser
+  judgment, the finite contextual chart, parser-totality certificates, a total
+  file-only lexer/parser frontend, and their current soundness proofs are
+  present. Strict UTF-8 and canonical-byte facts are also present.
+- **Not yet implemented:** The separate fast `Parser`, structural judgment and
+  validator, `CertifiedParsedModule`, the six complete canonical-standard parse
+  certificates, and the public `Solcore.Surface.Multi` umbrella are absent.
+  Consequently ADR-0015 is Accepted as a decision but is not yet a completed
+  implementation or publication boundary.
+- **Suggested reading:** Read “Acceptance scope and frozen published
+  boundaries”, “Closed source-preserving AST”, and “Complete syntactic grammar”
+  for the language; then “Independent judgments and pure executors”,
+  “Termination and resource bounds”, and “Module boundaries and implementation
+  order” for the proof and delivery plan. Use the compatibility ledger as a
+  decision index rather than reading every grammar table first.
+
 ## Context
 
 ADR-0012 and ADR-0013 define and publish the deliberately small, one-file
@@ -46,12 +70,12 @@ implementation must wait until these prerequisites are closed.
 
 ## Decision
 
-### Proposal gate and frozen published boundaries
+### Acceptance scope and frozen published boundaries
 
-This ADR is a proposal. It authorizes no implementation while its status is
-`Proposed`. Acceptance will authorize only the internal modules, judgments,
-executors, proofs, and fixtures listed below. Publication still requires a
-separate ADR.
+This ADR was originally reviewed behind a proposal gate and is now Accepted.
+Acceptance authorizes only the internal modules, judgments, executors, proofs,
+and fixtures listed below; it does not claim that every implementation slice is
+complete. Publication still requires a separate ADR.
 
 Oracle v1 through v4, draft.1 through draft.4 language versions, existing
 profiles, Surface v1, parse-result v1, Semantic Core v1 and v2, existing golden
@@ -5249,12 +5273,11 @@ certificate, fixture, and kernel audits pass.
 `Polarity.accepts : Polarity -> GuardDecision -> Bool`, with
 `GuardDecision.allows` only as the definitionally equal argument-order alias.
 An implementation that still exposes `Polarity -> Bool -> Bool` is not
-conforming to this Accepted ADR. Updating that shared algebra and its
-exhaustive table checks is a prerequisite gate. In addition, the present
-ParserCore/value/reduction/diagnostic revision must pass an independent
-closedness audit before `ParserJudgment.lean`, `Chart.lean`, or `Parser.lean`
-may be implemented, accepted, or imported as a conforming slice. This
-implementation stop does not change the ADR's `Accepted` status.
+conforming to this Accepted ADR. The repository now uses the closed
+`GuardDecision` algebra and has passed the ParserCore closedness gate, so
+`ParserJudgment.lean`, `Chart.lean`, and the total chart-based parser have been
+implemented. This milestone does not complete the still-missing fast parser,
+structural certification, canonical-standard parse certificates, or umbrella.
 
 Implementation proceeds in this order:
 
@@ -5448,8 +5471,9 @@ No lexer, parser, AST, EBNF-expansion, production/action-ID, priority-guard,
 AST-reduction, parse-frontier diagnostic, structural-diagnostic, span,
 separator, precedence, termination, resource-bound, strict-UTF-8, canonical
 raw-data, or canonical-fixture decision required to implement this ADR remains
-open. Proposed-to-Accepted review may replace a decision, but code must not
-precede acceptance or fill a gap from either comparison implementation.
+open. The Accepted decision closes those design questions; an incompatible
+change requires explicit review and must not be inferred from either comparison
+implementation.
 
 ADR-0016 must define structural syntax identity over
 `Multi.CertifiedParsedModule`. ADR-0017 must define module/interface/scope

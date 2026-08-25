@@ -4,6 +4,20 @@
 - Decision date: 2026-07-23
 - Scope: `solcore-oracle/v1`
 
+## Reader summary / Current implementation
+
+- **Decision:** Language outcomes use six distinct verdicts, malformed protocol
+  input is separate, and exhausted implementation limits are `inconclusive`
+  rather than language rejection.
+- **Current implementation:** Oracle v1 through v4 keep protocol errors outside
+  language results and preserve the distinction among the verdict subset each
+  closed query set can emit. In particular, reaching a defined limit is not
+  reclassified as source rejection.
+- **Boundary:** Contract execution and its runtime halt observations remain
+  outside the currently published Core- and parser-only profiles.
+- **Suggested reading:** Read “Decision” for wire meaning and
+  “Conformance Requirements” for limit and regression behavior.
+
 ## Context
 
 Differential fuzzing must distinguish a program that is invalid under the

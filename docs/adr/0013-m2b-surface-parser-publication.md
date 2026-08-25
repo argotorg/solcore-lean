@@ -4,6 +4,18 @@
 - Decision date: 2026-08-18
 - Scope: M2b Surface parser publication
 
+## Reader summary / Current implementation
+
+- **Decision:** Publish the M2a parser as draft.4, profile `frontend-m2b-v1`,
+  Surface v1, parse-result v1, and Oracle v4 while freezing all earlier bytes.
+- **Current implementation:** Metadata, codecs, parser projection and provenance
+  proofs, source limits, diagnostics, capabilities, Oracle dispatch, and positive,
+  negative, malformed, boundary, and mixed-version golden tests are complete.
+- **Boundary:** M2b is parse-only and single-file; the internal Multi Surface
+  work under ADR-0015 does not widen this published protocol.
+- **Suggested reading:** Read the language/profile decision, wire schema, Oracle
+  behavior, and finally “Conformance requirements”.
+
 ## Context
 
 ADR-0012 fixed the closed M2a lexical and syntactic grammar and introduced a

@@ -1,218 +1,158 @@
-# M1: Semantic Core implementation plan
+# M1: Semantic Core plan and completion record
 
-The objective of M1 is to implement the smallest Semantic Core that can be
-evaluated without passing through the Solcore source parser or backend, together
-with all three of a declarative specification, an executable evaluator, and
-correspondence proofs.
-Even when an M0 feature is `directionAccepted`, it is not promoted to
-`normative` or `implemented` until it satisfies the completion criteria below.
+M1 defines a small typed Core language that can be checked and evaluated
+without the source parser or backend. Its completion standard is deliberately
+strong: declarative semantics, total executable procedures, correspondence
+proofs, stable wire formats, and conformance tests must agree.
 
-## Current progress: M1c publication
+For the revision-local project summary, see [current status](CURRENT_STATUS.md).
+For component boundaries, see [architecture](ARCHITECTURE.md).
 
-### M1a semantic kernel
+## Status at a glance
 
-Following ADR-0009, the project implements the closed fragment consisting of
-unit/bool/word literals, de Bruijn variables, initialized immutable `let`, and
-conditionals. The semantic kernel establishes:
+| Stage | Scope | Implementation | Proof | Publication |
+| --- | --- | --- | --- | --- |
+| M1a | unit/bool/word literals, de Bruijn variables, immutable `let`, conditionals, CEK machine | complete | complete | internal foundation for later releases |
+| M1b | five independently named Core features plus Core v1 wire | complete | complete | draft.2, `core-m1a-v1`, Oracle v2 |
+| M1c | bool-not and the specified word primitive subset plus Core v2 wire | complete | complete | draft.3, `core-m1c-v1`, Oracle v3 |
+| Remaining aggregate M1 language | functions, mutation, products, sums, ADTs, matches, closures, and deferred primitives | not implemented | not started | not published |
 
-- soundness and completeness of the executable inferencer with respect to
-  declarative typing
-- typing uniqueness
-- determinism of declarative big-step evaluation
-- correspondence between CEK transitions and executable `advance`, and their
-  determinism
-- soundness and completeness of the fuelled runner
-- bidirectional correspondence between big-step evaluation and the CEK machine
-- value, environment, and state typing
-- progress and preservation of CEK transitions
-- finite-fuel termination and fault unreachability for well-typed closed
-  programs
+The current public Core boundary is M1c. “M1c complete” does not mean every
+feature originally considered for M1 has been implemented.
 
-### M1b publication
+## Completed semantic kernel
 
-Following ADR-0010, the completed fragment is divided into `coreUnit`,
-`coreBool`, `coreWord`, `coreImmutableLet`, and `coreConditional`, then
-published as normative and implemented in the `core-m1a-v1` profile of
-`solcore/0.1.0-draft.2`. M1b additionally implements:
+The closed M1c fragment contains:
 
-- a strict decoder and canonical encoder for `solcore-semantic-core/v1`
-- a fixed-width lowercase hexadecimal wire representation for words
-- stable type-error codes, AST paths, and structured arguments
-- the `solcore-oracle/v2` `capabilities`, `coreCheck`, and `coreEval` queries
-- independent `inconclusive` outcomes for Core depth/node limits and CEK
-  evaluation fuel
-- mixed v1/v2 streams, canonical output, and a negative wire corpus
+- unit, bool, and range-checked 256-bit word literals and values;
+- de Bruijn variables and initialized immutable bindings;
+- condition-first, selected-branch-only conditionals;
+- `boolNot` and `wordNot`;
+- modular `wordAdd`, `wordSub`, and `wordMul`;
+- total unsigned `wordDiv` and `wordMod`, returning zero on a zero divisor;
+- `wordEq` and unsigned `wordGt`; and
+- `wordAnd`, `wordOr`, `wordXor`, `wordShl`, and `wordShr`, with shifts at
+  least 256 returning zero.
 
-### M1c primitive semantics and publication
+Unary operands are evaluated once. Binary operands are evaluated exactly once,
+left to right, before primitive application. Operation results are bounded
+words; wire literals are range-checked rather than silently reduced.
+`wordNe`, `wordLt`, `wordLe`, and `wordGe` are derived Core forms, not new wire
+primitive tags.
 
-Following
-[ADR-0011](adr/0011-m1c-primitive-semantics-and-publication.md), M1c adds the
-following exact primitive set:
+The kernel establishes:
 
-- unary boolean negation `boolNot : bool -> bool` and
-  `wordNot : word -> word`, which complements all 256 bits
-- modular `wordAdd`, `wordSub`, and `wordMul`
-- unsigned `wordDiv` and `wordMod`, each returning zero for a zero divisor
-- `wordEq : word × word -> bool` and unsigned
-  `wordGt : word × word -> bool`
-- fixed-width `wordAnd`, `wordOr`, and `wordXor`
-- logical `wordShl` and `wordShr`, with the value on the left, shift amount on
-  the right, and a zero result for shift amounts greater than or equal to 256
+- soundness and completeness of executable inference against declarative
+  typing, plus typing uniqueness;
+- agreement of detailed checking, inference, and declarative typing;
+- totality and result-type preservation of primitive application;
+- determinism of declarative evaluation and machine transitions;
+- correspondence between CEK transitions and executable `advance`;
+- soundness and completeness of the fuelled runner;
+- bidirectional correspondence between big-step evaluation and the CEK
+  machine;
+- value, environment, and state typing;
+- progress and preservation; and
+- sufficient-fuel termination and fault unreachability for well-typed closed
+  programs.
 
-Unary operands are evaluated exactly once. Binary operands are evaluated
-exactly once from left to right before primitive application. Operation results
-are bounded words; wire literals remain range-checked rather than implicitly
-reduced modulo `2^256`. `wordNe`, `wordLt`, `wordLe`, and `wordGe` are Core
-derived forms rather than additional primitive tags.
+## Published boundaries and compatibility
 
-The existing kernel proofs now cover unary and binary primitive expressions:
+| Boundary | Fixed contract | Status |
+| --- | --- | --- |
+| Semantic Core v1 | strict decoder, canonical encoder, fixed-width lowercase word hex, stable type-error codes and AST paths | frozen with Oracle v2 |
+| Oracle v2 | `capabilities`, `coreCheck`, and `coreEval` under draft.2 and `core-m1a-v1` | frozen |
+| Semantic Core v2 | separate closed AST and codec adding unary and binary expression tags | current Core wire |
+| Oracle v3 | `capabilities`, `coreCheck`, and `coreEval` under draft.3 and `core-m1c-v1` | current public Core Oracle |
+| Capabilities v3 | exact profile digest, schema IDs, enabled features, limits, and observation schemas | current public Core capabilities |
 
-- executable inference remains sound and complete for declarative typing, with
-  typing uniqueness
-- detailed checking agrees with both inference and declarative typing
-- primitive application is total and result-type preserving when operands have
-  the declared types
-- declarative evaluation and machine transitions remain deterministic
-- big-step evaluation and the CEK machine correspond in both directions
-- evaluation preserves types, and CEK transitions satisfy progress and
-  preservation
-- well-typed closed programs have sufficient fuel, terminate, and cannot reach
-  structured machine faults
+Core depth/node limits and CEK fuel produce independent `inconclusive`
+outcomes. Positive, rejection, malformed-wire, cross-version, exact-fuel,
+mixed-stream, round-trip, and canonicalization cases cover the published
+boundary.
 
-M1c publishes these semantics as `solcore/0.1.0-draft.3` and profile
-[`core-m1c-v1`](../profiles/solcore-0.1.0-draft.3-core-m1c.json). The new
-profile enables the five M1b features plus
-`coreBoolNot`, `coreWordArithmetic`, `coreWordComparison`, and
-`coreWordBitwise`. Static and dynamic semantics versions are both 2. The
-publication adds:
+Publication is additive. Draft.1 and draft.2 profiles, Core v1, Oracle v1 and
+v2, their schemas, capability documents, digests, and golden bytes remain
+immutable. Oracle v2 rejects Core v2 and Oracle v3 rejects Core v1 rather than
+guessing a wire version from expression shape.
 
-- a separate closed
-  [`solcore-semantic-core/v2`](../schema/semantic-core-v2.schema.json) AST and
-  strict canonical codec with unary and binary expression tags
-- bounded decoder/encoder round-trip and canonicalization theorems for Core v2
-- [`solcore-oracle/v3`](../schema/oracle-v3.schema.json) `capabilities`,
-  `coreCheck`, and `coreEval`
-- `solcore-capabilities/v3`, bound to Core v2 and the canonical M1c profile
-  digest
-- v3 positive, rejection, malformed-wire, cross-version, exact-fuel, and mixed
-  stream coverage
+## Boundary to M2
 
-The aggregate `corePrimitives` feature remains `partialSupport`: short-circuit
-boolean operators, conversions, and other unlisted primitive families remain
-outside M1c. Functions, mutation, ADTs, and the remaining aggregate language
-features are still planned. All draft.1 and draft.2 profiles, digests, schemas,
-capability documents, and golden bytes remain immutable.
+Source text does not enter M1 directly. M2 is responsible for parsing,
+workspace validation, name resolution, source checking, and elaboration into a
+published Core version.
 
-## Input boundary
+The repository now has two parser layers beyond M1:
 
-M0 `solcore-oracle/v1` defines a typed result only for `capabilities`. Kinds from
-`parse` through `contract` are reserved for capability negotiation and always
-return `unsupported` in M0. An undecided Core AST must not be smuggled through
-an arbitrary field such as `scenario : Json`.
+- the published M2b single-file parser in Oracle v4; and
+- an internal M2c workspace identity kernel and source-preserving Multi
+  lexer/parser with an unconditional file-only entry point.
 
-M1b added all of the following together:
+Neither layer currently resolves modules or names, checks source types, or
+elaborates source into Core. Therefore Oracle v3 remains a reference for closed
+Core fixtures, not an end-to-end source conformance oracle.
 
-1. the versioned `solcore-semantic-core/v1` JSON Schema
-2. a strict decoder and canonical encoder for Core ASTs and values
-3. Oracle v2 queries that directly evaluate Core input, typed observations, and
-   the detailed phases required by Core
-4. round-trip and golden tests between Core JSON fixtures and Lean values
+## What remains outside M1c
 
-M1c preserves that complete boundary and adds, as a new versioned unit:
+| Family | Current status | Required decision or work |
+| --- | --- | --- |
+| functions, application, and return | planned | argument order, recursion, control transfer, closure environment |
+| lexical closures | planned | capture identity, recursion, divergence boundary |
+| mutable locals and assignment | planned | cell identity and assignment evaluation order |
+| products and sums | planned | value and wire algebra |
+| user ADTs and pattern matching | planned | constructor identity/order, selection order, exhaustiveness, match failure |
+| short-circuit boolean conjunction/disjunction | outside M1c | source typing and selected-branch elaboration into Core |
+| conversions and additional primitives | outside M1c | source rules, feature split, wire and proof impact |
+| divergence | undecided | relation to the explicit-fuel evaluator |
 
-1. the closed `solcore-semantic-core/v2` JSON Schema
-2. a separate strict decoder and canonical encoder for the v2 wire AST
-3. Oracle v3 queries bound to draft.3, `core-m1c-v1`, and Core v2
-4. a `capabilities-v3` report that names the exact profile digest, Core schema,
-   enabled features, limits, and observation schemas
+Modules, import/export resolution, type inference, polymorphism, type-class
+resolution, and staging belong to M2. ABI, storage, contract hosting, and EVM
+execution belong to M3.
 
-Oracle v2 remains bound to draft.2 and Core v1. Oracle v3 rejects Core v1
-requests, and Oracle v2 rejects Core v2 requests, rather than inferring a
-version from an expression tag.
+## Implementation order for future M1 extensions
 
-The M2 parser, resolver, and elaborator are responsible for converting a
-`.solc` workspace into Core. M1 semantics are not defined by the existing
-compilers' lowering behavior or by an ad hoc source parser specific to M1.
-ADR-0012 now supplies the first internal parse-only Surface fragment, but it has
-no resolver, elaborator, versioned Surface wire format, or Oracle query.
-Consequently, the current Oracle remains a reference implementation for the
-published closed Core, not yet a source-level conformance oracle.
+The first six steps are complete for the published fragment:
 
-## Candidates for M1
+1. Core types, expressions, values, environments, and control results.
+2. Well-formedness and declarative typing.
+3. CEK transition relation and multi-step closure.
+4. Total explicit-fuel evaluator.
+5. Mapping to `rejected`, `inconclusive`, and `executed`.
+6. Versioned Core codecs, capability reports, and Oracle queries through Core
+   v2 / Oracle v3.
 
-- unit, bool, 256-bit words, and the M1c primitive subset
-- lexical local bindings and a future explicit local store
-- conditionals and future explicitly specified short-circuiting elaboration
-- first-class functions, lexical closures, application, and return
-- products, sums, user ADTs, constructors, and direct pattern matching
-- closed Core programs with explicit types
+Future work proceeds feature by feature:
 
-Modules/imports, type inference, polymorphism, type class resolution, and
-comptime remain in M2. The ABI, storage, contract host, and EVM remain in M3.
+7. Accept the semantic ADR for the feature and its evaluation order.
+8. Extend declarative syntax, typing, evaluation, and machine state.
+9. Extend the executable checker and evaluator without weakening old versions.
+10. Re-establish determinism, correspondence, progress, preservation, and a
+    sufficient-fuel theorem.
+11. Publish a new feature/profile/wire boundary only when the schema, limits,
+    capabilities, and golden corpus are closed.
 
-## ADR status for semantic choices
-
-ADR-0011 resolves modulo behavior, division and modulo by zero, shift ranges,
-primitive operand evaluation order, and selected-branch-only behavior for
-future `&&`/`||` elaboration. The following choices still require an Accepted
-ADR before implementation:
-
-- evaluation order for function arguments and assignment
-- the source typing, elaboration, evaluation-order preservation, feature
-  boundary, and publication version for `&&` and `||`
-- the source typing and elaboration rules for boolean/word conversions and
-  other deferred primitives
-- closure capture, recursion, and mutable local-cell identity
-- constructor identity, ADT field order, and pattern selection order
-- match exhaustiveness and unreachable match failure
-- control transfer such as return
-- the relationship between divergence and the fuelled evaluator
-
-These choices are not decided solely by agreement or majority between the
-Haskell and Rust implementations. Each choice must include a minimal
-implementation witness.
-
-## Implementation order
-
-1. Define `Core.Ty`, `Core.Expr`, `Core.Value`, environments, and control
-   results. Complete for the published M1c fragment.
-2. Define well-formedness and the declarative typing judgment. Complete for the
-   published M1c fragment.
-3. Define a CEK transition relation and its multi-step closure. Complete for the
-   published M1c fragment.
-4. Implement a total evaluator that takes explicit fuel. Complete for the
-   published M1c fragment.
-5. Map checker/evaluator results to `rejected`, `inconclusive`, and `executed`.
-   Complete.
-6. Add versioned Core JSON codecs and Oracle queries. Complete through Core v2
-   and Oracle v3.
-7. Preserve minimal Haskell/Rust source witnesses as candidates for elaboration
-   tests in M2 and later.
-8. Add each deferred semantic family only after its rule set, feature boundary,
-   wire impact, and proof obligations are accepted.
+Pinned Haskell and Rust behavior remains comparison evidence, not authority.
+Minimal source witnesses are retained for later elaboration tests; discrepancies
+are summarized in the [compatibility matrix](COMPATIBILITY_MATRIX.md).
 
 ## Completion criteria for each feature
 
-- An aggregate feature such as `corePrimitives` does not become `implemented`
-  when only some of its components are complete. If independently promoting a
-  component becomes necessary, an ADR that splits the feature ID must be
-  Accepted before changing the profile.
-- Declarative typing and evaluation rules exist.
-- An executable checker and evaluator exist.
-- Checker soundness is proved.
-- Evaluator soundness is proved.
-- Determinism is proved.
-- Progress and preservation are proved for the target fragment.
-- An explicit completeness theorem for sufficient fuel exists, or the
-  limitation of an unproved direction is documented.
-- Positive and negative witnesses and canonical wire golden cases exist.
-- The semantic kernel contains no `sorry`, `admit`, `partial`, `unsafe`, or
-  undeclared axioms.
+A feature is `normative` / `implemented` only when all applicable items hold:
 
-Only features satisfying these conditions are changed to `normative` /
-`implemented`. The same change updates `staticSemanticsVersion`,
-`dynamicSemanticsVersion`, the specification release when necessary, and the
-new profile's `enabledFeatures` and digest. Frozen draft.1/Core v1/Oracle v1 and
-draft.2/Core v1/Oracle v2 artifacts remain unchanged for backward
-compatibility; new semantics are published under new language, profile, Core
-wire, capability, and Oracle versions.
+- an Accepted ADR fixes every observable semantic choice;
+- declarative typing and evaluation rules exist;
+- pure total checker and evaluator procedures exist;
+- checker soundness and completeness are proved;
+- evaluator/machine correspondence and determinism are proved;
+- progress and preservation cover the target fragment;
+- sufficient fuel is proved, or the exact missing direction is documented;
+- resource exhaustion cannot be misclassified as source rejection;
+- positive, negative, boundary, and canonical wire cases exist;
+- old language/profile/wire versions retain their previous meaning; and
+- the semantic kernel passes the repository policy and public-theorem axiom
+  audit.
+
+An aggregate feature such as `corePrimitives` remains `partialSupport` while
+only an allowlisted subset is complete. Splitting or promoting it requires an
+ADR and a coordinated update to feature metadata, language/profile versions,
+schemas, capabilities, and documentation.

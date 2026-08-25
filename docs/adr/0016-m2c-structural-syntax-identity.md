@@ -4,9 +4,23 @@
 - Decision date: 2026-08-18
 - Scope: M2c parsed-syntax identity and address certification
 
-No implementation is authorized while this ADR remains Proposed. Acceptance
-requires ADR-0015 to be Accepted and an independent review showing that the
-closed traversal below covers its exact AST once and only once.
+## Reader summary / Current implementation
+
+- **Decision:** Assign every Multi Surface syntax site one role-tagged,
+  module-rooted structural address; derive certified module-reference sites,
+  virtual scope identities, canonical indices, selection, and finite measures
+  without using spans or compiler allocation identity.
+- **Current implementation:** The ADR is Accepted, so implementation is
+  authorized against the frozen ADR-0015 boundary. No Structural identity
+  modules are currently present in `Solcore`; implementation has not started.
+- **Not yet implemented:** `prepareGraphModule`, structural selection and
+  inventories, `CertifiedModuleIndex`, identity lifting, scope/owner tables,
+  primary-span proofs, and the required traversal and injectivity audits. Work
+  also depends on ADR-0015 producing `CertifiedParsedModule`.
+- **Suggested reading:** Read “Dependency and frozen boundaries”, “One absolute
+  address scheme”, and “Exact direct-child inventory” first; then read
+  “Virtual lexical scopes”, “Construction boundary and diagnostics”, and
+  “Required proof boundary”. The long role tables are reference material.
 
 ## Context
 
@@ -1705,7 +1719,7 @@ source text.
 
 ### Required proof boundary
 
-The implementation, once authorized by acceptance, must provide independent
+The implementation must provide independent
 judgments and pure executors for selection, scope sites, identity refinements,
 enumeration, and lift. At minimum it proves:
 
@@ -1841,13 +1855,16 @@ but it cannot replace its absolute module-root address.
 - Extending the parser AST requires an explicit update to this closed
   inventory.
 
-## Acceptance and conformance gates
+## Recorded acceptance gates and ongoing conformance
 
-Before this ADR may become Accepted:
+The Accepted decision records the following review and implementation gates.
+Acceptance authorizes work; it does not assert that the absent Structural
+implementation already satisfies them:
 
-1. ADR-0015 must be Accepted with the exact AST referenced here.
+1. ADR-0015 is Accepted; any implementation must consume the exact AST
+   referenced here.
 2. The canonical six-file standard parse gate and pinned compatibility fixtures
-   required by ADR-0015 must pass.
+   required by ADR-0015 must pass before Structural implementation is complete.
 3. An independent traversal review must enumerate every recursive ADR-0015 AST
    field and confirm exactly one inventory entry.
 4. An independent scope review must cover class and instance outer generics in
@@ -1860,8 +1877,8 @@ Before this ADR may become Accepted:
 6. A primary-span review must confirm every declaration/member binder or
    marker, every operator lexeme, the whole index-expression span, and the
    exact ordinary-let, for-init-let, and loop-header anchors.
-7. No implementation file may be added under this ADR while its status is
-   Proposed.
+7. Implementation files may now be added because the ADR is Accepted, but only
+   against the completed, reviewed ADR-0015 `CertifiedParsedModule` boundary.
 
 After acceptance, each implementation slice must pass the full build and test
 suite, metadata validation, repository English-text checks, formatting checks,

@@ -4,6 +4,25 @@
 - Decision date: 2026-08-18
 - Scope: M2c module graph, public interfaces, and lexical name resolution
 
+## Reader summary / Current implementation
+
+- **Decision under review:** Specify a pure reachable-module graph, exact
+  standard-bundle verification, least public-interface and candidate closure,
+  lexical lookup, typed diagnostics, certificate replay, and an outer resolver
+  API over ADR-0014 through ADR-0016 values.
+- **Current implementation:** None. This ADR remains Proposed; there are no
+  `Foundation/Sha256`, Structural identity, or Resolution modules. ADR-0015's
+  unconditional file-only parser exists, but its certified structural boundary
+  remains incomplete, and ADR-0016 has no code.
+- **Open gates:** The production SHA-256 path and six-source resolver run must
+  succeed in ordinary CI; exact `E`, `A`, `R`, strict-round, and final-atom
+  counts must replace the planning estimates; independent adversarial and
+  theorem-assumption audits must pass before acceptance.
+- **Suggested reading:** Read “Frozen published boundaries” and “Prerequisite
+  contracts”, then the import/export and interface-closure sections, followed by
+  “Exact executable resource metric” and both feasibility gates. Lookup tables
+  and divergence ledgers are reference sections.
+
 ## Context
 
 ADR-0014 fixes caller-workspace identity and canonical logical paths. Accepted

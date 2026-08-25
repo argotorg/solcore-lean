@@ -4,6 +4,19 @@
 - Decision date: 2026-07-23
 - Scope: `solcore/0.1.0-draft.1`
 
+## Reader summary / Current implementation
+
+- **Decision:** Keep source-preserving `Surface`, name-resolved `Resolved`, and
+  typed executable `Semantic Core` as separate semantic layers.
+- **Current implementation:** Semantic Core v1/v2, published single-file Surface
+  v1, and the unconditional file-only Multi lexer/parser milestone are
+  implemented and sound. ADR-0015's certified structural boundary, a `Resolved`
+  language, and source-to-Core elaboration are not yet implemented.
+- **Boundary:** Hull, Yul, EVM bytecode, and compiler lowering behavior do not
+  define Core semantics.
+- **Suggested reading:** Read “Decision” for the layer contract and
+  “Conformance Requirements” for the required cross-layer proofs.
+
 ## Context
 
 The Haskell and Rust compilers perform specialization, closure conversion,

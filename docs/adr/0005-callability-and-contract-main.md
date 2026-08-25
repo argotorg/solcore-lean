@@ -4,6 +4,17 @@
 - Decision date: 2026-07-23
 - Scope: static semantics and contract entry
 
+## Reader summary / Current implementation
+
+- **Decision:** Only function-typed or explicitly invokable values are callable,
+  and a source contract runtime `main` must take no parameters.
+- **Current implementation:** These rules remain planned; the repository has no
+  source type checker, callability elaborator, or contract-entry validator yet.
+- **Boundary:** This ADR does not decide return type, payability, fallback, or
+  constructor behavior.
+- **Suggested reading:** Read “Decision” for the two rules and
+  “Conformance Requirements” for the eventual checker tests.
+
 ## Context
 
 The Haskell compiler sometimes accepts examples that call a value annotated as
