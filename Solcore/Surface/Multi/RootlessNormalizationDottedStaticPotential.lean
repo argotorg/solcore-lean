@@ -198,7 +198,78 @@ def dottedStaticRankCell
 /-- Expanded productions with one requested left-hand side. -/
 def dottedStaticProductionsFor
     (lhs : NonterminalSymbol) : List ProductionId :=
-  allProductionIds.filter fun child => decide (child.lhs = lhs)
+  match lhs with
+  | .rule rule => [.root rule]
+  | .tail site => [.tail site .nil, .tail site .cons]
+  | .aux site =>
+      match kind : site.expression.kind with
+      | .atom => [.atom ⟨site, kind⟩]
+      | .sequence => [.seq ⟨site, kind⟩]
+      | .group => [.group ⟨site, kind⟩]
+      | .choice =>
+          let choice : ChoiceSite := ⟨site, kind⟩
+          (List.finRange choice.branchCount).map (.choice choice)
+      | .optional =>
+          let optional : OptionalSite := ⟨site, kind⟩
+          [.opt optional .none, .opt optional .some]
+      | .star =>
+          let star : StarSite := ⟨site, kind⟩
+          [.star star .nil, .star star .cons]
+      | .plus =>
+          let plus : PlusSite := ⟨site, kind⟩
+          [.plus plus .one, .plus plus .cons]
+      | .list0 =>
+          let list : List0Site := ⟨site, kind⟩
+          [.list0 list .nil, .list0 list .cons]
+      | .list1 => [.list1 ⟨site, kind⟩]
+
+/-- Every production occurs in the sparse row selected by its left side. -/
+theorem dottedStaticProductionsFor_complete (production : ProductionId) :
+    production ∈ dottedStaticProductionsFor production.lhs := by
+  cases production with
+  | root rule => simp [dottedStaticProductionsFor, ProductionId.lhs]
+  | atom site =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      split <;> simp_all
+  | seq site =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      split <;> simp_all
+  | group site =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      split <;> simp_all
+  | choice site branch =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      split <;> simp_all
+  | opt site branch =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      cases branch <;>
+      split <;> simp_all
+  | star site branch =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      cases branch <;>
+      split <;> simp_all
+  | plus site branch =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      cases branch <;>
+      split <;> simp_all
+  | list0 site branch =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      cases branch <;>
+      split <;> simp_all
+  | list1 site =>
+      simp only [ProductionId.lhs, dottedStaticProductionsFor]
+      have valid := site.hasKind
+      split <;> simp_all
+  | tail site branch =>
+      cases branch <;> simp [dottedStaticProductionsFor, ProductionId.lhs]
 
 /-- Sparse row check, restricted to productions selectable at the dot. -/
 def dottedStaticRankRow (waiting : DottedRhs) : Bool :=
