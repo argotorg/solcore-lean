@@ -2,6 +2,7 @@ import Solcore.Surface.Multi.DiagnosticExhaustiveness
 import Solcore.Surface.Multi.NonAssociativeOperandPrefixExclusive
 import Solcore.Surface.Multi.NonAssociativePresentEdgeReflection
 import Solcore.Surface.Multi.PostLogicalEofClosure
+import Solcore.Surface.Multi.RootlessNormalizationDottedRank
 import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
 
 set_option autoImplicit false
@@ -396,6 +397,32 @@ theorem rootlessExecutableProgress_of_computedRankTables
     (frontierCoverageTable_eq_true owned correct final
       (computedGreatestReachableCursor owned correct final))
     potential ranks.1 ranks.2 postEof
+
+/-- Three accepted dot-sensitive rank tables and post-EOF closure construct
+full rootless progress at the internally computed greatest cursor. -/
+theorem rootlessExecutableProgress_of_computedDottedRankTables
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (potential : FrontierDottedGrammarPotential tokens)
+    (completion : frontierDottedCompletionRankTable owned correct final
+      (computedGreatestReachableCursor owned correct final) potential = true)
+    (epsilon : frontierDottedEpsilonRankTable owned correct final
+      (computedGreatestReachableCursor owned correct final) potential = true)
+    (prediction : frontierDottedPredictionRankTable owned correct final
+      (computedGreatestReachableCursor owned correct final) potential = true)
+    (postEof : PostLogicalEofTerminalWaitForcesRoot
+      file tokens memo correct final) :
+    RootlessExecutableProgress file tokens memo correct final := by
+  exact rootlessExecutableProgress_of_componentsAt
+    (computedGreatestReachableCursor_spec owned correct final)
+    (fun waiting frontier => enabledNonterminalCoverageAt_of_reached
+      correct final waiting frontier.2.1)
+    (rankedFrontierNormalization_of_dottedGrammarRanked owned
+      ⟨potential, completion, epsilon, prediction⟩)
+    postEof
 
 /-- Fully executable three-table certificate for the concrete value-carrying
 worklist selected by the parser. -/
