@@ -1,5 +1,5 @@
 import Solcore.Surface.Multi.RootlessNormalizationDottedLexicographic
-import Solcore.Surface.Multi.RootlessNormalizationDottedStaticPotential
+import Solcore.Surface.Multi.RootlessNormalizationDottedStaticCertificate
 
 set_option autoImplicit false
 
@@ -226,5 +226,19 @@ theorem boundedFrontierDottedGrammarRankSearchSucceeds_of_staticTable
   · exact dottedStaticPredictionComponent_lt_of_table tableAccepted
   · exact dottedStaticEpsilonComponent_lt_of_table tableAccepted
   · exact dottedStaticCompletionDecrease_of_table tableAccepted
+
+/-- The fixed grammar admits bounded dotted-rank synthesis at every greatest
+reachable cursor. -/
+theorem boundedFrontierDottedGrammarRankSearchSucceeds
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor) :
+    BoundedFrontierDottedGrammarRankSearchSucceeds
+      owned correct final cursor := by
+  exact boundedFrontierDottedGrammarRankSearchSucceeds_of_staticTable
+    owned correct final cursor greatest dottedStaticRankTable_eq_true
 
 end Solcore.Surface.Multi
