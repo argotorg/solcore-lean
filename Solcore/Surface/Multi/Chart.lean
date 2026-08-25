@@ -981,6 +981,150 @@ private inductive UnitAddress (tokens : List Token) where
   | cubic (kind : ChartCubicUnitKind) (key : ChartCubicKey tokens)
   deriving DecidableEq
 
+private def grammarRuleIdFastHash (rule : GrammarRuleId) : UInt64 :=
+  hash rule.ctorIdx
+
+private def grammarSiteFastHash (site : GrammarSite) : UInt64 :=
+  mixHash (grammarRuleIdFastHash site.val.rule) (hash site.val.path)
+
+private def grammarSiteOfKindFastHash {kind : EbnfNodeKind}
+    (site : GrammarSiteOfKind kind) : UInt64 :=
+  grammarSiteFastHash site.site
+
+private def listSiteFastHash : ListSite → UInt64
+  | .list0 site =>
+      mixHash (hash (0 : Nat)) (grammarSiteOfKindFastHash site)
+  | .list1 site =>
+      mixHash (hash (1 : Nat)) (grammarSiteOfKindFastHash site)
+
+private def productionIdFastHash : ProductionId → UInt64
+  | .root rule =>
+      mixHash (hash (0 : Nat)) (grammarRuleIdFastHash rule)
+  | .atom site =>
+      mixHash (hash (1 : Nat)) (grammarSiteOfKindFastHash site)
+  | .seq site =>
+      mixHash (hash (2 : Nat)) (grammarSiteOfKindFastHash site)
+  | .group site =>
+      mixHash (hash (3 : Nat)) (grammarSiteOfKindFastHash site)
+  | .choice site branch =>
+      mixHash (hash (4 : Nat))
+        (mixHash (grammarSiteOfKindFastHash site) (hash branch.val))
+  | .opt site branch =>
+      mixHash (hash (5 : Nat))
+        (mixHash (grammarSiteOfKindFastHash site) (hash branch.ctorIdx))
+  | .star site branch =>
+      mixHash (hash (6 : Nat))
+        (mixHash (grammarSiteOfKindFastHash site) (hash branch.ctorIdx))
+  | .plus site branch =>
+      mixHash (hash (7 : Nat))
+        (mixHash (grammarSiteOfKindFastHash site) (hash branch.ctorIdx))
+  | .list0 site branch =>
+      mixHash (hash (8 : Nat))
+        (mixHash (grammarSiteOfKindFastHash site) (hash branch.ctorIdx))
+  | .list1 site =>
+      mixHash (hash (9 : Nat)) (grammarSiteOfKindFastHash site)
+  | .tail site branch =>
+      mixHash (hash (10 : Nat))
+        (mixHash (listSiteFastHash site) (hash branch.ctorIdx))
+
+private def dottedRhsFastHash (dotted : DottedRhs) : UInt64 :=
+  mixHash (productionIdFastHash dotted.production) (hash dotted.dot.val)
+
+private def guardContextFastHash {tokens : List Token} :
+    GuardContext tokens → UInt64
+  | .plain => hash (0 : Nat)
+  | .bracedBody boundary =>
+      mixHash (hash (1 : Nat)) (hash boundary.val)
+  | .armBody boundary =>
+      mixHash (hash (2 : Nat)) (hash boundary.val)
+  | .postfixInvocation boundary =>
+      mixHash (hash (3 : Nat)) (hash boundary.val)
+
+private def chartSourceTagFastHash {tokens : List Token} :
+    ChartSourceTag tokens → UInt64
+  | .rawEvidence => hash (0 : Nat)
+  | .contextual context =>
+      mixHash (hash (1 : Nat)) (guardContextFastHash context)
+
+private def productionInstanceKeyFastHash {tokens : List Token}
+    (key : ProductionInstanceKey tokens) : UInt64 :=
+  mixHash (productionIdFastHash key.production)
+    (mixHash (hash key.origin.val) (guardContextFastHash key.context))
+
+private def guardInstanceKeyFastHash {tokens : List Token}
+    (key : GuardInstanceKey tokens) : UInt64 :=
+  mixHash (hash key.guard.ctorIdx)
+    (mixHash (hash key.contextStart.val) (hash key.siteCursor.val))
+
+private def guardAddressFastHash {tokens : List Token}
+    (address : GuardAddress tokens) : UInt64 :=
+  mixHash
+    (mixHash
+      (mixHash (productionIdFastHash address.1.1.1)
+        (hash address.1.1.2.val))
+      (guardContextFastHash address.1.2))
+    (hash address.2.val)
+
+private def chartLinearKeyFastHash {tokens : List Token}
+    (key : ChartLinearKey tokens) : UInt64 :=
+  mixHash (chartSourceTagFastHash key.source)
+    (mixHash (dottedRhsFastHash key.dotted)
+      (mixHash (hash key.origin.val) (hash key.current.val)))
+
+private def chartPredictionKeyFastHash {tokens : List Token}
+    (key : ChartPredictionKey tokens) : UInt64 :=
+  mixHash (chartSourceTagFastHash key.source)
+    (mixHash (dottedRhsFastHash key.dotted)
+      (mixHash (productionIdFastHash key.production)
+        (mixHash (hash key.origin.val) (hash key.current.val))))
+
+private def chartCubicKeyFastHash {tokens : List Token}
+    (key : ChartCubicKey tokens) : UInt64 :=
+  mixHash (chartSourceTagFastHash key.source)
+    (mixHash (dottedRhsFastHash key.waiting)
+      (mixHash (dottedRhsFastHash key.finished)
+        (mixHash (hash key.origin.val)
+          (mixHash (hash key.shared.val) (hash key.current.val)))))
+
+private def unitAddressBEq {tokens : List Token}
+    (left right : UnitAddress tokens) : Bool :=
+  decide (left = right)
+
+private instance {tokens : List Token} : BEq (UnitAddress tokens) :=
+  ⟨unitAddressBEq⟩
+
+private instance {tokens : List Token} : LawfulBEq (UnitAddress tokens) where
+  rfl := by
+    intro address
+    change decide (address = address) = true
+    exact of_decide_eq_self_eq_true address
+  eq_of_beq := by
+    intro left right equal
+    change unitAddressBEq left right = true at equal
+    exact of_decide_eq_true equal
+
+private instance {tokens : List Token} : Hashable (UnitAddress tokens) where
+  hash
+    | .phase slot =>
+        mixHash (hash (0 : Nat)) (hash slot.ctorIdx)
+    | .guardFinalize slot key =>
+        mixHash (hash (1 : Nat))
+          (mixHash (hash slot.ctorIdx) (guardInstanceKeyFastHash key))
+    | .production key =>
+        mixHash (hash (2 : Nat)) (productionInstanceKeyFastHash key)
+    | .guardWitness slot key =>
+        mixHash (hash (3 : Nat))
+          (mixHash (hash slot.ctorIdx) (guardAddressFastHash key))
+    | .linear kind key =>
+        mixHash (hash (4 : Nat))
+          (mixHash (hash kind.ctorIdx) (chartLinearKeyFastHash key))
+    | .prediction kind key =>
+        mixHash (hash (5 : Nat))
+          (mixHash (hash kind.ctorIdx) (chartPredictionKeyFastHash key))
+    | .cubic kind key =>
+        mixHash (hash (6 : Nat))
+          (mixHash (hash kind.ctorIdx) (chartCubicKeyFastHash key))
+
 private def UnitAddress.toSum {tokens : List Token} :
     UnitAddress tokens → AddressSum tokens
   | .phase slot => .inl (.inl (.inl (.inl (.inl (.inl slot)))))
@@ -1095,10 +1239,18 @@ private theorem unitAddress_injective (tokens : List Token) :
 /-- The executable ledger of already charged primitive addresses. -/
 private structure Counter (tokens : List Token) where
   usedRev : List (UnitAddress tokens)
+  usedIndex : Std.HashSet (UnitAddress tokens)
   unique : usedRev.Nodup
+  indexed : ∀ address,
+    usedIndex.contains address = true ↔ address ∈ usedRev
 
 private def Counter.empty (tokens : List Token) : Counter tokens :=
-  ⟨[], by simp⟩
+  {
+    usedRev := []
+    usedIndex := ∅
+    unique := by simp
+    indexed := by intro address; simp
+  }
 
 private def Counter.units {tokens : List Token}
     (counter : Counter tokens) : Nat :=
@@ -1108,7 +1260,25 @@ private def Counter.units {tokens : List Token}
 private def Counter.charge {tokens : List Token}
     (counter : Counter tokens) (address : UnitAddress tokens)
     (fresh : address ∉ counter.usedRev) : Counter tokens :=
-  ⟨address :: counter.usedRev, List.nodup_cons.mpr ⟨fresh, counter.unique⟩⟩
+  {
+    usedRev := address :: counter.usedRev
+    usedIndex := counter.usedIndex.insert address
+    unique := List.nodup_cons.mpr ⟨fresh, counter.unique⟩
+    indexed := by
+      intro candidate
+      rw [Std.HashSet.contains_insert, Bool.or_eq_true]
+      rw [counter.indexed candidate, List.mem_cons]
+      simp only [beq_iff_eq]
+      exact or_congr eq_comm Iff.rfl
+  }
+
+private def Counter.freshDecidable {tokens : List Token}
+    (counter : Counter tokens) (address : UnitAddress tokens) :
+    Decidable (address ∉ counter.usedRev) :=
+  if present : counter.usedIndex.contains address = true then
+    isFalse fun fresh => fresh ((counter.indexed address).mp present)
+  else
+    isTrue fun member => present ((counter.indexed address).mpr member)
 
 /-- One logical primitive: its state transition has exactly one charge. -/
 private structure PrimitiveStep (tokens : List Token) (state : Type) where
@@ -1478,6 +1648,8 @@ private def runMappedPrimitive?
     (current : CountedState tokens before)
     (address : UnitAddress tokens) (transition : before → after) :
     Option (CountedState tokens after) :=
+  letI : Decidable (address ∉ current.counter.usedRev) :=
+    current.counter.freshDecidable address
   if fresh : address ∉ current.counter.usedRev then
     some {
       payload := transition current.payload
@@ -1508,6 +1680,39 @@ private def chargeAddresses?
       let next ← runMappedPrimitive? current address id
       chargeAddresses? next rest
 
+/-- Insert an address block in the same order as repeated primitive charges. -/
+private def insertUnitAddresses {tokens : List Token}
+    (index : Std.HashSet (UnitAddress tokens)) :
+    List (UnitAddress tokens) → Std.HashSet (UnitAddress tokens)
+  | [] => index
+  | address :: rest => insertUnitAddresses (index.insert address) rest
+
+private theorem insertUnitAddresses_contains {tokens : List Token} :
+    ∀ (addresses : List (UnitAddress tokens))
+      (index : Std.HashSet (UnitAddress tokens))
+      (candidate : UnitAddress tokens),
+      (insertUnitAddresses index addresses).contains candidate = true ↔
+        candidate ∈ addresses ∨ index.contains candidate = true := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro index candidate
+      simp [insertUnitAddresses]
+  | cons address rest induction =>
+      intro index candidate
+      rw [insertUnitAddresses, induction]
+      rw [Std.HashSet.contains_insert, Bool.or_eq_true]
+      simp only [beq_iff_eq, List.mem_cons]
+      constructor
+      · rintro (member | equal | present)
+        · exact Or.inl (Or.inr member)
+        · exact Or.inl (Or.inl equal.symm)
+        · exact Or.inr present
+      · rintro ((equal | member) | present)
+        · exact Or.inr (Or.inl equal.symm)
+        · exact Or.inl member
+        · exact Or.inr (Or.inr present)
+
 /-- Charge a proved-fresh address block without repeating ledger searches. -/
 private def chargeAddressesCertified
     {tokens : List Token} {state : Type}
@@ -1520,6 +1725,7 @@ private def chargeAddressesCertified
   payload := current.payload
   counter := {
     usedRev := addresses.reverse ++ current.counter.usedRev
+    usedIndex := insertUnitAddresses current.counter.usedIndex addresses
     unique := by
       rw [List.nodup_append]
       refine ⟨(List.reverse_perm addresses).symm.nodup unique,
@@ -1528,6 +1734,10 @@ private def chargeAddressesCertified
       rw [List.mem_reverse] at usedMember
       apply fresh used usedMember
       simpa [equal] using oldMember
+    indexed := by
+      intro candidate
+      rw [insertUnitAddresses_contains, current.counter.indexed,
+        List.mem_append, List.mem_reverse]
   }
 }
 
@@ -1544,7 +1754,7 @@ private theorem chargeAddresses?_eq_certified
   induction addresses with
   | nil =>
       intro current unique fresh
-      simp [chargeAddresses?, chargeAddressesCertified]
+      simp [chargeAddresses?, chargeAddressesCertified, insertUnitAddresses]
   | cons address rest induction =>
       intro current unique pending
       rw [List.nodup_cons] at unique
@@ -1567,7 +1777,7 @@ private theorem chargeAddresses?_eq_certified
       rw [induction next unique.2 restFresh]
       congr 1
       simp [chargeAddressesCertified, next, Counter.charge,
-        List.reverse_cons, List.append_assoc]
+        insertUnitAddresses, List.reverse_cons, List.append_assoc]
 
 private def allGuardInstanceKeys (tokens : List Token) :
     List (GuardInstanceKey tokens) :=
@@ -7547,6 +7757,8 @@ private def materializePhaseAIndexesCertified
   counter := {
     usedRev := (addresses.map UnitAddress.evidenceIndex).reverse ++
       current.counter.usedRev
+    usedIndex := insertUnitAddresses current.counter.usedIndex
+      (addresses.map UnitAddress.evidenceIndex)
     unique := by
       rw [List.nodup_append]
       refine ⟨?_, current.counter.unique, ?_⟩
@@ -7558,6 +7770,10 @@ private def materializePhaseAIndexesCertified
         rcases usedMember with ⟨address, addressMember, rfl⟩
         apply fresh address addressMember
         simpa [equal] using oldMember
+    indexed := by
+      intro candidate
+      rw [insertUnitAddresses_contains, current.counter.indexed,
+        List.mem_append, List.mem_reverse]
   }
 }
 
@@ -7575,7 +7791,8 @@ private theorem materializePhaseAIndexes?_eq_certified
   induction addresses with
   | nil =>
       intro current unique fresh
-      simp [materializePhaseAIndexes?, materializePhaseAIndexesCertified]
+      simp [materializePhaseAIndexes?, materializePhaseAIndexesCertified,
+        insertUnitAddresses]
   | cons address rest induction =>
       intro current unique pending
       rw [List.nodup_cons] at unique
@@ -7607,7 +7824,8 @@ private theorem materializePhaseAIndexes?_eq_certified
       rw [induction next unique.2 restFresh]
       congr 1
       simp [materializePhaseAIndexesCertified, next, transition,
-        Counter.charge, List.reverse_cons, List.append_assoc]
+        Counter.charge, insertUnitAddresses, List.reverse_cons,
+        List.append_assoc]
 
 private def indexSaturatedPhaseAWith?
     {file : WorkspaceFile} {tokens : List Token}
@@ -8879,17 +9097,27 @@ private def finalizeNextIndexedGuard?
           indexes := state.indexes
         } : PhaseBIndexed file tokens)
 
-/-- Test freshness of every finalize slot for one key with one ledger pass. -/
-private def UnitAddress.outsideGuardFinalizeKey
-    {tokens : List Token} (key : GuardInstanceKey tokens) :
-    UnitAddress tokens → Bool
-  | .guardFinalize _ candidate => decide (candidate ≠ key)
-  | _ => true
+/-- The complete fixed schedule for one guard-finalization key. -/
+private def guardFinalizeSlots : List GuardFinalizeSlot := [
+  .initializeUndecided,
+  .siteTerminalLookup,
+  .adjacentTerminalWindowLookup,
+  .exactSliceLookup,
+  .unguardedSpanLookup,
+  .greatestEndLookup,
+  .delimiterOrRegionLookup,
+  .writeFinalDecision
+]
+
+private theorem guardFinalizeSlot_mem (slot : GuardFinalizeSlot) :
+    slot ∈ guardFinalizeSlots := by
+  cases slot <;> simp [guardFinalizeSlots]
 
 private def guardFinalizeKeyFreshBool
     {tokens : List Token} (counter : Counter tokens)
     (key : GuardInstanceKey tokens) : Bool :=
-  counter.usedRev.all (UnitAddress.outsideGuardFinalizeKey key)
+  guardFinalizeSlots.all fun slot =>
+    !counter.usedIndex.contains (.guardFinalize slot key)
 
 private theorem guardFinalizeAddress_fresh_of_keyFresh
     {tokens : List Token} (counter : Counter tokens)
@@ -8898,9 +9126,12 @@ private theorem guardFinalizeAddress_fresh_of_keyFresh
     (slot : GuardFinalizeSlot) :
     UnitAddress.guardFinalize slot key ∉ counter.usedRev := by
   intro member
-  have outside := (List.all_eq_true.mp clean)
-    (UnitAddress.guardFinalize slot key) member
-  simp [UnitAddress.outsideGuardFinalizeKey] at outside
+  have absent := (List.all_eq_true.mp clean) slot
+    (guardFinalizeSlot_mem slot)
+  have present : counter.usedIndex.contains
+      (.guardFinalize slot key) = true :=
+    (counter.indexed (.guardFinalize slot key)).mpr member
+  simp [present] at absent
 
 private theorem preFinalGuardAddresses_nodup_fast
     {tokens : List Token} (key : GuardInstanceKey tokens) :
@@ -9200,7 +9431,7 @@ private def runIndexedPhaseB?
           let next ← finalizeNextIndexedGuard? current
           runIndexedPhaseB? fuel next
 
-/-- Phase-B runner using one ledger scan per guard-finalization block. -/
+/-- Phase-B runner using indexed freshness checks per guard-finalization block. -/
 private def runIndexedPhaseBFast?
     {file : WorkspaceFile} {tokens : List Token} :
     Nat → CountedState tokens (PhaseBIndexed file tokens) →
@@ -10607,7 +10838,11 @@ private def phaseBTotalityCollisionInput
   }
   counter := {
     usedRev := [.phase .sealAEnterB]
+    usedIndex := Std.HashSet.ofList [.phase .sealAEnterB]
     unique := by simp
+    indexed := by
+      intro address
+      rw [Std.HashSet.contains_ofList, List.contains_iff_mem]
   }
 }
 

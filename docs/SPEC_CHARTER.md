@@ -151,13 +151,19 @@ recomputing Phase A saturation after the worklist result has already certified
 it, classifies completion items once, rejects incompatible prediction
 candidates before rebuilding the waiting production, indexes complete-item
 recognition, and materializes the Phase A evidence table in a linear bulk step.
-Phase B batches the eight proved-fresh finalization slots for each guard after
-one ledger scan. Exact-equivalence theorems preserve the checked reference
-result for these execution changes.
+Phase B checks the eight finalization slots for each guard through the coherent
+hash index, then batches the proved-fresh block. Exact-equivalence theorems
+preserve the checked reference result for these execution changes. The counter
+retains `usedRev` as its proof
+ledger and uses a coherent hash set to make duplicate checks fast. The proved
+agreement between these two views ensures that only lookup cost changes;
+charge order, failures, and resulting states do not.
 
 On the development host, the native `tiny` benchmark (`data A;`) took about
-89.0 seconds before these passes and 6.82–7.24 seconds across two fresh-process
-runs afterward. The latest observed `empty` elapsed time was 0.86 seconds.
+89.0 seconds before these passes and 2.699 and 2.721 seconds across two
+fresh-process runs afterward (about 2.71 seconds). The latest observed `empty`
+elapsed time was 0.417 seconds. `/usr/bin/time` reported a maximum resident set
+size of 59,473,920 bytes for `tiny`.
 These observations are neither normative limits nor stable benchmarks;
 broader runtime and memory behavior remains uncharacterized.
 
