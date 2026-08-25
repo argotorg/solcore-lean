@@ -447,7 +447,13 @@ def dottedStaticRankRowAt
 def dottedStaticRankRow (waiting : DottedRhs) : Bool :=
   dottedStaticRankRowAt (waiting, dottedStaticIndex waiting)
 
-private def dottedStaticRankTable : Bool :=
+/-- One independently checkable segment of the fixed static edge table. -/
+def dottedStaticRankChunk (start count : Nat) : Bool :=
+  ((allDottedRhs.zipIdx.drop start).take count).all
+    dottedStaticRankRowAt
+
+/-- Complete fixed-grammar static edge table. -/
+def dottedStaticRankTable : Bool :=
   allDottedRhs.zipIdx.all dottedStaticRankRowAt
 
 private theorem dottedStaticRankCell_true_of_table
@@ -469,6 +475,55 @@ private theorem dottedStaticRankCell_true_of_table
     row.1
   simpa [dottedStaticRankCell, indexEquation] using
     row.2 child (dottedStaticProductionsFor_complete child)
+
+/-- Accepted static cells orient every nonempty prediction edge. -/
+theorem dottedStaticPredictionComponent_lt_of_table
+    (tableAccepted : dottedStaticRankTable = true)
+    (waiting : DottedRhs) (child : ProductionId)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal child.lhs))
+    (nonempty : child.rhs ≠ []) :
+    dottedStaticComponentRank (dottedStaticStart child) <
+      dottedStaticComponentRank waiting := by
+  have accepted := dottedStaticRankCell_true_of_table
+    tableAccepted waiting child next
+  rw [dottedStaticRankCell_eq] at accepted
+  simp only [Bool.and_eq_true] at accepted
+  exact dottedStaticPredictionRankCell_sound
+    waiting child next nonempty accepted.1.1
+
+/-- Accepted static cells orient every direct epsilon edge. -/
+theorem dottedStaticEpsilonComponent_lt_of_table
+    (tableAccepted : dottedStaticRankTable = true)
+    (waiting : DottedRhs) (child : ProductionId)
+    (incomplete : waiting.dot.val < waiting.production.rhs.length)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal child.lhs))
+    (empty : child.rhs = []) :
+    dottedStaticComponentRank
+        (dottedStaticAdvance waiting incomplete) <
+      dottedStaticComponentRank waiting := by
+  have accepted := dottedStaticRankCell_true_of_table
+    tableAccepted waiting child next
+  rw [dottedStaticRankCell_eq] at accepted
+  simp only [Bool.and_eq_true] at accepted
+  exact dottedStaticEpsilonRankCell_sound
+    waiting child incomplete next empty accepted.1.2
+
+/-- Accepted static cells orient every completion continuation. -/
+theorem dottedStaticCompletionDecrease_of_table
+    (tableAccepted : dottedStaticRankTable = true)
+    (waiting : DottedRhs) (child : ProductionId)
+    (incomplete : waiting.dot.val < waiting.production.rhs.length)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal child.lhs)) :
+    DottedStaticCompletionDecrease waiting child incomplete := by
+  have accepted := dottedStaticRankCell_true_of_table
+    tableAccepted waiting child next
+  rw [dottedStaticRankCell_eq] at accepted
+  simp only [Bool.and_eq_true] at accepted
+  exact dottedStaticCompletionRankCell_sound
+    waiting child incomplete next accepted.2
 
 /-- A consuming-prefix certificate excludes an all-nullable prefix. -/
 theorem dottedStaticPrefixConsumes_sound (dotted : DottedRhs)
