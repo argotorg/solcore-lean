@@ -1302,6 +1302,14 @@ private def Counter.freshDecidable {tokens : List Token}
   else
     isTrue fun member => present ((counter.indexed address).mpr member)
 
+private def Counter.usedDecidable {tokens : List Token}
+    (counter : Counter tokens) (address : UnitAddress tokens) :
+    Decidable (address ∈ counter.usedRev) :=
+  if present : counter.usedIndex.contains address = true then
+    isTrue ((counter.indexed address).mp present)
+  else
+    isFalse fun member => present ((counter.indexed address).mpr member)
+
 /-- One logical primitive: its state transition has exactly one charge. -/
 private structure PrimitiveStep (tokens : List Token) (state : Type) where
   address : UnitAddress tokens
@@ -2610,6 +2618,8 @@ private def attemptCompletion?
       let address : UnitAddress tokens :=
         .cubic .U03_completionAttempt
           (rawCompletionKey waiting finished)
+      letI : Decidable (address ∈ current.counter.usedRev) :=
+        current.counter.usedDecidable address
       if address ∈ current.counter.usedRev then
         some current
       else do
@@ -14238,6 +14248,9 @@ private def attemptPhaseCCompletedEdge?
             let attemptAddress : UnitAddress tokens :=
               .cubic .U06_frontierCompletion
                 (contextualCompletionKey edge.waiting edge.finished)
+            letI : Decidable
+                (attemptAddress ∈ current.counter.usedRev) :=
+              current.counter.usedDecidable attemptAddress
             if attemptAddress ∈ current.counter.usedRev then
               some current
             else do
@@ -14479,6 +14492,8 @@ private def attemptContextualPrediction?
           (contextualPredictionKey waiting predicted)) id
       let activationAddress : UnitAddress tokens :=
         .production productionInstance
+      letI : Decidable (activationAddress ∈ attempted.counter.usedRev) :=
+        attempted.counter.usedDecidable activationAddress
       if activationAddress ∈ attempted.counter.usedRev then
         some attempted
       else do
@@ -14592,6 +14607,8 @@ private def attemptContextualCompletion?
       let address : UnitAddress tokens :=
         .cubic .U03_completionAttempt
           (contextualCompletionKey waiting finished)
+      letI : Decidable (address ∈ current.counter.usedRev) :=
+        current.counter.usedDecidable address
       if address ∈ current.counter.usedRev then
         some current
       else do
@@ -33621,6 +33638,8 @@ private def attemptContextualCompletionMulti?
       let address : UnitAddress tokens :=
         .cubic .U03_completionAttempt
           (contextualCompletionKey waiting finished)
+      letI : Decidable (address ∈ current.counter.usedRev) :=
+        current.counter.usedDecidable address
       if address ∈ current.counter.usedRev then
         some current
       else do

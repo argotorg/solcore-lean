@@ -161,13 +161,15 @@ preserve the checked reference result for these execution changes. The counter
 retains `usedRev` as its proof
 ledger and uses a coherent hash set to make duplicate checks fast. The proved
 agreement between these two views ensures that only lookup cost changes;
-charge order, failures, and resulting states do not.
+direct completion and production-activation prechecks use the indexed
+decision procedure, while charge order, failures, and resulting states do not
+change.
 
 On the development host, the native `tiny` benchmark (`data A;`) took about
-89.0 seconds before these passes and 2.116 and 2.142 seconds across two
-fresh-process runs afterward (about 2.13 seconds). The latest observed `empty`
-elapsed time was 0.304 seconds. `/usr/bin/time` reported a maximum resident set
-size of 59,588,608 bytes for `tiny`.
+89.0 seconds before these passes and 1.807–1.892 seconds across five
+fresh-process runs afterward (median 1.818 seconds). The latest observed
+`empty` elapsed time was 0.241 seconds. `/usr/bin/time` reported a maximum
+resident set size of 59,637,760 bytes for `tiny`.
 These observations are neither normative limits nor stable benchmarks;
 broader runtime and memory behavior remains uncharacterized.
 

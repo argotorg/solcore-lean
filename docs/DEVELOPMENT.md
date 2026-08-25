@@ -133,17 +133,19 @@ lake build m2cFrontendBench
 machine-readable line containing the elapsed nanoseconds and observed result.
 Use an external timeout when profiling an untrusted performance change. Do not
 turn these wall-clock measurements into normative language limits. On the
-development host, the latest `empty` run reported 0.304 seconds and two
-fresh-process `tiny` runs reported 2.116 and 2.142 seconds (about 2.13 seconds),
-compared with a pre-optimization baseline of about 89.0 seconds.
-`/usr/bin/time` reported a maximum resident set size of 59,588,608 bytes for
+development host, the latest `empty` run reported 0.241 seconds and five
+fresh-process `tiny` runs ranged from 1.807 to 1.892 seconds (median 1.818
+seconds), compared with a pre-optimization baseline of about 89.0 seconds.
+`/usr/bin/time` reported a maximum resident set size of 59,637,760 bytes for
 `tiny`.
 
 The counter keeps `usedRev` as the proof-carrying record of charged addresses.
 A hash set, proved to contain exactly the same addresses, now handles duplicate
 checks without repeatedly scanning that record. Because the two views are kept
 coherent, this is a lookup optimization only: charge order, failure behavior,
-and resulting state remain the same. The role-directed completion scan also
+and resulting state remain the same. Direct completion and
+production-activation prechecks use the same indexed membership decision. The
+role-directed completion scan also
 uses the fact that one role cannot be both waiting and finished, avoiding a
 whole-item equality check for self pairs; an exact theorem preserves the
 reference result. A proof-carrying hash table also groups productions by their

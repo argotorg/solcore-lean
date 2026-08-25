@@ -169,11 +169,12 @@ Exact-equivalence theorems relate each optimized path to the
 retained checked implementation. The counter continues to use `usedRev` as its
 proof ledger, with a coherent hash set accelerating duplicate checks. The
 proved correspondence between them means that charge order, failures, and
-resulting states are unchanged. On the development host, the native `tiny`
-benchmark (`data A;`) improved from about 89.0 seconds to 2.116 and 2.142
-seconds across two fresh-process runs (about 2.13 seconds), and the latest
-`empty` elapsed time was 0.304 seconds. `/usr/bin/time` reported a maximum
-resident set size of 59,588,608 bytes for `tiny`.
+resulting states are unchanged. Direct completion and production-activation
+prechecks also use this indexed membership decision. On the development host,
+the native `tiny` benchmark (`data A;`) improved from about 89.0 seconds to
+1.807–1.892 seconds across five fresh-process runs (median 1.818 seconds), and
+the latest `empty` elapsed time was 0.241 seconds. `/usr/bin/time` reported a
+maximum resident set size of 59,637,760 bytes for `tiny`.
 This is a substantial improvement, but the two synthetic cases do not establish
 interactive or high-throughput readiness.
 
