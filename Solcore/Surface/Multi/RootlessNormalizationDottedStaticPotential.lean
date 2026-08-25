@@ -283,4 +283,31 @@ theorem dottedStaticCapacity :
   rw [dottedStaticD_eq]
   decide
 
+private def dottedStaticNullableClosureCell
+    (production : ProductionId) : Bool :=
+  if production.rhs.all dottedStaticNullableSymbol then
+    dottedStaticNullableSymbol (.nonterminal production.lhs)
+  else
+    true
+
+private def dottedStaticNullableClosureTable : Bool :=
+  allProductionIds.all dottedStaticNullableClosureCell
+
+set_option maxRecDepth 20000 in
+private theorem dottedStaticNullableClosureTable_true :
+    dottedStaticNullableClosureTable = true := by
+  run_tac
+    Lean.Meta.withTransparency .all do
+      (← Lean.Elab.Tactic.getMainGoal).refl
+
+/-- Fixed-grammar nullability is closed under every expanded production. -/
+theorem dottedStaticNullableSymbol_closed (production : ProductionId)
+    (nullableRhs :
+      production.rhs.all dottedStaticNullableSymbol = true) :
+    dottedStaticNullableSymbol (.nonterminal production.lhs) = true := by
+  have row := (List.all_eq_true.mp
+    dottedStaticNullableClosureTable_true) production
+    (allProductionIds_complete production)
+  simpa [dottedStaticNullableClosureCell, nullableRhs] using row
+
 end Solcore.Surface.Multi
