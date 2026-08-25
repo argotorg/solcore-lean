@@ -2604,6 +2604,15 @@ private theorem attemptCompletionForRoles?_exact
     exact (attemptCompletion?_eq_self_of_not_roleCompatible
       current waiting finished semanticInactive).symm
 
+/-- One item cannot be both sides of a role-directed completion. -/
+private theorem attemptCompletionForRoles?_self
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (item : DottedItem tokens) (role : RawCompletionRole) :
+    attemptCompletionForRoles? current item item role role = some current := by
+  cases role <;>
+    simp [attemptCompletionForRoles?, RawCompletionRolesCompatible]
+
 /-- Completion scan with the pivot classification shared across every pair. -/
 private def attemptCompletionsWithRoles?
     {file : WorkspaceFile} {tokens : List Token}
@@ -2616,11 +2625,8 @@ private def attemptCompletionsWithRoles?
       let otherRole := rawCompletionRole other
       let forward ← attemptCompletionForRoles? current pivot other
         pivotRole otherRole
-      let reverse ←
-        if other = pivot then
-          some forward
-        else
-          attemptCompletionForRoles? forward other pivot otherRole pivotRole
+      let reverse ← attemptCompletionForRoles? forward other pivot
+        otherRole pivotRole
       attemptCompletionsWithRoles? pivot pivotRole rest reverse
 
 private def attemptCompletionsWithEntries?
@@ -2633,11 +2639,8 @@ private def attemptCompletionsWithEntries?
   | (other, otherRole) :: rest, current => do
       let forward ← attemptCompletionForRoles? current pivot other
         pivotRole otherRole
-      let reverse ←
-        if other = pivot then
-          some forward
-        else
-          attemptCompletionForRoles? forward other pivot otherRole pivotRole
+      let reverse ← attemptCompletionForRoles? forward other pivot
+        otherRole pivotRole
       attemptCompletionsWithEntries? pivot pivotRole rest reverse
 
 private theorem attemptCompletionsWithEntries?_eq_roles
@@ -2658,11 +2661,9 @@ private theorem attemptCompletionsWithEntries?_eq_roles
         attemptCompletionsWithRoles?]
       apply Option.bind_congr
       intro forward _forwardEq
-      split
-      · exact induction forward
-      · apply Option.bind_congr
-        intro reverse _reverseEq
-        exact induction reverse
+      apply Option.bind_congr
+      intro reverse _reverseEq
+      exact induction reverse
 
 private def attemptCompletionsFastWith?
     {file : WorkspaceFile} {tokens : List Token}
@@ -2692,8 +2693,18 @@ private theorem attemptCompletionsWithRoles?_exact
             attemptCompletionForRoles?_exact, forwardEq]
       | some forward =>
           by_cases same : other = pivot
-          · simp [attemptCompletionsWithRoles?, attemptCompletionsWith?,
-              attemptCompletionForRoles?_exact, same, induction]
+          · subst other
+            have forwardSame : current = forward := by
+              have exact := attemptCompletionForRoles?_exact
+                current pivot pivot
+              rw [attemptCompletionForRoles?_self, forwardEq] at exact
+              exact Option.some.inj exact
+            subst forward
+            simp only [attemptCompletionsWithRoles?, attemptCompletionsWith?]
+            rw [attemptCompletionForRoles?_self, forwardEq]
+            simp only [Option.bind_eq_bind, Option.bind_some, ↓reduceIte]
+            rw [attemptCompletionForRoles?_self]
+            exact induction current
           · cases reverseEq : attemptCompletion? forward other pivot with
             | none =>
                 simp [attemptCompletionsWithRoles?, attemptCompletionsWith?,

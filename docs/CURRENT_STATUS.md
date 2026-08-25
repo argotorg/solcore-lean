@@ -119,9 +119,12 @@ once so incompatible pairs can be skipped. Prediction candidates are rejected
 from that classification before rebuilding the waiting production, and
 complete-item recognition uses a local hash index. The Phase A evidence table
 is materialized in one linear pass instead of repeatedly copying growing
-lists. Phase B checks all eight finalization slots through the coherent hash
-index and then charges the proved-fresh block directly. Each faster path
-has an exact-equivalence theorem against the retained reference implementation.
+lists. The role-directed completion scan also avoids comparing whole items to
+detect a self pair: equal roles cannot form a waiting/finished pair, and the
+no-op replacement is proved equivalent. Phase B checks all eight finalization
+slots through the coherent hash index and then charges the proved-fresh block
+directly. Each faster path has an exact-equivalence theorem against the
+retained reference implementation.
 The execution counter still keeps `usedRev` as its proof ledger, while a
 coherent hash set answers duplicate checks quickly. A maintained theorem says
 that the hash set contains exactly the addresses in `usedRev`, so this changes
@@ -129,10 +132,10 @@ only how membership is found: charge order, failures, and resulting states are
 unchanged.
 
 On the development host, the native benchmark's `tiny` case (`data A;`) fell
-from about 89.0 seconds before these passes to 2.699 and 2.721 seconds across
-two fresh-process runs (about 2.71 seconds). The latest observed `empty`
-elapsed time was 0.417 seconds. `/usr/bin/time` reported a maximum resident set
-size of 59,473,920 bytes for `tiny`.
+from about 89.0 seconds before these passes to 2.339 and 2.425 seconds across
+two fresh-process runs (about 2.38 seconds). The latest observed `empty`
+elapsed time was 0.365 seconds. `/usr/bin/time` reported a maximum resident set
+size of 59,965,440 bytes for `tiny`.
 These are machine-dependent observations, not language limits or performance
 guarantees. Representative-file and memory measurements are still needed
 before claiming interactive or fuzzing-speed readiness.

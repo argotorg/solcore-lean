@@ -159,18 +159,19 @@ bounded Phase C runner continuing after both queues were empty; it now returns
 immediately. Phase A also re-uses its certified worklist result instead of
 recomputing the complete saturation, caches completion classifications, skips
 incompatible prediction candidates before rebuilding the waiting production,
-and indexes complete-item recognition. Its evidence table is built in one
-linear pass. Phase B checks each fixed guard-finalization block through the
+indexes complete-item recognition, and avoids whole-item self comparisons in
+the role-directed completion scan. Its evidence table is built in one linear
+pass. Phase B checks each fixed guard-finalization block through the
 coherent hash index and then batches its proved-fresh addresses.
 Exact-equivalence theorems relate each optimized path to the
 retained checked implementation. The counter continues to use `usedRev` as its
 proof ledger, with a coherent hash set accelerating duplicate checks. The
 proved correspondence between them means that charge order, failures, and
 resulting states are unchanged. On the development host, the native `tiny`
-benchmark (`data A;`) improved from about 89.0 seconds to 2.699 and 2.721
-seconds across two fresh-process runs (about 2.71 seconds), and the latest
-`empty` elapsed time was 0.417 seconds. `/usr/bin/time` reported a maximum
-resident set size of 59,473,920 bytes for `tiny`.
+benchmark (`data A;`) improved from about 89.0 seconds to 2.339 and 2.425
+seconds across two fresh-process runs (about 2.38 seconds), and the latest
+`empty` elapsed time was 0.365 seconds. `/usr/bin/time` reported a maximum
+resident set size of 59,965,440 bytes for `tiny`.
 This is a substantial improvement, but the two synthetic cases do not establish
 interactive or high-throughput readiness.
 
