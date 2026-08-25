@@ -277,12 +277,10 @@ def dottedStaticCompletionRankCell
   dottedStaticCompletionRankCellAt components phases waiting child
     waitingIndex childBase
 
-/-- Combined static edge check for one waiting/child pair. -/
-def dottedStaticRankCell
+def dottedStaticRankCellAt (waitingIndex : Nat)
     (waiting : DottedRhs) (child : ProductionId) : Bool :=
   let components := dottedStaticComponentValues.toArray
   let phases := dottedStaticPhaseValues.toArray
-  let waitingIndex := dottedStaticIndex waiting
   let childBase :=
     (dottedStaticProductionOffsets[
       dottedStaticProductionIndex child]?).getD 0
@@ -291,6 +289,11 @@ def dottedStaticRankCell
     dottedStaticEpsilonRankCellAt components waiting child waitingIndex &&
     dottedStaticCompletionRankCellAt components phases waiting child
       waitingIndex childBase
+
+/-- Combined static edge check for one waiting/child pair. -/
+def dottedStaticRankCell
+    (waiting : DottedRhs) (child : ProductionId) : Bool :=
+  dottedStaticRankCellAt (dottedStaticIndex waiting) waiting child
 
 theorem dottedStaticRankCell_eq (waiting : DottedRhs)
     (child : ProductionId) :
@@ -426,19 +429,26 @@ theorem dottedStaticProductionsFor_complete (production : ProductionId) :
   | tail site branch =>
       cases branch <;> simp [dottedStaticProductionsFor, ProductionId.lhs]
 
-/-- Sparse row check, restricted to productions selectable at the dot. -/
-def dottedStaticRankRow (waiting : DottedRhs) : Bool :=
+def dottedStaticRankRowAt
+    (entry : DottedRhs × Nat) : Bool :=
+  let waiting := entry.1
+  let waitingIndex := entry.2
   if incomplete : waiting.dot.val < waiting.production.rhs.length then
     match waiting.production.rhs[waiting.dot.val] with
     | .terminal _ => true
     | .nonterminal lhs =>
-        (dottedStaticProductionsFor lhs).all
-          (dottedStaticRankCell waiting)
+        decide (waitingIndex = dottedStaticIndex waiting) &&
+          (dottedStaticProductionsFor lhs).all
+            (dottedStaticRankCellAt waitingIndex waiting)
   else
     true
 
+/-- Sparse row check, restricted to productions selectable at the dot. -/
+def dottedStaticRankRow (waiting : DottedRhs) : Bool :=
+  dottedStaticRankRowAt (waiting, dottedStaticIndex waiting)
+
 private def dottedStaticRankTable : Bool :=
-  allDottedRhs.all dottedStaticRankRow
+  allDottedRhs.zipIdx.all dottedStaticRankRowAt
 
 private theorem dottedStaticRankCell_true_of_table
     (tableAccepted : dottedStaticRankTable = true)
@@ -448,10 +458,17 @@ private theorem dottedStaticRankCell_true_of_table
     dottedStaticRankCell waiting child = true := by
   rcases List.getElem?_eq_some_iff.mp next with
     ⟨incomplete, selected⟩
-  have row := (List.all_eq_true.mp tableAccepted) waiting
-    (allDottedRhs_complete waiting)
-  simp [dottedStaticRankRow, incomplete, selected] at row
-  exact row child (dottedStaticProductionsFor_complete child)
+  obtain ⟨waitingIndex, indexed⟩ :=
+    List.getElem?_of_mem (allDottedRhs_complete waiting)
+  have member : (waiting, waitingIndex) ∈ allDottedRhs.zipIdx :=
+    List.mk_mem_zipIdx_iff_getElem?.mpr indexed
+  have row := (List.all_eq_true.mp tableAccepted)
+    (waiting, waitingIndex) member
+  simp [dottedStaticRankRowAt, incomplete, selected] at row
+  have indexEquation : waitingIndex = dottedStaticIndex waiting :=
+    row.1
+  simpa [dottedStaticRankCell, indexEquation] using
+    row.2 child (dottedStaticProductionsFor_complete child)
 
 /-- A consuming-prefix certificate excludes an all-nullable prefix. -/
 theorem dottedStaticPrefixConsumes_sound (dotted : DottedRhs)
