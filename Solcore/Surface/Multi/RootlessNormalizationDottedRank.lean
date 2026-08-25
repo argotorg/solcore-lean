@@ -188,6 +188,80 @@ theorem frontierDottedPredictionRank_lt_of_table
     if_pos nonempty] at cell
   exact decide_eq_true_iff.mp cell
 
+/-- Pointwise descent for every enabled nonempty prediction makes the exact
+dotted prediction table accept. -/
+theorem frontierDottedPredictionRankTable_eq_true_of_decreases
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (decreases : ∀ waiting production,
+      ContextualReach file tokens memo correct final waiting →
+      waiting.raw.current = cursor →
+      NextSymbol waiting.raw (.nonterminal production.lhs) →
+      EnabledProductionInstance file tokens memo correct final {
+        production := production
+        origin := waiting.raw.current
+        context := descendContext waiting production
+      } →
+      production.rhs ≠ [] →
+      frontierDottedGrammarRank potential
+          (FrontierPredictedItem waiting production) <
+        frontierDottedGrammarRank potential waiting) :
+    frontierDottedPredictionRankTable
+      owned correct final cursor potential = true := by
+  apply List.all_eq_true.mpr
+  intro waiting _waitingMember
+  apply List.all_eq_true.mpr
+  intro production _productionMember
+  letI : Decidable
+      (ContextualReach file tokens memo correct final waiting) :=
+    contextualReachDecision owned correct final waiting
+  letI : Decidable
+      (NextSymbol waiting.raw (.nonterminal production.lhs)) :=
+    dottedNextSymbolDecision waiting.raw (.nonterminal production.lhs)
+  letI : Decidable
+      (EnabledProductionInstance file tokens memo correct final {
+        production := production
+        origin := waiting.raw.current
+        context := descendContext waiting production
+      }) := enabledProductionInstanceDecision correct final _
+  by_cases reached : ContextualReach file tokens memo correct final waiting
+  · by_cases current : waiting.raw.current = cursor
+    · by_cases next :
+        NextSymbol waiting.raw (.nonterminal production.lhs)
+      · by_cases enabled : EnabledProductionInstance file tokens memo
+          correct final {
+            production := production
+            origin := waiting.raw.current
+            context := descendContext waiting production
+          }
+        · by_cases nonempty : production.rhs ≠ []
+          · simp only [frontierDottedPredictionRankCell, if_pos reached,
+              if_pos current, if_pos next, if_pos enabled,
+              if_pos nonempty, decide_eq_true_iff]
+            exact decreases waiting production reached current next enabled
+              nonempty
+          · simp [frontierDottedPredictionRankCell, reached, current,
+              next, nonempty]
+        · have disabledAtCursor : ¬ EnabledProductionInstance file tokens
+              memo correct final {
+                production := production
+                origin := cursor
+                context := descendContext waiting production
+              } := by
+            intro enabledAtCursor
+            apply enabled
+            rw [current]
+            exact enabledAtCursor
+          simp [frontierDottedPredictionRankCell, reached, current, next,
+            disabledAtCursor]
+      · simp [frontierDottedPredictionRankCell, reached, current, next]
+    · simp [frontierDottedPredictionRankCell, reached, current]
+  · simp [frontierDottedPredictionRankCell, reached]
+
 /-- One possible lower reached item on the same dotted-rank frontier. -/
 def frontierDottedLowerRankCell
     {file : WorkspaceFile} {tokens : List Token}
@@ -447,6 +521,68 @@ theorem frontierDottedEpsilonRank_lt_of_table
     if_pos enabled, if_pos epsilon, if_pos afterReached,
     if_pos afterCurrent, if_pos advance] at cell
   exact decide_eq_true_iff.mp cell
+
+/-- Pointwise descent for every direct epsilon advance makes the exact dotted
+epsilon table accept. -/
+theorem frontierDottedEpsilonRankTable_eq_true_of_decreases
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (decreases : ∀ waiting production after,
+      ContextualReach file tokens memo correct final waiting →
+      waiting.raw.current = cursor →
+      NextSymbol waiting.raw (.nonterminal production.lhs) →
+      EnabledProductionInstance file tokens memo correct final {
+        production := production
+        origin := waiting.raw.current
+        context := descendContext waiting production
+      } →
+      production.rhs = [] →
+      ContextualReach file tokens memo correct final after →
+      after.raw.current = cursor →
+      AdvanceItem waiting.raw waiting.raw.current after.raw →
+      frontierDottedGrammarRank potential after <
+        frontierDottedGrammarRank potential waiting) :
+    frontierDottedEpsilonRankTable
+      owned correct final cursor potential = true := by
+  apply List.all_eq_true.mpr
+  intro waiting _waitingMember
+  apply List.all_eq_true.mpr
+  intro production _productionMember
+  apply List.all_eq_true.mpr
+  intro after _afterMember
+  simp only [frontierDottedEpsilonRankCell]
+  split
+  next waitingReached =>
+    split
+    next waitingCurrent =>
+      split
+      next nextSymbol =>
+        split
+        next enabled =>
+          split
+          next epsilon =>
+            split
+            next afterReached =>
+              split
+              next afterCurrent =>
+                split
+                next advance =>
+                  exact decide_eq_true_iff.mpr
+                    (decreases waiting production after waitingReached
+                      waitingCurrent nextSymbol enabled epsilon afterReached
+                      afterCurrent advance)
+                next => rfl
+              next => rfl
+            next => rfl
+          next => rfl
+        next => rfl
+      next => rfl
+    next => rfl
+  next => rfl
 
 /-- The three exact dotted tables construct every field of the abstract
 frontier normalization ranking. -/
