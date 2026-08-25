@@ -1049,6 +1049,105 @@ private def productionIdFastHash : ProductionId → UInt64
       mixHash (hash (10 : Nat))
         (mixHash (listSiteFastHash site) (hash branch.ctorIdx))
 
+/-- A hash key retaining the complete dotted item while hashing only its
+proof-independent structural data. -/
+private structure RawItemHashKey (tokens : List Token) where
+  item : DottedItem tokens
+
+private def rawItemHashKeyBEq {tokens : List Token}
+    (left right : RawItemHashKey tokens) : Bool :=
+  decide (left.item = right.item)
+
+private instance {tokens : List Token} : BEq (RawItemHashKey tokens) :=
+  ⟨rawItemHashKeyBEq⟩
+
+private instance {tokens : List Token} : LawfulBEq (RawItemHashKey tokens) where
+  rfl := by
+    intro key
+    change decide (key.item = key.item) = true
+    exact of_decide_eq_self_eq_true key.item
+  eq_of_beq := by
+    intro left right equal
+    change rawItemHashKeyBEq left right = true at equal
+    have itemEqual : left.item = right.item := by
+      exact of_decide_eq_true equal
+    cases left
+    cases right
+    cases itemEqual
+    rfl
+
+private instance {tokens : List Token} : Hashable (RawItemHashKey tokens) where
+  hash key :=
+    mixHash (productionIdFastHash key.item.production)
+      (mixHash (hash key.item.dot.val)
+        (mixHash (hash key.item.origin.val) (hash key.item.current.val)))
+
+private def rawItemHashKey {tokens : List Token}
+    (item : DottedItem tokens) : RawItemHashKey tokens :=
+  ⟨item⟩
+
+private theorem rawItemHashKey_injective {tokens : List Token} :
+    Function.Injective (rawItemHashKey (tokens := tokens)) := by
+  intro left right equal
+  exact congrArg RawItemHashKey.item equal
+
+private theorem rawItemIndex_insert_contains
+    {tokens : List Token}
+    (index : Std.HashSet (RawItemHashKey tokens))
+    (inserted candidate : DottedItem tokens) :
+    (index.insert (rawItemHashKey inserted)).contains
+        (rawItemHashKey candidate) = true ↔
+      candidate = inserted ∨
+        index.contains (rawItemHashKey candidate) = true := by
+  rw [Std.HashSet.contains_insert, Bool.or_eq_true, beq_iff_eq]
+  constructor
+  · rintro (equal | present)
+    · exact Or.inl (rawItemHashKey_injective equal).symm
+    · exact Or.inr present
+  · rintro (equal | present)
+    · exact Or.inl (congrArg rawItemHashKey equal).symm
+    · exact Or.inr present
+
+/-- Insert item keys in exactly the order used by repeated successful raw-item
+insertions. -/
+private def insertRawItemKeys {tokens : List Token}
+    (index : Std.HashSet (RawItemHashKey tokens)) :
+    List (DottedItem tokens) → Std.HashSet (RawItemHashKey tokens)
+  | [] => index
+  | item :: rest =>
+      insertRawItemKeys (index.insert (rawItemHashKey item)) rest
+
+private theorem insertRawItemKeys_contains {tokens : List Token} :
+    ∀ (items : List (DottedItem tokens))
+      (index : Std.HashSet (RawItemHashKey tokens))
+      (candidate : DottedItem tokens),
+      (insertRawItemKeys index items).contains
+          (rawItemHashKey candidate) = true ↔
+        candidate ∈ items ∨
+          index.contains (rawItemHashKey candidate) = true := by
+  intro items
+  induction items with
+  | nil =>
+      intro index candidate
+      simp [insertRawItemKeys]
+  | cons item rest induction =>
+      intro index candidate
+      rw [insertRawItemKeys, induction,
+        rawItemIndex_insert_contains, List.mem_cons]
+      constructor
+      · intro present
+        rcases present with restMember | inserted
+        · exact Or.inl (Or.inr restMember)
+        · rcases inserted with equal | old
+          · exact Or.inl (Or.inl equal)
+          · exact Or.inr old
+      · intro present
+        rcases present with inserted | old
+        · rcases inserted with equal | restMember
+          · exact Or.inr (Or.inl equal)
+          · exact Or.inl restMember
+        · exact Or.inr (Or.inr old)
+
 private def dottedRhsFastHash (dotted : DottedRhs) : UInt64 :=
   mixHash (productionIdFastHash dotted.production) (hash dotted.dot.val)
 
@@ -1995,6 +2094,9 @@ private def RawCompletionRows.candidates {tokens : List Token}
 
 private structure PhaseAOpen (file : WorkspaceFile) (tokens : List Token) where
   rawItems : List (DottedItem tokens)
+  rawItemIndex : Std.HashSet (RawItemHashKey tokens)
+  rawItemIndexed : ∀ item,
+    rawItemIndex.contains (rawItemHashKey item) = true ↔ item ∈ rawItems
   completionRows : RawCompletionRows tokens
   completionRows_eq : completionRows = buildRawCompletionRows rawItems
   itemQueue : List (DottedItem tokens)
@@ -2002,10 +2104,30 @@ private structure PhaseAOpen (file : WorkspaceFile) (tokens : List Token) where
   edgeQueue : List (PackedEdge file tokens)
   productionRows : ProductionLhsRows
 
+private theorem rawItemIndexed_after_insert
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : PhaseAOpen file tokens) (item : DottedItem tokens) :
+    ∀ candidate,
+      (state.rawItemIndex.insert (rawItemHashKey item)).contains
+          (rawItemHashKey candidate) = true ↔
+        candidate ∈ state.rawItems ++ [item] := by
+  intro candidate
+  rw [rawItemIndex_insert_contains, state.rawItemIndexed,
+    List.mem_append, List.mem_singleton]
+  constructor
+  · rintro (equal | old)
+    · exact Or.inr equal
+    · exact Or.inl old
+  · rintro (old | equal)
+    · exact Or.inr old
+    · exact Or.inl equal
+
 private def beginPhaseA (file : WorkspaceFile) (tokens : List Token) :
     CountedState tokens (PhaseAOpen file tokens) := {
   payload := {
     rawItems := []
+    rawItemIndex := ∅
+    rawItemIndexed := by simp
     completionRows := RawCompletionRows.empty tokens
     completionRows_eq := rfl
     itemQueue := []
@@ -2398,7 +2520,7 @@ private def RawItemInsertSource.unitKind :
   | .scan => .L05_scannedItemInsert
   | .completion => .L07_completedItemInsert
 
-private def insertRawItem?
+private def insertRawItemReference?
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseAOpen file tokens))
     (source : RawItemInsertSource) (item : DottedItem tokens) :
@@ -2410,6 +2532,32 @@ private def insertRawItem?
       (.linear source.unitKind (rawLinearKey item)) fun state => {
         state with
         rawItems := state.rawItems ++ [item]
+        rawItemIndex := state.rawItemIndex.insert (rawItemHashKey item)
+        rawItemIndexed := rawItemIndexed_after_insert state item
+        completionRows := state.completionRows.insert item
+          (rawCompletionRole item)
+        completionRows_eq := by
+          rw [state.completionRows_eq]
+          simp [buildRawCompletionRows, List.foldl_append,
+            RawCompletionRows.insert]
+        itemQueue := state.itemQueue ++ [item]
+      }
+
+/-- Runtime raw-item insertion using the coherent Phase-A membership index. -/
+private def insertRawItem?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  if current.payload.rawItemIndex.contains (rawItemHashKey item) then
+    some current
+  else
+    runMappedPrimitive? current
+      (.linear source.unitKind (rawLinearKey item)) fun state => {
+        state with
+        rawItems := state.rawItems ++ [item]
+        rawItemIndex := state.rawItemIndex.insert (rawItemHashKey item)
+        rawItemIndexed := rawItemIndexed_after_insert state item
         completionRows := state.completionRows.insert item
           (rawCompletionRole item)
         completionRows_eq := by
@@ -3283,6 +3431,25 @@ private theorem rawMemberBool_true_iff
   · intro member
     exact ⟨item, member, rfl⟩
 
+private theorem rawItemContains_eq_rawMemberBool
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : PhaseAOpen file tokens) (item : DottedItem tokens) :
+    state.rawItemIndex.contains (rawItemHashKey item) =
+      rawMemberBool state.rawItems item := by
+  apply Bool.eq_iff_iff.mpr
+  exact (state.rawItemIndexed item).trans
+    (rawMemberBool_true_iff state.rawItems item).symm
+
+/-- Indexed item insertion is exactly the list-membership reference. -/
+private theorem insertRawItem?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (source : RawItemInsertSource) (item : DottedItem tokens) :
+    insertRawItem? current source item =
+      insertRawItemReference? current source item := by
+  unfold insertRawItem? insertRawItemReference?
+  rw [rawItemContains_eq_rawMemberBool]
+
 private theorem rawClosureBool_mono
     {tokens : List Token} {left right : List (DottedItem tokens)}
     (subset : left ⊆ right) (item : DottedItem tokens)
@@ -3391,7 +3558,8 @@ private theorem insertRawItem?_rawSound
     (sound : item ∈ rawSaturation tokens)
     (selected : insertRawItem? current source item = some result) :
     PhaseARawSound result.payload := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   · cases selected
     exact invariant
@@ -4089,7 +4257,8 @@ private theorem insertRawItem?_units_mono
     (source : RawItemInsertSource) (item : DottedItem tokens)
     (selected : insertRawItem? current source item = some result) :
     current.counter.units ≤ result.counter.units := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   · cases selected
     exact Nat.le_refl _
@@ -4457,7 +4626,8 @@ private theorem insertRawItem?_coverage
     current.payload.rawItems ⊆ result.payload.rawItems ∧
       current.payload.itemQueue ⊆ result.payload.itemQueue ∧
       item ∈ result.payload.rawItems := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -4727,7 +4897,8 @@ private theorem insertRawItem?_subsets
     (selected : insertRawItem? current source item = some result) :
     PhaseAContentSubset current result ∧
       CompletionAttemptAddressesSubset current result := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -5233,7 +5404,8 @@ private theorem insertRawItem?_itemGrowth
     (source : RawItemInsertSource) (item : DottedItem tokens)
     (selected : insertRawItem? current source item = some result) :
     PhaseAItemGrowth current result := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -5677,7 +5849,8 @@ private theorem insertRawItem?_rawItemsQueued
     (invariant : RawItemsQueued current)
     (selected : insertRawItem? current source item = some result) :
     RawItemsQueued result := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -6071,7 +6244,8 @@ private theorem insertRawItem?_itemSafe
     (safe : PhaseAItemSafe current)
     (selected : insertRawItem? current source item = some result) :
     PhaseAItemSafe result := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -6173,7 +6347,8 @@ private theorem insertRawItem?_total
     (source : RawItemInsertSource) (item : DottedItem tokens)
     (safe : PhaseAItemSafe current) :
     ∃ result, insertRawItem? current source item = some result := by
-  unfold insertRawItem?
+  rw [insertRawItem?_eq_reference]
+  unfold insertRawItemReference?
   split
   next present => exact ⟨current, rfl⟩
   next absent =>
@@ -6411,7 +6586,8 @@ private theorem insertRawItem?_preserves_fresh
     (fresh : target ∉ current.counter.usedRev)
     (selected : insertRawItem? current source item = some result) :
     target ∉ result.counter.usedRev := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -6459,7 +6635,8 @@ private theorem insertRawItem?_used_mono
     (source : RawItemInsertSource) (item : DottedItem tokens)
     (selected : insertRawItem? current source item = some result) :
     current.counter.usedRev ⊆ result.counter.usedRev := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -6829,7 +7006,8 @@ private theorem insertRawItem?_completionSafe
     (safe : PhaseACompletionSafe current)
     (selected : insertRawItem? current source item = some result) :
     PhaseACompletionSafe result := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -7192,7 +7370,8 @@ private theorem insertRawItem?_edgeSafe
     (safe : PhaseAEdgeSafe current)
     (selected : insertRawItem? current source item = some result) :
     PhaseAEdgeSafe result := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   next present =>
     cases selected
@@ -8929,43 +9108,6 @@ private def canonicalRawItemsReference (tokens : List Token)
     (items : List (DottedItem tokens)) : List (DottedItem tokens) :=
   (allDottedItems tokens).filter fun item => rawMemberBool items item
 
-/-- A hash key retaining the complete dotted item while using a cheap,
-proof-independent hash projection. -/
-private structure RawItemHashKey (tokens : List Token) where
-  item : DottedItem tokens
-
-private def rawItemHashKeyBEq {tokens : List Token}
-    (left right : RawItemHashKey tokens) : Bool :=
-  decide (left.item = right.item)
-
-private instance {tokens : List Token} : BEq (RawItemHashKey tokens) :=
-  ⟨rawItemHashKeyBEq⟩
-
-private instance {tokens : List Token} : LawfulBEq (RawItemHashKey tokens) where
-  rfl := by
-    intro key
-    change decide (key.item = key.item) = true
-    exact of_decide_eq_self_eq_true key.item
-  eq_of_beq := by
-    intro left right equal
-    change rawItemHashKeyBEq left right = true at equal
-    have itemEqual : left.item = right.item := by
-      exact of_decide_eq_true equal
-    cases left
-    cases right
-    cases itemEqual
-    rfl
-
-private instance {tokens : List Token} : Hashable (RawItemHashKey tokens) where
-  hash key :=
-    mixHash (hash key.item.production.sourceRule.index)
-      (mixHash (hash key.item.dot.val)
-        (mixHash (hash key.item.origin.val) (hash key.item.current.val)))
-
-private def rawItemHashKey {tokens : List Token}
-    (item : DottedItem tokens) : RawItemHashKey tokens :=
-  ⟨item⟩
-
 /-- Canonical set presentation in the stable dotted-item enumeration order.
 Membership is indexed once instead of rescanning the discovered-item list for
 every finite carrier element. -/
@@ -8987,11 +9129,6 @@ private theorem rawMemberBool_eq_true_iff
     exact member
   · intro member
     exact ⟨item, member, rfl⟩
-
-private theorem rawItemHashKey_injective {tokens : List Token} :
-    Function.Injective (rawItemHashKey (tokens := tokens)) := by
-  intro left right equal
-  exact congrArg RawItemHashKey.item equal
 
 private theorem rawItemHashKey_mem_map_iff
     {tokens : List Token} (items : List (DottedItem tokens))
@@ -9113,6 +9250,11 @@ private def normalizePhaseARawItems
   payload := {
     current.payload with
     rawItems := items
+    rawItemIndex := current.payload.rawItemIndex
+    rawItemIndexed := by
+      intro item
+      exact (current.payload.rawItemIndexed item).trans
+        (mem_canonicalRawItems_iff current.payload.rawItems item).symm
     completionRows := buildRawCompletionRows items
     completionRows_eq := rfl
   }
@@ -9880,6 +10022,18 @@ private def insertRawSeedsCertified
     payload := {
       current.payload with
       rawItems := current.payload.rawItems ++ seeds
+      rawItemIndex := insertRawItemKeys current.payload.rawItemIndex seeds
+      rawItemIndexed := by
+        intro candidate
+        rw [insertRawItemKeys_contains, current.payload.rawItemIndexed,
+          List.mem_append]
+        constructor
+        · rintro (seed | old)
+          · exact Or.inr seed
+          · exact Or.inl old
+        · rintro (old | seed)
+          · exact Or.inr old
+          · exact Or.inl seed
       completionRows := seeds.foldl (fun rows item =>
         rows.insert item (rawCompletionRole item))
         current.payload.completionRows
@@ -9927,7 +10081,7 @@ private theorem insertRawSeeds?_eq_certified
   | nil =>
       intro current unique absent fresh
       simp [insertRawSeeds?, insertRawSeedsCertified,
-        insertUnitAddresses]
+        insertRawItemKeys, insertUnitAddresses]
   | cons item rest induction =>
       intro current unique absent pending
       rw [List.nodup_cons] at unique
@@ -9936,6 +10090,8 @@ private theorem insertRawSeeds?_eq_certified
       let transition := fun (state : PhaseAOpen file tokens) => ({
         state with
         rawItems := state.rawItems ++ [item]
+        rawItemIndex := state.rawItemIndex.insert (rawItemHashKey item)
+        rawItemIndexed := rawItemIndexed_after_insert state item
         completionRows := state.completionRows.insert item
           (rawCompletionRole item)
         completionRows_eq := by
@@ -9953,7 +10109,8 @@ private theorem insertRawSeeds?_eq_certified
         simp [runMappedPrimitive?, headFresh, next]
       have inserted : insertRawItem? current .seedOrPrediction item =
           some next := by
-        unfold insertRawItem?
+        rw [insertRawItem?_eq_reference]
+        unfold insertRawItemReference?
         split
         next present =>
           exact (headAbsent
@@ -9983,7 +10140,8 @@ private theorem insertRawSeeds?_eq_certified
       rw [induction next unique.2 restAbsent restFresh]
       congr 1
       simp [insertRawSeedsCertified, next, transition, Counter.charge,
-        insertUnitAddresses, List.reverse_cons, List.append_assoc]
+        insertRawItemKeys, insertUnitAddresses, List.reverse_cons,
+        List.append_assoc]
 
 private theorem rawSeedInsertAddress_begin_fresh
     (file : WorkspaceFile) (tokens : List Token) :
@@ -11352,6 +11510,10 @@ private def phaseBTotalityWitnessPhaseA
     (file : WorkspaceFile) (tokens : List Token) :
     PhaseAOpen file tokens := {
   rawItems := rawSaturation tokens
+  rawItemIndex := Std.HashSet.ofList
+    ((rawSaturation tokens).map rawItemHashKey)
+  rawItemIndexed := rawItemHashIndex_contains_eq_true_iff
+    (rawSaturation tokens)
   completionRows := buildRawCompletionRows (rawSaturation tokens)
   completionRows_eq := rfl
   itemQueue := []
@@ -11484,7 +11646,8 @@ private theorem insertRawItem?_reservedFresh
     (invariant : PhaseAReservedFresh current.counter)
     (selected : insertRawItem? current source item = some result) :
     PhaseAReservedFresh result.counter := by
-  unfold insertRawItem? at selected
+  rw [insertRawItem?_eq_reference] at selected
+  unfold insertRawItemReference? at selected
   split at selected
   · cases selected
     exact invariant

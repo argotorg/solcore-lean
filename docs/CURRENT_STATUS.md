@@ -129,6 +129,11 @@ share. A waiting item therefore visits only completed items that can join it,
 and a completed item visits only the matching waiting items. Each group retains
 discovery order, and a checked equivalence theorem shows that skipping every
 other item has exactly the same result as the former full scan.
+The discovered raw-item list is likewise retained as the ordered proof view,
+while a coherent hash set answers duplicate checks. Normal insertions update
+both views together, the seed block extends the existing set in seed order,
+and normalization reuses the same set because it preserves membership. The
+indexed decision is proved equal to the former list search.
 Production candidates are grouped by left-hand-side symbol once, in
 source-production order, and the same proved index is shared by Phase A,
 contextual recognition, and value evaluation.
@@ -143,10 +148,10 @@ use that same indexed decision procedure; charge order, failures, and resulting
 states are unchanged.
 
 On the development host, the native benchmark's `tiny` case (`data A;`) fell
-from about 89.0 seconds before these passes to 0.297–0.314 seconds across five
-fresh-process runs (median 0.301 seconds). The latest observed `empty` elapsed
-time was 0.037 seconds. `/usr/bin/time` reported a maximum resident set size of
-59,981,824 bytes for `tiny`.
+from about 89.0 seconds before these passes to 0.140–0.148 seconds across five
+fresh-process runs (median 0.141 seconds). The latest observed `empty` elapsed
+time was 0.016 seconds. `/usr/bin/time` reported a maximum resident set size of
+60,604,416 bytes for `tiny`.
 These are machine-dependent observations, not language limits or performance
 guarantees. Representative-file and memory measurements are still needed
 before claiming interactive or fuzzing-speed readiness.

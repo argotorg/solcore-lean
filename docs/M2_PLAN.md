@@ -171,6 +171,10 @@ preserves source-production order and supplies candidates to Phase A,
 contextual recognition, and value evaluation. Phase B checks each fixed
 guard-finalization block through the coherent hash index and then batches its
 proved-fresh addresses.
+The raw-item discovery list is retained, but a coherent structural hash set now
+answers duplicate checks. Insertions update both views, normalization reuses
+the set after proving membership unchanged, and the fast decision is exactly
+equal to the former list search.
 Exact-equivalence theorems relate each optimized path to the
 retained checked implementation. The counter continues to use `usedRev` as its
 proof ledger, with a coherent hash set accelerating duplicate checks. The
@@ -178,9 +182,9 @@ proved correspondence between them means that charge order, failures, and
 resulting states are unchanged. Direct completion and production-activation
 prechecks also use this indexed membership decision. On the development host,
 the native `tiny` benchmark (`data A;`) improved from about 89.0 seconds to
-0.297–0.314 seconds across five fresh-process runs (median 0.301 seconds), and
-the latest `empty` elapsed time was 0.037 seconds. `/usr/bin/time` reported a
-maximum resident set size of 59,981,824 bytes for `tiny`.
+0.140–0.148 seconds across five fresh-process runs (median 0.141 seconds), and
+the latest `empty` elapsed time was 0.016 seconds. `/usr/bin/time` reported a
+maximum resident set size of 60,604,416 bytes for `tiny`.
 This is a substantial improvement, but the two synthetic cases do not establish
 interactive or high-throughput readiness.
 

@@ -160,6 +160,11 @@ duplicate-free Phase A seed block is also materialized in one reference-exact
 step. Production candidates are grouped once by left-hand-side symbol in their
 original order, with the proved index shared by Phase A, contextual
 recognition, and value evaluation.
+The ordered raw-item list remains the discovery and proof view, while a
+coherent structural hash set handles duplicate checks. Dynamic insertion and
+bulk seeding update both views, normalization preserves the set under a proved
+membership equality, and the indexed decision is exactly equivalent to the
+retained list search.
 Phase B checks the eight finalization slots for each guard through the coherent
 hash index, then batches the proved-fresh block. Exact-equivalence theorems
 preserve the checked reference result for these execution changes. The counter
@@ -171,10 +176,10 @@ decision procedure, while charge order, failures, and resulting states do not
 change.
 
 On the development host, the native `tiny` benchmark (`data A;`) took about
-89.0 seconds before these passes and 0.297–0.314 seconds across five
-fresh-process runs afterward (median 0.301 seconds). The latest observed
-`empty` elapsed time was 0.037 seconds. `/usr/bin/time` reported a maximum
-resident set size of 59,981,824 bytes for `tiny`.
+89.0 seconds before these passes and 0.140–0.148 seconds across five
+fresh-process runs afterward (median 0.141 seconds). The latest observed
+`empty` elapsed time was 0.016 seconds. `/usr/bin/time` reported a maximum
+resident set size of 60,604,416 bytes for `tiny`.
 These observations are neither normative limits nor stable benchmarks;
 broader runtime and memory behavior remains uncharacterized.
 
