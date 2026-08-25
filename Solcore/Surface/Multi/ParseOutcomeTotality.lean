@@ -3,6 +3,7 @@ import Solcore.Surface.Multi.NonAssociativeOperandPrefixExclusive
 import Solcore.Surface.Multi.NonAssociativePresentEdgeReflection
 import Solcore.Surface.Multi.PostLogicalEofClosure
 import Solcore.Surface.Multi.RootlessNormalizationDottedRank
+import Solcore.Surface.Multi.RootlessNormalizationDottedStaticTotality
 import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
 
 set_option autoImplicit false
@@ -1651,5 +1652,88 @@ theorem executeObservedContextualParseOfBoundedDottedSearch_sound
       file tokens owned
         (executeObservedContextualNonAssociativeCertificateBool_eq_true
           file tokens owned))
+
+/-- The concrete parser's bounded dotted search always succeeds. -/
+theorem executeObservedContextualBoundedDottedPotentialSearchSucceeds
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    ExecuteObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned := by
+  let result := Chart.executeObservedContextualValueWorklistMulti
+    file tokens owned
+  let selected :=
+    Chart.executeObservedContextualValueWorklistMulti_selected
+      file tokens owned
+  let recognitionSelected :=
+    Chart.executeObservedContextualValueWorklistMulti?_recognition
+      file tokens owned result selected
+  let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+    file tokens owned result.recognition recognitionSelected
+  let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+    file tokens owned result.recognition recognitionSelected
+  let cursor := computedGreatestReachableCursor owned correct final
+  change BoundedFrontierDottedGrammarRankSearchSucceeds
+    owned correct final cursor
+  exact boundedFrontierDottedGrammarRankSearchSucceeds
+    owned correct final cursor
+      (computedGreatestReachableCursor_spec owned correct final)
+
+/-- The selected concrete worklist has rootless executable progress. -/
+theorem executeObservedContextualValueWorklistMulti_rootlessExecutableProgress
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    let selected :=
+      Chart.executeObservedContextualValueWorklistMulti_selected
+        file tokens owned
+    let recognitionSelected :=
+      Chart.executeObservedContextualValueWorklistMulti?_recognition
+        file tokens owned result selected
+    let correct := executeObservedContextualWorklistMulti?_phaseBCorrect
+      file tokens owned result.recognition recognitionSelected
+    let final := Chart.executeObservedContextualWorklistMulti?_allGuardsFinal
+      file tokens owned result.recognition recognitionSelected
+    RootlessExecutableProgress
+      file tokens result.recognition.memo correct final := by
+  exact
+    executeObservedContextualValueWorklistMulti_rootlessExecutableProgress_of_boundedDottedSearch
+      file tokens owned
+        (executeObservedContextualBoundedDottedPotentialSearchSucceeds
+          file tokens owned)
+
+/-- Unconditional executable parse outcome for one owned token stream. -/
+def executeObservedContextualParse
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Except ParseDiagnostic ParsedModuleV1 :=
+  executeObservedContextualParseOfBoundedDottedSearch file tokens owned
+    (executeObservedContextualBoundedDottedPotentialSearchSucceeds
+      file tokens owned)
+
+/-- The unconditional parser selects exactly the implementation outcome. -/
+theorem executeObservedContextualParse_selected
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    let result := Chart.executeObservedContextualValueWorklistMulti
+      file tokens owned
+    result.parseOutcome? file =
+      some (executeObservedContextualParse file tokens owned) := by
+  exact executeObservedContextualParseOfBoundedDottedSearch_selected
+    file tokens owned
+      (executeObservedContextualBoundedDottedPotentialSearchSucceeds
+        file tokens owned)
+
+/-- The unconditional executable parse is declaratively sound. -/
+theorem executeObservedContextualParse_sound
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    match executeObservedContextualParse file tokens owned with
+    | .ok module => Parses file tokens module
+    | .error diagnostic => ParseDiagnostic.Applies file tokens diagnostic := by
+  exact executeObservedContextualParseOfBoundedDottedSearch_sound
+    file tokens owned
+      (executeObservedContextualBoundedDottedPotentialSearchSucceeds
+        file tokens owned)
 
 end Solcore.Surface.Multi
