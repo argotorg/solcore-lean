@@ -241,6 +241,56 @@ theorem dottedStaticRankCell_eq (waiting : DottedRhs)
         dottedStaticCompletionRankCell waiting child) :=
   rfl
 
+set_option maxRecDepth 20000 in
+private theorem dottedStaticPredictionRankCell_sound
+    (waiting : DottedRhs) (child : ProductionId)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal child.lhs))
+    (nonempty : child.rhs ≠ [])
+    (accepted : dottedStaticPredictionRankCell waiting child = true) :
+    dottedStaticComponentRank (dottedStaticStart child) <
+      dottedStaticComponentRank waiting := by
+  rcases List.getElem?_eq_some_iff.mp next with
+    ⟨incomplete, selected⟩
+  simp [dottedStaticPredictionRankCell,
+    dottedStaticPredictionRankCellAt, incomplete, selected,
+    nonempty] at accepted
+  simpa [dottedStaticComponentRank, dottedStaticValueAt,
+    dottedStaticArrayValue, dottedStaticStart, dottedStaticIndex] using accepted
+
+set_option maxRecDepth 20000 in
+private theorem dottedStaticEpsilonRankCell_sound
+    (waiting : DottedRhs) (child : ProductionId)
+    (incomplete : waiting.dot.val < waiting.production.rhs.length)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal child.lhs))
+    (empty : child.rhs = [])
+    (accepted : dottedStaticEpsilonRankCell waiting child = true) :
+    dottedStaticComponentRank (dottedStaticAdvance waiting incomplete) <
+      dottedStaticComponentRank waiting := by
+  have selected := (List.getElem?_eq_some_iff.mp next).2
+  simp [dottedStaticEpsilonRankCell,
+    dottedStaticEpsilonRankCellAt, incomplete, selected, empty] at accepted
+  simpa [dottedStaticComponentRank, dottedStaticValueAt,
+    dottedStaticArrayValue, dottedStaticAdvance, dottedStaticIndex,
+    Nat.add_assoc] using accepted
+
+set_option maxRecDepth 20000 in
+private theorem dottedStaticCompletionRankCell_sound
+    (waiting : DottedRhs) (child : ProductionId)
+    (incomplete : waiting.dot.val < waiting.production.rhs.length)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal child.lhs))
+    (accepted : dottedStaticCompletionRankCell waiting child = true) :
+    DottedStaticCompletionDecrease waiting child incomplete := by
+  have selected := (List.getElem?_eq_some_iff.mp next).2
+  simp [dottedStaticCompletionRankCell,
+    dottedStaticCompletionRankCellAt, incomplete, selected] at accepted
+  simpa [DottedStaticCompletionDecrease, dottedStaticComponentRank,
+    dottedStaticPhase, dottedStaticValueAt, dottedStaticArrayValue,
+    dottedStaticAdvance, dottedStaticComplete, dottedStaticIndex,
+    Nat.add_assoc] using accepted
+
 /-- Expanded productions with one requested left-hand side. -/
 def dottedStaticProductionsFor
     (lhs : NonterminalSymbol) : List ProductionId :=
@@ -327,6 +377,22 @@ def dottedStaticRankRow (waiting : DottedRhs) : Bool :=
           (dottedStaticRankCell waiting)
   else
     true
+
+private def dottedStaticRankTable : Bool :=
+  allDottedRhs.all dottedStaticRankRow
+
+private theorem dottedStaticRankCell_true_of_table
+    (tableAccepted : dottedStaticRankTable = true)
+    (waiting : DottedRhs) (child : ProductionId)
+    (next : waiting.production.rhs[waiting.dot.val]? =
+      some (.nonterminal child.lhs)) :
+    dottedStaticRankCell waiting child = true := by
+  rcases List.getElem?_eq_some_iff.mp next with
+    ⟨incomplete, selected⟩
+  have row := (List.all_eq_true.mp tableAccepted) waiting
+    (allDottedRhs_complete waiting)
+  simp [dottedStaticRankRow, incomplete, selected] at row
+  exact row child (dottedStaticProductionsFor_complete child)
 
 /-- A consuming-prefix certificate excludes an all-nullable prefix. -/
 theorem dottedStaticPrefixConsumes_sound (dotted : DottedRhs)
