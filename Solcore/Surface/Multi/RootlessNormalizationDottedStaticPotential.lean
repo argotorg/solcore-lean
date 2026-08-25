@@ -129,9 +129,13 @@ def DottedStaticCompletionDecrease
       (dottedStaticPhase after < dottedStaticPhase finished ∨
         dottedStaticPrefixConsumes waiting = true)
 
-/-- Prediction edge check for one waiting/child pair. -/
-def dottedStaticPredictionRankCell
-    (waiting : DottedRhs) (child : ProductionId) : Bool :=
+private abbrev dottedStaticArrayValue
+    (values : Array Nat) (index : Nat) : Nat :=
+  (values[index]?).getD 0
+
+private def dottedStaticPredictionRankCellAt
+    (components : Array Nat) (waiting : DottedRhs)
+    (child : ProductionId) (waitingIndex childBase : Nat) : Bool :=
   if incomplete : waiting.dot.val < waiting.production.rhs.length then
     match waiting.production.rhs[waiting.dot.val] with
     | .terminal _ => true
@@ -140,25 +144,24 @@ def dottedStaticPredictionRankCell
           if child.rhs = [] then
             true
           else
-            decide (dottedStaticComponentRank (dottedStaticStart child) <
-              dottedStaticComponentRank waiting)
+            decide (dottedStaticArrayValue components childBase <
+              dottedStaticArrayValue components waitingIndex)
         else
           true
   else
     true
 
-/-- Direct epsilon edge check for one waiting/child pair. -/
-def dottedStaticEpsilonRankCell
-    (waiting : DottedRhs) (child : ProductionId) : Bool :=
+private def dottedStaticEpsilonRankCellAt
+    (components : Array Nat) (waiting : DottedRhs)
+    (child : ProductionId) (waitingIndex : Nat) : Bool :=
   if incomplete : waiting.dot.val < waiting.production.rhs.length then
     match waiting.production.rhs[waiting.dot.val] with
     | .terminal _ => true
     | .nonterminal lhs =>
         if child.lhs = lhs then
           if child.rhs = [] then
-            decide (dottedStaticComponentRank
-                (dottedStaticAdvance waiting incomplete) <
-              dottedStaticComponentRank waiting)
+            decide (dottedStaticArrayValue components (waitingIndex + 1) <
+              dottedStaticArrayValue components waitingIndex)
           else
             true
         else
@@ -166,34 +169,77 @@ def dottedStaticEpsilonRankCell
   else
     true
 
-/-- Completion edge check for one waiting/child pair. -/
-def dottedStaticCompletionRankCell
-    (waiting : DottedRhs) (child : ProductionId) : Bool :=
+private def dottedStaticCompletionRankCellAt
+    (components phases : Array Nat) (waiting : DottedRhs)
+    (child : ProductionId) (waitingIndex childBase : Nat) : Bool :=
   if incomplete : waiting.dot.val < waiting.production.rhs.length then
     match waiting.production.rhs[waiting.dot.val] with
     | .terminal _ => true
     | .nonterminal lhs =>
         if child.lhs = lhs then
-          let after := dottedStaticAdvance waiting incomplete
-          let finished := dottedStaticComplete child
-          decide (dottedStaticComponentRank after <
-              dottedStaticComponentRank finished) ||
-            (decide (dottedStaticComponentRank after =
-                dottedStaticComponentRank finished) &&
-              (decide (dottedStaticPhase after <
-                  dottedStaticPhase finished) ||
+          let after := waitingIndex + 1
+          let finished := childBase + child.rhs.length
+          decide (dottedStaticArrayValue components after <
+              dottedStaticArrayValue components finished) ||
+            (decide (dottedStaticArrayValue components after =
+                dottedStaticArrayValue components finished) &&
+              (decide (dottedStaticArrayValue phases after <
+                  dottedStaticArrayValue phases finished) ||
                 dottedStaticPrefixConsumes waiting))
         else
           true
   else
     true
 
+/-- Prediction edge check for one waiting/child pair. -/
+def dottedStaticPredictionRankCell
+    (waiting : DottedRhs) (child : ProductionId) : Bool :=
+  let components := dottedStaticComponentValues.toArray
+  let waitingIndex := dottedStaticIndex waiting
+  let childBase :=
+    (dottedStaticProductionOffsets[child.index]?).getD 0
+  dottedStaticPredictionRankCellAt components waiting child
+    waitingIndex childBase
+
+/-- Direct epsilon edge check for one waiting/child pair. -/
+def dottedStaticEpsilonRankCell
+    (waiting : DottedRhs) (child : ProductionId) : Bool :=
+  let components := dottedStaticComponentValues.toArray
+  dottedStaticEpsilonRankCellAt components waiting child
+    (dottedStaticIndex waiting)
+
+/-- Completion edge check for one waiting/child pair. -/
+def dottedStaticCompletionRankCell
+    (waiting : DottedRhs) (child : ProductionId) : Bool :=
+  let components := dottedStaticComponentValues.toArray
+  let phases := dottedStaticPhaseValues.toArray
+  let waitingIndex := dottedStaticIndex waiting
+  let childBase :=
+    (dottedStaticProductionOffsets[child.index]?).getD 0
+  dottedStaticCompletionRankCellAt components phases waiting child
+    waitingIndex childBase
+
 /-- Combined static edge check for one waiting/child pair. -/
 def dottedStaticRankCell
     (waiting : DottedRhs) (child : ProductionId) : Bool :=
-  dottedStaticPredictionRankCell waiting child &&
-    dottedStaticEpsilonRankCell waiting child &&
-    dottedStaticCompletionRankCell waiting child
+  let components := dottedStaticComponentValues.toArray
+  let phases := dottedStaticPhaseValues.toArray
+  let waitingIndex := dottedStaticIndex waiting
+  let childBase :=
+    (dottedStaticProductionOffsets[child.index]?).getD 0
+  dottedStaticPredictionRankCellAt components waiting child
+      waitingIndex childBase &&
+    dottedStaticEpsilonRankCellAt components waiting child waitingIndex &&
+    dottedStaticCompletionRankCellAt components phases waiting child
+      waitingIndex childBase
+
+theorem dottedStaticRankCell_eq (waiting : DottedRhs)
+    (child : ProductionId) :
+    dottedStaticRankCell waiting child =
+      (dottedStaticPredictionRankCell waiting child &&
+        dottedStaticEpsilonRankCell waiting child &&
+        dottedStaticCompletionRankCell waiting child) :=
+  rfl
 
 /-- Expanded productions with one requested left-hand side. -/
 def dottedStaticProductionsFor
