@@ -152,7 +152,9 @@ it, classifies completion items once, rejects incompatible prediction
 candidates before rebuilding the waiting production, indexes complete-item
 recognition, removes whole-item self comparisons from the role-directed
 completion scan, and materializes the Phase A evidence table in a linear bulk
-step.
+step. Production candidates are grouped once by left-hand-side symbol in their
+original order, with the proved index shared by Phase A, contextual
+recognition, and value evaluation.
 Phase B checks the eight finalization slots for each guard through the coherent
 hash index, then batches the proved-fresh block. Exact-equivalence theorems
 preserve the checked reference result for these execution changes. The counter
@@ -162,10 +164,10 @@ agreement between these two views ensures that only lookup cost changes;
 charge order, failures, and resulting states do not.
 
 On the development host, the native `tiny` benchmark (`data A;`) took about
-89.0 seconds before these passes and 2.339 and 2.425 seconds across two
-fresh-process runs afterward (about 2.38 seconds). The latest observed `empty`
-elapsed time was 0.365 seconds. `/usr/bin/time` reported a maximum resident set
-size of 59,965,440 bytes for `tiny`.
+89.0 seconds before these passes and 2.116 and 2.142 seconds across two
+fresh-process runs afterward (about 2.13 seconds). The latest observed `empty`
+elapsed time was 0.304 seconds. `/usr/bin/time` reported a maximum resident set
+size of 59,588,608 bytes for `tiny`.
 These observations are neither normative limits nor stable benchmarks;
 broader runtime and memory behavior remains uncharacterized.
 

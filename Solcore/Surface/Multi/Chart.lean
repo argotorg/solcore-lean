@@ -1,3 +1,4 @@
+import Std.Data.HashMap.Lemmas
 import Std.Data.HashSet.Lemmas
 import Solcore.Surface.Multi.ParserCore
 
@@ -997,6 +998,27 @@ private def listSiteFastHash : ListSite → UInt64
   | .list1 site =>
       mixHash (hash (1 : Nat)) (grammarSiteOfKindFastHash site)
 
+private def nonterminalSymbolFastHash : NonterminalSymbol → UInt64
+  | .rule rule =>
+      mixHash (hash (0 : Nat)) (grammarRuleIdFastHash rule)
+  | .aux site =>
+      mixHash (hash (1 : Nat)) (grammarSiteFastHash site)
+  | .tail site =>
+      mixHash (hash (2 : Nat)) (listSiteFastHash site)
+
+private instance : LawfulBEq NonterminalSymbol where
+  rfl := by
+    intro symbol
+    change decide (symbol = symbol) = true
+    exact of_decide_eq_self_eq_true symbol
+  eq_of_beq := by
+    intro left right equal
+    change decide (left = right) = true at equal
+    exact of_decide_eq_true equal
+
+private instance : Hashable NonterminalSymbol where
+  hash := nonterminalSymbolFastHash
+
 private def productionIdFastHash : ProductionId → UInt64
   | .root rule =>
       mixHash (hash (0 : Nat)) (grammarRuleIdFastHash rule)
@@ -1812,6 +1834,51 @@ private inductive RawCompletionRole where
   | inactive
   deriving DecidableEq
 
+/-- Build each left-hand-side row in the original production order. -/
+private def buildProductionLhsRows :
+    List ProductionId →
+      Std.HashMap NonterminalSymbol (List ProductionId)
+  | [] => ∅
+  | production :: rest =>
+      let rows := buildProductionLhsRows rest
+      rows.insert production.lhs
+        (production :: rows.getD production.lhs [])
+
+private theorem buildProductionLhsRows_getD
+    (productions : List ProductionId) (symbol : NonterminalSymbol) :
+    (buildProductionLhsRows productions).getD symbol [] =
+      productions.filter fun production =>
+        decide (production.lhs = symbol) := by
+  induction productions generalizing symbol with
+  | nil => simp [buildProductionLhsRows]
+  | cons production rest induction =>
+      by_cases same : production.lhs = symbol
+      · subst symbol
+        simp [buildProductionLhsRows, induction]
+      · rw [buildProductionLhsRows, Std.HashMap.getD_insert]
+        have different : (production.lhs == symbol) = false := by
+          change decide (production.lhs = symbol) = false
+          simp [same]
+        simp [different, same, induction]
+
+/-- Immutable production rows paired with their exact source-order law. -/
+private structure ProductionLhsRows where
+  table : Std.HashMap NonterminalSymbol (List ProductionId)
+  rows_eq : ∀ symbol, table.getD symbol [] =
+    allProductionIds.filter fun production =>
+      decide (production.lhs = symbol)
+
+private def canonicalProductionLhsRows : ProductionLhsRows := {
+  table := buildProductionLhsRows allProductionIds
+  rows_eq := buildProductionLhsRows_getD allProductionIds
+}
+
+private def ProductionLhsRows.candidates
+    (rows : ProductionLhsRows) :
+    RawCompletionRole → List ProductionId
+  | .waiting symbol => rows.table.getD symbol []
+  | .finished _ | .inactive => []
+
 /-- Classify an item once when it enters Phase A. -/
 private def rawCompletionRole {tokens : List Token}
     (item : DottedItem tokens) : RawCompletionRole :=
@@ -1831,6 +1898,7 @@ private structure PhaseAOpen (file : WorkspaceFile) (tokens : List Token) where
   itemQueue : List (DottedItem tokens)
   rawEdges : List (PackedEdge file tokens)
   edgeQueue : List (PackedEdge file tokens)
+  productionRows : ProductionLhsRows
 
 private def beginPhaseA (file : WorkspaceFile) (tokens : List Token) :
     CountedState tokens (PhaseAOpen file tokens) := {
@@ -1841,6 +1909,7 @@ private def beginPhaseA (file : WorkspaceFile) (tokens : List Token) :
     itemQueue := []
     rawEdges := []
     edgeQueue := []
+    productionRows := canonicalProductionLhsRows
   }
   counter := (Counter.empty tokens).charge
     (.phase .initializePhaseA) (by simp [Counter.empty])
@@ -1854,6 +1923,15 @@ private def beginPhaseA (file : WorkspaceFile) (tokens : List Token) :
 private structure PhaseASealed (file : WorkspaceFile) (tokens : List Token) where
   rawItems : List (DottedItem tokens)
   rawEdges : List (PackedEdge file tokens)
+  productionRows : ProductionLhsRows
+
+private def PhaseAOpen.seal
+    {file : WorkspaceFile} {tokens : List Token}
+    (state : PhaseAOpen file tokens) : PhaseASealed file tokens := {
+  rawItems := state.rawItems
+  rawEdges := state.rawEdges
+  productionRows := state.productionRows
+}
 
 private structure PhaseBOpen (file : WorkspaceFile) (tokens : List Token) where
   phaseA : PhaseASealed file tokens
@@ -1868,7 +1946,7 @@ private def enterPhaseB? {file : WorkspaceFile} {tokens : List Token}
     if _edgesDone : current.payload.edgeQueue = [] then
       if _saturated : current.payload.rawItems = rawSaturation tokens then
         runMappedPrimitive? current (.phase .sealAEnterB) fun state => {
-          phaseA := ⟨state.rawItems, state.rawEdges⟩
+          phaseA := state.seal
           cells := fun _ => none
           remaining := allGuardInstanceKeys tokens
           finalizedRev := []
@@ -2350,6 +2428,30 @@ private instance rawPredictionRoleCompatibleDecidable
   cases waitingRole <;>
     simp only [RawPredictionRoleCompatible] <;> infer_instance
 
+private theorem ProductionLhsRows.candidates_eq_filter
+    (rows : ProductionLhsRows) (waitingRole : RawCompletionRole) :
+    rows.candidates waitingRole =
+      allProductionIds.filter fun predicted =>
+        decide (RawPredictionRoleCompatible waitingRole predicted) := by
+  cases waitingRole with
+  | waiting symbol =>
+      rw [ProductionLhsRows.candidates, rows.rows_eq]
+      apply List.filter_congr
+      intro predicted _member
+      simp [RawPredictionRoleCompatible]
+  | finished symbol =>
+      rw [ProductionLhsRows.candidates]
+      symm
+      apply List.filter_eq_nil_iff.mpr
+      intro predicted _member
+      simp [RawPredictionRoleCompatible]
+  | inactive =>
+      rw [ProductionLhsRows.candidates]
+      symm
+      apply List.filter_eq_nil_iff.mpr
+      intro predicted _member
+      simp [RawPredictionRoleCompatible]
+
 private theorem predictedItem?_eq_none_of_role_incompatible
     {tokens : List Token} (waiting : DottedItem tokens)
     (predicted : ProductionId)
@@ -2432,13 +2534,36 @@ private theorem attemptPredictionsForRole?_exact
       intro next _nextEq
       exact induction next
 
+private theorem attemptPredictionsForRole?_filter_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : DottedItem tokens) (waitingRole : RawCompletionRole) :
+    ∀ candidates (current : CountedState tokens (PhaseAOpen file tokens)),
+      attemptPredictionsForRole? waiting waitingRole
+          (candidates.filter fun predicted =>
+            decide (RawPredictionRoleCompatible waitingRole predicted))
+          current =
+        attemptPredictionsForRole? waiting waitingRole candidates current := by
+  intro candidates
+  induction candidates with
+  | nil => intro current; rfl
+  | cons predicted rest induction =>
+      intro current
+      by_cases compatible :
+          RawPredictionRoleCompatible waitingRole predicted
+      · simp [attemptPredictionsForRole?, compatible, induction]
+      · have noOp : attemptPredictionForRole? current waiting predicted
+            waitingRole = some current := by
+          simp [attemptPredictionForRole?, compatible]
+        simp [attemptPredictionsForRole?, compatible, noOp, induction]
+
 private def attemptPredictionsFast?
     {file : WorkspaceFile} {tokens : List Token}
     (waiting : DottedItem tokens)
     (current : CountedState tokens (PhaseAOpen file tokens)) :
     Option (CountedState tokens (PhaseAOpen file tokens)) :=
-  attemptPredictionsForRole? waiting (rawCompletionRole waiting)
-    allProductionIds current
+  let waitingRole := rawCompletionRole waiting
+  attemptPredictionsForRole? waiting waitingRole
+    (current.payload.productionRows.candidates waitingRole) current
 
 private theorem attemptPredictionsFast?_eq_reference
     {file : WorkspaceFile} {tokens : List Token}
@@ -2446,6 +2571,9 @@ private theorem attemptPredictionsFast?_eq_reference
     (current : CountedState tokens (PhaseAOpen file tokens)) :
     attemptPredictionsFast? waiting current =
       attemptPredictions? waiting allProductionIds current := by
+  simp only [attemptPredictionsFast?]
+  rw [current.payload.productionRows.candidates_eq_filter]
+  rw [attemptPredictionsForRole?_filter_exact]
   exact attemptPredictionsForRole?_exact waiting allProductionIds current
 
 private def rawScanApplicable {tokens : List Token}
@@ -7953,20 +8081,10 @@ private instance {tokens : List Token} : LawfulBEq
     change rawRecognitionHashKeyBEq left right = true at equal
     exact of_decide_eq_true equal
 
-private def nonterminalSymbolHash : NonterminalSymbol → UInt64
-  | .rule rule =>
-      mixHash (hash (0 : Nat)) (hash rule.index)
-  | .aux site =>
-      mixHash (hash (1 : Nat)) (hash site.index)
-  | .tail (.list0 site) =>
-      mixHash (hash (2 : Nat)) (hash site.site.index)
-  | .tail (.list1 site) =>
-      mixHash (hash (3 : Nat)) (hash site.site.index)
-
 private instance {tokens : List Token} : Hashable
     (RawRecognitionHashKey tokens) where
   hash key :=
-    mixHash (nonterminalSymbolHash key.symbol)
+    mixHash (nonterminalSymbolFastHash key.symbol)
       (mixHash (hash key.start.val) (hash key.finish.val))
 
 private def rawRecognitionHashKey
@@ -9562,7 +9680,7 @@ private def enterIndexedPhaseBUnchecked?
     payload := indexed.payload.phaseA
     counter := indexed.counter
   } (.phase .sealAEnterB) fun state => ({
-    phaseA := ⟨state.rawItems, state.rawEdges⟩
+    phaseA := state.seal
     cells := fun _ => none
     remaining := allGuardInstanceKeys tokens
     finalizedRev := []
@@ -10580,7 +10698,7 @@ private theorem enterPhaseB?_initializes
       next saturated =>
         have payload := phaseB_runMappedPrimitive?_payload current
           (.phase .sealAEnterB) (fun state => ({
-            phaseA := ⟨state.rawItems, state.rawEdges⟩
+            phaseA := state.seal
             cells := fun _ => none
             remaining := allGuardInstanceKeys tokens
             finalizedRev := []
@@ -10830,6 +10948,7 @@ private def phaseBTotalityWitnessPhaseA
   itemQueue := []
   rawEdges := []
   edgeQueue := []
+  productionRows := canonicalProductionLhsRows
 }
 
 private def phaseBTotalityWitnessEvaluator
@@ -11648,7 +11767,7 @@ private theorem enterIndexedPhaseB?_total_ready
     counter := current.counter
   }
   let transition := fun (state : PhaseAOpen file tokens) => ({
-    phaseA := ⟨state.rawItems, state.rawEdges⟩
+    phaseA := state.seal
     cells := fun _ => none
     remaining := allGuardInstanceKeys tokens
     finalizedRev := []
@@ -12309,6 +12428,32 @@ private def contextualPredictedItem?
       else
         none
   | _ => none
+
+private theorem contextualPredictedItem?_eq_none_of_role_incompatible
+    {tokens : List Token} (waiting : ContextualItemKey tokens)
+    (predicted : ProductionId)
+    (incompatible : ¬RawPredictionRoleCompatible
+      (rawCompletionRole waiting.raw) predicted) :
+    contextualPredictedItem? waiting predicted = none := by
+  by_cases nextInRange :
+      waiting.raw.dot.val < waiting.raw.production.rhs.length
+  · have lookupEq :
+        waiting.raw.production.rhs[waiting.raw.dot.val]? =
+          some waiting.raw.production.rhs[waiting.raw.dot.val] :=
+      List.getElem?_eq_getElem nextInRange
+    cases nextEq : waiting.raw.production.rhs[waiting.raw.dot.val] with
+    | terminal terminal =>
+        simp [contextualPredictedItem?, lookupEq, nextEq]
+    | nonterminal expected =>
+        have lhsDifferent : predicted.lhs ≠ expected := by
+          simpa [rawCompletionRole, nextInRange, nextEq,
+            RawPredictionRoleCompatible] using incompatible
+        simp [contextualPredictedItem?, lookupEq, nextEq, lhsDifferent]
+  · have lookupEq :
+        waiting.raw.production.rhs[waiting.raw.dot.val]? = none := by
+      rw [List.getElem?_eq_none_iff]
+      omega
+    simp [contextualPredictedItem?, lookupEq]
 
 /-- Construct a checked contextual scan directly from Core terminal evidence. -/
 private def contextualScannedEdge?
@@ -13956,6 +14101,66 @@ private def attemptPhaseCValuePredictions?
         owned current waiting predicted
       attemptPhaseCValuePredictions? owned waiting rest next
 
+private theorem attemptPhaseCValuePrediction?_eq_current_of_role_incompatible
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (incompatible : ¬RawPredictionRoleCompatible
+      (rawCompletionRole waiting.raw) predicted) :
+    attemptPhaseCValuePrediction? owned current waiting predicted =
+      some current := by
+  simp [attemptPhaseCValuePrediction?,
+    contextualPredictedItem?_eq_none_of_role_incompatible waiting predicted
+      incompatible]
+
+private theorem attemptPhaseCValuePredictions?_filter_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens) :
+    ∀ candidates
+      (current : CountedState tokens (PhaseCValueWorklist file tokens)),
+      attemptPhaseCValuePredictions? owned waiting
+          (candidates.filter fun predicted => decide
+            (RawPredictionRoleCompatible
+              (rawCompletionRole waiting.raw) predicted)) current =
+        attemptPhaseCValuePredictions? owned waiting candidates current := by
+  intro candidates
+  induction candidates with
+  | nil => intro current; rfl
+  | cons predicted rest induction =>
+      intro current
+      by_cases compatible : RawPredictionRoleCompatible
+          (rawCompletionRole waiting.raw) predicted
+      · simp [attemptPhaseCValuePredictions?, compatible, induction]
+      · have noOp :=
+          attemptPhaseCValuePrediction?_eq_current_of_role_incompatible
+            owned current waiting predicted compatible
+        simp [attemptPhaseCValuePredictions?, compatible, noOp, induction]
+
+private def attemptPhaseCValuePredictionsFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCValueWorklist file tokens)) :=
+  let waitingRole := rawCompletionRole waiting.raw
+  attemptPhaseCValuePredictions? owned waiting
+    (current.payload.recognition.phaseC.phaseA.productionRows.candidates
+      waitingRole) current
+
+private theorem attemptPhaseCValuePredictionsFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    (waiting : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
+    attemptPhaseCValuePredictionsFast? owned waiting current =
+      attemptPhaseCValuePredictions? owned waiting allProductionIds current := by
+  simp only [attemptPhaseCValuePredictionsFast?]
+  rw [current.payload.recognition.phaseC.phaseA.productionRows.candidates_eq_filter]
+  exact attemptPhaseCValuePredictions?_filter_exact owned waiting
+    allProductionIds current
+
 /-- Rebuild one retained structural scan, retrieve its exact source prefix,
 compute and classify its target, then charge traversal before publication. -/
 private def attemptPhaseCScannedEdge?
@@ -14095,8 +14300,7 @@ private def processPhaseCValueItem?
     (item : ContextualItemKey tokens)
     (current : CountedState tokens (PhaseCValueWorklist file tokens)) :
     Option (CountedState tokens (PhaseCValueWorklist file tokens)) := do
-  let predicted ← attemptPhaseCValuePredictions?
-    owned item allProductionIds current
+  let predicted ← attemptPhaseCValuePredictionsFast? owned item current
   let scanned ← attemptPhaseCRetainedScannedEdges? owned item
     predicted.payload.recognition.phaseC.contextualEdges predicted
   attemptPhaseCRetainedCompletedEdges? owned item
@@ -14296,6 +14500,60 @@ private def attemptContextualPredictions?
       let next ← attemptContextualPrediction? current waiting predicted
       attemptContextualPredictions? waiting rest next
 
+private theorem attemptContextualPrediction?_eq_current_of_role_incompatible
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseCWorklist file tokens))
+    (waiting : ContextualItemKey tokens) (predicted : ProductionId)
+    (incompatible : ¬RawPredictionRoleCompatible
+      (rawCompletionRole waiting.raw) predicted) :
+    attemptContextualPrediction? current waiting predicted = some current := by
+  simp [attemptContextualPrediction?,
+    contextualPredictedItem?_eq_none_of_role_incompatible waiting predicted
+      incompatible]
+
+private theorem attemptContextualPredictions?_filter_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens) :
+    ∀ candidates (current : CountedState tokens (PhaseCWorklist file tokens)),
+      attemptContextualPredictions? waiting
+          (candidates.filter fun predicted => decide
+            (RawPredictionRoleCompatible
+              (rawCompletionRole waiting.raw) predicted)) current =
+        attemptContextualPredictions? waiting candidates current := by
+  intro candidates
+  induction candidates with
+  | nil => intro current; rfl
+  | cons predicted rest induction =>
+      intro current
+      by_cases compatible : RawPredictionRoleCompatible
+          (rawCompletionRole waiting.raw) predicted
+      · simp [attemptContextualPredictions?, compatible, induction]
+      · have noOp :=
+          attemptContextualPrediction?_eq_current_of_role_incompatible
+            current waiting predicted compatible
+        simp [attemptContextualPredictions?, compatible, noOp, induction]
+
+private def attemptContextualPredictionsFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    Option (CountedState tokens (PhaseCWorklist file tokens)) :=
+  let waitingRole := rawCompletionRole waiting.raw
+  attemptContextualPredictions? waiting
+    (current.payload.phaseC.phaseA.productionRows.candidates waitingRole)
+    current
+
+private theorem attemptContextualPredictionsFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting : ContextualItemKey tokens)
+    (current : CountedState tokens (PhaseCWorklist file tokens)) :
+    attemptContextualPredictionsFast? waiting current =
+      attemptContextualPredictions? waiting allProductionIds current := by
+  simp only [attemptContextualPredictionsFast?]
+  rw [current.payload.phaseC.phaseA.productionRows.candidates_eq_filter]
+  exact attemptContextualPredictions?_filter_exact waiting
+    allProductionIds current
+
 private def contextualScanApplicable {tokens : List Token}
     (item : ContextualItemKey tokens) : Bool :=
   match item.raw.production.rhs[item.raw.dot.val]? with
@@ -14363,8 +14621,7 @@ private def processContextualItem?
     (item : ContextualItemKey tokens)
     (current : CountedState tokens (PhaseCWorklist file tokens)) :
     Option (CountedState tokens (PhaseCWorklist file tokens)) := do
-  let predicted ←
-    attemptContextualPredictions? item allProductionIds current
+  let predicted ← attemptContextualPredictionsFast? item current
   let scanned ← attemptContextualScan? owned predicted item
   attemptContextualCompletionsWith? item
     scanned.payload.phaseC.contextualItems scanned
@@ -15619,6 +15876,7 @@ private theorem processPhaseCValueItem?_recognition
     (selected : processPhaseCValueItem? owned item current = some result) :
     result.payload.recognition = current.payload.recognition := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -15906,6 +16164,7 @@ private theorem processPhaseCValueItem?_queuePrefixesAvailable
     (selected : processPhaseCValueItem? owned item current = some result) :
     result.payload.frontier.queuePrefixesAvailable = true := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -16390,6 +16649,7 @@ private theorem processContextualItem?_backpointerInvariant
     (selected : processContextualItem? owned item current = some result) :
     PhaseCBackpointerInvariant file tokens result.payload := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -19069,6 +19329,7 @@ private theorem processContextualItem?_operationalInvariant
     PhaseCOperationalInvariant file tokens result.payload ∧
       result.payload.phaseC.memo = current.payload.phaseC.memo := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -21287,6 +21548,7 @@ private theorem processContextualItem?_contentGrowth
     (selected : processContextualItem? owned item current = some result) :
     PhaseCContentGrowth current result := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -23352,6 +23614,7 @@ private theorem processContextualItem?_attemptLedger
     (selected : processContextualItem? owned item current = some result) :
     PhaseCAttemptLedgerMaterialized result := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -24066,6 +24329,7 @@ private theorem processContextualItem?_prediction_materializes
     (selected : processContextualItem? owned pivot current = some result) :
     item ∈ result.payload.phaseC.contextualItems := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predictions, predictionsEq, scanned, scannedEq, completionsEq⟩
@@ -24091,6 +24355,7 @@ private theorem processContextualItem?_scan_materializes
       ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
         retained.val = .scanned edge.before edge.after edge.cursor := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predictions, predictionsEq, scanned, scannedEq, completionsEq⟩
@@ -24123,6 +24388,7 @@ private theorem processContextualItem?_completion_materializes
           retained.val = .completed edge.waiting edge.finished edge.after
             edge.shared) := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predictions, predictionsEq, scanned, scannedEq, completionsEq⟩
@@ -30152,7 +30418,9 @@ private theorem processPhaseCValueItem?_total_processing
       scanned.payload.recognition.phaseC.contextualEdges scanned result
         scannedRecognized scannedTargets completedEq
   have selected : processPhaseCValueItem? owned source current = some result := by
-    simp [processPhaseCValueItem?, predictedEq, scannedEq, completedEq]
+    simp [processPhaseCValueItem?,
+      attemptPhaseCValuePredictionsFast?_eq_reference,
+      predictedEq, scannedEq, completedEq]
   exact ⟨result, selected,
     processPhaseCValueItem?_recognition owned source current result selected,
     resultSafe, resultPresent, resultNotQueued, resultNodup,
@@ -32448,6 +32716,7 @@ private theorem processContextualItem?_ledgerExact
     (selected : processContextualItem? owned item current = some result) :
     PhaseCBackpointerLedgerExact result := by
   unfold processContextualItem? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -33877,8 +34146,7 @@ private def processContextualItemMulti?
     (item : ContextualItemKey tokens)
     (current : CountedState tokens (PhaseCWorklist file tokens)) :
     Option (CountedState tokens (PhaseCWorklist file tokens)) := do
-  let predicted ←
-    attemptContextualPredictions? item allProductionIds current
+  let predicted ← attemptContextualPredictionsFast? item current
   let scanned ← attemptContextualScan? owned predicted item
   attemptContextualCompletionsWithMulti? item
     scanned.payload.phaseC.contextualItems scanned
@@ -33894,6 +34162,7 @@ private theorem processContextualItemMulti?_valueAddressesFresh
     (selected : processContextualItemMulti? owned item current = some result) :
     PhaseCValueAddressesFresh result.counter := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -33939,7 +34208,9 @@ private theorem processContextualItemMulti?_total_allSafe_backpointers
       scanned.payload.phaseC.contextualItems scanned scannedSafe scannedCovers
         scannedExact
   exact ⟨result, by
-    simp [processContextualItemMulti?, predictedEq, scannedEq, completedEq],
+    simp [processContextualItemMulti?,
+      attemptContextualPredictionsFast?_eq_reference,
+      predictedEq, scannedEq, completedEq],
     resultSafe, resultCovers, resultExact⟩
 
 end Solcore.Surface.Multi.Chart
@@ -34134,6 +34405,7 @@ private theorem processContextualItemMulti?_operationalInvariant
     PhaseCOperationalInvariant file tokens result.payload ∧
       result.payload.phaseC.memo = current.payload.phaseC.memo := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -34679,6 +34951,7 @@ private theorem processContextualItemMulti?_edgeSafe
     (selected : processContextualItemMulti? owned item current = some result) :
     PhaseCEdgeSafe result := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -35622,6 +35895,7 @@ private theorem processContextualItemMulti?_valueCompletionAttemptsFresh
     (selected : processContextualItemMulti? owned item current = some result) :
     PhaseCValueCompletionAttemptsFresh result.counter := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -36353,6 +36627,7 @@ private theorem processPhaseCValueItem?_used_mono
     (selected : processPhaseCValueItem? owned source current = some result) :
     current.counter.usedRev ⊆ result.counter.usedRev := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -36712,6 +36987,7 @@ private theorem processContextualItemMulti?_used_mono
     (selected : processContextualItemMulti? owned item current = some result) :
     current.counter.usedRev ⊆ result.counter.usedRev := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -37634,6 +37910,7 @@ private theorem processContextualItemMulti?_contentGrowth
       some result) :
     PhaseCContentGrowth current result := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -37653,6 +37930,7 @@ private theorem processContextualItemMulti?_attemptLedger
     (selected : processContextualItemMulti? owned item current = some result) :
     PhaseCAttemptLedgerMaterialized result := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -37795,6 +38073,7 @@ private theorem processContextualItemMulti?_prediction_materializes
       some result) :
     item ∈ result.payload.phaseC.contextualItems := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predictions, predictionsEq, scanned, scannedEq, completionsEq⟩
@@ -37821,6 +38100,7 @@ private theorem processContextualItemMulti?_scan_materializes
       ∃ retained, retained ∈ result.payload.phaseC.contextualEdges ∧
         retained.val = .scanned edge.before edge.after edge.cursor := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predictions, predictionsEq, scanned, scannedEq, completionsEq⟩
@@ -37854,6 +38134,7 @@ private theorem processContextualItemMulti?_completion_materializes
           retained.val = .completed edge.waiting edge.finished edge.after
             edge.shared) := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predictions, predictionsEq, scanned, scannedEq, completionsEq⟩
@@ -38510,6 +38791,7 @@ private theorem processContextualItemMulti?_edgesNodup
     (selected : processContextualItemMulti? owned item current = some result) :
     result.payload.phaseC.contextualEdges.Nodup := by
   unfold processContextualItemMulti? at selected
+  rw [attemptContextualPredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with
     ⟨predicted, predictedEq, scanned, scannedEq, completedEq⟩
@@ -38768,6 +39050,7 @@ private theorem processPhaseCValueItem?_valueTrace
     ContextualValueFrontierTrace owned recognition
       result.payload.frontier := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -39382,6 +39665,7 @@ private theorem processPhaseCValueItem?_frontierGrowth
     PhaseCValueFrontierGrowth current.payload.frontier
       result.payload.frontier := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -39790,6 +40074,7 @@ private theorem processPhaseCValueItem?_preserves_prefix_present
     (selected : processPhaseCValueItem? owned source current = some result) :
     result.payload.frontier.prefixMemberBool target = true := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -39935,6 +40220,7 @@ private theorem processPhaseCValueItem?_completionAttemptMaterialized
     (selected : processPhaseCValueItem? owned source current = some result) :
     PhaseCValueCompletionAttemptMaterialized result := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -40203,6 +40489,7 @@ private theorem processPhaseCValueItem?_prediction_target_present
     (selected : processPhaseCValueItem? owned source current = some result) :
     result.payload.frontier.prefixMemberBool item = true := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predictedState, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -40230,6 +40517,7 @@ private theorem processPhaseCValueItem?_scan_target_present
     (selected : processPhaseCValueItem? owned source current = some result) :
     result.payload.frontier.prefixMemberBool edge.after = true := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
@@ -40266,6 +40554,7 @@ private theorem processPhaseCValueItem?_completion_target_present
     (selected : processPhaseCValueItem? owned source current = some result) :
     result.payload.frontier.prefixMemberBool edge.after = true := by
   unfold processPhaseCValueItem? at selected
+  rw [attemptPhaseCValuePredictionsFast?_eq_reference] at selected
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq, scanned, scannedEq,
     completedEq⟩
