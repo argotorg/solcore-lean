@@ -448,6 +448,40 @@ theorem frontierDottedCompletionRankTable_eq_true_of_normalizes
     · simp [frontierDottedCompletionRankCell, reached, current]
   · simp [frontierDottedCompletionRankCell, reached]
 
+/-- Direct activation continuations suffice for the completion table: a
+completed module root is canonical, and every other completed item exposes
+one reached caller continuation. -/
+theorem frontierDottedCompletionRankTable_eq_true_of_continuations
+    {file : WorkspaceFile} {tokens : List Token}
+    (owned : TokensOwnedBy file tokens)
+    {memo : GuardMemo tokens}
+    (correct : PhaseBCorrect file tokens memo)
+    (final : AllGuardsFinal memo) (cursor : Boundary tokens)
+    (greatest : GreatestReachableCursor
+      file tokens memo correct final cursor)
+    (potential : FrontierDottedGrammarPotential tokens)
+    (decreases : ∀ parent finished after,
+      ContextualActivationParent
+        file tokens memo correct final parent finished →
+      CompleteItem finished.raw →
+      AdvanceItem parent.raw finished.raw.current after.raw →
+      frontierDottedGrammarRank potential after <
+        frontierDottedGrammarRank potential finished) :
+    frontierDottedCompletionRankTable
+      owned correct final cursor potential = true := by
+  apply frontierDottedCompletionRankTable_eq_true_of_normalizes
+    owned correct final cursor greatest potential
+  intro finished frontier complete
+  by_cases root : finished.raw.production = .root .module
+  · exact Or.inl
+      (contextualReach_completeModule_eq_canonical
+        frontier.2.1 root complete)
+  · rcases frontierReach_continuation_of_complete_nonroot
+        frontier complete root with
+      ⟨parent, after, activated, afterFrontier, advance⟩
+    exact Or.inr ⟨after, afterFrontier,
+      decreases parent finished after activated complete advance⟩
+
 private def dottedAdvanceItemDecision
     {tokens : List Token} (before : DottedItem tokens)
     (next : Boundary tokens) (after : DottedItem tokens) :
