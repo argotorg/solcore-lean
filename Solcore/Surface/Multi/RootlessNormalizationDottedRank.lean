@@ -94,6 +94,40 @@ theorem frontierDottedGrammarRank_continuation_lt_of_potential_lt
     frontierDottedGrammarRank potential after <
       frontierDottedGrammarRank potential finished :=
   decreases
+/-- If a static completion weight is unchanged, the caller must begin
+strictly before its child whenever zero-span callers select only strict
+static completion edges. -/
+theorem contextualActivationParent_origin_lt_of_equalCompletionWeight
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (nullablePrefix : DottedRhs → Bool) (weight : DottedRhs → Nat)
+    {parent finished after : ContextualItemKey tokens}
+    (activated : ContextualActivationParent
+      file tokens memo correct final parent finished)
+    (_complete : CompleteItem finished.raw)
+    (_advance : AdvanceItem parent.raw finished.raw.current after.raw)
+    (equalWeight :
+      weight (frontierDottedRhsOfItem after.raw) =
+        weight (frontierDottedRhsOfItem finished.raw))
+    (nullableAtOrigin : parent.raw.origin = parent.raw.current →
+      nullablePrefix (frontierDottedRhsOfItem parent.raw) = true)
+    (strictOfNullable :
+      nullablePrefix (frontierDottedRhsOfItem parent.raw) = true →
+      weight (frontierDottedRhsOfItem after.raw) <
+        weight (frontierDottedRhsOfItem finished.raw)) :
+    parent.raw.origin.val < finished.raw.origin.val := by
+  have ordered := contextualActivationParent_origin_le activated
+  apply Nat.lt_of_le_of_ne ordered
+  intro equalOriginValue
+  have equalOrigin : parent.raw.origin = finished.raw.origin :=
+    Fin.ext equalOriginValue
+  have parentAtOrigin : parent.raw.origin = parent.raw.current :=
+    equalOrigin.trans activated.2.2.1.symm
+  have decreases := strictOfNullable (nullableAtOrigin parentAtOrigin)
+  exact (Nat.ne_of_lt decreases) equalWeight
+
 
 private def dottedNextSymbolDecision
     {tokens : List Token} (item : DottedItem tokens)
