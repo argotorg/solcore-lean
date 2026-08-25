@@ -8,36 +8,13 @@ namespace Solcore.Surface.Multi
 open Grammar
 open Solcore.Workspace
 
-private def dottedStaticTotalityAdvance (waiting : DottedRhs)
-    (incomplete : waiting.dot.val < waiting.production.rhs.length) :
-    DottedRhs := {
-  production := waiting.production
-  dot := ⟨waiting.dot.val + 1, Nat.succ_lt_succ incomplete⟩
-}
-
-private def dottedStaticTotalityComplete
-    (production : ProductionId) : DottedRhs := {
-  production := production
-  dot := ⟨production.rhs.length, Nat.lt_succ_self _⟩
-}
-
-private def DottedStaticTotalityCompletionDecrease
-    (waiting : DottedRhs) (child : ProductionId)
-    (incomplete : waiting.dot.val < waiting.production.rhs.length) : Prop :=
-  let after := dottedStaticTotalityAdvance waiting incomplete
-  let finished := dottedStaticTotalityComplete child
-  dottedStaticComponentRank after < dottedStaticComponentRank finished ∨
-    dottedStaticComponentRank after = dottedStaticComponentRank finished ∧
-      (dottedStaticPhase after < dottedStaticPhase finished ∨
-        dottedStaticPrefixConsumes waiting = true)
-
 private theorem frontierDottedRhsOfItem_eq_staticTotalityAdvance
     {tokens : List Token} {before after : DottedItem tokens}
     {next : Boundary tokens}
     (incomplete : before.dot.val < before.production.rhs.length)
     (advance : AdvanceItem before next after) :
     frontierDottedRhsOfItem after =
-      dottedStaticTotalityAdvance
+      dottedStaticAdvance
         (frontierDottedRhsOfItem before) incomplete := by
   cases before with
   | mk beforeProduction beforeDot beforeOrigin beforeCurrent =>
@@ -47,7 +24,7 @@ private theorem frontierDottedRhsOfItem_eq_staticTotalityAdvance
           rcases advance with ⟨production, dot, _origin, _current⟩
           subst afterProduction
           simp only [frontierDottedRhsOfItem,
-            dottedStaticTotalityAdvance]
+            dottedStaticAdvance]
           congr 1
           exact Fin.ext dot
 
@@ -55,12 +32,12 @@ private theorem frontierDottedRhsOfItem_eq_staticTotalityComplete
     {tokens : List Token} {item : DottedItem tokens}
     (complete : CompleteItem item) :
     frontierDottedRhsOfItem item =
-      dottedStaticTotalityComplete item.production := by
+      dottedStaticComplete item.production := by
   cases item with
   | mk production dot origin current =>
       simp only [CompleteItem] at complete
       simp only [frontierDottedRhsOfItem,
-        dottedStaticTotalityComplete]
+        dottedStaticComplete]
       congr 1
       exact Fin.ext complete
 
@@ -86,7 +63,7 @@ private theorem dottedStaticCompletionOrientation_of_certificate
       (incomplete : waiting.dot.val < waiting.production.rhs.length),
       waiting.production.rhs[waiting.dot.val]? =
           some (.nonterminal child.lhs) →
-        DottedStaticTotalityCompletionDecrease
+        DottedStaticCompletionDecrease
           waiting child incomplete)
     (parent finished after : ContextualItemKey tokens)
     (activated : ContextualActivationParent
@@ -109,7 +86,7 @@ private theorem dottedStaticCompletionOrientation_of_certificate
   have static := completionCertificate
     (frontierDottedRhsOfItem parent.raw) finished.raw.production
     activated.2.1.1 activated.2.1.2
-  simp only [DottedStaticTotalityCompletionDecrease] at static
+  simp only [DottedStaticCompletionDecrease] at static
   rw [← afterEq, ← finishedEq] at static
   rcases static with componentLt | ⟨componentEq, phaseLt | consumes⟩
   · exact Or.inl componentLt
@@ -164,14 +141,14 @@ theorem boundedFrontierDottedGrammarRankSearchSucceeds_of_staticCertificates
           some (.nonterminal child.lhs) →
       child.rhs = [] →
       dottedStaticComponentRank
-          (dottedStaticTotalityAdvance waiting incomplete) <
+          (dottedStaticAdvance waiting incomplete) <
         dottedStaticComponentRank waiting)
     (completionCertificate : ∀ (waiting : DottedRhs)
       (child : ProductionId)
       (incomplete : waiting.dot.val < waiting.production.rhs.length),
       waiting.production.rhs[waiting.dot.val]? =
           some (.nonterminal child.lhs) →
-        DottedStaticTotalityCompletionDecrease
+        DottedStaticCompletionDecrease
           waiting child incomplete) :
     BoundedFrontierDottedGrammarRankSearchSucceeds
       owned correct final cursor := by
