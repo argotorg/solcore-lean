@@ -223,6 +223,100 @@ theorem frontierSpanPotential_nonempty_lt_epsilonBand
           omega)
       rowLe
 
+/-- A zero-span reached item has a nullable consumed prefix for every symbol
+predicate closed under the expanded productions. -/
+theorem contextualReach_zeroSpan_prefix_all_of_nullableClosure
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (nullableSymbol : GrammarSymbol → Bool)
+    (closed : ∀ production : ProductionId,
+      (production.rhs.all nullableSymbol = true) →
+        nullableSymbol (.nonterminal production.lhs) = true)
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (zeroSpan : item.raw.origin = item.raw.current) :
+    (item.raw.production.rhs.take item.raw.dot.val).all
+        nullableSymbol = true := by
+  induction reached with
+  | root => rfl
+  | predict => rfl
+  | scan before after cursor beforeReached structural induction =>
+      rcases structural.1 with
+        ⟨terminal, value, span, next, atCurrent, terminalAt,
+          terminalMatches, advance⟩
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      have ordered := contextualReach_ordered beforeReached
+      have zeroValues := congrArg Fin.val zeroSpan
+      have beforeCurrentValues : before.raw.current.val = cursor.val := by
+        rw [← atCurrent]
+        rfl
+      have originValues := congrArg Fin.val originEq
+      have afterCurrentValues : after.raw.current.val = cursor.val + 1 := by
+        rw [currentEq]
+        rfl
+      omega
+  | complete waiting finished after shared waitingReached finishedReached
+      structural waitingInduction finishedInduction =>
+      rcases structural.1 with
+        ⟨symbol, next, complete, lhsEq, waitingAtShared,
+          finishedAtShared, advance⟩
+      have waitingOrdered := contextualReach_ordered waitingReached
+      have finishedOrdered := contextualReach_ordered finishedReached
+      rcases advance with
+        ⟨productionEq, dotEq, originEq, currentEq⟩
+      have zeroValues := congrArg Fin.val zeroSpan
+      have waitingAtValues := congrArg Fin.val waitingAtShared
+      have finishedAtValues := congrArg Fin.val finishedAtShared
+      have originValues := congrArg Fin.val originEq
+      have currentValues := congrArg Fin.val currentEq
+      have waitingZero : waiting.raw.origin = waiting.raw.current := by
+        apply Fin.ext
+        omega
+      have finishedZero : finished.raw.origin = finished.raw.current := by
+        apply Fin.ext
+        omega
+      have waitingNullable := waitingInduction waitingZero
+      have finishedNullable := finishedInduction finishedZero
+      rw [prefix_full_layout finished.raw complete] at finishedNullable
+      have childNullable :
+          nullableSymbol (.nonterminal finished.raw.production.lhs) = true :=
+        closed finished.raw.production finishedNullable
+      have exactNext : NextSymbol waiting.raw
+          (.nonterminal finished.raw.production.lhs) := by
+        rw [lhsEq]
+        exact next
+      have layout := prefix_complete_layout waiting.raw finished.raw
+        after.raw exactNext ⟨productionEq, dotEq, originEq, currentEq⟩
+      rw [← layout, List.all_append]
+      simp only [waitingNullable, List.all_cons, childNullable,
+        List.all_nil, Bool.and_true]
+
+/-- A reached item whose consumed prefix is statically nonnullable must have
+made strict source progress. -/
+theorem contextualReach_origin_lt_current_of_prefix_not_all
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (nullableSymbol : GrammarSymbol → Bool)
+    (closed : ∀ production : ProductionId,
+      (production.rhs.all nullableSymbol = true) →
+        nullableSymbol (.nonterminal production.lhs) = true)
+    {item : ContextualItemKey tokens}
+    (reached : ContextualReach file tokens memo correct final item)
+    (nonnullable :
+      (item.raw.production.rhs.take item.raw.dot.val).all
+          nullableSymbol ≠ true) :
+    item.raw.origin.val < item.raw.current.val := by
+  apply Nat.lt_of_le_of_ne (contextualReach_ordered reached)
+  intro equalValues
+  apply nonnullable
+  exact contextualReach_zeroSpan_prefix_all_of_nullableClosure
+    nullableSymbol closed reached (Fin.ext equalValues)
+
 /-- One reached caller that introduced a contextual production instance. -/
 def ContextualActivationParent
     (file : WorkspaceFile) (tokens : List Token)
