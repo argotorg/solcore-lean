@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.RootlessNormalizationDottedRank
+import Lean.Elab.Tactic
 
 set_option autoImplicit false
 
@@ -218,5 +219,68 @@ theorem dottedStaticPrefixConsumes_sound (dotted : DottedRhs)
   have nullable :=
     (dottedStaticPrefixConsumes_eq_true_iff dotted).mp consumes
   simpa [dottedStaticPrefixNullable] using nullable
+
+set_option maxRecDepth 20000 in
+private theorem dottedStaticComponentValues_le_max :
+    dottedStaticComponentValues.all
+      (fun value => decide (value ≤ dottedStaticComponentMax)) = true := by
+  decide
+
+set_option maxRecDepth 20000 in
+private theorem dottedStaticPhaseValues_lt_width :
+    dottedStaticPhaseValues.all
+      (fun value => decide (value < dottedStaticPhaseWidth)) = true := by
+  decide
+
+/-- Every explicit SCC rank lies below the displayed maximum. -/
+theorem dottedStaticComponentRank_le_max (dotted : DottedRhs) :
+    dottedStaticComponentRank dotted ≤ dottedStaticComponentMax := by
+  unfold dottedStaticComponentRank dottedStaticValueAt
+  cases lookup :
+      dottedStaticComponentValues.toArray[dottedStaticIndex dotted]? with
+  | none => simp
+  | some value =>
+      simp only [Option.getD_some]
+      apply of_decide_eq_true
+      apply (List.all_eq_true.mp
+        dottedStaticComponentValues_le_max) value
+      rcases Array.getElem?_eq_some_iff.mp lookup with
+        ⟨arrayBound, elementEquation⟩
+      have member : value ∈ dottedStaticComponentValues.toArray := by
+        rw [← elementEquation]
+        exact Array.getElem_mem arrayBound
+      simpa using Array.mem_toList_iff.mpr member
+
+/-- Every explicit within-SCC phase fits in its reserved width. -/
+theorem dottedStaticPhase_lt_width (dotted : DottedRhs) :
+    dottedStaticPhase dotted < dottedStaticPhaseWidth := by
+  unfold dottedStaticPhase dottedStaticValueAt
+  cases lookup :
+      dottedStaticPhaseValues.toArray[dottedStaticIndex dotted]? with
+  | none => simp [dottedStaticPhaseWidth]
+  | some value =>
+      simp only [Option.getD_some]
+      apply of_decide_eq_true
+      apply (List.all_eq_true.mp
+        dottedStaticPhaseValues_lt_width) value
+      rcases Array.getElem?_eq_some_iff.mp lookup with
+        ⟨arrayBound, elementEquation⟩
+      have member : value ∈ dottedStaticPhaseValues.toArray := by
+        rw [← elementEquation]
+        exact Array.getElem_mem arrayBound
+      simpa using Array.mem_toList_iff.mpr member
+
+set_option maxRecDepth 20000 in
+private theorem dottedStaticD_eq : D = 2378 := by
+  rw [← allDottedRhs_length]
+  run_tac
+    Lean.Meta.withTransparency .all do
+      (← Lean.Elab.Tactic.getMainGoal).refl
+
+/-- The static lexicographic blocks fit in the generic dotted-rank bound. -/
+theorem dottedStaticCapacity :
+    (dottedStaticComponentMax + 1) * dottedStaticPhaseWidth ≤ D * 2 := by
+  rw [dottedStaticD_eq]
+  decide
 
 end Solcore.Surface.Multi
