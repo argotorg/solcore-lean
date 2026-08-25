@@ -151,11 +151,15 @@ recomputing Phase A saturation after the worklist result has already certified
 it, classifies completion items once, rejects incompatible prediction
 candidates before rebuilding the waiting production, indexes complete-item
 recognition, removes whole-item self comparisons from the role-directed
-completion scan, and materializes the Phase A evidence table in a linear bulk
-step. The proved duplicate-free Phase A seed block is also materialized in one
-reference-exact step. Production candidates are grouped once by left-hand-side
-symbol in their original order, with the proved index shared by Phase A,
-contextual recognition, and value evaluation.
+completion scan, and groups completion candidates by the nonterminal and
+boundary shared by their waiting and completed sides. Each group retains
+discovery order, and the executor visits only the matching opposite-role row;
+a stable-filter theorem proves exact agreement with the former full scan. The
+Phase A evidence table is materialized in a linear bulk step. The proved
+duplicate-free Phase A seed block is also materialized in one reference-exact
+step. Production candidates are grouped once by left-hand-side symbol in their
+original order, with the proved index shared by Phase A, contextual
+recognition, and value evaluation.
 Phase B checks the eight finalization slots for each guard through the coherent
 hash index, then batches the proved-fresh block. Exact-equivalence theorems
 preserve the checked reference result for these execution changes. The counter
@@ -167,10 +171,10 @@ decision procedure, while charge order, failures, and resulting states do not
 change.
 
 On the development host, the native `tiny` benchmark (`data A;`) took about
-89.0 seconds before these passes and 1.084–1.118 seconds across five
-fresh-process runs afterward (median 1.099 seconds). The latest observed
-`empty` elapsed time was 0.152 seconds. `/usr/bin/time` reported a maximum
-resident set size of 59,850,752 bytes for `tiny`.
+89.0 seconds before these passes and 0.297–0.314 seconds across five
+fresh-process runs afterward (median 0.301 seconds). The latest observed
+`empty` elapsed time was 0.037 seconds. `/usr/bin/time` reported a maximum
+resident set size of 59,981,824 bytes for `tiny`.
 These observations are neither normative limits nor stable benchmarks;
 broader runtime and memory behavior remains uncharacterized.
 

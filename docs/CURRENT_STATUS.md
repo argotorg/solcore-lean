@@ -124,6 +124,11 @@ materialized in one step, preserving the exact list and charge order of the
 reference insertion loop. The role-directed completion scan also avoids
 comparing whole items to detect a self pair: equal roles cannot form a
 waiting/finished pair, and the no-op replacement is proved equivalent.
+Completion candidates are grouped by the nonterminal and boundary they must
+share. A waiting item therefore visits only completed items that can join it,
+and a completed item visits only the matching waiting items. Each group retains
+discovery order, and a checked equivalence theorem shows that skipping every
+other item has exactly the same result as the former full scan.
 Production candidates are grouped by left-hand-side symbol once, in
 source-production order, and the same proved index is shared by Phase A,
 contextual recognition, and value evaluation.
@@ -138,10 +143,10 @@ use that same indexed decision procedure; charge order, failures, and resulting
 states are unchanged.
 
 On the development host, the native benchmark's `tiny` case (`data A;`) fell
-from about 89.0 seconds before these passes to 1.084–1.118 seconds across five
-fresh-process runs (median 1.099 seconds). The latest observed `empty` elapsed
-time was 0.152 seconds. `/usr/bin/time` reported a maximum resident set size of
-59,850,752 bytes for `tiny`.
+from about 89.0 seconds before these passes to 0.297–0.314 seconds across five
+fresh-process runs (median 0.301 seconds). The latest observed `empty` elapsed
+time was 0.037 seconds. `/usr/bin/time` reported a maximum resident set size of
+59,981,824 bytes for `tiny`.
 These are machine-dependent observations, not language limits or performance
 guarantees. Representative-file and memory measurements are still needed
 before claiming interactive or fuzzing-speed readiness.

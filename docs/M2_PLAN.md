@@ -160,13 +160,17 @@ immediately. Phase A also re-uses its certified worklist result instead of
 recomputing the complete saturation, caches completion classifications, skips
 incompatible prediction candidates before rebuilding the waiting production,
 indexes complete-item recognition, and avoids whole-item self comparisons in
-the role-directed completion scan. Its evidence table is built in one linear
-pass, and its proved duplicate-free seed block is materialized in one step
-with reference-exact ordering. A proof-carrying left-hand-side index preserves
-source-production order and supplies candidates to Phase A, contextual
-recognition, and value evaluation. Phase B checks each fixed guard-finalization
-block through the coherent hash index and then batches its proved-fresh
-addresses.
+the role-directed completion scan. Completion candidates are grouped by the
+nonterminal and boundary shared by the waiting and completed sides, preserving
+their original discovery order. The executor now visits only the matching
+opposite-role row; a stable-filter theorem proves this produces the same state
+and charge sequence as the full scan. Its evidence table is built in one
+linear pass, and its proved duplicate-free seed block is materialized in one
+step with reference-exact ordering. A proof-carrying left-hand-side index
+preserves source-production order and supplies candidates to Phase A,
+contextual recognition, and value evaluation. Phase B checks each fixed
+guard-finalization block through the coherent hash index and then batches its
+proved-fresh addresses.
 Exact-equivalence theorems relate each optimized path to the
 retained checked implementation. The counter continues to use `usedRev` as its
 proof ledger, with a coherent hash set accelerating duplicate checks. The
@@ -174,9 +178,9 @@ proved correspondence between them means that charge order, failures, and
 resulting states are unchanged. Direct completion and production-activation
 prechecks also use this indexed membership decision. On the development host,
 the native `tiny` benchmark (`data A;`) improved from about 89.0 seconds to
-1.084–1.118 seconds across five fresh-process runs (median 1.099 seconds), and
-the latest `empty` elapsed time was 0.152 seconds. `/usr/bin/time` reported a
-maximum resident set size of 59,850,752 bytes for `tiny`.
+0.297–0.314 seconds across five fresh-process runs (median 0.301 seconds), and
+the latest `empty` elapsed time was 0.037 seconds. `/usr/bin/time` reported a
+maximum resident set size of 59,981,824 bytes for `tiny`.
 This is a substantial improvement, but the two synthetic cases do not establish
 interactive or high-throughput readiness.
 

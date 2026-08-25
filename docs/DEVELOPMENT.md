@@ -133,10 +133,10 @@ lake build m2cFrontendBench
 machine-readable line containing the elapsed nanoseconds and observed result.
 Use an external timeout when profiling an untrusted performance change. Do not
 turn these wall-clock measurements into normative language limits. On the
-development host, the latest `empty` run reported 0.152 seconds and five
-fresh-process `tiny` runs ranged from 1.084 to 1.118 seconds (median 1.099
+development host, the latest `empty` run reported 0.037 seconds and five
+fresh-process `tiny` runs ranged from 0.297 to 0.314 seconds (median 0.301
 seconds), compared with a pre-optimization baseline of about 89.0 seconds.
-`/usr/bin/time` reported a maximum resident set size of 59,850,752 bytes for
+`/usr/bin/time` reported a maximum resident set size of 59,981,824 bytes for
 `tiny`.
 
 The counter keeps `usedRev` as the proof-carrying record of charged addresses.
@@ -145,15 +145,18 @@ checks without repeatedly scanning that record. Because the two views are kept
 coherent, this is a lookup optimization only: charge order, failure behavior,
 and resulting state remain the same. Direct completion and
 production-activation prechecks use the same indexed membership decision. The
-role-directed completion scan also
-uses the fact that one role cannot be both waiting and finished, avoiding a
-whole-item equality check for self pairs; an exact theorem preserves the
-reference result. A proof-carrying hash table also groups productions by their
-left-hand-side symbol once, retains their original order, and is reused by all
-three prediction paths. The duplicate-free initial seed block is materialized
-in one certified step with the same list and charge order as sequential
-insertion. These figures are useful for local regression checks, but none is a
-normative bound.
+role-directed completion scan also uses the fact that one role cannot be both
+waiting and finished, avoiding a whole-item equality check for self pairs; an
+exact theorem preserves the reference result. Completion candidates are
+grouped by their shared nonterminal and boundary, so the runtime walks only the
+opposite-role row that can join the pivot. The rows preserve discovery order,
+and their checked stable-filter characterization keeps state and charge order
+identical to the full scan. A proof-carrying hash table also groups productions
+by their left-hand-side symbol once, retains their original order, and is
+reused by all three prediction paths. The duplicate-free initial seed block is
+materialized in one certified step with the same list and charge order as
+sequential insertion. These figures are useful for local regression checks,
+but none is a normative bound.
 
 ## Documentation rule
 

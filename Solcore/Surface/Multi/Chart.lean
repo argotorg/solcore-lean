@@ -1898,11 +1898,105 @@ private def rawCompletionRole {tokens : List Token}
   else
     .finished item.production.lhs
 
+/-- The structural join coordinate shared by a waiting item and a completed
+item that can advance it. -/
+private structure RawCompletionJoinKey (tokens : List Token) where
+  symbol : NonterminalSymbol
+  shared : Boundary tokens
+  deriving DecidableEq
+
+private def rawCompletionJoinKeyBEq {tokens : List Token}
+    (left right : RawCompletionJoinKey tokens) : Bool :=
+  decide (left = right)
+
+private instance {tokens : List Token} : BEq (RawCompletionJoinKey tokens) :=
+  ⟨rawCompletionJoinKeyBEq⟩
+
+private instance {tokens : List Token} : LawfulBEq
+    (RawCompletionJoinKey tokens) where
+  rfl := by
+    intro key
+    change decide (key = key) = true
+    exact of_decide_eq_self_eq_true key
+  eq_of_beq := by
+    intro left right equal
+    change rawCompletionJoinKeyBEq left right = true at equal
+    exact of_decide_eq_true equal
+
+private instance {tokens : List Token} : Hashable
+    (RawCompletionJoinKey tokens) where
+  hash key :=
+    mixHash (nonterminalSymbolFastHash key.symbol) (hash key.shared.val)
+
+private def rawCompletionJoinKey {tokens : List Token}
+    (symbol : NonterminalSymbol) (shared : Boundary tokens) :
+    RawCompletionJoinKey tokens :=
+  ⟨symbol, shared⟩
+
+@[simp] private theorem rawCompletionJoinKey_eq_iff {tokens : List Token}
+    (leftSymbol rightSymbol : NonterminalSymbol)
+    (leftShared rightShared : Boundary tokens) :
+    rawCompletionJoinKey leftSymbol leftShared =
+        rawCompletionJoinKey rightSymbol rightShared ↔
+      leftSymbol = rightSymbol ∧ leftShared = rightShared := by
+  simp [rawCompletionJoinKey]
+
+/-- Source-order rows for both sides of one completion join coordinate. -/
+private structure RawCompletionBucket (tokens : List Token) where
+  waiting : List (DottedItem tokens × RawCompletionRole)
+  finished : List (DottedItem tokens × RawCompletionRole)
+
+private def RawCompletionBucket.empty (tokens : List Token) :
+    RawCompletionBucket tokens :=
+  ⟨[], []⟩
+
+private structure RawCompletionRows (tokens : List Token) where
+  table : Std.HashMap (RawCompletionJoinKey tokens)
+    (RawCompletionBucket tokens)
+
+private def RawCompletionRows.empty (tokens : List Token) :
+    RawCompletionRows tokens :=
+  ⟨∅⟩
+
+/-- Add one classified item while retaining discovery order inside its side
+of the completion row. -/
+private def RawCompletionRows.insert {tokens : List Token}
+    (rows : RawCompletionRows tokens) (item : DottedItem tokens)
+    (role : RawCompletionRole) : RawCompletionRows tokens :=
+  match role with
+  | .waiting symbol =>
+      let key := rawCompletionJoinKey symbol item.current
+      let bucket := rows.table.getD key (RawCompletionBucket.empty tokens)
+      ⟨rows.table.insert key {
+        bucket with waiting := bucket.waiting ++ [(item, role)] }⟩
+  | .finished symbol =>
+      let key := rawCompletionJoinKey symbol item.origin
+      let bucket := rows.table.getD key (RawCompletionBucket.empty tokens)
+      ⟨rows.table.insert key {
+        bucket with finished := bucket.finished ++ [(item, role)] }⟩
+  | .inactive => rows
+
+private def buildRawCompletionRows {tokens : List Token}
+    (items : List (DottedItem tokens)) : RawCompletionRows tokens :=
+  items.foldl (fun rows item =>
+    rows.insert item (rawCompletionRole item))
+    (RawCompletionRows.empty tokens)
+
+private def RawCompletionRows.candidates {tokens : List Token}
+    (rows : RawCompletionRows tokens) (pivot : DottedItem tokens) :
+    RawCompletionRole → List (DottedItem tokens × RawCompletionRole)
+  | .waiting symbol =>
+      (rows.table.getD (rawCompletionJoinKey symbol pivot.current)
+        (RawCompletionBucket.empty tokens)).finished
+  | .finished symbol =>
+      (rows.table.getD (rawCompletionJoinKey symbol pivot.origin)
+        (RawCompletionBucket.empty tokens)).waiting
+  | .inactive => []
+
 private structure PhaseAOpen (file : WorkspaceFile) (tokens : List Token) where
   rawItems : List (DottedItem tokens)
-  completionEntries : List (DottedItem tokens × RawCompletionRole)
-  completionEntries_eq :
-    completionEntries = rawItems.map fun item => (item, rawCompletionRole item)
+  completionRows : RawCompletionRows tokens
+  completionRows_eq : completionRows = buildRawCompletionRows rawItems
   itemQueue : List (DottedItem tokens)
   rawEdges : List (PackedEdge file tokens)
   edgeQueue : List (PackedEdge file tokens)
@@ -1912,8 +2006,8 @@ private def beginPhaseA (file : WorkspaceFile) (tokens : List Token) :
     CountedState tokens (PhaseAOpen file tokens) := {
   payload := {
     rawItems := []
-    completionEntries := []
-    completionEntries_eq := rfl
+    completionRows := RawCompletionRows.empty tokens
+    completionRows_eq := rfl
     itemQueue := []
     rawEdges := []
     edgeQueue := []
@@ -2316,11 +2410,12 @@ private def insertRawItem?
       (.linear source.unitKind (rawLinearKey item)) fun state => {
         state with
         rawItems := state.rawItems ++ [item]
-        completionEntries :=
-          state.completionEntries ++ [(item, rawCompletionRole item)]
-        completionEntries_eq := by
-          rw [state.completionEntries_eq, List.map_append]
-          rfl
+        completionRows := state.completionRows.insert item
+          (rawCompletionRole item)
+        completionRows_eq := by
+          rw [state.completionRows_eq]
+          simp [buildRawCompletionRows, List.foldl_append,
+            RawCompletionRows.insert]
         itemQueue := state.itemQueue ++ [item]
       }
 
@@ -2711,6 +2806,78 @@ private instance rawCompletionRolesCompatibleDecidable
   cases waitingRole <;> cases finishedRole <;>
     simp only [RawCompletionRolesCompatible] <;> infer_instance
 
+private def RawCompletionJoinCompatible {tokens : List Token}
+    (pivot other : DottedItem tokens)
+    (pivotRole otherRole : RawCompletionRole) : Prop :=
+  RawCompletionRolesCompatible pivot other pivotRole otherRole ∨
+    RawCompletionRolesCompatible other pivot otherRole pivotRole
+
+private instance rawCompletionJoinCompatibleDecidable
+    {tokens : List Token} (pivot other : DottedItem tokens)
+    (pivotRole otherRole : RawCompletionRole) :
+    Decidable (RawCompletionJoinCompatible pivot other
+      pivotRole otherRole) := by
+  unfold RawCompletionJoinCompatible
+  infer_instance
+
+private theorem RawCompletionRows.insert_candidates
+    {tokens : List Token} (rows : RawCompletionRows tokens)
+    (pivot item : DottedItem tokens)
+    (pivotRole itemRole : RawCompletionRole) :
+    (rows.insert item itemRole).candidates pivot pivotRole =
+      if RawCompletionJoinCompatible pivot item pivotRole itemRole then
+        rows.candidates pivot pivotRole ++ [(item, itemRole)]
+      else
+        rows.candidates pivot pivotRole := by
+  cases pivotRole <;> cases itemRole <;>
+    simp [RawCompletionJoinCompatible, RawCompletionRolesCompatible,
+      RawCompletionRows.insert, RawCompletionRows.candidates,
+      Std.HashMap.getD_insert]
+  all_goals
+    split <;> simp_all [eq_comm]
+
+private def rawCompletionEntry {tokens : List Token}
+    (item : DottedItem tokens) : DottedItem tokens × RawCompletionRole :=
+  (item, rawCompletionRole item)
+
+private theorem RawCompletionRows.foldl_insert_candidates
+    {tokens : List Token} (rows : RawCompletionRows tokens)
+    (pivot : DottedItem tokens) (pivotRole : RawCompletionRole) :
+    ∀ items : List (DottedItem tokens),
+      (items.foldl (fun current item =>
+        current.insert item (rawCompletionRole item)) rows).candidates
+          pivot pivotRole =
+        rows.candidates pivot pivotRole ++
+          (items.map rawCompletionEntry).filter fun entry =>
+            decide (RawCompletionJoinCompatible pivot entry.1
+              pivotRole entry.2) := by
+  intro items
+  induction items generalizing rows with
+  | nil => simp
+  | cons item rest induction =>
+      simp only [List.foldl_cons, List.map_cons]
+      rw [induction]
+      rw [RawCompletionRows.insert_candidates]
+      by_cases compatible : RawCompletionJoinCompatible pivot item
+          pivotRole (rawCompletionRole item)
+      · simp [compatible, rawCompletionEntry, List.append_assoc]
+      · simp [compatible, rawCompletionEntry]
+
+/-- A completion row is exactly the stable source-order filter of items that
+can contribute a forward or reverse completion for the pivot. -/
+private theorem buildRawCompletionRows_candidates_eq_filter
+    {tokens : List Token} (items : List (DottedItem tokens))
+    (pivot : DottedItem tokens) (pivotRole : RawCompletionRole) :
+    (buildRawCompletionRows items).candidates pivot pivotRole =
+      (items.map rawCompletionEntry).filter fun entry =>
+        decide (RawCompletionJoinCompatible pivot entry.1
+          pivotRole entry.2) := by
+  unfold buildRawCompletionRows
+  rw [RawCompletionRows.foldl_insert_candidates]
+  cases pivotRole <;>
+    simp [RawCompletionRows.empty, RawCompletionRows.candidates,
+      RawCompletionBucket.empty]
+
 private def attemptCompletionForRoles?
     {file : WorkspaceFile} {tokens : List Token}
     (current : CountedState tokens (PhaseAOpen file tokens))
@@ -2781,6 +2948,38 @@ private def attemptCompletionsWithEntries?
         otherRole pivotRole
       attemptCompletionsWithEntries? pivot pivotRole rest reverse
 
+private theorem attemptCompletionsWithEntries?_filter_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) (pivotRole : RawCompletionRole) :
+    ∀ entries (current : CountedState tokens (PhaseAOpen file tokens)),
+      attemptCompletionsWithEntries? pivot pivotRole
+          (entries.filter fun entry =>
+            decide (RawCompletionJoinCompatible pivot entry.1
+              pivotRole entry.2)) current =
+        attemptCompletionsWithEntries? pivot pivotRole entries current := by
+  intro entries
+  induction entries with
+  | nil =>
+      intro current
+      rfl
+  | cons entry rest induction =>
+      intro current
+      rcases entry with ⟨other, otherRole⟩
+      by_cases compatible : RawCompletionJoinCompatible pivot other
+          pivotRole otherRole
+      · simp [compatible, attemptCompletionsWithEntries?, induction]
+      · have forwardInactive : ¬RawCompletionRolesCompatible
+            pivot other pivotRole otherRole := by
+          intro selected
+          exact compatible (Or.inl selected)
+        have reverseInactive : ¬RawCompletionRolesCompatible
+            other pivot otherRole pivotRole := by
+          intro selected
+          exact compatible (Or.inr selected)
+        simp [compatible, attemptCompletionsWithEntries?,
+          attemptCompletionForRoles?, forwardInactive, reverseInactive,
+          induction]
+
 private theorem attemptCompletionsWithEntries?_eq_roles
     {file : WorkspaceFile} {tokens : List Token}
     (pivot : DottedItem tokens) (pivotRole : RawCompletionRole) :
@@ -2808,8 +3007,9 @@ private def attemptCompletionsFastWith?
     (pivot : DottedItem tokens)
     (current : CountedState tokens (PhaseAOpen file tokens)) :
     Option (CountedState tokens (PhaseAOpen file tokens)) :=
-  attemptCompletionsWithEntries? pivot (rawCompletionRole pivot)
-    current.payload.completionEntries current
+  let pivotRole := rawCompletionRole pivot
+  attemptCompletionsWithEntries? pivot pivotRole
+    (current.payload.completionRows.candidates pivot pivotRole) current
 
 private theorem attemptCompletionsWithRoles?_exact
     {file : WorkspaceFile} {tokens : List Token}
@@ -2859,8 +3059,10 @@ private theorem attemptCompletionsFastWith?_eq_reference
     (current : CountedState tokens (PhaseAOpen file tokens)) :
     attemptCompletionsFastWith? pivot current =
       attemptCompletionsWith? pivot current.payload.rawItems current := by
-  unfold attemptCompletionsFastWith?
-  rw [current.payload.completionEntries_eq]
+  simp only [attemptCompletionsFastWith?]
+  rw [current.payload.completionRows_eq]
+  rw [buildRawCompletionRows_candidates_eq_filter]
+  rw [attemptCompletionsWithEntries?_filter_exact]
   exact (attemptCompletionsWithEntries?_eq_roles pivot
     (rawCompletionRole pivot) current.payload.rawItems current).trans
       (attemptCompletionsWithRoles?_exact pivot current.payload.rawItems current)
@@ -8911,9 +9113,8 @@ private def normalizePhaseARawItems
   payload := {
     current.payload with
     rawItems := items
-    completionEntries := items.map fun item =>
-      (item, rawCompletionRole item)
-    completionEntries_eq := rfl
+    completionRows := buildRawCompletionRows items
+    completionRows_eq := rfl
   }
 }
 
@@ -9679,10 +9880,12 @@ private def insertRawSeedsCertified
     payload := {
       current.payload with
       rawItems := current.payload.rawItems ++ seeds
-      completionEntries := current.payload.completionEntries ++
-        seeds.map fun item => (item, rawCompletionRole item)
-      completionEntries_eq := by
-        rw [current.payload.completionEntries_eq, List.map_append]
+      completionRows := seeds.foldl (fun rows item =>
+        rows.insert item (rawCompletionRole item))
+        current.payload.completionRows
+      completionRows_eq := by
+        rw [current.payload.completionRows_eq]
+        simp [buildRawCompletionRows, List.foldl_append]
       itemQueue := current.payload.itemQueue ++ seeds
     }
     counter := {
@@ -9733,11 +9936,11 @@ private theorem insertRawSeeds?_eq_certified
       let transition := fun (state : PhaseAOpen file tokens) => ({
         state with
         rawItems := state.rawItems ++ [item]
-        completionEntries :=
-          state.completionEntries ++ [(item, rawCompletionRole item)]
-        completionEntries_eq := by
-          rw [state.completionEntries_eq, List.map_append]
-          rfl
+        completionRows := state.completionRows.insert item
+          (rawCompletionRole item)
+        completionRows_eq := by
+          rw [state.completionRows_eq]
+          simp [buildRawCompletionRows, List.foldl_append]
         itemQueue := state.itemQueue ++ [item]
       } : PhaseAOpen file tokens)
       let next : CountedState tokens (PhaseAOpen file tokens) := {
@@ -11149,9 +11352,8 @@ private def phaseBTotalityWitnessPhaseA
     (file : WorkspaceFile) (tokens : List Token) :
     PhaseAOpen file tokens := {
   rawItems := rawSaturation tokens
-  completionEntries := rawSaturation tokens |>.map fun item =>
-    (item, rawCompletionRole item)
-  completionEntries_eq := rfl
+  completionRows := buildRawCompletionRows (rawSaturation tokens)
+  completionRows_eq := rfl
   itemQueue := []
   rawEdges := []
   edgeQueue := []
