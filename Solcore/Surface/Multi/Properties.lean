@@ -11055,4 +11055,116 @@ theorem lexBound_sufficient (file : WorkspaceFile) :
   simp only [lexBound]
   omega
 
+/-- File-only frontend execution, from lexing through the total parser. -/
+def executeObservedContextualFrontend
+    (file : WorkspaceFile) :
+    Except SurfaceDiagnostic ParsedModuleV1 :=
+  match lexing : lexModule file with
+  | .error diagnostic => .error (.lexical diagnostic)
+  | .ok lexed =>
+      match executeObservedContextualParse file lexed.tokens
+          (lexer_tokensOwnedBy lexing) with
+      | .ok module => .ok module
+      | .error diagnostic => .error (.parse diagnostic)
+
+/-- Successful lexing exposes exactly the total parser branch. -/
+theorem executeObservedContextualFrontend_eq_of_lexing
+    {file : WorkspaceFile} {lexed : LexedModule}
+    (lexing : lexModule file = .ok lexed) :
+    executeObservedContextualFrontend file =
+      match executeObservedContextualParse file lexed.tokens
+          (lexer_tokensOwnedBy lexing) with
+      | .ok module => .ok module
+      | .error diagnostic => .error (.parse diagnostic) := by
+  have requested := lexing
+  unfold executeObservedContextualFrontend
+  split
+  · rename_i actual emitted
+    rw [requested] at emitted
+    cases emitted
+  · rename_i actual emitted
+    rw [requested] at emitted
+    cases emitted
+    rfl
+
+/-- Lexical failure is selected without entering the parser. -/
+theorem executeObservedContextualFrontend_eq_of_lexicalDiagnostic
+    {file : WorkspaceFile} {diagnostic : LexicalDiagnostic}
+    (lexing : lexModule file = .error diagnostic) :
+    executeObservedContextualFrontend file =
+      .error (.lexical diagnostic) := by
+  have requested := lexing
+  unfold executeObservedContextualFrontend
+  split
+  · rename_i actual emitted
+    rw [requested] at emitted
+    cases emitted
+    rfl
+  · rename_i actual emitted
+    rw [requested] at emitted
+    cases emitted
+
+/-- The file-only frontend selects the lexer failure or the implementation's
+parser outcome exactly. -/
+theorem executeObservedContextualFrontend_selected
+    (file : WorkspaceFile) :
+    match lexing : lexModule file with
+    | .error diagnostic =>
+        executeObservedContextualFrontend file =
+          .error (.lexical diagnostic)
+    | .ok lexed =>
+        let owned := lexer_tokensOwnedBy lexing
+        let result := Chart.executeObservedContextualValueWorklistMulti
+          file lexed.tokens owned
+        (result.parseOutcome? file).map (fun outcome =>
+          match outcome with
+          | .ok module => .ok module
+          | .error diagnostic => .error (.parse diagnostic)) =
+            some (executeObservedContextualFrontend file) := by
+  split
+  · rename_i diagnostic lexing
+    exact executeObservedContextualFrontend_eq_of_lexicalDiagnostic lexing
+  · rename_i lexed lexing
+    dsimp only
+    rw [executeObservedContextualParse_selected
+      file lexed.tokens (lexer_tokensOwnedBy lexing)]
+    rw [executeObservedContextualFrontend_eq_of_lexing lexing]
+    cases executeObservedContextualParse file lexed.tokens
+        (lexer_tokensOwnedBy lexing) <;> rfl
+
+/-- Every file-only result satisfies its corresponding declarative judgment;
+the frontend cannot construct a structural diagnostic. -/
+theorem executeObservedContextualFrontend_sound
+    (file : WorkspaceFile) :
+    match executeObservedContextualFrontend file with
+    | .ok module =>
+        ∃ lexed, lexModule file = .ok lexed ∧
+          Parses file lexed.tokens module
+    | .error (.lexical diagnostic) =>
+        LexicalDiagnostic.Applies file diagnostic
+    | .error (.parse diagnostic) =>
+        ∃ lexed, lexModule file = .ok lexed ∧
+          ParseDiagnostic.Applies file lexed.tokens diagnostic
+    | .error (.structural _) => False := by
+  cases lexing : lexModule file with
+  | error diagnostic =>
+      rw [executeObservedContextualFrontend_eq_of_lexicalDiagnostic lexing]
+      exact lexical_diagnostic_sound lexing
+  | ok lexed =>
+      let owned := lexer_tokensOwnedBy lexing
+      have parserSound := executeObservedContextualParse_sound
+        file lexed.tokens owned
+      cases parsing : executeObservedContextualParse
+          file lexed.tokens owned with
+      | ok module =>
+          rw [executeObservedContextualFrontend_eq_of_lexing lexing,
+            parsing]
+          rw [parsing] at parserSound
+          exact ⟨lexed, rfl, parserSound⟩
+      | error diagnostic =>
+          rw [executeObservedContextualFrontend_eq_of_lexing lexing,
+            parsing]
+          rw [parsing] at parserSound
+          exact ⟨lexed, rfl, parserSound⟩
+
 end Solcore.Surface.Multi
