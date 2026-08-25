@@ -119,11 +119,14 @@ once so incompatible pairs can be skipped. Prediction candidates are rejected
 from that classification before rebuilding the waiting production, and
 complete-item recognition uses a local hash index. The Phase A evidence table
 is materialized in one linear pass instead of repeatedly copying growing
-lists. The role-directed completion scan also avoids comparing whole items to
-detect a self pair: equal roles cannot form a waiting/finished pair, and the
-no-op replacement is proved equivalent. Production candidates are grouped by
-left-hand-side symbol once, in source-production order, and the same proved
-index is shared by Phase A, contextual recognition, and value evaluation.
+lists. The initial Phase A seed block is likewise proved duplicate-free and
+materialized in one step, preserving the exact list and charge order of the
+reference insertion loop. The role-directed completion scan also avoids
+comparing whole items to detect a self pair: equal roles cannot form a
+waiting/finished pair, and the no-op replacement is proved equivalent.
+Production candidates are grouped by left-hand-side symbol once, in
+source-production order, and the same proved index is shared by Phase A,
+contextual recognition, and value evaluation.
 Phase B checks all eight finalization slots through the coherent hash index and
 then charges the proved-fresh block directly. Each faster path has an
 exact-equivalence theorem against the retained reference implementation.
@@ -135,10 +138,10 @@ use that same indexed decision procedure; charge order, failures, and resulting
 states are unchanged.
 
 On the development host, the native benchmark's `tiny` case (`data A;`) fell
-from about 89.0 seconds before these passes to 1.807–1.892 seconds across five
-fresh-process runs (median 1.818 seconds). The latest observed `empty` elapsed
-time was 0.241 seconds. `/usr/bin/time` reported a maximum resident set size of
-59,637,760 bytes for `tiny`.
+from about 89.0 seconds before these passes to 1.084–1.118 seconds across five
+fresh-process runs (median 1.099 seconds). The latest observed `empty` elapsed
+time was 0.152 seconds. `/usr/bin/time` reported a maximum resident set size of
+59,850,752 bytes for `tiny`.
 These are machine-dependent observations, not language limits or performance
 guarantees. Representative-file and memory measurements are still needed
 before claiming interactive or fuzzing-speed readiness.

@@ -133,10 +133,10 @@ lake build m2cFrontendBench
 machine-readable line containing the elapsed nanoseconds and observed result.
 Use an external timeout when profiling an untrusted performance change. Do not
 turn these wall-clock measurements into normative language limits. On the
-development host, the latest `empty` run reported 0.241 seconds and five
-fresh-process `tiny` runs ranged from 1.807 to 1.892 seconds (median 1.818
+development host, the latest `empty` run reported 0.152 seconds and five
+fresh-process `tiny` runs ranged from 1.084 to 1.118 seconds (median 1.099
 seconds), compared with a pre-optimization baseline of about 89.0 seconds.
-`/usr/bin/time` reported a maximum resident set size of 59,637,760 bytes for
+`/usr/bin/time` reported a maximum resident set size of 59,850,752 bytes for
 `tiny`.
 
 The counter keeps `usedRev` as the proof-carrying record of charged addresses.
@@ -150,8 +150,10 @@ uses the fact that one role cannot be both waiting and finished, avoiding a
 whole-item equality check for self pairs; an exact theorem preserves the
 reference result. A proof-carrying hash table also groups productions by their
 left-hand-side symbol once, retains their original order, and is reused by all
-three prediction paths. These figures are useful for local regression checks,
-but none is a normative bound.
+three prediction paths. The duplicate-free initial seed block is materialized
+in one certified step with the same list and charge order as sequential
+insertion. These figures are useful for local regression checks, but none is a
+normative bound.
 
 ## Documentation rule
 

@@ -9647,6 +9647,183 @@ private def executeIndexedPhaseB?
     (allGuardInstanceKeys tokens).length entered
   sealIndexedPhaseB? finalized
 
+/-- The unique L03 charge consumed by inserting one Phase-A seed. -/
+private def rawSeedInsertAddress {tokens : List Token}
+    (item : DottedItem tokens) : UnitAddress tokens :=
+  .linear .L03_itemInsert (rawLinearKey item)
+
+private theorem rawSeedInsertAddress_injective {tokens : List Token} :
+    Function.Injective (rawSeedInsertAddress (tokens := tokens)) := by
+  intro left right equal
+  apply rawLinearKey_injective
+  exact (UnitAddress.linear.inj equal).2
+
+private theorem rawSeedItems_nodup (tokens : List Token) :
+    (rawSeedItems tokens).Nodup := by
+  unfold rawSeedItems
+  exact List.Pairwise.filter _ (allDottedItems_nodup tokens)
+
+/-- Insert a proved-fresh, duplicate-free seed block in one pass.  The three
+payload lists retain seed order, while the reverse ledger records the exact
+order produced by repeated `Counter.charge` calls. -/
+private def insertRawSeedsCertified
+    {file : WorkspaceFile} {tokens : List Token}
+    (seeds : List (DottedItem tokens))
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (unique : seeds.Nodup)
+    (fresh : ∀ item, item ∈ seeds →
+      rawSeedInsertAddress item ∉ current.counter.usedRev) :
+    CountedState tokens (PhaseAOpen file tokens) :=
+  let addresses := seeds.map rawSeedInsertAddress
+  {
+    payload := {
+      current.payload with
+      rawItems := current.payload.rawItems ++ seeds
+      completionEntries := current.payload.completionEntries ++
+        seeds.map fun item => (item, rawCompletionRole item)
+      completionEntries_eq := by
+        rw [current.payload.completionEntries_eq, List.map_append]
+      itemQueue := current.payload.itemQueue ++ seeds
+    }
+    counter := {
+      usedRev := addresses.reverse ++ current.counter.usedRev
+      usedIndex := insertUnitAddresses current.counter.usedIndex addresses
+      unique := by
+        rw [List.nodup_append]
+        refine ⟨?_, current.counter.unique, ?_⟩
+        · exact (List.reverse_perm addresses).symm.nodup
+            (map_nodup_of_injective rawSeedInsertAddress
+              rawSeedInsertAddress_injective unique)
+        · intro used usedMember old oldMember equal
+          rw [List.mem_reverse, List.mem_map] at usedMember
+          rcases usedMember with ⟨item, itemMember, rfl⟩
+          apply fresh item itemMember
+          simpa [equal] using oldMember
+      indexed := by
+        intro candidate
+        rw [insertUnitAddresses_contains, current.counter.indexed,
+          List.mem_append, List.mem_reverse]
+    }
+  }
+
+/-- The certified seed block is exactly repeated reference insertion whenever
+the source items and their L03 addresses are known fresh. -/
+private theorem insertRawSeeds?_eq_certified
+    {file : WorkspaceFile} {tokens : List Token} :
+    ∀ (seeds : List (DottedItem tokens))
+      (current : CountedState tokens (PhaseAOpen file tokens))
+      (unique : seeds.Nodup)
+      (_absent : ∀ item, item ∈ seeds →
+        item ∉ current.payload.rawItems)
+      (fresh : ∀ item, item ∈ seeds →
+        rawSeedInsertAddress item ∉ current.counter.usedRev),
+      insertRawSeeds? seeds current =
+        some (insertRawSeedsCertified seeds current unique fresh) := by
+  intro seeds
+  induction seeds with
+  | nil =>
+      intro current unique absent fresh
+      simp [insertRawSeeds?, insertRawSeedsCertified,
+        insertUnitAddresses]
+  | cons item rest induction =>
+      intro current unique absent pending
+      rw [List.nodup_cons] at unique
+      have headAbsent := absent item (by simp)
+      have headFresh := pending item (by simp)
+      let transition := fun (state : PhaseAOpen file tokens) => ({
+        state with
+        rawItems := state.rawItems ++ [item]
+        completionEntries :=
+          state.completionEntries ++ [(item, rawCompletionRole item)]
+        completionEntries_eq := by
+          rw [state.completionEntries_eq, List.map_append]
+          rfl
+        itemQueue := state.itemQueue ++ [item]
+      } : PhaseAOpen file tokens)
+      let next : CountedState tokens (PhaseAOpen file tokens) := {
+        payload := transition current.payload
+        counter := current.counter.charge
+          (rawSeedInsertAddress item) headFresh
+      }
+      have stepped : runMappedPrimitive? current
+          (rawSeedInsertAddress item) transition = some next := by
+        simp [runMappedPrimitive?, headFresh, next]
+      have inserted : insertRawItem? current .seedOrPrediction item =
+          some next := by
+        unfold insertRawItem?
+        split
+        next present =>
+          exact (headAbsent
+            ((rawMemberBool_true_iff current.payload.rawItems item).mp
+              present)).elim
+        next =>
+          simpa [rawSeedInsertAddress, RawItemInsertSource.unitKind,
+            transition] using stepped
+      have restAbsent : ∀ candidate, candidate ∈ rest →
+          candidate ∉ next.payload.rawItems := by
+        intro candidate member included
+        simp only [next, transition, List.mem_append,
+          List.mem_singleton] at included
+        rcases included with old | equal
+        · exact absent candidate (by simp [member]) old
+        · exact unique.1 (equal ▸ member)
+      have restFresh : ∀ candidate, candidate ∈ rest →
+          rawSeedInsertAddress candidate ∉ next.counter.usedRev := by
+        intro candidate member used
+        simp only [next, Counter.charge, List.mem_cons] at used
+        rcases used with equal | old
+        · have same := rawSeedInsertAddress_injective equal
+          exact unique.1 (same ▸ member)
+        · exact pending candidate (by simp [member]) old
+      rw [insertRawSeeds?, inserted]
+      change insertRawSeeds? rest next = _
+      rw [induction next unique.2 restAbsent restFresh]
+      congr 1
+      simp [insertRawSeedsCertified, next, transition, Counter.charge,
+        insertUnitAddresses, List.reverse_cons, List.append_assoc]
+
+private theorem rawSeedInsertAddress_begin_fresh
+    (file : WorkspaceFile) (tokens : List Token) :
+    ∀ item, item ∈ rawSeedItems tokens →
+      rawSeedInsertAddress item ∉
+        (beginPhaseA file tokens).counter.usedRev := by
+  intro item _member
+  simp [rawSeedInsertAddress, beginPhaseA, Counter.empty, Counter.charge]
+
+/-- The initial Phase-A state with its entire seed block materialized without
+dynamic membership or freshness searches. -/
+private def beginPhaseASeededCertified
+    (file : WorkspaceFile) (tokens : List Token) :
+    CountedState tokens (PhaseAOpen file tokens) :=
+  insertRawSeedsCertified (rawSeedItems tokens) (beginPhaseA file tokens)
+    (rawSeedItems_nodup tokens)
+    (rawSeedInsertAddress_begin_fresh file tokens)
+
+private theorem insertRawSeeds?_eq_beginPhaseASeededCertified
+    (file : WorkspaceFile) (tokens : List Token) :
+    insertRawSeeds? (rawSeedItems tokens) (beginPhaseA file tokens) =
+      some (beginPhaseASeededCertified file tokens) := by
+  unfold beginPhaseASeededCertified
+  apply insertRawSeeds?_eq_certified
+  intro item _member
+  simp [beginPhaseA]
+
+/-- Phase A with the certified seed block and the unchanged queue runner. -/
+private def executePhaseAFast?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  runPhaseAQueues? owned (chartGBound (tokens.length + 1))
+    (beginPhaseASeededCertified file tokens)
+
+private theorem executePhaseAFast?_eq_reference
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    executePhaseAFast? file tokens owned = executePhaseA? file tokens owned := by
+  unfold executePhaseAFast? executePhaseA?
+  rw [insertRawSeeds?_eq_beginPhaseASeededCertified]
+  simp only [Option.bind_eq_bind, Option.bind_some]
+
 private theorem executePhaseA?_isSome_eq_true
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens) :
@@ -9654,21 +9831,41 @@ private theorem executePhaseA?_isSome_eq_true
   exact Option.isSome_iff_exists.mpr
     (executePhaseA?_total file tokens owned)
 
+private theorem executePhaseAFast?_isSome_eq_true
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    (executePhaseAFast? file tokens owned).isSome = true := by
+  rw [executePhaseAFast?_eq_reference]
+  exact executePhaseA?_isSome_eq_true file tokens owned
+
+/-- The fast Phase-A result paired with its reference-selection certificate.
+The package is opaque so downstream dependent code does not unfold the seed
+bulk proof; its value component remains executable. -/
+private opaque executePhaseACertified
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    { result : CountedState tokens (PhaseAOpen file tokens) //
+      executePhaseA? file tokens owned = some result } :=
+  let selected := executePhaseAFast?_isSome_eq_true file tokens owned
+  let result := (executePhaseAFast? file tokens owned).get selected
+  ⟨result, by
+    rw [← executePhaseAFast?_eq_reference]
+    apply Option.eq_some_iff_get_eq.mpr
+    exact ⟨selected, rfl⟩⟩
+
 /-- Total proof-free Phase-A result. -/
 private def executePhaseA
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens) :
     CountedState tokens (PhaseAOpen file tokens) :=
-  (executePhaseA? file tokens owned).get
-    (executePhaseA?_isSome_eq_true file tokens owned)
+  (executePhaseACertified file tokens owned).val
 
 private theorem executePhaseA_selected
     (file : WorkspaceFile) (tokens : List Token)
     (owned : TokensOwnedBy file tokens) :
     executePhaseA? file tokens owned =
       some (executePhaseA file tokens owned) := by
-  apply Option.eq_some_iff_get_eq.mpr
-  exact ⟨executePhaseA?_isSome_eq_true file tokens owned, rfl⟩
+  exact (executePhaseACertified file tokens owned).property
 
 /-- Reference Phase-A/B execution retaining all dynamic saturation gates. -/
 private def executeObservedPhaseABReference?
