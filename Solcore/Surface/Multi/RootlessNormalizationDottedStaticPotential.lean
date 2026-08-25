@@ -452,9 +452,40 @@ def dottedStaticRankChunk (start count : Nat) : Bool :=
   ((allDottedRhs.zipIdx.drop start).take count).all
     dottedStaticRankRowAt
 
+private theorem dottedStaticAll_eq_take_and_drop {α : Type}
+    (entries : List α) (predicate : α → Bool) (count : Nat) :
+    entries.all predicate =
+      ((entries.take count).all predicate &&
+        (entries.drop count).all predicate) := by
+  rw [← List.all_append, List.take_append_drop]
+
 /-- Complete fixed-grammar static edge table. -/
 def dottedStaticRankTable : Bool :=
   allDottedRhs.zipIdx.all dottedStaticRankRowAt
+
+/-- Four independently checked segments cover the complete static table. -/
+theorem dottedStaticRankTable_true_of_chunks
+    (chunk0 : dottedStaticRankChunk 0 640 = true)
+    (chunk640 : dottedStaticRankChunk 640 640 = true)
+    (chunk1280 : dottedStaticRankChunk 1280 640 = true)
+    (tail1920 : (allDottedRhs.zipIdx.drop 1920).all
+      dottedStaticRankRowAt = true) :
+    dottedStaticRankTable = true := by
+  unfold dottedStaticRankChunk at chunk0 chunk640 chunk1280
+  unfold dottedStaticRankTable
+  rw [dottedStaticAll_eq_take_and_drop]
+  simp only [Bool.and_eq_true]
+  constructor
+  · simpa using chunk0
+  · rw [dottedStaticAll_eq_take_and_drop]
+    simp only [Bool.and_eq_true]
+    constructor
+    · simpa using chunk640
+    · rw [dottedStaticAll_eq_take_and_drop]
+      simp only [Bool.and_eq_true]
+      constructor
+      · simpa [List.drop_drop] using chunk1280
+      · simpa [List.drop_drop] using tail1920
 
 private theorem dottedStaticRankCell_true_of_table
     (tableAccepted : dottedStaticRankTable = true)
