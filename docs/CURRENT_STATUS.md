@@ -34,7 +34,7 @@ or fuzzing-speed parser.
 | M2a single-file parser kernel | Yes | Yes | Via M2b | Complete |
 | M2b single-file parser publication | Yes | Yes | Oracle v4 / Surface v1 | Current public parse boundary |
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
-| M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome and soundness | No; internal API | Total; first empty-queue performance defect fixed, broader optimization remains |
+| M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome and soundness | No; internal API | Total; built-in benchmarks complete, representative-file optimization remains |
 | M2c structural acceptance | Pure validator and all 20 diagnostics | Canonical output shape; judgment correspondence pending | No; internal API | Executable and fully fixture-tested, not yet certified or connected to the frontend |
 | M2c structural syntax identity | No | No | No | Design accepted in ADR-0016 |
 | M2c module and name resolution | No | No | No | ADR-0017 is proposed |
@@ -114,13 +114,18 @@ smoke run on empty input did not finish within 226 seconds. Investigation found
 that one bounded Phase C runner kept applying an empty transition until its
 multi-billion-step upper bound was exhausted. It now returns as soon as both
 queues are empty. Phase A also no longer recomputes the full saturation merely
-to validate a result it has already certified; the faster path is proved equal
-to the retained checked reference path. After these changes, two native empty-
-module runs completed in about 3.22 and 3.30 seconds on the development host.
-The minimal `data A;` case still did not finish within 60 seconds. These are
+to validate a result it has already certified. Completion items are classified
+once so incompatible pairs can be skipped, and the Phase A evidence table is
+now materialized in one linear pass instead of repeatedly copying growing
+lists. Each faster path has an exact-equivalence theorem against the retained
+reference implementation.
+
+On the development host, the native benchmark's `tiny` case (`data A;`) fell
+from about 89.0 seconds before this pass to 16.20–17.48 seconds across three
+later runs. The latest observed `empty` elapsed time was 1.36 seconds. These are
 machine-dependent observations, not language limits or performance guarantees.
-More profiling is still needed before claiming interactive or fuzzing-speed
-readiness.
+Representative-file and memory measurements are still needed before claiming
+interactive or fuzzing-speed readiness.
 
 ## Next work
 

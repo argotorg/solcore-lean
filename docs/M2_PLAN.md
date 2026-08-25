@@ -157,12 +157,14 @@ Formal totality is not a speed claim. An earlier development smoke run on empty
 input did not finish within 226 seconds. The first identified cause was a
 bounded Phase C runner continuing after both queues were empty; it now returns
 immediately. Phase A also re-used its certified worklist result instead of
-recomputing the complete saturation, with an exact-equivalence theorem against
-the retained checked path. Two native empty-module runs then completed in about
-3.22 and 3.30 seconds on the development host. The minimal `data A;` case still
-did not finish within 60 seconds. Further profiling and optimization are still
-required before the chart executor is suitable for interactive use or
-high-throughput differential fuzzing.
+recomputing the complete saturation, caches completion classifications, and
+builds its evidence table in one linear pass. Exact-equivalence theorems relate
+each optimized path to the retained checked implementation. On the development
+host, the native `tiny` benchmark (`data A;`) improved from about 89.0 seconds
+to 16.20–17.48 seconds across three runs, and the latest `empty` elapsed time
+was 1.36 seconds.
+This is a substantial improvement, but the two synthetic cases do not establish
+interactive or high-throughput readiness.
 
 ## Work still required to finish ADR-0015
 

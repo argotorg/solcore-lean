@@ -115,10 +115,9 @@ changes, re-establish all of the following before claiming parser completion:
 5. the finite dotted-rank certificate for the new grammar; and
 6. file-only frontend selection and soundness.
 
-Runtime behavior must be measured separately. Empty input now completes on the
-native development benchmark, but the minimal `data A;` case has exceeded a
-60-second smoke timeout. The parser is therefore not yet characterized for
-interactive nonempty use. Optimization changes should add benchmarks or
+Runtime behavior must be measured separately. The native benchmark now
+completes both built-in cases, but they do not characterize representative
+programs or interactive use. Optimization changes should add benchmarks or
 bounded regression tests without weakening the proof boundary.
 
 The native frontend benchmark is deliberately outside the default build and
@@ -133,9 +132,12 @@ lake build m2cFrontendBench
 `empty` parses an empty module; `tiny` parses `data A;`. Each command prints one
 machine-readable line containing the elapsed nanoseconds and observed result.
 Use an external timeout when profiling an untrusted performance change. Do not
-turn these wall-clock measurements into normative language limits. Current
-development observations put `empty` near 3.2–3.3 seconds and show `tiny`
-exceeding 60 seconds; neither number is a normative bound.
+turn these wall-clock measurements into normative language limits. On the
+development host, `empty` reported about 1.36 seconds and two fresh-process
+`tiny` runs reported 16.20 and 16.72 seconds, compared with a pre-optimization
+baseline of about 89.0 seconds. A third `tiny` run reported 17.48 seconds.
+These figures are useful for local regression checks, but none is a normative
+bound.
 
 ## Documentation rule
 

@@ -148,12 +148,15 @@ runtime smoke, an empty-input Multi parse had not completed after more than 226
 seconds. Investigation found a Phase C runner that continued after its queues
 were empty; that path now stops immediately. The executor also avoids
 recomputing Phase A saturation after the worklist result has already certified
-it, while an exact-equivalence theorem preserves the checked reference result.
-Two subsequent native empty-module runs completed in about 3.22 and 3.30
-seconds on the development host, while the minimal `data A;` case did not
-finish within 60 seconds. The historical timeout and these observations are
-neither normative limits nor stable benchmarks; broader runtime behavior still
-requires measurement.
+it, classifies completion items once, and materializes the Phase A evidence
+table in a linear bulk step. Exact-equivalence theorems preserve the checked
+reference result for these execution changes.
+
+On the development host, the native `tiny` benchmark (`data A;`) took about
+89.0 seconds before the latest pass and 16.20–17.48 seconds across three runs
+afterward. The latest observed `empty` elapsed time was 1.36 seconds. These
+observations are neither normative limits nor stable benchmarks; broader
+runtime and memory behavior remains uncharacterized.
 
 Therefore:
 

@@ -1,3 +1,4 @@
+import Std.Data.HashSet.Lemmas
 import Solcore.Surface.Multi.ParserCore
 
 set_option autoImplicit false
@@ -1534,15 +1535,42 @@ private theorem allGuardInstanceKeys_complete
     refine ⟨key.siteCursor, List.mem_finRange _, ?_⟩
     simp [key.ordered]
 
+private inductive RawCompletionRole where
+  | waiting (symbol : NonterminalSymbol)
+  | finished (symbol : NonterminalSymbol)
+  | inactive
+  deriving DecidableEq
+
+/-- Classify an item once when it enters Phase A. -/
+private def rawCompletionRole {tokens : List Token}
+    (item : DottedItem tokens) : RawCompletionRole :=
+  let rhs := item.production.rhs
+  if nextInRange : item.dot.val < rhs.length then
+    match rhs[item.dot.val] with
+    | .nonterminal symbol => .waiting symbol
+    | .terminal _ => .inactive
+  else
+    .finished item.production.lhs
+
 private structure PhaseAOpen (file : WorkspaceFile) (tokens : List Token) where
   rawItems : List (DottedItem tokens)
+  completionEntries : List (DottedItem tokens × RawCompletionRole)
+  completionEntries_eq :
+    completionEntries = rawItems.map fun item => (item, rawCompletionRole item)
   itemQueue : List (DottedItem tokens)
   rawEdges : List (PackedEdge file tokens)
   edgeQueue : List (PackedEdge file tokens)
 
 private def beginPhaseA (file : WorkspaceFile) (tokens : List Token) :
     CountedState tokens (PhaseAOpen file tokens) := {
-  payload := ⟨[], [], [], []⟩
+  payload := {
+    rawItems := []
+    completionEntries := []
+    completionEntries_eq := rfl
+    itemQueue := []
+    rawEdges := []
+    edgeQueue := []
+  }
   counter := (Counter.empty tokens).charge
     (.phase .initializePhaseA) (by simp [Counter.empty])
 }
@@ -1931,6 +1959,11 @@ private def insertRawItem?
       (.linear source.unitKind (rawLinearKey item)) fun state => {
         state with
         rawItems := state.rawItems ++ [item]
+        completionEntries :=
+          state.completionEntries ++ [(item, rawCompletionRole item)]
+        completionEntries_eq := by
+          rw [state.completionEntries_eq, List.map_append]
+          rfl
         itemQueue := state.itemQueue ++ [item]
       }
 
@@ -2075,6 +2108,58 @@ private def attemptCompletion?
         let withItem ← insertRawItem? attempted .completion after
         insertRawEdge? withItem edge
 
+private def RawCompletionCompatible {tokens : List Token}
+    (waiting finished : DottedItem tokens) : Prop :=
+  ∃ symbol,
+    rawCompletionRole waiting = .waiting symbol ∧
+      rawCompletionRole finished = .finished symbol ∧
+      waiting.current = finished.origin
+
+private theorem completedEdge?_roleCompatible
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished after : DottedItem tokens)
+    (edge : PackedEdge file tokens)
+    (selected : completedEdge? waiting finished = some (after, edge)) :
+    RawCompletionCompatible waiting finished := by
+  unfold completedEdge? at selected
+  split at selected <;> try contradiction
+  next nextInRange =>
+    split at selected <;> try contradiction
+    next symbol nextEq =>
+      split at selected <;> try contradiction
+      next sameLhs =>
+        split at selected <;> try contradiction
+        next complete =>
+          split at selected <;> try contradiction
+          next sameCursor =>
+            refine ⟨symbol, ?_, ?_, sameCursor⟩
+            · simp [rawCompletionRole, nextInRange, nextEq]
+            · have notNext :
+                  ¬finished.dot.val < finished.production.rhs.length := by
+                omega
+              simp [rawCompletionRole, notNext, sameLhs]
+
+private theorem completedEdge?_eq_none_of_not_roleCompatible
+    {file : WorkspaceFile} {tokens : List Token}
+    (waiting finished : DottedItem tokens)
+    (incompatible : ¬RawCompletionCompatible waiting finished) :
+    completedEdge? (file := file) waiting finished = none := by
+  cases selected : completedEdge? (file := file) waiting finished with
+  | none => rfl
+  | some pair =>
+      rcases pair with ⟨after, edge⟩
+      exact (incompatible
+        (completedEdge?_roleCompatible waiting finished after edge selected)).elim
+
+private theorem attemptCompletion?_eq_self_of_not_roleCompatible
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (incompatible : ¬RawCompletionCompatible waiting finished) :
+    attemptCompletion? current waiting finished = some current := by
+  simp [attemptCompletion?,
+    completedEdge?_eq_none_of_not_roleCompatible waiting finished incompatible]
+
 private def attemptCompletionsWith?
     {file : WorkspaceFile} {tokens : List Token}
     (pivot : DottedItem tokens) :
@@ -2091,6 +2176,165 @@ private def attemptCompletionsWith?
           attemptCompletion? forward other pivot
       attemptCompletionsWith? pivot rest reverse
 
+private def RawCompletionRolesCompatible {tokens : List Token}
+    (waiting finished : DottedItem tokens)
+    (waitingRole finishedRole : RawCompletionRole) : Prop :=
+  match waitingRole, finishedRole with
+  | .waiting expected, .finished actual =>
+      expected = actual ∧ waiting.current = finished.origin
+  | _, _ => False
+
+private instance rawCompletionRolesCompatibleDecidable
+    {tokens : List Token} (waiting finished : DottedItem tokens)
+    (waitingRole finishedRole : RawCompletionRole) :
+    Decidable (RawCompletionRolesCompatible waiting finished
+      waitingRole finishedRole) := by
+  cases waitingRole <;> cases finishedRole <;>
+    simp only [RawCompletionRolesCompatible] <;> infer_instance
+
+private def attemptCompletionForRoles?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens)
+    (waitingRole finishedRole : RawCompletionRole) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  if RawCompletionRolesCompatible waiting finished
+      waitingRole finishedRole then
+    attemptCompletion? current waiting finished
+  else
+    some current
+
+private theorem attemptCompletionForRoles?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseAOpen file tokens))
+    (waiting finished : DottedItem tokens) :
+    attemptCompletionForRoles? current waiting finished
+        (rawCompletionRole waiting) (rawCompletionRole finished) =
+      attemptCompletion? current waiting finished := by
+  unfold attemptCompletionForRoles?
+  split
+  · rfl
+  next inactive =>
+    have semanticInactive : ¬RawCompletionCompatible waiting finished := by
+      rintro ⟨symbol, waitingRole, finishedRole, sameCursor⟩
+      apply inactive
+      simp [RawCompletionRolesCompatible, waitingRole, finishedRole,
+        sameCursor]
+    exact (attemptCompletion?_eq_self_of_not_roleCompatible
+      current waiting finished semanticInactive).symm
+
+/-- Completion scan with the pivot classification shared across every pair. -/
+private def attemptCompletionsWithRoles?
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) (pivotRole : RawCompletionRole) :
+    List (DottedItem tokens) →
+      CountedState tokens (PhaseAOpen file tokens) →
+      Option (CountedState tokens (PhaseAOpen file tokens))
+  | [], current => some current
+  | other :: rest, current => do
+      let otherRole := rawCompletionRole other
+      let forward ← attemptCompletionForRoles? current pivot other
+        pivotRole otherRole
+      let reverse ←
+        if other = pivot then
+          some forward
+        else
+          attemptCompletionForRoles? forward other pivot otherRole pivotRole
+      attemptCompletionsWithRoles? pivot pivotRole rest reverse
+
+private def attemptCompletionsWithEntries?
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) (pivotRole : RawCompletionRole) :
+    List (DottedItem tokens × RawCompletionRole) →
+      CountedState tokens (PhaseAOpen file tokens) →
+      Option (CountedState tokens (PhaseAOpen file tokens))
+  | [], current => some current
+  | (other, otherRole) :: rest, current => do
+      let forward ← attemptCompletionForRoles? current pivot other
+        pivotRole otherRole
+      let reverse ←
+        if other = pivot then
+          some forward
+        else
+          attemptCompletionForRoles? forward other pivot otherRole pivotRole
+      attemptCompletionsWithEntries? pivot pivotRole rest reverse
+
+private theorem attemptCompletionsWithEntries?_eq_roles
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) (pivotRole : RawCompletionRole) :
+    ∀ others (current : CountedState tokens (PhaseAOpen file tokens)),
+      attemptCompletionsWithEntries? pivot pivotRole
+          (others.map fun other => (other, rawCompletionRole other)) current =
+        attemptCompletionsWithRoles? pivot pivotRole others current := by
+  intro others
+  induction others with
+  | nil =>
+      intro current
+      rfl
+  | cons other rest induction =>
+      intro current
+      simp only [List.map_cons, attemptCompletionsWithEntries?,
+        attemptCompletionsWithRoles?]
+      apply Option.bind_congr
+      intro forward _forwardEq
+      split
+      · exact induction forward
+      · apply Option.bind_congr
+        intro reverse _reverseEq
+        exact induction reverse
+
+private def attemptCompletionsFastWith?
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    Option (CountedState tokens (PhaseAOpen file tokens)) :=
+  attemptCompletionsWithEntries? pivot (rawCompletionRole pivot)
+    current.payload.completionEntries current
+
+private theorem attemptCompletionsWithRoles?_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens) :
+    ∀ others (current : CountedState tokens (PhaseAOpen file tokens)),
+      attemptCompletionsWithRoles? pivot (rawCompletionRole pivot)
+          others current =
+        attemptCompletionsWith? pivot others current := by
+  intro others
+  induction others with
+  | nil =>
+      intro current
+      rfl
+  | cons other rest induction =>
+      intro current
+      cases forwardEq : attemptCompletion? current pivot other with
+      | none =>
+          simp [attemptCompletionsWithRoles?, attemptCompletionsWith?,
+            attemptCompletionForRoles?_exact, forwardEq]
+      | some forward =>
+          by_cases same : other = pivot
+          · simp [attemptCompletionsWithRoles?, attemptCompletionsWith?,
+              attemptCompletionForRoles?_exact, same, induction]
+          · cases reverseEq : attemptCompletion? forward other pivot with
+            | none =>
+                simp [attemptCompletionsWithRoles?, attemptCompletionsWith?,
+                  attemptCompletionForRoles?_exact, forwardEq, same,
+                  reverseEq]
+            | some reverse =>
+                simp [attemptCompletionsWithRoles?, attemptCompletionsWith?,
+                  attemptCompletionForRoles?_exact, forwardEq, same,
+                  reverseEq, induction]
+
+private theorem attemptCompletionsFastWith?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (pivot : DottedItem tokens)
+    (current : CountedState tokens (PhaseAOpen file tokens)) :
+    attemptCompletionsFastWith? pivot current =
+      attemptCompletionsWith? pivot current.payload.rawItems current := by
+  unfold attemptCompletionsFastWith?
+  rw [current.payload.completionEntries_eq]
+  exact (attemptCompletionsWithEntries?_eq_roles pivot
+    (rawCompletionRole pivot) current.payload.rawItems current).trans
+      (attemptCompletionsWithRoles?_exact pivot current.payload.rawItems current)
+
 private def processRawItem?
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -2099,7 +2343,7 @@ private def processRawItem?
     Option (CountedState tokens (PhaseAOpen file tokens)) := do
   let predicted ← attemptPredictions? item allProductionIds current
   let scanned ← attemptScan? owned predicted item
-  attemptCompletionsWith? item scanned.payload.rawItems scanned
+  attemptCompletionsFastWith? item scanned
 
 private def runPhaseAQueues?
     {file : WorkspaceFile} {tokens : List Token}
@@ -2806,6 +3050,7 @@ private theorem processRawItem?_rawSound
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completionEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completionEq
   have predictedSound := attemptPredictions?_rawSound item
     allProductionIds current predicted invariant itemSound predictedEq
   have scannedSound := attemptScan?_rawSound owned predicted scanned item
@@ -3298,6 +3543,7 @@ private theorem processRawItem?_units_mono
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completionEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completionEq
   exact Nat.le_trans
     (attemptPredictions?_units_mono item allProductionIds
       current predicted predictedEq)
@@ -4099,6 +4345,7 @@ private theorem processRawItem?_completionLedger
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completedEq
   exact attemptCompletionsWith?_completionLedger item
     scanned.payload.rawItems scanned result
     (attemptScan?_completionLedger owned predicted scanned item
@@ -4578,6 +4825,7 @@ private theorem processRawItem?_itemGrowth
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completedEq
   exact (attemptPredictions?_itemGrowth item allProductionIds
     current predicted predictedEq).trans
     ((attemptScan?_itemGrowth owned predicted scanned item scannedEq).trans
@@ -4596,6 +4844,7 @@ private theorem processRawItem?_prediction_materializes
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completedEq
   have predictedMember := attemptPredictions?_materializes pivot
     allProductionIds current predicted predictedEq production
       (Grammar.allProductionIds_complete production) after computed
@@ -4616,6 +4865,7 @@ private theorem processRawItem?_scan_materializes
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completedEq
   exact (attemptCompletionsWith?_itemGrowth pivot scanned.payload.rawItems
     scanned result completedEq).1
       (attemptScan?_materializes owned predicted scanned pivot after edge
@@ -4639,6 +4889,7 @@ private theorem processRawItem?_completion_materializes
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completedEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completedEq
   have predictedGrowth := attemptPredictions?_itemGrowth pivot
     allProductionIds current predicted predictedEq
   have predictedLedger := attemptPredictions?_completionLedger pivot
@@ -6827,6 +7078,8 @@ private theorem processRawItem?_total_allSafe
   rw [predictedEq]
   simp only [Option.bind_eq_bind, Option.bind_some]
   rw [scannedEq]
+  simp only [Option.bind_some]
+  rw [attemptCompletionsFastWith?_eq_reference]
   exact completionEq
 
 private theorem dequeueRawItem?_queue_shape
@@ -7074,6 +7327,108 @@ private def materializePhaseAIndexes?
           }]
         }
       materializePhaseAIndexes? evaluate rest next
+
+private def UnitAddress.outsideEvidenceIndexFamily {tokens : List Token} :
+    UnitAddress tokens → Bool
+  | .cubic .U01_evidenceIndex _ => false
+  | _ => true
+
+private def evidenceIndexFamilyFreshBool {tokens : List Token}
+    (counter : Counter tokens) : Bool :=
+  counter.usedRev.all UnitAddress.outsideEvidenceIndexFamily
+
+private theorem evidenceIndexAddress_fresh_of_familyFresh
+    {tokens : List Token} (counter : Counter tokens)
+    (clean : evidenceIndexFamilyFreshBool counter = true)
+    (address : EvidenceIndexAddress tokens) :
+    UnitAddress.evidenceIndex address ∉ counter.usedRev := by
+  intro member
+  have outside := (List.all_eq_true.mp clean)
+    (UnitAddress.evidenceIndex address) member
+  simp [UnitAddress.outsideEvidenceIndexFamily,
+    UnitAddress.evidenceIndex, evidenceIndexUnitAddress] at outside
+
+/-- One-pass materialization used when the U01 family is known fresh. -/
+private def materializePhaseAIndexesCertified
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (addresses : List (EvidenceIndexAddress tokens))
+    (current : CountedState tokens (PhaseAIndexed file tokens))
+    (unique : addresses.Nodup)
+    (fresh : ∀ address, address ∈ addresses →
+      UnitAddress.evidenceIndex address ∉ current.counter.usedRev) :
+    CountedState tokens (PhaseAIndexed file tokens) := {
+  payload := {
+    phaseA := current.payload.phaseA
+    entries := current.payload.entries ++ addresses.map fun address => {
+      address := address
+      selected := evaluate current.payload.phaseA address
+    }
+  }
+  counter := {
+    usedRev := (addresses.map UnitAddress.evidenceIndex).reverse ++
+      current.counter.usedRev
+    unique := by
+      rw [List.nodup_append]
+      refine ⟨?_, current.counter.unique, ?_⟩
+      · exact (List.reverse_perm _).symm.nodup
+          (map_nodup_of_injective UnitAddress.evidenceIndex
+            UnitAddress.evidenceIndex_injective unique)
+      · intro used usedMember old oldMember equal
+        rw [List.mem_reverse, List.mem_map] at usedMember
+        rcases usedMember with ⟨address, addressMember, rfl⟩
+        apply fresh address addressMember
+        simpa [equal] using oldMember
+  }
+}
+
+private theorem materializePhaseAIndexes?_eq_certified
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens) :
+    ∀ addresses (current : CountedState tokens (PhaseAIndexed file tokens))
+      (unique : addresses.Nodup)
+      (fresh : ∀ address, address ∈ addresses →
+        UnitAddress.evidenceIndex address ∉ current.counter.usedRev),
+      materializePhaseAIndexes? evaluate addresses current =
+        some (materializePhaseAIndexesCertified evaluate addresses current
+          unique fresh) := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current unique fresh
+      simp [materializePhaseAIndexes?, materializePhaseAIndexesCertified]
+  | cons address rest induction =>
+      intro current unique pending
+      rw [List.nodup_cons] at unique
+      have headFresh := pending address (by simp)
+      let transition := fun (state : PhaseAIndexed file tokens) => ({
+        state with entries := state.entries ++ [{
+          address := address
+          selected := evaluate state.phaseA address
+        }]
+      } : PhaseAIndexed file tokens)
+      let next : CountedState tokens (PhaseAIndexed file tokens) := {
+        payload := transition current.payload
+        counter := current.counter.charge
+          (UnitAddress.evidenceIndex address) headFresh
+      }
+      have stepped : runMappedPrimitive? current
+          (UnitAddress.evidenceIndex address) transition = some next := by
+        simp [runMappedPrimitive?, headFresh, next]
+      have restFresh : ∀ candidate, candidate ∈ rest →
+          UnitAddress.evidenceIndex candidate ∉ next.counter.usedRev := by
+        intro candidate member used
+        simp only [next, Counter.charge, List.mem_cons] at used
+        rcases used with equal | old
+        · have same := UnitAddress.evidenceIndex_injective equal
+          exact unique.1 (same.symm ▸ member)
+        · exact pending candidate (by simp [member]) old
+      rw [materializePhaseAIndexes?, stepped]
+      change materializePhaseAIndexes? evaluate rest next = _
+      rw [induction next unique.2 restFresh]
+      congr 1
+      simp [materializePhaseAIndexesCertified, next, transition,
+        Counter.charge, List.reverse_cons, List.append_assoc]
 
 private def indexSaturatedPhaseAWith?
     {file : WorkspaceFile} {tokens : List Token}
@@ -7617,10 +7972,57 @@ namespace Chart
 open Grammar
 open Solcore.Workspace
 
-/-- Canonical set presentation in the stable dotted-item enumeration order. -/
-private def canonicalRawItems (tokens : List Token)
+/-- Reference canonicalization by repeated list membership. -/
+private def canonicalRawItemsReference (tokens : List Token)
     (items : List (DottedItem tokens)) : List (DottedItem tokens) :=
   (allDottedItems tokens).filter fun item => rawMemberBool items item
+
+/-- A hash key retaining the complete dotted item while using a cheap,
+proof-independent hash projection. -/
+private structure RawItemHashKey (tokens : List Token) where
+  item : DottedItem tokens
+
+private def rawItemHashKeyBEq {tokens : List Token}
+    (left right : RawItemHashKey tokens) : Bool :=
+  decide (left.item = right.item)
+
+private instance {tokens : List Token} : BEq (RawItemHashKey tokens) :=
+  ⟨rawItemHashKeyBEq⟩
+
+private instance {tokens : List Token} : LawfulBEq (RawItemHashKey tokens) where
+  rfl := by
+    intro key
+    change decide (key.item = key.item) = true
+    exact of_decide_eq_self_eq_true key.item
+  eq_of_beq := by
+    intro left right equal
+    change rawItemHashKeyBEq left right = true at equal
+    have itemEqual : left.item = right.item := by
+      exact of_decide_eq_true equal
+    cases left
+    cases right
+    cases itemEqual
+    rfl
+
+private instance {tokens : List Token} : Hashable (RawItemHashKey tokens) where
+  hash key :=
+    mixHash (hash key.item.production.sourceRule.index)
+      (mixHash (hash key.item.dot.val)
+        (mixHash (hash key.item.origin.val) (hash key.item.current.val)))
+
+private def rawItemHashKey {tokens : List Token}
+    (item : DottedItem tokens) : RawItemHashKey tokens :=
+  ⟨item⟩
+
+/-- Canonical set presentation in the stable dotted-item enumeration order.
+Membership is indexed once instead of rescanning the discovered-item list for
+every finite carrier element. -/
+private def canonicalRawItems (tokens : List Token)
+    (items : List (DottedItem tokens)) : List (DottedItem tokens) :=
+  let index : Std.HashSet (RawItemHashKey tokens) :=
+    Std.HashSet.ofList (items.map rawItemHashKey)
+  (allDottedItems tokens).filter fun item =>
+    index.contains (rawItemHashKey item)
 
 private theorem rawMemberBool_eq_true_iff
     {tokens : List Token} (items : List (DottedItem tokens))
@@ -7634,11 +8036,48 @@ private theorem rawMemberBool_eq_true_iff
   · intro member
     exact ⟨item, member, rfl⟩
 
+private theorem rawItemHashKey_injective {tokens : List Token} :
+    Function.Injective (rawItemHashKey (tokens := tokens)) := by
+  intro left right equal
+  exact congrArg RawItemHashKey.item equal
+
+private theorem rawItemHashKey_mem_map_iff
+    {tokens : List Token} (items : List (DottedItem tokens))
+    (item : DottedItem tokens) :
+    rawItemHashKey item ∈ items.map rawItemHashKey ↔ item ∈ items := by
+  constructor
+  · rw [List.mem_map]
+    rintro ⟨candidate, member, equal⟩
+    exact (rawItemHashKey_injective equal).symm ▸ member
+  · intro member
+    exact List.mem_map.mpr ⟨item, member, rfl⟩
+
+private theorem rawItemHashIndex_contains_eq_true_iff
+    {tokens : List Token} (items : List (DottedItem tokens))
+    (item : DottedItem tokens) :
+    (Std.HashSet.ofList (items.map rawItemHashKey)).contains
+        (rawItemHashKey item) = true ↔ item ∈ items := by
+  rw [Std.HashSet.contains_ofList, List.contains_iff_mem,
+    rawItemHashKey_mem_map_iff]
+
+/-- The indexed implementation is exactly the reference canonicalization. -/
+private theorem canonicalRawItems_eq_reference
+    {tokens : List Token} (items : List (DottedItem tokens)) :
+    canonicalRawItems tokens items =
+      canonicalRawItemsReference tokens items := by
+  unfold canonicalRawItems canonicalRawItemsReference
+  apply List.filter_congr
+  intro item _member
+  apply Bool.eq_iff_iff.mpr
+  exact (rawItemHashIndex_contains_eq_true_iff items item).trans
+    (rawMemberBool_eq_true_iff items item).symm
+
 private theorem mem_canonicalRawItems_iff
     {tokens : List Token} (items : List (DottedItem tokens))
     (item : DottedItem tokens) :
     item ∈ canonicalRawItems tokens items ↔ item ∈ items := by
-  rw [canonicalRawItems, List.mem_filter,
+  rw [canonicalRawItems_eq_reference, canonicalRawItemsReference,
+    List.mem_filter,
     rawMemberBool_eq_true_iff]
   exact and_iff_right (allDottedItems_complete item)
 
@@ -7661,7 +8100,9 @@ private theorem canonicalRawItems_eq_iff
       rw [← equal] at canonicalMember
       exact (mem_canonicalRawItems_iff left item).mp canonicalMember
   · intro sameMembers
-    unfold canonicalRawItems
+    rw [canonicalRawItems_eq_reference,
+      canonicalRawItems_eq_reference]
+    unfold canonicalRawItemsReference
     congr 1
     funext item
     apply Bool.eq_iff_iff.mpr
@@ -7673,7 +8114,8 @@ private theorem canonicalRawItems_filter
     {tokens : List Token} (select : DottedItem tokens → Bool) :
     canonicalRawItems tokens ((allDottedItems tokens).filter select) =
       (allDottedItems tokens).filter select := by
-  unfold canonicalRawItems
+  rw [canonicalRawItems_eq_reference]
+  unfold canonicalRawItemsReference
   apply List.filter_congr
   intro item member
   apply Bool.eq_iff_iff.mpr
@@ -7712,11 +8154,16 @@ private def normalizePhaseARawItems
     (_sameMembers :
       canonicalRawItems tokens current.payload.rawItems =
         canonicalRawItems tokens (rawSaturation tokens)) :
-    CountedState tokens (PhaseAOpen file tokens) := {
+    CountedState tokens (PhaseAOpen file tokens) :=
+  let items := canonicalRawItems tokens current.payload.rawItems
+  {
   current with
   payload := {
     current.payload with
-    rawItems := canonicalRawItems tokens current.payload.rawItems
+    rawItems := items
+    completionEntries := items.map fun item =>
+      (item, rawCompletionRole item)
+    completionEntries_eq := rfl
   }
 }
 
@@ -8166,29 +8613,6 @@ private def executeIndexedPhaseBOfCertifiedPhaseA?
     (allGuardInstanceKeys tokens).length entered
   sealIndexedPhaseB? finalized
 
-/-- Execute Phase A once, canonicalize its proved worklist result without
-re-evaluating the reference closure, then enter Phase B through proof-erased
-certificates. -/
-private def executeObservedPhaseAB?
-    (file : WorkspaceFile) (tokens : List Token)
-    (owned : TokensOwnedBy file tokens) :
-    Option (CountedState tokens (PhaseBSealed file tokens)) := do
-  let phaseA := executePhaseA file tokens owned
-  let phaseAEq := executePhaseA_selected file tokens owned
-  let sameMembers :
-      canonicalRawItems tokens phaseA.payload.rawItems =
-        canonicalRawItems tokens (rawSaturation tokens) :=
-    (canonicalRawItems_eq_iff
-      phaseA.payload.rawItems (rawSaturation tokens)).mpr
-        (executePhaseA?_membership_eq file tokens owned phaseA phaseAEq)
-  let normalized := normalizePhaseARawItems phaseA sameMembers
-  let indexed ← materializePhaseAIndexes?
-    (phaseAObservationIndexEvaluator owned)
-    (allEvidenceIndexAddresses tokens)
-    (beginPhaseAIndexing normalized)
-  executeIndexedPhaseBOfCertifiedPhaseA?
-    file tokens owned phaseA phaseAEq sameMembers indexed
-
 end Chart
 
 namespace Chart
@@ -8398,6 +8822,61 @@ private theorem allEvidenceIndexAddresses_nodup (tokens : List Token) :
     (allEvidenceIndexAddresses tokens).Nodup := by
   rw [allEvidenceIndexAddresses_eq_canonical]
   exact canonicalEvidenceIndexAddresses_nodup tokens
+
+private def materializeAllPhaseAIndexesFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAIndexed file tokens)) :
+    Option (CountedState tokens (PhaseAIndexed file tokens)) :=
+  if clean : evidenceIndexFamilyFreshBool current.counter = true then
+    some (materializePhaseAIndexesCertified evaluate
+      (allEvidenceIndexAddresses tokens) current
+      (allEvidenceIndexAddresses_nodup tokens)
+      (fun address _member =>
+        evidenceIndexAddress_fresh_of_familyFresh current.counter
+          clean address))
+  else
+    materializePhaseAIndexes? evaluate
+      (allEvidenceIndexAddresses tokens) current
+
+private theorem materializeAllPhaseAIndexesFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (evaluate : PhaseAIndexEvaluator file tokens)
+    (current : CountedState tokens (PhaseAIndexed file tokens)) :
+    materializeAllPhaseAIndexesFast? evaluate current =
+      materializePhaseAIndexes? evaluate
+        (allEvidenceIndexAddresses tokens) current := by
+  unfold materializeAllPhaseAIndexesFast?
+  split
+  next clean =>
+    exact (materializePhaseAIndexes?_eq_certified evaluate
+      (allEvidenceIndexAddresses tokens) current
+      (allEvidenceIndexAddresses_nodup tokens)
+      (fun address _member =>
+        evidenceIndexAddress_fresh_of_familyFresh current.counter
+          clean address)).symm
+  next => rfl
+
+/-- Execute Phase A once, materialize its certified evidence table in one
+pass, then enter Phase B through proof-erased certificates. -/
+private def executeObservedPhaseAB?
+    (file : WorkspaceFile) (tokens : List Token)
+    (owned : TokensOwnedBy file tokens) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) := do
+  let phaseA := executePhaseA file tokens owned
+  let phaseAEq := executePhaseA_selected file tokens owned
+  let sameMembers :
+      canonicalRawItems tokens phaseA.payload.rawItems =
+        canonicalRawItems tokens (rawSaturation tokens) :=
+    (canonicalRawItems_eq_iff
+      phaseA.payload.rawItems (rawSaturation tokens)).mpr
+        (executePhaseA?_membership_eq file tokens owned phaseA phaseAEq)
+  let normalized := normalizePhaseARawItems phaseA sameMembers
+  let indexed ← materializeAllPhaseAIndexesFast?
+    (phaseAObservationIndexEvaluator owned)
+    (beginPhaseAIndexing normalized)
+  executeIndexedPhaseBOfCertifiedPhaseA?
+    file tokens owned phaseA phaseAEq sameMembers indexed
 
 private def EvidenceEntriesAddressNodup
     {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens)) :
@@ -8667,13 +9146,13 @@ private theorem executeObservedPhaseAB?_eq_reference
   simp only [Option.bind_eq_bind, Option.bind_some]
   rw [indexedReference]
   change
-    (materializePhaseAIndexes?
+    (materializeAllPhaseAIndexesFast?
       (phaseAObservationIndexEvaluator owned)
-      (allEvidenceIndexAddresses tokens)
       (beginPhaseAIndexing
         (normalizePhaseARawItems phaseA sameMembers))).bind
       (executeIndexedPhaseBOfCertifiedPhaseA?
         file tokens owned phaseA phaseAEq sameMembers) = _
+  rw [materializeAllPhaseAIndexesFast?_eq_reference]
   cases indexedEq : materializePhaseAIndexes?
       (phaseAObservationIndexEvaluator owned)
       (allEvidenceIndexAddresses tokens)
@@ -9292,6 +9771,9 @@ private def phaseBTotalityWitnessPhaseA
     (file : WorkspaceFile) (tokens : List Token) :
     PhaseAOpen file tokens := {
   rawItems := rawSaturation tokens
+  completionEntries := rawSaturation tokens |>.map fun item =>
+    (item, rawCompletionRole item)
+  completionEntries_eq := rfl
   itemQueue := []
   rawEdges := []
   edgeQueue := []
@@ -9671,6 +10153,7 @@ private theorem processRawItem?_reservedFresh
   simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at selected
   rcases selected with ⟨predicted, predictedEq,
     scanned, scannedEq, completionEq⟩
+  rw [attemptCompletionsFastWith?_eq_reference] at completionEq
   exact attemptCompletionsWith?_reservedFresh item
     scanned.payload.rawItems scanned result
     (attemptScan?_reservedFresh owned predicted scanned item
