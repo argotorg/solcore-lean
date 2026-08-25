@@ -128,6 +128,82 @@ theorem contextualActivationParent_origin_lt_of_equalCompletionWeight
   have decreases := strictOfNullable (nullableAtOrigin parentAtOrigin)
   exact (Nat.ne_of_lt decreases) equalWeight
 
+/-- A statically nonnullable consumed prefix places an activation parent at
+a strictly earlier origin than the child it introduced. -/
+theorem contextualActivationParent_origin_lt_of_prefix_not_all
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (nullableSymbol : GrammarSymbol → Bool)
+    (closed : ∀ production : ProductionId,
+      production.rhs.all nullableSymbol = true →
+        nullableSymbol (.nonterminal production.lhs) = true)
+    {parent finished : ContextualItemKey tokens}
+    (activated : ContextualActivationParent
+      file tokens memo correct final parent finished)
+    (nonnullable :
+      (parent.raw.production.rhs.take parent.raw.dot.val).all
+          nullableSymbol ≠ true) :
+    parent.raw.origin.val < finished.raw.origin.val := by
+  have progresses := contextualReach_origin_lt_current_of_prefix_not_all
+    nullableSymbol closed activated.1 nonnullable
+  rw [activated.2.2.1] at progresses
+  exact progresses
+
+/-- Any certified static prefix-consumption check supplies the same strict
+activation-origin separation. -/
+theorem contextualActivationParent_origin_lt_of_prefixConsumes
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (nullableSymbol : GrammarSymbol → Bool)
+    (closed : ∀ production : ProductionId,
+      production.rhs.all nullableSymbol = true →
+        nullableSymbol (.nonterminal production.lhs) = true)
+    (consumes : DottedRhs → Bool)
+    (consumesSound : ∀ dotted,
+      consumes dotted = true →
+        (dotted.production.rhs.take dotted.dot.val).all
+          nullableSymbol ≠ true)
+    {parent finished : ContextualItemKey tokens}
+    (activated : ContextualActivationParent
+      file tokens memo correct final parent finished)
+    (checked :
+      consumes (frontierDottedRhsOfItem parent.raw) = true) :
+    parent.raw.origin.val < finished.raw.origin.val := by
+  apply contextualActivationParent_origin_lt_of_prefix_not_all
+    nullableSymbol closed activated
+  exact consumesSound _ checked
+
+/-- Advancing such a parent preserves its earlier origin, giving the exact
+origin descent used by a completion continuation rank. -/
+theorem contextualCompletionContinuation_origin_lt_of_prefixConsumes
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    (nullableSymbol : GrammarSymbol → Bool)
+    (closed : ∀ production : ProductionId,
+      production.rhs.all nullableSymbol = true →
+        nullableSymbol (.nonterminal production.lhs) = true)
+    (consumes : DottedRhs → Bool)
+    (consumesSound : ∀ dotted,
+      consumes dotted = true →
+        (dotted.production.rhs.take dotted.dot.val).all
+          nullableSymbol ≠ true)
+    {parent finished after : ContextualItemKey tokens}
+    (activated : ContextualActivationParent
+      file tokens memo correct final parent finished)
+    (advance : AdvanceItem parent.raw finished.raw.current after.raw)
+    (checked :
+      consumes (frontierDottedRhsOfItem parent.raw) = true) :
+    after.raw.origin.val < finished.raw.origin.val := by
+  rw [advance.2.2.1]
+  exact contextualActivationParent_origin_lt_of_prefixConsumes
+    nullableSymbol closed consumes consumesSound activated checked
+
 
 private def dottedNextSymbolDecision
     {tokens : List Token} (item : DottedItem tokens)
