@@ -1255,4 +1255,362 @@ theorem applies_controlOutsideLoop_iff
 
 end StructuralDiagnostic
 
+/-- A finite list has at least one written element. -/
+def HasElement {α : Type} (values : List α) : Prop :=
+  ∃ value, value ∈ values
+
+@[simp] theorem hasElement_nil {α : Type} :
+    ¬HasElement ([] : List α) := by
+  simp [HasElement]
+
+@[simp] theorem hasElement_cons {α : Type} (head : α) (tail : List α) :
+    HasElement (head :: tail) := by
+  exact ⟨head, by simp⟩
+
+/-- The keys of a finite list are pairwise distinct. -/
+def UniqueBy {α κ : Type} (key : α → κ) (values : List α) : Prop :=
+  (values.map key).Nodup
+
+/-- A unique-key list cannot contain a later duplicate occurrence. -/
+theorem UniqueBy.not_laterDuplicate
+    {α κ : Type} {key : α → κ} {values : List α} {later : α}
+    (unique : UniqueBy key values)
+    (duplicate : LaterDuplicate values key later) : False := by
+  induction values with
+  | nil => simp [LaterDuplicate] at duplicate
+  | cons head tail induction =>
+      rw [laterDuplicate_cons_iff] at duplicate
+      rw [UniqueBy, List.map_cons, List.nodup_cons] at unique
+      rcases unique with ⟨headAbsent, tailUnique⟩
+      rcases duplicate with suffixDuplicate |
+          ⟨candidate, member, candidateEq, keyEq⟩
+      · exact induction tailUnique suffixDuplicate
+      · apply headAbsent
+        apply List.mem_map.mpr
+        exact ⟨candidate, member, keyEq.symm⟩
+
+/-- A wildcard is valid alone, or the finite entry list has no wildcard. -/
+def WildcardListShape
+    (entryCount : Nat) (wildcardSpans : List SourceSpan) : Prop :=
+  entryCount = 1 ∨ wildcardSpans = []
+
+/-- A valid wildcard shape cannot yield a mixed-wildcard diagnostic. -/
+theorem WildcardListShape.not_mixed_least
+    {entryCount : Nat} {wildcardSpans : List SourceSpan}
+    {span : SourceSpan}
+    (shape : WildcardListShape entryCount wildcardSpans)
+    (mixed : entryCount ≠ 1)
+    (least : LeastSpanIn span wildcardSpans) : False := by
+  rcases shape with countOne | noWildcard
+  · exact mixed countOne
+  · have member := least.member
+    simp [noWildcard] at member
+
+namespace StructuralSite
+
+/-- Every parameter in the finite list carries an explicit type. -/
+def ParameterTypesPresent (parameters : List Parameter) : Prop :=
+  ∀ parameter ∈ parameters,
+    ∃ typeExpression, parameter.payload.type = some typeExpression
+
+/-- Modifier positions accepted for the declaration context of a signature. -/
+def SignatureModifiersAllowed
+    (context : Option ModifierContext)
+    (signature : FunctionSignature) : Prop :=
+  match context with
+  | none => True
+  | some _ =>
+      signature.payload.public = none ∧ signature.payload.payable = none
+
+/-- A wildcard selection and a named constructor list are both well formed. -/
+def ConstructorSelectionAccepts : Option ConstructorSelection → Prop
+  | none => True
+  | some selection =>
+      match selection.payload with
+      | .all _ => True
+      | .named constructors =>
+          UniqueBy (fun name => name.payload) constructors.toList
+
+/-- The target requirement attached to one pragma kind. -/
+def PragmaTargetsPresentWhenRequired (declaration : PragmaDecl) : Prop :=
+  match declaration.payload.kind.payload with
+  | .noGenericInstanceFor => HasElement declaration.payload.targets
+  | .noCoverageCondition
+  | .noPattersonCondition
+  | .noBoundedVariableCondition => True
+
+/-- A fallback return is absent or is unit after removing explicit groups. -/
+def FallbackReturnAccepts : Option TypeExpr → Prop
+  | none => True
+  | some returnType => GroupedUnit returnType
+
+/-- Every match arm has one pattern for each scrutinee. -/
+def MatchAritiesAgree
+    (scrutinees : NonemptyList Expression)
+    (arms : NonemptyList MatchArm) : Prop :=
+  ∀ arm ∈ arms.toList,
+    arm.payload.patterns.toList.length = scrutinees.toList.length
+
+/-- The local well-formedness conditions for one reached structural site. -/
+def Accepts : StructuralSite → Prop
+  | .importSelection selection =>
+      HasElement selection.payload.entries ∧
+        WildcardListShape selection.payload.entries.length
+          (StructuralDiagnostic.importWildcardSpans
+            selection.payload.entries) ∧
+        UniqueBy (fun binding => binding.1.payload)
+          (StructuralDiagnostic.namedImportBindings
+            selection.payload.entries) ∧
+        UniqueBy (fun binding => binding.2.payload)
+          (StructuralDiagnostic.namedImportBindings
+            selection.payload.entries)
+  | .hidingClause clause =>
+      HasElement clause.payload.names ∧
+        UniqueBy (fun name => name.payload) clause.payload.names
+  | .localExportList selection =>
+      HasElement selection.payload.entries ∧
+        WildcardListShape selection.payload.entries.length
+          (StructuralDiagnostic.localExportWildcardSpans
+            selection.payload.entries) ∧
+        UniqueBy (fun item => item.payload.name.payload)
+          (StructuralDiagnostic.localExportItems
+            selection.payload.entries) ∧
+        UniqueBy ModuleReference.eraseLocations
+          (StructuralDiagnostic.localExportReferences
+            selection.payload.entries)
+  | .remoteExportSelection selection =>
+      match selection.payload with
+      | .dotWildcard _ => True
+      | .braced entries =>
+          HasElement entries ∧
+            WildcardListShape entries.length
+              (StructuralDiagnostic.remoteExportWildcardSpans entries) ∧
+            UniqueBy (fun item => item.payload.name.payload)
+              (StructuralDiagnostic.remoteExportItems entries)
+  | .exportItem item =>
+      ConstructorSelectionAccepts item.payload.constructors
+  | .pragma declaration =>
+      PragmaTargetsPresentWhenRequired declaration ∧
+        UniqueBy (fun target => target.payload)
+          declaration.payload.targets
+  | .signature modifierContext _parameterContext functionSignature =>
+      SignatureModifiersAllowed modifierContext functionSignature ∧
+        ParameterTypesPresent functionSignature.payload.parameters
+  | .fallback declaration =>
+      declaration.payload.public = none ∧
+        declaration.payload.parameters = [] ∧
+        FallbackReturnAccepts declaration.payload.returnType
+  | .contractConstructor declaration =>
+      declaration.payload.public = none ∧
+        ParameterTypesPresent declaration.payload.parameters
+  | .statement loopDepth statementNode =>
+      match statementNode.payload with
+      | .match scrutinees arms _ => MatchAritiesAgree scrutinees arms
+      | .break _ | .continue _ => 0 < loopDepth
+      | _ => True
+  | .expression _ | .pattern _ | .body _ _ | .forInit _ | .forPost _ =>
+      True
+
+@[simp] theorem accepts_expression (expression : Expression) :
+    Accepts (.expression expression) :=
+  True.intro
+
+@[simp] theorem accepts_pattern (pattern : Pattern) :
+    Accepts (.pattern pattern) :=
+  True.intro
+
+@[simp] theorem accepts_body (loopDepth : Nat) (body : Body) :
+    Accepts (.body loopDepth body) :=
+  True.intro
+
+@[simp] theorem accepts_forInit (item : ForInitItem) :
+    Accepts (.forInit item) :=
+  True.intro
+
+@[simp] theorem accepts_forPost (item : ForPostItem) :
+    Accepts (.forPost item) :=
+  True.intro
+
+@[simp] theorem accepts_remoteDotWildcard
+    (span : SourceSpan) (marker : Marker) :
+    Accepts (.remoteExportSelection
+      (show RemoteExportSelection from ⟨span, .dotWildcard marker⟩)) :=
+  True.intro
+
+@[simp] theorem accepts_break_iff
+    (loopDepth : Nat) (span terminator : SourceSpan) :
+    Accepts (.statement loopDepth
+      (show Statement from ⟨span, .break terminator⟩)) ↔
+        0 < loopDepth :=
+  Iff.rfl
+
+@[simp] theorem accepts_continue_iff
+    (loopDepth : Nat) (span terminator : SourceSpan) :
+    Accepts (.statement loopDepth
+      (show Statement from ⟨span, .continue terminator⟩)) ↔
+        0 < loopDepth :=
+  Iff.rfl
+
+end StructuralSite
+
+/-- Every structural site reached from the module is locally well formed. -/
+structure StructurallyAccepts (module : ParsedModuleV1) : Prop where
+  atSite : ∀ {site : StructuralSite},
+    StructuralSite.Occurs module site → StructuralSite.Accepts site
+
+/-- Project module acceptance to any reached structural site. -/
+theorem StructurallyAccepts.acceptsAt
+    {module : ParsedModuleV1} (accepted : StructurallyAccepts module)
+    {site : StructuralSite}
+    (occurrence : StructuralSite.Occurs module site) :
+    StructuralSite.Accepts site :=
+  accepted.atSite occurrence
+
+/-- A structurally accepted module admits none of the structural diagnostics. -/
+theorem StructurallyAccepts.not_applies
+    {module : ParsedModuleV1} (accepted : StructurallyAccepts module)
+    {diagnostic : StructuralDiagnostic} :
+    ¬StructuralDiagnostic.Applies module diagnostic := by
+  intro applies
+  cases applies with
+  | emptyImportSelection occurrence empty =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      rcases site.1 with ⟨entry, member⟩
+      simp [empty] at member
+  | mixedImportWildcard occurrence mixed least =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact WildcardListShape.not_mixed_least site.2.1 mixed least
+  | duplicateImportSourceName occurrence duplicate =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact UniqueBy.not_laterDuplicate site.2.2.1 duplicate
+  | duplicateImportLocalName occurrence duplicate =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact UniqueBy.not_laterDuplicate site.2.2.2 duplicate
+  | emptyHidingClause occurrence empty =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      rcases site.1 with ⟨name, member⟩
+      simp [empty] at member
+  | duplicateHiddenName occurrence duplicate =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact UniqueBy.not_laterDuplicate site.2 duplicate
+  | emptyLocalExportList occurrence empty =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      rcases site.1 with ⟨entry, member⟩
+      simp [empty] at member
+  | emptyRemoteExportList entries occurrence braced empty =>
+      have site := accepted.acceptsAt occurrence
+      simp only [StructuralSite.Accepts] at site
+      rw [braced] at site
+      rcases site.1 with ⟨entry, member⟩
+      simp [empty] at member
+  | mixedLocalExportWildcard occurrence mixed least =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact WildcardListShape.not_mixed_least site.2.1 mixed least
+  | mixedRemoteExportWildcard occurrence braced mixed least =>
+      have site := accepted.acceptsAt occurrence
+      simp only [StructuralSite.Accepts] at site
+      rw [braced] at site
+      exact WildcardListShape.not_mixed_least site.2.1 mixed least
+  | duplicateLocalExportName occurrence duplicate =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact UniqueBy.not_laterDuplicate site.2.2.1 duplicate
+  | duplicateRemoteExportName occurrence braced duplicate =>
+      have site := accepted.acceptsAt occurrence
+      simp only [StructuralSite.Accepts] at site
+      rw [braced] at site
+      exact UniqueBy.not_laterDuplicate site.2.2 duplicate
+  | duplicateExportModuleReference occurrence duplicate =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact UniqueBy.not_laterDuplicate site.2.2.2 duplicate
+  | duplicateExportConstructor occurrence selectionPresent named duplicate =>
+      have site := accepted.acceptsAt occurrence
+      simp only [StructuralSite.Accepts] at site
+      simp only [StructuralSite.ConstructorSelectionAccepts,
+        selectionPresent, named] at site
+      exact UniqueBy.not_laterDuplicate site duplicate
+  | matchPatternArityMismatch occurrence shape armMember mismatch =>
+      have site := accepted.acceptsAt occurrence
+      simp only [StructuralSite.Accepts] at site
+      rw [shape] at site
+      unfold StructuralSite.MatchAritiesAgree at site
+      exact mismatch (site _ armMember)
+  | emptyGenericPragmaTargets occurrence kind empty =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      have required := site.1
+      unfold StructuralSite.PragmaTargetsPresentWhenRequired at required
+      rw [kind] at required
+      rcases required with ⟨target, member⟩
+      simp [empty] at member
+  | duplicatePragmaTarget occurrence duplicate =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact UniqueBy.not_laterDuplicate site.2 duplicate
+  | signatureModifierNotAllowed occurrence selected =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      unfold StructuralSite.SignatureModifiersAllowed at site
+      cases selected with
+      | publicMarker chosen =>
+          rw [site.1.1] at chosen
+          simp at chosen
+      | payableMarker chosen =>
+          rw [site.1.2] at chosen
+          simp at chosen
+  | fallbackModifierNotAllowed occurrence selected =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      rw [site.1] at selected
+      simp at selected
+  | constructorModifierNotAllowed occurrence selected =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      rw [site.1] at selected
+      simp at selected
+  | fallbackHasParameters occurrence nonempty =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      exact nonempty site.2.1
+  | fallbackHasNonUnitReturn occurrence returnPresent notUnit =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      have returnAccepted := site.2.2
+      unfold StructuralSite.FallbackReturnAccepts at returnAccepted
+      rw [returnPresent] at returnAccepted
+      exact notUnit returnAccepted
+  | signatureParameterTypeMissing occurrence member missing =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      unfold StructuralSite.ParameterTypesPresent at site
+      rcases site.2 _ member with ⟨typeExpression, present⟩
+      rw [missing] at present
+      simp at present
+  | constructorParameterTypeMissing occurrence member missing =>
+      have site := accepted.acceptsAt occurrence
+      unfold StructuralSite.Accepts at site
+      unfold StructuralSite.ParameterTypesPresent at site
+      rcases site.2 _ member with ⟨typeExpression, present⟩
+      rw [missing] at present
+      simp at present
+  | breakOutsideLoop occurrence shape =>
+      have site := accepted.acceptsAt occurrence
+      simp only [StructuralSite.Accepts] at site
+      rw [shape] at site
+      exact Nat.lt_irrefl 0 site
+  | continueOutsideLoop occurrence shape =>
+      have site := accepted.acceptsAt occurrence
+      simp only [StructuralSite.Accepts] at site
+      rw [shape] at site
+      exact Nat.lt_irrefl 0 site
+
 end Solcore.Surface.Multi
