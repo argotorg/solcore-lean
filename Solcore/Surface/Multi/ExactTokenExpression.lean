@@ -78,13 +78,21 @@ def parameterTokenPlan? (parameter : Parameter) : Option TokenPlan := do
     identifierPlan parameter.payload.name,
     typePlan]))
 
-private def parameterTokenPlans? :
+def parameterTokenPlans? :
     List Parameter → Option (List TokenPlan)
   | [] => some []
   | head :: tail => do
       let headPlan ← parameterTokenPlan? head
       let tailPlans ← parameterTokenPlans? tail
       pure (headPlan :: tailPlans)
+
+@[simp] theorem parameterTokenPlans?_eq_mapM
+    (parameters : List Parameter) :
+    parameterTokenPlans? parameters = parameters.mapM parameterTokenPlan? := by
+  induction parameters with
+  | nil => rfl
+  | cons parameter parameters induction =>
+      simp only [parameterTokenPlans?, List.mapM_cons, induction]
 
 /-- The source expression grammar level at which a subtree occurs. -/
 inductive ExpressionTokenLevel where
