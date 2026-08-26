@@ -405,13 +405,6 @@ private def expressionListDiagnostics (fuel : Nat)
     (expressions : List Expression) : List StructuralDiagnostic :=
   expressions.flatMap (expressionDiagnostics fuel)
 
-/-- Find structural diagnostics in an optional expression. -/
-private def optionalExpressionDiagnostics (fuel : Nat)
-    (expression : Option Expression) : List StructuralDiagnostic :=
-  match expression with
-  | none => []
-  | some value => expressionDiagnostics fuel value
-
 /-- Find nested-lambda diagnostics in a pattern. -/
 private def patternDiagnostics (fuel : Nat) (pattern : Pattern) :
     List StructuralDiagnostic :=
@@ -437,7 +430,8 @@ private def forPostDiagnostics (fuel : Nat) (item : ForPostItem) :
     List StructuralDiagnostic :=
   forPostDiagnosticsFuel fuel item
 
-private def functionDiagnostics
+/-- Collect signature and body diagnostics for one function declaration. -/
+def functionDiagnostics
     (fuel : Nat)
     (modifierContext : Option ModifierContext)
     (parameterContext : ParameterContext)
@@ -452,7 +446,8 @@ private def functionDiagnostics
       declaration.payload.signature.payload.parameters ++
     bodyDiagnostics fuel 0 declaration.payload.body
 
-private def classMethodDiagnostics
+/-- Collect restricted-signature diagnostics for one class method. -/
+def classMethodDiagnostics
     (declaration : ClassMethodDecl) : List StructuralDiagnostic :=
   disallowedSignatureModifierDiagnostics .classMethod
       declaration.payload.signature ++
@@ -502,25 +497,29 @@ def constructorDiagnostics
       declaration.payload.parameters ++
     bodyDiagnostics fuel 0 declaration.payload.body
 
-private def contractMemberDiagnostics
+/-- Collect diagnostics rooted at one contract member. -/
+def contractMemberDiagnostics
     (fuel : Nat)
     (member : ContractMember) : List StructuralDiagnostic :=
   match member.payload with
   | .dataDecl _ | .typeAlias _ => []
   | .field declaration =>
-      optionalExpressionDiagnostics fuel declaration.payload.initializer
+      match declaration.payload.initializer with
+      | none => []
+      | some initializer => expressionDiagnosticsFuel fuel initializer
   | .function declaration =>
       functionDiagnostics fuel none .contractFunction declaration
   | .fallback declaration => fallbackDiagnostics fuel declaration
   | .constructor declaration => constructorDiagnostics fuel declaration
 
-private def contractDiagnostics
+/-- Collect diagnostics rooted at every member of one contract declaration. -/
+def contractDiagnostics
     (fuel : Nat)
     (declaration : ContractDecl) : List StructuralDiagnostic :=
   declaration.payload.members.flatMap (contractMemberDiagnostics fuel)
 
 /-- Collect all structural candidates rooted at one top-level item. -/
-private def topItemDiagnostics (fuel : Nat) (item : TopItem) :
+def topItemDiagnostics (fuel : Nat) (item : TopItem) :
     List StructuralDiagnostic :=
   match item.payload with
   | .importDecl declaration => importDiagnostics declaration

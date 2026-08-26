@@ -1542,6 +1542,201 @@ theorem mem_constructorDiagnostics_applies
   · exact mem_bodyDiagnosticsFuel_applies
       occurrence.constructorBody_of_constructor body
 
+/-- Every diagnostic emitted for a function whose signature and body are
+reached is declaratively applicable. -/
+theorem mem_functionDiagnostics_applies
+    {fuel : Nat} {module : ParsedModuleV1}
+    {modifierContext : Option ModifierContext}
+    {parameterContext : ParameterContext}
+    {declaration : FunctionDecl} {diagnostic : StructuralDiagnostic}
+    (signatureOccurrence : StructuralSite.Occurs module
+      (.signature modifierContext parameterContext
+        declaration.payload.signature))
+    (bodyOccurrence : StructuralSite.Occurs module
+      (.body 0 declaration.payload.body))
+    (member : diagnostic ∈ functionDiagnostics fuel modifierContext
+      parameterContext declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  cases modifierContext with
+  | none =>
+      change diagnostic ∈
+        missingParameterTypeDiagnostics parameterContext
+            declaration.payload.signature.payload.parameters ++
+          bodyDiagnosticsFuel fuel 0 declaration.payload.body at member
+      rw [List.mem_append] at member
+      rcases member with parameterMember | bodyMember
+      · exact mem_missingParameterTypeDiagnostics_applies
+          signatureOccurrence parameterMember
+      · exact mem_bodyDiagnosticsFuel_applies bodyOccurrence bodyMember
+  | some context =>
+      change diagnostic ∈
+        (disallowedSignatureModifierDiagnostics context
+            declaration.payload.signature ++
+          missingParameterTypeDiagnostics parameterContext
+            declaration.payload.signature.payload.parameters) ++
+          bodyDiagnosticsFuel fuel 0 declaration.payload.body at member
+      simp only [List.mem_append] at member
+      rcases member with signatureMember | bodyMember
+      · rcases signatureMember with modifierMember | parameterMember
+        · exact mem_disallowedSignatureModifierDiagnostics_applies
+            signatureOccurrence modifierMember
+        · exact mem_missingParameterTypeDiagnostics_applies
+            signatureOccurrence parameterMember
+      · exact mem_bodyDiagnosticsFuel_applies bodyOccurrence bodyMember
+
+/-- Every diagnostic emitted for a reached class-method signature is
+declaratively applicable. -/
+theorem mem_classMethodDiagnostics_applies
+    {module : ParsedModuleV1} {declaration : ClassMethodDecl}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.signature (some .classMethod) .classMethod
+        declaration.payload.signature))
+    (member : diagnostic ∈ classMethodDiagnostics declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  change diagnostic ∈
+    disallowedSignatureModifierDiagnostics .classMethod
+        declaration.payload.signature ++
+      missingParameterTypeDiagnostics .classMethod
+        declaration.payload.signature.payload.parameters at member
+  rw [List.mem_append] at member
+  rcases member with modifierMember | parameterMember
+  · exact mem_disallowedSignatureModifierDiagnostics_applies
+      occurrence modifierMember
+  · exact mem_missingParameterTypeDiagnostics_applies
+      occurrence parameterMember
+
+/-- Every diagnostic emitted for a reached member of a top-level contract is
+declaratively applicable. -/
+theorem mem_contractMemberDiagnostics_applies
+    {fuel : Nat} {module : ParsedModuleV1} {item : TopItem}
+    {declaration : ContractDecl} {contractMember : ContractMember}
+    {diagnostic : StructuralDiagnostic}
+    (itemMember : item ∈ module.payload.items)
+    (itemShape : item.payload = .contractDecl declaration)
+    (contractMemberMember : contractMember ∈ declaration.payload.members)
+    (diagnosticMember : diagnostic ∈
+      contractMemberDiagnostics fuel contractMember) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  cases memberShape : contractMember.payload with
+  | dataDecl dataDeclaration =>
+      simp [contractMemberDiagnostics, memberShape] at diagnosticMember
+  | typeAlias typeAliasDeclaration =>
+      simp [contractMemberDiagnostics, memberShape] at diagnosticMember
+  | field fieldDeclaration =>
+      cases initializerShape : fieldDeclaration.payload.initializer with
+      | none =>
+          simp [contractMemberDiagnostics, memberShape,
+            initializerShape] at diagnosticMember
+      | some initializer =>
+          have expressionMember :
+              diagnostic ∈ expressionDiagnosticsFuel fuel initializer := by
+            simpa [contractMemberDiagnostics, memberShape,
+              initializerShape] using diagnosticMember
+          exact mem_expressionDiagnosticsFuel_applies
+            (.contractFieldInitializer itemMember itemShape
+              contractMemberMember memberShape initializerShape)
+            expressionMember
+  | «function» functionDeclaration =>
+      have functionMember : diagnostic ∈
+          functionDiagnostics fuel none .contractFunction
+            functionDeclaration := by
+        simpa [contractMemberDiagnostics, memberShape] using diagnosticMember
+      exact mem_functionDiagnostics_applies
+        (.contractFunctionSignature itemMember itemShape
+          contractMemberMember memberShape)
+        (.contractFunctionBody itemMember itemShape
+          contractMemberMember memberShape)
+        functionMember
+  | fallback fallbackDeclaration =>
+      have fallbackMember : diagnostic ∈
+          fallbackDiagnostics fuel fallbackDeclaration := by
+        simpa [contractMemberDiagnostics, memberShape] using diagnosticMember
+      exact mem_fallbackDiagnostics_applies
+        (.fallbackDeclaration itemMember itemShape
+          contractMemberMember memberShape)
+        fallbackMember
+  | constructor constructorDeclaration =>
+      have constructorMember : diagnostic ∈
+          constructorDiagnostics fuel constructorDeclaration := by
+        simpa [contractMemberDiagnostics, memberShape] using diagnosticMember
+      exact mem_constructorDiagnostics_applies
+        (.constructorDeclaration itemMember itemShape
+          contractMemberMember memberShape)
+        constructorMember
+
+/-- Every diagnostic emitted for a reached top-level contract declaration is
+declaratively applicable. -/
+theorem mem_contractDiagnostics_applies
+    {fuel : Nat} {module : ParsedModuleV1} {item : TopItem}
+    {declaration : ContractDecl} {diagnostic : StructuralDiagnostic}
+    (itemMember : item ∈ module.payload.items)
+    (itemShape : item.payload = .contractDecl declaration)
+    (member : diagnostic ∈ contractDiagnostics fuel declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [contractDiagnostics, List.mem_flatMap] at member
+  rcases member with
+    ⟨contractMember, contractMemberMember, diagnosticMember⟩
+  exact mem_contractMemberDiagnostics_applies
+    itemMember itemShape contractMemberMember diagnosticMember
+
+/-- Every diagnostic emitted for a reached top-level item is declaratively
+applicable. -/
+theorem mem_topItemDiagnostics_applies
+    {fuel : Nat} {module : ParsedModuleV1} {item : TopItem}
+    {diagnostic : StructuralDiagnostic}
+    (itemMember : item ∈ module.payload.items)
+    (member : diagnostic ∈ topItemDiagnostics fuel item) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  cases itemShape : item.payload with
+  | importDecl declaration =>
+      rw [topItemDiagnostics, itemShape] at member
+      exact mem_importDiagnostics_applies itemMember itemShape member
+  | exportDecl declaration =>
+      rw [topItemDiagnostics, itemShape] at member
+      exact mem_exportDiagnostics_applies itemMember itemShape member
+  | pragmaDecl declaration =>
+      rw [topItemDiagnostics, itemShape] at member
+      exact mem_pragmaDiagnostics_top_applies itemMember itemShape member
+  | dataDecl declaration =>
+      simp [topItemDiagnostics, itemShape] at member
+  | typeAliasDecl declaration =>
+      simp [topItemDiagnostics, itemShape] at member
+  | classDecl declaration =>
+      rw [topItemDiagnostics, itemShape, List.mem_flatMap] at member
+      rcases member with ⟨method, methodMember, diagnosticMember⟩
+      exact mem_classMethodDiagnostics_applies
+        (.classMethodSignature itemMember itemShape methodMember)
+        diagnosticMember
+  | instanceDecl declaration =>
+      rw [topItemDiagnostics, itemShape, List.mem_flatMap] at member
+      rcases member with ⟨method, methodMember, diagnosticMember⟩
+      exact mem_functionDiagnostics_applies
+        (.instanceMethodSignature itemMember itemShape methodMember)
+        (.instanceMethodBody itemMember itemShape methodMember)
+        diagnosticMember
+  | contractDecl declaration =>
+      rw [topItemDiagnostics, itemShape] at member
+      exact mem_contractDiagnostics_applies itemMember itemShape member
+  | functionDecl declaration =>
+      rw [topItemDiagnostics, itemShape] at member
+      exact mem_functionDiagnostics_applies
+        (.topFunctionSignature itemMember itemShape)
+        (.topFunctionBody itemMember itemShape)
+        member
+
+/-- Every executable structural candidate is declaratively applicable to its
+containing module. -/
+theorem mem_diagnosticCandidates_applies
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic}
+    (member : diagnostic ∈ diagnosticCandidates module) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  change diagnostic ∈ module.payload.items.flatMap
+    (topItemDiagnostics (astNodeMeasure module + 1)) at member
+  rw [List.mem_flatMap] at member
+  rcases member with ⟨item, itemMember, diagnosticMember⟩
+  exact mem_topItemDiagnostics_applies itemMember diagnosticMember
+
 end Structure
 
 end Solcore.Surface.Multi
