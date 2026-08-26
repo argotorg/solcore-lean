@@ -167,4 +167,33 @@ theorem typeAtomPlan?_wellAnchored
     plan.WellAnchored :=
   typeExprPlanAt?_wellAnchored true typeExpression plan success
 
+/-- Every type accepted in atom position has the identical plan at the full
+type entry point. Function and comptime forms are excluded by atom parsing. -/
+theorem typeAtomPlan?_promotes
+    {typeExpression : TypeExpr} {plan : TokenPlan}
+    (success : typeAtomPlan? typeExpression = some plan) :
+    typeExprPlan? typeExpression = some plan := by
+  rcases typeExpression with ⟨span, payload⟩
+  cases payload with
+  | named name arguments =>
+      cases arguments <;>
+        simpa [typeAtomPlan?, typeExprPlan?, typeExprPlanAt?] using success
+  | tuple elements =>
+      cases elements with
+      | nil =>
+          simpa [typeAtomPlan?, typeExprPlan?, typeExprPlanAt?] using success
+      | cons first tail =>
+          cases tail with
+          | nil => simp [typeAtomPlan?, typeExprPlanAt?] at success
+          | cons second rest =>
+              simpa [typeAtomPlan?, typeExprPlan?, typeExprPlanAt?] using success
+  | proxy marker inner =>
+      simpa [typeAtomPlan?, typeExprPlan?, typeExprPlanAt?] using success
+  | function domain codomain =>
+      simp [typeAtomPlan?, typeExprPlanAt?] at success
+  | group inner =>
+      simpa [typeAtomPlan?, typeExprPlan?, typeExprPlanAt?] using success
+  | comptime marker inner =>
+      simp [typeAtomPlan?, typeExprPlanAt?] at success
+
 end Solcore.Surface.Multi
