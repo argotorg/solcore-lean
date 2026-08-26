@@ -4,6 +4,7 @@ import Solcore.Surface.Multi.StructureCanonicalOrderingComparisonUnits
 import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 import Solcore.Surface.Multi.StructureLeastSpanComparisonUnits
 import Solcore.Surface.Multi.StructureResourceAccounting
+import Solcore.Surface.Multi.StructureResourceBound
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -83,6 +84,10 @@ def testMultiResourceBounds : IO Unit := do
     "the empty-module structural resource ledger changed"
   assertTrue (structureActualUnits emptyModule == 2)
     "the empty-module structural resource total changed"
+  assertTrue
+    (structureActualUnits emptyModule ≤
+      structureBound (astNodeMeasure emptyModule))
+    "the empty module exceeded the complete structural resource bound"
 
   let pathComponent : PathComponent :=
     locatedAt source 7 11 component
@@ -171,6 +176,10 @@ def testMultiResourceBounds : IO Unit := do
     (structureActualUnits duplicateModule ==
       structureNodeVisitUnits duplicateModule + 6)
     "the duplicate-module resource ledger did not sum all charged units"
+  assertTrue
+    (structureActualUnits duplicateModule ≤
+      structureBound (astNodeMeasure duplicateModule))
+    "the duplicate module exceeded the complete structural resource bound"
 
   let firstWildcardMarker : Marker :=
     locatedAt source 12 13 .wildcard
@@ -202,5 +211,9 @@ def testMultiResourceBounds : IO Unit := do
     (structureActualUnits mixedModule ==
       (structureResourceLedger mixedModule).total)
     "the public structural total diverged from its resource ledger"
+  assertTrue
+    (structureActualUnits mixedModule ≤
+      structureBound (astNodeMeasure mixedModule))
+    "the mixed-wildcard module exceeded the structural resource bound"
 
 end Tests
