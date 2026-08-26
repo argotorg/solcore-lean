@@ -339,6 +339,38 @@ theorem parseModuleWithRootSound_failure_iff
         exact parseModuleWithRootSound_eq_of_structuralDiagnostics
           rootSound lexing parsing validation
 
+/-- Two successful evaluations with the same root-soundness certificate return
+the same certified module. -/
+theorem parseModuleWithRootSound_deterministic
+    (rootSound : RootActionTokenPlanSound sourceRuleTokenPlanLayout)
+    {file : WorkspaceFile} {first second : CertifiedParsedModule}
+    (firstResult : parseModuleWithRootSound rootSound file = .ok first)
+    (secondResult : parseModuleWithRootSound rootSound file = .ok second) :
+    first = second := by
+  rw [firstResult] at secondResult
+  exact Except.ok.inj secondResult
+
+/-- Every input either produces a fully certified module or reports a
+nonempty diagnostic list. -/
+theorem parseModuleWithRootSound_accepted_or_diagnosed
+    (rootSound : RootActionTokenPlanSound sourceRuleTokenPlanLayout)
+    (file : WorkspaceFile) :
+    (∃ certified, parseModuleWithRootSound rootSound file = .ok certified) ∨
+      ∃ reported, parseModuleWithRootSound rootSound file = .error reported := by
+  cases result : parseModuleWithRootSound rootSound file with
+  | error reported => exact Or.inr ⟨reported, rfl⟩
+  | ok certified => exact Or.inl ⟨certified, rfl⟩
+
+/-- A successful certified result and a diagnostic result cannot coexist for
+one file. -/
+theorem parseModuleWithRootSound_success_not_diagnosed
+    (rootSound : RootActionTokenPlanSound sourceRuleTokenPlanLayout)
+    {file : WorkspaceFile} {certified : CertifiedParsedModule}
+    (success : parseModuleWithRootSound rootSound file = .ok certified) :
+    ∀ reported, parseModuleWithRootSound rootSound file ≠ .error reported := by
+  intro reported failure
+  rw [success] at failure
+  contradiction
+
 
 end Solcore.Surface.Multi
-
