@@ -33,7 +33,8 @@ theorem appendPhysical
   rw [PhysicalTokens.append leftOrdered rightOrdered]
   exact left.append right
 
-/-- Extend an ordered prefix by one checked grammar terminal. -/
+/-- Extend an ordered prefix by one checked terminal without discarding the
+retained token's payload or source span. -/
 theorem appendMatchedTerminal
     {file : WorkspaceFile} {tokens : List Token}
     {origin : Boundary tokens} {terminal : TerminalSymbol}
@@ -45,11 +46,11 @@ theorem appendMatchedTerminal
     TokenPlanEvidence
       (do
         let plan ← candidate
-        pure (plan.append (matched.grammarTokenPlan terminal)))
+        pure (plan.append matched.physicalTokenPlan))
       (PhysicalTokens tokens origin matched.cursor.afterBoundary) := by
   exact appendPhysical ordered (by
       simp [TerminalCursor.beforeBoundary, TerminalCursor.afterBoundary])
-    prior (matched.grammarTokenPlan_evidence terminal)
+    prior matched.physicalTokenPlan_evidence
 
 end TokenPlanEvidence
 
