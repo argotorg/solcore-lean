@@ -120,6 +120,19 @@ theorem enclose
 
 end TokenPlanEvidence
 
+/-- A checked scan preserves the exact retained token identity selected at its
+cursor, while logical EOF contributes the empty plan. -/
+theorem MatchedTerminal.physicalTokenPlan_evidence
+    {file : WorkspaceFile} {tokens : List Token}
+    {terminal : TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal) :
+    TokenPlanEvidence (some matched.physicalTokenPlan)
+      (PhysicalTokens tokens matched.cursor.beforeBoundary
+        matched.cursor.afterBoundary) := by
+  apply TokenPlanEvidence.some
+  rw [matched.physicalTokens_before_after]
+  exact matched.physicalTokenPlan_matches
+
 /-- A checked grammar scan yields token-plan evidence for exactly its local
 physical parser interval. -/
 theorem MatchedTerminal.grammarTokenPlan_evidence
