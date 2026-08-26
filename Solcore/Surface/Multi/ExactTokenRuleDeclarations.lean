@@ -1587,4 +1587,54 @@ theorem functionDecl_tokenPlanSound :
               unfold functionDeclPlan?
               simp [sourceLoc, signatureEq, bodyEq]
 
+/-- Class methods preserve their signature and exact terminator, then retain
+the checked source interval of the declaration. -/
+theorem classMethod_tokenPlanSound :
+    GrammarRuleTokenPlanSound .classMethod := by
+  intro file tokens origin finish input output _owned reduces inputEvidence
+  generalize inputEq : input = sourceInput at reduces inputEvidence
+  cases reduces with
+  | classMethod origin finish signature semicolon witness =>
+      rw [← inputEq] at inputEvidence
+      change TokenPlanEvidence
+        (classMethodDeclPlan? (sourceLoc witness {
+          signature := signature
+          terminator := semicolon.span
+        } : ClassMethodDecl)) _
+      have candidateEq : input.tokenPlan? sourceRuleTokenPlanLayout = (do
+          let signaturePlan ← ruleTokenPlan? .functionSignature signature
+          pure (signaturePlan.append
+            (TokenPlan.exact (.symbol .semicolon) semicolon.span))) := by
+        rw [inputEq]
+        simp [m2cV1, m2cV1Rhs, Grammar.sequence,
+          Grammar.nonterminal, Grammar.symbol, Grammar.terminal,
+          sourceRuleTokenPlanLayout,
+          matchedSymbol_physicalTokenPlan]
+      have physicalEvidence := inputEvidence.candidate_eq candidateEq
+      cases signatureEq : functionSignaturePlan? signature with
+      | none =>
+          simp [signatureEq, ruleTokenPlan?, TokenPlanEvidence]
+            at physicalEvidence
+      | some signaturePlan =>
+          simp [signatureEq, ruleTokenPlan?] at physicalEvidence
+          let corePlan := signaturePlan.append
+            (TokenPlan.exact (.symbol .semicolon) semicolon.span)
+          have coreAnchored : corePlan.WellAnchored := by
+            exact TokenPlan.WellAnchored.of_starts_ends_append
+              (functionSignaturePlan_startsRequired signature
+                signaturePlan signatureEq)
+              (by
+                simpa [TokenPlan.concat] using
+                  TokenPlan.WellAnchored.EndsRequired.concat_exact_last
+                    [] (.symbol .semicolon) semicolon.span)
+          have enclosed := TokenPlanEvidence.enclose physicalEvidence
+            (fun candidate success => by
+              simp only [Option.some.injEq] at success
+              subst candidate
+              exact coreAnchored)
+            witness.consumed
+          apply enclosed.candidate_eq
+          unfold classMethodDeclPlan?
+          simp [sourceLoc, signatureEq]
+
 end Solcore.Surface.Multi
