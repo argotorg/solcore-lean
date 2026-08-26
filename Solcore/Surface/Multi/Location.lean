@@ -13,12 +13,43 @@ structure LocationInventory where
   deriving Repr, BEq, DecidableEq
 
 /--
-An internal traversal result. `roots` are exactly the locations that an
+A proof-facing traversal result. `roots` are exactly the locations that an
 enclosing located wrapper must contain directly.
+The recursive visitors stay encapsulated behind canonical entry points.
 -/
-private structure LocationFragment where
+structure LocationFragment where
   roots : List SourceSpan
   inventory : LocationInventory
+
+namespace LocationInventory
+
+/-- Every span in one inventory is valid for the owning source file. -/
+def ValidFor (file : WorkspaceFile) (inventory : LocationInventory) : Prop :=
+  ∀ span ∈ inventory.spans, span.ValidFor file
+
+/-- Every direct parent-child edge in one inventory is geometrically nested. -/
+def Nested (inventory : LocationInventory) : Prop :=
+  ∀ containment ∈ inventory.containments,
+    containment.1.Contains containment.2
+
+end LocationInventory
+
+namespace LocationFragment
+
+/-- Every retained span in one traversal fragment is source-valid. -/
+def ValidFor (file : WorkspaceFile) (fragment : LocationFragment) : Prop :=
+  fragment.inventory.ValidFor file
+
+/-- Every direct parent-child edge in one fragment is geometrically nested. -/
+def Nested (fragment : LocationFragment) : Prop :=
+  fragment.inventory.Nested
+
+/-- Every root exposed by a fragment is contained by an enclosing span. -/
+def RootsContainedBy (fragment : LocationFragment)
+    (outer : SourceSpan) : Prop :=
+  ∀ root ∈ fragment.roots, outer.Contains root
+
+end LocationFragment
 
 /-- Exhaustive audit anchor for the 54 location-bearing carrier sorts. -/
 private def AstCarrierSort.hasLocatedWrapper : AstCarrierSort → Bool
@@ -140,6 +171,106 @@ private def locatedFragmentWithPromotedRoots (span : SourceSpan)
           merged.inventory.containments
     }
   }
+
+namespace LocationFragment
+
+/-- The empty traversal fragment. -/
+def empty : LocationFragment :=
+  emptyFragment
+
+/-- Merge sibling fragments without adding parent-child edges. -/
+def merge (fragments : List LocationFragment) : LocationFragment :=
+  mergeFragments fragments
+
+/-- Retain one raw span as a root without adding a wrapper. -/
+def raw (span : SourceSpan) : LocationFragment :=
+  rawFragment span
+
+/-- Retain one located wrapper around canonical child fragments. -/
+def located (span : SourceSpan) (children : List LocationFragment) :
+    LocationFragment :=
+  locatedFragment span children
+
+/-- Retain one located wrapper while exposing selected raw spans to its
+parent instead of connecting them to this wrapper. -/
+def locatedWithPromotedRoots (span : SourceSpan)
+    (promoted : List SourceSpan) (children : List LocationFragment) :
+    LocationFragment :=
+  locatedFragmentWithPromotedRoots span promoted children
+
+@[simp] theorem empty_roots : empty.roots = [] := by
+  rfl
+
+@[simp] theorem empty_spans : empty.inventory.spans = [] := by
+  rfl
+
+@[simp] theorem empty_containments : empty.inventory.containments = [] := by
+  rfl
+
+@[simp] theorem merge_roots (fragments : List LocationFragment) :
+    (merge fragments).roots = fragments.flatMap (fun fragment => fragment.roots) := by
+  rfl
+
+@[simp] theorem merge_spans (fragments : List LocationFragment) :
+    (merge fragments).inventory.spans =
+      fragments.flatMap (fun fragment => fragment.inventory.spans) := by
+  rfl
+
+@[simp] theorem merge_containments (fragments : List LocationFragment) :
+    (merge fragments).inventory.containments =
+      fragments.flatMap (fun fragment => fragment.inventory.containments) := by
+  rfl
+
+@[simp] theorem raw_roots (span : SourceSpan) :
+    (raw span).roots = [span] := by
+  rfl
+
+@[simp] theorem raw_spans (span : SourceSpan) :
+    (raw span).inventory.spans = [span] := by
+  rfl
+
+@[simp] theorem raw_containments (span : SourceSpan) :
+    (raw span).inventory.containments = [] := by
+  rfl
+
+@[simp] theorem located_roots (span : SourceSpan)
+    (children : List LocationFragment) :
+    (located span children).roots = [span] := by
+  rfl
+
+@[simp] theorem located_spans (span : SourceSpan)
+    (children : List LocationFragment) :
+    (located span children).inventory.spans =
+      span :: (merge children).inventory.spans := by
+  rfl
+
+@[simp] theorem located_containments (span : SourceSpan)
+    (children : List LocationFragment) :
+    (located span children).inventory.containments =
+      (merge children).roots.map (fun child => (span, child)) ++
+        (merge children).inventory.containments := by
+  rfl
+
+@[simp] theorem locatedWithPromotedRoots_roots (span : SourceSpan)
+    (promoted : List SourceSpan) (children : List LocationFragment) :
+    (locatedWithPromotedRoots span promoted children).roots =
+      span :: promoted := by
+  rfl
+
+@[simp] theorem locatedWithPromotedRoots_spans (span : SourceSpan)
+    (promoted : List SourceSpan) (children : List LocationFragment) :
+    (locatedWithPromotedRoots span promoted children).inventory.spans =
+      span :: promoted ++ (merge children).inventory.spans := by
+  rfl
+
+@[simp] theorem locatedWithPromotedRoots_containments (span : SourceSpan)
+    (promoted : List SourceSpan) (children : List LocationFragment) :
+    (locatedWithPromotedRoots span promoted children).inventory.containments =
+      (merge children).roots.map (fun child => (span, child)) ++
+        (merge children).inventory.containments := by
+  rfl
+
+end LocationFragment
 
 private def listFragment {alpha : Type}
     (visit : alpha → LocationFragment) (values : List alpha) :
@@ -773,18 +904,88 @@ private def parsedModuleFragment (module : ParsedModuleV1) :
     listFragment topItemFragment module.payload.items
   ]
 
+namespace LocationFragment
+
+/-- Proof-facing traversal of one literal and its retained locations. -/
+def ofLiteral (literal : Literal) : LocationFragment :=
+  literalFragment literal
+
+@[simp] theorem ofLiteral_roots (literal : Literal) :
+    (ofLiteral literal).roots = [literal.span] := by
+  rfl
+
+@[simp] theorem ofLiteral_spans (literal : Literal) :
+    (ofLiteral literal).inventory.spans = [literal.span] := by
+  rfl
+
+@[simp] theorem ofLiteral_containments (literal : Literal) :
+    (ofLiteral literal).inventory.containments = [] := by
+  rfl
+
+/-- Proof-facing traversal of one assignment operator location. -/
+def ofAssignmentOperator (operator : Located AssignmentOperator) :
+    LocationFragment :=
+  assignmentOperatorFragment operator
+
+@[simp] theorem ofAssignmentOperator_roots
+    (operator : Located AssignmentOperator) :
+    (ofAssignmentOperator operator).roots = [operator.span] := by
+  rfl
+
+@[simp] theorem ofAssignmentOperator_spans
+    (operator : Located AssignmentOperator) :
+    (ofAssignmentOperator operator).inventory.spans = [operator.span] := by
+  rfl
+
+@[simp] theorem ofAssignmentOperator_containments
+    (operator : Located AssignmentOperator) :
+    (ofAssignmentOperator operator).inventory.containments = [] := by
+  rfl
+
+/-- Proof-facing traversal of one expression and all of its descendants. -/
+def ofExpression (expression : Expression) : LocationFragment :=
+  expressionFragment expression
+
+/-- Proof-facing traversal of one body and all of its descendants. -/
+def ofBody (body : Body) : LocationFragment :=
+  bodyFragment body
+
+/-- Proof-facing traversal of one match arm and all of its descendants. -/
+def ofMatchArm (arm : MatchArm) : LocationFragment :=
+  matchArmFragment arm
+
+/-- Proof-facing traversal of one statement and all of its descendants. -/
+def ofStatement (statement : Statement) : LocationFragment :=
+  statementFragment statement
+
+/-- Proof-facing traversal of one opaque assembly slice. -/
+def ofAssemblySlice (slice : AssemblySlice) : LocationFragment :=
+  assemblySliceFragment slice
+
+/-- Proof-facing traversal of one complete parsed module. -/
+def ofParsedModule (module : ParsedModuleV1) : LocationFragment :=
+  parsedModuleFragment module
+
+end LocationFragment
+
 /-- Traverse one complete parsed module exactly once to collect its locations. -/
 def locationInventory (module : ParsedModuleV1) : LocationInventory :=
-  (parsedModuleFragment module).inventory
+  (LocationFragment.ofParsedModule module).inventory
+
+/-- The proof-facing module fragment uses the canonical public inventory. -/
+@[simp] theorem LocationFragment.ofParsedModule_inventory
+    (module : ParsedModuleV1) :
+    (LocationFragment.ofParsedModule module).inventory =
+      locationInventory module := by
+  rfl
 
 /-- Every located wrapper and retained raw span is valid for the source file. -/
 def AllLocationsValid (file : WorkspaceFile) (module : ParsedModuleV1) : Prop :=
-  ∀ span ∈ (locationInventory module).spans, span.ValidFor file
+  (locationInventory module).ValidFor file
 
 /-- Every direct AST parent location contains its retained child location. -/
 def AllLocationsNested (module : ParsedModuleV1) : Prop :=
-  ∀ containment ∈ (locationInventory module).containments,
-    containment.1.Contains containment.2
+  (locationInventory module).Nested
 
 /-- Complete location validity and direct parent-child nesting for one module. -/
 def EveryLocationValid (file : WorkspaceFile) (module : ParsedModuleV1) : Prop :=
@@ -798,7 +999,8 @@ def locationsValid (file : WorkspaceFile) (module : ParsedModuleV1) : Bool :=
 @[simp] theorem locationsValid_eq_true_iff
     (file : WorkspaceFile) (module : ParsedModuleV1) :
     locationsValid file module = true ↔ AllLocationsValid file module := by
-  simp [locationsValid, AllLocationsValid, SourceSpan.isValidFor_eq_true_iff]
+  simp [locationsValid, AllLocationsValid, LocationInventory.ValidFor,
+    SourceSpan.isValidFor_eq_true_iff]
 
 /-- Execute the direct parent-child containment check for a module. -/
 def locationsNested (module : ParsedModuleV1) : Bool :=
@@ -808,7 +1010,8 @@ def locationsNested (module : ParsedModuleV1) : Bool :=
 /-- The executable nesting check decides its logical predicate. -/
 @[simp] theorem locationsNested_eq_true_iff (module : ParsedModuleV1) :
     locationsNested module = true ↔ AllLocationsNested module := by
-  simp [locationsNested, AllLocationsNested, SourceSpan.contains_eq_true_iff]
+  simp [locationsNested, AllLocationsNested, LocationInventory.Nested,
+    SourceSpan.contains_eq_true_iff]
 
 /-- Execute the complete location-validity and nesting check. -/
 def everyLocationValid (file : WorkspaceFile) (module : ParsedModuleV1) : Bool :=
