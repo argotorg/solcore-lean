@@ -21,7 +21,7 @@ def ActionTokenPlanSound (layout : RuleTokenPlanLayout) : Prop :=
     {priorValues : PrefixValues file tokens item}
     {output : NonterminalValue file tokens item.raw.production.lhs},
     TokensOwnedBy file tokens →
-      TokensSourceExact file tokens →
+      TokensLexicallyExact file tokens →
       ContextualReach file tokens memo correct final item →
       (complete : CompleteItem item.raw) →
       CoherentPrefix file tokens memo correct final item priorValues →
@@ -179,7 +179,7 @@ private theorem reductionTokenPlanCase
     (layout : RuleTokenPlanLayout)
     (actionSound : ActionTokenPlanSound layout)
     (owned : TokensOwnedBy file tokens)
-    (sourceExact : TokensSourceExact file tokens)
+    (lexicallyExact : TokensLexicallyExact file tokens)
     (item : ContextualItemKey tokens)
     (priorValues : PrefixValues file tokens item)
     (output : NonterminalValue file tokens item.raw.production.lhs)
@@ -202,7 +202,7 @@ private theorem reductionTokenPlanCase
         trace prefixCarries) := by
   unfold PrefixTokenPlanMotive at prefixIH
   unfold ReductionTokenPlanMotive
-  exact actionSound owned sourceExact reached complete coherentPrefix action
+  exact actionSound owned lexicallyExact reached complete coherentPrefix action
     prefixIH
 
 namespace PrefixCarriesSourceTrace
@@ -217,7 +217,7 @@ theorem tokenPlanEvidence
     {owned : TokensOwnedBy file tokens}
     (layout : RuleTokenPlanLayout)
     (actionSound : ActionTokenPlanSound layout)
-    (sourceExact : TokensSourceExact file tokens)
+    (lexicallyExact : TokensLexicallyExact file tokens)
     {item : ContextualItemKey tokens}
     {values : PrefixValues file tokens item}
     {coherent : CoherentPrefix file tokens memo correct final item values}
@@ -235,7 +235,7 @@ theorem tokenPlanEvidence
     (prefixTokenPlanZeroCase layout owned)
     (prefixTokenPlanScanCase layout owned)
     (prefixTokenPlanCompleteCase layout owned)
-    (reductionTokenPlanCase layout actionSound owned sourceExact)
+    (reductionTokenPlanCase layout actionSound owned lexicallyExact)
     carries
 
 end PrefixCarriesSourceTrace
@@ -252,7 +252,7 @@ theorem tokenPlanEvidence
     {owned : TokensOwnedBy file tokens}
     (layout : RuleTokenPlanLayout)
     (actionSound : ActionTokenPlanSound layout)
-    (sourceExact : TokensSourceExact file tokens)
+    (lexicallyExact : TokensLexicallyExact file tokens)
     {item : ContextualItemKey tokens}
     {value : NonterminalValue file tokens item.raw.production.lhs}
     {coherent : CoherentReduction file tokens memo correct final item value}
@@ -270,7 +270,7 @@ theorem tokenPlanEvidence
     (prefixTokenPlanZeroCase layout owned)
     (prefixTokenPlanScanCase layout owned)
     (prefixTokenPlanCompleteCase layout owned)
-    (reductionTokenPlanCase layout actionSound owned sourceExact)
+    (reductionTokenPlanCase layout actionSound owned lexicallyExact)
     carries
 
 end ReductionCarriesSourceTrace

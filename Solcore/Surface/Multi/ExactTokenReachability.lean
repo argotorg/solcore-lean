@@ -109,7 +109,7 @@ def CoherentGrammarRuleTokenPlanSound
     (complete : CompleteItem
       (CanonicalCompleteRootItem tokens rule origin finish context).raw),
     TokensOwnedBy file tokens →
-      TokensSourceExact file tokens →
+      TokensLexicallyExact file tokens →
       CoherentPrefix file tokens memo correct final
         (CanonicalCompleteRootItem tokens rule origin finish context)
         priorValues →

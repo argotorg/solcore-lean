@@ -31,7 +31,7 @@ theorem ofRules
     (sound : ∀ rule : GrammarRuleId, GrammarRuleTokenPlanSound rule) :
     RootActionTokenPlanSound sourceRuleTokenPlanLayout := by
   intro rule file tokens memo correct final origin finish context priorValues
-    output complete owned _sourceExact _coherentPrefix reduces inputEvidence
+    output complete owned _lexicallyExact _coherentPrefix reduces inputEvidence
   apply sound rule owned reduces
   apply inputEvidence.candidate_eq
   symm

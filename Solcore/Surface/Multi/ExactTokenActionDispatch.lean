@@ -23,7 +23,7 @@ theorem ofRoot
     {layout : RuleTokenPlanLayout}
     (rootSound : RootActionTokenPlanSound layout) :
     ActionTokenPlanSound layout := by
-  intro file tokens memo correct final item priorValues output owned sourceExact
+  intro file tokens memo correct final item priorValues output owned lexicallyExact
     reached complete coherentPrefix action inputEvidence
   cases item with
   | mk raw context =>
@@ -49,7 +49,7 @@ theorem ofRoot
                 apply Fin.ext
                 exact complete
               subst dot
-              exact rootSound rule complete owned sourceExact coherentPrefix
+              exact rootSound rule complete owned lexicallyExact coherentPrefix
                 reduction inputEvidence
       | atom site =>
           exact ActionReduces.generated_tokenPlanEvidence

@@ -93,9 +93,9 @@ theorem assemblyStatement_coherentTokenPlanSound :
     CoherentGrammarRuleTokenPlanSound sourceRuleTokenPlanLayout
       .assemblyStatement := by
   intro file tokens memo correct final origin finish context priorValues output
-    complete owned sourceExact _coherentPrefix reduces inputEvidence
+    complete owned lexicallyExact _coherentPrefix reduces inputEvidence
   apply assemblyStatement_tokenPlanSound_of_tokensSourceExact
-    owned sourceExact reduces
+    owned lexicallyExact.tokensSourceExact reduces
   apply inputEvidence.candidate_eq
   symm
   rw [RootAction.unpack_tokenPlan?]

@@ -10,6 +10,20 @@ open Solcore.Workspace
 def TokensSourceExact (file : WorkspaceFile) (tokens : List Token) : Prop :=
   ∀ token ∈ tokens, TokenSourceExact file token
 
+/-- The lexical classification invariant not expressed by source bytes alone.
+In particular, an identifier payload may not use a reserved hard-keyword
+spelling. Other payload constructors already record their lexical class. -/
+def TokenKind.CanonicallyClassified : TokenKind → Prop
+  | .identifier spelling => HardKeyword.ofString? spelling = none
+  | _ => True
+
+/-- Exact source evidence together with the lexer classification of every
+retained token. -/
+def TokensLexicallyExact
+    (file : WorkspaceFile) (tokens : List Token) : Prop :=
+  ∀ token ∈ tokens,
+    TokenSourceExact file token ∧ token.payload.CanonicallyClassified
+
 /-- A complete lexical derivation supplies pointwise exact source evidence. -/
 theorem Lexes.tokensSourceExact
     {file : WorkspaceFile} {tokens : List Token}
@@ -17,6 +31,60 @@ theorem Lexes.tokensSourceExact
     TokensSourceExact file tokens := by
   intro token member
   exact lexical.tokenSourceExact member
+
+/-- Full lexical derivations supply both exact source bytes and canonical
+token classification. -/
+theorem Lexes.tokensLexicallyExact
+    {file : WorkspaceFile} {tokens : List Token}
+    {comments : List Comment} (lexical : Lexes file tokens comments) :
+    TokensLexicallyExact file tokens := by
+  intro token member
+  refine ⟨lexical.tokenSourceExact member, ?_⟩
+  rcases (Lexes.retainedTransitions lexical).1 token member with
+      ⟨pendingAssembly, candidateClass, winner⟩ | ⟨endByte, recognized⟩
+  · rcases winner with ⟨candidate, maximal⟩
+    cases candidate with
+    | string endByte retained recognized =>
+        rcases recognized with
+          ⟨spelling, decoded, quote, contents, sourceText, tokenEq⟩
+        rw [congrArg (fun value : Token => value.payload) tokenEq]
+        trivial
+    | pragmaName endByte retained recognized =>
+        rcases recognized with ⟨kind, spelling, tokenEq⟩
+        rw [congrArg (fun value : Token => value.payload) tokenEq]
+        trivial
+    | identifier endByte retained recognized =>
+        rcases recognized with
+          ⟨text, kind, valid, sourceText, classification, tokenEq⟩
+        rw [congrArg (fun value : Token => value.payload) tokenEq]
+        cases classification with
+        | hardKeyword keyword => trivial
+        | identifier text notKeyword => exact notKeyword
+    | decimal endByte retained recognized =>
+        rcases recognized with ⟨digits, valid, sourceText, tokenEq⟩
+        rw [congrArg (fun value : Token => value.payload) tokenEq]
+        trivial
+    | hexadecimal endByte retained recognized =>
+        rcases recognized with ⟨digits, valid, sourceText, tokenEq⟩
+        rw [congrArg (fun value : Token => value.payload) tokenEq]
+        trivial
+    | symbol endByte symbol retained recognized payloadEq =>
+        rcases recognized with
+          ⟨written, sourceText, slash, assembly, tokenEq⟩
+        rw [payloadEq]
+        trivial
+  · rcases recognized with ⟨slice, sliceAt, tokenEq⟩
+    rw [congrArg (fun value : Token => value.payload) tokenEq]
+    trivial
+
+/-- Lexically exact streams may forget classification while retaining their
+pointwise source evidence. -/
+theorem TokensLexicallyExact.tokensSourceExact
+    {file : WorkspaceFile} {tokens : List Token}
+    (lexical : TokensLexicallyExact file tokens) :
+    TokensSourceExact file tokens := by
+  intro token member
+  exact (lexical token member).1
 
 namespace ExpectedToken
 

@@ -25,7 +25,7 @@ theorem Parses.tokenPlanEvidence
       have evidence := carries.tokenPlanEvidence
         sourceRuleTokenPlanLayout
         (ActionTokenPlanSound.ofRoot rootSound)
-        lexical.tokensSourceExact
+        lexical.tokensLexicallyExact
       simpa [parsedModuleTokenPlan?, sourceRuleTokenPlanLayout,
         CanonicalCompleteRootItem, ProductionId.lhs,
         NonterminalValue.tokenPlan?, ruleTokenPlan?] using evidence
