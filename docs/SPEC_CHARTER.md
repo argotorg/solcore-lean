@@ -15,7 +15,7 @@ profile” are deliberately different claims.
 | --- | --- | --- |
 | M1c Semantic Core | Closed checker and evaluator with correspondence proofs | Published by Oracle v3 as `solcore/0.1.0-draft.3` / `core-m1c-v1` |
 | M2b Surface | Closed one-file parser with lexer/parser correspondence proofs | Published by Oracle v4 as `solcore/0.1.0-draft.4` / `frontend-m2b-v1` |
-| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result, soundness, and parser-wide location-validity theorems; separately certified 20-code structural validator with two-way correspondence; exact token correspondence, the fast parser, formal resource bounds, and certified frontend integration are pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
+| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result, soundness, and parser-wide location-validity theorems; separately certified 20-code structural validator with two-way correspondence; exact-token dispatch and the certified frontend core are implemented but final root closure is pending; bound functions exist while unit-accounting sufficiency and the fast parser remain pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
 | M2c workspace and syntax identity | Pure workspace validation and accepted structural-identity design | Internal only |
 | Resolution, checking, elaboration, execution | Not connected as one executable source frontend | Not published |
 

@@ -227,22 +227,21 @@ applicability. The canonical report has the same membership, is ordered and
 duplicate-free, and `validateStructure` succeeds exactly when
 `StructurallyAccepts` holds.
 
-This closes logical traversal-fuel sufficiency. The separate numeric resource
-contract required by the ADR is not yet implemented.
+This closes logical traversal-fuel sufficiency. The ADR-fixed `parseBound` and
+`structureBound` functions now exist; their executor-unit accounting and
+sufficiency theorems are not yet implemented.
 
 The remaining parser-kernel work is:
 
-1. implement the separate fast `Parser`, prove exact result equality with
+1. close the four remaining reachability-sensitive exact-token rule proofs;
+2. connect the existing proof-carrying `CertifiedParsedModule` phase core to
+   the unconditional root theorem and expose `parseModule`;
+3. add executable frontend phase-precedence fixtures for lexical, parse,
+   structural, and successful outcomes;
+4. implement numeric structural-unit accounting, prove
+   `structureBound_sufficient`, and prove the AST-carrier measure equality;
+5. implement the separate fast `Parser`, prove exact result equality with
    `Chart.G`, and establish its stated parser work bound;
-2. implement numeric structural-unit accounting, prove `structureBound`, and
-   prove the AST-carrier measure equality;
-3. finish exact token correspondence at the certified boundary, including
-   grouping, literal spelling, complete token consumption, and
-   no-normalization invariants;
-4. define the proof-carrying `CertifiedParsedModule` and the final
-   `parseModule` phase precedence;
-5. prove that structural success and failure select the corresponding
-   certified frontend result;
 6. construct and kernel-check parser plus structural certificates for the six
    canonical standard files from the one shared raw-byte source; and
 7. add the internal umbrella only after proof, test, kernel-policy, and axiom
@@ -250,8 +249,9 @@ The remaining parser-kernel work is:
 
 The executable structural pass and its independent specification both exist,
 and their correspondence is complete. Parser-wide location evidence is also
-complete. A certified file frontend still needs exact token correspondence and
-phase integration.
+complete. The certified frontend phase core and its success/failure theorems
+exist; unconditional publication inside Lean waits on the remaining
+exact-token root callbacks.
 
 ## Structural syntax identity: accepted design, no code yet
 

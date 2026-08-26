@@ -25,10 +25,14 @@ accepted module. The source-location proof is now complete across the parser:
 the inventory and executable checks cover every located AST field, and
 `Parses.everyLocationValid` proves that every successful lex/parse derivation
 produces a module whose locations are valid for the source file and properly
-nested. The remaining certification work is exact correspondence between the
-retained syntax and the original token/comment stream, followed by the
-proof-carrying frontend that combines parsing, locations, and structural
-acceptance. Formal resource accounting also remains.
+nested. The exact-token layer now has an executable correspondence visitor,
+parser-level lifting theorems, and an exhaustive 75-rule dispatch theorem. Its
+remaining proof work is confined to four reachability-sensitive rules. The
+proof-carrying frontend core already combines parsing, locations, exact-token
+correspondence, and structural acceptance when given that final root theorem;
+the proof-argument-free public wrapper remains to be connected. The fixed
+parser and structural bound functions now exist, while executor counters and
+their sufficiency proofs still remain.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -47,8 +51,10 @@ or fuzzing-speed parser.
 | M2b single-file parser publication | Yes | Yes | Oracle v4 / Surface v1 | Current public parse boundary |
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
 | M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome, soundness, and exact cache equivalence | No; internal API | Total; all six representative benchmarks pass, but large-file memory readiness is unproved |
-| M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Two-way correspondence, sufficient traversal fuel, canonical error-list properties, and executable success exactly equivalent to acceptance | No; internal API | Certified as a separate decision procedure; formal resource accounting and file-frontend integration remain |
-| M2c source-location evidence | Complete AST inventory and executable validity/nesting checks | `Parses.everyLocationValid` proves validity and direct-parent nesting for every successful parse, using token order, parser-span containment, and assembly-slice facts | No; internal API | Parser-wide location propagation is complete; exact token correspondence and certified frontend integration remain |
+| M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Two-way correspondence, sufficient traversal fuel, canonical error-list properties, and executable success exactly equivalent to acceptance | No; internal API | Certified as a separate decision procedure; numeric unit accounting remains |
+| M2c source-location evidence | Complete AST inventory and executable validity/nesting checks | `Parses.everyLocationValid` proves validity and direct-parent nesting for every successful parse, using token order, parser-span containment, and assembly-slice facts | No; internal API | Parser-wide location propagation is complete |
+| M2c exact-token correspondence | Executable token-plan visitor and complete rule dispatch | Parser lifting is proved once four remaining coherent rule callbacks are supplied | No; internal API | Final reachability-sensitive rule proofs remain |
+| M2c certified frontend | Proof-carrying result and lexical/parse/structural phase core | Phase precedence, success/failure characterization, determinism, total result selection, and success/failure exclusivity | No; internal API | Final proof-argument-free wrapper waits on exact-token root closure |
 | M2c structural syntax identity | No | No | No | Design accepted in ADR-0016 |
 | M2c module and name resolution | No | No | No | ADR-0017 is proposed |
 | M2d checking and Core elaboration | No | No | No | Planned |
@@ -102,18 +108,26 @@ succeeds exactly when `StructurallyAccepts` holds; on failure, its nonempty
 report contains exactly the applicable diagnostics, without duplicates and in
 canonical order.
 
-The remaining frontend boundary must attach this certified phase to parsing.
 All 54 located AST carrier sorts and all 12 retained raw span fields are
 covered by one executable inventory. Lexer token ordering, parser-interval
 containment, and assembly-internal facts are now carried through every parser
 reduction. The resulting theorem, `Parses.everyLocationValid`, says that every
-successful parse has valid and properly nested source locations. What is still
-missing is exact retained-token correspondence and the
-`CertifiedParsedModule`/frontend layer that bundles it with the existing parse,
-location, and structural proofs.
+successful parse has valid and properly nested source locations.
 
-The separate numeric resource theorem required by ADR-0015 remains to be
-implemented and proved.
+The exact-token visitor checks lexical replay, full-file ownership, retained
+token spelling and position, grouping, and complete token consumption. Its
+parser-level theorem is complete once `RootActionTokenPlanSound` is supplied.
+The exhaustive dispatch reduces that obligation to five coherent grammar
+callbacks; module references are closed, while let bindings, match arms,
+postfix expressions, and statement bodies remain. `CertifiedParsedModule` and
+the frontend phase core are implemented already, so closing those callbacks
+will make the public wrapper proof-argument-free without changing its phase
+behavior.
+
+The ADR-fixed `parseBound` and `structureBound` functions are now executable
+and proved positive and monotone. The separate executor-unit counters,
+`structureBound_sufficient`, parser-bound sufficiency, and AST-carrier
+cardinality theorem remain.
 
 Termination no longer depends on a proof supplied by the caller. A finite
 static certificate covers all 2,375 dotted grammar rows and supplies the rank
@@ -203,12 +217,12 @@ necessary.
 The shortest path from the current state to an end-to-end executable frontend
 is:
 
-1. implement the separate fast parser, prove exact result equality with the
+1. close the four remaining reachability-sensitive exact-token rules and
+   expose the proof-argument-free certified file frontend;
+2. add executor-unit accounting and prove the fixed parser and structural
+   bounds sufficient;
+3. implement the separate fast parser, prove exact result equality with the
    chart reference, and continue memory profiling on larger inputs;
-2. complete the ADR-defined formal resource bounds;
-3. prove exact token correspondence, then combine the existing parse,
-   location, and structural proofs in `CertifiedParsedModule` and the file
-   frontend;
 4. accept and implement module/name resolution;
 5. implement source checking and elaboration into Semantic Core;
 6. expose a new versioned workspace Oracle only after its profile, schemas,
