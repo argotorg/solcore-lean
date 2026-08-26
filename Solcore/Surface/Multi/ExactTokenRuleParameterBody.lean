@@ -525,7 +525,9 @@ private theorem statementRuleAtomValues_tokenPlan?
       statements.mapM (ruleTokenPlan? .statement)
   exact ruleAtomValues_tokenPlan? .statement statements
 
-private theorem bodyInput_tokenPlan?
+/-- The grammar input for a braced body plans both braces around the
+unrestricted repeated-statement plans. -/
+theorem bodyInput_tokenPlan?
     {file : WorkspaceFile} {tokens : List Token}
     (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
     (statements : List Statement)
@@ -569,11 +571,14 @@ private theorem bodyInput_tokenPlan?
   | some statementPlans =>
       simp
 
-private theorem ruleTokenPlan?_body (body : Body) :
+/-- The public body rule uses the braced-body token-plan visitor. -/
+theorem ruleTokenPlan?_body (body : Body) :
     ruleTokenPlan? .body body = bodyTokenPlan? .braced body := by
   rfl
 
-private theorem bracedBodyTokenPlan?_sourceLoc
+/-- Once the positional statement plans succeed, the braced-body visitor
+encloses the exact braces and repeated statement plan in the body span. -/
+theorem bracedBodyTokenPlan?_sourceLoc
     {file : WorkspaceFile} {tokens : List Token}
     {origin finish : Boundary tokens}
     (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
