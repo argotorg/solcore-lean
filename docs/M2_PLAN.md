@@ -17,7 +17,7 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 | M2c workspace identity | ADR-0014 Accepted | complete and proof-audited | internal only |
 | M2c Multi source/token/AST and lexer | ADR-0015 Accepted | complete for the current internal boundary | internal only |
 | M2c Multi full-token parser | ADR-0015 Accepted | unconditional parser and file-only lexer/parser wrapper implemented; selected-outcome and soundness theorems complete | internal only |
-| M2c structural acceptance | ADR-0015 Accepted | validator and independent applicability/acceptance judgments implemented; candidate soundness proved; reverse correspondence/fuel, certified module, and frontend integration remain | none |
+| M2c structural acceptance | ADR-0015 Accepted | validator and independent judgments implemented; two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance proved; numeric work bound and certified-module integration remain | internal only |
 | M2c structural syntax identity | ADR-0016 Accepted | design only; no implementation modules or tests yet | none |
 | M2c module and lexical resolution | ADR-0017 Proposed | blocked and not started | none |
 | M2d source checking and Core elaboration | decisions incomplete | not started | none |
@@ -26,8 +26,8 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 The **unconditional raw-parser milestone is complete**: callers can lex and
 parse one `WorkspaceFile` without supplying a termination proof. The full
 ADR-0015 parser delivery and the whole M2 frontend are not complete because the
-implemented structural validator is only partly connected to its independent
-judgments and is not yet connected to the certified-module boundary, while
+implemented structural validator is fully connected to its independent
+judgments but is not yet connected to the certified-module boundary, while
 resolution, checking, and elaboration do not exist yet.
 
 ## Published M2b boundary
@@ -219,30 +219,36 @@ exact. Import/export/pragma families have exact local specifications with
 top-level soundness. Signature missing-type/modifier families are exact and
 sound at every reached signature. Fallback and constructor declarations also
 have exact local specifications and soundness, with a fuel-free grouped-unit
-return check. All six recursive fuel collectors are sound for arbitrary fuel.
-Their composite theorem proves that every member of `diagnosticCandidates` is
-declaratively applicable.
+return check. All six recursive collectors are sound for arbitrary fuel, and
+structural paths are shorter than the module AST measure. Their composite
+theorems prove that `diagnosticCandidates` membership is exactly declarative
+applicability. The canonical report has the same membership, is ordered and
+duplicate-free, and `validateStructure` succeeds exactly when
+`StructurallyAccepts` holds.
+
+This closes logical traversal-fuel sufficiency. The separate numeric resource
+contract required by the ADR is not yet implemented.
 
 The remaining parser-kernel work is:
 
-1. prove the reverse direction from independent applicability to membership in
-   `diagnosticCandidates`, including sufficiency of the module-sized fuel;
-2. lift that exact correspondence through canonical diagnostics and structural
-   acceptance;
-3. define the proof-carrying `CertifiedParsedModule` and the final
-   `parseModule` phase precedence;
-4. prove that structural success and failure select the corresponding
-   certified frontend result;
-5. finish the location, nesting, source, grouping, literal-spelling, and
+1. implement the separate fast `Parser`, prove exact result equality with
+   `Chart.G`, and establish its stated parser work bound;
+2. implement numeric structural-unit accounting, prove `structureBound`, and
+   prove the AST-carrier measure equality;
+3. finish the location, nesting, source, grouping, literal-spelling, and
    no-normalization invariants at the certified boundary;
+4. define the proof-carrying `CertifiedParsedModule` and the final
+   `parseModule` phase precedence;
+5. prove that structural success and failure select the corresponding
+   certified frontend result;
 6. construct and kernel-check parser plus structural certificates for the six
    canonical standard files from the one shared raw-byte source; and
 7. add the internal umbrella only after proof, test, kernel-policy, and axiom
    audits pass.
 
 The executable structural pass and its independent specification both exist,
-but they are not yet a certified frontend boundary until reverse
-correspondence, fuel sufficiency, and frontend integration are connected.
+and their correspondence is complete. They are not yet a certified file
+frontend until location/token evidence and phase integration are connected.
 
 ## Structural syntax identity: accepted design, no code yet
 

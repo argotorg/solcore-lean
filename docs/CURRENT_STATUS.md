@@ -17,12 +17,13 @@ pure structural pass now checks all 20 accepted AST-shape rules and returns a
 canonical diagnostic list in a deterministic order. Its independent
 specification now covers all 26 diagnostic forms represented by
 `MSS0001`–`MSS0020`, defines structural acceptance, and proves that acceptance
-means exactly that no structural diagnostic applies. Primitive duplicate and
-span-selection rules are exact, several declaration and signature families
-are connected to their local specifications, and every executable diagnostic
-candidate is proved applicable. What remains is the reverse correspondence—
-showing that every applicable diagnostic is emitted with the module-sized fuel
-bound—and integration with the proof-carrying parsed-module frontend.
+means exactly that no structural diagnostic applies. The executable and
+declarative sides now agree in both directions: every reported diagnostic
+applies, every applicable diagnostic is reported, and the module-derived
+traversal fuel is sufficient. Structural validation succeeds exactly for an
+accepted module. What remains is integration with the proof-carrying
+parsed-module frontend, including exact location and token correspondence,
+plus formal resource accounting.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -41,7 +42,7 @@ or fuzzing-speed parser.
 | M2b single-file parser publication | Yes | Yes | Oracle v4 / Surface v1 | Current public parse boundary |
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
 | M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome, soundness, and exact cache equivalence | No; internal API | Total; all six representative benchmarks pass, but large-file memory readiness is unproved |
-| M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Acceptance equivalence, primitive/local bridges, and whole-candidate soundness; reverse correspondence and fuel sufficiency remain | No; internal API | Executable and fixture-tested, but not yet a certified frontend boundary |
+| M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Two-way correspondence, sufficient traversal fuel, canonical error-list properties, and executable success exactly equivalent to acceptance | No; internal API | Certified as a separate decision procedure; formal resource accounting and file-frontend integration remain |
 | M2c structural syntax identity | No | No | No | Design accepted in ADR-0016 |
 | M2c module and name resolution | No | No | No | ADR-0017 is proposed |
 | M2d checking and Core elaboration | No | No | No | Planned |
@@ -85,15 +86,23 @@ exports, and pragmas have exact local specifications and top-level soundness.
 Missing signature types and disallowed modifiers have exact local results and
 are sound at every reached signature. Fallback and constructor declarations
 also have exact local specifications and soundness, including a fuel-free
-grouped-unit return check. The six recursive fuel-bounded collectors are sound
-for every fuel value. These results compose to prove that every member of
-`diagnosticCandidates` is declaratively applicable to its module.
+grouped-unit return check. The six recursive collectors are sound for every
+fuel value, and structural paths are strictly shorter than the module AST
+measure. These results compose in both directions: membership in
+`diagnosticCandidates` is equivalent to declarative applicability, and the
+module-sized traversal fuel reaches every applicable site. Deduplication and
+sorting preserve that exact membership. Consequently `validateStructure`
+succeeds exactly when `StructurallyAccepts` holds; on failure, its nonempty
+report contains exactly the applicable diagnostics, without duplicates and in
+canonical order.
 
-The remaining structural proof is deliberately stated at a larger boundary:
-every applicable diagnostic must still be shown to occur in
-`diagnosticCandidates`. That reverse direction requires proving the
-module-sized fuel bound sufficient. The result can then be connected to
-`CertifiedParsedModule` and the file frontend.
+The remaining frontend boundary must attach this certified phase to parsing
+while also proving that every AST location and retained token corresponds
+exactly to the input file. Those properties belong in `CertifiedParsedModule`,
+not in the already closed structural validator.
+
+The separate numeric resource theorem required by ADR-0015 remains to be
+implemented and proved.
 
 Termination no longer depends on a proof supplied by the caller. A finite
 static certificate covers all 2,378 dotted grammar rows and supplies the rank
@@ -126,7 +135,7 @@ node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
-The full build checks 180 jobs. The semantic-kernel audit rejects `sorry`,
+The full build checks 181 jobs. The semantic-kernel audit rejects `sorry`,
 `admit`, `partial`, `unsafe`, `axiom`, `noncomputable`, `extern`, and
 `implemented_by` in the audited roots. The final parser certificate is also
 checked at `trust = 0`; its dependencies use only Lean's expected logical
@@ -183,14 +192,15 @@ necessary.
 The shortest path from the current state to an end-to-end executable frontend
 is:
 
-1. reduce the Multi parser's remaining cubic evidence/cache/counter cost and
-   continue profiling it on progressively larger inputs;
-2. prove reverse whole-validator correspondence and fuel sufficiency, then
-   connect structural diagnostics and acceptance to
-   `CertifiedParsedModule` and the file frontend;
-3. accept and implement module/name resolution;
-4. implement source checking and elaboration into Semantic Core;
-5. expose a new versioned workspace Oracle only after its profile, schemas,
+1. implement the separate fast parser, prove exact result equality with the
+   chart reference, and continue memory profiling on larger inputs;
+2. complete the ADR-defined formal resource bounds;
+3. prove exact location and token correspondence, then connect parsing and
+   structural acceptance through `CertifiedParsedModule` and the file
+   frontend;
+4. accept and implement module/name resolution;
+5. implement source checking and elaboration into Semantic Core;
+6. expose a new versioned workspace Oracle only after its profile, schemas,
    limits, diagnostics, proofs, and compatibility story are fixed.
 
 See the [M2 plan](M2_PLAN.md) for the detailed phase boundaries.

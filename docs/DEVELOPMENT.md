@@ -215,7 +215,7 @@ constructors represented by `MSS0001`–`MSS0020` and defines structural
 acceptance as the absence of an applicable diagnostic. That characterization
 is proved in both directions.
 
-The proof bridge is intentionally being built in layers. Duplicate,
+The proof bridge is organized in layers. Duplicate,
 source-span, and least-span primitives are exact. Imports, exports, and pragmas
 have exact local specifications and top-level soundness. Missing signature
 types and disallowed modifiers have exact local specifications and are sound
@@ -224,16 +224,23 @@ have exact local specifications and soundness; their grouped-unit return test
 is structural rather than fuel-dependent. Each of the six recursive
 fuel-bounded collectors is sound for any fuel value. These layers compose to
 show that every member of `diagnosticCandidates` is applicable to its module.
+The reverse construction follows each reached AST site through a
+module-measure-bounded structural path, proving that every applicable
+diagnostic is also emitted.
 
 The executable validator already sorts and removes exact duplicates to return
-a canonical diagnostic list. What is unfinished is the reverse proof that
-every applicable diagnostic appears in that list with the module-sized fuel
-bound.
+a canonical diagnostic list. Membership in that list is now exactly
+declarative applicability, and executable success is exactly
+`StructurallyAccepts`.
 
-Do not yet describe `validateStructure` as fully certified. The remaining
-boundary is reverse correspondence from declarative applicability to the
-complete `diagnosticCandidates` output, including sufficient fuel, followed by
-integration with `CertifiedParsedModule` and the file frontend.
+Traversal fuel is distinct from ADR-0015's numeric structural-resource
+contract. The structural-unit counter, quadratic `structureBound`, and
+AST-carrier cardinality equality are still pending.
+
+`validateStructure` is a certified standalone structural phase. Do not yet
+describe the raw file frontend as certified: it still needs exact location and
+retained-token correspondence, `CertifiedParsedModule`, and structural-phase
+integration.
 
 ## Documentation rule
 

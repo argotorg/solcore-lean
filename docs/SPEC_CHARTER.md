@@ -15,7 +15,7 @@ profile” are deliberately different claims.
 | --- | --- | --- |
 | M1c Semantic Core | Closed checker and evaluator with correspondence proofs | Published by Oracle v3 as `solcore/0.1.0-draft.3` / `core-m1c-v1` |
 | M2b Surface | Closed one-file parser with lexer/parser correspondence proofs | Published by Oracle v4 as `solcore/0.1.0-draft.4` / `frontend-m2b-v1` |
-| M2c Multi Surface | Unconditional executable lexer/parser path with selected-result and soundness theorems; pure 20-code structural validator plus independent applicability and acceptance judgments, with reverse correspondence/fuel and certified frontend integration still pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
+| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result and soundness theorems; separately certified 20-code structural validator with two-way correspondence; the fast parser, formal resource bounds, and certified frontend integration are pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
 | M2c workspace and syntax identity | Pure workspace validation and accepted structural-identity design | Internal only |
 | Resolution, checking, elaboration, execution | Not connected as one executable source frontend | Not published |
 
@@ -32,11 +32,12 @@ a canonical diagnostic list spanning all 20 structural codes. An independent
 `MSS0001`–`MSS0020`,
 and `StructurallyAccepts` is proved equivalent to having no applicable
 diagnostic. Primitive rules are exact, the executable layers are connected,
-and every diagnostic candidate is proved applicable. Reverse correspondence,
-fuel sufficiency, and a certified parsed result remain. None of this widens
-Oracle v4, certifies a
-whole workspace, resolves a name, assigns a type, elaborates to Core, or
-executes a contract.
+and executable diagnostics are exactly the applicable diagnostics. The
+module-derived traversal fuel is sufficient, and validator success is exactly
+structural acceptance. Formal resource accounting and a certified parsed
+result remain. None of this widens
+Oracle v4, certifies a whole workspace, resolves a name, assigns a type,
+elaborates to Core, or executes a contract.
 
 ## Purpose
 
@@ -266,10 +267,12 @@ and pragma families have local exactness and top-level soundness. Signature
 families are locally exact and sound at every reached signature. Fallback and
 constructor declarations also have exact local specifications and soundness,
 including a fuel-free grouped-unit return check. All six recursive fuel
-collectors are sound for arbitrary fuel, and every executable diagnostic
-candidate is proved applicable. The reverse direction from applicability to
-the executable list, sufficient fuel, and the certified frontend connection
-remain.
+collectors are sound for arbitrary fuel. Structural paths are bounded by the
+module AST measure, so the executable list and declarative applicability agree
+in both directions. Canonical reports are duplicate-free and ordered, and
+validator success is equivalent to structural acceptance. Formal resource
+accounting, exact location/token correspondence, and the certified frontend
+connection remain.
 
 [`ADR-0016`](adr/0016-m2c-structural-syntax-identity.md) accepts structural
 syntax identity over certified parser output.
@@ -483,10 +486,14 @@ selection and soundness theorems. It does not complete M2c publication.
 
 Before a complete M2c frontend can be claimed, at least the following remain:
 
-- prove reverse correspondence from the structural applicability judgment to
-  `diagnosticCandidates`, including sufficient fuel;
-- connect structural validation and acceptance to `CertifiedParsedModule` and
-  the file-only frontend;
+- implement the separate fast parser and prove exact result equality with the
+  chart reference, including its stated parser work bound;
+- implement the numeric structural-unit accounting, prove the quadratic
+  `structureBound`, and relate `astNodeMeasure` to the full AST carrier;
+- prove exact location, nesting, source ownership, grouping, literal-spelling,
+  and retained-token correspondence for successful parses;
+- connect the already certified structural phase to `CertifiedParsedModule`
+  and the file-only frontend with the specified diagnostic precedence;
 - reduce the cubic evidence/cache/counter memory cost and validate
   progressively larger inputs;
 - define and implement reachable-workspace parsing;

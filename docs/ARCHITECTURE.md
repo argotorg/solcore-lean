@@ -20,10 +20,13 @@ raw workspace
   -> versioned observable result
 ```
 
-The repository currently reaches the third step on the internal M2c path.
-Structural certification, resolution, source checking, and elaboration remain
-separate future stages. The public Oracle v4 follows the older M2b
-single-source parser path and stops after parsing.
+The repository implements workspace validation, per-file lexing and parsing,
+and structural validation as separate internal M2c kernels. The parser and
+structural validator are each proof-connected to an independent judgment, but
+the proof-carrying facade that joins them and certifies exact locations and
+tokens is not yet present. Resolution, source checking, and elaboration remain
+future stages. The public Oracle v4 follows the older M2b single-source parser
+path and stops after parsing.
 
 ## Main components
 
@@ -99,6 +102,7 @@ The implementation is organized around these responsibilities:
 | implementation/proof correspondence | `ChartProperties`, `Properties` |
 | total parse selection | `ParseOutcomeTotality` |
 | structural diagnostic order and pure AST validation | `Diagnostic`, `Structure` |
+| structural judgments, traversal bounds, and correspondence | `StructureJudgment`, `StructureFuelProperties`, `StructureProperties` |
 | finite termination certificate | `RootlessNormalizationDottedStatic*` |
 
 The internal file-only API is
@@ -111,8 +115,10 @@ token ownership proof internally derived by the lexer.
 StructuralDiagnostic) Unit` is the separate structural executor. It traverses
 the full AST, including expressions nested in patterns and lambda bodies,
 returns every applicable closed diagnostic, and canonicalizes the result. Its
-independent judgment and correspondence layer are the next unfinished proof
-boundary, so it is not yet part of a certified parsed-module facade.
+independent applicability and acceptance judgments agree exactly with the
+executor, including sufficient module-derived traversal fuel and the returned
+error list. It is not yet part of a certified parsed-module facade because
+exact location and retained-token correspondence are still separate work.
 
 ## Why the parser has a static certificate
 
@@ -139,7 +145,7 @@ The common proof pattern is:
 | workspace | pure validator | validation/rejection judgments | soundness and completeness |
 | lexing | bounded lexer | lexical judgment and diagnostic applicability | accepted-token and rejection theorems |
 | parsing | bounded chart executor | `Parses` and parse-diagnostic applicability | selected-outcome and soundness theorems |
-| structural validation | complete pure diagnostic collector | independent acceptance/applicability judgments are pending | canonical list-shape lemmas exist; full correspondence is pending |
+| structural validation | complete pure diagnostic collector | independent acceptance and applicability judgments | two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance; numeric work bound remains |
 | Core checking | Boolean/detailed checker | typing relation | soundness and completeness |
 | Core execution | fuelled CEK machine | big-step relation | two-way correspondence |
 

@@ -15,9 +15,13 @@
   grammar tables, `ParserCore`, the lexical judgment and lexer, the parser
   judgment, the finite contextual chart, parser-totality certificates, a total
   file-only lexer/parser frontend, and their current soundness proofs are
-  present. Strict UTF-8 and canonical-byte facts are also present.
-- **Not yet implemented:** The separate fast `Parser`, structural judgment and
-  validator, `CertifiedParsedModule`, the six complete canonical-standard parse
+  present. The structural judgment and validator are also present, with
+  two-way diagnostic correspondence, sufficient traversal fuel, canonical
+  reports, and executable acceptance equivalence. Strict UTF-8 and
+  canonical-byte facts are present.
+- **Not yet implemented:** The separate fast `Parser`, exact whole-AST location
+  and token correspondence, formal structural-resource accounting,
+  `CertifiedParsedModule`, the six complete canonical-standard parse
   certificates, and the public `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed
   implementation or publication boundary.
@@ -5277,7 +5281,8 @@ conforming to this Accepted ADR. The repository now uses the closed
 `GuardDecision` algebra and has passed the ParserCore closedness gate, so
 `ParserJudgment.lean`, `Chart.lean`, and the total chart-based parser have been
 implemented. This milestone does not complete the still-missing fast parser,
-structural certification, canonical-standard parse certificates, or umbrella.
+exact location/token certification and the proof-carrying facade,
+canonical-standard parse certificates, or umbrella.
 
 Implementation proceeds in this order:
 
