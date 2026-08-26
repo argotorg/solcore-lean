@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.RuleCoherentIntervalLocation
+import Solcore.Surface.Multi.RuleCoherentSpanLayout
 import Solcore.Surface.Multi.SourceRuleIntervalLocation
 
 set_option autoImplicit false
@@ -312,6 +313,375 @@ def MatchArmStatementLayout
     anchors.spans = statements.map (fun statement => statement.span) ∧
       anchors.Within origin finish ∧ anchors.Ordered
 
+private def matchArmStatementSpans :
+    (rule : GrammarRuleId) → RuleValue rule → List SourceSpan
+  | .statement, value => [value.span]
+  | .letStatement, value => [value.span]
+  | .returnStatement, value => [value.span]
+  | .blockStatement, value => [value.span]
+  | .breakStatement, value => [value.span]
+  | .continueStatement, value => [value.span]
+  | .assemblyStatement, value => [value.span]
+  | .ifStatement, value => [value.span]
+  | .forStatement, value => [value.span]
+  | .matchStatement, value => [value.span]
+  | .armStatement, value => [value.span]
+  | .assignmentStatement, value => [value.span]
+  | .expressionStatement, value => [value.span]
+  | _, _ => []
+
+private def matchArmStatementSpanLayout : RuleSpanLayout := {
+  spans := matchArmStatementSpans
+  safe := by
+    intro rule value nonempty
+    cases rule <;> simp [matchArmStatementSpans] at nonempty ⊢
+}
+
+private theorem focusedSingletonOfConsumed
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens} {span : SourceSpan}
+    (consumed : ConsumedSpan file tokens origin finish span)
+    (occupied : origin.val < Nat.min finish.val tokens.length) :
+    FocusedSpanEvidence file tokens origin finish [span] := by
+  let anchor : SourceAnchor file tokens := {
+    origin := origin
+    finish := finish
+    span := span
+    occupied := ⟨consumed, occupied⟩
+  }
+  refine ⟨[anchor], rfl, ?_, SourceAnchorTrace.ordered_singleton anchor⟩
+  intro selected member
+  simp only [List.mem_singleton] at member
+  subst selected
+  exact ⟨Nat.le_refl _, Nat.le_refl _⟩
+
+private theorem matchArmStatementSourceSound
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs rule)}
+    {output : RuleValue rule}
+    (reduction : RuleReduction file tokens rule origin finish input output)
+    (occupied : matchArmStatementSpanLayout.spans rule output ≠ [] →
+      origin.val < Nat.min finish.val tokens.length)
+    (inputEvidence : FocusedSpanEvidence file tokens origin finish
+      (input.layoutSpans matchArmStatementSpanLayout)) :
+    FocusedSpanEvidence file tokens origin finish
+      (matchArmStatementSpanLayout.spans rule output) := by
+  cases reduction with
+  | statementLet origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementLet (file := file)
+            (tokens := tokens) origin finish value)) .letStatement value :=
+        .choice ⟨0, by decide⟩ (.rule .letStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementReturn origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementReturn (file := file)
+            (tokens := tokens) origin finish value)) .returnStatement value :=
+        .choice ⟨1, by decide⟩ (.rule .returnStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementMatch origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementMatch (file := file)
+            (tokens := tokens) origin finish value)) .matchStatement value :=
+        .choice ⟨2, by decide⟩ (.rule .matchStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementIf origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementIf (file := file)
+            (tokens := tokens) origin finish value)) .ifStatement value :=
+        .choice ⟨3, by decide⟩ (.rule .ifStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementFor origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementFor (file := file)
+            (tokens := tokens) origin finish value)) .forStatement value :=
+        .choice ⟨4, by decide⟩ (.rule .forStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementAssembly origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementAssembly (file := file)
+            (tokens := tokens) origin finish value)) .assemblyStatement value :=
+        .choice ⟨5, by decide⟩ (.rule .assemblyStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementBlock origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementBlock (file := file)
+            (tokens := tokens) origin finish value)) .blockStatement value :=
+        .choice ⟨6, by decide⟩ (.rule .blockStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementBreak origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementBreak (file := file)
+            (tokens := tokens) origin finish value)) .breakStatement value :=
+        .choice ⟨7, by decide⟩ (.rule .breakStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementContinue origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementContinue (file := file)
+            (tokens := tokens) origin finish value)) .continueStatement value :=
+        .choice ⟨8, by decide⟩ (.rule .continueStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementAssignment origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementAssignment (file := file)
+            (tokens := tokens) origin finish value)) .assignmentStatement value :=
+        .choice ⟨9, by decide⟩ (.rule .assignmentStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | statementExpression origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.statementExpression (file := file)
+            (tokens := tokens) origin finish value)) .expressionStatement value :=
+        .choice ⟨10, by decide⟩ (.rule .expressionStatement value)
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | armStatement origin finish value =>
+      have inside : EbnfValue.ContainsRuleValue file tokens
+          (inputValue (RuleReduction.armStatement (file := file)
+            (tokens := tokens) origin finish value)) .statement value :=
+        .rule .statement value
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        inputEvidence.select
+          (inside.layoutSpans_sublist matchArmStatementSpanLayout)
+  | letStatement origin finish binding semicolon witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | returnStatement origin finish keyword value semicolon witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | blockStatement origin finish body witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | breakStatement origin finish keyword semicolon witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | continueStatement origin finish keyword semicolon witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | assemblyStatement origin finish keyword block slice projects witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | ifStatementWithoutElse origin finish keyword openParen condition closeParen
+      thenBody witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | ifStatementWithElse origin finish keyword openParen condition closeParen
+      thenBody elseKeyword elseBody witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | forStatement origin finish keyword openParen initializers firstSemicolon
+      condition secondSemicolon post closeParen body witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | matchStatement origin finish keyword scrutinees openBrace arms closeBrace
+      terminator witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | assignmentStatement origin finish left operator right semicolon witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | expressionStatementTerminated origin finish expression semicolon witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | expressionStatementTerminal origin finish expression witness =>
+      exact focusedSingletonOfConsumed witness.consumed
+        (occupied (by
+          simp [matchArmStatementSpanLayout, matchArmStatementSpans]))
+  | _ =>
+      simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
+        FocusedSpanEvidence.empty (file := file) origin finish
+
+private theorem matchArmStatementRootSound :
+    RootActionLayoutSpanSound matchArmStatementSpanLayout := by
+  intro file tokens rule origin finish input output reduction occupied
+    inputEvidence
+  rw [← RootAction.unpack_layoutSpans] at inputEvidence
+  exact matchArmStatementSourceSound reduction occupied inputEvidence
+
+local syntax "layoutEvs![" term,* "]" : term
+
+local macro "layoutEvs![" values:term,* "]" : term => do
+  let mut result ← `(EbnfValues.nil)
+  for value in values.getElems.reverse do
+    result ← `(EbnfValues.cons _ _ $value $result)
+  return result
+
+local syntax "layoutSeq![" term "|" term,* "]" : term
+
+local macro "layoutSeq![" children:term "|" values:term,* "]" : term =>
+  `(EbnfValue.sequence $children layoutEvs![$values,*])
+
+@[simp] private theorem matchArmLayout_armStatementRuleAtoms
+    {file : WorkspaceFile} {tokens : List Token}
+    (statements : List Statement) :
+    (statements.map (EbnfValue.ruleAtom
+      (file := file) (tokens := tokens) .armStatement)).flatMap
+        (fun value => value.layoutSpans matchArmStatementSpanLayout) =
+      statements.map (fun statement => statement.span) := by
+  induction statements with
+  | nil => rfl
+  | cons head tail inductionHypothesis =>
+      change
+        (EbnfValue.ruleAtom (file := file) (tokens := tokens)
+            .armStatement head).layoutSpans matchArmStatementSpanLayout ++
+          (tail.map (EbnfValue.ruleAtom .armStatement)).flatMap
+            (fun value => value.layoutSpans matchArmStatementSpanLayout) =
+        head.span :: tail.map (fun statement => statement.span)
+      rw [EbnfValue.layoutSpans_ruleAtom, inductionHypothesis]
+      rfl
+
+@[simp] private theorem matchArmLayout_patternRuleAtoms
+    {file : WorkspaceFile} {tokens : List Token}
+    (patterns : List Pattern) :
+    (patterns.map (EbnfValue.ruleAtom
+      (file := file) (tokens := tokens) .pattern)).flatMap
+        (fun value => value.layoutSpans matchArmStatementSpanLayout) = [] := by
+  induction patterns with
+  | nil => rfl
+  | cons head tail inductionHypothesis =>
+      change
+        (EbnfValue.ruleAtom (file := file) (tokens := tokens)
+            .pattern head).layoutSpans matchArmStatementSpanLayout ++
+          (tail.map (EbnfValue.ruleAtom .pattern)).flatMap
+            (fun value => value.layoutSpans matchArmStatementSpanLayout) = []
+      rw [EbnfValue.layoutSpans_ruleAtom, inductionHypothesis]
+      rfl
+
+@[simp] private theorem matchArm_inputLayoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (pipe : MatchedTerminal file tokens (.symbol .pipe))
+    (patterns : NonemptyList Pattern)
+    (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow))
+    (statements : List Statement)
+    (witness : ConsumedSpanWitness file tokens origin finish) :
+    (inputValue
+      (RuleReduction.matchArm origin finish pipe patterns fatArrow statements
+        witness)).layoutSpans matchArmStatementSpanLayout =
+      [pipe.span, fatArrow.span] ++
+        statements.map (fun statement => statement.span) := by
+  let children : List EbnfExpr := [
+    .atom (.terminal (.symbol .pipe)),
+    .list1 (.atom (.nonterminal .pattern)),
+    .atom (.terminal (.symbol .fatArrow)),
+    .star (.atom (.nonterminal .armStatement))]
+  let sequenceValue : EbnfValue file tokens (.sequence children) :=
+    layoutSeq![children |
+      EbnfValue.terminalAtom _ pipe,
+      EbnfValue.list1 _
+        (patterns.map (EbnfValue.ruleAtom .pattern)),
+      EbnfValue.terminalAtom _ fatArrow,
+      EbnfValue.star _
+        (statements.map (EbnfValue.ruleAtom .armStatement))]
+  have rootShape : EbnfExpr.sequence children = m2cV1.rhs .matchArm := by
+    rfl
+  have inputEq :
+      inputValue
+          (RuleReduction.matchArm origin finish pipe patterns fatArrow
+            statements witness) =
+        EbnfValue.transport rootShape sequenceValue := by
+    rfl
+  have layoutInputEq := congrArg
+    (EbnfValue.layoutSpans matchArmStatementSpanLayout) inputEq
+  calc
+    _ = (EbnfValue.transport rootShape sequenceValue).layoutSpans
+          matchArmStatementSpanLayout := layoutInputEq
+    _ = sequenceValue.layoutSpans matchArmStatementSpanLayout :=
+      EbnfValue.layoutSpans_transport matchArmStatementSpanLayout rootShape _
+    _ = _ := by
+      rw [EbnfValue.layoutSpans_sequence]
+      rw [EbnfValues.layoutSpans_cons, EbnfValues.layoutSpans_cons,
+        EbnfValues.layoutSpans_cons, EbnfValues.layoutSpans_cons,
+        EbnfValues.layoutSpans_nil]
+      rw [EbnfValue.layoutSpans_list1, EbnfValue.layoutSpans_star]
+      rw [EbnfValue.layoutSpans_terminalAtom,
+        EbnfValue.layoutSpans_terminalAtom]
+      simp
+      simp only [NonemptyList.map]
+      change
+        (EbnfValue.ruleAtom (file := file) (tokens := tokens)
+            .pattern patterns.head).layoutSpans matchArmStatementSpanLayout ++
+          ((patterns.tail.map (EbnfValue.ruleAtom .pattern)).flatMap
+              (fun value =>
+                value.layoutSpans matchArmStatementSpanLayout) ++
+            fatArrow.span ::
+              statements.map (fun statement => statement.span)) =
+          fatArrow.span :: statements.map (fun statement => statement.span)
+      rw [EbnfValue.layoutSpans_ruleAtom,
+        matchArmLayout_patternRuleAtoms]
+      rfl
+
+private theorem matchArm_statementLayout_of_coherentRoot
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {owned : TokensOwnedBy file tokens}
+    {origin finish : Boundary tokens}
+    {context : GuardContext tokens}
+    {priorValues : PrefixValues file tokens
+      (CanonicalRootLocationItem tokens .matchArm origin finish context)}
+    {complete : CompleteItem
+      (CanonicalRootLocationItem tokens .matchArm origin finish context).raw}
+    {coherentPrefix : CoherentPrefix file tokens memo correct final
+      (CanonicalRootLocationItem tokens .matchArm origin finish context)
+        priorValues}
+    (pipe : MatchedTerminal file tokens (.symbol .pipe))
+    (patterns : NonemptyList Pattern)
+    (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow))
+    (statements : List Statement)
+    (witness : ConsumedSpanWitness file tokens origin finish)
+    (inputEq : inputValue
+        (RuleReduction.matchArm origin finish pipe patterns fatArrow
+          statements witness) =
+      RootAction.unpack .matchArm
+        (PrefixValues.fullValue
+          (CanonicalRootLocationItem tokens .matchArm origin finish context)
+          complete priorValues))
+    {trace : SourceAnchorTrace file tokens}
+    {carries : PrefixCarriesSourceTrace file tokens memo correct final owned
+      coherentPrefix trace} :
+    MatchArmStatementLayout (file := file) statements origin finish := by
+  have inputLayout := carries.rootInputLayoutSpanEvidence
+    matchArmStatementSpanLayout matchArmStatementRootSound inputEq
+  rw [matchArm_inputLayoutSpans] at inputLayout
+  exact inputLayout.select
+    (List.sublist_append_right [pipe.span, fatArrow.span]
+      (statements.map (fun statement => statement.span)))
+
 theorem matchArm_bodyGeometry_of_statementLayout
     {file : WorkspaceFile} {tokens : List Token}
     (tokensOrdered : TokenSpansOrdered tokens)
@@ -614,6 +984,57 @@ theorem matchArm_coherentRootLocationSound_of_statementLayout
   rw [← inputEq] at unpackEvidence
   exact matchArm_locationSound_of_statementLayout tokensOrdered origin finish
     pipe patterns fatArrow statements witness trace unpackEvidence layout
+
+/-- A coherent match-arm reduction preserves exact source intervals, including
+the promoted fat-arrow root and the statement-delimited body interval. -/
+theorem matchArm_coherentRootLocationSound
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {owned : TokensOwnedBy file tokens}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    {origin finish : Boundary tokens}
+    {context : GuardContext tokens}
+    {priorValues : PrefixValues file tokens
+      (CanonicalRootLocationItem tokens .matchArm origin finish context)}
+    {complete : CompleteItem
+      (CanonicalRootLocationItem tokens .matchArm origin finish context).raw}
+    {coherentPrefix : CoherentPrefix file tokens memo correct final
+      (CanonicalRootLocationItem tokens .matchArm origin finish context)
+        priorValues}
+    (pipe : MatchedTerminal file tokens (.symbol .pipe))
+    (patterns : NonemptyList Pattern)
+    (fatArrow : MatchedTerminal file tokens (.symbol .fatArrow))
+    (statements : List Statement)
+    (witness : ConsumedSpanWitness file tokens origin finish)
+    (inputEq : inputValue
+        (RuleReduction.matchArm origin finish pipe patterns fatArrow
+          statements witness) =
+      RootAction.unpack .matchArm
+        (PrefixValues.fullValue
+          (CanonicalRootLocationItem tokens .matchArm origin finish context)
+          complete priorValues))
+    {trace : SourceAnchorTrace file tokens}
+    {carries : PrefixCarriesSourceTrace file tokens memo correct final owned
+      coherentPrefix trace} :
+    CoherentActionLocationSound complete coherentPrefix
+      (ActionReduces.root .matchArm origin finish
+        (PrefixValues.fullValue
+          (CanonicalRootLocationItem tokens .matchArm origin finish context)
+          complete priorValues)
+        (sourceLoc witness {
+          patterns := patterns
+          body := RuleReduction.armBody fatArrow statements
+        })
+        (inputEq ▸ RuleReduction.matchArm origin finish pipe patterns
+          fatArrow statements witness)) trace carries := by
+  apply matchArm_coherentRootLocationSound_of_statementLayout
+    tokensOrdered pipe patterns fatArrow statements witness inputEq
+  exact matchArm_statementLayout_of_coherentRoot
+    (memo := memo) (correct := correct) (final := final) (owned := owned)
+    (coherentPrefix := coherentPrefix) (trace := trace) (carries := carries)
+    pipe patterns fatArrow statements witness inputEq
 
 end RuleReduction
 
