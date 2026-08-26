@@ -3172,6 +3172,16 @@ private theorem sitesOfKind_nodup (kind : EbnfNodeKind) :
   split at leftSelected <;> split at rightSelected <;> simp_all
   exact congrArg GrammarSiteOfKind.site
     (leftSelected.trans rightSelected.symm)
+
+/-- Every atom site occurs in the canonical grammar-site order. -/
+theorem allAtomSites_complete (site : AtomSite) :
+    site ∈ allAtomSites :=
+  sitesOfKind_complete site
+
+/-- Canonical atom sites contain no repeated grammar location. -/
+theorem allAtomSites_nodup : allAtomSites.Nodup :=
+  sitesOfKind_nodup .atom
+
 private theorem namedSitesOfKind_nodup
     {kind : EbnfNodeKind} (sites : List (GrammarSiteOfKind kind))
     (definition : sites = allGrammarSites.filterMap
@@ -3833,6 +3843,53 @@ def allFastMemoKeyKinds : List FastMemoKeyKind :=
   allGrammarSites.map .site ++
   allPriorityGuardIds.map .guard ++
   allActionIds.map .action
+
+/-- Every grammar-owned memo family occurs in the fast-parser enumeration. -/
+theorem allFastMemoKeyKinds_complete (kind : FastMemoKeyKind) :
+    kind ∈ allFastMemoKeyKinds := by
+  cases kind with
+  | rule rule =>
+      simp [allFastMemoKeyKinds, allGrammarRuleIds_complete rule]
+  | site site =>
+      simp [allFastMemoKeyKinds, allGrammarSites_complete site]
+  | guard guard =>
+      cases guard <;> simp [allFastMemoKeyKinds, allPriorityGuardIds]
+  | action action =>
+      cases action with
+      | actionFor production =>
+          simp [allFastMemoKeyKinds, allActionIds,
+            allProductionIds_complete production]
+
+/-- Memo families occur exactly once in their displayed constructor/table
+order. -/
+theorem allFastMemoKeyKinds_nodup : allFastMemoKeyKinds.Nodup := by
+  have ruleUnique :
+      (allGrammarRuleIds.map FastMemoKeyKind.rule).Nodup :=
+    map_nodup_of_injective _ _ (by decide)
+      (by intro left right equal; cases equal; rfl)
+  have siteUnique :
+      (allGrammarSites.map FastMemoKeyKind.site).Nodup :=
+    map_nodup_of_injective _ _ allGrammarSites_nodup
+      (by intro left right equal; cases equal; rfl)
+  have guardUnique :
+      (allPriorityGuardIds.map FastMemoKeyKind.guard).Nodup :=
+    map_nodup_of_injective _ _ (by decide)
+      (by intro left right equal; cases equal; rfl)
+  have actionIdsUnique : allActionIds.Nodup :=
+    map_nodup_of_injective ActionId.actionFor allProductionIds
+      allProductionIds_nodup
+      (by intro left right equal; cases equal; rfl)
+  have actionUnique :
+      (allActionIds.map FastMemoKeyKind.action).Nodup :=
+    map_nodup_of_injective _ _ actionIdsUnique
+      (by intro left right equal; cases equal; rfl)
+  simp [allFastMemoKeyKinds, List.nodup_append, ruleUnique,
+    siteUnique, guardUnique, actionUnique]
+  constructor
+  · rintro _ _ _ _ rfl _ (⟨_, _, rfl⟩ | ⟨_, _, rfl⟩) equal
+    all_goals cases equal
+  · rintro _ _ _ (⟨_, _, _, rfl⟩ | ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩) equal
+    all_goals cases equal
 
 namespace FastMemoKeyKind
 

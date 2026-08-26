@@ -123,6 +123,60 @@ def kind (index : FastMemoKindIndex) : Grammar.FastMemoKeyKind :=
     exact (show index.val < Grammar.allFastMemoKeyKinds.length from
       index.isLt))
 
+/-- Select the canonical schedule index of a grammar memo-key family. -/
+def ofKind (kind : Grammar.FastMemoKeyKind) : FastMemoKindIndex :=
+  ⟨kind.index, by
+    unfold Grammar.FastMemoKeyKind.index Grammar.F
+    rw [List.findIdx_lt_length]
+    exact ⟨kind, Grammar.allFastMemoKeyKinds_complete kind, by simp⟩⟩
+
+/-- Looking up a canonically indexed memo family recovers that family. -/
+@[simp] theorem kind_ofKind (memoKind : Grammar.FastMemoKeyKind) :
+    kind (ofKind memoKind) = memoKind := by
+  unfold kind ofKind Grammar.FastMemoKeyKind.index
+  exact beq_iff_eq.mp (List.findIdx_getElem
+    (xs := Grammar.allFastMemoKeyKinds)
+    (p := (· == memoKind))
+    (w := List.idxOf_lt_length_of_mem
+      (Grammar.allFastMemoKeyKinds_complete memoKind)))
+
+/-- Distinct schedule indices select distinct memo families. -/
+theorem kind_injective : Function.Injective kind := by
+  intro left right equal
+  apply Fin.ext
+  apply (List.getElem?_inj left.isLt
+    Grammar.allFastMemoKeyKinds_nodup).mp
+  rw [List.getElem?_eq_getElem left.isLt,
+    List.getElem?_eq_getElem right.isLt]
+  exact congrArg some equal
+
+/-- Canonically indexing the family selected by an index recovers the index. -/
+@[simp] theorem ofKind_kind (index : FastMemoKindIndex) :
+    ofKind index.kind = index := by
+  apply kind_injective
+  exact kind_ofKind index.kind
+
+/-- Canonical memo-family indexing is one-to-one. -/
+theorem ofKind_injective : Function.Injective ofKind := by
+  intro left right equal
+  calc
+    left = kind (ofKind left) := (kind_ofKind left).symm
+    _ = kind (ofKind right) := congrArg kind equal
+    _ = right := kind_ofKind right
+
+/-- Every schedule memo-family index names a grammar memo family. -/
+theorem ofKind_surjective : Function.Surjective ofKind := by
+  intro index
+  exact ⟨index.kind, ofKind_kind index⟩
+
+/-- Grammar memo families have exactly the schedule's memo-family capacity. -/
+def ranking :
+    ExactFiniteRanking Grammar.FastMemoKeyKind Grammar.F := {
+  rank := ofKind
+  injective := ofKind_injective
+  surjective := ofKind_surjective
+}
+
 end FastMemoKindIndex
 
 /-- The sole fixed unit reserved by the fast-parser schedule. -/
