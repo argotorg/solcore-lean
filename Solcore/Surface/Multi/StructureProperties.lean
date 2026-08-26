@@ -280,6 +280,40 @@ theorem leastSourceSpan?_eq_some_iff
       · intro spanLeast
         exact congrArg some (leastSpanIn_unique computedLeast spanLeast)
 
+/-- The pragma collector emits exactly its empty-target and later-duplicate
+diagnostics. -/
+theorem mem_pragmaDiagnostics_iff
+    {declaration : PragmaDecl} {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ pragmaDiagnostics declaration ↔
+      (declaration.payload.kind.payload = .noGenericInstanceFor ∧
+        declaration.payload.targets = [] ∧
+        diagnostic = .emptyGenericPragmaTargets
+          declaration.payload.kind.span) ∨
+      ∃ target,
+        LaterDuplicate declaration.payload.targets
+          (fun value => value.payload) target ∧
+        StructuralDiagnostic.duplicatePragmaTarget
+          target.span target.payload = diagnostic := by
+  simp [pragmaDiagnostics, mem_duplicateDiagnostics_iff_laterDuplicate,
+    and_assoc]
+
+/-- Every diagnostic emitted for a reached pragma is declaratively
+applicable. -/
+theorem mem_pragmaDiagnostics_applies
+    {module : ParsedModuleV1} {declaration : PragmaDecl}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.pragma declaration))
+    (member : diagnostic ∈ pragmaDiagnostics declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_pragmaDiagnostics_iff] at member
+  rcases member with empty | duplicate
+  · rcases empty with ⟨kind, targets, diagnosticEq⟩
+    subst diagnostic
+    exact .emptyGenericPragmaTargets occurrence kind targets
+  · rcases duplicate with ⟨target, later, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .duplicatePragmaTarget occurrence later
+
 end Structure
 
 end Solcore.Surface.Multi
