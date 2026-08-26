@@ -7,6 +7,24 @@ namespace Solcore.Surface.Multi
 
 open Grammar Solcore.Workspace
 
+/-- A checked hard-keyword scan contributes its exact retained spelling and
+span. -/
+@[simp] theorem MatchedTerminal.physicalTokenPlan_hardKeyword
+    {file : WorkspaceFile} {tokens : List Token}
+    (keyword : HardKeyword)
+    (matched : MatchedTerminal file tokens (.hardKeyword keyword)) :
+    matched.physicalTokenPlan =
+      TokenPlan.exact (.hardKeyword keyword) matched.span := by
+  rcases matched with
+    ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases terminalAt with
+  | retained token inRange lookup valid =>
+      simp [MatchedTerminal.physicalTokenPlan, TerminalMatches]
+        at matchedEvidence ⊢
+      rw [matchedEvidence]
+  | endOfFile atEnd =>
+      simp [TerminalMatches] at matchedEvidence
+
 /-- Viewing a freshly built choice recovers its dependent branch value. -/
 @[simp] theorem EbnfValue.choiceView_choice
     {file : WorkspaceFile} {tokens : List Token}

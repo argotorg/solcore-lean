@@ -103,11 +103,11 @@ private def optionalMarkerPlan? (role : SyntaxMarker) (kind : TokenKind) :
   | none => some .empty
   | some marker => markerPlan? role kind marker
 
-private def identifierPlans (values : List IdentifierOccurrence) :
+def identifierPlans (values : List IdentifierOccurrence) :
     List TokenPlan :=
   values.map identifierPlan
 
-private def nonemptyIdentifierPlans
+def nonemptyIdentifierPlans
     (values : NonemptyList IdentifierOccurrence) : List TokenPlan :=
   identifierPlan values.head :: identifierPlans values.tail
 
@@ -303,6 +303,16 @@ def forallClausePlan? (clause : ForallClause) : Option TokenPlan := do
   let first ← forallBinderPlan? clause.payload.binders.head
   let rest ← plans? forallBinderPlan? clause.payload.binders.tail
   pure (forallClausePlanWith first rest clause)
+
+/-- Forall-clause planning traverses its nonempty binder sequence in source
+order. -/
+theorem forallClausePlan?_eq_mapM (clause : ForallClause) :
+    forallClausePlan? clause = (do
+      let first ← forallBinderPlan? clause.payload.binders.head
+      let rest ← clause.payload.binders.tail.mapM forallBinderPlan?
+      pure (forallClausePlanWith first rest clause)) := by
+  unfold forallClausePlan?
+  rw [plans?_eq_mapM]
 
 def predicatePlan? (predicate : Predicate) : Option TokenPlan := do
   let main ← typeAtomPlan? predicate.payload.main
