@@ -2,6 +2,7 @@ import Solcore.Surface.Multi.StructureDiagnosticInsertionUnits
 import Solcore.Surface.Multi.StructureCanonicalDedupComparisonUnits
 import Solcore.Surface.Multi.StructureCanonicalOrderingComparisonUnits
 import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
+import Solcore.Surface.Multi.StructureLeastSpanComparisonUnits
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -154,5 +155,29 @@ def testMultiResourceBounds : IO Unit := do
   assertTrue
     (Structure.structureCanonicalOrderingComparisonUnits duplicateModule == 1)
     "sorting two canonical diagnostics must perform one ordering comparison"
+
+  let firstWildcardMarker : Marker :=
+    locatedAt source 12 13 .wildcard
+  let secondWildcardMarker : Marker :=
+    locatedAt source 24 25 .wildcard
+  let firstWildcard : ImportSelectorEntry :=
+    locatedAt source 12 13 (.wildcard firstWildcardMarker)
+  let secondWildcard : ImportSelectorEntry :=
+    locatedAt source 24 25 (.wildcard secondWildcardMarker)
+  let mixedSelection : ImportSelection :=
+    locatedAt source 11 26 {
+      entries := [firstWildcard, firstEntry, secondWildcard]
+    }
+  let mixedDeclaration : ImportDecl :=
+    locatedAt source 0 26 {
+      moduleRef := moduleReference
+      mode := .items mixedSelection none
+    }
+  let mixedItem : TopItem :=
+    locatedAt source 0 26 (.importDecl mixedDeclaration)
+  let mixedModule : ParsedModuleV1 :=
+    locatedAt source 0 26 { source, items := [mixedItem] }
+  assertTrue (Structure.structureLeastSpanComparisonUnits mixedModule == 1)
+    "two wildcard spans must perform one least-span comparison"
 
 end Tests
