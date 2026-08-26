@@ -399,6 +399,22 @@ theorem ordered_append_across
   exact Nat.le_trans (leftInside earlier earlierMember).2
     (rightInside later laterMember).1
 
+/-- Every physical span in an enclosed trace is contained by the consumed
+span of the enclosing parser interval. -/
+theorem spans_containedBy
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {outerSpan : SourceSpan}
+    {trace : SourceAnchorTrace file tokens}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    (outer : ConsumedSpan file tokens origin finish outerSpan)
+    (inside : Within trace origin finish) :
+    ∀ span ∈ spans trace, outerSpan.Contains span := by
+  intro span member
+  rcases List.mem_map.mp member with ⟨anchor, anchorMember, rfl⟩
+  exact anchor.containedBy tokensOrdered outer
+    (inside anchor anchorMember)
+
 end SourceAnchorTrace
 
 namespace ConsumedSpanWitness
