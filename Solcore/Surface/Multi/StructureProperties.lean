@@ -2397,6 +2397,296 @@ theorem mem_diagnosticCandidates_applies
   rcases member with ⟨item, itemMember, diagnosticMember⟩
   exact mem_topItemDiagnostics_applies itemMember diagnosticMember
 
+private theorem mem_diagnosticCandidates_of_mem_topItemDiagnostics
+    {module : ParsedModuleV1} {item : TopItem}
+    {diagnostic : StructuralDiagnostic}
+    (itemMember : item ∈ module.payload.items)
+    (diagnosticMember : diagnostic ∈
+      topItemDiagnostics (astNodeMeasure module + 1) item) :
+    diagnostic ∈ diagnosticCandidates module := by
+  change diagnostic ∈ module.payload.items.flatMap
+    (topItemDiagnostics (astNodeMeasure module + 1))
+  rw [List.mem_flatMap]
+  exact ⟨item, itemMember, diagnosticMember⟩
+
+private def nonrecursiveDiagnosticsAt
+    (fuel : Nat) : StructuralSite → List StructuralDiagnostic
+  | .importSelection selection => importSelectionDiagnostics selection
+  | .hidingClause clause => hidingDiagnostics clause
+  | .localExportList selection => localExportDiagnostics selection
+  | .remoteExportSelection selection => remoteExportDiagnostics selection
+  | .exportItem item => exportItemDiagnostics item
+  | .pragma declaration => pragmaDiagnostics declaration
+  | .signature modifierContext parameterContext signature =>
+      (match modifierContext with
+      | none => []
+      | some context =>
+          disallowedSignatureModifierDiagnostics context signature) ++
+        missingParameterTypeDiagnostics parameterContext
+          signature.payload.parameters
+  | .fallback declaration => fallbackDiagnostics fuel declaration
+  | .contractConstructor declaration =>
+      constructorDiagnostics fuel declaration
+  | _ => []
+
+private theorem mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt
+    {module : ParsedModuleV1} {site : StructuralSite}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module site)
+    (diagnosticMember : diagnostic ∈
+      nonrecursiveDiagnosticsAt (astNodeMeasure module + 1) site) :
+    diagnostic ∈ diagnosticCandidates module := by
+  induction occurrence <;>
+    simp only [nonrecursiveDiagnosticsAt, List.not_mem_nil] at diagnosticMember
+  case importSelectionTop item declaration selection hidingClause
+      itemMember itemShape modeShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp [topItemDiagnostics, itemShape, importDiagnostics, modeShape,
+      diagnosticMember]
+  case hidingClauseTop item declaration selection clause itemMember itemShape
+      modeShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp [topItemDiagnostics, itemShape, importDiagnostics, modeShape,
+      diagnosticMember]
+  case localExportListTop item declaration selection itemMember itemShape
+      modeShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simpa [topItemDiagnostics, itemShape, exportDiagnostics, modeShape] using
+      diagnosticMember
+  case remoteExportSelectionTop item declaration moduleRef selection itemMember
+      itemShape modeShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simpa [topItemDiagnostics, itemShape, exportDiagnostics, modeShape] using
+      diagnosticMember
+  case localExportItem selection entry item selectionOccurs entryMember
+      entryShape induction =>
+    apply induction
+    change diagnostic ∈ localExportDiagnostics selection
+    rw [mem_localExportDiagnostics_iff]
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    exact ⟨item,
+      mem_localExportItems_iff_entry.mpr ⟨entry, entryMember, entryShape⟩,
+      diagnosticMember⟩
+  case remoteExportItem selection entries entry item selectionOccurs
+      selectionShape entryMember entryShape induction =>
+    apply induction
+    change diagnostic ∈ remoteExportDiagnostics selection
+    rw [mem_remoteExportDiagnostics_braced_iff selectionShape]
+    apply Or.inr
+    apply Or.inr
+    apply Or.inr
+    exact ⟨item,
+      mem_remoteExportItems_iff_entry.mpr ⟨entry, entryMember, entryShape⟩,
+      diagnosticMember⟩
+  case pragmaTop item declaration itemMember itemShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simpa [topItemDiagnostics, itemShape] using diagnosticMember
+  case topFunctionSignature item declaration itemMember itemShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp only [topItemDiagnostics, itemShape, functionDiagnostics]
+    rw [List.mem_append]
+    exact Or.inl diagnosticMember
+  case classMethodSignature item declaration method itemMember itemShape
+      methodMember =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp only [topItemDiagnostics, itemShape]
+    rw [List.mem_flatMap]
+    exact ⟨method, methodMember, by
+      simpa [classMethodDiagnostics] using diagnosticMember⟩
+  case instanceMethodSignature item declaration method itemMember itemShape
+      methodMember =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp only [topItemDiagnostics, itemShape]
+    rw [List.mem_flatMap]
+    refine ⟨method, methodMember, ?_⟩
+    simp only [functionDiagnostics]
+    rw [List.mem_append]
+    exact Or.inl diagnosticMember
+  case contractFunctionSignature item declaration contractMember
+      functionDeclaration itemMember itemShape contractMemberMember
+      memberShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp only [topItemDiagnostics, itemShape, contractDiagnostics]
+    rw [List.mem_flatMap]
+    refine ⟨contractMember, contractMemberMember, ?_⟩
+    simp only [contractMemberDiagnostics, memberShape, functionDiagnostics]
+    rw [List.mem_append]
+    exact Or.inl diagnosticMember
+  case fallbackDeclaration item declaration contractMember
+      fallbackDeclaration itemMember itemShape contractMemberMember
+      memberShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp only [topItemDiagnostics, itemShape, contractDiagnostics]
+    rw [List.mem_flatMap]
+    exact ⟨contractMember, contractMemberMember, by
+      simpa [contractMemberDiagnostics, memberShape] using diagnosticMember⟩
+  case constructorDeclaration item declaration contractMember
+      constructorDeclaration itemMember itemShape contractMemberMember
+      memberShape =>
+    apply mem_diagnosticCandidates_of_mem_topItemDiagnostics itemMember
+    simp only [topItemDiagnostics, itemShape, contractDiagnostics]
+    rw [List.mem_flatMap]
+    exact ⟨contractMember, contractMemberMember, by
+      simpa [contractMemberDiagnostics, memberShape] using diagnosticMember⟩
+
+private theorem mem_diagnosticCandidates_of_mem_statementDiagnosticsFuel_one
+    {module : ParsedModuleV1} {loopDepth : Nat} {statement : Statement}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.statement loopDepth statement))
+    (diagnosticMember : diagnostic ∈
+      statementDiagnosticsFuel 1 loopDepth statement) :
+    diagnostic ∈ diagnosticCandidates module := by
+  rcases occurrence.statement_fuelPath with ⟨depth, path⟩
+  apply mem_diagnosticCandidates_of_mem_statementDiagnosticsFuel
+    (fuel := 1) path
+  · have depthBound := path.depth_lt_astNodeMeasure
+    omega
+  · exact diagnosticMember
+
+/-- Every declaratively applicable diagnostic is an executable candidate. -/
+theorem applies_mem_diagnosticCandidates
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic}
+    (applies : StructuralDiagnostic.Applies module diagnostic) :
+    diagnostic ∈ diagnosticCandidates module := by
+  cases applies with
+  | emptyImportSelection occurrence empty =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_importSelectionDiagnostics_iff]
+      exact Or.inl ⟨empty, rfl⟩
+  | mixedImportWildcard occurrence mixed least =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_importSelectionDiagnostics_iff]
+      exact Or.inr (Or.inl ⟨mixed, _, least, rfl⟩)
+  | duplicateImportSourceName occurrence duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_importSelectionDiagnostics_iff]
+      exact Or.inr (Or.inr (Or.inl ⟨_, duplicate, rfl⟩))
+  | duplicateImportLocalName occurrence duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_importSelectionDiagnostics_iff]
+      exact Or.inr (Or.inr (Or.inr ⟨_, duplicate, rfl⟩))
+  | emptyHidingClause occurrence empty =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_hidingDiagnostics_iff]
+      exact Or.inl ⟨empty, rfl⟩
+  | duplicateHiddenName occurrence duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_hidingDiagnostics_iff]
+      exact Or.inr ⟨_, duplicate, rfl⟩
+  | emptyLocalExportList occurrence empty =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_localExportDiagnostics_iff]
+      exact Or.inl ⟨empty, rfl⟩
+  | emptyRemoteExportList entries occurrence braced empty =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt,
+        mem_remoteExportDiagnostics_braced_iff braced]
+      exact Or.inl ⟨empty, rfl⟩
+  | mixedLocalExportWildcard occurrence mixed least =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_localExportDiagnostics_iff]
+      exact Or.inr (Or.inl ⟨mixed, _, least, rfl⟩)
+  | mixedRemoteExportWildcard occurrence braced mixed least =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt,
+        mem_remoteExportDiagnostics_braced_iff braced]
+      exact Or.inr (Or.inl ⟨mixed, _, least, rfl⟩)
+  | duplicateLocalExportName occurrence duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_localExportDiagnostics_iff]
+      exact Or.inr (Or.inr (Or.inl ⟨_, duplicate, rfl⟩))
+  | duplicateRemoteExportName occurrence braced duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt,
+        mem_remoteExportDiagnostics_braced_iff braced]
+      exact Or.inr (Or.inr (Or.inl ⟨_, duplicate, rfl⟩))
+  | duplicateExportModuleReference occurrence duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_localExportDiagnostics_iff]
+      exact Or.inr (Or.inr (Or.inr (Or.inl
+        ⟨_, duplicate, rfl⟩)))
+  | duplicateExportConstructor occurrence selectionPresent named duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_exportItemDiagnostics_iff]
+      exact ⟨_, _, _, selectionPresent, named, duplicate, rfl⟩
+  | matchPatternArityMismatch occurrence shape armMember mismatch =>
+      apply mem_diagnosticCandidates_of_mem_statementDiagnosticsFuel_one
+        occurrence
+      exact matchPatternArityMismatch_mem_statementDiagnosticsFuel_one
+        shape armMember mismatch
+  | emptyGenericPragmaTargets occurrence kind empty =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_pragmaDiagnostics_iff]
+      exact Or.inl ⟨kind, empty, rfl⟩
+  | duplicatePragmaTarget occurrence duplicate =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_pragmaDiagnostics_iff]
+      exact Or.inr ⟨_, duplicate, rfl⟩
+  | signatureModifierNotAllowed occurrence selected =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, List.mem_append]
+      apply Or.inl
+      rw [mem_disallowedSignatureModifierDiagnostics_iff]
+      cases selected with
+      | publicMarker selected =>
+          exact Or.inl ⟨_, selected, rfl⟩
+      | payableMarker selected =>
+          exact Or.inr ⟨_, selected, rfl⟩
+  | fallbackModifierNotAllowed occurrence selected =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_fallbackDiagnostics_iff]
+      exact Or.inl ⟨_, selected, rfl⟩
+  | constructorModifierNotAllowed occurrence selected =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_constructorDiagnostics_iff]
+      exact Or.inl ⟨_, selected, rfl⟩
+  | fallbackHasParameters occurrence nonempty =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_fallbackDiagnostics_iff]
+      exact Or.inr (Or.inl ⟨nonempty, rfl⟩)
+  | fallbackHasNonUnitReturn occurrence returnPresent notUnit =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_fallbackDiagnostics_iff]
+      exact Or.inr (Or.inr (Or.inl
+        ⟨_, returnPresent, notUnit, rfl⟩))
+  | signatureParameterTypeMissing occurrence parameterMember missing =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      simp only [nonrecursiveDiagnosticsAt]
+      rw [List.mem_append]
+      apply Or.inr
+      rw [mem_missingParameterTypeDiagnostics_iff]
+      exact ⟨_, parameterMember, missing, rfl⟩
+  | constructorParameterTypeMissing occurrence parameterMember missing =>
+      apply mem_diagnosticCandidates_of_nonrecursiveDiagnosticsAt occurrence
+      rw [nonrecursiveDiagnosticsAt, mem_constructorDiagnostics_iff]
+      exact Or.inr (Or.inl ⟨_, parameterMember, missing, rfl⟩)
+  | breakOutsideLoop occurrence shape =>
+      apply mem_diagnosticCandidates_of_mem_statementDiagnosticsFuel_one
+        occurrence
+      exact breakOutsideLoop_mem_statementDiagnosticsFuel_one shape
+  | continueOutsideLoop occurrence shape =>
+      apply mem_diagnosticCandidates_of_mem_statementDiagnosticsFuel_one
+        occurrence
+      exact continueOutsideLoop_mem_statementDiagnosticsFuel_one shape
+
+/-- Executable candidates are exactly the applicable structural diagnostics. -/
+@[simp] theorem mem_diagnosticCandidates_iff_applies
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ diagnosticCandidates module ↔
+      StructuralDiagnostic.Applies module diagnostic :=
+  ⟨mem_diagnosticCandidates_applies, applies_mem_diagnosticCandidates⟩
+
+/-- Canonical diagnostics are exactly the applicable structural diagnostics. -/
+@[simp] theorem mem_diagnostics_iff_applies
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ diagnostics module ↔
+      StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_diagnostics, mem_diagnosticCandidates_iff_applies]
+
 end Structure
 
 end Solcore.Surface.Multi
