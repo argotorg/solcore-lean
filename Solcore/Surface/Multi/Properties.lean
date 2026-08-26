@@ -8263,6 +8263,44 @@ private theorem lexesPrefix_tokenSpansOrdered
 
 namespace Lexes
 
+/-- A successful lexical partition exposes the exact recognition transition
+that retained every token and comment. -/
+theorem retainedTransitions
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {comments : List Comment}
+    (lexical : Lexes file tokens comments) :
+    (∀ token ∈ tokens,
+      (∃ pendingAssembly candidateClass,
+        LexicalJudgment.CandidateWinsAt file pendingAssembly
+          token.span.startByte (.token candidateClass token)) ∨
+      (∃ endByte,
+        LexicalJudgment.AssemblyTokenAt file token.span.startByte
+          endByte token)) ∧
+    (∀ comment ∈ comments,
+      ∃ pendingAssembly,
+        LexicalJudgment.CandidateWinsAt file pendingAssembly
+          comment.span.startByte (.comment comment)) := by
+  cases lexical with
+  | complete pendingAssembly partition =>
+      exact lexesPrefix_retainedTransitions partition
+
+/-- Every token retained by a successful lexical partition is owned by its
+input file. -/
+theorem tokensOwnedBy
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {comments : List Comment}
+    (lexical : Lexes file tokens comments) :
+    TokensOwnedBy file tokens := by
+  intro token member
+  rcases (retainedTransitions lexical).1 token member with normal | assembly
+  · rcases normal with ⟨pendingAssembly, candidateClass, winner⟩
+    simpa [LexicalJudgment.Candidate.span] using
+      candidateAt_span_valid winner.1
+  · rcases assembly with ⟨endByte, recognized⟩
+    exact assemblyTokenAt_span_valid recognized
+
 /-- A successful lexical partition retains tokens in nonoverlapping source
 order. -/
 theorem tokenSpansOrdered
