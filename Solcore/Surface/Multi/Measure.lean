@@ -71,54 +71,54 @@ inductive AstCarrier where
   | payload (sort : AstCarrierSort)
   deriving Repr, BEq, DecidableEq
 
-private def measureList {α : Type} (measure : α → Nat)
+def measureList {α : Type} (measure : α → Nat)
     (values : List α) : Nat :=
   (values.map measure).sum
 
-private def measureOption {α : Type} (measure : α → Nat) : Option α → Nat
+def measureOption {α : Type} (measure : α → Nat) : Option α → Nat
   | none => 0
   | some value => measure value
 
-private def measureNonemptyList {α : Type} (measure : α → Nat)
+def measureNonemptyList {α : Type} (measure : α → Nat)
     (values : NonemptyList α) : Nat :=
   measure values.head + measureList measure values.tail
 
-private def identifierMeasure (_ : IdentifierOccurrence) : Nat :=
+def identifierMeasure (_ : IdentifierOccurrence) : Nat :=
   2
 
-private def pathComponentMeasure (_ : PathComponent) : Nat :=
+def pathComponentMeasure (_ : PathComponent) : Nat :=
   2
 
-private def externalLibraryNameMeasure
+def externalLibraryNameMeasure
     (_ : Located ExternalLibraryName) : Nat :=
   2
 
-private def markerMeasure (_ : Marker) : Nat :=
+def markerMeasure (_ : Marker) : Nat :=
   2
 
-private def unitMarkerMeasure (_ : Located Unit) : Nat :=
+def unitMarkerMeasure (_ : Located Unit) : Nat :=
   2
 
-private def pragmaKindMeasure (_ : Located PragmaKind) : Nat :=
+def pragmaKindMeasure (_ : Located PragmaKind) : Nat :=
   2
 
-private def prefixOperatorMeasure (_ : Located PrefixOperator) : Nat :=
+def prefixOperatorMeasure (_ : Located PrefixOperator) : Nat :=
   2
 
-private def infixOperatorMeasure (_ : Located InfixOperator) : Nat :=
+def infixOperatorMeasure (_ : Located InfixOperator) : Nat :=
   2
 
-private def assignmentOperatorMeasure
+def assignmentOperatorMeasure
     (_ : Located AssignmentOperator) : Nat :=
   2
 
-private def assemblySliceMeasure (_ : AssemblySlice) : Nat :=
+def assemblySliceMeasure (_ : AssemblySlice) : Nat :=
   2
 
-private def qualifiedNameMeasure (name : QualifiedName) : Nat :=
+def qualifiedNameMeasure (name : QualifiedName) : Nat :=
   2 + measureNonemptyList identifierMeasure name.payload.components
 
-private def moduleReferenceMeasure (reference : ModuleReference) : Nat :=
+def moduleReferenceMeasure (reference : ModuleReference) : Nat :=
   2 +
     match reference.payload with
     | .relative components =>
@@ -133,7 +133,7 @@ private def moduleReferenceMeasure (reference : ModuleReference) : Nat :=
           externalLibraryNameMeasure library +
           measureNonemptyList pathComponentMeasure tail
 
-private def importSelectorEntryMeasure
+def importSelectorEntryMeasure
     (entry : ImportSelectorEntry) : Nat :=
   2 +
     match entry.payload with
@@ -141,13 +141,13 @@ private def importSelectorEntryMeasure
     | .named source alias =>
         identifierMeasure source + measureOption identifierMeasure alias
 
-private def importSelectionMeasure (selection : ImportSelection) : Nat :=
+def importSelectionMeasure (selection : ImportSelection) : Nat :=
   2 + measureList importSelectorEntryMeasure selection.payload.entries
 
-private def hidingClauseMeasure (clause : HidingClause) : Nat :=
+def hidingClauseMeasure (clause : HidingClause) : Nat :=
   2 + measureList identifierMeasure clause.payload.names
 
-private def importModeMeasure (mode : ImportMode) : Nat :=
+def importModeMeasure (mode : ImportMode) : Nat :=
   1 +
     match mode with
     | .module alias => measureOption identifierMeasure alias
@@ -155,12 +155,12 @@ private def importModeMeasure (mode : ImportMode) : Nat :=
         importSelectionMeasure selection +
           measureOption hidingClauseMeasure hidingClause
 
-private def importDeclMeasure (declaration : ImportDecl) : Nat :=
+def importDeclMeasure (declaration : ImportDecl) : Nat :=
   2 +
     moduleReferenceMeasure declaration.payload.moduleRef +
     importModeMeasure declaration.payload.mode
 
-private def constructorSelectionMeasure
+def constructorSelectionMeasure
     (selection : ConstructorSelection) : Nat :=
   2 +
     match selection.payload with
@@ -168,12 +168,12 @@ private def constructorSelectionMeasure
     | .named constructors =>
         measureNonemptyList identifierMeasure constructors
 
-private def exportItemMeasure (item : ExportItem) : Nat :=
+def exportItemMeasure (item : ExportItem) : Nat :=
   2 +
     identifierMeasure item.payload.name +
     measureOption constructorSelectionMeasure item.payload.constructors
 
-private def exportEntryMeasure (entry : ExportEntry) : Nat :=
+def exportEntryMeasure (entry : ExportEntry) : Nat :=
   2 +
     match entry.payload with
     | .wildcard marker => markerMeasure marker
@@ -181,23 +181,23 @@ private def exportEntryMeasure (entry : ExportEntry) : Nat :=
     | .allFrom moduleRef marker =>
         moduleReferenceMeasure moduleRef + markerMeasure marker
 
-private def localExportListMeasure (selection : LocalExportList) : Nat :=
+def localExportListMeasure (selection : LocalExportList) : Nat :=
   2 + measureList exportEntryMeasure selection.payload.entries
 
-private def remoteExportEntryMeasure (entry : RemoteExportEntry) : Nat :=
+def remoteExportEntryMeasure (entry : RemoteExportEntry) : Nat :=
   2 +
     match entry.payload with
     | .wildcard marker => markerMeasure marker
     | .item item => exportItemMeasure item
 
-private def remoteExportSelectionMeasure
+def remoteExportSelectionMeasure
     (selection : RemoteExportSelection) : Nat :=
   2 +
     match selection.payload with
     | .dotWildcard marker => markerMeasure marker
     | .braced entries => measureList remoteExportEntryMeasure entries
 
-private def exportModeMeasure (declaration : ExportDecl) : Nat :=
+def exportModeMeasure (declaration : ExportDecl) : Nat :=
   2 +
     match declaration.payload with
     | .local selection => localExportListMeasure selection
@@ -208,7 +208,7 @@ private def exportModeMeasure (declaration : ExportDecl) : Nat :=
         moduleReferenceMeasure moduleRef +
           remoteExportSelectionMeasure selection
 
-private def literalMeasure (literal : Literal) : Nat :=
+def literalMeasure (literal : Literal) : Nat :=
   1 +
     match literal.payload with
     | .decimal _ _ => 1
@@ -217,7 +217,7 @@ private def literalMeasure (literal : Literal) : Nat :=
 
 mutual
 
-private def typeExprPayloadMeasure : TypeExprPayload → Nat
+def typeExprPayloadMeasure : TypeExprPayload → Nat
   | .named name arguments =>
       1 + qualifiedNameMeasure name + typeExprArgumentsMeasure arguments
   | .proxy marker inner =>
@@ -231,27 +231,27 @@ private def typeExprPayloadMeasure : TypeExprPayload → Nat
   | .comptime marker inner =>
       1 + markerMeasure marker + typeExprMeasure inner
 
-private def typeExprMeasure : TypeExpr → Nat
+def typeExprMeasure : TypeExpr → Nat
   | ⟨_, payload⟩ =>
       1 + typeExprPayloadMeasure payload
 
-private def typeExprArgumentsMeasure :
+def typeExprArgumentsMeasure :
     Option (NonemptyList TypeExpr) → Nat
   | none => 0
   | some arguments => typeExprNonemptyMeasure arguments
 
-private def typeExprNonemptyMeasure : NonemptyList TypeExpr → Nat
+def typeExprNonemptyMeasure : NonemptyList TypeExpr → Nat
   | ⟨head, tail⟩ =>
       typeExprMeasure head + typeExprListMeasure tail
 
-private def typeExprListMeasure : List TypeExpr → Nat
+def typeExprListMeasure : List TypeExpr → Nat
   | [] => 0
   | head :: tail =>
       typeExprMeasure head + typeExprListMeasure tail
 
 end
 
-private def forallBinderMeasure (binder : ForallBinder) : Nat :=
+def forallBinderMeasure (binder : ForallBinder) : Nat :=
   2 +
     match binder.payload with
     | .bare name => identifierMeasure name
@@ -262,10 +262,10 @@ private def forallBinderMeasure (binder : ForallBinder) : Nat :=
             (measureNonemptyList typeExprMeasure)
             arguments
 
-private def forallClauseMeasure (clause : ForallClause) : Nat :=
+def forallClauseMeasure (clause : ForallClause) : Nat :=
   2 + measureNonemptyList forallBinderMeasure clause.payload.binders
 
-private def predicateMeasure (predicate : Predicate) : Nat :=
+def predicateMeasure (predicate : Predicate) : Nat :=
   2 +
     typeExprMeasure predicate.payload.main +
     qualifiedNameMeasure predicate.payload.className +
@@ -273,20 +273,20 @@ private def predicateMeasure (predicate : Predicate) : Nat :=
       (measureNonemptyList typeExprMeasure)
       predicate.payload.parameters
 
-private def genericPrefixMeasure (genericPrefix : GenericPrefix) : Nat :=
+def genericPrefixMeasure (genericPrefix : GenericPrefix) : Nat :=
   2 +
     forallClauseMeasure genericPrefix.payload.forallClause +
     measureOption
       (measureNonemptyList predicateMeasure)
       genericPrefix.payload.context
 
-private def parameterMeasure (parameter : Parameter) : Nat :=
+def parameterMeasure (parameter : Parameter) : Nat :=
   2 +
     measureOption markerMeasure parameter.payload.comptime +
     identifierMeasure parameter.payload.name +
     measureOption typeExprMeasure parameter.payload.type
 
-private def functionSignatureMeasure
+def functionSignatureMeasure
     (signature : FunctionSignature) : Nat :=
   2 +
     measureOption genericPrefixMeasure signature.payload.genericPrefix +
@@ -298,7 +298,7 @@ private def functionSignatureMeasure
 
 mutual
 
-private def expressionPayloadMeasure : ExpressionPayload → Nat
+def expressionPayloadMeasure : ExpressionPayload → Nat
   | .name name =>
       1 + identifierMeasure name
   | .call callee arguments =>
@@ -345,7 +345,7 @@ private def expressionPayloadMeasure : ExpressionPayload → Nat
   | .group inner =>
       1 + expressionMeasure inner
 
-private def patternPayloadMeasure : PatternPayload → Nat
+def patternPayloadMeasure : PatternPayload → Nat
   | .named name arguments =>
       1 + qualifiedNameMeasure name + patternArgumentsMeasure arguments
   | .dotConstructor marker name arguments =>
@@ -364,11 +364,11 @@ private def patternPayloadMeasure : PatternPayload → Nat
   | .group inner =>
       1 + patternMeasure inner
 
-private def bodyPayloadMeasure : BodyPayload → Nat
+def bodyPayloadMeasure : BodyPayload → Nat
   | ⟨_, statements⟩ =>
       1 + statementListMeasure statements
 
-private def letBindingPayloadMeasure : LetBindingPayload → Nat
+def letBindingPayloadMeasure : LetBindingPayload → Nat
   | ⟨comptime, name, typeExpression, initializer⟩ =>
       1 +
         measureOption markerMeasure comptime +
@@ -376,7 +376,7 @@ private def letBindingPayloadMeasure : LetBindingPayload → Nat
         measureOption typeExprMeasure typeExpression +
         expressionOptionMeasure initializer
 
-private def forInitItemPayloadMeasure : ForInitItemPayload → Nat
+def forInitItemPayloadMeasure : ForInitItemPayload → Nat
   | .letBinding binding =>
       1 + letBindingMeasure binding
   | .assignment operator left right =>
@@ -387,7 +387,7 @@ private def forInitItemPayloadMeasure : ForInitItemPayload → Nat
   | .expression expression =>
       1 + expressionMeasure expression
 
-private def forPostItemPayloadMeasure : ForPostItemPayload → Nat
+def forPostItemPayloadMeasure : ForPostItemPayload → Nat
   | .assignment operator left right =>
       1 +
         assignmentOperatorMeasure operator +
@@ -396,11 +396,11 @@ private def forPostItemPayloadMeasure : ForPostItemPayload → Nat
   | .expression expression =>
       1 + expressionMeasure expression
 
-private def matchArmPayloadMeasure : MatchArmPayload → Nat
+def matchArmPayloadMeasure : MatchArmPayload → Nat
   | ⟨patterns, body⟩ =>
       1 + patternNonemptyMeasure patterns + bodyMeasure body
 
-private def statementPayloadMeasure : StatementPayload → Nat
+def statementPayloadMeasure : StatementPayload → Nat
   | .assignment operator left right =>
       1 +
         assignmentOperatorMeasure operator +
@@ -436,109 +436,109 @@ private def statementPayloadMeasure : StatementPayload → Nat
   | .continue _ =>
       1
 
-private def expressionMeasure : Expression → Nat
+def expressionMeasure : Expression → Nat
   | ⟨_, payload⟩ =>
       1 + expressionPayloadMeasure payload
 
-private def expressionListMeasure : List Expression → Nat
+def expressionListMeasure : List Expression → Nat
   | [] => 0
   | head :: tail =>
       expressionMeasure head + expressionListMeasure tail
 
-private def expressionListOptionMeasure : Option (List Expression) → Nat
+def expressionListOptionMeasure : Option (List Expression) → Nat
   | none => 0
   | some expressions => expressionListMeasure expressions
 
-private def bodyMeasure : Body → Nat
+def bodyMeasure : Body → Nat
   | ⟨_, payload⟩ =>
       1 + bodyPayloadMeasure payload
 
-private def patternArgumentsMeasure :
+def patternArgumentsMeasure :
     Option (NonemptyList Pattern) → Nat
   | none => 0
   | some patterns => patternNonemptyMeasure patterns
 
-private def patternListMeasure : List Pattern → Nat
+def patternListMeasure : List Pattern → Nat
   | [] => 0
   | head :: tail =>
       patternMeasure head + patternListMeasure tail
 
-private def patternMeasure : Pattern → Nat
+def patternMeasure : Pattern → Nat
   | ⟨_, payload⟩ =>
       1 + patternPayloadMeasure payload
 
-private def statementListMeasure : List Statement → Nat
+def statementListMeasure : List Statement → Nat
   | [] => 0
   | head :: tail =>
       statementMeasure head + statementListMeasure tail
 
-private def expressionOptionMeasure : Option Expression → Nat
+def expressionOptionMeasure : Option Expression → Nat
   | none => 0
   | some expression => expressionMeasure expression
 
-private def letBindingMeasure : LetBinding → Nat
+def letBindingMeasure : LetBinding → Nat
   | ⟨_, payload⟩ =>
       1 + letBindingPayloadMeasure payload
 
-private def patternNonemptyMeasure : NonemptyList Pattern → Nat
+def patternNonemptyMeasure : NonemptyList Pattern → Nat
   | ⟨head, tail⟩ =>
       patternMeasure head + patternListMeasure tail
 
-private def expressionNonemptyMeasure : NonemptyList Expression → Nat
+def expressionNonemptyMeasure : NonemptyList Expression → Nat
   | ⟨head, tail⟩ =>
       expressionMeasure head + expressionListMeasure tail
 
-private def matchArmNonemptyMeasure : NonemptyList MatchArm → Nat
+def matchArmNonemptyMeasure : NonemptyList MatchArm → Nat
   | ⟨head, tail⟩ =>
       matchArmMeasure head + matchArmListMeasure tail
 
-private def bodyOptionMeasure : Option Body → Nat
+def bodyOptionMeasure : Option Body → Nat
   | none => 0
   | some body => bodyMeasure body
 
-private def forInitItemListMeasure : List ForInitItem → Nat
+def forInitItemListMeasure : List ForInitItem → Nat
   | [] => 0
   | head :: tail =>
       forInitItemMeasure head + forInitItemListMeasure tail
 
-private def forPostItemListMeasure : List ForPostItem → Nat
+def forPostItemListMeasure : List ForPostItem → Nat
   | [] => 0
   | head :: tail =>
       forPostItemMeasure head + forPostItemListMeasure tail
 
-private def statementMeasure : Statement → Nat
+def statementMeasure : Statement → Nat
   | ⟨_, payload⟩ =>
       1 + statementPayloadMeasure payload
 
-private def matchArmMeasure : MatchArm → Nat
+def matchArmMeasure : MatchArm → Nat
   | ⟨_, payload⟩ =>
       1 + matchArmPayloadMeasure payload
 
-private def matchArmListMeasure : List MatchArm → Nat
+def matchArmListMeasure : List MatchArm → Nat
   | [] => 0
   | head :: tail =>
       matchArmMeasure head + matchArmListMeasure tail
 
-private def forInitItemMeasure : ForInitItem → Nat
+def forInitItemMeasure : ForInitItem → Nat
   | ⟨_, payload⟩ =>
       1 + forInitItemPayloadMeasure payload
 
-private def forPostItemMeasure : ForPostItem → Nat
+def forPostItemMeasure : ForPostItem → Nat
   | ⟨_, payload⟩ =>
       1 + forPostItemPayloadMeasure payload
 
 end
 
-private def classMethodDeclMeasure
+def classMethodDeclMeasure
     (declaration : ClassMethodDecl) : Nat :=
   2 + functionSignatureMeasure declaration.payload.signature
 
-private def functionDeclMeasure (declaration : FunctionDecl) : Nat :=
+def functionDeclMeasure (declaration : FunctionDecl) : Nat :=
   2 +
     functionSignatureMeasure declaration.payload.signature +
     bodyMeasure declaration.payload.body
 
-private def fallbackDeclMeasure (declaration : FallbackDecl) : Nat :=
+def fallbackDeclMeasure (declaration : FallbackDecl) : Nat :=
   2 +
     measureOption genericPrefixMeasure declaration.payload.genericPrefix +
     measureOption markerMeasure declaration.payload.public +
@@ -548,7 +548,7 @@ private def fallbackDeclMeasure (declaration : FallbackDecl) : Nat :=
     measureOption typeExprMeasure declaration.payload.returnType +
     bodyMeasure declaration.payload.body
 
-private def contractConstructorDeclMeasure
+def contractConstructorDeclMeasure
     (declaration : ContractConstructorDecl) : Nat :=
   2 +
     measureOption markerMeasure declaration.payload.public +
@@ -557,7 +557,7 @@ private def contractConstructorDeclMeasure
     measureList parameterMeasure declaration.payload.parameters +
     bodyMeasure declaration.payload.body
 
-private def dataConstructorMeasure
+def dataConstructorMeasure
     (dataConstructor : DataConstructor) : Nat :=
   2 +
     identifierMeasure dataConstructor.payload.name +
@@ -565,7 +565,7 @@ private def dataConstructorMeasure
       (measureNonemptyList typeExprMeasure)
       dataConstructor.payload.fields
 
-private def dataDeclMeasure (declaration : DataDecl) : Nat :=
+def dataDeclMeasure (declaration : DataDecl) : Nat :=
   2 +
     identifierMeasure declaration.payload.name +
     measureOption
@@ -575,7 +575,7 @@ private def dataDeclMeasure (declaration : DataDecl) : Nat :=
       (measureNonemptyList dataConstructorMeasure)
       declaration.payload.constructors
 
-private def typeAliasDeclMeasure (declaration : TypeAliasDecl) : Nat :=
+def typeAliasDeclMeasure (declaration : TypeAliasDecl) : Nat :=
   2 +
     identifierMeasure declaration.payload.name +
     measureOption
@@ -583,7 +583,7 @@ private def typeAliasDeclMeasure (declaration : TypeAliasDecl) : Nat :=
       declaration.payload.parameters +
     typeExprMeasure declaration.payload.body
 
-private def classDeclMeasure (declaration : ClassDecl) : Nat :=
+def classDeclMeasure (declaration : ClassDecl) : Nat :=
   2 +
     measureOption genericPrefixMeasure declaration.payload.genericPrefix +
     typeExprMeasure declaration.payload.main +
@@ -593,7 +593,7 @@ private def classDeclMeasure (declaration : ClassDecl) : Nat :=
       declaration.payload.parameters +
     measureList classMethodDeclMeasure declaration.payload.methods
 
-private def instanceDeclMeasure (declaration : InstanceDecl) : Nat :=
+def instanceDeclMeasure (declaration : InstanceDecl) : Nat :=
   2 +
     measureOption genericPrefixMeasure declaration.payload.genericPrefix +
     measureOption markerMeasure declaration.payload.default +
@@ -604,18 +604,18 @@ private def instanceDeclMeasure (declaration : InstanceDecl) : Nat :=
       declaration.payload.parameters +
     measureList functionDeclMeasure declaration.payload.methods
 
-private def pragmaDeclMeasure (declaration : PragmaDecl) : Nat :=
+def pragmaDeclMeasure (declaration : PragmaDecl) : Nat :=
   2 +
     pragmaKindMeasure declaration.payload.kind +
     measureList identifierMeasure declaration.payload.targets
 
-private def fieldDeclMeasure (declaration : FieldDecl) : Nat :=
+def fieldDeclMeasure (declaration : FieldDecl) : Nat :=
   2 +
     identifierMeasure declaration.payload.name +
     typeExprMeasure declaration.payload.type +
     measureOption expressionMeasure declaration.payload.initializer
 
-private def contractMemberMeasure (member : ContractMember) : Nat :=
+def contractMemberMeasure (member : ContractMember) : Nat :=
   2 +
     match member.payload with
     | .dataDecl declaration => dataDeclMeasure declaration
@@ -626,7 +626,7 @@ private def contractMemberMeasure (member : ContractMember) : Nat :=
     | .constructor declaration =>
         contractConstructorDeclMeasure declaration
 
-private def contractDeclMeasure (declaration : ContractDecl) : Nat :=
+def contractDeclMeasure (declaration : ContractDecl) : Nat :=
   2 +
     identifierMeasure declaration.payload.name +
     measureOption
@@ -634,7 +634,7 @@ private def contractDeclMeasure (declaration : ContractDecl) : Nat :=
       declaration.payload.parameters +
     measureList contractMemberMeasure declaration.payload.members
 
-private def topItemMeasure (item : TopItem) : Nat :=
+def topItemMeasure (item : TopItem) : Nat :=
   2 +
     match item.payload with
     | .importDecl declaration => importDeclMeasure declaration
@@ -650,6 +650,97 @@ private def topItemMeasure (item : TopItem) : Nat :=
 /-- Count every concrete located wrapper and payload carrier in a parsed module. -/
 def astNodeMeasure (parsedModule : ParsedModuleV1) : Nat :=
   2 + measureList topItemMeasure parsedModule.payload.items
+
+/- Proof-facing short names for the reducible component measures whose
+composition defines `astNodeMeasure`.  The namespace keeps independent
+concrete-carrier proofs readable while preserving the original equations. -/
+namespace AstCarrierMeasure
+
+abbrev list {alpha : Type} := @measureList alpha
+abbrev option {alpha : Type} := @measureOption alpha
+abbrev nonemptyList {alpha : Type} := @measureNonemptyList alpha
+
+abbrev identifier := identifierMeasure
+abbrev pathComponent := pathComponentMeasure
+abbrev externalLibraryName := externalLibraryNameMeasure
+abbrev marker := markerMeasure
+abbrev unitMarker := unitMarkerMeasure
+abbrev pragmaKind := pragmaKindMeasure
+abbrev prefixOperator := prefixOperatorMeasure
+abbrev infixOperator := infixOperatorMeasure
+abbrev assignmentOperator := assignmentOperatorMeasure
+abbrev assemblySlice := assemblySliceMeasure
+abbrev qualifiedName := qualifiedNameMeasure
+abbrev moduleReference := moduleReferenceMeasure
+abbrev importSelectorEntry := importSelectorEntryMeasure
+abbrev importSelection := importSelectionMeasure
+abbrev hidingClause := hidingClauseMeasure
+abbrev importMode := importModeMeasure
+abbrev importDecl := importDeclMeasure
+abbrev constructorSelection := constructorSelectionMeasure
+abbrev exportItem := exportItemMeasure
+abbrev exportEntry := exportEntryMeasure
+abbrev localExportList := localExportListMeasure
+abbrev remoteExportEntry := remoteExportEntryMeasure
+abbrev remoteExportSelection := remoteExportSelectionMeasure
+abbrev exportMode := exportModeMeasure
+abbrev literal := literalMeasure
+abbrev typeExprPayload := typeExprPayloadMeasure
+abbrev typeExpr := typeExprMeasure
+abbrev typeExprArguments := typeExprArgumentsMeasure
+abbrev typeExprNonempty := typeExprNonemptyMeasure
+abbrev typeExprList := typeExprListMeasure
+abbrev forallBinder := forallBinderMeasure
+abbrev forallClause := forallClauseMeasure
+abbrev predicate := predicateMeasure
+abbrev genericPrefix := genericPrefixMeasure
+abbrev parameter := parameterMeasure
+abbrev functionSignature := functionSignatureMeasure
+abbrev expressionPayload := expressionPayloadMeasure
+abbrev patternPayload := patternPayloadMeasure
+abbrev bodyPayload := bodyPayloadMeasure
+abbrev letBindingPayload := letBindingPayloadMeasure
+abbrev forInitItemPayload := forInitItemPayloadMeasure
+abbrev forPostItemPayload := forPostItemPayloadMeasure
+abbrev matchArmPayload := matchArmPayloadMeasure
+abbrev statementPayload := statementPayloadMeasure
+abbrev expression := expressionMeasure
+abbrev expressionList := expressionListMeasure
+abbrev expressionListOption := expressionListOptionMeasure
+abbrev body := bodyMeasure
+abbrev patternArguments := patternArgumentsMeasure
+abbrev patternList := patternListMeasure
+abbrev pattern := patternMeasure
+abbrev statementList := statementListMeasure
+abbrev expressionOption := expressionOptionMeasure
+abbrev letBinding := letBindingMeasure
+abbrev patternNonempty := patternNonemptyMeasure
+abbrev expressionNonempty := expressionNonemptyMeasure
+abbrev matchArmNonempty := matchArmNonemptyMeasure
+abbrev bodyOption := bodyOptionMeasure
+abbrev forInitItemList := forInitItemListMeasure
+abbrev forPostItemList := forPostItemListMeasure
+abbrev statement := statementMeasure
+abbrev matchArm := matchArmMeasure
+abbrev matchArmList := matchArmListMeasure
+abbrev forInitItem := forInitItemMeasure
+abbrev forPostItem := forPostItemMeasure
+abbrev classMethodDecl := classMethodDeclMeasure
+abbrev functionDecl := functionDeclMeasure
+abbrev fallbackDecl := fallbackDeclMeasure
+abbrev contractConstructorDecl := contractConstructorDeclMeasure
+abbrev dataConstructor := dataConstructorMeasure
+abbrev dataDecl := dataDeclMeasure
+abbrev typeAliasDecl := typeAliasDeclMeasure
+abbrev classDecl := classDeclMeasure
+abbrev instanceDecl := instanceDeclMeasure
+abbrev pragmaDecl := pragmaDeclMeasure
+abbrev fieldDecl := fieldDeclMeasure
+abbrev contractMember := contractMemberMeasure
+abbrev contractDecl := contractDeclMeasure
+abbrev topItem := topItemMeasure
+
+end AstCarrierMeasure
 
 namespace StructureFuelDepth
 
