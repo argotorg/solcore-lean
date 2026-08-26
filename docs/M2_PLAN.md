@@ -233,13 +233,13 @@ sufficiency theorems are not yet implemented.
 
 The remaining parser-kernel work is:
 
-1. close the four remaining reachability-sensitive exact-token rule proofs;
+1. close the three remaining reachability-sensitive exact-token rule proofs;
 2. connect the existing proof-carrying `CertifiedParsedModule` phase core to
    the unconditional root theorem and expose `parseModule`;
 3. add executable frontend phase-precedence fixtures for lexical, parse,
    structural, and successful outcomes;
-4. implement numeric structural-unit accounting, prove
-   `structureBound_sufficient`, and prove the AST-carrier measure equality;
+4. implement numeric structural-unit accounting and prove
+   `structureBound_sufficient`; the AST-carrier measure equality is complete;
 5. implement the separate fast `Parser`, prove exact result equality with
    `Chart.G`, and establish its stated parser work bound;
 6. construct and kernel-check parser plus structural certificates for the six

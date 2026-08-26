@@ -495,8 +495,9 @@ Before a complete M2c frontend can be claimed, at least the following remain:
 
 - implement the separate fast parser and prove exact result equality with the
   chart reference, including its stated parser work bound;
-- implement the numeric structural-unit accounting, prove the quadratic
-  `structureBound`, and relate `astNodeMeasure` to the full AST carrier;
+- implement the numeric structural-unit accounting and prove the quadratic
+  `structureBound` sufficient; `astNodeMeasure` is already related to a
+  concrete enumeration of the full AST carrier;
 - prove exact token correspondence for successful parses, including retained
   leaves, grouping, literal spelling, and the absence of parser normalization;
 - connect the already certified structural phase to `CertifiedParsedModule`

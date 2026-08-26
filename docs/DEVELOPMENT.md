@@ -235,13 +235,13 @@ declarative applicability, and executable success is exactly
 
 Traversal fuel is distinct from ADR-0015's numeric structural-resource
 contract. The quadratic `structureBound` function now exists; the
-structural-unit counter, its sufficiency theorem, and the AST-carrier
-cardinality equality are still pending.
+AST-node measure is proved equal to a concrete carrier enumeration. The
+structural-unit counter and its sufficiency theorem are still pending.
 
 `validateStructure` is a certified standalone structural phase. The
 proof-carrying `CertifiedParsedModule` and parameterized frontend phase core
 now exist, but do not yet describe the raw file frontend as unconditionally
-certified: four reachability-sensitive exact-token rules and the final
+certified: three reachability-sensitive exact-token rules and the final
 proof-argument-free wrapper remain. Location certification itself is complete.
 The inventory and its executable checks cover the whole AST, and
 `Parses.everyLocationValid` combines token ordering, parser-span containment,

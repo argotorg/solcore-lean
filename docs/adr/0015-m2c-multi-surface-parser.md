@@ -19,11 +19,15 @@
   two-way diagnostic correspondence, sufficient traversal fuel, canonical
   reports, and executable acceptance equivalence. Strict UTF-8 and
   canonical-byte facts are present. Parser-wide source-location validity and
-  nesting are proved by `Parses.everyLocationValid`.
-- **Not yet implemented:** The separate fast `Parser`, exact token
-  correspondence, formal structural-resource accounting,
-  `CertifiedParsedModule`, the six complete canonical-standard parse
-  certificates, and the public `Solcore.Surface.Multi` umbrella are absent.
+  nesting are proved by `Parses.everyLocationValid`. `CertifiedParsedModule`,
+  its phase-composition core, executable resource-bound functions, and the
+  concrete AST-carrier cardinality theorem are also present. Exact-token
+  dispatch is exhaustive; module-reference and let-binding callbacks are
+  closed, leaving match-arm, postfix-expression, and statement-body callbacks.
+- **Not yet implemented:** The separate fast `Parser`, final exact-token root
+  closure and proof-argument-free frontend wrapper, executor-unit sufficiency,
+  the six complete canonical-standard parse certificates, and the public
+  `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed
   implementation or publication boundary.
 - **Suggested reading:** Read “Acceptance scope and frozen published
@@ -5288,7 +5292,7 @@ conforming to this Accepted ADR. The repository now uses the closed
 `ParserJudgment.lean`, `Chart.lean`, and the total chart-based parser have been
 implemented. Parser-wide location certification is also complete through
 `Parses.everyLocationValid`. This milestone does not complete the still-missing
-fast parser, exact token correspondence and the proof-carrying facade,
+fast parser, final exact-token root closure and proof-argument-free facade,
 canonical-standard parse certificates, or umbrella.
 
 Implementation proceeds in this order:

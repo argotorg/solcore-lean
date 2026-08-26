@@ -24,10 +24,11 @@ The repository implements workspace validation, per-file lexing and parsing,
 and structural validation as separate internal M2c kernels. The parser proves
 that every successful result has source-valid, properly nested AST locations,
 and the structural validator is proof-connected to an independent judgment.
-The proof-carrying facade that joins these results is not yet present because
-exact token correspondence and phase integration remain. Resolution, source
-checking, and elaboration are future stages. The public Oracle v4 follows the
-older M2b single-source parser path and stops after parsing.
+The proof-carrying frontend result and its phase-composition core are present.
+The unconditional file wrapper still waits on the last three exact-token rule
+proofs. Resolution, source checking, and elaboration are future stages. The
+public Oracle v4 follows the older M2b single-source parser path and stops after
+parsing.
 
 ## Main components
 
