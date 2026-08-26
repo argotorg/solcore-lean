@@ -353,24 +353,6 @@ def GrammarSymbolValues.locationFragment
 
 namespace LocationFragment
 
-/-- Location fragments are equal when all three observable lists agree. -/
-theorem eq_of_fields
-    {left right : LocationFragment}
-    (roots : left.roots = right.roots)
-    (spans : left.inventory.spans = right.inventory.spans)
-    (containments : left.inventory.containments =
-      right.inventory.containments) :
-    left = right := by
-  cases left with
-  | mk leftRoots leftInventory =>
-      cases right with
-      | mk rightRoots rightInventory =>
-          cases leftInventory
-          cases rightInventory
-          simp only at roots spans containments
-          subst_vars
-          rfl
-
 @[simp] theorem merge_empty_left (fragment : LocationFragment) :
     merge [empty, fragment] = fragment := by
   apply eq_of_fields <;> simp
