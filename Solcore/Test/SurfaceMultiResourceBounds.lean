@@ -5,7 +5,7 @@ import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 import Solcore.Surface.Multi.StructureLeastSpanComparisonUnits
 import Solcore.Surface.Multi.StructureResourceAccounting
 import Solcore.Surface.Multi.StructureResourceBound
-import Solcore.Surface.Multi.ParserResourceAccounting
+import Solcore.Surface.Multi.ParserSchedule
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -128,6 +128,57 @@ def testMultiResourceBounds : IO Unit := do
     "the parser schedule capacity diverged from the fixed parser bound"
   assertTrue (parserCapacity.fixedUnits == 1)
     "the parser schedule must retain its one fixed startup unit"
+  let noTokens : List Solcore.Surface.Multi.Token := []
+  let firstKind : FastMemoKindIndex := ⟨0, by decide⟩
+  let firstBoundaryAddress : FastBoundarySlotAddress noTokens := {
+    kind := firstKind
+    boundary := Boundary.start noTokens
+    slot := ⟨0, by decide⟩
+  }
+  let firstMemoAddress : FastMemoSlotAddress noTokens := {
+    kind := firstKind
+    start := Boundary.start noTokens
+    finish := Boundary.start noTokens
+    slot := ⟨0, by decide⟩
+  }
+  let fixedAddress : FastParserUnitAddress noTokens := .fixed .startup
+  let boundaryAddress : FastParserUnitAddress noTokens :=
+    .boundarySlot firstBoundaryAddress
+  let memoAddress : FastParserUnitAddress noTokens :=
+    .memoSlot firstMemoAddress
+  assertTrue
+    (FastMemoKindIndex.kind firstKind == .rule .module)
+    "the first fast memo-kind index must select the module rule"
+  assertTrue (firstBoundaryAddress.rank.val == 0)
+    "the first boundary-local schedule address must have rank zero"
+  assertTrue (firstMemoAddress.rank.val == 0)
+    "the first span-local schedule address must have rank zero"
+  assertTrue (fixedAddress.rank.val == 0)
+    "the fixed startup address must begin the total address space"
+  assertTrue (boundaryAddress.rank.val == 1)
+    "the first boundary-local address must follow the startup address"
+  assertTrue
+    (fastParserUnitAddressCapacity noTokens == parseBound 1)
+    "the empty-token address universe must equal the one-terminal bound"
+  let chargedCounter :=
+    (((FastParserCounter.zero noTokens).charge fixedAddress).charge
+      boundaryAddress).charge memoAddress
+  assertTrue (chargedCounter.ledger == {
+      fixedUnits := 1
+      boundarySlotUnits := 1
+      memoSlotUnits := 1
+    })
+    "typed schedule charges must update their three ledger components"
+  assertTrue (chargedCounter.actualUnits == 3)
+    "three typed schedule charges must record exactly three units"
+  let addressCapacity := fastParserScheduleAddressCapacity noTokens
+  assertTrue
+    (decide (chargedCounter.ledger.fixedUnits ≤ addressCapacity.fixedUnits) &&
+      decide (chargedCounter.ledger.boundarySlotUnits ≤
+        addressCapacity.boundarySlotUnits) &&
+      decide (chargedCounter.ledger.memoSlotUnits ≤
+        addressCapacity.memoSlotUnits))
+    "the three-address regression counter must fit the empty-token schedule"
 
   let emptySelection : ImportSelection :=
     locatedAt source 12 14 { entries := [] }
