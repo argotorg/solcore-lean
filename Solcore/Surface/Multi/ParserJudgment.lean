@@ -18015,6 +18015,48 @@ inductive Parses : WorkspaceFile → List Token → ParsedModuleV1 → Prop wher
       (sourceBacked : SourceBackedRoot file tokens module) :
       Parses file tokens module
 
+/-- A successful parse has one coherent module reduction from the first chart
+boundary through the boundary after logical end of file. -/
+theorem parser_consumes_all
+    {file : WorkspaceFile} {tokens : List Token}
+    {module : ParsedModuleV1}
+    (parsed : Parses file tokens module) :
+    ∃ memo : GuardMemo tokens,
+      ∃ correct : PhaseBCorrect file tokens memo,
+        ∃ final : AllGuardsFinal memo,
+          CanonicalCompleteRootReduction
+            file tokens memo correct final .module
+            (Boundary.start tokens)
+            (Boundary.afterLogicalEOF tokens)
+            .plain module := by
+  cases parsed with
+  | sourceBackedRoot _ sourceBacked =>
+      exact sourceBacked
+
+/-- A successfully parsed module is owned by the input file, covers that whole
+file, and records the same source in its payload. -/
+theorem module_source_exact
+    {file : WorkspaceFile} {tokens : List Token}
+    {module : ParsedModuleV1}
+    (parsed : Parses file tokens module) :
+    module = {
+      span := SourceSpan.fullFile file
+      payload := {
+        source := file.id
+        items := module.payload.items
+      }
+    } := by
+  rcases parser_consumes_all parsed with
+    ⟨memo, correct, final, _reached, _complete, coherent⟩
+  cases coherent with
+  | reduce item priorValues output reached complete coherentPrefix action =>
+      cases action with
+      | root rule origin finish input output reduces =>
+          rcases ruleReduction_source_backed reduces with
+            ⟨items, _origin, _finish, outputEq⟩
+          rw [outputEq]
+          rfl
+
 private theorem finalMemo_eq
     {file : WorkspaceFile} {tokens : List Token}
     {leftMemo rightMemo : GuardMemo tokens}
