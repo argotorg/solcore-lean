@@ -3,6 +3,7 @@ import Solcore.Surface.Multi.StructureCanonicalDedupComparisonUnits
 import Solcore.Surface.Multi.StructureCanonicalOrderingComparisonUnits
 import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 import Solcore.Surface.Multi.StructureLeastSpanComparisonUnits
+import Solcore.Surface.Multi.StructureResourceAccounting
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -71,6 +72,17 @@ def testMultiResourceBounds : IO Unit := do
     (structureNodeVisitUnits emptyModule ≤
       structureBound (astNodeMeasure emptyModule))
     "the empty-module node visits exceeded the structural bound"
+  assertTrue (structureResourceLedger emptyModule == {
+      nodeVisits := 2
+      diagnosticInsertions := 0
+      duplicateComparisons := 0
+      canonicalDedupComparisons := 0
+      canonicalOrderingComparisons := 0
+      leastSpanComparisons := 0
+    })
+    "the empty-module structural resource ledger changed"
+  assertTrue (structureActualUnits emptyModule == 2)
+    "the empty-module structural resource total changed"
 
   let pathComponent : PathComponent :=
     locatedAt source 7 11 component
@@ -155,6 +167,10 @@ def testMultiResourceBounds : IO Unit := do
   assertTrue
     (Structure.structureCanonicalOrderingComparisonUnits duplicateModule == 1)
     "sorting two canonical diagnostics must perform one ordering comparison"
+  assertTrue
+    (structureActualUnits duplicateModule ==
+      structureNodeVisitUnits duplicateModule + 6)
+    "the duplicate-module resource ledger did not sum all charged units"
 
   let firstWildcardMarker : Marker :=
     locatedAt source 12 13 .wildcard
@@ -179,5 +195,12 @@ def testMultiResourceBounds : IO Unit := do
     locatedAt source 0 26 { source, items := [mixedItem] }
   assertTrue (Structure.structureLeastSpanComparisonUnits mixedModule == 1)
     "two wildcard spans must perform one least-span comparison"
+  assertTrue
+    ((structureResourceLedger mixedModule).leastSpanComparisons == 1)
+    "the mixed-wildcard comparison was not exposed by the resource ledger"
+  assertTrue
+    (structureActualUnits mixedModule ==
+      (structureResourceLedger mixedModule).total)
+    "the public structural total diverged from its resource ledger"
 
 end Tests
