@@ -14,12 +14,14 @@ private structure FrontendFixture where
   source : String
   expectedItems : Nat
 
-/-- The six source programs exercised by the M2c frontend benchmark. -/
+/-- Representative source programs exercised by the exact-token frontend
+regression. -/
 private def frontendFixtures : List FrontendFixture := [
   ⟨"empty", "", 0⟩,
   ⟨"tiny", "data A;", 1⟩,
   ⟨"import-path", "import lib.core;", 1⟩,
   ⟨"return-literal", "function f() { return 0; }", 1⟩,
+  ⟨"spaced-call-terminal", "function f() { x (y) }", 1⟩,
   ⟨"data-constructors", "data Bool = False | True;", 1⟩,
   ⟨"contract-field", "contract C { value: word; }", 1⟩]
 

@@ -8,15 +8,14 @@ namespace Solcore.Surface.Multi
 
 open Grammar Solcore.Workspace
 
-private abbrev expressionStatementSourceBranches : List EbnfExpr := [
-  .sequence [
-    .atom (.nonterminal .expression),
-    .atom (.terminal (.symbol .semicolon))],
-  .atom (.nonterminal .terminalExpression)]
+private abbrev expressionStatementSourceChildren : List EbnfExpr := [
+  .atom (.nonterminal .expression),
+  .optional (.atom (.terminal (.symbol .semicolon)))]
 
 /-- A terminal expression statement has no plan in a context that requires a
 semicolon. This records why the rule-level dispatcher must accept both source
-branches before an enclosing statement list applies its positional policy. -/
+terminator values before an enclosing statement list applies its positional
+policy. -/
 theorem expressionStatementTerminal_mandatoryPlan_none
     {file : WorkspaceFile} {tokens : List Token}
     {origin finish : Boundary tokens}
@@ -42,8 +41,8 @@ theorem expressionStatementTerminal_mandatoryEvidence_absent
   rintro ⟨plan, success, _relation⟩
   cases success
 
-/-- Expression-statement reduction preserves exact tokens for both the
-semicolon-terminated and terminal-expression branches. -/
+/-- Expression-statement reduction preserves exact tokens both with and
+without the optional semicolon. -/
 theorem expressionStatement_tokenPlanSound :
     GrammarRuleTokenPlanSound .expressionStatement := by
   intro file tokens origin finish input output _owned reduces inputEvidence
@@ -51,7 +50,7 @@ theorem expressionStatement_tokenPlanSound :
   cases reduces with
   | expressionStatementTerminated origin finish expression semicolon witness =>
       change EbnfValue file tokens
-        (.choice expressionStatementSourceBranches) at input
+        (.sequence expressionStatementSourceChildren) at input
       rw [← inputEq] at inputEvidence
       change TokenPlanEvidence
         (statementTokenPlan? true
@@ -90,7 +89,7 @@ theorem expressionStatement_tokenPlanSound :
             expressionEq] using enclosed
   | expressionStatementTerminal origin finish expression witness =>
       change EbnfValue file tokens
-        (.choice expressionStatementSourceBranches) at input
+        (.sequence expressionStatementSourceChildren) at input
       rw [← inputEq] at inputEvidence
       change TokenPlanEvidence
         (statementTokenPlan? true

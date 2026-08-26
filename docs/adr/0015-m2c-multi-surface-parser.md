@@ -1131,8 +1131,7 @@ assignmentOperator
                 ::= "=" | "+=" | "-=" | "^=" | "&=" | "|=" | "%="
 
 expressionStatement
-                ::= expression ";"
-                  | terminalExpression
+                ::= expression [";"]
 terminalExpression
                 ::= expression
 ```
@@ -1487,7 +1486,7 @@ The bridges are the total eliminators of each site subtype's `hasKind` proof;
 Their equality arguments are checked
 proofs and erase at runtime; unchecked representation conversion, conversion
 from an assumed equation,
-reflection into private definitions, and 1,040 hand-written conversions are
+reflection into private definitions, and 1,039 hand-written conversions are
 forbidden. Adding this API changes neither `ProductionId`, `ActionId`, their
 ordering, nor `P`, `D`, or `F`.
 
@@ -1782,7 +1781,7 @@ anchor equation in this table holds:
 | `G05_typeComptime` | any | type start / the same type start |
 | `G06_patternComptime` | any | pattern start / the same pattern start |
 | `G07_leadingDotArguments` | `postfixInvocation postfixStart` | that canonical enclosing postfix invocation origin / the guarded argument-or-call site (the current token is `(` only for positive evidence) |
-| `G08_terminalExpression` | `bracedBody bodyStart` or `armBody armBodyStart` | that nearest enclosing region start / expression-statement start |
+| `G08_terminalExpression` | `bracedBody bodyStart` or `armBody armBodyStart` | that nearest enclosing region start / the selected expression's end, immediately before the optional terminator |
 | `G09_genericContext` | any | context-option start after `forallClause` / that same cursor |
 
 “Any” means that the surrounding context is retained in the
@@ -2212,7 +2211,7 @@ For `G02`, a missing retained token, including the logical-EOF position, is
 | `G05_typeComptime` | `positive` exactly when the identifier at `siteCursor` has contextual spelling `comptime`, even if no following type exists; otherwise `negative`. |
 | `G06_patternComptime` | `positive` exactly when `siteCursor` spells contextual `comptime` and, from its successor, the greatest unguarded complete `expression` ends at the next same-pattern-depth `,`, `)`, or `=>`; otherwise `negative`. |
 | `G07_leadingDotArguments` | `positive` exactly when `ExactSlice(contextStart, siteCursor, [dot, identifier])` and the token at `siteCursor` is `(`; otherwise `negative`. |
-| `G08_terminalExpression` | `positive` holds exactly when there exists `regionEnd` with `NearestStatementRegion(contextStart, regionEnd)` and the greatest unguarded complete `expression` end from `siteCursor` not past `regionEnd` equals `regionEnd`; otherwise `negative`. `NearestStatementRegion.functional` makes this existential endpoint single-valued inside the proposition; no endpoint is selected into Type. |
+| `G08_terminalExpression` | `positive` exactly when `NearestStatementRegion(contextStart, siteCursor)`, so the expression chosen by the expression-statement reduction ends at the nearest enclosing statement-region boundary; otherwise `negative`. |
 | `G09_genericContext` | `positive` exactly when, from `siteCursor` after `forallClause`, the greatest unguarded complete nonempty `predicateList` ends immediately before `=>`; otherwise `negative`. |
 
 Only `G02` can yield `neutral`. Thus a recognized next-arm header enables the
@@ -2244,8 +2243,8 @@ nonempty exactly on these expanded choices: `G01_statementIf` guards the
 the two `type` alternatives; `G06_patternComptime` guards the comptime and
 qualified-name pattern alternatives; `G07_leadingDotArguments` guards
 the leading-dot argument option and the competing first call `postfixPart`;
-`G08_terminalExpression` guards the `terminalExpression`
-expression-statement alternative; and `G09_genericContext` guards the
+`G08_terminalExpression` guards the absent-semicolon branch after the selected
+expression; and `G09_genericContext` guards the
 generic-prefix context option. `Polarity` selects the enabled or disabled side
 through `GuardDecision.allows`. Every other production has `guardOf = []`.
 
@@ -2260,7 +2259,7 @@ The exact cells, using the `GrammarSite` rule plus child-index path, are:
 | `G05` | `P.choice[type, [], 0]` | `P.choice[type, [], 1]` |
 | `G06` | `P.choice[pattern, [], 3]` | `P.choice[pattern, [], 4]` |
 | `G07` | `P.opt[atom, [2,2], some]` | `P.opt[atom, [2,2], none]`; `P.choice[postfixPart, [], 0]` |
-| `G08` | `P.choice[expressionStatement, [], 1]` | none |
+| `G08` | `P.opt[expressionStatement, [1], none]` | none |
 | `G09` | `P.opt[genericPrefix, [1], some]` | `P.opt[genericPrefix, [1], none]` |
 
 This table has `H = 18` cells. It is the same executable `guardOf` table used
@@ -3561,7 +3560,7 @@ The remaining 38 equations continue that same table and order:
 | `armStatement` | `statement -> statement` (pass-through). |
 | `assignmentStatement` | `(left, operator, right, semi) -> sourceLoc (.assignment operator left right)`. |
 | `assignmentOperator` | Branches `#0..#6` map `=`, `+=`, `-=`, `^=`, `&=`, `|=`, `%=` respectively to values `{ span := sp token, payload := .equal }`, `{ span := sp token, payload := .addEqual }`, `{ span := sp token, payload := .subtractEqual }`, `{ span := sp token, payload := .bitXorEqual }`, `{ span := sp token, payload := .bitAndEqual }`, `{ span := sp token, payload := .bitOrEqual }`, and `{ span := sp token, payload := .moduloEqual }`. |
-| `expressionStatement` | `#0(expression, semi) -> sourceLoc (.expression expression (some (sp semi)))`; `#1 terminalExpression -> sourceLoc (.expression terminalExpression none)`. |
+| `expressionStatement` | `(expression, some semi) -> sourceLoc (.expression expression (some (sp semi)))`; `(expression, none) -> sourceLoc (.expression expression none)`. |
 | `terminalExpression` | `expression -> expression` (pass-through). |
 | `pattern` | `#0 underscore -> sourceLoc (.wildcard (marker wildcard underscore))`; `#1 literal -> sourceLoc (.literal literal)`; `#2(dot, name, none) -> sourceLoc (.dotConstructor (unit dot) (id name) none)`; `#2(dot, name, some(open, arguments, close)) -> sourceLoc (.dotConstructor (unit dot) (id name) (some arguments))`; `#3(comptime, expression) -> sourceLoc (.comptime (marker comptimeModifier comptime) expression)`; `#4(name, none) -> sourceLoc (.named name none)`; `#4(name, some(open, arguments, close)) -> sourceLoc (.named name (some arguments))`; `#5(open, close) -> sourceLoc (.tuple [])`; `#6(open, inner, close) -> sourceLoc (.group inner)`; `#7(open, first, comma, second, rest, close) -> sourceLoc (.tuple (first :: second :: map (fun (comma, value) => value) rest))`. |
 | `expression` | `annotation -> annotation` (pass-through). |

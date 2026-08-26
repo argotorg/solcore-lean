@@ -116,9 +116,9 @@ The separate numeric resource theorem required by ADR-0015 remains to be
 implemented and proved.
 
 Termination no longer depends on a proof supplied by the caller. A finite
-static certificate covers all 2,378 dotted grammar rows and supplies the rank
+static certificate covers all 2,375 dotted grammar rows and supplies the rank
 decrease needed by the bounded search. The certificate is split into one
-640-row shard, eighteen 96-row shards, and one 10-row tail so Lean can check it
+640-row shard, eighteen 96-row shards, and one 7-row tail so Lean can check it
 reliably.
 
 ## What is public today

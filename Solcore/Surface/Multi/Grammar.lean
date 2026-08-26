@@ -750,9 +750,9 @@ def m2cV1Rhs : GrammarRuleId → EbnfExpr
         symbol .percentEqual
       ]
   | .expressionStatement =>
-      choice [
-        sequence [nonterminal .expression, symbol .semicolon],
-        nonterminal .terminalExpression
+      sequence [
+        nonterminal .expression,
+        optional (symbol .semicolon)
       ]
   | .terminalExpression =>
       nonterminal .expression
@@ -3691,8 +3691,6 @@ def guardOf : ProductionId → List (PriorityGuardId × Polarity)
         [(.G06_patternComptime, .negative)]
       else if site.site.isAt .postfixPart [] && branch.val == 0 then
         [(.G07_leadingDotArguments, .negative)]
-      else if site.site.isAt .expressionStatement [] && branch.val == 1 then
-        [(.G08_terminalExpression, .positive)]
       else
         []
   | .opt site branch =>
@@ -3711,6 +3709,10 @@ def guardOf : ProductionId → List (PriorityGuardId × Polarity)
           match branch with
           | .none => .negative
           | .some => .positive)]
+      else if site.site.isAt .expressionStatement [1] then
+        match branch with
+        | .none => [(.G08_terminalExpression, .positive)]
+        | .some => []
       else if site.site.isAt .genericPrefix [1] then
         [(.G09_genericContext,
           match branch with
@@ -3802,7 +3804,7 @@ def expectedGuardCells : PriorityGuardId → List GuardCell
       ⟨.opt .atom [2, 2] .some, .positive⟩
     ]
   | .G08_terminalExpression => [
-      ⟨.choice .expressionStatement [] 1, .positive⟩
+      ⟨.opt .expressionStatement [1] .none, .positive⟩
     ]
   | .G09_genericContext => [
       ⟨.opt .genericPrefix [1] .none, .negative⟩,
@@ -4063,14 +4065,19 @@ private def postfixPartChoice : ChoiceSite := {
     rfl
 }
 
-private def expressionStatementChoice : ChoiceSite := {
-  site := ⟨{ rule := .expressionStatement, path := [] }, by
-    unfold GrammarSiteKey.valid m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
-    rfl⟩
+set_option linter.unusedSimpArgs false in
+private def expressionStatementOptional : OptionalSite := {
+  site := ⟨{ rule := .expressionStatement, path := [1] }, by
+    simp [GrammarSiteKey.valid, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, terminal, hardKeyword, contextualKeyword,
+      pragmaName, symbol, category, nonterminal, sequence, choice, group,
+      optional, star, plus, list0, list1, identifier, pathComponent]⟩
   hasKind := by
-    unfold GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
-      EbnfExpr.kind
-    rfl
+    simp [GrammarSite.expression, m2cV1, m2cV1Rhs, EbnfExpr.nodeAt?,
+      EbnfExpr.children, EbnfExpr.kind, terminal, hardKeyword,
+      contextualKeyword, pragmaName, symbol, category, nonterminal,
+      sequence, choice, group, optional, star, plus, list0, list1,
+      identifier, pathComponent]
 }
 
 set_option linter.unusedSimpArgs false in
@@ -4207,13 +4214,6 @@ private theorem postfixPartChoice_branchCount :
     m2cV1 m2cV1Rhs EbnfExpr.nodeAt? EbnfExpr.choiceBranchCount
   rfl
 
-private theorem expressionStatementChoice_branchCount :
-    expressionStatementChoice.branchCount = 2 := by
-  unfold expressionStatementChoice ChoiceSite.branchCount
-    GrammarSite.expression m2cV1 m2cV1Rhs EbnfExpr.nodeAt?
-    EbnfExpr.choiceBranchCount
-  rfl
-
 private def guardedProductions : List ProductionId := [
   .choice statementChoice ⟨3, by rw [statementChoice_branchCount]; omega⟩,
   .choice statementChoice ⟨10, by rw [statementChoice_branchCount]; omega⟩,
@@ -4222,8 +4222,7 @@ private def guardedProductions : List ProductionId := [
   .choice patternChoice ⟨3, by rw [patternChoice_branchCount]; omega⟩,
   .choice patternChoice ⟨4, by rw [patternChoice_branchCount]; omega⟩,
   .choice postfixPartChoice ⟨0, by rw [postfixPartChoice_branchCount]; omega⟩,
-  .choice expressionStatementChoice
-    ⟨1, by rw [expressionStatementChoice_branchCount]; omega⟩,
+  .opt expressionStatementOptional .none,
   .opt parameterOptional .none,
   .opt parameterOptional .some,
   .opt letBindingOptional .none,
@@ -4244,7 +4243,7 @@ private def guardedKeys : List GuardedProductionKey := [
   .choice .pattern [] 3,
   .choice .pattern [] 4,
   .choice .postfixPart [] 0,
-  .choice .expressionStatement [] 1,
+  .opt .expressionStatement [1] .none,
   .opt .parameter [0] .none,
   .opt .parameter [0] .some,
   .opt .letBinding [2, 0, 1] .none,
@@ -4809,19 +4808,25 @@ theorem staticNonterminalCoverage
                     atomLocated]
                 · simp [guardOf, optionalSite, parameterLocated, letLocated,
                     atomLocated]
-              · by_cases genericLocated :
-                    site.isAt .genericPrefix [1] = true
-                · refine .originPair .G09_genericContext
-                    (Or.inr (Or.inr (Or.inr rfl)))
-                    (.opt optionalSite .some) (.opt optionalSite .none)
-                    rfl rfl ?_ ?_
-                  · simp [guardOf, optionalSite, parameterLocated, letLocated,
-                      atomLocated, genericLocated]
-                  · simp [guardOf, optionalSite, parameterLocated, letLocated,
-                      atomLocated, genericLocated]
-                · exact .guardless (.opt optionalSite .none) rfl
+              · by_cases expressionStatementLocated :
+                    site.isAt .expressionStatement [1] = true
+                · exact .guardless (.opt optionalSite .some) rfl
                     (by simp [guardOf, optionalSite, parameterLocated, letLocated,
-                      atomLocated, genericLocated])
+                      atomLocated, expressionStatementLocated])
+                · by_cases genericLocated :
+                      site.isAt .genericPrefix [1] = true
+                  · refine .originPair .G09_genericContext
+                      (Or.inr (Or.inr (Or.inr rfl)))
+                      (.opt optionalSite .some) (.opt optionalSite .none)
+                      rfl rfl ?_ ?_
+                    · simp [guardOf, optionalSite, parameterLocated, letLocated,
+                        atomLocated, expressionStatementLocated, genericLocated]
+                    · simp [guardOf, optionalSite, parameterLocated, letLocated,
+                        atomLocated, expressionStatementLocated, genericLocated]
+                  · exact .guardless (.opt optionalSite .none) rfl
+                      (by simp [guardOf, optionalSite, parameterLocated,
+                        letLocated, atomLocated, expressionStatementLocated,
+                        genericLocated])
       | star child =>
           let starSite : StarSite := ⟨site, by
             simp [expression, EbnfExpr.kind]⟩

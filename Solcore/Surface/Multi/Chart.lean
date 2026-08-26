@@ -9534,20 +9534,14 @@ private def phaseBG07Positive?
         key.contextStart key.siteCursor after
     ]
 
-/-- G08: the nearest statement-region end is also the greatest complete
-expression end from the guarded site. -/
+/-- G08: the guarded optional terminator is absent exactly at the nearest
+statement-region end.  Its site cursor is the selected expression finish. -/
 private def phaseBG08Positive?
     {tokens : List Token}
     (entries : List (PhaseAEvidenceEntry tokens))
     (key : GuardInstanceKey tokens) : Option Bool :=
-  phaseBAnyReads?
-    ((List.finRange (tokens.length + 2)).map fun regionEnd =>
-      phaseBAllReads? [
-        phaseBReadDelimiterGuard? entries .G08_terminalExpression
-          key.contextStart key.siteCursor regionEnd,
-        phaseBReadGreatestRule? entries .expression
-          key.siteCursor regionEnd regionEnd
-      ])
+  phaseBReadDelimiterGuard? entries .G08_terminalExpression
+    key.contextStart key.siteCursor key.siteCursor
 
 /-- G09: the greatest nonempty predicate-list end is an exact fat arrow. -/
 private def phaseBG09Positive?
@@ -9712,14 +9706,8 @@ private def phaseBG08PositiveCached?
     {tokens : List Token}
     (cache : PhaseAEvidenceCache tokens)
     (key : GuardInstanceKey tokens) : Option Bool :=
-  phaseBAnyReads?
-    ((List.finRange (tokens.length + 2)).map fun regionEnd =>
-      phaseBAllReads? [
-        phaseBReadDelimiterGuardCached? cache .G08_terminalExpression
-          key.contextStart key.siteCursor regionEnd,
-        phaseBReadGreatestRuleCached? cache .expression
-          key.siteCursor regionEnd regionEnd
-      ])
+  phaseBReadDelimiterGuardCached? cache .G08_terminalExpression
+    key.contextStart key.siteCursor key.siteCursor
 
 private def phaseBG09PositiveCached?
     {tokens : List Token}
@@ -12229,18 +12217,9 @@ private theorem phaseBG08Positive?_total
     (key : GuardInstanceKey tokens) :
     ∃ selected, phaseBG08Positive? entries key = some selected := by
   unfold phaseBG08Positive?
-  apply phaseBAnyReads?_total
-  intro candidate candidateMember
-  rw [List.mem_map] at candidateMember
-  rcases candidateMember with ⟨regionEnd, _, rfl⟩
-  apply phaseBAllReads?_total
-  intro read readMember
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at readMember
-  rcases readMember with rfl | rfl
-  · exact phaseBReadIndex?_total entries complete .delimiterOrRegion
-      (.inl .G08_terminalExpression) key.contextStart key.siteCursor regionEnd
-  · exact phaseBReadIndex?_total entries complete .greatestEnd
-      (.inr .expression) key.siteCursor regionEnd regionEnd
+  exact phaseBReadIndex?_total entries complete .delimiterOrRegion
+    (.inl .G08_terminalExpression) key.contextStart key.siteCursor
+      key.siteCursor
 
 private theorem phaseBG09Positive?_total
     {tokens : List Token} (entries : List (PhaseAEvidenceEntry tokens))
@@ -18947,17 +18926,15 @@ open Solcore.Workspace
 abbrev StatementRegionObservation (tokens : List Token) :=
   Boundary tokens → Boundary tokens → Bool
 
-/-- G08's complete positive observation, parameterized by the nearest-region
-and greatest-end oracles whose semantic adequacy belongs to Phase A. -/
+/-- G08's complete positive observation.  The greatest-end parameter remains
+for API compatibility; the optional-terminator site is already the selected
+expression finish, so only the nearest-region oracle is consulted. -/
 def terminalExpressionPositiveObservationBool
     {tokens : List Token}
     (region : StatementRegionObservation tokens)
-    (greatest : GreatestEndObservation tokens)
+    (_greatest : GreatestEndObservation tokens)
     (key : GuardInstanceKey tokens) : Bool :=
-  (List.finRange (tokens.length + 2)).any fun regionEnd =>
-    region key.contextStart regionEnd &&
-      greatest (.rule .expression)
-        key.siteCursor regionEnd regionEnd
+  region key.contextStart key.siteCursor
 
 /-- Canonical U01 reads implement G08's public parameterized observation. -/
 private theorem phaseBGuardObservationFromIndexes?_canonical_G08
@@ -18979,10 +18956,9 @@ private theorem phaseBGuardObservationFromIndexes?_canonical_G08
   change guard = .G08_terminalExpression at isTerminalExpression
   subst guard
   simp [phaseBGuardObservationFromIndexes?, phaseBG08Positive?,
-    phaseBReadDelimiterGuard?, phaseBReadGreatestRule?,
+    phaseBReadDelimiterGuard?,
     phaseBReadIndex?, phaseAEvidenceEntryAt?_canonical_exact,
     phaseAObservationIndexEvaluator, phaseADelimiterOrRegionGuardBool,
-    phaseBAllReads?, phaseBAnyReads?_map_some,
     terminalExpressionPositiveObservationBool]
 
 end Chart

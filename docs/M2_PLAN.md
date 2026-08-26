@@ -111,8 +111,8 @@ cardinalities, and lexer fingerprints for all six canonical standard files.
 
 ### Grammar, chart, and parse diagnostics
 
-The fixed grammar contains 75 named rules, 737 EBNF sites, 1,040 expanded
-production/action IDs, 2,378 dotted rows (`D`), and 1,861 contextual frontier
+The fixed grammar contains 75 named rules, 736 EBNF sites, 1,039 expanded
+production/action IDs, 2,375 dotted rows (`D`), and 1,859 contextual frontier
 coordinates (`F`). The implementation provides typed action reductions,
 context-preserving chart items and edges, declarative `Parses`, closed
 unexpected/repeated-nonassociative diagnostics, and a three-phase chart
@@ -146,9 +146,9 @@ the lexer and is sound for lexical failure, parse failure, and success. It
 cannot construct `.structural`, because structural checking is a later phase.
 
 Termination is no longer a caller premise. A kernel-checked Boolean table
-covers all 2,378 dotted rows, proves the grammar-specific decreasing rank, and
+covers all 2,375 dotted rows, proves the grammar-specific decreasing rank, and
 closes bounded search. The certificate is checked as one 640-row shard,
-eighteen 96-row shards, and a 10-row tail, then composed by
+eighteen 96-row shards, and a 7-row tail, then composed by
 `dottedStaticRankTable_eq_true`. It uses neither `native_decide` nor an
 undeclared axiom.
 

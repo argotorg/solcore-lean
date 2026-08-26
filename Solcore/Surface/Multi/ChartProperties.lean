@@ -641,8 +641,8 @@ theorem matchArmClassifiedObservation_exact
     exact matchArmPipeObservationBool_exact owned key
 
 
-/-- G08 is exact once nearest-region and raw greatest-expression observations
-are exact. -/
+/-- G08 is exact once the nearest-region observation is exact.  The
+greatest-end arguments remain in the interface for compatibility. -/
 theorem terminalExpressionPositiveObservationBool_exact
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -653,7 +653,7 @@ theorem terminalExpressionPositiveObservationBool_exact
     (regionExact : ∀ regionStart regionEnd,
       region regionStart regionEnd = true ↔
         NearestStatementRegion file tokens regionStart regionEnd)
-    (greatestExact : ∀ start upperBound finish,
+    (_greatestExact : ∀ start upperBound finish,
       greatest (.rule .expression) start upperBound finish = true ↔
         GreatestUnguardedEnd file tokens (.rule .expression)
           start upperBound finish) :
@@ -664,9 +664,10 @@ theorem terminalExpressionPositiveObservationBool_exact
   change guard = .G08_terminalExpression at isTerminalExpression
   subst guard
   simp [Chart.terminalExpressionPositiveObservationBool, GuardEvidence,
-    owned, List.any_eq_true, regionExact, greatestExact]
+    owned, regionExact]
 
-/-- G08 classification is exact under the same two explicit phase contracts. -/
+/-- G08 classification is exact under the nearest-region contract; the
+greatest-end contract is retained only for interface compatibility. -/
 theorem terminalExpressionClassifiedObservation_exact
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -1170,8 +1171,8 @@ theorem semanticPatternComptimeClassifiedObservation_exact
       semanticGreatestEndObservation_exact owned (.rule .expression)
         start upperBound finish) decision
 
-/-- G08 classification using the declarative nearest-region and greatest-end
-adapters is exact. -/
+/-- G08 classification using the declarative nearest-region adapter is exact.
+The greatest-end adapter remains a compatibility argument. -/
 theorem semanticTerminalExpressionClassifiedObservation_exact
     {file : WorkspaceFile} {tokens : List Token}
     (owned : TokensOwnedBy file tokens)
@@ -5827,52 +5828,55 @@ theorem executeExpressionStatementRoot_reduces
         ready.1 ready.2.1 input) := by
   let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
   let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
-  let branches : List EbnfExpr := [
-    .sequence [expressionAtom, semicolonAtom],
-    .atom (.nonterminal .terminalExpression)]
-  change EbnfValue file tokens (.choice branches) at input
-  generalize viewEq : EbnfValue.choiceView branches input = viewed
-  rcases viewed with ⟨branch, raw⟩
-  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
-    calc
-      _ = EbnfValue.choice branches
-          (EbnfValue.choiceView branches input) := by rw [viewEq]
-      _ = input := EbnfValue.choice_of_view branches input
-  have branchCases : branch = 0 ∨ branch = 1 := by
-    have lengthEq : branches.length = 2 := by rfl
-    have bound : branch.val < 2 := by simpa [lengthEq] using branch.isLt
-    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
-    rcases valueCases with valueEq | valueEq
-    · exact Or.inl (Fin.ext valueEq)
-    · exact Or.inr (Fin.ext valueEq)
+  let optionalSemicolon : EbnfExpr := .optional semicolonAtom
+  change EbnfValue file tokens
+    (.sequence [expressionAtom, optionalSemicolon]) at input
+  let viewed := EbnfValue.sequence2View
+    expressionAtom optionalSemicolon input
+  let expression := EbnfValue.ruleView .expression viewed.1
   let witness := ConsumedSpanWitness.compute
     file tokens origin finish ready.1 ready.2.1
-  rcases branchCases with rfl | rfl
-  · let viewed := EbnfValue.sequence2View expressionAtom semicolonAtom raw
-    let expression := EbnfValue.ruleView .expression viewed.1
-    let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
-    have rawEq := EbnfValue.sequence2_of_view
-      expressionAtom semicolonAtom raw
-    have expressionEq := EbnfValue.rule_of_view .expression viewed.1
-    have semicolonEq :=
-      EbnfValue.terminal_of_view (.symbol .semicolon) viewed.2
-    have resultEq : executeExpressionStatementRoot file tokens origin finish
-        ready.1 ready.2.1 input = sourceLoc witness
-          (.expression expression (some semicolon.span)) := by
-      rw [executeExpressionStatementRoot, viewEq]
-      rfl
-    rw [resultEq, ← inputEq, ← rawEq, ← expressionEq, ← semicolonEq]
-    exact .expressionStatementTerminated
-      origin finish expression semicolon witness
-  · let expression := EbnfValue.ruleView .terminalExpression raw
-    have rawEq := EbnfValue.rule_of_view .terminalExpression raw
-    have resultEq : executeExpressionStatementRoot file tokens origin finish
-        ready.1 ready.2.1 input =
-          sourceLoc witness (.expression expression none) := by
-      rw [executeExpressionStatementRoot, viewEq]
-      rfl
-    rw [resultEq, ← inputEq, ← rawEq]
-    exact .expressionStatementTerminal origin finish expression witness
+  have inputEq := EbnfValue.sequence2_of_view
+    expressionAtom optionalSemicolon input
+  have expressionEq := EbnfValue.rule_of_view .expression viewed.1
+  have optionalEq := EbnfValue.optional_of_view semicolonAtom viewed.2
+  generalize selectedEq :
+    EbnfValue.optionalView semicolonAtom viewed.2 = selected
+  cases selected with
+  | none =>
+      have resultEq : executeExpressionStatementRoot file tokens origin finish
+          ready.1 ready.2.1 input =
+            sourceLoc witness (.expression expression none) := by
+        simp only [executeExpressionStatementRoot, expressionAtom,
+          semicolonAtom, optionalSemicolon, viewed, expression, selectedEq,
+          witness]
+        rfl
+      have optionalEq' :
+          EbnfValue.optional semicolonAtom none = viewed.2 := by
+        rw [← selectedEq]
+        exact optionalEq
+      rw [resultEq, ← inputEq, ← expressionEq, ← optionalEq']
+      exact .expressionStatementTerminal origin finish expression witness
+  | some raw =>
+      let semicolon := EbnfValue.terminalView (.symbol .semicolon) raw
+      have semicolonEq :=
+        EbnfValue.terminal_of_view (.symbol .semicolon) raw
+      have resultEq : executeExpressionStatementRoot file tokens origin finish
+          ready.1 ready.2.1 input =
+            sourceLoc witness
+              (.expression expression (some semicolon.span)) := by
+        simp only [executeExpressionStatementRoot, expressionAtom,
+          semicolonAtom, optionalSemicolon, viewed, expression, selectedEq,
+          semicolon, witness]
+        rfl
+      have optionalEq' :
+          EbnfValue.optional semicolonAtom (some raw) = viewed.2 := by
+        rw [← selectedEq]
+        exact optionalEq
+      rw [resultEq, ← inputEq, ← expressionEq, ← optionalEq',
+        ← semicolonEq]
+      exact .expressionStatementTerminated
+        origin finish expression semicolon witness
 
 /-- The contract-member executor realizes its selected declaration root. -/
 theorem executeContractMemberRoot_reduces

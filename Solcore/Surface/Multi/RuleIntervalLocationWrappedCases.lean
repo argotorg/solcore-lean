@@ -410,8 +410,10 @@ theorem expressionStatementTerminal_case
   apply exactInput_of_shape witness
       (LocationFragment.ofExpression expression)
   · unfold InputFragmentEquals
-    exact (EbnfValue.locationFragment_choice _ _).trans
-      (EbnfValue.locationFragment_ruleAtom _ _)
+    refine (EbnfValue.locationFragment_sequence _ _).trans ?_
+    refine (EbnfValues.locationFragment_cons _ _ _ _).trans ?_
+    apply LocationFragment.eq_of_fields <;>
+      simp [RuleLocationView.ofRuleValue]
   · rw [RuleLocationView.ofRuleValue,
       LocationFragment.ofStatement_mk]
     simp [sourceLoc, LocationFragment.ofStatementPayload,
@@ -916,8 +918,8 @@ theorem expressionStatementTerminated_case
       LocationFragment.raw semicolon.span]
   apply exactInput_of_shape witness core
   · unfold InputFragmentEquals
-    refine (EbnfValue.locationFragment_choice _ _).trans ?_
     refine (EbnfValue.locationFragment_sequence _ _).trans ?_
+    refine (EbnfValues.locationFragment_cons _ _ _ _).trans ?_
     apply LocationFragment.eq_of_fields <;>
       simp [core, RuleLocationView.ofRuleValue,
         MatchedTerminal.locationFragment]

@@ -4488,10 +4488,10 @@ open Solcore.Surface.Multi.Grammar in
 def testMultiGrammarTables : IO Unit := do
   assertTrue
     (allGrammarRuleIds.length == 75 &&
-      allGrammarSites.length == 737 &&
-      allProductionIds.length == 1040 &&
-      allActionIds.length == 1040 &&
-      productionCount == 1040 && D == 2378 && F == 1861)
+      allGrammarSites.length == 736 &&
+      allProductionIds.length == 1039 &&
+      allActionIds.length == 1039 &&
+      productionCount == 1039 && D == 2375 && F == 1859)
     "the derived Multi grammar cardinalities must remain exact"
   assertTrue
     (allGrammarRuleIds == expectedMultiGrammarRuleIds &&

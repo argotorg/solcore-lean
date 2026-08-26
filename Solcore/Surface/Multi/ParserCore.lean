@@ -8251,7 +8251,8 @@ def executeForPostItemRoot
   | ⟨⟨1, _⟩, raw⟩ =>
       sourceLoc witness (.expression (EbnfValue.ruleView .expression raw))
 
-/-- Execute an expression statement from its terminated or terminal branch. -/
+/-- Execute an expression statement from its expression and optional
+terminator. -/
 def executeExpressionStatementRoot
     (file : WorkspaceFile) (tokens : List Token)
     (origin finish : Boundary tokens)
@@ -8261,19 +8262,15 @@ def executeExpressionStatementRoot
     Statement :=
   let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
   let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
-  let branches : List EbnfExpr := [
-    .sequence [expressionAtom, semicolonAtom],
-    .atom (.nonterminal .terminalExpression)]
+  let optionalSemicolon : EbnfExpr := .optional semicolonAtom
   let witness := shallowRootWitness file tokens origin finish owned ordered
-  match EbnfValue.choiceView branches input with
-  | ⟨⟨0, _⟩, raw⟩ =>
-      let viewed := EbnfValue.sequence2View expressionAtom semicolonAtom raw
-      let semicolon := EbnfValue.terminalView (.symbol .semicolon) viewed.2
-      sourceLoc witness (.expression
-        (EbnfValue.ruleView .expression viewed.1) (some semicolon.span))
-  | ⟨⟨1, _⟩, raw⟩ =>
-      sourceLoc witness (.expression
-        (EbnfValue.ruleView .terminalExpression raw) none)
+  let viewed := EbnfValue.sequence2View
+    expressionAtom optionalSemicolon input
+  let terminator :=
+    (EbnfValue.optionalView semicolonAtom viewed.2).map fun raw =>
+      (EbnfValue.terminalView (.symbol .semicolon) raw).span
+  sourceLoc witness (.expression
+    (EbnfValue.ruleView .expression viewed.1) terminator)
 
 /-- Execute a contract member from its selected declaration alternative. -/
 def executeContractMemberRoot

@@ -2695,10 +2695,7 @@ def GuardEvidence
     ] ∧
     SymbolAtBoundary file tokens key.siteCursor .leftParen
   let terminalExpression :=
-    ∃ regionEnd : Boundary tokens,
-      NearestStatementRegion file tokens key.contextStart regionEnd ∧
-      GreatestUnguardedEnd file tokens (.rule .expression)
-        key.siteCursor regionEnd regionEnd
+    NearestStatementRegion file tokens key.contextStart key.siteCursor
   let genericContext :=
     ∃ arrowCursor : Boundary tokens,
       SymbolAtBoundary file tokens arrowCursor .fatArrow ∧
@@ -4761,12 +4758,9 @@ local macro_rules
       rrTerminalExpr![.symbol .pipeEqual],
       rrTerminalExpr![.symbol .percentEqual]
     ])
-  | `(rrPublicRhs![.expressionStatement]) => `(rrExprChoice![
-      rrExprSeq![
-        rrRuleExpr![.expression],
-        rrTerminalExpr![.symbol .semicolon]
-      ],
-      rrRuleExpr![.terminalExpression]
+  | `(rrPublicRhs![.expressionStatement]) => `(rrExprSeq![
+      rrRuleExpr![.expression],
+      rrExprOpt![rrTerminalExpr![.symbol .semicolon]]
     ])
   | `(rrPublicRhs![.terminalExpression]) => `(rrRuleExpr![.expression])
   | `(rrPublicRhs![.pattern]) => `(rrExprChoice![
@@ -8036,22 +8030,21 @@ inductive RuleReduction
       (semicolon : MatchedTerminal file tokens (.symbol .semicolon))
       (witness : ConsumedSpanWitness file tokens origin finish) :
       RuleReduction file tokens .expressionStatement origin finish
-        (rrChoiceRoot![.expressionStatement]
-          ⟨⟨0, by decide⟩,
-            EbnfValue.sequence _
-              (rrCons (EbnfValue.ruleAtom .expression expression)
-                (rrCons
-                  (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)
-                  rrNil))⟩)
+        (rrSequenceRoot![.expressionStatement]
+          (rrCons (EbnfValue.ruleAtom .expression expression)
+            (rrCons
+              (EbnfValue.optional _ (some
+                (EbnfValue.terminalAtom (.symbol .semicolon) semicolon)))
+              rrNil)))
         (sourceLoc witness (.expression expression (some semicolon.span)))
   | expressionStatementTerminal
       (origin finish : Boundary tokens)
       (expression : Expression)
       (witness : ConsumedSpanWitness file tokens origin finish) :
       RuleReduction file tokens .expressionStatement origin finish
-        (rrChoiceRoot![.expressionStatement]
-          ⟨⟨1, by decide⟩,
-            EbnfValue.ruleAtom .terminalExpression expression⟩)
+        (rrSequenceRoot![.expressionStatement]
+          (rrCons (EbnfValue.ruleAtom .expression expression)
+            (rrCons (EbnfValue.optional _ none) rrNil)))
         (sourceLoc witness (.expression expression none))
   | terminalExpression
       (origin finish : Boundary tokens)
@@ -9802,27 +9795,25 @@ private theorem ruleReduction_expressionStatement_functional
     left = right := by
   generalize inputEq : input = rightInput at rightReduces
   cases leftReduces <;> cases rightReduces
-  all_goals have choiceEq := EbnfValue.choice_injective _ inputEq
-  all_goals have branchEq := congrArg Sigma.fst choiceEq
-  all_goals simp at branchEq
-  all_goals have choiceParts := Sigma.ext_iff.mp choiceEq
-  all_goals have valueEq := eq_of_heq choiceParts.2
-  all_goals simp only [List.get_eq_getElem] at valueEq
-  all_goals apply (sourceLoc_eq_iff _ _ _ _).2
-  · have sequenceEq := EbnfValue.sequence_injective _ valueEq
-    have expressionConsEq := EbnfValues.cons_injective _ _ sequenceEq
-    have expressionEq :=
-      EbnfValue.ruleAtom_injective _ expressionConsEq.1
-    have semicolonConsEq :=
-      EbnfValues.cons_injective _ _ expressionConsEq.2
+  all_goals have sequenceEq := EbnfValue.sequence_injective _ inputEq
+  all_goals have expressionConsEq :=
+    EbnfValues.cons_injective _ _ sequenceEq
+  all_goals have expressionEq :=
+    EbnfValue.ruleAtom_injective _ expressionConsEq.1
+  all_goals have optionalConsEq :=
+    EbnfValues.cons_injective _ _ expressionConsEq.2
+  all_goals have optionalEq :=
+    EbnfValue.optional_injective _ optionalConsEq.1
+  · have semicolonValueEq := Option.some.inj optionalEq
     have semicolonEq :=
-      EbnfValue.terminalAtom_injective _ semicolonConsEq.1
+      EbnfValue.terminalAtom_injective _ semicolonValueEq
     cases expressionEq
     cases semicolonEq
-    rfl
-  · have expressionEq := EbnfValue.ruleAtom_injective _ valueEq
-    cases expressionEq
-    rfl
+    exact (sourceLoc_eq_iff _ _ _ _).2 rfl
+  · simp at optionalEq
+  · simp at optionalEq
+  · cases expressionEq
+    exact (sourceLoc_eq_iff _ _ _ _).2 rfl
 
 private theorem ruleReduction_terminalExpression_functional
     {file : WorkspaceFile} {tokens : List Token}
@@ -12638,45 +12629,31 @@ private theorem ruleReduction_expressionStatement_total
       RuleReduction file tokens .expressionStatement origin finish input output := by
   let expressionAtom : EbnfExpr := .atom (.nonterminal .expression)
   let semicolonAtom : EbnfExpr := .atom (.terminal (.symbol .semicolon))
-  let branches : List EbnfExpr := [
-    .sequence [expressionAtom, semicolonAtom],
-    .atom (.nonterminal .terminalExpression)]
-  change EbnfValue file tokens (.choice branches) at input
-  generalize viewEq : choiceView branches input = viewed
-  rcases viewed with ⟨branch, raw⟩
-  have inputEq : EbnfValue.choice branches ⟨branch, raw⟩ = input := by
-    calc
-      _ = EbnfValue.choice branches (choiceView branches input) :=
-        congrArg (EbnfValue.choice branches) viewEq.symm
-      _ = input := choice_of_view branches input
-  have branchCases : branch = 0 ∨ branch = 1 := by
-    have branchesLength : branches.length = 2 := by rfl
-    have bound : branch.val < 2 := by omega
-    have valueCases : branch.val = 0 ∨ branch.val = 1 := by omega
-    rcases valueCases with valueEq | valueEq
-    · exact Or.inl (Fin.ext valueEq)
-    · exact Or.inr (Fin.ext valueEq)
+  let children : List EbnfExpr := [
+    expressionAtom, .optional semicolonAtom]
+  change EbnfValue file tokens (.sequence children) at input
+  generalize rootEq : sequenceFlatView children input = values
+  rcases values with ⟨rawExpression, rawSemicolon, ⟨⟩⟩
+  let expression := ruleView .expression rawExpression
+  have expressionEq := rule_of_view .expression rawExpression
+  generalize optionalEq : optionalView semicolonAtom rawSemicolon = viewed
   let witness := ConsumedSpanWitness.compute
     file tokens origin finish ready.1 ready.2.1
-  rcases branchCases with rfl | rfl
-  · change EbnfValue file tokens
-      (.sequence [expressionAtom, semicolonAtom]) at raw
-    generalize pairEq : sequenceFlatView
-      [expressionAtom, semicolonAtom] raw = pair
-    rcases pair with ⟨rawExpression, rawSemicolon, ⟨⟩⟩
-    let expression := ruleView .expression rawExpression
-    let semicolon := terminalView (.symbol .semicolon) rawSemicolon
-    have expressionEq := rule_of_view .expression rawExpression
-    have semicolonEq := terminal_of_view (.symbol .semicolon) rawSemicolon
-    rw [← inputEq, ← sequence_of_flat_view
-      [expressionAtom, semicolonAtom] raw, pairEq,
-      ← expressionEq, ← semicolonEq]
-    exact ⟨_, .expressionStatementTerminated origin finish
-      expression semicolon witness⟩
-  · let expression := ruleView .terminalExpression raw
-    have rawEq := rule_of_view .terminalExpression raw
-    rw [← inputEq, ← rawEq]
-    exact ⟨_, .expressionStatementTerminal origin finish expression witness⟩
+  cases viewed with
+  | none =>
+      rw [← sequence_of_flat_view children input, rootEq,
+        ← expressionEq,
+        ← optional_of_view semicolonAtom rawSemicolon, optionalEq]
+      exact ⟨_, .expressionStatementTerminal origin finish expression witness⟩
+  | some raw =>
+      let semicolon := terminalView (.symbol .semicolon) raw
+      have semicolonEq := terminal_of_view (.symbol .semicolon) raw
+      rw [← sequence_of_flat_view children input, rootEq,
+        ← expressionEq,
+        ← optional_of_view semicolonAtom rawSemicolon, optionalEq,
+        ← semicolonEq]
+      exact ⟨_, .expressionStatementTerminated origin finish
+        expression semicolon witness⟩
 
 private structure SequencePairView
     (file : WorkspaceFile) (tokens : List Token)

@@ -131,7 +131,7 @@ The chart algorithm must show that normalization cannot continue indefinitely
 through rootless prediction, epsilon, and completion edges. The proof assigns
 a decreasing finite rank to the fixed grammar's dotted rows.
 
-The executable checker validates a table covering all 2,378 rows. Small Lean
+The executable checker validates a table covering all 2,375 rows. Small Lean
 theorems certify chunks of that table, and one final theorem composes the
 chunks. The accepted table then supplies the rank facts used by bounded search,
 which supplies unconditional parser progress and, finally, the
