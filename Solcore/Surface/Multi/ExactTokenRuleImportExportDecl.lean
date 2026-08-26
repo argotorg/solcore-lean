@@ -29,7 +29,7 @@ elab "unfoldOptionalPlanCore" : tactic => do
   | [(declaration, _)] => unfoldTarget declaration
   | _ => throwError "the declaration visitor has an unknown option helper"
 
-elab "rwDeclarationPlansMapM" : tactic => do
+elab "rwImportExportDeclarationPlansMapM" : tactic => do
   let environment ← getEnv
   let suffix := `Solcore.Surface.Multi.plans?_eq_mapM
   let candidates := environment.constants.toList.filter fun entry =>
@@ -1489,7 +1489,7 @@ theorem importDecl_tokenPlanSound :
                   simp only [ruleTokenPlan?, importDeclPlan?, sourceLoc,
                     referenceEq]
                   unfold importSelectionPlan?
-                  rwDeclarationPlansMapM
+                  rwImportExportDeclarationPlansMapM
                   simp only [RuleReduction.between]
                   rw [entriesOutputEq]
                   unfoldOptionalPlanCore
@@ -1727,7 +1727,7 @@ theorem exportDecl_tokenPlanSound :
           apply enclosed.candidate_eq
           simp only [ruleTokenPlan?, exportDeclPlan?, sourceLoc]
           unfold localExportListPlan?
-          rwDeclarationPlansMapM
+          rwImportExportDeclarationPlansMapM
           simp only [RuleReduction.between]
           rw [entriesOutputEq]
           simp [entriesPlan, selectionPlan, inner,
@@ -1933,7 +1933,7 @@ theorem exportDecl_tokenPlanSound :
               simp only [RuleReduction.between]
               unfold remoteExportSelectionPlan?
               simp only [RuleReduction.between]
-              rwDeclarationPlansMapM
+              rwImportExportDeclarationPlansMapM
               rw [entriesOutputEq]
               simp [entriesPlan, selectionPlan, inner,
                 RuleReduction.between, TokenPlan.concat_cons,

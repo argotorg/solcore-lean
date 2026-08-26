@@ -9,7 +9,7 @@ namespace Solcore.Surface.Multi
 open Grammar Solcore.Workspace
 open Lean Lean.Elab Lean.Elab.Tactic
 
-elab "unfoldNonemptyTypePlanCore" : tactic => do
+elab "unfoldForallBinderNonemptyTypePlanCore" : tactic => do
   let environment ← getEnv
   let suffix := `Solcore.Surface.Multi.nonemptyTypePlans?
   let candidates := environment.constants.toList.filter fun entry =>
@@ -189,7 +189,7 @@ private theorem forallBinderPlan?_bounded_some
         qualifiedNamePlan className,
         .parens (.commaSeparated argumentPlans)]))) := by
   simp_all! [forallBinderPlan?]
-  unfoldNonemptyTypePlanCore
+  unfoldForallBinderNonemptyTypePlanCore
   cases nonemptyTypeExprPlans? arguments <;> simp
 
 /-- Forall-binder reductions preserve the binder, bound, and optional
