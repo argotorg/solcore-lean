@@ -725,4 +725,181 @@ def ExactTokenCorrespondenceWith
     rw [equation, Bool.and_eq_true, TokenSlot.listMatches_eq_true_iff]
     exact ⟨anchored, relation⟩
 
+namespace TokenPlan
+
+private def StartsRequired : List TokenSlot → Prop
+  | [] => True
+  | .required _ :: _ => True
+  | .optional _ :: _ => False
+
+private def EndsRequired : List TokenSlot → Prop
+  | [] => True
+  | [last] => last.isRequired = true
+  | _ :: second :: rest => EndsRequired (second :: rest)
+
+private theorem lastRequired_ends
+    (first : TokenSlot) (rest : List TokenSlot)
+    (required : lastRequired first rest = true) :
+    EndsRequired (first :: rest) := by
+  induction rest generalizing first with
+  | nil => simpa [lastRequired, EndsRequired] using required
+  | cons next rest induction =>
+      cases rest with
+      | nil => simpa [lastRequired, EndsRequired] using required
+      | cons third tail =>
+          apply induction next
+          simpa [lastRequired] using required
+
+private theorem wellAnchored_shapes
+    {plan : TokenPlan} (anchored : plan.WellAnchored) :
+    StartsRequired plan.slots ∧ EndsRequired plan.slots := by
+  cases plan with
+  | mk slots =>
+      cases slots with
+      | nil => exact ⟨True.intro, True.intro⟩
+      | cons first rest =>
+          unfold WellAnchored wellAnchored at anchored
+          simp only [Bool.and_eq_true] at anchored
+          constructor
+          · cases first <;>
+              simp_all [StartsRequired, TokenSlot.isRequired]
+          · exact lastRequired_ends first rest anchored.2
+
+private theorem addFirst_preserves_ends
+    (constraint : TokenSpanConstraint) (slots : List TokenSlot)
+    (required : EndsRequired slots) :
+    EndsRequired (TokenSlot.addFirst constraint slots) := by
+  cases slots with
+  | nil => trivial
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          cases first <;>
+            simp_all [EndsRequired, TokenSlot.addFirst,
+              TokenSlot.addConstraint, TokenSlot.isRequired]
+      | cons second rest =>
+          simpa [EndsRequired, TokenSlot.addFirst] using required
+
+private theorem matches_addConstraint
+    {constraint : TokenSpanConstraint}
+    {expected : ExpectedToken} {actual : Token}
+    (holds : constraint.Holds actual)
+    (relation : expected.Matches actual) :
+    ({ expected with constraints :=
+      constraint :: expected.constraints } : ExpectedToken).Matches actual := by
+  refine ⟨relation.1, ?_⟩
+  intro candidate member
+  simp only [List.mem_cons] at member
+  rcases member with rfl | member
+  · exact holds
+  · exact relation.2 candidate member
+
+private theorem addFirst_sound
+    {constraint : TokenSpanConstraint}
+    {slots : List TokenSlot} {actual : List Token}
+    (relation : TokenSlot.ListMatches slots actual)
+    (required : StartsRequired slots)
+    (holds : ∀ first rest, actual = first :: rest →
+      constraint.Holds first) :
+    TokenSlot.ListMatches (TokenSlot.addFirst constraint slots) actual := by
+  cases relation with
+  | nil => exact .nil
+  | required head tail =>
+      apply TokenSlot.ListMatches.required
+      · exact matches_addConstraint (holds _ _ rfl) head
+      · exact tail
+  | optionalAbsent tail => contradiction
+  | optionalPresent head tail => contradiction
+
+private theorem matches_append
+    {firstSlots secondSlots : List TokenSlot}
+    {firstActual secondActual : List Token}
+    (first : TokenSlot.ListMatches firstSlots firstActual)
+    (second : TokenSlot.ListMatches secondSlots secondActual) :
+    TokenSlot.ListMatches (firstSlots ++ secondSlots)
+      (firstActual ++ secondActual) := by
+  induction first with
+  | nil => exact second
+  | required head tail induction => exact .required head induction
+  | optionalAbsent tail induction => exact .optionalAbsent induction
+  | optionalPresent head tail induction =>
+      exact .optionalPresent head induction
+
+private theorem matches_reverse
+    {slots : List TokenSlot} {actual : List Token}
+    (relation : TokenSlot.ListMatches slots actual) :
+    TokenSlot.ListMatches slots.reverse actual.reverse := by
+  induction relation with
+  | nil => exact .nil
+  | @required expected actual slots actualTail head tail induction =>
+      simpa using matches_append induction
+        (TokenSlot.ListMatches.required head .nil)
+  | @optionalAbsent expected slots actual tail induction =>
+      simpa using matches_append induction
+        (TokenSlot.ListMatches.optionalAbsent
+          (expected := expected) TokenSlot.ListMatches.nil)
+  | @optionalPresent expected actual slots actualTail head tail induction =>
+      simpa using matches_append induction
+        (TokenSlot.ListMatches.optionalPresent head .nil)
+
+private theorem ends_reverse_starts
+    {slots : List TokenSlot} (required : EndsRequired slots) :
+    StartsRequired slots.reverse := by
+  induction slots with
+  | nil => trivial
+  | cons first rest induction =>
+      cases rest with
+      | nil =>
+          cases first <;>
+            simp_all [EndsRequired, StartsRequired, TokenSlot.isRequired]
+      | cons second rest =>
+          have tailRequired : EndsRequired (second :: rest) := by
+            simpa [EndsRequired] using required
+          have tailStarts := induction tailRequired
+          have tailReverseNonempty : (second :: rest).reverse ≠ [] := by simp
+          cases reversed : (second :: rest).reverse with
+          | nil => contradiction
+          | cons last before =>
+              cases last <;>
+                simp_all [StartsRequired, List.reverse_cons]
+
+private theorem addLast_sound
+    {constraint : TokenSpanConstraint}
+    {slots : List TokenSlot} {actual : List Token}
+    (relation : TokenSlot.ListMatches slots actual)
+    (required : EndsRequired slots)
+    (holds : ∀ initial last, actual = initial ++ [last] →
+      constraint.Holds last) :
+    TokenSlot.ListMatches (TokenSlot.addLast constraint slots) actual := by
+  have reversed := matches_reverse relation
+  have reverseHolds : ∀ first rest,
+      actual.reverse = first :: rest → constraint.Holds first := by
+    intro first rest equation
+    have reversedEquation := congrArg List.reverse equation
+    simp only [List.reverse_reverse, List.reverse_cons] at reversedEquation
+    exact holds rest.reverse first reversedEquation
+  have constrained := addFirst_sound reversed
+    (ends_reverse_starts required) reverseHolds
+  have restored := matches_reverse constrained
+  simpa [TokenSlot.addLast] using restored
+
+/-- Enclosing an endpoint-anchored plan adds exactly the asserted first and
+last token constraints while preserving full token correspondence. -/
+theorem enclose_listMatches
+    {span : SourceSpan} {plan : TokenPlan} {actual : List Token}
+    (relation : TokenSlot.ListMatches plan.slots actual)
+    (anchored : plan.WellAnchored)
+    (starts : ∀ first rest, actual = first :: rest →
+      (TokenSpanConstraint.starts span).Holds first)
+    (ends : ∀ initial last, actual = initial ++ [last] →
+      (TokenSpanConstraint.ends span).Holds last) :
+    TokenSlot.ListMatches (plan.enclose span).slots actual := by
+  have shapes := wellAnchored_shapes anchored
+  have firstConstrained := addFirst_sound relation shapes.1 starts
+  have lastShape := addFirst_preserves_ends (.starts span) _ shapes.2
+  have lastConstrained := addLast_sound firstConstrained lastShape ends
+  exact lastConstrained
+
+end TokenPlan
+
 end Solcore.Surface.Multi
