@@ -105,7 +105,9 @@ private theorem addLastView_cons_nonempty
     (addLastView constraint slots).length = slots.length := by
   simp [addLastView]
 
-@[simp] private theorem enclose_slots_length
+/-- Enclosing a token plan changes only endpoint constraints, never its slot
+count. -/
+@[simp] theorem enclose_slots_length
     (span : SourceSpan) (plan : TokenPlan) :
     (plan.enclose span).slots.length = plan.slots.length := by
   simp [TokenPlan.enclose, enclose_eq_view]
