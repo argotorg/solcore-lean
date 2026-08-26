@@ -80,6 +80,46 @@ theorem contains_eq_true_iff (outer inner : SourceSpan) :
     outer.contains inner = true ↔ outer.Contains inner := by
   simp [contains, Contains, and_assoc]
 
+namespace Contains
+
+/-- Every ordered span contains itself. -/
+theorem refl {span : SourceSpan} (ordered : span.startByte ≤ span.endByte) :
+    span.Contains span := by
+  exact ⟨rfl, Nat.le_refl _, ordered, Nat.le_refl _⟩
+
+/-- Source-span containment is transitive. -/
+theorem trans {outer middle inner : SourceSpan}
+    (outerMiddle : outer.Contains middle)
+    (middleInner : middle.Contains inner) :
+    outer.Contains inner := by
+  rcases outerMiddle with
+    ⟨outerSource, outerStart, _middleOrdered, middleEnd⟩
+  rcases middleInner with
+    ⟨middleSource, middleStart, innerOrdered, innerEnd⟩
+  exact ⟨outerSource.trans middleSource, Nat.le_trans outerStart middleStart,
+    innerOrdered, Nat.le_trans innerEnd middleEnd⟩
+
+end Contains
+
+/-- The exact half-open span of all UTF-8 bytes in a workspace file. -/
+def fullFile (file : WorkspaceFile) : SourceSpan := {
+  source := file.id
+  startByte := 0
+  endByte := file.content.utf8ByteSize
+}
+
+/-- The full-file span is valid for the file that constructs it. -/
+@[simp] theorem fullFile_validFor (file : WorkspaceFile) :
+    (fullFile file).ValidFor file := by
+  simp [fullFile, ValidFor]
+
+/-- Every span valid for a file is contained in that file's full span. -/
+theorem fullFile_contains_of_validFor {file : WorkspaceFile}
+    {span : SourceSpan} (valid : span.ValidFor file) :
+    (fullFile file).Contains span := by
+  rcases valid with ⟨owned, ordered, bounded, _startBoundary, _endBoundary⟩
+  exact ⟨owned.symm, Nat.zero_le _, ordered, bounded⟩
+
 /--
 The endpoint cover of two spans. Callers establish shared ownership and source
 order before using this constructor as a semantic cover.
