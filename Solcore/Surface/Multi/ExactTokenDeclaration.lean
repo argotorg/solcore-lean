@@ -72,6 +72,14 @@ private def plans? {α : Type} (visit : α → Option TokenPlan) :
       let restPlans ← plans? visit rest
       pure (plan :: restPlans)
 
+@[simp] private theorem plans?_eq_mapM
+    {α : Type} (visit : α → Option TokenPlan) (values : List α) :
+    plans? visit values = values.mapM visit := by
+  induction values with
+  | nil => rfl
+  | cons value rest induction =>
+      simp only [plans?, List.mapM_cons, induction]
+
 private def nonemptyPlans? {α : Type} (visit : α → Option TokenPlan)
     (values : NonemptyList α) : Option (List TokenPlan) := do
   let headPlan ← visit values.head
@@ -555,6 +563,16 @@ planned suffix in source order. -/
       | none => simp
       | some tail =>
           simp [TokenPlan.concat, TokenPlan.append]
+
+/-- Module planning is the ordinary pointwise visitor followed by plan
+concatenation. -/
+theorem declarationModulePlan?_eq_mapM (module : ParsedModuleV1) :
+    declarationModulePlan? module =
+      Option.map TokenPlan.concat
+        (module.payload.items.mapM topItemPlan?) := by
+  unfold declarationModulePlan?
+  rw [plans?_eq_mapM]
+  cases result : module.payload.items.mapM topItemPlan? <;> simp
 
 /-!
 Rejected AST shapes are explicit `none` results:
