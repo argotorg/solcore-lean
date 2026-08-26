@@ -9,6 +9,7 @@ import Solcore.Standard.CanonicalData
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
+import Solcore.Test.SurfaceMultiLocation
 import Solcore.Test.SurfaceMultiStructure
 
 set_option autoImplicit false
@@ -4819,6 +4820,7 @@ def run : IO Unit := do
   testMultiLexerUtf8Spans
   testMultiLexerAssemblySlice
   testCanonicalRawLexing
+  testMultiLocationInventory
   testMultiStructuralValidation
 
 end Tests
