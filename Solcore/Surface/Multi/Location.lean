@@ -906,6 +906,305 @@ private def parsedModuleFragment (module : ParsedModuleV1) :
 
 namespace LocationFragment
 
+/-- Proof-facing traversal of one identifier occurrence. -/
+def ofIdentifier (identifier : IdentifierOccurrence) : LocationFragment :=
+  identifierFragment identifier
+
+@[simp] theorem ofIdentifier_roots (identifier : IdentifierOccurrence) :
+    (ofIdentifier identifier).roots = [identifier.span] := by
+  rfl
+
+/-- Proof-facing traversal of one top-level item. -/
+def ofTopItem (item : TopItem) : LocationFragment :=
+  topItemFragment item
+
+@[simp] theorem ofTopItem_roots (item : TopItem) :
+    (ofTopItem item).roots = [item.span] := by
+  rfl
+
+/-- Proof-facing traversal of one qualified name. -/
+def ofQualifiedName (name : QualifiedName) : LocationFragment :=
+  qualifiedNameFragment name
+
+@[simp] theorem ofQualifiedName_roots (name : QualifiedName) :
+    (ofQualifiedName name).roots = [name.span] := by
+  rfl
+
+/-- Proof-facing traversal of one module reference. -/
+def ofModuleReference (reference : ModuleReference) : LocationFragment :=
+  moduleReferenceFragment reference
+
+@[simp] theorem ofModuleReference_roots (reference : ModuleReference) :
+    (ofModuleReference reference).roots = [reference.span] := by
+  rfl
+
+/-- Proof-facing traversal of one import selector entry. -/
+def ofImportSelectorEntry (entry : ImportSelectorEntry) : LocationFragment :=
+  importSelectorEntryFragment entry
+
+@[simp] theorem ofImportSelectorEntry_roots (entry : ImportSelectorEntry) :
+    (ofImportSelectorEntry entry).roots = [entry.span] := by
+  rfl
+
+/-- Proof-facing traversal of one hiding clause. -/
+def ofHidingClause (clause : HidingClause) : LocationFragment :=
+  hidingClauseFragment clause
+
+@[simp] theorem ofHidingClause_roots (clause : HidingClause) :
+    (ofHidingClause clause).roots = [clause.span] := by
+  rfl
+
+/-- Proof-facing traversal of one import declaration. -/
+def ofImportDecl (declaration : ImportDecl) : LocationFragment :=
+  importDeclFragment declaration
+
+@[simp] theorem ofImportDecl_roots (declaration : ImportDecl) :
+    (ofImportDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one constructor selection. -/
+def ofConstructorSelection (selection : ConstructorSelection) :
+    LocationFragment :=
+  constructorSelectionFragment selection
+
+@[simp] theorem ofConstructorSelection_roots
+    (selection : ConstructorSelection) :
+    (ofConstructorSelection selection).roots = [selection.span] := by
+  rfl
+
+/-- Proof-facing traversal of one exported item. -/
+def ofExportItem (item : ExportItem) : LocationFragment :=
+  exportItemFragment item
+
+@[simp] theorem ofExportItem_roots (item : ExportItem) :
+    (ofExportItem item).roots = [item.span] := by
+  rfl
+
+/-- Proof-facing traversal of one local export entry. -/
+def ofExportEntry (entry : ExportEntry) : LocationFragment :=
+  exportEntryFragment entry
+
+@[simp] theorem ofExportEntry_roots (entry : ExportEntry) :
+    (ofExportEntry entry).roots = [entry.span] := by
+  rfl
+
+/-- Proof-facing traversal of one remote export entry. -/
+def ofRemoteExportEntry (entry : RemoteExportEntry) : LocationFragment :=
+  remoteExportEntryFragment entry
+
+@[simp] theorem ofRemoteExportEntry_roots (entry : RemoteExportEntry) :
+    (ofRemoteExportEntry entry).roots = [entry.span] := by
+  rfl
+
+/-- Proof-facing traversal of one export declaration. -/
+def ofExportDecl (declaration : ExportDecl) : LocationFragment :=
+  exportDeclFragment declaration
+
+@[simp] theorem ofExportDecl_roots (declaration : ExportDecl) :
+    (ofExportDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one forall binder. -/
+def ofForallBinder (binder : ForallBinder) : LocationFragment :=
+  forallBinderFragment binder
+
+@[simp] theorem ofForallBinder_roots (binder : ForallBinder) :
+    (ofForallBinder binder).roots = [binder.span] := by
+  rfl
+
+/-- Proof-facing traversal of one forall clause. -/
+def ofForallClause (clause : ForallClause) : LocationFragment :=
+  forallClauseFragment clause
+
+@[simp] theorem ofForallClause_roots (clause : ForallClause) :
+    (ofForallClause clause).roots = [clause.span] := by
+  rfl
+
+/-- Proof-facing traversal of one predicate. -/
+def ofPredicate (predicate : Predicate) : LocationFragment :=
+  predicateFragment predicate
+
+@[simp] theorem ofPredicate_roots (predicate : Predicate) :
+    (ofPredicate predicate).roots = [predicate.span] := by
+  rfl
+
+/-- Proof-facing traversal of one generic prefix. -/
+def ofGenericPrefix (genericPrefix : GenericPrefix) : LocationFragment :=
+  genericPrefixFragment genericPrefix
+
+@[simp] theorem ofGenericPrefix_roots (genericPrefix : GenericPrefix) :
+    (ofGenericPrefix genericPrefix).roots = [genericPrefix.span] := by
+  rfl
+
+/-- Proof-facing traversal of one parameter. -/
+def ofParameter (parameter : Parameter) : LocationFragment :=
+  parameterFragment parameter
+
+@[simp] theorem ofParameter_roots (parameter : Parameter) :
+    (ofParameter parameter).roots = [parameter.span] := by
+  rfl
+
+/-- Proof-facing traversal of one function signature. -/
+def ofFunctionSignature (signature : FunctionSignature) : LocationFragment :=
+  functionSignatureFragment signature
+
+@[simp] theorem ofFunctionSignature_roots (signature : FunctionSignature) :
+    (ofFunctionSignature signature).roots = [signature.span] := by
+  rfl
+
+/-- Proof-facing traversal of one class method declaration. -/
+def ofClassMethodDecl (declaration : ClassMethodDecl) : LocationFragment :=
+  classMethodDeclFragment declaration
+
+@[simp] theorem ofClassMethodDecl_roots (declaration : ClassMethodDecl) :
+    (ofClassMethodDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one function declaration. -/
+def ofFunctionDecl (declaration : FunctionDecl) : LocationFragment :=
+  functionDeclFragment declaration
+
+@[simp] theorem ofFunctionDecl_roots (declaration : FunctionDecl) :
+    (ofFunctionDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one fallback declaration. -/
+def ofFallbackDecl (declaration : FallbackDecl) : LocationFragment :=
+  fallbackDeclFragment declaration
+
+@[simp] theorem ofFallbackDecl_roots (declaration : FallbackDecl) :
+    (ofFallbackDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one contract constructor declaration. -/
+def ofContractConstructorDecl (declaration : ContractConstructorDecl) :
+    LocationFragment :=
+  contractConstructorDeclFragment declaration
+
+@[simp] theorem ofContractConstructorDecl_roots
+    (declaration : ContractConstructorDecl) :
+    (ofContractConstructorDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one data constructor. -/
+def ofDataConstructor (constructor : DataConstructor) : LocationFragment :=
+  dataConstructorFragment constructor
+
+@[simp] theorem ofDataConstructor_roots (constructor : DataConstructor) :
+    (ofDataConstructor constructor).roots = [constructor.span] := by
+  rfl
+
+/-- Proof-facing traversal of one data declaration. -/
+def ofDataDecl (declaration : DataDecl) : LocationFragment :=
+  dataDeclFragment declaration
+
+@[simp] theorem ofDataDecl_roots (declaration : DataDecl) :
+    (ofDataDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one type-alias declaration. -/
+def ofTypeAliasDecl (declaration : TypeAliasDecl) : LocationFragment :=
+  typeAliasDeclFragment declaration
+
+@[simp] theorem ofTypeAliasDecl_roots (declaration : TypeAliasDecl) :
+    (ofTypeAliasDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one class declaration. -/
+def ofClassDecl (declaration : ClassDecl) : LocationFragment :=
+  classDeclFragment declaration
+
+@[simp] theorem ofClassDecl_roots (declaration : ClassDecl) :
+    (ofClassDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one instance declaration. -/
+def ofInstanceDecl (declaration : InstanceDecl) : LocationFragment :=
+  instanceDeclFragment declaration
+
+@[simp] theorem ofInstanceDecl_roots (declaration : InstanceDecl) :
+    (ofInstanceDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one pragma declaration. -/
+def ofPragmaDecl (declaration : PragmaDecl) : LocationFragment :=
+  pragmaDeclFragment declaration
+
+@[simp] theorem ofPragmaDecl_roots (declaration : PragmaDecl) :
+    (ofPragmaDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one field declaration. -/
+def ofFieldDecl (declaration : FieldDecl) : LocationFragment :=
+  fieldDeclFragment declaration
+
+@[simp] theorem ofFieldDecl_roots (declaration : FieldDecl) :
+    (ofFieldDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one contract member. -/
+def ofContractMember (member : ContractMember) : LocationFragment :=
+  contractMemberFragment member
+
+@[simp] theorem ofContractMember_roots (member : ContractMember) :
+    (ofContractMember member).roots = [member.span] := by
+  rfl
+
+/-- Proof-facing traversal of one contract declaration. -/
+def ofContractDecl (declaration : ContractDecl) : LocationFragment :=
+  contractDeclFragment declaration
+
+@[simp] theorem ofContractDecl_roots (declaration : ContractDecl) :
+    (ofContractDecl declaration).roots = [declaration.span] := by
+  rfl
+
+/-- Proof-facing traversal of one type expression. -/
+def ofTypeExpr (typeExpression : TypeExpr) : LocationFragment :=
+  {
+    roots := [typeExpression.span]
+    inventory := (typeExprFragment typeExpression).inventory
+  }
+
+@[simp] theorem ofTypeExpr_roots (typeExpression : TypeExpr) :
+    (ofTypeExpr typeExpression).roots = [typeExpression.span] := by
+  rfl
+
+/-- Proof-facing traversal of one pattern. -/
+def ofPattern (pattern : Pattern) : LocationFragment :=
+  patternFragment pattern
+
+@[simp] theorem ofPattern_roots (pattern : Pattern) :
+    (ofPattern pattern).roots = [pattern.span] := by
+  cases pattern
+  rfl
+
+/-- Proof-facing traversal of one let binding. -/
+def ofLetBinding (binding : LetBinding) : LocationFragment :=
+  letBindingFragment binding
+
+@[simp] theorem ofLetBinding_roots (binding : LetBinding) :
+    (ofLetBinding binding).roots = [binding.span] := by
+  cases binding
+  rfl
+
+/-- Proof-facing traversal of one for-loop initializer. -/
+def ofForInitItem (item : ForInitItem) : LocationFragment :=
+  forInitItemFragment item
+
+@[simp] theorem ofForInitItem_roots (item : ForInitItem) :
+    (ofForInitItem item).roots = [item.span] := by
+  cases item
+  rfl
+
+/-- Proof-facing traversal of one for-loop post item. -/
+def ofForPostItem (item : ForPostItem) : LocationFragment :=
+  forPostItemFragment item
+
+@[simp] theorem ofForPostItem_roots (item : ForPostItem) :
+    (ofForPostItem item).roots = [item.span] := by
+  cases item
+  rfl
+
 /-- Proof-facing traversal of one literal and its retained locations. -/
 def ofLiteral (literal : Literal) : LocationFragment :=
   literalFragment literal
@@ -946,25 +1245,56 @@ def ofAssignmentOperator (operator : Located AssignmentOperator) :
 def ofExpression (expression : Expression) : LocationFragment :=
   expressionFragment expression
 
+@[simp] theorem ofExpression_roots (expression : Expression) :
+    (ofExpression expression).roots = [expression.span] := by
+  cases expression
+  rfl
+
 /-- Proof-facing traversal of one body and all of its descendants. -/
 def ofBody (body : Body) : LocationFragment :=
   bodyFragment body
+
+@[simp] theorem ofBody_roots (body : Body) :
+    (ofBody body).roots =
+      match body.payload.origin with
+      | .braced _ _ => [body.span]
+      | .matchArm fatArrow => [body.span, fatArrow] := by
+  rcases body with ⟨span, origin, statements⟩
+  cases origin <;> rfl
 
 /-- Proof-facing traversal of one match arm and all of its descendants. -/
 def ofMatchArm (arm : MatchArm) : LocationFragment :=
   matchArmFragment arm
 
+@[simp] theorem ofMatchArm_roots (arm : MatchArm) :
+    (ofMatchArm arm).roots = [arm.span] := by
+  cases arm
+  rfl
+
 /-- Proof-facing traversal of one statement and all of its descendants. -/
 def ofStatement (statement : Statement) : LocationFragment :=
   statementFragment statement
+
+@[simp] theorem ofStatement_roots (statement : Statement) :
+    (ofStatement statement).roots = [statement.span] := by
+  cases statement
+  rfl
 
 /-- Proof-facing traversal of one opaque assembly slice. -/
 def ofAssemblySlice (slice : AssemblySlice) : LocationFragment :=
   assemblySliceFragment slice
 
+@[simp] theorem ofAssemblySlice_roots (slice : AssemblySlice) :
+    (ofAssemblySlice slice).roots = [slice.span] := by
+  rfl
+
 /-- Proof-facing traversal of one complete parsed module. -/
 def ofParsedModule (module : ParsedModuleV1) : LocationFragment :=
   parsedModuleFragment module
+
+@[simp] theorem ofParsedModule_roots (module : ParsedModuleV1) :
+    (ofParsedModule module).roots = [module.span] := by
+  rfl
 
 end LocationFragment
 
