@@ -109,6 +109,18 @@ theorem optional_present
     ListMatches [.optional expected] [actual] :=
   .optionalPresent head .nil
 
+/-- A required exact head may forget its endpoint constraints while retaining
+the same token kind and the remainder of the complete match. -/
+theorem requiredHeadToPlain
+    {expected : ExpectedToken} {slots : List TokenSlot}
+    {actual : List Token}
+    (relation : ListMatches (.required expected :: slots) actual) :
+    ListMatches
+      (.required (ExpectedToken.plain expected.kind) :: slots) actual := by
+  cases relation with
+  | required head tail =>
+      exact .required head.toPlain tail
+
 /-- A mandatory singleton plan consumes exactly one matching token. -/
 theorem required_singleton_iff
     {expected : ExpectedToken} {actual : List Token} :
