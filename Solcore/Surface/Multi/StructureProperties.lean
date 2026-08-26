@@ -1913,6 +1913,249 @@ theorem mem_constructorDiagnostics_iff
         ⟨parameter, parameterMember, missing, diagnosticEq.symm⟩)
     · exact Or.inr (Or.inr body)
 
+section StructuralFuelRouting
+
+open StructureFuelDepth
+
+private def EmitsAt
+    (node : RecursiveAstNode) (fuel : Nat)
+    (diagnostic : StructuralDiagnostic) : Prop :=
+  match node with
+  | .expression expression =>
+      diagnostic ∈ expressionDiagnosticsFuel fuel expression
+  | .pattern pattern =>
+      diagnostic ∈ patternDiagnosticsFuel fuel pattern
+  | .body loopDepth body =>
+      diagnostic ∈ bodyDiagnosticsFuel fuel loopDepth body
+  | .statement loopDepth statement =>
+      diagnostic ∈ statementDiagnosticsFuel fuel loopDepth statement
+  | .forInit item =>
+      diagnostic ∈ forInitDiagnosticsFuel fuel item
+  | .forPost item =>
+      diagnostic ∈ forPostDiagnosticsFuel fuel item
+
+private theorem emitsAt_mono
+    {node : RecursiveAstNode} {fuel larger : Nat}
+    {diagnostic : StructuralDiagnostic}
+    (fuelLe : fuel ≤ larger)
+    (emits : EmitsAt node fuel diagnostic) :
+    EmitsAt node larger diagnostic := by
+  cases node with
+  | expression expression =>
+      exact mem_expressionDiagnosticsFuel_mono fuelLe emits
+  | pattern pattern =>
+      exact mem_patternDiagnosticsFuel_mono fuelLe emits
+  | body loopDepth body =>
+      exact mem_bodyDiagnosticsFuel_mono fuelLe emits
+  | statement loopDepth statement =>
+      exact mem_statementDiagnosticsFuel_mono fuelLe emits
+  | forInit item =>
+      exact mem_forInitDiagnosticsFuel_mono fuelLe emits
+  | forPost item =>
+      exact mem_forPostDiagnosticsFuel_mono fuelLe emits
+
+private theorem emitsAt_parent
+    {parent child : RecursiveAstNode}
+    (edge : RecursiveAstChild parent child)
+    {fuel : Nat} {diagnostic : StructuralDiagnostic}
+    (emits : EmitsAt child fuel diagnostic) :
+    EmitsAt parent (fuel + 1) diagnostic := by
+  cases edge <;>
+    simp_all [EmitsAt, expressionDiagnosticsFuel,
+      patternDiagnosticsFuel, bodyDiagnosticsFuel,
+      statementDiagnosticsFuel, forInitDiagnosticsFuel,
+      forPostDiagnosticsFuel, nonemptyToList]
+  case expressionCallArgument =>
+    exact Or.inr ⟨_, ‹_›, emits⟩
+  case expressionDotConstructorArgument =>
+    exact ⟨_, ‹_›, emits⟩
+  case expressionTupleElement =>
+    exact ⟨_, ‹_›, emits⟩
+  case patternNamedArgument =>
+    rcases ‹_ = _ ∨ _› with rfl | member
+    · exact Or.inl emits
+    · exact Or.inr ⟨_, member, emits⟩
+  case patternDotConstructorArgument =>
+    rcases ‹_ = _ ∨ _› with rfl | member
+    · exact Or.inl emits
+    · exact Or.inr ⟨_, member, emits⟩
+  case patternTupleElement =>
+    exact ⟨_, ‹_›, emits⟩
+  case bodyStatement =>
+    exact ⟨_, ‹_›, emits⟩
+  case statementMatchScrutinee =>
+    rcases ‹_ = _ ∨ _› with rfl | member
+    · exact Or.inl emits
+    · exact Or.inr (Or.inl ⟨_, member, emits⟩)
+  case statementMatchPattern armMember patternMember =>
+    rcases armMember with rfl | armMember
+    · rcases patternMember with rfl | patternMember
+      · exact Or.inr (Or.inr (Or.inr (Or.inl emits)))
+      · exact Or.inr (Or.inr (Or.inr (Or.inr
+          (Or.inl ⟨_, patternMember, emits⟩))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+        ⟨_, armMember, by
+          rcases patternMember with rfl | patternMember
+          · exact Or.inr (Or.inl emits)
+          · exact Or.inr (Or.inr (Or.inl
+              ⟨_, patternMember, emits⟩))
+        ⟩)))))
+  case statementMatchBody =>
+    rcases ‹_ = _ ∨ _› with rfl | armMember
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl emits)))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+        ⟨_, armMember, Or.inr (Or.inr (Or.inr emits))⟩)))))
+  case statementForInitializer =>
+    exact Or.inl ⟨_, ‹_›, emits⟩
+  case statementForPost =>
+    exact Or.inr (Or.inr (Or.inl ⟨_, ‹_›, emits⟩))
+
+private theorem emitsAt_mem_diagnosticCandidates_of_root
+    {module : ParsedModuleV1} {node : RecursiveAstNode}
+    (root : RecursiveAstRoot module node)
+    {diagnostic : StructuralDiagnostic}
+    (emits : EmitsAt node (astNodeMeasure module + 1) diagnostic) :
+    diagnostic ∈ diagnosticCandidates module := by
+  change diagnostic ∈ module.payload.items.flatMap
+    (topItemDiagnostics (astNodeMeasure module + 1))
+  rw [List.mem_flatMap]
+  cases root with
+  | topLevelFunction member =>
+      refine ⟨_, member, ?_⟩
+      simp only [topItemDiagnostics, functionDiagnostics]
+      change diagnostic ∈ (_ ++ _) ++
+        bodyDiagnosticsFuel (astNodeMeasure module + 1) 0 _
+      rw [List.mem_append, List.mem_append]
+      exact Or.inr emits
+  | instanceMethod itemMember methodMember =>
+      refine ⟨_, itemMember, ?_⟩
+      simp only [topItemDiagnostics]
+      rw [List.mem_flatMap]
+      refine ⟨_, methodMember, ?_⟩
+      simp only [functionDiagnostics]
+      change diagnostic ∈ (_ ++ _) ++
+        bodyDiagnosticsFuel (astNodeMeasure module + 1) 0 _
+      rw [List.mem_append, List.mem_append]
+      exact Or.inr emits
+  | contractFieldInitializer itemMember memberMember initializer_eq =>
+      refine ⟨_, itemMember, ?_⟩
+      simp only [topItemDiagnostics, contractDiagnostics]
+      rw [List.mem_flatMap]
+      refine ⟨_, memberMember, ?_⟩
+      simp only [contractMemberDiagnostics]
+      rw [initializer_eq]
+      exact emits
+  | contractFunction itemMember memberMember =>
+      refine ⟨_, itemMember, ?_⟩
+      simp only [topItemDiagnostics, contractDiagnostics]
+      rw [List.mem_flatMap]
+      refine ⟨_, memberMember, ?_⟩
+      simp only [contractMemberDiagnostics]
+      change diagnostic ∈ _ ++
+        bodyDiagnosticsFuel (astNodeMeasure module + 1) 0 _
+      rw [List.mem_append]
+      exact Or.inr emits
+  | fallback itemMember memberMember =>
+      refine ⟨_, itemMember, ?_⟩
+      simp only [topItemDiagnostics, contractDiagnostics]
+      rw [List.mem_flatMap]
+      refine ⟨_, memberMember, ?_⟩
+      simp only [contractMemberDiagnostics]
+      exact mem_fallbackDiagnostics_iff.mpr
+        (Or.inr (Or.inr (Or.inr emits)))
+  | constructor itemMember memberMember =>
+      refine ⟨_, itemMember, ?_⟩
+      simp only [topItemDiagnostics, contractDiagnostics]
+      rw [List.mem_flatMap]
+      refine ⟨_, memberMember, ?_⟩
+      simp only [contractMemberDiagnostics]
+      exact mem_constructorDiagnostics_iff.mpr
+        (Or.inr (Or.inr emits))
+
+private theorem emitsAt_mem_diagnosticCandidates_of_path
+    {module : ParsedModuleV1} {node : RecursiveAstNode} {depth fuel : Nat}
+    {diagnostic : StructuralDiagnostic}
+    (path : StructuralFuelPath module node depth)
+    (fuelBound : fuel + depth ≤ astNodeMeasure module + 1)
+    (emits : EmitsAt node fuel diagnostic) :
+    diagnostic ∈ diagnosticCandidates module := by
+  induction path generalizing fuel with
+  | root root =>
+      exact emitsAt_mem_diagnosticCandidates_of_root root
+        (emitsAt_mono (by omega) emits)
+  | @child parent child depth parentPath edge induction =>
+      exact induction (fuel := fuel + 1) (by omega)
+        (emitsAt_parent edge emits)
+
+/-- An expression diagnostic emitted within a module-bounded structural path
+is an executable diagnostic candidate of that module. -/
+theorem mem_diagnosticCandidates_of_mem_expressionDiagnosticsFuel
+    {module : ParsedModuleV1} {expression : Expression}
+    {depth fuel : Nat} {diagnostic : StructuralDiagnostic}
+    (path : StructuralFuelPath module (.expression expression) depth)
+    (fuelBound : fuel + depth ≤ astNodeMeasure module + 1)
+    (member : diagnostic ∈ expressionDiagnosticsFuel fuel expression) :
+    diagnostic ∈ diagnosticCandidates module :=
+  emitsAt_mem_diagnosticCandidates_of_path path fuelBound member
+
+/-- A pattern diagnostic emitted within a module-bounded structural path is an
+executable diagnostic candidate of that module. -/
+theorem mem_diagnosticCandidates_of_mem_patternDiagnosticsFuel
+    {module : ParsedModuleV1} {pattern : Pattern}
+    {depth fuel : Nat} {diagnostic : StructuralDiagnostic}
+    (path : StructuralFuelPath module (.pattern pattern) depth)
+    (fuelBound : fuel + depth ≤ astNodeMeasure module + 1)
+    (member : diagnostic ∈ patternDiagnosticsFuel fuel pattern) :
+    diagnostic ∈ diagnosticCandidates module :=
+  emitsAt_mem_diagnosticCandidates_of_path path fuelBound member
+
+/-- A body diagnostic emitted within a module-bounded structural path is an
+executable diagnostic candidate of that module. -/
+theorem mem_diagnosticCandidates_of_mem_bodyDiagnosticsFuel
+    {module : ParsedModuleV1} {loopDepth : Nat} {body : Body}
+    {depth fuel : Nat} {diagnostic : StructuralDiagnostic}
+    (path : StructuralFuelPath module (.body loopDepth body) depth)
+    (fuelBound : fuel + depth ≤ astNodeMeasure module + 1)
+    (member : diagnostic ∈ bodyDiagnosticsFuel fuel loopDepth body) :
+    diagnostic ∈ diagnosticCandidates module :=
+  emitsAt_mem_diagnosticCandidates_of_path path fuelBound member
+
+/-- A statement diagnostic emitted within a module-bounded structural path is
+an executable diagnostic candidate of that module. -/
+theorem mem_diagnosticCandidates_of_mem_statementDiagnosticsFuel
+    {module : ParsedModuleV1} {loopDepth : Nat} {statement : Statement}
+    {depth fuel : Nat} {diagnostic : StructuralDiagnostic}
+    (path : StructuralFuelPath module (.statement loopDepth statement) depth)
+    (fuelBound : fuel + depth ≤ astNodeMeasure module + 1)
+    (member : diagnostic ∈
+      statementDiagnosticsFuel fuel loopDepth statement) :
+    diagnostic ∈ diagnosticCandidates module :=
+  emitsAt_mem_diagnosticCandidates_of_path path fuelBound member
+
+/-- A `for`-initializer diagnostic emitted within a module-bounded structural
+path is an executable diagnostic candidate of that module. -/
+theorem mem_diagnosticCandidates_of_mem_forInitDiagnosticsFuel
+    {module : ParsedModuleV1} {item : ForInitItem}
+    {depth fuel : Nat} {diagnostic : StructuralDiagnostic}
+    (path : StructuralFuelPath module (.forInit item) depth)
+    (fuelBound : fuel + depth ≤ astNodeMeasure module + 1)
+    (member : diagnostic ∈ forInitDiagnosticsFuel fuel item) :
+    diagnostic ∈ diagnosticCandidates module :=
+  emitsAt_mem_diagnosticCandidates_of_path path fuelBound member
+
+/-- A `for`-post diagnostic emitted within a module-bounded structural path is
+an executable diagnostic candidate of that module. -/
+theorem mem_diagnosticCandidates_of_mem_forPostDiagnosticsFuel
+    {module : ParsedModuleV1} {item : ForPostItem}
+    {depth fuel : Nat} {diagnostic : StructuralDiagnostic}
+    (path : StructuralFuelPath module (.forPost item) depth)
+    (fuelBound : fuel + depth ≤ astNodeMeasure module + 1)
+    (member : diagnostic ∈ forPostDiagnosticsFuel fuel item) :
+    diagnostic ∈ diagnosticCandidates module :=
+  emitsAt_mem_diagnosticCandidates_of_path path fuelBound member
+
+end StructuralFuelRouting
+
 /-- Every diagnostic emitted for a reached fallback declaration is
 declaratively applicable. -/
 theorem mem_fallbackDiagnostics_applies
