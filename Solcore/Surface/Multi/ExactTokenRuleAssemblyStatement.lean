@@ -87,4 +87,22 @@ theorem assemblyStatement_tokenPlanSound_of_tokensSourceExact
       simpa [ruleTokenPlan?, statementTokenPlan?, sourceLoc,
         TokenPlan.concat_cons] using enclosed
 
+/-- Coherent assembly reductions inherit the lexical source evidence carried
+by the parser-wide callback. -/
+theorem assemblyStatement_coherentTokenPlanSound :
+    CoherentGrammarRuleTokenPlanSound sourceRuleTokenPlanLayout
+      .assemblyStatement := by
+  intro file tokens memo correct final origin finish context priorValues output
+    complete owned sourceExact _coherentPrefix reduces inputEvidence
+  apply assemblyStatement_tokenPlanSound_of_tokensSourceExact
+    owned sourceExact reduces
+  apply inputEvidence.candidate_eq
+  symm
+  rw [RootAction.unpack_tokenPlan?]
+  simpa only [CanonicalCompleteRootItem] using
+    (PrefixValues.tokenPlan?_fullValue sourceRuleTokenPlanLayout
+      (CanonicalCompleteRootItem tokens .assemblyStatement
+        origin finish context)
+      complete priorValues)
+
 end Solcore.Surface.Multi
