@@ -2701,8 +2701,8 @@ theorem structure_complete
     diagnostic ∈ diagnostics module :=
   mem_diagnostics_iff_applies.mpr applies
 
-/-- The module-derived traversal bound reaches every applicable diagnostic. -/
-theorem structureBound_sufficient
+/-- The module-derived traversal fuel reaches every applicable diagnostic. -/
+theorem structuralTraversalFuel_sufficient
     {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic}
     (applies : StructuralDiagnostic.Applies module diagnostic) :
     diagnostic ∈ diagnosticCandidates module :=
