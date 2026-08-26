@@ -210,22 +210,45 @@ private def tagDuplicateComparisons
       candidateOrdinal := comparison.candidateOrdinal
       seenOffset := comparison.seenOffset }
 
-private def duplicateRunTrace {α κ : Type} [DecidableEq κ]
+/-- Tag the comparison trace from one duplicate-helper invocation with its
+structural-validator site. -/
+def duplicateComparisonTrace {α κ : Type} [DecidableEq κ]
     (kind : StructureDuplicateComparisonKind) (siteSpan : SourceSpan)
     (key : α → κ) (makeDiagnostic : α → StructuralDiagnostic)
     (values : List α) : List StructureDuplicateComparisonUnit :=
   tagDuplicateComparisons kind siteSpan
     (duplicateDiagnosticsRun key makeDiagnostic values).comparisons
 
+@[simp] theorem duplicateComparisonTrace_length {α κ : Type}
+    [DecidableEq κ]
+    (kind : StructureDuplicateComparisonKind) (siteSpan : SourceSpan)
+    (key : α → κ) (makeDiagnostic : α → StructuralDiagnostic)
+    (values : List α) :
+    (duplicateComparisonTrace kind siteSpan key makeDiagnostic values).length =
+      duplicateComparisonUnits key makeDiagnostic values := by
+  simp [duplicateComparisonTrace, tagDuplicateComparisons,
+    duplicateComparisonUnits]
+
+/-- Site tagging preserves the per-invocation quadratic comparison bound. -/
+theorem duplicateComparisonTrace_length_le_square {α κ : Type}
+    [DecidableEq κ]
+    (kind : StructureDuplicateComparisonKind) (siteSpan : SourceSpan)
+    (key : α → κ) (makeDiagnostic : α → StructuralDiagnostic)
+    (values : List α) :
+    (duplicateComparisonTrace kind siteSpan key makeDiagnostic values).length ≤
+      values.length * values.length := by
+  rw [duplicateComparisonTrace_length]
+  exact duplicateComparisonUnits_le_square key makeDiagnostic values
+
 /-- Duplicate-key comparisons performed within one import selection. -/
 def importSelectionDuplicateComparisonTrace
     (selection : ImportSelection) : List StructureDuplicateComparisonUnit :=
   let named := namedImportEntries selection.payload.entries
-  duplicateRunTrace .importSourceName selection.span
+  duplicateComparisonTrace .importSourceName selection.span
       (fun entry => entry.1.payload)
       (fun entry => .duplicateImportSourceName entry.1.span entry.1.payload)
       named ++
-    duplicateRunTrace .importLocalName selection.span
+    duplicateComparisonTrace .importLocalName selection.span
       (fun entry => entry.2.payload)
       (fun entry => .duplicateImportLocalName entry.2.span entry.2.payload)
       named
@@ -233,7 +256,7 @@ def importSelectionDuplicateComparisonTrace
 /-- Duplicate-key comparisons performed within one import hiding clause. -/
 def hidingDuplicateComparisonTrace
     (clause : HidingClause) : List StructureDuplicateComparisonUnit :=
-  duplicateRunTrace .hiddenName clause.span
+  duplicateComparisonTrace .hiddenName clause.span
     (fun name => name.payload)
     (fun name => .duplicateHiddenName name.span name.payload)
     clause.payload.names
@@ -248,7 +271,7 @@ def constructorSelectionDuplicateComparisonTrace
       match located.payload with
       | .all _ => []
       | .named constructors =>
-          duplicateRunTrace .exportConstructor located.span
+          duplicateComparisonTrace .exportConstructor located.span
             (fun name => name.payload)
             (fun name =>
               .duplicateExportConstructor name.span name.payload)
@@ -282,12 +305,12 @@ def localExportDuplicateComparisonTrace
     localExportItemsForDuplicateComparisons selection.payload.entries
   let references :=
     localExportReferencesForDuplicateComparisons selection.payload.entries
-  duplicateRunTrace .exportName selection.span
+  duplicateComparisonTrace .exportName selection.span
       (fun item => item.payload.name.payload)
       (fun item => .duplicateExportName
         item.payload.name.span item.payload.name.payload)
       items ++
-    duplicateRunTrace .exportModuleReference selection.span
+    duplicateComparisonTrace .exportModuleReference selection.span
       ModuleReference.eraseLocations
       (fun reference => .duplicateExportModuleReference
         reference.span reference.eraseLocations)
@@ -311,7 +334,7 @@ def remoteExportDuplicateComparisonTrace
   | .dotWildcard _ => []
   | .braced entries =>
       let items := remoteExportItemsForDuplicateComparisons entries
-      duplicateRunTrace .exportName selection.span
+      duplicateComparisonTrace .exportName selection.span
           (fun item => item.payload.name.payload)
           (fun item => .duplicateExportName
             item.payload.name.span item.payload.name.payload)
@@ -321,7 +344,7 @@ def remoteExportDuplicateComparisonTrace
 /-- Duplicate-key comparisons performed within a pragma declaration. -/
 def pragmaDuplicateComparisonTrace
     (declaration : PragmaDecl) : List StructureDuplicateComparisonUnit :=
-  duplicateRunTrace .pragmaTarget declaration.span
+  duplicateComparisonTrace .pragmaTarget declaration.span
     (fun target => target.payload)
     (fun target => .duplicatePragmaTarget target.span target.payload)
     declaration.payload.targets
@@ -361,4 +384,3 @@ def structureDuplicateComparisonUnits (module : ParsedModuleV1) : Nat :=
 end Structure
 
 end Solcore.Surface.Multi
-
