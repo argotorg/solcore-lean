@@ -257,7 +257,8 @@ def disallowedSignatureModifierDiagnostics
 
 mutual
 
-private def expressionDiagnosticsFuel : Nat → Expression →
+/-- Collect expression-rooted diagnostics within the supplied traversal fuel. -/
+def expressionDiagnosticsFuel : Nat → Expression →
     List StructuralDiagnostic
   | 0, _ => []
   | fuel + 1, expression =>
@@ -289,7 +290,8 @@ private def expressionDiagnosticsFuel : Nat → Expression →
           elements.flatMap (expressionDiagnosticsFuel fuel)
       | .group inner => expressionDiagnosticsFuel fuel inner
 
-private def patternDiagnosticsFuel : Nat → Pattern → List StructuralDiagnostic
+/-- Collect pattern-rooted diagnostics within the supplied traversal fuel. -/
+def patternDiagnosticsFuel : Nat → Pattern → List StructuralDiagnostic
   | 0, _ => []
   | fuel + 1, pattern =>
       match pattern.payload with
@@ -303,13 +305,15 @@ private def patternDiagnosticsFuel : Nat → Pattern → List StructuralDiagnost
       | .tuple elements => elements.flatMap (patternDiagnosticsFuel fuel)
       | .group inner => patternDiagnosticsFuel fuel inner
 
-private def bodyDiagnosticsFuel : Nat → Nat → Body → List StructuralDiagnostic
+/-- Collect body-rooted diagnostics at a fixed loop depth and traversal fuel. -/
+def bodyDiagnosticsFuel : Nat → Nat → Body → List StructuralDiagnostic
   | 0, _, _ => []
   | fuel + 1, loopDepth, body =>
       body.payload.statements.flatMap
         (statementDiagnosticsFuel fuel loopDepth)
 
-private def statementDiagnosticsFuel : Nat → Nat → Statement →
+/-- Collect statement-rooted diagnostics at a fixed loop depth and fuel. -/
+def statementDiagnosticsFuel : Nat → Nat → Statement →
     List StructuralDiagnostic
   | 0, _, _ => []
   | fuel + 1, loopDepth, statement =>
@@ -363,7 +367,8 @@ private def statementDiagnosticsFuel : Nat → Nat → Statement →
           else
             []
 
-private def forInitDiagnosticsFuel : Nat → ForInitItem →
+/-- Collect diagnostics rooted at one `for` initializer within the fuel. -/
+def forInitDiagnosticsFuel : Nat → ForInitItem →
     List StructuralDiagnostic
   | 0, _ => []
   | fuel + 1, item =>
@@ -377,7 +382,8 @@ private def forInitDiagnosticsFuel : Nat → ForInitItem →
             expressionDiagnosticsFuel fuel right
       | .expression expression => expressionDiagnosticsFuel fuel expression
 
-private def forPostDiagnosticsFuel : Nat → ForPostItem →
+/-- Collect diagnostics rooted at one `for` post item within the fuel. -/
+def forPostDiagnosticsFuel : Nat → ForPostItem →
     List StructuralDiagnostic
   | 0, _ => []
   | fuel + 1, item =>

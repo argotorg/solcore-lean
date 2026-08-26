@@ -852,6 +852,431 @@ theorem mem_pragmaDiagnostics_top_applies
   mem_pragmaDiagnostics_applies
     (.pragmaTop itemMember itemShape) member
 
+private structure RecursiveDiagnosticsFuelSound (fuel : Nat) : Prop where
+  expression :
+    ∀ {module : ParsedModuleV1} {expression : Expression}
+      {diagnostic : StructuralDiagnostic},
+      StructuralSite.Occurs module (.expression expression) →
+      diagnostic ∈ expressionDiagnosticsFuel fuel expression →
+      StructuralDiagnostic.Applies module diagnostic
+  pattern :
+    ∀ {module : ParsedModuleV1} {pattern : Pattern}
+      {diagnostic : StructuralDiagnostic},
+      StructuralSite.Occurs module (.pattern pattern) →
+      diagnostic ∈ patternDiagnosticsFuel fuel pattern →
+      StructuralDiagnostic.Applies module diagnostic
+  body :
+    ∀ {module : ParsedModuleV1} {loopDepth : Nat} {body : Body}
+      {diagnostic : StructuralDiagnostic},
+      StructuralSite.Occurs module (.body loopDepth body) →
+      diagnostic ∈ bodyDiagnosticsFuel fuel loopDepth body →
+      StructuralDiagnostic.Applies module diagnostic
+  statement :
+    ∀ {module : ParsedModuleV1} {loopDepth : Nat} {statement : Statement}
+      {diagnostic : StructuralDiagnostic},
+      StructuralSite.Occurs module (.statement loopDepth statement) →
+      diagnostic ∈ statementDiagnosticsFuel fuel loopDepth statement →
+      StructuralDiagnostic.Applies module diagnostic
+  forInit :
+    ∀ {module : ParsedModuleV1} {item : ForInitItem}
+      {diagnostic : StructuralDiagnostic},
+      StructuralSite.Occurs module (.forInit item) →
+      diagnostic ∈ forInitDiagnosticsFuel fuel item →
+      StructuralDiagnostic.Applies module diagnostic
+  forPost :
+    ∀ {module : ParsedModuleV1} {item : ForPostItem}
+      {diagnostic : StructuralDiagnostic},
+      StructuralSite.Occurs module (.forPost item) →
+      diagnostic ∈ forPostDiagnosticsFuel fuel item →
+      StructuralDiagnostic.Applies module diagnostic
+
+private theorem recursiveDiagnosticsFuel_applies
+    (fuel : Nat) : RecursiveDiagnosticsFuelSound fuel := by
+  induction fuel with
+  | zero =>
+      constructor <;> intros <;> simp_all [expressionDiagnosticsFuel,
+        patternDiagnosticsFuel, bodyDiagnosticsFuel,
+        statementDiagnosticsFuel, forInitDiagnosticsFuel,
+        forPostDiagnosticsFuel]
+  | succ fuel previous =>
+      constructor
+      · intro module expression diagnostic occurrence member
+        cases shape : expression.payload with
+        | name name => simp [expressionDiagnosticsFuel, shape] at member
+        | call callee arguments =>
+            rw [expressionDiagnosticsFuel, shape, List.mem_append] at member
+            rcases member with calleeMember | argumentMember
+            · exact previous.expression
+                (.expressionCallCallee occurrence shape) calleeMember
+            · rw [List.mem_flatMap] at argumentMember
+              rcases argumentMember with
+                ⟨argument, argumentIn, diagnosticIn⟩
+              exact previous.expression
+                (.expressionCallArgument occurrence shape argumentIn)
+                diagnosticIn
+        | select receiver field =>
+            rw [expressionDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.expressionSelectReceiver occurrence shape) member
+        | dotConstructor marker name arguments =>
+            cases arguments with
+            | none => simp [expressionDiagnosticsFuel, shape] at member
+            | some arguments =>
+                rw [expressionDiagnosticsFuel, shape,
+                  List.mem_flatMap] at member
+                rcases member with ⟨argument, argumentIn, diagnosticIn⟩
+                exact previous.expression
+                  (.expressionDotConstructorArgument occurrence shape
+                    argumentIn)
+                  diagnosticIn
+        | proxy marker typeExpression =>
+            simp [expressionDiagnosticsFuel, shape] at member
+        | literal literal =>
+            simp [expressionDiagnosticsFuel, shape] at member
+        | lambda parameters returnType body =>
+            rw [expressionDiagnosticsFuel, shape] at member
+            exact previous.body
+              (.expressionLambdaBody occurrence shape) member
+        | annotation inner typeExpression =>
+            rw [expressionDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.expressionAnnotationInner occurrence shape) member
+        | keywordConditional condition thenBranch elseBranch =>
+            simp only [expressionDiagnosticsFuel, shape,
+              List.mem_append] at member
+            rcases member with earlierMember | elseMember
+            · rcases earlierMember with conditionMember | thenMember
+              · exact previous.expression
+                  (.expressionKeywordCondition occurrence shape)
+                  conditionMember
+              · exact previous.expression
+                  (.expressionKeywordThen occurrence shape) thenMember
+            · exact previous.expression
+                (.expressionKeywordElse occurrence shape) elseMember
+        | ternaryConditional condition thenBranch elseBranch =>
+            simp only [expressionDiagnosticsFuel, shape,
+              List.mem_append] at member
+            rcases member with earlierMember | elseMember
+            · rcases earlierMember with conditionMember | thenMember
+              · exact previous.expression
+                  (.expressionTernaryCondition occurrence shape)
+                  conditionMember
+              · exact previous.expression
+                  (.expressionTernaryThen occurrence shape) thenMember
+            · exact previous.expression
+                (.expressionTernaryElse occurrence shape) elseMember
+        | index receiver index =>
+            rw [expressionDiagnosticsFuel, shape, List.mem_append] at member
+            rcases member with receiverMember | indexMember
+            · exact previous.expression
+                (.expressionIndexReceiver occurrence shape) receiverMember
+            · exact previous.expression
+                (.expressionIndexValue occurrence shape) indexMember
+        | «prefix» operator operand =>
+            rw [expressionDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.expressionPrefixOperand occurrence shape) member
+        | «infix» operator left right =>
+            rw [expressionDiagnosticsFuel, shape, List.mem_append] at member
+            rcases member with leftMember | rightMember
+            · exact previous.expression
+                (.expressionInfixLeft occurrence shape) leftMember
+            · exact previous.expression
+                (.expressionInfixRight occurrence shape) rightMember
+        | tuple elements =>
+            rw [expressionDiagnosticsFuel, shape,
+              List.mem_flatMap] at member
+            rcases member with ⟨element, elementIn, diagnosticIn⟩
+            exact previous.expression
+              (.expressionTupleElement occurrence shape elementIn)
+              diagnosticIn
+        | group inner =>
+            rw [expressionDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.expressionGroupInner occurrence shape) member
+      · intro module pattern diagnostic occurrence member
+        cases shape : pattern.payload with
+        | named name arguments =>
+            cases arguments with
+            | none => simp [patternDiagnosticsFuel, shape] at member
+            | some arguments =>
+                rw [patternDiagnosticsFuel, shape,
+                  List.mem_flatMap] at member
+                rcases member with ⟨argument, argumentIn, diagnosticIn⟩
+                exact previous.pattern
+                  (.patternNamedArgument occurrence shape (by
+                    simpa [nonemptyToList, NonemptyList.toList] using
+                      argumentIn))
+                  diagnosticIn
+        | dotConstructor marker name arguments =>
+            cases arguments with
+            | none => simp [patternDiagnosticsFuel, shape] at member
+            | some arguments =>
+                rw [patternDiagnosticsFuel, shape,
+                  List.mem_flatMap] at member
+                rcases member with ⟨argument, argumentIn, diagnosticIn⟩
+                exact previous.pattern
+                  (.patternDotConstructorArgument occurrence shape (by
+                    simpa [nonemptyToList, NonemptyList.toList] using
+                      argumentIn))
+                  diagnosticIn
+        | wildcard marker =>
+            simp [patternDiagnosticsFuel, shape] at member
+        | literal literal =>
+            simp [patternDiagnosticsFuel, shape] at member
+        | comptime marker expression =>
+            rw [patternDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.patternComptimeExpression occurrence shape) member
+        | tuple elements =>
+            rw [patternDiagnosticsFuel, shape, List.mem_flatMap] at member
+            rcases member with ⟨element, elementIn, diagnosticIn⟩
+            exact previous.pattern
+              (.patternTupleElement occurrence shape elementIn) diagnosticIn
+        | group inner =>
+            rw [patternDiagnosticsFuel, shape] at member
+            exact previous.pattern
+              (.patternGroupInner occurrence shape) member
+      · intro module loopDepth body diagnostic occurrence member
+        rw [bodyDiagnosticsFuel, List.mem_flatMap] at member
+        rcases member with ⟨statement, statementIn, diagnosticIn⟩
+        exact previous.statement
+          (.bodyStatement occurrence statementIn) diagnosticIn
+      · intro module loopDepth statement diagnostic occurrence member
+        cases shape : statement.payload with
+        | assignment operator left right =>
+            rw [statementDiagnosticsFuel, shape, List.mem_append] at member
+            rcases member with leftMember | rightMember
+            · exact previous.expression
+                (.statementAssignmentLeft occurrence shape) leftMember
+            · exact previous.expression
+                (.statementAssignmentRight occurrence shape) rightMember
+        | letBinding binding =>
+            cases initializerShape : binding.payload.initializer with
+            | none =>
+                simp [statementDiagnosticsFuel, shape,
+                  initializerShape] at member
+            | some initializer =>
+                simp only [statementDiagnosticsFuel, shape,
+                  initializerShape] at member
+                exact previous.expression
+                  (.statementLetInitializer occurrence shape
+                    initializerShape)
+                  member
+        | block body =>
+            rw [statementDiagnosticsFuel, shape] at member
+            exact previous.body (.statementBlockBody occurrence shape) member
+        | expression expression terminator =>
+            rw [statementDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.statementExpression occurrence shape) member
+        | «return» value terminator =>
+            cases value with
+            | none => simp [statementDiagnosticsFuel, shape] at member
+            | some expression =>
+                rw [statementDiagnosticsFuel, shape] at member
+                exact previous.expression
+                  (.statementReturnValue occurrence shape) member
+        | «match» scrutinees arms terminator =>
+            rw [statementDiagnosticsFuel, shape,
+              List.mem_append] at member
+            rcases member with scrutineeDiagnostic | armDiagnostic
+            · rw [List.mem_flatMap] at scrutineeDiagnostic
+              rcases scrutineeDiagnostic with
+                ⟨scrutinee, scrutineeIn, diagnosticIn⟩
+              exact previous.expression
+                (.statementMatchScrutinee occurrence shape (by
+                  simpa [nonemptyToList, NonemptyList.toList] using
+                    scrutineeIn))
+                diagnosticIn
+            · rw [List.mem_flatMap] at armDiagnostic
+              rcases armDiagnostic with ⟨arm, armIn, diagnosticIn⟩
+              simp only [List.mem_append] at diagnosticIn
+              rcases diagnosticIn with earlierDiagnostic | bodyDiagnostic
+              · rcases earlierDiagnostic with mismatchDiagnostic |
+                  patternDiagnostic
+                · by_cases arity :
+                      (nonemptyToList arm.payload.patterns).length =
+                        (nonemptyToList scrutinees).length
+                  · simp [arity] at mismatchDiagnostic
+                  · simp only [arity, if_false,
+                      List.mem_singleton] at mismatchDiagnostic
+                    rw [mismatchDiagnostic]
+                    exact .matchPatternArityMismatch occurrence shape (by
+                      simpa [nonemptyToList, NonemptyList.toList] using armIn)
+                      (by
+                        simpa [nonemptyToList, NonemptyList.toList] using
+                          arity)
+                · rw [List.mem_flatMap] at patternDiagnostic
+                  rcases patternDiagnostic with
+                    ⟨pattern, patternIn, nestedDiagnostic⟩
+                  exact previous.pattern
+                    (.statementMatchPattern occurrence shape (by
+                      simpa [nonemptyToList, NonemptyList.toList] using armIn)
+                      (by
+                        simpa [nonemptyToList, NonemptyList.toList] using
+                          patternIn))
+                    nestedDiagnostic
+              · exact previous.body
+                  (.statementMatchArmBody occurrence shape (by
+                    simpa [nonemptyToList, NonemptyList.toList] using armIn))
+                  bodyDiagnostic
+        | assembly slice =>
+            simp [statementDiagnosticsFuel, shape] at member
+        | ifThenElse condition thenBody elseBody =>
+            rw [statementDiagnosticsFuel, shape] at member
+            simp only [List.mem_append] at member
+            rcases member with earlierDiagnostic | elseDiagnostic
+            · rcases earlierDiagnostic with conditionDiagnostic |
+                thenDiagnostic
+              · exact previous.expression
+                  (.statementIfCondition occurrence shape)
+                  conditionDiagnostic
+              · exact previous.body
+                  (.statementIfThenBody occurrence shape) thenDiagnostic
+            · cases elseBody with
+              | none => simp at elseDiagnostic
+              | some elseBody =>
+                  exact previous.body
+                    (.statementIfElseBody occurrence shape) elseDiagnostic
+        | forLoop initializers condition post body =>
+            simp only [statementDiagnosticsFuel, shape,
+              List.mem_append] at member
+            rcases member with beforeBody | bodyDiagnostic
+            · rcases beforeBody with beforePost | postDiagnostic
+              · rcases beforePost with initializerDiagnostic |
+                  conditionDiagnostic
+                · rw [List.mem_flatMap] at initializerDiagnostic
+                  rcases initializerDiagnostic with
+                    ⟨item, itemIn, diagnosticIn⟩
+                  exact previous.forInit
+                    (.statementForInitializer occurrence shape itemIn)
+                    diagnosticIn
+                · exact previous.expression
+                    (.statementForCondition occurrence shape)
+                    conditionDiagnostic
+              · rw [List.mem_flatMap] at postDiagnostic
+                rcases postDiagnostic with ⟨item, itemIn, diagnosticIn⟩
+                exact previous.forPost
+                  (.statementForPost occurrence shape itemIn) diagnosticIn
+            · exact previous.body
+                (.statementForBody occurrence shape) bodyDiagnostic
+        | «break» terminator =>
+            by_cases atTop : loopDepth = 0
+            · subst loopDepth
+              simp only [statementDiagnosticsFuel, shape, if_true,
+                List.mem_singleton] at member
+              rw [member]
+              exact .breakOutsideLoop occurrence shape
+            · simp [statementDiagnosticsFuel, shape, atTop] at member
+        | «continue» terminator =>
+            by_cases atTop : loopDepth = 0
+            · subst loopDepth
+              simp only [statementDiagnosticsFuel, shape, if_true,
+                List.mem_singleton] at member
+              rw [member]
+              exact .continueOutsideLoop occurrence shape
+            · simp [statementDiagnosticsFuel, shape, atTop] at member
+      · intro module item diagnostic occurrence member
+        cases shape : item.payload with
+        | letBinding binding =>
+            cases initializerShape : binding.payload.initializer with
+            | none =>
+                simp [forInitDiagnosticsFuel, shape,
+                  initializerShape] at member
+            | some initializer =>
+                simp only [forInitDiagnosticsFuel, shape,
+                  initializerShape] at member
+                exact previous.expression
+                  (.forInitLetInitializer occurrence shape initializerShape)
+                  member
+        | assignment operator left right =>
+            rw [forInitDiagnosticsFuel, shape, List.mem_append] at member
+            rcases member with leftMember | rightMember
+            · exact previous.expression
+                (.forInitAssignmentLeft occurrence shape) leftMember
+            · exact previous.expression
+                (.forInitAssignmentRight occurrence shape) rightMember
+        | expression expression =>
+            rw [forInitDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.forInitExpression occurrence shape) member
+      · intro module item diagnostic occurrence member
+        cases shape : item.payload with
+        | assignment operator left right =>
+            rw [forPostDiagnosticsFuel, shape, List.mem_append] at member
+            rcases member with leftMember | rightMember
+            · exact previous.expression
+                (.forPostAssignmentLeft occurrence shape) leftMember
+            · exact previous.expression
+                (.forPostAssignmentRight occurrence shape) rightMember
+        | expression expression =>
+            rw [forPostDiagnosticsFuel, shape] at member
+            exact previous.expression
+              (.forPostExpression occurrence shape) member
+
+/-- Every diagnostic emitted while traversing a reached expression is
+declaratively applicable. -/
+theorem mem_expressionDiagnosticsFuel_applies
+    {fuel : Nat} {module : ParsedModuleV1} {expression : Expression}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.expression expression))
+    (member : diagnostic ∈ expressionDiagnosticsFuel fuel expression) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  (recursiveDiagnosticsFuel_applies fuel).expression occurrence member
+
+/-- Every diagnostic emitted while traversing a reached pattern is
+declaratively applicable. -/
+theorem mem_patternDiagnosticsFuel_applies
+    {fuel : Nat} {module : ParsedModuleV1} {pattern : Pattern}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.pattern pattern))
+    (member : diagnostic ∈ patternDiagnosticsFuel fuel pattern) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  (recursiveDiagnosticsFuel_applies fuel).pattern occurrence member
+
+/-- Every diagnostic emitted while traversing a reached body is declaratively
+applicable. -/
+theorem mem_bodyDiagnosticsFuel_applies
+    {fuel loopDepth : Nat} {module : ParsedModuleV1} {body : Body}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.body loopDepth body))
+    (member : diagnostic ∈ bodyDiagnosticsFuel fuel loopDepth body) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  (recursiveDiagnosticsFuel_applies fuel).body occurrence member
+
+/-- Every diagnostic emitted while traversing a reached statement is
+declaratively applicable. -/
+theorem mem_statementDiagnosticsFuel_applies
+    {fuel loopDepth : Nat} {module : ParsedModuleV1} {statement : Statement}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.statement loopDepth statement))
+    (member : diagnostic ∈
+      statementDiagnosticsFuel fuel loopDepth statement) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  (recursiveDiagnosticsFuel_applies fuel).statement occurrence member
+
+/-- Every diagnostic emitted while traversing a reached `for` initializer is
+declaratively applicable. -/
+theorem mem_forInitDiagnosticsFuel_applies
+    {fuel : Nat} {module : ParsedModuleV1} {item : ForInitItem}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.forInit item))
+    (member : diagnostic ∈ forInitDiagnosticsFuel fuel item) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  (recursiveDiagnosticsFuel_applies fuel).forInit occurrence member
+
+/-- Every diagnostic emitted while traversing a reached `for` post item is
+declaratively applicable. -/
+theorem mem_forPostDiagnosticsFuel_applies
+    {fuel : Nat} {module : ParsedModuleV1} {item : ForPostItem}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.forPost item))
+    (member : diagnostic ∈ forPostDiagnosticsFuel fuel item) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  (recursiveDiagnosticsFuel_applies fuel).forPost occurrence member
+
 end Structure
 
 end Solcore.Surface.Multi
