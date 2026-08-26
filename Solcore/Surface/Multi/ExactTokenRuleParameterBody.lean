@@ -570,10 +570,10 @@ private theorem bodyInput_tokenPlan?
       simp
 
 private theorem ruleTokenPlan?_body (body : Body) :
-    ruleTokenPlan? .body body = bodyTokenPlanAny? body := by
+    ruleTokenPlan? .body body = bodyTokenPlan? .braced body := by
   rfl
 
-private theorem bodyTokenPlanAny?_sourceLoc
+private theorem bracedBodyTokenPlan?_sourceLoc
     {file : WorkspaceFile} {tokens : List Token}
     {origin finish : Boundary tokens}
     (openBrace : MatchedTerminal file tokens (.symbol .leftBrace))
@@ -582,14 +582,14 @@ private theorem bodyTokenPlanAny?_sourceLoc
     (statementPlans : List TokenPlan)
     (plansEq : statementTokenPlans? statements = some statementPlans)
     (witness : ConsumedSpanWitness file tokens origin finish) :
-    bodyTokenPlanAny? (sourceLoc witness {
+    bodyTokenPlan? .braced (sourceLoc witness {
       origin := BodyOrigin.braced openBrace.span closeBrace.span
       statements := statements
     }) = some (TokenPlan.enclose witness.span (TokenPlan.concat [
       TokenPlan.exact (.symbol .leftBrace) openBrace.span,
       TokenPlan.concat statementPlans,
       TokenPlan.exact (.symbol .rightBrace) closeBrace.span])) := by
-  unfold bodyTokenPlanAny? bodyTokenPlan?
+  unfold bodyTokenPlan?
   simp [sourceLoc]
   rw [plansEq]
   unfold bracedBodyPlanWith?
@@ -643,5 +643,5 @@ theorem body_tokenPlanSound : GrammarRuleTokenPlanSound .body := by
             witness.consumed
           apply TokenPlanEvidence.candidate_eq enclosed
           rw [ruleTokenPlan?_body]
-          simpa using (bodyTokenPlanAny?_sourceLoc openBrace statements
+          exact (bracedBodyTokenPlan?_sourceLoc openBrace statements
             closeBrace statementPlans outputPlansEq witness).symm

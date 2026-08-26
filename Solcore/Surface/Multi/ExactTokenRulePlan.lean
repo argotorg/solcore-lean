@@ -70,7 +70,7 @@ def ruleTokenPlan? :
   | .fallbackDecl, value => fallbackDeclPlan? value
   | .contractConstructorDecl, value => contractConstructorDeclPlan? value
   | .parameter, value => parameterTokenPlan? value
-  | .body, value => bodyTokenPlanAny? value
+  | .body, value => bodyTokenPlan? .braced value
   | .type, value => typeExprPlan? value
   | .typeAtom, value => typeAtomPlan? value
   | .qualifiedName, value => some (qualifiedNamePlan value)
