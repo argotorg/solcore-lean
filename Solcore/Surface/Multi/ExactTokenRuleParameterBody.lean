@@ -517,7 +517,7 @@ private theorem statementRuleAtomValues_tokenPlan?
     (statements.map (EbnfValue.ruleAtom (file := file) (tokens := tokens)
       .statement)).mapM
         (fun value => value.tokenPlan? sourceRuleTokenPlanLayout) =
-      statements.mapM (statementTokenPlan? false) := by
+      statements.mapM (statementTokenPlan? true) := by
   change
     (statements.map (EbnfValue.ruleAtom (file := file) (tokens := tokens)
       .statement)).mapM
@@ -545,7 +545,7 @@ private theorem bodyInput_tokenPlan?
               EbnfValues.nil))))).tokenPlan? sourceRuleTokenPlanLayout =
       (do
         let statementPlans ←
-          statements.mapM (statementTokenPlan? false)
+          statements.mapM (statementTokenPlan? true)
         pure (TokenPlan.concat [
           TokenPlan.exact (.symbol .leftBrace) openBrace.span,
           TokenPlan.concat statementPlans,
@@ -563,7 +563,7 @@ private theorem bodyInput_tokenPlan?
     matchedSymbol_physicalTokenPlan .leftBrace openBrace,
     matchedSymbol_physicalTokenPlan .rightBrace closeBrace]
   simp [TokenPlan.concat, TokenPlan.append, TokenPlan.empty]
-  cases plansEq : statements.mapM (statementTokenPlan? false) with
+  cases plansEq : statements.mapM (statementTokenPlan? true) with
   | none =>
       simp
   | some statementPlans =>
@@ -595,53 +595,21 @@ private theorem bracedBodyTokenPlan?_sourceLoc
   unfold bracedBodyPlanWith?
   rfl
 
-theorem body_tokenPlanSound : GrammarRuleTokenPlanSound .body := by
-  intro file tokens origin finish input output _owned reduces inputEvidence
-  generalize inputEq : input = sourceInput at reduces inputEvidence
-  cases reduces with
-  | body origin finish openBrace statements closeBrace witness =>
-      change EbnfValue file tokens (.sequence [
-        .atom (.terminal (.symbol .leftBrace)),
-        .star (.atom (.nonterminal .statement)),
-        .atom (.terminal (.symbol .rightBrace))]) at input
-      rw [← inputEq] at inputEvidence
-      have candidateEq : input.tokenPlan? sourceRuleTokenPlanLayout =
-          (do
-            let statementPlans ←
-              statements.mapM (statementTokenPlan? false)
-            pure (TokenPlan.concat [
-              TokenPlan.exact (.symbol .leftBrace) openBrace.span,
-              TokenPlan.concat statementPlans,
-              TokenPlan.exact (.symbol .rightBrace) closeBrace.span])) := by
-        rw [inputEq]
-        exact bodyInput_tokenPlan? openBrace statements closeBrace
-      have physicalEvidence := inputEvidence.candidate_eq candidateEq
-      rcases physicalEvidence with ⟨inputPlan, planEq, relation⟩
-      cases statementPlansEq :
-          statements.mapM (statementTokenPlan? false) with
-      | none => simp [statementPlansEq] at planEq
-      | some statementPlans =>
-          simp [statementPlansEq] at planEq
-          subst inputPlan
-          have outputPlansEq := statementTokenPlans?_of_mapM
-            statements statementPlans statementPlansEq
-          have exactEvidence : TokenPlanEvidence
-              (some (TokenPlan.concat [
-                TokenPlan.exact (.symbol .leftBrace) openBrace.span,
-                TokenPlan.concat statementPlans,
-                TokenPlan.exact (.symbol .rightBrace) closeBrace.span]))
-              (PhysicalTokens tokens origin finish) :=
-            ⟨_, rfl, relation⟩
-          have enclosed := exactEvidence.enclose
-            (fun plan success => by
-              injection success with planEq
-              subst plan
-              exact TokenPlan.WellAnchored.concatExactBookended
-                (.symbol .leftBrace) openBrace.span
-                (.symbol .rightBrace) closeBrace.span
-                [TokenPlan.concat statementPlans])
-            witness.consumed
-          apply TokenPlanEvidence.candidate_eq enclosed
-          rw [ruleTokenPlan?_body]
-          exact (bracedBodyTokenPlan?_sourceLoc openBrace statements
-            closeBrace statementPlans outputPlansEq witness).symm
+/-- A terminal expression has a final-position plan but no nonfinal plan.
+Consequently the unrestricted body input, which visits every statement with
+`true`, cannot by itself justify the positional body output visitor. -/
+theorem body_unrestrictedTerminalPlacement_obstruction
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (expression : Expression)
+    (witness : ConsumedSpanWitness file tokens origin finish)
+    (plan : TokenPlan)
+    (expressionEq : expressionTokenPlan? expression = some plan) :
+    statementTokenPlan? true
+        (sourceLoc witness (.expression expression none) : Statement) =
+          some (TokenPlan.enclose witness.span plan) ∧
+      statementTokenPlan? false
+        (sourceLoc witness (.expression expression none) : Statement) = none := by
+  change expressionTokenPlanAt? .annotation expression = some plan
+    at expressionEq
+  simp [statementTokenPlan?, sourceLoc, expressionEq]
