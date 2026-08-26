@@ -10,7 +10,7 @@ open Grammar Solcore.Workspace
 the same comma-separated sequence of child plans. -/
 theorem predicateList_tokenPlanSound :
     GrammarRuleTokenPlanSound .predicateList := by
-  intro file tokens origin finish input output reduces inputEvidence
+  intro file tokens origin finish input output _owned reduces inputEvidence
   cases reduces with
   | predicateList origin finish predicates =>
       simp only [EbnfValue.tokenPlan?_transport,

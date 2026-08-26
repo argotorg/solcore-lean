@@ -8,15 +8,17 @@ namespace Solcore.Surface.Multi
 open Grammar
 open Solcore.Workspace
 
-/-- The only semantic callback required by token-plan action dispatch: a
-source-rule reduction transforms complete input-plan evidence into evidence
-for the rule visitor's output plan over the same parser interval. -/
+/-- The only semantic callback required by token-plan action dispatch: for an
+owned token stream, a source-rule reduction transforms complete input-plan
+evidence into evidence for the rule visitor's output plan over the same parser
+interval. -/
 def RootActionTokenPlanSound (layout : RuleTokenPlanLayout) : Prop :=
   ∀ {file : WorkspaceFile} {tokens : List Token}
     {rule : GrammarRuleId} {origin finish : Boundary tokens}
     {input : EbnfValue file tokens (m2cV1.rhs rule)}
     {output : RuleValue rule},
-    RuleReduction file tokens rule origin finish input output →
+    TokensOwnedBy file tokens →
+      RuleReduction file tokens rule origin finish input output →
       TokenPlanEvidence
         (EbnfValue.tokenPlan? layout input)
         (PhysicalTokens tokens origin finish) →
@@ -33,11 +35,11 @@ theorem ofRoot
     {layout : RuleTokenPlanLayout}
     (rootSound : RootActionTokenPlanSound layout) :
     ActionTokenPlanSound layout := by
-  intro file tokens actionId origin finish input output action inputEvidence
+  intro file tokens actionId origin finish input output owned action inputEvidence
   cases action with
   | root rule origin finish input output reduction =>
       simp only [ActionId.production_actionFor] at inputEvidence ⊢
-      apply rootSound reduction
+      apply rootSound owned reduction
       rw [RootAction.unpack_tokenPlan?]
       exact inputEvidence
   | atom site origin finish input =>

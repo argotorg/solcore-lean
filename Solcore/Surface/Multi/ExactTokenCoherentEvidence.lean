@@ -9,13 +9,15 @@ namespace Solcore.Surface.Multi
 open Grammar Solcore.Workspace
 
 /-- A callback proving that one checked semantic action preserves the complete
-token-plan match carried by its parser interval. -/
+token-plan match carried by its parser interval. Source ownership supplies the
+file identity needed by spans synthesized from child values. -/
 def ActionTokenPlanSound (layout : RuleTokenPlanLayout) : Prop :=
   ∀ {file : WorkspaceFile} {tokens : List Token}
     {actionId : ActionId} {origin finish : Boundary tokens}
     {input : GrammarSymbolValues file tokens actionId.production.rhs}
     {output : NonterminalValue file tokens actionId.production.lhs},
-    ActionReduces file tokens actionId origin finish input output →
+    TokensOwnedBy file tokens →
+      ActionReduces file tokens actionId origin finish input output →
       TokenPlanEvidence
         (GrammarSymbolValues.tokenPlan? layout
           actionId.production.rhs input)
@@ -190,7 +192,7 @@ private theorem reductionTokenPlanCase
         trace prefixCarries) := by
   unfold PrefixTokenPlanMotive at prefixIH
   unfold ReductionTokenPlanMotive
-  apply actionSound action
+  apply actionSound owned action
   simp only [ActionId.production_actionFor]
   rw [PrefixValues.tokenPlan?_fullValue]
   exact prefixIH

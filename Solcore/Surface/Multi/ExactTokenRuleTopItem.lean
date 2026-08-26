@@ -59,7 +59,7 @@ private theorem optionMap_eq_bindPure
 checked source span to the mandatory physical endpoints of the child plan. -/
 theorem grammarRuleTokenPlanSound_topItem :
     GrammarRuleTokenPlanSound .topItem := by
-  intro file tokens origin finish input output reduces inputEvidence
+  intro file tokens origin finish input output _owned reduces inputEvidence
   cases reduces with
   | topItemImport origin finish declaration witness =>
       rw [EbnfValue.tokenPlan?_transport] at inputEvidence

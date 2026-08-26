@@ -101,7 +101,7 @@ private theorem TokenSlot.ListMatches.threeFixedToPlain
 plans and derives its enclosing span from the consumed parser interval. -/
 theorem hidingClause_tokenPlanSound :
     GrammarRuleTokenPlanSound .hidingClause := by
-  intro file tokens origin finish input output reduces inputEvidence
+  intro file tokens origin finish input output _owned reduces inputEvidence
   cases reduces with
   | hidingClause origin finish hidingKw openBrace names closeBrace
       nameProjects witness =>
