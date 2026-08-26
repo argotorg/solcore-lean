@@ -13,13 +13,16 @@ published as the parse-only Oracle v4 boundary.
 The newer M2c path now has a validated workspace identity kernel and a
 source-preserving Multi lexer/parser. The parser has an unconditional,
 proof-argument-free file API and kernel-checked soundness theorems. A separate
-pure structural pass now checks all 20 accepted AST-shape rules and returns the
-complete diagnostic list in a deterministic order. An independent declarative
-foundation now describes the AST sites visited by that pass, duplicate and
-span-order helpers, and grouped unit types. Per-diagnostic applicability, final
-structural acceptance, and correspondence with the executable validator are
-still missing, so this does not yet complete the full ADR-0015 parser delivery
-or the whole frontend.
+pure structural pass now checks all 20 accepted AST-shape rules and returns a
+canonical diagnostic list in a deterministic order. Its independent
+specification now covers all 26 diagnostic forms represented by
+`MSS0001`–`MSS0020`, defines structural acceptance, and proves that acceptance
+means exactly that no structural diagnostic applies. Primitive duplicate and
+span-selection rules are exact, several declaration and signature families
+are connected to their local specifications, and every executable diagnostic
+candidate is proved applicable. What remains is the reverse correspondence—
+showing that every applicable diagnostic is emitted with the module-sized fuel
+bound—and integration with the proof-carrying parsed-module frontend.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -38,7 +41,7 @@ or fuzzing-speed parser.
 | M2b single-file parser publication | Yes | Yes | Oracle v4 / Surface v1 | Current public parse boundary |
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
 | M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome, soundness, and exact cache equivalence | No; internal API | Total; all six representative benchmarks pass, but large-file memory readiness is unproved |
-| M2c structural acceptance | Pure validator and all 20 diagnostics; independent reachability/helper foundation | Canonical output shape; diagnostic and acceptance correspondence pending | No; internal API | Executable and fully fixture-tested, not yet certified or connected to the frontend |
+| M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Acceptance equivalence, primitive/local bridges, and whole-candidate soundness; reverse correspondence and fuel sufficiency remain | No; internal API | Executable and fixture-tested, but not yet a certified frontend boundary |
 | M2c structural syntax identity | No | No | No | Design accepted in ADR-0016 |
 | M2c module and name resolution | No | No | No | ADR-0017 is proposed |
 | M2d checking and Core elaboration | No | No | No | Planned |
@@ -68,16 +71,29 @@ failure, parse failure, and successful parsing. This wrapper cannot emit a
 structural diagnostic: structural validation is a later phase.
 
 Call `validateStructure module` on a parsed module to run the new structural
-phase. It reports every applicable `MSS0001`–`MSS0020` diagnostic, ordered by
-code, source, byte range, and payload. Its tests cover exact diagnostic spans,
+phase. It returns `MSS0001`–`MSS0020` diagnostics ordered by code,
+source, byte range, and payload. Its tests cover exact diagnostic spans,
 duplicate handling, fallback rules, required parameter types, match arity, and
 the rule that a lambda cannot target an enclosing loop.
 
-The separate `StructureJudgment.lean` module now gives a declarative account
-of the typed AST sites reachable from a parsed module. Its helpers also state
-later-duplicate, source-span ordering, least-span, and grouped-unit facts
-without depending on the validator. It is a foundation only: it does not yet
-state all 20 diagnostic-applicability rules or final structural acceptance.
+The separate `StructureJudgment.lean` module gives a declarative account of
+the typed AST sites reachable from a parsed module. Its `Applies` relation
+covers all 26 diagnostic constructors behind `MSS0001`–`MSS0020`, and
+`StructurallyAccepts` holds exactly when no such diagnostic applies. The
+duplicate, source-span, and least-span primitives are proved exact. Imports,
+exports, and pragmas have exact local specifications and top-level soundness.
+Missing signature types and disallowed modifiers have exact local results and
+are sound at every reached signature. Fallback and constructor declarations
+also have exact local specifications and soundness, including a fuel-free
+grouped-unit return check. The six recursive fuel-bounded collectors are sound
+for every fuel value. These results compose to prove that every member of
+`diagnosticCandidates` is declaratively applicable to its module.
+
+The remaining structural proof is deliberately stated at a larger boundary:
+every applicable diagnostic must still be shown to occur in
+`diagnosticCandidates`. That reverse direction requires proving the
+module-sized fuel bound sufficient. The result can then be connected to
+`CertifiedParsedModule` and the file frontend.
 
 Termination no longer depends on a proof supplied by the caller. A finite
 static certificate covers all 2,378 dotted grammar rows and supplies the rank
@@ -106,10 +122,11 @@ At this revision the project has been checked with:
 ```sh
 lake build
 lake test
+node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
-The full build checks 178 jobs. The semantic-kernel audit rejects `sorry`,
+The full build checks 180 jobs. The semantic-kernel audit rejects `sorry`,
 `admit`, `partial`, `unsafe`, `axiom`, `noncomputable`, `extern`, and
 `implemented_by` in the audited roots. The final parser certificate is also
 checked at `trust = 0`; its dependencies use only Lean's expected logical
@@ -120,78 +137,57 @@ axioms (`propext`, `Quot.sound`, and, where executable selection requires it,
 
 Formal totality and runtime speed are different claims. An earlier development
 smoke run on empty input did not finish within 226 seconds. Investigation found
-that one bounded Phase C runner kept applying an empty transition until its
-multi-billion-step upper bound was exhausted. It now returns as soon as both
-queues are empty. Phase A also no longer recomputes the full saturation merely
-to validate a result it has already certified. Completion items are classified
-once so incompatible pairs can be skipped. Prediction candidates are rejected
-from that classification before rebuilding the waiting production, and
-complete-item recognition uses a local hash index. The Phase A evidence table
-is materialized in one linear pass instead of repeatedly copying growing
-lists. The initial Phase A seed block is likewise proved duplicate-free and
-materialized in one step, preserving the exact list and charge order of the
-reference insertion loop. The role-directed completion scan also avoids
-comparing whole items to detect a self pair: equal roles cannot form a
-waiting/finished pair, and the no-op replacement is proved equivalent.
-Completion candidates are grouped by the nonterminal and boundary they must
-share. A waiting item therefore visits only completed items that can join it,
-and a completed item visits only the matching waiting items. Each group retains
-discovery order, and a checked equivalence theorem shows that skipping every
-other item has exactly the same result as the former full scan.
-The discovered raw-item list is likewise retained as the ordered proof view,
-while a coherent hash set answers duplicate checks. Normal insertions update
-both views together, the seed block extends the existing set in seed order,
-and normalization reuses the same set because it preserves membership. The
-indexed decision is proved equal to the former list search.
-Production candidates are grouped by left-hand-side symbol once, in
-source-production order, and the same proved index is shared by Phase A,
-contextual recognition, and value evaluation.
-Phase B checks all eight finalization slots through the coherent hash index and
-then charges the proved-fresh block directly. At Phase-B entry, the executor
-also builds one immutable lookup table from the Phase A evidence and reuses it
-for every guard. The cache preserves the evidence list's first-match and
-missing-entry behavior exactly. The cached runner is proved to preserve
-charges, failures, and resulting state, and the cache is not retained in the
-sealed parser output. Each faster path has an exact-equivalence theorem against
-the retained reference implementation.
-The execution counter still keeps `usedRev` as its proof ledger, while a
-coherent hash set answers duplicate checks quickly. A maintained theorem says
-that the hash set contains exactly the addresses in `usedRev`, so this changes
-only how membership is found. Completion and production-activation prechecks
-use that same indexed decision procedure; charge order, failures, and resulting
-states are unchanged.
+an executor loop that continued after its work queues were empty. That path now
+stops immediately. The parser also reuses completed work, groups compatible
+candidates, performs indexed duplicate and production lookups, builds evidence
+in bulk, and consumes Phase B evidence into a temporary cache-only state.
+
+Each optimization has a checked correspondence with the retained reference
+path: selected output, diagnostic behavior, charge order, and failure behavior
+are unchanged. The implementation details and reproduction commands live in
+the [development guide](DEVELOPMENT.md).
 
 All six representative benchmark cases pass. Five fresh-process runs on the
 development host produced these elapsed-time results:
 
 | Case | Elapsed seconds (range) | Median |
 | --- | ---: | ---: |
-| `empty` | 0.014505–0.014781 | 0.014609 |
-| `tiny` | 0.093648–0.094299 | 0.093837 |
-| `import-path` | 0.233372–0.237631 | 0.234023 |
-| `return-literal` | 0.899758–0.921011 | 0.917875 |
-| `data-constructors` | 0.411895–0.414846 | 0.412456 |
-| `contract-field` | 0.544452–0.568294 | 0.548575 |
+| `empty` | 0.014303167–0.014395000 | 0.014339333 |
+| `tiny` | 0.090263250–0.096705291 | 0.090872417 |
+| `import-path` | 0.221413542–0.227876417 | 0.223409167 |
+| `return-literal` | 0.863788792–0.887059959 | 0.868775750 |
+| `data-constructors` | 0.387477833–0.433975625 | 0.392871250 |
+| `contract-field` | 0.536238167–0.599856583 | 0.567094417 |
 
-`/usr/bin/time` reported maximum resident set sizes of 62,816,256 bytes for
-`tiny`, 252,198,912 for `return-literal`, 157,237,248 for
-`data-constructors`, and 199,098,368 for `contract-field`. The speed improvement
-is substantial: `tiny` took about 89.0 seconds before these optimization
-passes. These are machine-dependent observations, not language limits or
-performance guarantees. The Phase A evidence and its lookup cache still grow
-cubically with the token stream, so large-file readiness is unproved and
-memory optimization remains necessary.
+`/usr/bin/time` reported the following maximum resident set sizes:
+
+| Case | Maximum resident set size (bytes) |
+| --- | ---: |
+| `empty` | 42,647,552 |
+| `tiny` | 60,375,040 |
+| `import-path` | 90,275,840 |
+| `return-literal` | 210,714,624 |
+| `data-constructors` | 139,575,296 |
+| `contract-field` | 169,820,160 |
+
+The speed improvement is substantial: `tiny` took about 89.0 seconds before
+these optimization passes. These are machine-dependent observations, not
+language limits or performance guarantees. Cache-only Phase B lowers retained
+memory, but the Phase A evidence enumeration, its lookup cache, and the
+proof-carrying counter ledger/index still grow cubically with the token stream.
+Large-file readiness is therefore unproved and further memory work remains
+necessary.
 
 ## Next work
 
 The shortest path from the current state to an end-to-end executable frontend
 is:
 
-1. reduce the Multi parser's cubic evidence/cache memory cost and continue
-   profiling it on progressively larger inputs;
-2. extend the independent structural foundation with diagnostic-applicability
-   and final-acceptance judgments, prove correspondence with the implemented
-   validator, and connect structural diagnostics to the file frontend;
+1. reduce the Multi parser's remaining cubic evidence/cache/counter cost and
+   continue profiling it on progressively larger inputs;
+2. prove reverse whole-validator correspondence and fuel sufficiency, then
+   connect structural diagnostics and acceptance to
+   `CertifiedParsedModule` and the file frontend;
 3. accept and implement module/name resolution;
 4. implement source checking and elaboration into Semantic Core;
 5. expose a new versioned workspace Oracle only after its profile, schemas,

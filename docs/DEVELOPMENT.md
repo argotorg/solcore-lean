@@ -152,12 +152,12 @@ five-run measurements on the development host were:
 
 | Case | Elapsed seconds (range) | Median |
 | --- | ---: | ---: |
-| `empty` | 0.014505–0.014781 | 0.014609 |
-| `tiny` | 0.093648–0.094299 | 0.093837 |
-| `import-path` | 0.233372–0.237631 | 0.234023 |
-| `return-literal` | 0.899758–0.921011 | 0.917875 |
-| `data-constructors` | 0.411895–0.414846 | 0.412456 |
-| `contract-field` | 0.544452–0.568294 | 0.548575 |
+| `empty` | 0.014303167–0.014395000 | 0.014339333 |
+| `tiny` | 0.090263250–0.096705291 | 0.090872417 |
+| `import-path` | 0.221413542–0.227876417 | 0.223409167 |
+| `return-literal` | 0.863788792–0.887059959 | 0.868775750 |
+| `data-constructors` | 0.387477833–0.433975625 | 0.392871250 |
+| `contract-field` | 0.536238167–0.599856583 | 0.567094417 |
 
 All six cases parsed successfully. For comparison, `tiny` took about 89.0
 seconds before the parser optimization work. `/usr/bin/time` reported these
@@ -165,10 +165,12 @@ maximum resident set sizes:
 
 | Case | Maximum resident set size (bytes) |
 | --- | ---: |
-| `tiny` | 62,816,256 |
-| `return-literal` | 252,198,912 |
-| `data-constructors` | 157,237,248 |
-| `contract-field` | 199,098,368 |
+| `empty` | 42,647,552 |
+| `tiny` | 60,375,040 |
+| `import-path` | 90,275,840 |
+| `return-literal` | 210,714,624 |
+| `data-constructors` | 139,575,296 |
+| `contract-field` | 169,820,160 |
 
 The counter keeps `usedRev` as the proof-carrying record of charged addresses.
 A hash set, proved to contain exactly the same addresses, now handles duplicate
@@ -192,29 +194,46 @@ membership decision is exactly equal to the retained list search, including
 after normalization and bulk seed insertion. These figures are useful for
 local regression checks, but none is a normative bound.
 
-Phase B now builds one immutable lookup table from the Phase A evidence when
-it enters the phase and reuses it for every guard check. The lookup is proved
-to preserve the evidence list's first-match and missing-entry behavior. The
-whole cached runner is also proved to preserve charges, failures, and output
-state. The lookup table is temporary execution data and is not retained in the
-sealed parser result. This removes repeated evidence-list scans and accounts
-for much of the improvement in the representative cases. It does not remove
-the cubic-size evidence table or the cache built from it, so large-file memory
-readiness is still unproved and memory optimization remains required.
+Phase B now builds one immutable lookup table from the Phase A evidence and
+consumes the evidence list into a cache-only state. The lookup preserves the
+list's first-match and missing-entry behavior, while whole-run correspondence
+preserves failure, counter state, and sealed output. Generated C performs one
+operational cache build and releases list and entry wrappers incrementally as
+the streaming fold advances. The cache is discarded before the sealed parser
+result is returned.
+
+This reduces retained memory without changing the asymptotic limit. The Phase
+A evidence enumeration, the cache, and the proof-carrying counter ledger/index
+still grow cubically with token count. Treat the six small cases as local
+regression checks, not evidence of large-file or production readiness.
 
 ## Structural-certification guidance
 
-`Solcore/Surface/Multi/StructureJudgment.lean` now provides an independent
-declarative foundation for structural checking. It describes which typed AST
-sites are reachable from a parsed module and supplies small relations for
-later duplicates, source-span ordering, least-span selection, and grouped unit
-types. It intentionally does not import or restate the executable structural
-validator.
+`Solcore/Surface/Multi/StructureJudgment.lean` is the independent declarative
+side of structural checking. It defines applicability for all 26 diagnostic
+constructors represented by `MSS0001`–`MSS0020` and defines structural
+acceptance as the absence of an applicable diagnostic. That characterization
+is proved in both directions.
 
-This is only the proof foundation. The per-diagnostic applicability judgments,
-the final structural-acceptance judgment, and the soundness/completeness
-connection to `validateStructure` still have to be implemented. Keep those
-claims distinct when reviewing or documenting later work.
+The proof bridge is intentionally being built in layers. Duplicate,
+source-span, and least-span primitives are exact. Imports, exports, and pragmas
+have exact local specifications and top-level soundness. Missing signature
+types and disallowed modifiers have exact local specifications and are sound
+at every reached signature. Fallback and constructor declarations likewise
+have exact local specifications and soundness; their grouped-unit return test
+is structural rather than fuel-dependent. Each of the six recursive
+fuel-bounded collectors is sound for any fuel value. These layers compose to
+show that every member of `diagnosticCandidates` is applicable to its module.
+
+The executable validator already sorts and removes exact duplicates to return
+a canonical diagnostic list. What is unfinished is the reverse proof that
+every applicable diagnostic appears in that list with the module-sized fuel
+bound.
+
+Do not yet describe `validateStructure` as fully certified. The remaining
+boundary is reverse correspondence from declarative applicability to the
+complete `diagnosticCandidates` output, including sufficient fuel, followed by
+integration with `CertifiedParsedModule` and the file frontend.
 
 ## Documentation rule
 
