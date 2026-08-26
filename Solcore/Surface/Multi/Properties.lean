@@ -11,6 +11,7 @@ import Solcore.Surface.Multi.NonAssociativeOperandPrefixExclusive
 import Solcore.Surface.Multi.ParseOutcomeTotality
 import Solcore.Surface.Multi.RootlessNormalizationGrammarRank
 import Solcore.Surface.Multi.RootlessNormalizationRank
+import Solcore.Surface.Multi.StructureProperties
 
 set_option autoImplicit false
 
