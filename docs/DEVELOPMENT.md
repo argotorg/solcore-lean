@@ -113,7 +113,8 @@ changes, re-establish all of the following before claiming parser completion:
 3. chart invariants and declarative parse soundness;
 4. total outcome selection;
 5. the finite dotted-rank certificate for the new grammar; and
-6. file-only frontend selection and soundness.
+6. all 75 exact-token rule obligations and their root composition; and
+7. certified file-frontend selection, phase precedence, and soundness.
 
 Runtime behavior must be measured separately. The native benchmark covers an
 empty module, a minimal declaration, and four small examples of everyday
@@ -249,21 +250,28 @@ Parser resource accounting is at an earlier integration point.
 `ParserResourceAccounting.lean` exposes the fixed, boundary-slot, and
 memo-slot components of the quadratic fast-parser schedule. Their capacity
 ledger sums definitionally to `parseBound`, and its reduction theorems show
-exactly how a counted execution will inherit that bound. This does not count
-the current `Chart.G` reference executor: its private counter uses the separate
-quartic `chartGBound` address universe. Closing the parser bound still requires
-the counted fast executor, a correspondence theorem from its counter to the
-public schedule ledger, and proofs of the three component bounds.
+exactly how a counted execution will inherit that bound.
+`ParserSchedule.lean` realizes the three families as typed finite address
+spaces, proves exact rankings/cardinalities, and provides a lightweight
+counter. `ParserScheduleTrace.lean` adds a distinct-rank trace whose charge
+operation rejects reuse. Its ledger always fits the three capacities, every
+fresh charge adds exactly one unit, and its total is at most `parseBound`.
+This does not count the current `Chart.G` reference executor: its private
+counter uses the separate quartic `chartGBound` address universe. Closing the
+parser integration still requires an executor that charges these schedule
+addresses, the transition/address invariant and operational correspondence,
+and exact result equality with `Chart.G`.
 
-`validateStructure` is a certified standalone structural phase. The
-proof-carrying `CertifiedParsedModule` and parameterized frontend phase core
-now exist, but do not yet describe the raw file frontend as unconditionally
-certified: three reachability-sensitive exact-token rules and the final
-proof-argument-free wrapper remain. Location certification itself is complete.
-The inventory and its executable checks cover the whole AST, and
-`Parses.everyLocationValid` combines token ordering, parser-span containment,
-and assembly-internal facts to prove valid, properly nested locations for every
-successful parse.
+`validateStructure` is a certified standalone structural phase. Exact-token
+soundness is also closed across all 75 grammar rules by
+`rootActionTokenPlanSound`. `Solcore.Surface.Multi.parseModule` composes lexing,
+parsing, structural validation, location certification, and retained-token
+correspondence without a proof argument from its caller. A successful
+`CertifiedParsedModule` carries all five judgments; failure is a nonempty
+diagnostic list from the first failing phase. The executable regression module
+`Solcore/Test/SurfaceMultiCertifiedFrontend.lean` covers lexical, parse,
+structural, and successful outcomes. This remains an internal Lean API and does
+not change Oracle v4.
 
 ## Documentation rule
 

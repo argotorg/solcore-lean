@@ -104,6 +104,20 @@ import Solcore.Surface
 import Solcore.Workspace
 ```
 
+For proof-carrying parsing from Lean, import the internal certified frontend:
+
+```lean
+import Solcore.Surface.Multi.CertifiedFrontend
+
+def certify (file : Solcore.Workspace.WorkspaceFile) :=
+  Solcore.Surface.Multi.parseModule file
+```
+
+The function returns either nonempty diagnostics or a `CertifiedParsedModule`
+carrying the parser's checked properties. This interface is available to Lean
+users but is not yet published through an Oracle protocol. Oracle v4 continues
+to use the stable parse-only Surface v1 interface described above.
+
 ## Schemas and documentation
 
 - [Documentation guide](docs/README.md)

@@ -15,7 +15,7 @@ profile” are deliberately different claims.
 | --- | --- | --- |
 | M1c Semantic Core | Closed checker and evaluator with correspondence proofs | Published by Oracle v3 as `solcore/0.1.0-draft.3` / `core-m1c-v1` |
 | M2b Surface | Closed one-file parser with lexer/parser correspondence proofs | Published by Oracle v4 as `solcore/0.1.0-draft.4` / `frontend-m2b-v1` |
-| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result, soundness, and parser-wide location-validity theorems; separately certified and resource-bounded 20-code structural validator with two-way correspondence; exact-token dispatch and the certified frontend core are implemented but final root closure is pending; the fast-parser schedule ledger and numeric `parseBound` reduction exist, while its counted executor, ledger correspondence, and component bounds remain pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
+| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result and soundness theorems; separately certified and resource-bounded 20-code structural validator; all 75 exact-token rules, parser-wide location validity, and a proof-argument-free one-file certified frontend are complete; exact finite fast-schedule address spaces and a duplicate-rejecting trace are bounded by `parseBound`, while a connected fast executor, operational correspondence, and exact equality with `Chart.G` remain pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
 | M2c workspace and syntax identity | Pure workspace validation and accepted structural-identity design | Internal only |
 | Resolution, checking, elaboration, execution | Not connected as one executable source frontend | Not published |
 
@@ -24,21 +24,26 @@ The [documentation guide](README.md) links the repository's reader paths. Use
 [architecture](ARCHITECTURE.md) for module and proof boundaries, and the
 [development guide](DEVELOPMENT.md) for reproducible build and audit commands.
 
-The newest implementation result is the M2c Multi parser and its separate
-structural validator. The parser entry point no longer requires a
-caller-supplied rank certificate or progress premise, and the validator emits
-a canonical diagnostic list spanning all 20 structural codes. An independent
+The newest implementation result is the M2c certified one-file frontend. Its
+entry point requires only a `WorkspaceFile` and returns a nonempty lexical,
+parse, or structural diagnostic list, or a proof-carrying parsed module. The
+underlying parser no longer requires a caller-supplied rank certificate or
+progress premise, and the validator emits a canonical diagnostic list spanning
+all 20 structural codes. An independent
 `Applies` relation covers all 26 diagnostic forms represented by
 `MSS0001`–`MSS0020`,
 and `StructurallyAccepts` is proved equivalent to having no applicable
 diagnostic. Primitive rules are exact, the executable layers are connected,
 and executable diagnostics are exactly the applicable diagnostics. The
 module-derived traversal fuel is sufficient, and validator success is exactly
-structural acceptance. Successful parses now also carry a proof that every AST
-location is valid for its source and properly nested. Exact token
-root closure, parser executor-to-ledger resource correspondence, the fast
-schedule's component bounds, and the proof-argument-free certified file
-wrapper remain. None of this widens
+structural acceptance. `rootActionTokenPlanSound` closes exact retained-token
+correspondence for all 75 grammar rules. A successful
+`CertifiedParsedModule` carries `Lexes`, `Parses`, `StructurallyAccepts`,
+`EveryLocationValid`, and `ExactTokenCorrespondence`; fixtures cover the three
+failure phases and success. A standalone fast-schedule trace now rejects
+duplicate addresses and is proved within `parseBound`, but the actual fast
+parser, its transition/trace and operational correspondence, and exact result
+equality with `Chart.G` remain. None of this widens
 Oracle v4, certifies a whole workspace, resolves a name, assigns a type,
 elaborates to Core, or executes a contract.
 
@@ -96,12 +101,24 @@ It runs `lexModule`, obtains token ownership from the lexer proof, and invokes
 - `SurfaceDiagnostic.structural` cannot be constructed by this path because
   the later structural-validation phase is not run here.
 
-This is not yet the ADR-0015 `Multi.parseModule` interface returning a
-`CertifiedParsedModule` and aggregated structural diagnostics.
+The certified one-file entry point is defined in
+[`CertifiedFrontend.lean`](../Solcore/Surface/Multi/CertifiedFrontend.lean):
+
+```text
+parseModule :
+  WorkspaceFile ->
+  Except (NonemptyList SurfaceDiagnostic) CertifiedParsedModule
+```
+
+It runs the same lexical and parser path, then structural validation. It reports
+the first failing phase and, on success, packages the file, tokens, comments,
+and module with `Lexes`, `Parses`, `StructurallyAccepts`,
+`EveryLocationValid`, and `ExactTokenCorrespondence`. The caller supplies no
+proof argument. This entry point is internal and is not an Oracle v4 query.
 
 ### What is proved
 
-The kernel-checked parser proof has four user-visible consequences:
+The kernel-checked parser and frontend proofs have these consequences:
 
 - the fixed grammar has a finite decreasing rank, so callers do not supply a
   termination or progress proof;
@@ -109,12 +126,17 @@ The kernel-checked parser proof has four user-visible consequences:
   outcome; and
 - successful parsing satisfies `Parses`, while lexical and parse failures
   satisfy their independent diagnostic judgments with exact source
-  provenance; and
+  provenance;
 - `Parses.everyLocationValid` proves that every successfully parsed module has
-  source-valid locations and direct parent-child nesting throughout its AST.
+  source-valid locations and direct parent-child nesting throughout its AST;
+- `rootActionTokenPlanSound` covers all 75 grammar rules and lifts exact
+  retained-token correspondence to successful parses; and
+- `parseModule` deterministically composes lexical, parse, and structural
+  phases and returns only certified success or nonempty first-phase
+  diagnostics.
 
-These are soundness and implementation-selection claims. They do not by
-themselves certify structural acceptance, resolution, typing, or elaboration.
+These are soundness and implementation-selection claims for one file. They do
+not certify workspace reachability, resolution, typing, or elaboration.
 
 ### Why the rank search closes
 
@@ -259,9 +281,10 @@ or resolution.
 
 [`ADR-0015`](adr/0015-m2c-multi-surface-parser.md) accepts the closed,
 source-preserving Multi Surface grammar and the target certified parser
-boundary. The unconditional lexer/parser executor described above closes a
-major totality prerequisite, but the current file-only API still returns raw
-`ParsedModuleV1`, not `CertifiedParsedModule`.
+boundary. The unconditional lexer/parser executor and the certified
+`parseModule` facade described above complete the one-file certificate boundary
+for the current grammar. The lower-level raw parser API remains available for
+parser-specific use.
 
 `StructureJudgment.lean` supplies the independent declarative side of
 structural validation. Its applicability relation covers all 26 diagnostic
@@ -276,15 +299,17 @@ collectors are sound for arbitrary fuel. Structural paths are bounded by the
 module AST measure, so the executable list and declarative applicability agree
 in both directions. Canonical reports are duplicate-free and ordered, and
 validator success is equivalent to structural acceptance. Formal resource
-accounting is complete for structural validation. On the parser side, the
-three-component schedule ledger sums exactly to `parseBound` and a numeric
-reduction theorem is present; the counted fast executor, its correspondence to
-that ledger, and the component bounds remain. The certified frontend
-connection also remains. Location
-certification is complete: the executable inventory, token order, parser-span
-geometry, and assembly-location facts compose into
-`Parses.everyLocationValid` for every successful parse. Exact token
-correspondence is the remaining source-fidelity proof.
+accounting is complete for structural validation. On the parser side, exact
+finite typed fixed, boundary-slot, and memo-slot address spaces have the
+cardinalities prescribed by the schedule and sum exactly to `parseBound`. A
+distinct-address trace rejects repeated charges, always fits each component
+capacity, increments by one on a fresh charge, and has total at most the bound.
+The actual executor, transition/trace and operational correspondence, and
+equality with `Chart.G` remain. Location certification
+is complete through `Parses.everyLocationValid`; exact token correspondence is
+complete through the 75-rule `rootActionTokenPlanSound`; and
+`Solcore.Surface.Multi.parseModule` packages both with parsing and structural
+acceptance.
 
 [`ADR-0016`](adr/0016-m2c-structural-syntax-identity.md) accepts structural
 syntax identity over certified parser output.
@@ -496,17 +521,15 @@ The current internal milestone closes unconditional bounded parsing for the
 fixed Multi grammar and exposes token-level and file-only executable APIs with
 selection and soundness theorems. It does not complete M2c publication.
 
-Before a complete M2c frontend can be claimed, at least the following remain:
+Before a complete workspace-level M2c frontend can be claimed, at least the
+following remain:
 
-- implement the separate counted fast parser, connect its counter to the
-  existing schedule ledger, prove the fixed/boundary/memo component bounds,
-  and prove exact result equality with the chart reference;
-- prove exact token correspondence for successful parses, including retained
-  leaves, grouping, literal spelling, and the absence of parser normalization;
-- connect the already certified structural phase to `CertifiedParsedModule`
-  and the file-only frontend with the specified diagnostic precedence;
+- implement the separate fast parser against the typed schedule addresses,
+  prove transition/trace and operational correspondence, and prove exact
+  result equality with the chart reference;
 - reduce the cubic evidence/cache/counter memory cost and validate
   progressively larger inputs;
+- construct the canonical six-file parse and structural certificates;
 - define and implement reachable-workspace parsing;
 - accept and implement the resolver boundary;
 - connect source checking and elaboration to declarative judgments; and

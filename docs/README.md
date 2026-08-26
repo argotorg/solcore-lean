@@ -30,10 +30,11 @@ The documents deliberately keep four questions separate:
 - **Performance-ready** — representative execution has been measured and is
   fast enough for its intended use.
 
-For example, the M2c chart-based lexer/parser milestone is implemented with
-selected-outcome and soundness theorems, but the complete ADR-0015 delivery is
-not finished and no Oracle publishes it. Its executor also needs performance
-work before it is suitable for high-volume differential testing.
+For example, the M2c one-file certified frontend is implemented and proved,
+including exact retained-token correspondence for all 75 grammar rules, but no
+Oracle publishes it. Its chart executor also needs a counted fast replacement
+and larger-file performance work before it is suitable for high-volume
+differential testing.
 
 An accepted ADR records a decision. It does not, by itself, prove that every
 piece of the decision has been implemented. The status page and matrices are

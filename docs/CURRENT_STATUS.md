@@ -11,9 +11,9 @@ v3. The original single-file Surface parser is implemented, proved, and
 published as the parse-only Oracle v4 boundary.
 
 The newer M2c path now has a validated workspace identity kernel and a
-source-preserving Multi lexer/parser. The parser has an unconditional,
-proof-argument-free file API and kernel-checked soundness theorems. A separate
-pure structural pass now checks all 20 accepted AST-shape rules and returns a
+source-preserving Multi lexer/parser. The parser has an unconditional file API
+and kernel-checked soundness theorems. A separate pure structural pass now
+checks all 20 accepted AST-shape rules and returns a
 canonical diagnostic list in a deterministic order. Its independent
 specification now covers all 26 diagnostic forms represented by
 `MSS0001`–`MSS0020`, defines structural acceptance, and proves that acceptance
@@ -25,19 +25,22 @@ accepted module. The source-location proof is now complete across the parser:
 the inventory and executable checks cover every located AST field, and
 `Parses.everyLocationValid` proves that every successful lex/parse derivation
 produces a module whose locations are valid for the source file and properly
-nested. The exact-token layer now has an executable correspondence visitor,
-parser-level lifting theorems, and an exhaustive 75-rule dispatch theorem. Its
-remaining proof work is confined to three reachability-sensitive rules. The
-proof-carrying frontend core already combines parsing, locations, exact-token
-correspondence, and structural acceptance when given that final root theorem;
-the proof-argument-free public wrapper remains to be connected. The fixed
-parser and structural bound functions now exist. Structural validation exposes
-exact executable traces for all six charged families, one ledger that sums
-them, and a proof that the fixed quadratic structural bound is sufficient. The
-parser side now exposes the three-component fast-schedule capacity ledger and
-the numeric reduction from an accounted ledger to `parseBound`. What remains
-is the counted fast executor itself, the theorem connecting its counter to
-that ledger, and the three component bounds required by the reduction.
+nested. Exact retained-token correspondence is now closed for every one of the
+75 grammar rules by `rootActionTokenPlanSound`. The internal
+`Solcore.Surface.Multi.parseModule` API needs only a `WorkspaceFile`; it
+returns a nonempty lexical, parse, or structural diagnostic report, or a
+`CertifiedParsedModule` carrying the lexing, parsing, structural-acceptance,
+location, and exact-token proofs. Executable fixtures cover all four outcomes.
+The fixed parser and structural bound functions now exist. Structural
+validation exposes exact executable traces for all six charged families, one
+ledger that sums them, and a proof that the fixed quadratic structural bound is
+sufficient. The parser side now exposes exact finite typed address spaces for
+the fixed, boundary-slot, and memo-slot schedule families, together with their
+exact cardinalities and a duplicate-rejecting address trace. Every trace fits the
+three component capacities, its total is at most `parseBound`, and each fresh
+charge increases that total by exactly one. What remains is the actual fast
+executor, its transition/address discipline and operational correspondence,
+and exact result equality with `Chart.G`.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -56,10 +59,11 @@ or fuzzing-speed parser.
 | M2b single-file parser publication | Yes | Yes | Oracle v4 / Surface v1 | Current public parse boundary |
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
 | M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome, soundness, and exact cache equivalence | No; internal API | Total; all six representative benchmarks pass, but large-file memory readiness is unproved |
+| M2c fast-parser schedule accounting | Exact finite typed address spaces and duplicate-rejecting trace | Exact capacities, component `FitsWithin`, total at most `parseBound`, and fresh-charge increment | No; internal API | Complete as an independent accounting layer; parser transitions are not connected |
 | M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Two-way correspondence, sufficient traversal fuel, canonical error-list properties, executable success exactly equivalent to acceptance, and sufficient fixed resource bound | No; internal API | Certified as a separate bounded decision procedure |
 | M2c source-location evidence | Complete AST inventory and executable validity/nesting checks | `Parses.everyLocationValid` proves validity and direct-parent nesting for every successful parse, using token order, parser-span containment, and assembly-slice facts | No; internal API | Parser-wide location propagation is complete |
-| M2c exact-token correspondence | Executable token-plan visitor and complete rule dispatch | Parser lifting is proved once three remaining coherent rule callbacks are supplied | No; internal API | Final reachability-sensitive rule proofs remain |
-| M2c certified frontend | Proof-carrying result and lexical/parse/structural phase core | Phase precedence, success/failure characterization, determinism, total result selection, and success/failure exclusivity | No; internal API | Final proof-argument-free wrapper waits on exact-token root closure |
+| M2c exact-token correspondence | Executable token-plan visitor and complete 75-rule dispatch | `rootActionTokenPlanSound` closes every source-reachable grammar action and lifts to successful parses | No; internal API | Complete for the current grammar |
+| M2c certified frontend | Proof-argument-free `parseModule` returning phase diagnostics or `CertifiedParsedModule` | Lexing, parsing, structural acceptance, locations, and exact-token correspondence are bundled; phase precedence, determinism, totality, and success/failure characterizations are proved | No; internal API | Complete for one file; four phase fixtures pass |
 | M2c structural syntax identity | No | No | No | Design accepted in ADR-0016 |
 | M2c module and name resolution | No | No | No | ADR-0017 is proposed |
 | M2d checking and Core elaboration | No | No | No | Planned |
@@ -77,7 +81,10 @@ The current internal entry points are:
 - `executeObservedContextualParse file tokens owned`, for an already lexed
   token stream whose ownership is proved; and
 - `executeObservedContextualFrontend file`, which lexes and parses one
-  `WorkspaceFile` without asking its caller for a proof argument.
+  `WorkspaceFile` without asking its caller for a proof argument; and
+- `Solcore.Surface.Multi.parseModule file`, which also performs structural
+  validation and returns either nonempty phase diagnostics or a fully
+  certified module.
 
 For the parser entry point, the selected-outcome theorem states that the API
 returns exactly the outcome selected by the chart implementation. The
@@ -120,14 +127,18 @@ reduction. The resulting theorem, `Parses.everyLocationValid`, says that every
 successful parse has valid and properly nested source locations.
 
 The exact-token visitor checks lexical replay, full-file ownership, retained
-token spelling and position, grouping, and complete token consumption. Its
-parser-level theorem is complete once `RootActionTokenPlanSound` is supplied.
-The exhaustive dispatch reduces that obligation to five coherent grammar
-callbacks; module references and let bindings are closed, while match arms,
-postfix expressions, and statement bodies remain. `CertifiedParsedModule` and
-the frontend phase core are implemented already, so closing those callbacks
-will make the public wrapper proof-argument-free without changing its phase
-behavior.
+token spelling and position, grouping, and complete token consumption. The
+coherent proofs for module references, let bindings, match arms, postfix
+expressions, and statement bodies now compose into
+`rootActionTokenPlanSound`, covering all 75 grammar rules. That theorem closes
+the parser-level lifting result used by `Solcore.Surface.Multi.parseModule`.
+
+The certified file frontend reports the first failing phase in lexical,
+parse, then structural order. Success returns `CertifiedParsedModule`, whose
+fields certify `Lexes`, `Parses`, `StructurallyAccepts`,
+`EveryLocationValid`, and `ExactTokenCorrespondence` for the returned file,
+tokens, comments, and module. Its executable regressions exercise lexical
+failure, parse failure, structural failure, and success.
 
 The ADR-fixed `parseBound` and `structureBound` functions are now executable
 and proved positive and monotone. The AST-node measure is also proved equal to
@@ -142,10 +153,15 @@ canonical-list comparison count is bounded by the square of the insertion
 count. These inequalities compose in `structureBound_sufficient`, proving the
 fixed quadratic bound sufficient for the exact ledger. The parser schedule is
 also decomposed into fixed, boundary-slot, and memo-slot capacity, whose total
-is exactly `parseBound`; a reduction theorem proves any correspondingly
-accounted execution is within that bound. No current executor supplies that
-ledger yet. Parser-bound sufficiency therefore still requires the counted fast
-executor, operational correspondence, and component bounds.
+is exactly `parseBound`. `ParserSchedule.lean` realizes those capacities as
+exact finite typed address spaces, proves their rankings are bijective, and
+provides a component counter. `ParserScheduleTrace.lean` adds distinct-address
+tracking: repeated charges are rejected, every trace fits all three component
+capacities, every successful fresh charge adds one unit, and the total is at
+most the numeric bound. No current parser executor charges its transitions
+through this trace. Parser-bound integration therefore still requires the fast
+executor, its transition/address invariant and operational correspondence, and
+exact result equality with `Chart.G`.
 
 Termination no longer depends on a proof supplied by the caller. A finite
 static certificate covers all 2,375 dotted grammar rows and supplies the rank
@@ -178,12 +194,11 @@ node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
-The full build checks 213 jobs. The semantic-kernel audit rejects `sorry`,
-`admit`, `partial`, `unsafe`, `axiom`, `noncomputable`, `extern`, and
-`implemented_by` in the audited roots. The final parser certificate is also
-checked at `trust = 0`; its dependencies use only Lean's expected logical
-axioms (`propext`, `Quot.sound`, and, where executable selection requires it,
-`Classical.choice`).
+The semantic-kernel audit rejects `sorry`, `admit`, `partial`, `unsafe`,
+`axiom`, `noncomputable`, `extern`, and `implemented_by` in the audited roots.
+The final parser certificates are also checked at `trust = 0`; their
+dependencies use only Lean's expected logical axioms (`propext`, `Quot.sound`,
+and, where executable selection requires it, `Classical.choice`).
 
 ## Known limitation: runtime cost
 
@@ -235,16 +250,18 @@ necessary.
 The shortest path from the current state to an end-to-end executable frontend
 is:
 
-1. close the three remaining reachability-sensitive exact-token rules and
-   expose the proof-argument-free certified file frontend;
-2. implement the counted fast parser, connect its counter to the existing
-   schedule ledger, prove the fixed, boundary-slot, and memo-slot component
-   bounds, and thereby close `parseBound` sufficiency;
-3. prove exact result equality between that fast parser and the chart
-   reference, and continue memory profiling on larger inputs;
-4. accept and implement module/name resolution;
-5. implement source checking and elaboration into Semantic Core;
-6. expose a new versioned workspace Oracle only after its profile, schemas,
+1. implement the fast parser against the finite typed schedule addresses and
+   prove that its transitions are exactly represented by the
+   duplicate-rejecting trace;
+2. prove operational correspondence and exact result equality between that
+   fast parser and the chart reference, and continue memory profiling on larger
+   inputs;
+3. construct kernel-checked parse and structural certificates for the six
+   canonical standard files;
+4. implement the accepted structural-identity layer;
+5. accept and implement module/name resolution;
+6. implement source checking and elaboration into Semantic Core;
+7. expose a new versioned workspace Oracle only after its profile, schemas,
    limits, diagnostics, proofs, and compatibility story are fixed.
 
 See the [M2 plan](M2_PLAN.md) for the detailed phase boundaries.

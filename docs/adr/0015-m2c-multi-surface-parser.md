@@ -22,20 +22,22 @@
   nesting are proved by `Parses.everyLocationValid`. `CertifiedParsedModule`,
   its phase-composition core, executable resource-bound functions, and the
   concrete AST-carrier cardinality theorem are also present. Exact-token
-  dispatch is exhaustive; module-reference and let-binding callbacks are
-  closed, leaving match-arm, postfix-expression, and statement-body callbacks.
+  correspondence is closed for all 75 grammar rules by
+  `rootActionTokenPlanSound`, and the proof-argument-free
+  `Solcore.Surface.Multi.parseModule` returns phase diagnostics or a module
+  carrying all five frontend judgments. Four executable fixtures cover lexical,
+  parse, structural, and successful outcomes.
   All six structural unit families now have executable traces and exact
   projections, and a public ledger exposes their combined total. The two
   canonical-list passes also have insertion-square comparison bounds, and the
   complete ledger satisfies the ADR-fixed quadratic structural bound.
-  The quadratic fast-parser schedule is also exposed as a public
-  three-component capacity ledger whose total is exactly `parseBound`, with
-  reduction theorems that make the remaining executor correspondence and
-  component-bound obligations explicit.
-- **Not yet implemented:** The separate fast `Parser`, final exact-token root
-  closure and proof-argument-free frontend wrapper, the counted parser
-  execution and its correspondence to the schedule ledger, the schedule's
-  component bounds and resulting parser-bound sufficiency,
+  The quadratic fast-parser schedule is exposed as exact finite typed fixed,
+  boundary-slot, and memo-slot address spaces whose cardinality total is
+  exactly `parseBound`. Its duplicate-rejecting trace has component
+  `FitsWithin`, fresh-charge increment, and total-bound theorems.
+- **Not yet implemented:** The separate fast `Parser`, transitions that charge
+  the typed schedule addresses, their trace and operational correspondence,
+  and exact result equality with `Chart.G`,
   the six complete canonical-standard parse certificates, and the public
   `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed
@@ -4385,12 +4387,15 @@ the exact source slice, every container span against its grammar children and
 delimiters, source ownership, token order, absence versus presence fields,
 and complete token consumption. It does not compare only pretty-printed text.
 
-The location half of this certified boundary is already implemented:
+Both source-fidelity halves of this certified boundary are implemented:
 `Parses.everyLocationValid` derives `EveryLocationValid file module` from the
 lexer and parser judgments. In plain terms, every retained AST location in a
 successful parse belongs to the input file and every direct child location is
-inside its parent. Exact token correspondence and the facade that bundles all
-of these proofs remain to be implemented.
+inside its parent. `rootActionTokenPlanSound` closes the coherent retained-token
+plan for all 75 grammar rules and lifts it to successful parses.
+`Solcore.Surface.Multi.parseModule` bundles these proofs with lexing, parsing, and
+structural acceptance without requiring a proof argument from its caller. It
+remains an internal Lean API and does not change Oracle v4.
 
 ### Termination and resource bounds
 
@@ -4726,11 +4731,15 @@ parseTokens_eq_chartG :
 
 Current Lean status is deliberately narrower than that acceptance condition.
 `ParserResourceAccounting.lean` exposes the fixed, boundary-slot, and
-memo-slot schedule capacities, proves that their total is exactly
-`parseBound`, and supplies the final numeric reduction theorem. The counted
-fast executor, its operational correspondence to that ledger, the component
-bounds, and `parseTokens_eq_chartG` remain to be implemented. The private
-`Chart.G` counter continues to belong to the separate `chartGBound` universe.
+memo-slot schedule capacities. `ParserSchedule.lean` realizes them as typed
+finite address spaces with exact bijective rankings, proves that their total is
+`parseBound`, and supplies a component counter plus the numeric reduction.
+`ParserScheduleTrace.lean` rejects repeated address charges, proves that every
+trace ledger fits the three capacities, proves that a fresh charge adds one
+unit, and bounds every trace by `parseBound`. The fast executor, its
+transition/trace and operational correspondence, and `parseTokens_eq_chartG`
+remain to be implemented. The private `Chart.G` counter continues to belong to
+the separate `chartGBound` universe.
 
 A structural unit is one `astChildren` node visit, list comparison, or
 diagnostic insertion. Thus `structureBound` uses exactly the AST node meaning
@@ -5260,6 +5269,8 @@ Solcore/Surface/Multi/Grammar.lean
 Solcore/Surface/Multi/ParserCore.lean
 Solcore/Surface/Multi/ResourceBounds.lean
 Solcore/Surface/Multi/ParserResourceAccounting.lean
+Solcore/Surface/Multi/ParserSchedule.lean
+Solcore/Surface/Multi/ParserScheduleTrace.lean
 
 Solcore/Surface/Multi/LexicalJudgment.lean
 Solcore/Surface/Multi/Lexer.lean
@@ -5270,6 +5281,7 @@ Solcore/Surface/Multi/StructureJudgment.lean
 Solcore/Surface/Multi/Structure.lean
 
 Solcore/Surface/Multi/Properties.lean
+Solcore/Surface/Multi/CertifiedFrontend.lean
 Solcore/Surface/Multi/StandardFixtures.lean
 Solcore/Surface/Multi.lean
 ```
@@ -5287,9 +5299,12 @@ total `compute`, `sourceLoc`, `SourceLocates`, and `Expected.compare`. In partic
 imports no judgment or executor.
 
 `ParserResourceAccounting.lean` owns the public three-component fast-schedule
-ledger, its exact equality with `parseBound`, and reduction theorems whose
-premises state the still-missing executor correspondence and component bounds.
-It does not expose the private `Chart.G` counter as fast-parser accounting.
+ledger and its numeric reduction to `parseBound`. `ParserSchedule.lean` owns
+the typed finite address families, exact rankings and cardinalities, and the
+lightweight component counter. `ParserScheduleTrace.lean` owns distinct-address
+tracking, duplicate rejection, component-capacity proofs, and the total bound.
+None exposes the private `Chart.G` counter as fast-parser accounting, and no
+current parser executor charges transitions through these addresses.
 
 `LexicalJudgment.lean` does not import `Lexer.lean`.
 `ParserJudgment.lean`, `Chart.lean`, and `Parser.lean` each import the same
@@ -5316,9 +5331,10 @@ conforming to this Accepted ADR. The repository now uses the closed
 `GuardDecision` algebra and has passed the ParserCore closedness gate, so
 `ParserJudgment.lean`, `Chart.lean`, and the total chart-based parser have been
 implemented. Parser-wide location certification is also complete through
-`Parses.everyLocationValid`. This milestone does not complete the still-missing
-fast parser, final exact-token root closure and proof-argument-free facade,
-canonical-standard parse certificates, or umbrella.
+`Parses.everyLocationValid`; exact-token correspondence and the proof-argument-free
+certified facade are complete through `rootActionTokenPlanSound` and
+`Solcore.Surface.Multi.parseModule`. This does not complete the still-missing fast
+parser, canonical-standard parse certificates, or umbrella.
 
 Implementation proceeds in this order:
 
@@ -5335,12 +5351,12 @@ Implementation proceeds in this order:
 6. the independent parser judgment only after step 5 and the independent ADR
    closedness audit, then finite-chart `G`
    and the separate fast full-token parser, their phase barriers, bounds,
-   correspondence, and exact result-equality proof; the fast schedule's public
-   capacity ledger and numeric bound reduction are already present, while the
-   counted executor connection remains;
+   correspondence, and exact result-equality proof; the fast schedule's typed
+   address spaces and duplicate-rejecting bounded trace are already present,
+   while the executor connection remains;
 7. independent structural acceptance and the structural validator;
-8. parser-wide location certification (now complete), followed by exact token
-   correspondence and the remaining diagnostic and resource theorems;
+8. parser-wide location certification and exact token correspondence (now
+   complete), followed by the remaining executor-integrated resource theorems;
 9. checked compatibility, strict UTF-8, byte-round-trip, and six-file standard
    certificates; and
 10. the internal `Solcore.Surface.Multi` umbrella.

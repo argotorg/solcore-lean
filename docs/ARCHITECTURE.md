@@ -22,13 +22,12 @@ raw workspace
 
 The repository implements workspace validation, per-file lexing and parsing,
 and structural validation as separate internal M2c kernels. The parser proves
-that every successful result has source-valid, properly nested AST locations,
-and the structural validator is proof-connected to an independent judgment.
-The proof-carrying frontend result and its phase-composition core are present.
-The unconditional file wrapper still waits on the last three exact-token rule
-proofs. Resolution, source checking, and elaboration are future stages. The
-public Oracle v4 follows the older M2b single-source parser path and stops after
-parsing.
+that every successful result has source-valid, properly nested AST locations
+and exact retained-token correspondence, and the structural validator is
+proof-connected to an independent judgment. These results are assembled by a
+proof-argument-free, one-file certified frontend. Resolution, source checking,
+and elaboration are future stages. The public Oracle v4 follows the older M2b
+single-source parser path and stops after parsing.
 
 ## Main components
 
@@ -102,26 +101,31 @@ The implementation is organized around these responsibilities:
 | chart state and execution | `Chart`, `ParserCore` |
 | declarative parsing | `ParserJudgment` |
 | implementation/proof correspondence | `ChartProperties`, `Properties` |
-| fixed resource bounds and accounting ledgers | `ResourceBounds`, `ParserResourceAccounting`, `StructureResourceAccounting`, `StructureResourceBound` |
+| fixed resource bounds, finite parser-schedule addresses, and accounting ledgers | `ResourceBounds`, `ParserResourceAccounting`, `ParserSchedule`, `ParserScheduleTrace`, `StructureResourceAccounting`, `StructureResourceBound` |
 | AST location inventory, parser-span geometry, and whole-parse location proof | `Location`, `LocationProperties`, `RuleCoherent*`, `EndpointActionIntervalLocation` |
+| exact-token visitor, coherent rule closure, and parser lifting | `ExactToken*`, `Coherent*`, `RuleCoherent*` |
 | total parse selection | `ParseOutcomeTotality` |
 | structural diagnostic order and pure AST validation | `Diagnostic`, `Structure` |
 | structural judgments, traversal bounds, and correspondence | `StructureJudgment`, `StructureFuelProperties`, `StructureProperties` |
+| certified one-file phase composition | `CertifiedFrontendCore`, `CertifiedFrontend` |
 | finite termination certificate | `RootlessNormalizationDottedStatic*` |
 
-The internal file-only API is
+The lower-level file-only API is
 `executeObservedContextualFrontend : WorkspaceFile -> Except
 SurfaceDiagnostic ParsedModuleV1`. It returns lexical or parse diagnostics and
 does not perform the later structural phase. The lower-level parser accepts a
 token ownership proof internally derived by the lexer.
 
 `ParserResourceAccounting` describes the separate quadratic fast-parser
-schedule as fixed, boundary-slot, and memo-slot components. Its capacity total
-is exactly `parseBound`, and a reduction theorem turns executor-to-ledger
-correspondence plus the component bounds into the final numeric bound. The
-current chart reference uses its own `chartGBound` counter and is not silently
-reclassified as that fast schedule. A counted fast executor and the missing
-correspondence and component theorems are still required.
+schedule as fixed, boundary-slot, and memo-slot components. `ParserSchedule`
+realizes each component as a typed finite address space, proves its exact
+cardinality, and supplies a lightweight component counter.
+`ParserScheduleTrace` records distinct ranked addresses, rejects a repeated
+charge, proves each component fits its capacity, proves a fresh charge adds one
+unit, and bounds every trace total by `parseBound`. The current chart reference
+uses its own `chartGBound` counter and is not silently reclassified as that fast
+schedule. An executor that actually charges these addresses, its operational
+correspondence, and exact equality with the chart result are still required.
 
 `validateStructure : ParsedModuleV1 -> Except (NonemptyList
 StructuralDiagnostic) Unit` is the separate structural executor. It traverses
@@ -129,11 +133,12 @@ the full AST, including expressions nested in patterns and lambda bodies,
 returns every applicable closed diagnostic, and canonicalizes the result. Its
 independent applicability and acceptance judgments agree exactly with the
 executor, including sufficient module-derived traversal fuel and the returned
-error list. It is not yet part of a certified parsed-module facade because
-exact retained-token correspondence and phase integration are still separate
-work. Location propagation is complete: `Parses.everyLocationValid` combines
-the inventory, token ordering, parser-span geometry, and opaque-assembly facts
-to prove valid and properly nested locations for every successful parse.
+error list. `Solcore.Surface.Multi.parseModule` composes it after lexing and
+parsing, preserving first-failing-phase precedence. On success it returns a
+`CertifiedParsedModule` carrying `Lexes`, `Parses`, `StructurallyAccepts`,
+`EveryLocationValid`, and `ExactTokenCorrespondence`. The exact-token root
+theorem covers all 75 grammar rules. This facade is an internal Lean API, not
+an Oracle v4 capability.
 
 ## Why the parser has a static certificate
 
@@ -159,8 +164,9 @@ The common proof pattern is:
 | --- | --- | --- | --- |
 | workspace | pure validator | validation/rejection judgments | soundness and completeness |
 | lexing | bounded lexer | lexical judgment and diagnostic applicability | accepted-token and rejection theorems |
-| parsing | bounded chart reference; fast schedule ledger without its counted executor | `Parses` and parse-diagnostic applicability | selected-outcome, soundness, and parser-wide location-validity theorems for the chart path; exact numeric reduction for a future ledger-connected fast counter |
+| parsing | bounded chart reference; exact finite fast-schedule address spaces and duplicate-rejecting trace without a connected executor | `Parses` and parse-diagnostic applicability | selected-outcome, soundness, parser-wide location validity, and exact-token correspondence for the chart path; every standalone fast-schedule trace is bounded by `parseBound` |
 | structural validation | complete pure diagnostic collector | independent acceptance and applicability judgments | two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance; numeric accounting exposes all six charged families and their exact total, with a proved sufficient fixed quadratic bound |
+| certified file frontend | `Solcore.Surface.Multi.parseModule` | conjunction of lexical, parse, structural, location, and retained-token properties | proof-argument-free phase composition with deterministic success/failure characterizations |
 | Core checking | Boolean/detailed checker | typing relation | soundness and completeness |
 | Core execution | fuelled CEK machine | big-step relation | two-way correspondence |
 

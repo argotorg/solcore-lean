@@ -18,18 +18,21 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 | M2c Multi source/token/AST and lexer | ADR-0015 Accepted | complete for the current internal boundary | internal only |
 | M2c Multi full-token parser | ADR-0015 Accepted | unconditional parser and file-only lexer/parser wrapper implemented; selected-outcome and soundness theorems complete | internal only |
 | M2c parser-wide source locations | ADR-0015 Accepted | `Parses.everyLocationValid` proves source validity and direct-parent nesting for every successful parse | internal only |
-| M2c structural acceptance | ADR-0015 Accepted | validator and independent judgments implemented; two-way correspondence, sufficient traversal fuel, canonical reports, success iff acceptance, and the fixed numeric work bound proved; certified-module integration remains | internal only |
+| M2c structural acceptance | ADR-0015 Accepted | validator and independent judgments implemented; two-way correspondence, sufficient traversal fuel, canonical reports, success iff acceptance, and the fixed numeric work bound proved | internal only |
+| M2c exact-token correspondence | ADR-0015 Accepted | `rootActionTokenPlanSound` closes all 75 grammar rules and lifts exact retained-token correspondence to successful parses | internal only |
+| M2c certified one-file frontend | ADR-0015 Accepted | proof-argument-free `parseModule` returns phase diagnostics or a certificate bundling lexing, parsing, structural acceptance, locations, and exact tokens; four phase fixtures pass | internal only |
 | M2c structural syntax identity | ADR-0016 Accepted | design only; no implementation modules or tests yet | none |
 | M2c module and lexical resolution | ADR-0017 Proposed | blocked and not started | none |
 | M2d source checking and Core elaboration | decisions incomplete | not started | none |
 | M2e polymorphism, classes, and staging | direction accepted in part | not started | none |
 
-The **unconditional raw-parser milestone is complete**: callers can lex and
-parse one `WorkspaceFile` without supplying a termination proof. Every
-successful parse is also proved to have valid, properly nested source
-locations. The full ADR-0015 frontend is not complete because exact token
-correspondence and the certified-module integration are still missing.
-Resolution, checking, and elaboration do not exist yet.
+The one-file ADR-0015 frontend path is now proof-argument-free: callers pass a
+`WorkspaceFile` and receive nonempty lexical, parse, or structural diagnostics,
+or a `CertifiedParsedModule`. Every successful result is proved to lex and
+parse the file, pass structural validation, have valid and properly nested
+locations, and correspond exactly to the retained token/comment streams.
+This is still an internal Lean API. Resolution, checking, and elaboration do
+not exist yet.
 
 ## Published M2b boundary
 
@@ -207,10 +210,10 @@ retained wrappers, but the evidence enumeration, lookup cache, and
 proof-carrying counter ledger/index still have cubic growth in the token count.
 Large-file readiness is unproved and memory optimization remains.
 
-## Work still required to finish ADR-0015
+## Certified one-file frontend and remaining ADR-0015 work
 
-The current file-only wrapper stops after raw parsing. A pure structural
-executor now traverses the complete AST, emits all `MSS0001`–`MSS0020`
+The lower-level file wrapper still stops after raw parsing. A pure structural
+executor traverses the complete AST, emits all `MSS0001`–`MSS0020`
 diagnostic candidates with their specified spans and payloads, canonicalizes
 that list, and accepts clean modules. `StructureJudgment.lean` independently
 defines all 26 applicability cases represented by those 20 codes and defines
@@ -231,33 +234,36 @@ This closes logical traversal-fuel sufficiency. The ADR-fixed `parseBound` and
 `structureBound` functions now exist. All six structural unit families have
 executable accounting and an exact combined ledger. Their aggregate
 AST-measure inequalities compose into `structureBound_sufficient`, so the
-structural resource contract is complete. The parser side now has a public
-three-component schedule ledger whose capacity total is exactly `parseBound`,
-plus reduction theorems from ledger accounting and component bounds to the
-fixed bound. The counted fast executor, its counter-to-ledger correspondence,
-and those component bounds remain to be implemented.
+structural resource contract is complete. The parser side has exact finite
+typed address spaces for its fixed, boundary-slot, and memo-slot schedule
+families, with exact cardinalities totaling `parseBound`. A
+duplicate-rejecting trace records distinct ranked addresses; its components
+always fit their capacities, a fresh charge adds one unit, and its total is at
+most `parseBound`. An actual fast parser does not yet charge its transitions
+through these addresses; its transition/trace correspondence, operational
+correspondence, and exact equality with `Chart.G` remain.
 
-The remaining parser-kernel work is:
+The coherent exact-token proofs for module references, let bindings, match
+arms, postfix expressions, and statement bodies compose into
+`rootActionTokenPlanSound`, closing all 75 grammar rules. The proof-argument-free
+`Solcore.Surface.Multi.parseModule` uses this root theorem to assemble lexical,
+parse, structural-acceptance, location, and exact-token evidence. Its tests
+cover lexical failure, parse failure, structural failure, and success.
 
-1. close the three remaining reachability-sensitive exact-token rule proofs;
-2. connect the existing proof-carrying `CertifiedParsedModule` phase core to
-   the unconditional root theorem and expose `parseModule`;
-3. add executable frontend phase-precedence fixtures for lexical, parse,
-   structural, and successful outcomes;
-4. implement the separate counted fast `Parser`, connect its execution counter
-   to the existing schedule ledger, prove the fixed/boundary/memo component
-   bounds, close `parseBound` sufficiency, and prove exact result equality with
-   `Chart.G`;
-5. construct and kernel-check parser plus structural certificates for the six
+The remaining parser and integration work is:
+
+1. implement the separate fast `Parser` against the typed schedule addresses,
+   prove that its transitions correspond to the duplicate-rejecting trace, and
+   prove operational correspondence and exact result equality with `Chart.G`;
+2. construct and kernel-check parser plus structural certificates for the six
    canonical standard files from the one shared raw-byte source; and
-6. add the internal umbrella only after proof, test, kernel-policy, and axiom
+3. add the internal umbrella only after proof, test, kernel-policy, and axiom
    audits pass.
 
 The executable structural pass and its independent specification both exist,
 and their correspondence is complete. Parser-wide location evidence is also
-complete. The certified frontend phase core and its success/failure theorems
-exist; unconditional publication inside Lean waits on the remaining
-exact-token root callbacks.
+complete. The certified one-file frontend and its success/failure theorems are
+complete for the current grammar, but no public profile or Oracle exposes it.
 
 ## Structural syntax identity: accepted design, no code yet
 
@@ -336,14 +342,13 @@ golden streams, and compatibility classification.
 
 | Order | Deliverable | Exit condition |
 | ---: | --- | --- |
-| 1 | parser performance and memory pass | representative files retain explicit runtime/memory regressions, and cubic evidence/cache/counter memory is reduced without weakening proofs |
-| 2 | ADR-0015 certified frontend | exact token correspondence is proved and `parseModule` returns only certified modules or canonical lexical/parse/structural diagnostics |
-| 3 | six-file canonical parse gate | all shared standard bytes lex, parse, structurally pass, and re-encode in the kernel |
-| 4 | ADR-0016 structural identity | prepared modules and all identity/selection/enumeration theorems complete |
-| 5 | ADR-0017 feasibility and acceptance | SHA and actual canonical resolver gates record reproducible counts |
-| 6 | module and lexical resolution | pure resolver is sound, complete, deterministic, and non-dangling |
-| 7 | M2d checking and elaboration | accepted source subset elaborates to a published Core with type preservation |
-| 8 | workspace publication | new versioned protocol and conformance corpus are frozen additively |
+| 1 | counted fast parser and performance pass | transitions correspond to the bounded duplicate-rejecting trace, results equal `Chart.G`, and larger runtime/memory regressions are recorded |
+| 2 | six-file canonical parse gate | all shared standard bytes lex, parse, structurally pass, and re-encode in the kernel |
+| 3 | ADR-0016 structural identity | prepared modules and all identity/selection/enumeration theorems complete |
+| 4 | ADR-0017 feasibility and acceptance | SHA and actual canonical resolver gates record reproducible counts |
+| 5 | module and lexical resolution | pure resolver is sound, complete, deterministic, and non-dangling |
+| 6 | M2d checking and elaboration | accepted source subset elaborates to a published Core with type preservation |
+| 7 | workspace publication | new versioned protocol and conformance corpus are frozen additively |
 
 ## Completion criteria for every frontend phase
 
