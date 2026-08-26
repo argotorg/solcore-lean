@@ -1,5 +1,6 @@
 import Solcore.Surface.Multi.LocationProperties
 import Solcore.Surface.Multi.ParserJudgment
+import Solcore.Surface.Multi.RuleLocation
 
 set_option autoImplicit false
 
@@ -58,47 +59,54 @@ theorem assignmentOperator_location
     (reduces : RuleReduction file tokens .assignmentOperator origin finish
       input output) :
     SingleAnchorLocationEvidence file tokens
-      (LocationFragment.ofAssignmentOperator output) := by
+      (RuleLocationView.ofRuleValue .assignmentOperator output) := by
   cases reduces with
   | assignmentOperatorEqual _ _ terminal =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.assignmentOperator, RuleReduction.terminalLoc,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.assignmentOperator,
+        RuleReduction.terminalLoc,
         LocationFragment.ValidFor, LocationInventory.ValidFor,
         LocationFragment.Nested, LocationInventory.Nested,
         MatchedTerminal.span_validFor]
   | assignmentOperatorAddEqual _ _ terminal =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.assignmentOperator, RuleReduction.terminalLoc,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.assignmentOperator,
+        RuleReduction.terminalLoc,
         LocationFragment.ValidFor, LocationInventory.ValidFor,
         LocationFragment.Nested, LocationInventory.Nested,
         MatchedTerminal.span_validFor]
   | assignmentOperatorSubtractEqual _ _ terminal =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.assignmentOperator, RuleReduction.terminalLoc,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.assignmentOperator,
+        RuleReduction.terminalLoc,
         LocationFragment.ValidFor, LocationInventory.ValidFor,
         LocationFragment.Nested, LocationInventory.Nested,
         MatchedTerminal.span_validFor]
   | assignmentOperatorBitXorEqual _ _ terminal =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.assignmentOperator, RuleReduction.terminalLoc,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.assignmentOperator,
+        RuleReduction.terminalLoc,
         LocationFragment.ValidFor, LocationInventory.ValidFor,
         LocationFragment.Nested, LocationInventory.Nested,
         MatchedTerminal.span_validFor]
   | assignmentOperatorBitAndEqual _ _ terminal =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.assignmentOperator, RuleReduction.terminalLoc,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.assignmentOperator,
+        RuleReduction.terminalLoc,
         LocationFragment.ValidFor, LocationInventory.ValidFor,
         LocationFragment.Nested, LocationInventory.Nested,
         MatchedTerminal.span_validFor]
   | assignmentOperatorBitOrEqual _ _ terminal =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.assignmentOperator, RuleReduction.terminalLoc,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.assignmentOperator,
+        RuleReduction.terminalLoc,
         LocationFragment.ValidFor, LocationInventory.ValidFor,
         LocationFragment.Nested, LocationInventory.Nested,
         MatchedTerminal.span_validFor]
   | assignmentOperatorModuloEqual _ _ terminal =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.assignmentOperator, RuleReduction.terminalLoc,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.assignmentOperator,
+        RuleReduction.terminalLoc,
         LocationFragment.ValidFor, LocationInventory.ValidFor,
         LocationFragment.Nested, LocationInventory.Nested,
         MatchedTerminal.span_validFor]
@@ -114,21 +122,24 @@ theorem literal_location
     (owned : TokensOwnedBy file tokens)
     (reduces : RuleReduction file tokens .literal origin finish input output) :
     SingleAnchorLocationEvidence file tokens
-      (LocationFragment.ofLiteral output) := by
+      (RuleLocationView.ofRuleValue .literal output) := by
   cases reduces with
   | literalDecimal _ _ terminal payload projects =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.terminalLoc, LocationFragment.ValidFor,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.terminalLoc,
+        LocationFragment.ValidFor,
         LocationInventory.ValidFor, LocationFragment.Nested,
         LocationInventory.Nested, MatchedTerminal.span_validFor]
   | literalHexadecimal _ _ terminal payload projects =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.terminalLoc, LocationFragment.ValidFor,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.terminalLoc,
+        LocationFragment.ValidFor,
         LocationInventory.ValidFor, LocationFragment.Nested,
         LocationInventory.Nested, MatchedTerminal.span_validFor]
   | literalString _ _ terminal payload projects =>
       refine ⟨terminal.sourceAnchor owned (by simp), ?_⟩
-      simp [RuleReduction.terminalLoc, LocationFragment.ValidFor,
+      simp [RuleLocationView.ofRuleValue, RuleReduction.terminalLoc,
+        LocationFragment.ValidFor,
         LocationInventory.ValidFor, LocationFragment.Nested,
         LocationInventory.Nested, MatchedTerminal.span_validFor]
 
