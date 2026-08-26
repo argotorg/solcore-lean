@@ -243,7 +243,9 @@ private theorem patternRuleValues_mapM_tokenPlan?
   rw [List.mapM_map]
   simp [Function.comp_def, sourceRuleTokenPlanLayout]
 
-private theorem nonemptyPatternRuleValues_tokenPlan?
+/-- A nonempty grammar list of pattern rule values computes the same
+comma-separated plan as the semantic nonempty-pattern visitor. -/
+theorem nonemptyPatternRuleValues_tokenPlan?
     {file : WorkspaceFile} {tokens : List Token}
     (values : NonemptyList Pattern) :
     (EbnfValue.list1 (.atom (.nonterminal .pattern))
