@@ -863,6 +863,24 @@ theorem Occurs.pragma_inversion
   | pragmaTop itemMember itemShape =>
       exact ⟨_, itemMember, itemShape⟩
 
+/-- A reached fallback declaration also reaches its body at loop depth zero. -/
+theorem Occurs.fallbackBody_of_fallback
+    {module : ParsedModuleV1} {declaration : FallbackDecl}
+    (occurrence : Occurs module (.fallback declaration)) :
+    Occurs module (.body 0 declaration.payload.body) := by
+  cases occurrence with
+  | fallbackDeclaration itemMember itemShape memberMember memberShape =>
+      exact .fallbackBody itemMember itemShape memberMember memberShape
+
+/-- A reached contract constructor also reaches its body at loop depth zero. -/
+theorem Occurs.constructorBody_of_constructor
+    {module : ParsedModuleV1} {declaration : ContractConstructorDecl}
+    (occurrence : Occurs module (.contractConstructor declaration)) :
+    Occurs module (.body 0 declaration.payload.body) := by
+  cases occurrence with
+  | constructorDeclaration itemMember itemShape memberMember memberShape =>
+      exact .constructorBody itemMember itemShape memberMember memberShape
+
 /-- A lambda body always begins a fresh loop-control region. -/
 theorem Occurs.lambdaBody
     {module : ParsedModuleV1} {expression : Expression}

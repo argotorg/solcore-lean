@@ -459,18 +459,15 @@ private def classMethodDiagnostics
     missingParameterTypeDiagnostics .classMethod
       declaration.payload.signature.payload.parameters
 
-private def typeExprIsGroupedUnitFuel : Nat → TypeExpr → Bool
-  | 0, _ => false
-  | fuel + 1, expression =>
-      match expression.payload with
-      | .tuple [] => true
-      | .group inner => typeExprIsGroupedUnitFuel fuel inner
-      | _ => false
+/-- Decide whether a fallback return type is unit after removing only groups. -/
+def typeExprIsGroupedUnit : TypeExpr → Bool
+  | ⟨_, .tuple []⟩ => true
+  | ⟨_, .group inner⟩ => typeExprIsGroupedUnit inner
+  | _ => false
+termination_by expression => sizeOf expression
 
-private def typeExprIsGroupedUnit (fuel : Nat) (expression : TypeExpr) : Bool :=
-  typeExprIsGroupedUnitFuel fuel expression
-
-private def fallbackDiagnostics
+/-- Collect local and body diagnostics rooted at one fallback declaration. -/
+def fallbackDiagnostics
     (fuel : Nat)
     (declaration : FallbackDecl) : List StructuralDiagnostic :=
   let publicDiagnostic :=
@@ -486,12 +483,13 @@ private def fallbackDiagnostics
     match declaration.payload.returnType with
     | none => []
     | some expression =>
-        if typeExprIsGroupedUnit fuel expression then []
+        if typeExprIsGroupedUnit expression then []
         else [.fallbackHasNonUnitReturn expression.span]
   publicDiagnostic ++ parameters ++ returnType ++
     bodyDiagnostics fuel 0 declaration.payload.body
 
-private def constructorDiagnostics
+/-- Collect local and body diagnostics rooted at one contract constructor. -/
+def constructorDiagnostics
     (fuel : Nat)
     (declaration : ContractConstructorDecl) : List StructuralDiagnostic :=
   let publicDiagnostic :=

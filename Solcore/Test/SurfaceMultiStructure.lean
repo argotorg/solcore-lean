@@ -748,4 +748,45 @@ def testMultiStructuralValidation : IO Unit := do
   assertTrue (Structure.diagnosticCandidates allowedModule == [])
     "allowed modifiers, lambda parameters, or grouped unit were rejected"
 
+  let deeplyGroupedUnitType : TypeExpr := locatedAt source 460
+    (.group (locatedAt source 461
+      (.group (locatedAt source 462
+        (.group (locatedAt source 463
+          (.group (locatedAt source 464
+            (.group (locatedAt source 465 (.tuple [])))))))))))
+  let zeroFuelUnitFallback : FallbackDecl := locatedAt source 459 {
+    genericPrefix := none
+    «public» := none
+    payable := none
+    marker := markerAt source 459 .fallbackName
+    parameters := []
+    returnType := some deeplyGroupedUnitType
+    body := bodyAt source 466
+  }
+  let zeroFuelUnitDiagnostics :=
+    Structure.fallbackDiagnostics 0 zeroFuelUnitFallback
+  assertTrue (zeroFuelUnitDiagnostics == [])
+    "deeply grouped unit return emitted a zero-fuel fallback diagnostic"
+
+  let zeroFuelNonUnitType := namedTypeAt source 470 valueName
+  let zeroFuelNonUnitFallback : FallbackDecl := locatedAt source 469 {
+    genericPrefix := none
+    «public» := none
+    payable := none
+    marker := markerAt source 469 .fallbackName
+    parameters := []
+    returnType := some zeroFuelNonUnitType
+    body := bodyAt source 471
+  }
+  let zeroFuelNonUnitDiagnostics :=
+    Structure.fallbackDiagnostics 0 zeroFuelNonUnitFallback
+  assertTrue
+    (zeroFuelNonUnitDiagnostics == [
+      .fallbackHasNonUnitReturn (fixtureSpan source 470)
+    ])
+    "non-unit return did not emit the zero-fuel fallback diagnostic"
+  assertTrue
+    (zeroFuelNonUnitDiagnostics.map StructuralDiagnostic.code == ["MSS0018"])
+    "zero-fuel non-unit fallback did not report MSS0018"
+
 end Tests

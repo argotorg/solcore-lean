@@ -1277,6 +1277,271 @@ theorem mem_forPostDiagnosticsFuel_applies
     StructuralDiagnostic.Applies module diagnostic :=
   (recursiveDiagnosticsFuel_applies fuel).forPost occurrence member
 
+/-- The executable fallback return-type test is exactly the independent
+grouped-unit judgment. -/
+@[simp] theorem typeExprIsGroupedUnit_eq_true_iff :
+    ∀ expression : TypeExpr,
+      typeExprIsGroupedUnit expression = true ↔ GroupedUnit expression := by
+  intro expression
+  rcases expression with ⟨span, payload⟩
+  cases payload with
+  | tuple elements =>
+      cases elements with
+      | nil =>
+          simp only [typeExprIsGroupedUnit]
+          exact ⟨fun _ => .unitTuple span, fun _ => True.intro⟩
+      | cons head tail =>
+          simp only [typeExprIsGroupedUnit, Bool.false_eq_true]
+          exact ⟨False.elim, fun accepted => by cases accepted⟩
+  | group inner =>
+      simp only [typeExprIsGroupedUnit]
+      rw [typeExprIsGroupedUnit_eq_true_iff inner]
+      exact ⟨fun accepted => .group span inner accepted,
+        fun accepted => by cases accepted; assumption⟩
+  | named name arguments =>
+      simp only [typeExprIsGroupedUnit, Bool.false_eq_true]
+      exact ⟨False.elim, fun accepted => by cases accepted⟩
+  | proxy marker inner =>
+      simp only [typeExprIsGroupedUnit, Bool.false_eq_true]
+      exact ⟨False.elim, fun accepted => by cases accepted⟩
+  | «function» domain codomain =>
+      simp only [typeExprIsGroupedUnit, Bool.false_eq_true]
+      exact ⟨False.elim, fun accepted => by cases accepted⟩
+  | comptime marker inner =>
+      simp only [typeExprIsGroupedUnit, Bool.false_eq_true]
+      exact ⟨False.elim, fun accepted => by cases accepted⟩
+termination_by expression => sizeOf expression
+
+private theorem mem_fallbackDiagnostics_iff_emitted
+    {fuel : Nat} {declaration : FallbackDecl}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ fallbackDiagnostics fuel declaration ↔
+      (∃ marker,
+        declaration.payload.public = some marker ∧
+        diagnostic = StructuralDiagnostic.modifierNotAllowed
+          marker.span .fallback marker.payload) ∨
+      (declaration.payload.parameters ≠ [] ∧
+        diagnostic = StructuralDiagnostic.fallbackHasParameters
+          declaration.payload.marker.span
+          declaration.payload.parameters.length) ∨
+      (∃ returnType,
+        declaration.payload.returnType = some returnType ∧
+        ¬GroupedUnit returnType ∧
+        diagnostic = StructuralDiagnostic.fallbackHasNonUnitReturn
+          returnType.span) ∨
+      diagnostic ∈
+        bodyDiagnosticsFuel fuel 0 declaration.payload.body := by
+  change diagnostic ∈
+      (match declaration.payload.public with
+      | none => []
+      | some marker =>
+          [.modifierNotAllowed marker.span .fallback marker.payload]) ++
+      (if declaration.payload.parameters.isEmpty then []
+      else [.fallbackHasParameters declaration.payload.marker.span
+        declaration.payload.parameters.length]) ++
+      (match declaration.payload.returnType with
+      | none => []
+      | some returnType =>
+          if typeExprIsGroupedUnit returnType then []
+          else [.fallbackHasNonUnitReturn returnType.span]) ++
+      bodyDiagnosticsFuel fuel 0 declaration.payload.body ↔ _
+  cases publicShape : declaration.payload.public with
+  | none =>
+      cases returnShape : declaration.payload.returnType with
+      | none =>
+          by_cases parametersEmpty : declaration.payload.parameters = []
+          · simp [parametersEmpty]
+          · simp [parametersEmpty]
+      | some returnType =>
+          by_cases parametersEmpty : declaration.payload.parameters = []
+          · simp [parametersEmpty,
+              typeExprIsGroupedUnit_eq_true_iff]
+          · simp [parametersEmpty, typeExprIsGroupedUnit_eq_true_iff]
+  | some marker =>
+      cases returnShape : declaration.payload.returnType with
+      | none =>
+          by_cases parametersEmpty : declaration.payload.parameters = []
+          · simp [parametersEmpty]
+          · simp [parametersEmpty]
+      | some returnType =>
+          by_cases parametersEmpty : declaration.payload.parameters = []
+          · simp [parametersEmpty, typeExprIsGroupedUnit_eq_true_iff]
+          · simp [parametersEmpty, typeExprIsGroupedUnit_eq_true_iff]
+
+/-- The fallback collector emits exactly its public-modifier, parameter-list,
+return-type, and nested-body diagnostics. -/
+theorem mem_fallbackDiagnostics_iff
+    {fuel : Nat} {declaration : FallbackDecl}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ fallbackDiagnostics fuel declaration ↔
+      (∃ marker,
+        declaration.payload.public = some marker ∧
+        StructuralDiagnostic.modifierNotAllowed
+          marker.span .fallback marker.payload = diagnostic) ∨
+      (declaration.payload.parameters ≠ [] ∧
+        StructuralDiagnostic.fallbackHasParameters
+          declaration.payload.marker.span
+          declaration.payload.parameters.length = diagnostic) ∨
+      (∃ returnType,
+        declaration.payload.returnType = some returnType ∧
+        ¬GroupedUnit returnType ∧
+        StructuralDiagnostic.fallbackHasNonUnitReturn
+          returnType.span = diagnostic) ∨
+      diagnostic ∈
+        bodyDiagnosticsFuel fuel 0 declaration.payload.body := by
+  rw [mem_fallbackDiagnostics_iff_emitted]
+  constructor
+  · intro member
+    rcases member with modifier | parameters | returnType | body
+    · rcases modifier with ⟨marker, selected, diagnosticEq⟩
+      exact Or.inl ⟨marker, selected, diagnosticEq.symm⟩
+    · rcases parameters with ⟨nonempty, diagnosticEq⟩
+      exact Or.inr (Or.inl ⟨nonempty, diagnosticEq.symm⟩)
+    · rcases returnType with
+        ⟨returnType, selected, notUnit, diagnosticEq⟩
+      exact Or.inr (Or.inr (Or.inl
+        ⟨returnType, selected, notUnit, diagnosticEq.symm⟩))
+    · exact Or.inr (Or.inr (Or.inr body))
+  · intro member
+    rcases member with modifier | parameters | returnType | body
+    · rcases modifier with ⟨marker, selected, diagnosticEq⟩
+      exact Or.inl ⟨marker, selected, diagnosticEq.symm⟩
+    · rcases parameters with ⟨nonempty, diagnosticEq⟩
+      exact Or.inr (Or.inl ⟨nonempty, diagnosticEq.symm⟩)
+    · rcases returnType with
+        ⟨returnType, selected, notUnit, diagnosticEq⟩
+      exact Or.inr (Or.inr (Or.inl
+        ⟨returnType, selected, notUnit, diagnosticEq.symm⟩))
+    · exact Or.inr (Or.inr (Or.inr body))
+
+private theorem mem_constructorDiagnostics_iff_emitted
+    {fuel : Nat} {declaration : ContractConstructorDecl}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ constructorDiagnostics fuel declaration ↔
+      (∃ marker,
+        declaration.payload.public = some marker ∧
+        diagnostic = StructuralDiagnostic.modifierNotAllowed marker.span
+          .contractConstructor marker.payload) ∨
+      (∃ parameter,
+        parameter ∈ declaration.payload.parameters ∧
+        parameter.payload.type = none ∧
+        diagnostic = StructuralDiagnostic.requiredParameterTypeMissing
+          parameter.payload.name.span .contractConstructor) ∨
+      diagnostic ∈
+        bodyDiagnosticsFuel fuel 0 declaration.payload.body := by
+  change diagnostic ∈
+      (match declaration.payload.public with
+      | none => []
+      | some marker =>
+          [.modifierNotAllowed marker.span .contractConstructor
+            marker.payload]) ++
+      missingParameterTypeDiagnostics .contractConstructor
+        declaration.payload.parameters ++
+      bodyDiagnosticsFuel fuel 0 declaration.payload.body ↔ _
+  have missingIff :
+      diagnostic ∈ missingParameterTypeDiagnostics .contractConstructor
+          declaration.payload.parameters ↔
+        ∃ parameter,
+          parameter ∈ declaration.payload.parameters ∧
+          parameter.payload.type = none ∧
+          diagnostic = StructuralDiagnostic.requiredParameterTypeMissing
+            parameter.payload.name.span .contractConstructor := by
+    rw [mem_missingParameterTypeDiagnostics_iff]
+    constructor
+    · rintro ⟨parameter, parameterMember, missing, diagnosticEq⟩
+      exact ⟨parameter, parameterMember, missing, diagnosticEq.symm⟩
+    · rintro ⟨parameter, parameterMember, missing, diagnosticEq⟩
+      exact ⟨parameter, parameterMember, missing, diagnosticEq.symm⟩
+  cases publicShape : declaration.payload.public with
+  | none =>
+      simp [missingIff]
+  | some marker =>
+      simp [missingIff]
+
+/-- The constructor collector emits exactly its public-modifier,
+missing-parameter-type, and nested-body diagnostics. -/
+theorem mem_constructorDiagnostics_iff
+    {fuel : Nat} {declaration : ContractConstructorDecl}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ constructorDiagnostics fuel declaration ↔
+      (∃ marker,
+        declaration.payload.public = some marker ∧
+        StructuralDiagnostic.modifierNotAllowed marker.span
+          .contractConstructor marker.payload = diagnostic) ∨
+      (∃ parameter,
+        parameter ∈ declaration.payload.parameters ∧
+        parameter.payload.type = none ∧
+        StructuralDiagnostic.requiredParameterTypeMissing
+          parameter.payload.name.span .contractConstructor = diagnostic) ∨
+      diagnostic ∈
+        bodyDiagnosticsFuel fuel 0 declaration.payload.body := by
+  rw [mem_constructorDiagnostics_iff_emitted]
+  constructor
+  · intro member
+    rcases member with modifier | parameter | body
+    · rcases modifier with ⟨marker, selected, diagnosticEq⟩
+      exact Or.inl ⟨marker, selected, diagnosticEq.symm⟩
+    · rcases parameter with
+        ⟨parameter, parameterMember, missing, diagnosticEq⟩
+      exact Or.inr (Or.inl
+        ⟨parameter, parameterMember, missing, diagnosticEq.symm⟩)
+    · exact Or.inr (Or.inr body)
+  · intro member
+    rcases member with modifier | parameter | body
+    · rcases modifier with ⟨marker, selected, diagnosticEq⟩
+      exact Or.inl ⟨marker, selected, diagnosticEq.symm⟩
+    · rcases parameter with
+        ⟨parameter, parameterMember, missing, diagnosticEq⟩
+      exact Or.inr (Or.inl
+        ⟨parameter, parameterMember, missing, diagnosticEq.symm⟩)
+    · exact Or.inr (Or.inr body)
+
+/-- Every diagnostic emitted for a reached fallback declaration is
+declaratively applicable. -/
+theorem mem_fallbackDiagnostics_applies
+    {fuel : Nat} {module : ParsedModuleV1}
+    {declaration : FallbackDecl} {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.fallback declaration))
+    (member : diagnostic ∈ fallbackDiagnostics fuel declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_fallbackDiagnostics_iff] at member
+  rcases member with modifier | parameters | returnType | body
+  · rcases modifier with ⟨marker, selected, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .fallbackModifierNotAllowed occurrence selected
+  · rcases parameters with ⟨nonempty, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .fallbackHasParameters occurrence nonempty
+  · rcases returnType with
+      ⟨returnType, selected, notUnit, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .fallbackHasNonUnitReturn occurrence selected notUnit
+  · exact mem_bodyDiagnosticsFuel_applies
+      occurrence.fallbackBody_of_fallback body
+
+/-- Every diagnostic emitted for a reached contract constructor is
+declaratively applicable. -/
+theorem mem_constructorDiagnostics_applies
+    {fuel : Nat} {module : ParsedModuleV1}
+    {declaration : ContractConstructorDecl}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.contractConstructor declaration))
+    (member : diagnostic ∈ constructorDiagnostics fuel declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_constructorDiagnostics_iff] at member
+  rcases member with modifier | parameter | body
+  · rcases modifier with ⟨marker, selected, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .constructorModifierNotAllowed occurrence selected
+  · rcases parameter with
+      ⟨parameter, parameterMember, missing, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .constructorParameterTypeMissing
+      occurrence parameterMember missing
+  · exact mem_bodyDiagnosticsFuel_applies
+      occurrence.constructorBody_of_constructor body
+
 end Structure
 
 end Solcore.Surface.Multi
