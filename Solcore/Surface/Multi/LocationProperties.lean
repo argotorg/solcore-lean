@@ -102,6 +102,121 @@ theorem validFor
 
 end ConsumedSpan
 
+/-- A consumed chart interval that retains at least one physical token. -/
+def OccupiedConsumedSpan
+    (file : WorkspaceFile)
+    (tokens : List Token)
+    (origin finish : Boundary tokens)
+    (span : SourceSpan) : Prop :=
+  ConsumedSpan file tokens origin finish span ∧
+    origin.val < Nat.min finish.val tokens.length
+
+namespace OccupiedConsumedSpan
+
+/-- An occupied consumed interval is source-valid. -/
+theorem validFor
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {span : SourceSpan}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    (occupied : OccupiedConsumedSpan file tokens origin finish span) :
+    span.ValidFor file :=
+  ConsumedSpan.validFor tokensOrdered occupied.1
+
+/-- A physically occupied inner chart interval is contained by any enclosing
+consumed interval. Empty intervals deliberately use a separate theorem because
+trivia can separate a boundary byte from the preceding token end. -/
+theorem containedBy
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {outerOrigin outerFinish innerOrigin innerFinish : Boundary tokens}
+    {outerSpan innerSpan : SourceSpan}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    (outer : ConsumedSpan file tokens outerOrigin outerFinish outerSpan)
+    (inner : OccupiedConsumedSpan file tokens innerOrigin innerFinish innerSpan)
+    (startsInside : outerOrigin.val ≤ innerOrigin.val)
+    (finishesInside : innerFinish.val ≤ outerFinish.val) :
+    outerSpan.Contains innerSpan := by
+  have innerValid := inner.validFor tokensOrdered
+  have innerOccupied := inner.2
+  have innerBounds := Nat.lt_min.mp innerOccupied
+  have outerOccupied :
+      outerOrigin.val < Nat.min outerFinish.val tokens.length := by
+    apply Nat.lt_min.mpr
+    constructor <;> omega
+  unfold ConsumedSpan at outer
+  rcases outer with ⟨outerOwned, _outerOrdered, outerShape⟩
+  simp only [outerOccupied, ↓reduceDIte] at outerShape
+  unfold OccupiedConsumedSpan ConsumedSpan at inner
+  rcases inner with ⟨⟨innerOwned, _innerOrdered, innerShape⟩,
+    _occupiedAgain⟩
+  simp only [innerOccupied, ↓reduceDIte] at innerShape
+  subst outerSpan
+  subst innerSpan
+  have outerFirstBound : outerOrigin.val < tokens.length :=
+    Nat.lt_of_lt_of_le outerOccupied (Nat.min_le_right _ _)
+  have innerFirstBound : innerOrigin.val < tokens.length :=
+    innerBounds.2
+  have outerCapPositive :
+      0 < Nat.min outerFinish.val tokens.length :=
+    Nat.zero_lt_of_lt outerOccupied
+  have innerCapPositive :
+      0 < Nat.min innerFinish.val tokens.length :=
+    Nat.zero_lt_of_lt innerOccupied
+  have outerLastBound :
+      Nat.min outerFinish.val tokens.length - 1 < tokens.length :=
+    Nat.lt_of_lt_of_le
+      (Nat.sub_lt outerCapPositive Nat.zero_lt_one)
+      (Nat.min_le_right _ _)
+  have innerLastBound :
+      Nat.min innerFinish.val tokens.length - 1 < tokens.length :=
+    Nat.lt_of_lt_of_le
+      (Nat.sub_lt innerCapPositive Nat.zero_lt_one)
+      (Nat.min_le_right _ _)
+  have startsOrdered :
+      tokens[outerOrigin.val].span.startByte ≤
+        tokens[innerOrigin.val].span.startByte := by
+    by_cases same : outerOrigin.val = innerOrigin.val
+    · simpa only [same] using
+        Nat.le_refl tokens[innerOrigin.val].span.startByte
+    · have before : outerOrigin.val < innerOrigin.val := by omega
+      have outerFirstValid :=
+        outerOwned.getElem_valid outerOrigin.val outerFirstBound
+      exact Nat.le_trans outerFirstValid.2.1
+        (tokensOrdered.getElem_end_le_start
+          outerFirstBound innerFirstBound before)
+  have cappedFinishesOrdered :
+      Nat.min innerFinish.val tokens.length ≤
+        Nat.min outerFinish.val tokens.length := by
+    simp only [Nat.min_def]
+    split <;> split <;> omega
+  have lastIndicesOrdered :
+      Nat.min innerFinish.val tokens.length - 1 ≤
+        Nat.min outerFinish.val tokens.length - 1 := by
+    exact Nat.sub_le_sub_right cappedFinishesOrdered 1
+  have finishesOrdered :
+      tokens[Nat.min innerFinish.val tokens.length - 1].span.endByte ≤
+        tokens[Nat.min outerFinish.val tokens.length - 1].span.endByte := by
+    by_cases same :
+        Nat.min innerFinish.val tokens.length - 1 =
+          Nat.min outerFinish.val tokens.length - 1
+    · simpa only [same] using Nat.le_refl
+        tokens[Nat.min outerFinish.val tokens.length - 1].span.endByte
+    · have before :
+          Nat.min innerFinish.val tokens.length - 1 <
+            Nat.min outerFinish.val tokens.length - 1 := by
+        omega
+      have outerLastValid := outerOwned.getElem_valid
+        (Nat.min outerFinish.val tokens.length - 1) outerLastBound
+      exact Nat.le_trans
+        (tokensOrdered.getElem_end_le_start
+          innerLastBound outerLastBound before)
+        outerLastValid.2.1
+  exact ⟨rfl, startsOrdered, innerValid.2.1, finishesOrdered⟩
+
+end OccupiedConsumedSpan
+
 namespace ConsumedSpanWitness
 
 /-- Every checked chart-span witness is valid for its source file when the
