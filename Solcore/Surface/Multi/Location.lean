@@ -790,4 +790,34 @@ def AllLocationsNested (module : ParsedModuleV1) : Prop :=
 def EveryLocationValid (file : WorkspaceFile) (module : ParsedModuleV1) : Prop :=
   AllLocationsValid file module ∧ AllLocationsNested module
 
+/-- Execute the validity check for every location retained by a module. -/
+def locationsValid (file : WorkspaceFile) (module : ParsedModuleV1) : Bool :=
+  (locationInventory module).spans.all (fun span => span.isValidFor file)
+
+/-- The executable location-validity check decides its logical predicate. -/
+@[simp] theorem locationsValid_eq_true_iff
+    (file : WorkspaceFile) (module : ParsedModuleV1) :
+    locationsValid file module = true ↔ AllLocationsValid file module := by
+  simp [locationsValid, AllLocationsValid, SourceSpan.isValidFor_eq_true_iff]
+
+/-- Execute the direct parent-child containment check for a module. -/
+def locationsNested (module : ParsedModuleV1) : Bool :=
+  (locationInventory module).containments.all fun containment =>
+    containment.1.contains containment.2
+
+/-- The executable nesting check decides its logical predicate. -/
+@[simp] theorem locationsNested_eq_true_iff (module : ParsedModuleV1) :
+    locationsNested module = true ↔ AllLocationsNested module := by
+  simp [locationsNested, AllLocationsNested, SourceSpan.contains_eq_true_iff]
+
+/-- Execute the complete location-validity and nesting check. -/
+def everyLocationValid (file : WorkspaceFile) (module : ParsedModuleV1) : Bool :=
+  locationsValid file module && locationsNested module
+
+/-- The complete executable check decides `EveryLocationValid`. -/
+@[simp] theorem everyLocationValid_eq_true_iff
+    (file : WorkspaceFile) (module : ParsedModuleV1) :
+    everyLocationValid file module = true ↔ EveryLocationValid file module := by
+  simp [everyLocationValid, EveryLocationValid]
+
 end Solcore.Surface.Multi
