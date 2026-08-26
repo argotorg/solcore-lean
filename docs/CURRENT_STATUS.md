@@ -34,7 +34,10 @@ the proof-argument-free public wrapper remains to be connected. The fixed
 parser and structural bound functions now exist. Structural validation exposes
 exact executable traces for all six charged families, one ledger that sums
 them, and a proof that the fixed quadratic structural bound is sufficient. The
-parser executor's corresponding unit accounting and sufficiency proof remain.
+parser side now exposes the three-component fast-schedule capacity ledger and
+the numeric reduction from an accounted ledger to `parseBound`. What remains
+is the counted fast executor itself, the theorem connecting its counter to
+that ledger, and the three component bounds required by the reduction.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -137,8 +140,12 @@ duplicate comparisons, and least-span selection are related to the AST
 measure; canonicalization never creates an uncharged diagnostic; and each
 canonical-list comparison count is bounded by the square of the insertion
 count. These inequalities compose in `structureBound_sufficient`, proving the
-fixed quadratic bound sufficient for the exact ledger. Parser-bound
-sufficiency remains.
+fixed quadratic bound sufficient for the exact ledger. The parser schedule is
+also decomposed into fixed, boundary-slot, and memo-slot capacity, whose total
+is exactly `parseBound`; a reduction theorem proves any correspondingly
+accounted execution is within that bound. No current executor supplies that
+ledger yet. Parser-bound sufficiency therefore still requires the counted fast
+executor, operational correspondence, and component bounds.
 
 Termination no longer depends on a proof supplied by the caller. A finite
 static certificate covers all 2,375 dotted grammar rows and supplies the rank
@@ -230,10 +237,11 @@ is:
 
 1. close the three remaining reachability-sensitive exact-token rules and
    expose the proof-argument-free certified file frontend;
-2. add parser executor-unit accounting and prove the fixed parser bound
-   sufficient;
-3. implement the separate fast parser, prove exact result equality with the
-   chart reference, and continue memory profiling on larger inputs;
+2. implement the counted fast parser, connect its counter to the existing
+   schedule ledger, prove the fixed, boundary-slot, and memo-slot component
+   bounds, and thereby close `parseBound` sufficiency;
+3. prove exact result equality between that fast parser and the chart
+   reference, and continue memory profiling on larger inputs;
 4. accept and implement module/name resolution;
 5. implement source checking and elaboration into Semantic Core;
 6. expose a new versioned workspace Oracle only after its profile, schemas,

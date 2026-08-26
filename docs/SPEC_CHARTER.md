@@ -15,7 +15,7 @@ profile” are deliberately different claims.
 | --- | --- | --- |
 | M1c Semantic Core | Closed checker and evaluator with correspondence proofs | Published by Oracle v3 as `solcore/0.1.0-draft.3` / `core-m1c-v1` |
 | M2b Surface | Closed one-file parser with lexer/parser correspondence proofs | Published by Oracle v4 as `solcore/0.1.0-draft.4` / `frontend-m2b-v1` |
-| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result, soundness, and parser-wide location-validity theorems; separately certified and resource-bounded 20-code structural validator with two-way correspondence; exact-token dispatch and the certified frontend core are implemented but final root closure is pending; parser unit-accounting sufficiency and the fast parser remain pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
+| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result, soundness, and parser-wide location-validity theorems; separately certified and resource-bounded 20-code structural validator with two-way correspondence; exact-token dispatch and the certified frontend core are implemented but final root closure is pending; the fast-parser schedule ledger and numeric `parseBound` reduction exist, while its counted executor, ledger correspondence, and component bounds remain pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
 | M2c workspace and syntax identity | Pure workspace validation and accepted structural-identity design | Internal only |
 | Resolution, checking, elaboration, execution | Not connected as one executable source frontend | Not published |
 
@@ -36,8 +36,9 @@ and executable diagnostics are exactly the applicable diagnostics. The
 module-derived traversal fuel is sufficient, and validator success is exactly
 structural acceptance. Successful parses now also carry a proof that every AST
 location is valid for its source and properly nested. Exact token
-root closure, complete resource accounting, and the proof-argument-free
-certified file wrapper remain. None of this widens
+root closure, parser executor-to-ledger resource correspondence, the fast
+schedule's component bounds, and the proof-argument-free certified file
+wrapper remain. None of this widens
 Oracle v4, certifies a whole workspace, resolves a name, assigns a type,
 elaborates to Core, or executes a contract.
 
@@ -275,7 +276,11 @@ collectors are sound for arbitrary fuel. Structural paths are bounded by the
 module AST measure, so the executable list and declarative applicability agree
 in both directions. Canonical reports are duplicate-free and ordered, and
 validator success is equivalent to structural acceptance. Formal resource
-accounting and the certified frontend connection remain. Location
+accounting is complete for structural validation. On the parser side, the
+three-component schedule ledger sums exactly to `parseBound` and a numeric
+reduction theorem is present; the counted fast executor, its correspondence to
+that ledger, and the component bounds remain. The certified frontend
+connection also remains. Location
 certification is complete: the executable inventory, token order, parser-span
 geometry, and assembly-location facts compose into
 `Parses.everyLocationValid` for every successful parse. Exact token
@@ -493,8 +498,9 @@ selection and soundness theorems. It does not complete M2c publication.
 
 Before a complete M2c frontend can be claimed, at least the following remain:
 
-- implement the separate fast parser and prove exact result equality with the
-  chart reference, including its stated parser work bound;
+- implement the separate counted fast parser, connect its counter to the
+  existing schedule ledger, prove the fixed/boundary/memo component bounds,
+  and prove exact result equality with the chart reference;
 - prove exact token correspondence for successful parses, including retained
   leaves, grouping, literal spelling, and the absence of parser normalization;
 - connect the already certified structural phase to `CertifiedParsedModule`

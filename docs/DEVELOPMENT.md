@@ -245,6 +245,16 @@ comparisons are bounded by the AST measure, aggregate duplicate comparisons
 are bounded quadratically, and `structureBound_sufficient` combines those
 facts to prove the fixed structural bound sufficient for the complete ledger.
 
+Parser resource accounting is at an earlier integration point.
+`ParserResourceAccounting.lean` exposes the fixed, boundary-slot, and
+memo-slot components of the quadratic fast-parser schedule. Their capacity
+ledger sums definitionally to `parseBound`, and its reduction theorems show
+exactly how a counted execution will inherit that bound. This does not count
+the current `Chart.G` reference executor: its private counter uses the separate
+quartic `chartGBound` address universe. Closing the parser bound still requires
+the counted fast executor, a correspondence theorem from its counter to the
+public schedule ledger, and proofs of the three component bounds.
+
 `validateStructure` is a certified standalone structural phase. The
 proof-carrying `CertifiedParsedModule` and parameterized frontend phase core
 now exist, but do not yet describe the raw file frontend as unconditionally

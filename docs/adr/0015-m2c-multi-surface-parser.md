@@ -28,8 +28,14 @@
   projections, and a public ledger exposes their combined total. The two
   canonical-list passes also have insertion-square comparison bounds, and the
   complete ledger satisfies the ADR-fixed quadratic structural bound.
+  The quadratic fast-parser schedule is also exposed as a public
+  three-component capacity ledger whose total is exactly `parseBound`, with
+  reduction theorems that make the remaining executor correspondence and
+  component-bound obligations explicit.
 - **Not yet implemented:** The separate fast `Parser`, final exact-token root
-  closure and proof-argument-free frontend wrapper, parser executor-unit sufficiency,
+  closure and proof-argument-free frontend wrapper, the counted parser
+  execution and its correspondence to the schedule ledger, the schedule's
+  component bounds and resulting parser-bound sufficiency,
   the six complete canonical-standard parse certificates, and the public
   `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed
@@ -4718,6 +4724,14 @@ parseTokens_eq_chartG :
   Multi.parseTokens file lexed = Multi.Chart.G file lexed
 ```
 
+Current Lean status is deliberately narrower than that acceptance condition.
+`ParserResourceAccounting.lean` exposes the fixed, boundary-slot, and
+memo-slot schedule capacities, proves that their total is exactly
+`parseBound`, and supplies the final numeric reduction theorem. The counted
+fast executor, its operational correspondence to that ledger, the component
+bounds, and `parseTokens_eq_chartG` remain to be implemented. The private
+`Chart.G` counter continues to belong to the separate `chartGBound` universe.
+
 A structural unit is one `astChildren` node visit, list comparison, or
 diagnostic insertion. Thus `structureBound` uses exactly the AST node meaning
 shared with ADR-0016, including leaf wrappers/payloads and the unlocated
@@ -5244,6 +5258,8 @@ Solcore/Surface/Multi/Diagnostic.lean
 Solcore/Surface/Multi/Measure.lean
 Solcore/Surface/Multi/Grammar.lean
 Solcore/Surface/Multi/ParserCore.lean
+Solcore/Surface/Multi/ResourceBounds.lean
+Solcore/Surface/Multi/ParserResourceAccounting.lean
 
 Solcore/Surface/Multi/LexicalJudgment.lean
 Solcore/Surface/Multi/Lexer.lean
@@ -5269,6 +5285,11 @@ all eleven typed action packers and their equations, `descendContext`,
 total `compute`, `sourceLoc`, `SourceLocates`, and `Expected.compare`. In particular, `GuardAnchor` and
 `GuardWitnessKey` have no shadow definition in a judgment or executor. It
 imports no judgment or executor.
+
+`ParserResourceAccounting.lean` owns the public three-component fast-schedule
+ledger, its exact equality with `parseBound`, and reduction theorems whose
+premises state the still-missing executor correspondence and component bounds.
+It does not expose the private `Chart.G` counter as fast-parser accounting.
 
 `LexicalJudgment.lean` does not import `Lexer.lean`.
 `ParserJudgment.lean`, `Chart.lean`, and `Parser.lean` each import the same
@@ -5314,7 +5335,9 @@ Implementation proceeds in this order:
 6. the independent parser judgment only after step 5 and the independent ADR
    closedness audit, then finite-chart `G`
    and the separate fast full-token parser, their phase barriers, bounds,
-   correspondence, and exact result-equality proof;
+   correspondence, and exact result-equality proof; the fast schedule's public
+   capacity ledger and numeric bound reduction are already present, while the
+   counted executor connection remains;
 7. independent structural acceptance and the structural validator;
 8. parser-wide location certification (now complete), followed by exact token
    correspondence and the remaining diagnostic and resource theorems;

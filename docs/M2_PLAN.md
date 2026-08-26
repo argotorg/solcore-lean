@@ -231,7 +231,11 @@ This closes logical traversal-fuel sufficiency. The ADR-fixed `parseBound` and
 `structureBound` functions now exist. All six structural unit families have
 executable accounting and an exact combined ledger. Their aggregate
 AST-measure inequalities compose into `structureBound_sufficient`, so the
-structural resource contract is complete.
+structural resource contract is complete. The parser side now has a public
+three-component schedule ledger whose capacity total is exactly `parseBound`,
+plus reduction theorems from ledger accounting and component bounds to the
+fixed bound. The counted fast executor, its counter-to-ledger correspondence,
+and those component bounds remain to be implemented.
 
 The remaining parser-kernel work is:
 
@@ -240,8 +244,10 @@ The remaining parser-kernel work is:
    the unconditional root theorem and expose `parseModule`;
 3. add executable frontend phase-precedence fixtures for lexical, parse,
    structural, and successful outcomes;
-4. implement the separate fast `Parser`, prove exact result equality with
-   `Chart.G`, and establish its stated parser work bound;
+4. implement the separate counted fast `Parser`, connect its execution counter
+   to the existing schedule ledger, prove the fixed/boundary/memo component
+   bounds, close `parseBound` sufficiency, and prove exact result equality with
+   `Chart.G`;
 5. construct and kernel-check parser plus structural certificates for the six
    canonical standard files from the one shared raw-byte source; and
 6. add the internal umbrella only after proof, test, kernel-policy, and axiom

@@ -102,6 +102,7 @@ The implementation is organized around these responsibilities:
 | chart state and execution | `Chart`, `ParserCore` |
 | declarative parsing | `ParserJudgment` |
 | implementation/proof correspondence | `ChartProperties`, `Properties` |
+| fixed resource bounds and accounting ledgers | `ResourceBounds`, `ParserResourceAccounting`, `StructureResourceAccounting`, `StructureResourceBound` |
 | AST location inventory, parser-span geometry, and whole-parse location proof | `Location`, `LocationProperties`, `RuleCoherent*`, `EndpointActionIntervalLocation` |
 | total parse selection | `ParseOutcomeTotality` |
 | structural diagnostic order and pure AST validation | `Diagnostic`, `Structure` |
@@ -113,6 +114,14 @@ The internal file-only API is
 SurfaceDiagnostic ParsedModuleV1`. It returns lexical or parse diagnostics and
 does not perform the later structural phase. The lower-level parser accepts a
 token ownership proof internally derived by the lexer.
+
+`ParserResourceAccounting` describes the separate quadratic fast-parser
+schedule as fixed, boundary-slot, and memo-slot components. Its capacity total
+is exactly `parseBound`, and a reduction theorem turns executor-to-ledger
+correspondence plus the component bounds into the final numeric bound. The
+current chart reference uses its own `chartGBound` counter and is not silently
+reclassified as that fast schedule. A counted fast executor and the missing
+correspondence and component theorems are still required.
 
 `validateStructure : ParsedModuleV1 -> Except (NonemptyList
 StructuralDiagnostic) Unit` is the separate structural executor. It traverses
@@ -150,7 +159,7 @@ The common proof pattern is:
 | --- | --- | --- | --- |
 | workspace | pure validator | validation/rejection judgments | soundness and completeness |
 | lexing | bounded lexer | lexical judgment and diagnostic applicability | accepted-token and rejection theorems |
-| parsing | bounded chart executor | `Parses` and parse-diagnostic applicability | selected-outcome, soundness, and parser-wide location-validity theorems |
+| parsing | bounded chart reference; fast schedule ledger without its counted executor | `Parses` and parse-diagnostic applicability | selected-outcome, soundness, and parser-wide location-validity theorems for the chart path; exact numeric reduction for a future ledger-connected fast counter |
 | structural validation | complete pure diagnostic collector | independent acceptance and applicability judgments | two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance; numeric accounting exposes all six charged families and their exact total, with a proved sufficient fixed quadratic bound |
 | Core checking | Boolean/detailed checker | typing relation | soundness and completeness |
 | Core execution | fuelled CEK machine | big-step relation | two-way correspondence |
