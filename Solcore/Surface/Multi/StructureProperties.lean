@@ -438,6 +438,293 @@ theorem mem_importDiagnostics_applies
               (.hidingClauseTop itemMember itemShape modeShape)
               hidingMember
 
+/-- Constructor-selection diagnostics are exactly later duplicate constructor
+names from a written named selection. -/
+theorem mem_constructorSelectionDiagnostics_iff
+    {selected : Option ConstructorSelection}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ constructorSelectionDiagnostics selected ↔
+      ∃ selection constructors name,
+        selected = some selection ∧
+        selection.payload = .named constructors ∧
+        LaterDuplicate constructors.toList
+          (fun value => value.payload) name ∧
+        StructuralDiagnostic.duplicateExportConstructor
+          name.span name.payload = diagnostic := by
+  cases selected with
+  | none => simp [constructorSelectionDiagnostics]
+  | some selection =>
+      cases shape : selection.payload with
+      | all marker => simp [constructorSelectionDiagnostics, shape]
+      | named constructors =>
+          simp [constructorSelectionDiagnostics, shape,
+            mem_duplicateDiagnostics_iff_laterDuplicate,
+            nonemptyToList, NonemptyList.toList]
+
+/-- Export-item diagnostics are exactly later duplicate constructor names in
+that item's named constructor selection. -/
+theorem mem_exportItemDiagnostics_iff
+    {item : ExportItem} {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ exportItemDiagnostics item ↔
+      ∃ selection constructors name,
+        item.payload.constructors = some selection ∧
+        selection.payload = .named constructors ∧
+        LaterDuplicate constructors.toList
+          (fun value => value.payload) name ∧
+        StructuralDiagnostic.duplicateExportConstructor
+          name.span name.payload = diagnostic := by
+  simpa [exportItemDiagnostics] using
+    (mem_constructorSelectionDiagnostics_iff
+      (selected := item.payload.constructors)
+      (diagnostic := diagnostic))
+
+/-- Membership in the local-item projection retains an original export entry
+witness. -/
+theorem mem_localExportItems_iff_entry
+    {entries : List ExportEntry} {item : ExportItem} :
+    item ∈ StructuralDiagnostic.localExportItems entries ↔
+      ∃ entry, entry ∈ entries ∧ entry.payload = .item item := by
+  rw [StructuralDiagnostic.localExportItems, List.mem_filterMap]
+  constructor
+  · rintro ⟨entry, member, selected⟩
+    cases shape : entry.payload with
+    | wildcard marker => simp [shape] at selected
+    | item candidate =>
+        simp only [shape, Option.some.injEq] at selected
+        subst candidate
+        exact ⟨entry, member, shape⟩
+    | allFrom reference marker => simp [shape] at selected
+  · rintro ⟨entry, member, shape⟩
+    exact ⟨entry, member, by simp [shape]⟩
+
+/-- Membership in the remote-item projection retains an original braced entry
+witness. -/
+theorem mem_remoteExportItems_iff_entry
+    {entries : List RemoteExportEntry} {item : ExportItem} :
+    item ∈ StructuralDiagnostic.remoteExportItems entries ↔
+      ∃ entry, entry ∈ entries ∧ entry.payload = .item item := by
+  rw [StructuralDiagnostic.remoteExportItems, List.mem_filterMap]
+  constructor
+  · rintro ⟨entry, member, selected⟩
+    cases shape : entry.payload with
+    | wildcard marker => simp [shape] at selected
+    | item candidate =>
+        simp only [shape, Option.some.injEq] at selected
+        subst candidate
+        exact ⟨entry, member, shape⟩
+  · rintro ⟨entry, member, shape⟩
+    exact ⟨entry, member, by simp [shape]⟩
+
+private theorem localExportDiagnostics_expansion
+    (selection : LocalExportList) :
+    localExportDiagnostics selection =
+      let entries := selection.payload.entries
+      let items := StructuralDiagnostic.localExportItems entries
+      let references := StructuralDiagnostic.localExportReferences entries
+      let empty :=
+        if entries.isEmpty then
+          [.emptyLocalExportList selection.span]
+        else []
+      let mixed := mixedWildcardDiagnostic? entries.length
+        (StructuralDiagnostic.localExportWildcardSpans entries)
+        StructuralDiagnostic.mixedExportWildcard
+      let duplicateNames := duplicateDiagnostics
+        (fun item => item.payload.name.payload)
+        (fun item => .duplicateExportName
+          item.payload.name.span item.payload.name.payload)
+        items
+      let duplicateReferences := duplicateDiagnostics
+        ModuleReference.eraseLocations
+        (fun reference => .duplicateExportModuleReference
+          reference.span reference.eraseLocations)
+        references
+      empty ++ mixed ++ duplicateNames ++ duplicateReferences ++
+        items.flatMap exportItemDiagnostics := by
+  rfl
+
+/-- The local-export collector emits exactly its four selection diagnostics
+and the constructor diagnostics of projected export items. -/
+theorem mem_localExportDiagnostics_iff
+    {selection : LocalExportList} {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ localExportDiagnostics selection ↔
+      (selection.payload.entries = [] ∧
+        diagnostic = .emptyLocalExportList selection.span) ∨
+      (selection.payload.entries.length ≠ 1 ∧
+        ∃ span,
+          LeastSpanIn span
+            (StructuralDiagnostic.localExportWildcardSpans
+              selection.payload.entries) ∧
+          StructuralDiagnostic.mixedExportWildcard span = diagnostic) ∨
+      (∃ item,
+        LaterDuplicate
+          (StructuralDiagnostic.localExportItems
+            selection.payload.entries)
+          (fun value => value.payload.name.payload) item ∧
+        StructuralDiagnostic.duplicateExportName
+          item.payload.name.span item.payload.name.payload = diagnostic) ∨
+      (∃ reference,
+        LaterDuplicate
+          (StructuralDiagnostic.localExportReferences
+            selection.payload.entries)
+          ModuleReference.eraseLocations reference ∧
+        StructuralDiagnostic.duplicateExportModuleReference
+          reference.span reference.eraseLocations = diagnostic) ∨
+      ∃ item,
+        item ∈ StructuralDiagnostic.localExportItems
+          selection.payload.entries ∧
+        diagnostic ∈ exportItemDiagnostics item := by
+  rw [localExportDiagnostics_expansion]
+  simp [mem_mixedWildcardDiagnostic?_iff,
+    mem_duplicateDiagnostics_iff_laterDuplicate]
+
+private theorem remoteExportDiagnostics_expansion
+    (selection : RemoteExportSelection)
+    (entries : List RemoteExportEntry)
+    (braced : selection.payload = .braced entries) :
+    remoteExportDiagnostics selection =
+      let items := StructuralDiagnostic.remoteExportItems entries
+      let empty :=
+        if entries.isEmpty then
+          [.emptyRemoteExportList selection.span]
+        else []
+      let mixed := mixedWildcardDiagnostic? entries.length
+        (StructuralDiagnostic.remoteExportWildcardSpans entries)
+        StructuralDiagnostic.mixedExportWildcard
+      let duplicateNames := duplicateDiagnostics
+        (fun item => item.payload.name.payload)
+        (fun item => .duplicateExportName
+          item.payload.name.span item.payload.name.payload)
+        items
+      empty ++ mixed ++ duplicateNames ++
+        items.flatMap exportItemDiagnostics := by
+  rw [remoteExportDiagnostics, braced]
+  rfl
+
+/-- A braced remote-export collector emits exactly its three selection
+diagnostics and the constructor diagnostics of projected export items. -/
+theorem mem_remoteExportDiagnostics_braced_iff
+    {selection : RemoteExportSelection}
+    {entries : List RemoteExportEntry}
+    {diagnostic : StructuralDiagnostic}
+    (braced : selection.payload = .braced entries) :
+    diagnostic ∈ remoteExportDiagnostics selection ↔
+      (entries = [] ∧
+        diagnostic = .emptyRemoteExportList selection.span) ∨
+      (entries.length ≠ 1 ∧
+        ∃ span,
+          LeastSpanIn span
+            (StructuralDiagnostic.remoteExportWildcardSpans entries) ∧
+          StructuralDiagnostic.mixedExportWildcard span = diagnostic) ∨
+      (∃ item,
+        LaterDuplicate
+          (StructuralDiagnostic.remoteExportItems entries)
+          (fun value => value.payload.name.payload) item ∧
+        StructuralDiagnostic.duplicateExportName
+          item.payload.name.span item.payload.name.payload = diagnostic) ∨
+      ∃ item,
+        item ∈ StructuralDiagnostic.remoteExportItems entries ∧
+        diagnostic ∈ exportItemDiagnostics item := by
+  rw [remoteExportDiagnostics_expansion selection entries braced]
+  simp [mem_mixedWildcardDiagnostic?_iff,
+    mem_duplicateDiagnostics_iff_laterDuplicate]
+
+/-- Every diagnostic emitted for a reached export item is declaratively
+applicable. -/
+theorem mem_exportItemDiagnostics_applies
+    {module : ParsedModuleV1} {item : ExportItem}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.exportItem item))
+    (member : diagnostic ∈ exportItemDiagnostics item) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_exportItemDiagnostics_iff] at member
+  rcases member with
+    ⟨selection, constructors, name, selected, named, later, diagnosticEq⟩
+  rw [← diagnosticEq]
+  exact .duplicateExportConstructor occurrence selected named later
+
+/-- Every diagnostic emitted for a reached local export list is declaratively
+applicable. -/
+theorem mem_localExportDiagnostics_applies
+    {module : ParsedModuleV1} {selection : LocalExportList}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.localExportList selection))
+    (member : diagnostic ∈ localExportDiagnostics selection) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_localExportDiagnostics_iff] at member
+  rcases member with empty | mixed | duplicateName |
+      duplicateReference | nested
+  · rcases empty with ⟨entries, diagnosticEq⟩
+    subst diagnostic
+    exact .emptyLocalExportList occurrence entries
+  · rcases mixed with ⟨entryCount, span, least, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .mixedLocalExportWildcard occurrence entryCount least
+  · rcases duplicateName with ⟨item, later, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .duplicateLocalExportName occurrence later
+  · rcases duplicateReference with
+      ⟨reference, later, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .duplicateExportModuleReference occurrence later
+  · rcases nested with ⟨item, itemMember, diagnosticMember⟩
+    rcases mem_localExportItems_iff_entry.mp itemMember with
+      ⟨entry, entryMember, entryShape⟩
+    exact mem_exportItemDiagnostics_applies
+      (.localExportItem occurrence entryMember entryShape)
+      diagnosticMember
+
+/-- Every diagnostic emitted for a reached remote export selection is
+declaratively applicable. -/
+theorem mem_remoteExportDiagnostics_applies
+    {module : ParsedModuleV1} {selection : RemoteExportSelection}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.remoteExportSelection selection))
+    (member : diagnostic ∈ remoteExportDiagnostics selection) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  cases shape : selection.payload with
+  | dotWildcard marker =>
+      simp [remoteExportDiagnostics, shape] at member
+  | braced entries =>
+      rw [mem_remoteExportDiagnostics_braced_iff shape] at member
+      rcases member with empty | mixed | duplicateName | nested
+      · rcases empty with ⟨entriesEmpty, diagnosticEq⟩
+        subst diagnostic
+        exact .emptyRemoteExportList entries occurrence shape entriesEmpty
+      · rcases mixed with ⟨entryCount, span, least, diagnosticEq⟩
+        rw [← diagnosticEq]
+        exact .mixedRemoteExportWildcard occurrence shape entryCount least
+      · rcases duplicateName with ⟨item, later, diagnosticEq⟩
+        rw [← diagnosticEq]
+        exact .duplicateRemoteExportName occurrence shape later
+      · rcases nested with ⟨item, itemMember, diagnosticMember⟩
+        rcases mem_remoteExportItems_iff_entry.mp itemMember with
+          ⟨entry, entryMember, entryShape⟩
+        exact mem_exportItemDiagnostics_applies
+          (.remoteExportItem occurrence shape entryMember entryShape)
+          diagnosticMember
+
+/-- Every diagnostic emitted for a top-level export declaration is
+declaratively applicable to the containing module. -/
+theorem mem_exportDiagnostics_applies
+    {module : ParsedModuleV1} {item : TopItem}
+    {declaration : ExportDecl} {diagnostic : StructuralDiagnostic}
+    (itemMember : item ∈ module.payload.items)
+    (itemShape : item.payload = .exportDecl declaration)
+    (member : diagnostic ∈ exportDiagnostics declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  cases modeShape : declaration.payload with
+  | module moduleReference alias =>
+      simp [exportDiagnostics, modeShape] at member
+  | «local» selection =>
+      rw [exportDiagnostics, modeShape] at member
+      exact mem_localExportDiagnostics_applies
+        (.localExportListTop itemMember itemShape modeShape) member
+  | «from» moduleReference selection =>
+      rw [exportDiagnostics, modeShape] at member
+      exact mem_remoteExportDiagnostics_applies
+        (.remoteExportSelectionTop itemMember itemShape modeShape) member
+
 /-- The pragma collector emits exactly its empty-target and later-duplicate
 diagnostics. -/
 theorem mem_pragmaDiagnostics_iff

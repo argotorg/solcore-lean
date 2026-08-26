@@ -127,7 +127,8 @@ def importDiagnostics (declaration : ImportDecl) : List StructuralDiagnostic :=
         | none => []
         | some clause => hidingDiagnostics clause
 
-private def constructorSelectionDiagnostics
+/-- Collect duplicate names from a named constructor selection. -/
+def constructorSelectionDiagnostics
     (selection : Option ConstructorSelection) : List StructuralDiagnostic :=
   match selection with
   | none => []
@@ -140,7 +141,8 @@ private def constructorSelectionDiagnostics
             (fun name => .duplicateExportConstructor name.span name.payload)
             (nonemptyToList constructors)
 
-private def exportItemDiagnostics
+/-- Collect diagnostics local to one named export item. -/
+def exportItemDiagnostics
     (item : ExportItem) : List StructuralDiagnostic :=
   constructorSelectionDiagnostics item.payload.constructors
 
@@ -157,7 +159,8 @@ private def localExportReferences
     | .allFrom reference _ => some reference
     | .wildcard _ | .item _ => none
 
-private def localExportDiagnostics
+/-- Collect diagnostics local to a local export list. -/
+def localExportDiagnostics
     (selection : LocalExportList) : List StructuralDiagnostic :=
   let entries := selection.payload.entries
   let items := localExportItems entries
@@ -187,7 +190,8 @@ private def remoteExportItems
     | .item item => some item
     | .wildcard _ => none
 
-private def remoteExportDiagnostics
+/-- Collect diagnostics local to a remote export selection. -/
+def remoteExportDiagnostics
     (selection : RemoteExportSelection) : List StructuralDiagnostic :=
   match selection.payload with
   | .dotWildcard _ => []
