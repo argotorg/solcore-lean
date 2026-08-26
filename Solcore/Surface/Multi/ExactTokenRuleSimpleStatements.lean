@@ -159,4 +159,24 @@ theorem returnStatement_tokenPlanSound :
               simpa [ruleTokenPlan?, statementTokenPlan?, sourceLoc,
                 TokenPlan.concat_cons, expressionEq] using enclosed
 
+/-- A block statement accepts exactly the braced-body plan supplied by its
+body child and encloses it with the completed statement interval. -/
+theorem blockStatement_tokenPlanSound :
+    GrammarRuleTokenPlanSound .blockStatement := by
+  intro file tokens origin finish input output _owned reduces inputEvidence
+  generalize inputEq : input = sourceInput at reduces inputEvidence
+  cases reduces with
+  | blockStatement origin finish body witness =>
+      change EbnfValue file tokens (.atom (.nonterminal .body)) at input
+      simp only [m2cV1, m2cV1Rhs, Grammar.nonterminal] at inputEvidence
+      rw [EbnfValue.tokenPlan?_ruleAtom] at inputEvidence
+      simp only [sourceRuleTokenPlanLayout, ruleTokenPlan?] at inputEvidence
+      have enclosed := TokenPlanEvidence.enclose inputEvidence
+        (fun plan success =>
+          bracedBodyTokenPlan?_wellAnchored body plan success)
+        witness.consumed
+      apply enclosed.candidate_eq
+      cases bodyEq : bodyTokenPlan? .braced body <;>
+        simp [bodyEq, ruleTokenPlan?, statementTokenPlan?, sourceLoc]
+
 end Solcore.Surface.Multi
