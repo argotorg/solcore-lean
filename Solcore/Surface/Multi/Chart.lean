@@ -9132,17 +9132,18 @@ private def phaseAEvidenceHashKey {tokens : List Token}
 private abbrev PhaseAEvidenceCache (tokens : List Token) :=
   Std.HashMap (PhaseAEvidenceHashKey tokens) Bool
 
-private def phaseAEvidenceCachePairs {tokens : List Token}
-    (entries : List (PhaseAEvidenceEntry tokens)) :
-    List (PhaseAEvidenceHashKey tokens × Bool) :=
-  entries.map fun entry =>
-    (phaseAEvidenceHashKey entry.address, entry.selected)
+private def insertPhaseAEvidenceCacheEntry {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (entry : PhaseAEvidenceEntry tokens) :
+    PhaseAEvidenceCache tokens :=
+  cache.insertIfNew (phaseAEvidenceHashKey entry.address) entry.selected
 
 /-- Build a cache whose duplicate policy is the reference list's first match. -/
 private def buildPhaseAEvidenceCache {tokens : List Token}
     (entries : List (PhaseAEvidenceEntry tokens)) :
     PhaseAEvidenceCache tokens :=
-  Std.HashMap.ofList (phaseAEvidenceCachePairs entries).reverse
+  entries.foldl insertPhaseAEvidenceCacheEntry
+    (Std.HashMap.emptyWithCapacity entries.length)
 
 private def phaseAEvidenceCacheEntryAt? {tokens : List Token}
     (cache : PhaseAEvidenceCache tokens)
@@ -9820,22 +9821,48 @@ private theorem phaseAEvidenceHashKey_beq_eq_addressEqBool
       phaseAEvidenceAddressEqBool left right := by
   rfl
 
-private theorem phaseAEvidenceEntryAt?_eq_findSome?
+private theorem buildPhaseAEvidenceCacheFold_lookup
     {tokens : List Token}
     (entries : List (PhaseAEvidenceEntry tokens))
+    (cache : PhaseAEvidenceCache tokens)
     (address : EvidenceIndexAddress tokens) :
-    phaseAEvidenceEntryAt? entries address =
-      entries.findSome? fun entry =>
-        if phaseAEvidenceAddressEqBool entry.address address then
-          some entry.selected
-        else
-          none := by
-  induction entries with
-  | nil => rfl
+    ((entries.foldl insertPhaseAEvidenceCacheEntry cache)[phaseAEvidenceHashKey address]?) =
+      (cache[phaseAEvidenceHashKey address]?).or
+        (phaseAEvidenceEntryAt? entries address) := by
+  induction entries generalizing cache with
+  | nil => simp [phaseAEvidenceEntryAt?]
   | cons entry rest induction =>
-      rw [phaseAEvidenceEntryAt?, List.findSome?, induction]
-      cases comparison : phaseAEvidenceAddressEqBool entry.address address <;>
-        simp
+      rw [List.foldl_cons, induction]
+      simp only [insertPhaseAEvidenceCacheEntry,
+        Std.HashMap.getElem?_insertIfNew,
+        phaseAEvidenceHashKey_beq_eq_addressEqBool]
+      rw [phaseAEvidenceEntryAt?]
+      cases cached : cache[phaseAEvidenceHashKey address]? with
+      | none =>
+          cases comparison :
+              phaseAEvidenceAddressEqBool entry.address address with
+          | false => simp
+          | true =>
+              have addressEqual : entry.address = address :=
+                (phaseAEvidenceAddressEqBool_eq_true_iff
+                  entry.address address).mp comparison
+              have absent : ¬phaseAEvidenceHashKey address ∈ cache := by
+                rw [Std.HashMap.mem_iff_isSome_getElem?]
+                simp [cached]
+              rw [addressEqual]
+              simp [absent]
+      | some selected =>
+          cases comparison :
+              phaseAEvidenceAddressEqBool entry.address address with
+          | false => simp
+          | true =>
+              have addressEqual : entry.address = address :=
+                (phaseAEvidenceAddressEqBool_eq_true_iff
+                  entry.address address).mp comparison
+              have present : phaseAEvidenceHashKey address ∈ cache :=
+                Std.HashMap.mem_iff_isSome_getElem?.mpr (by simp [cached])
+              rw [addressEqual]
+              simp [present]
 
 /-- The cache retains the reference list's first-match and absence behavior. -/
 private theorem phaseAEvidenceCacheEntryAt?_eq_reference
@@ -9844,12 +9871,10 @@ private theorem phaseAEvidenceCacheEntryAt?_eq_reference
     (address : EvidenceIndexAddress tokens) :
     phaseAEvidenceCacheEntryAt? (buildPhaseAEvidenceCache entries) address =
       phaseAEvidenceEntryAt? entries address := by
-  rw [phaseAEvidenceEntryAt?_eq_findSome?]
-  simp [phaseAEvidenceCacheEntryAt?, buildPhaseAEvidenceCache,
-    phaseAEvidenceCachePairs, Std.HashMap.ofList_eq_insertMany_empty,
-    Std.HashMap.getElem?_insertMany_list]
-  rw [List.findSome?_map]
-  rfl
+  simp only [phaseAEvidenceCacheEntryAt?, buildPhaseAEvidenceCache]
+  rw [Std.HashMap.get?_eq_getElem?]
+  rw [buildPhaseAEvidenceCacheFold_lookup]
+  simp
 
 private theorem phaseBGuardDecisionFromCache?_eq_reference
     {tokens : List Token}
