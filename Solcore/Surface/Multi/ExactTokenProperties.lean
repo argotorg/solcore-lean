@@ -348,6 +348,38 @@ theorem exact (kind : TokenKind) (span : SourceSpan) :
     (TokenPlan.exact kind span).WellAnchored := by
   rfl
 
+/-- Mandatory first and last slots anchor any intervening token language. -/
+theorem bookended
+    (first last : ExpectedToken) (middle : List TokenSlot) :
+    ({ slots := [.required first] ++ middle ++ [.required last] } :
+      TokenPlan).WellAnchored := by
+  unfold TokenPlan.WellAnchored
+  rw [wellAnchored_eq_slotsWellAnchored]
+  exact slotsWellAnchored_required_bookends first last middle
+
+/-- Required fixed tokens at both ends anchor a concatenated plan even when
+the intervening plans contain optional endpoints. -/
+theorem concatPlainBookended
+    (first last : TokenKind) (middle : List TokenPlan) :
+    (TokenPlan.concat
+      (TokenPlan.plain first :: middle ++ [TokenPlan.plain last])).WellAnchored := by
+  simpa [TokenPlan.concat, TokenPlan.plain, List.flatMap_append] using
+    bookended (ExpectedToken.plain first) (ExpectedToken.plain last)
+      (middle.flatMap (fun plan => plan.slots))
+
+/-- Required source-exact tokens at both ends anchor a concatenated plan. -/
+theorem concatExactBookended
+    (firstKind : TokenKind) (firstSpan : SourceSpan)
+    (lastKind : TokenKind) (lastSpan : SourceSpan)
+    (middle : List TokenPlan) :
+    (TokenPlan.concat
+      (TokenPlan.exact firstKind firstSpan :: middle ++
+        [TokenPlan.exact lastKind lastSpan])).WellAnchored := by
+  simpa [TokenPlan.concat, TokenPlan.exact, List.flatMap_append] using
+    bookended (ExpectedToken.exact firstKind firstSpan)
+      (ExpectedToken.exact lastKind lastSpan)
+      (middle.flatMap (fun plan => plan.slots))
+
 /-- Adding source-span constraints preserves mandatory physical endpoints. -/
 theorem enclose {plan : TokenPlan} (anchored : plan.WellAnchored)
     (span : SourceSpan) :
