@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.RuleCoherentIntervalLocation
+import Solcore.Surface.Multi.RuleCoherentSpanLayout
 import Solcore.Surface.Multi.SourceRuleIntervalLocation
 
 set_option autoImplicit false
@@ -1848,6 +1849,843 @@ theorem principalFocusedAnchors
 
 end ExpressionFoldLocationCase
 
+/-- The closed family of semantic spans needed to expose every operand of an
+expression fold.  Postfix parts retain their internal grammar-order layout
+instead of presenting one synthetic principal span. -/
+def expressionLayoutSpans :
+    (rule : GrammarRuleId) → RuleValue rule → List SourceSpan
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.expression, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.annotation, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.conditional, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.logicalOr, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.logicalAnd, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.equality, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.relational, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.bitOr, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.bitXor, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.bitAnd, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.additive, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.multiplicative, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.prefix, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.postfix, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.postfixPart, part =>
+      postfixPartInitialFocusedSpans part ++ [postfixPartEndpointSpan part]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.atom, value => [value.span]
+  | Solcore.Surface.Multi.Grammar.GrammarRuleId.lambda, value => [value.span]
+  | _, _ => []
+
+def expressionSpanLayout : RuleSpanLayout := {
+  spans := expressionLayoutSpans
+  safe := by
+    intro rule value nonempty
+    cases rule <;> simp [expressionLayoutSpans] at nonempty ⊢
+}
+
+/-- Singleton focused evidence from an already checked consumed span. -/
+theorem consumedSingletonFocusedSpanEvidence
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens} {span : SourceSpan}
+    (consumed : ConsumedSpan file tokens origin finish span)
+    (progress : origin.val < Nat.min finish.val tokens.length) :
+    FocusedSpanEvidence file tokens origin finish [span] := by
+  let anchor : SourceAnchor file tokens := {
+    origin := origin
+    finish := finish
+    span := span
+    occupied := ⟨consumed, progress⟩
+  }
+  refine ⟨[anchor], ?_, ?_,
+    SourceAnchorTrace.ordered_singleton anchor⟩
+  · simp [anchor]
+  · intro selected member
+    simp only [List.mem_singleton] at member
+    subst selected
+    exact ⟨Nat.le_refl _, Nat.le_refl _⟩
+
+/-- Fold actions consume their exact interleaved input layout and retain the
+folded result as a singleton principal expression span. -/
+theorem foldFocusedSpanEvidence
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs rule)}
+    {output : RuleValue rule}
+    (reduces : RuleReduction file tokens rule origin finish input output)
+    (classified : ExpressionFoldLocationCase reduces)
+    (inputEvidence : FocusedSpanEvidence file tokens origin finish
+      classified.focusedSpans) :
+    FocusedSpanEvidence file tokens origin finish
+      (expressionLayoutSpans rule output) := by
+  rcases inputEvidence with
+    ⟨anchors, anchorSpans, anchorsWithin, anchorsOrdered⟩
+  have principal := classified.principalFocusedAnchors reduces anchors
+    anchorSpans anchorsWithin anchorsOrdered
+  cases classified <;>
+    simpa [FocusedSpanEvidence, expressionLayoutSpans,
+      RuleLocationView.exposedSpans,
+      RuleLocationView.ofRuleValue] using principal
+
+/-- One rebuilt fixed-infix tail contributes its terminal and operand layout. -/
+theorem EbnfValue.fixedInfixTailValue_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (focus : RuleSpanLayout)
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (value : MatchedTerminal file tokens terminal × RuleValue operand) :
+    (EbnfValue.fixedInfixTailValue terminal operand value).layoutSpans
+        focus =
+      (if terminal = .endOfFile then [] else [value.1.span]) ++
+        focus.spans operand value.2 := by
+  unfold EbnfValue.fixedInfixTailValue EbnfValue.fixedInfixTailExpr
+  rw [EbnfValue.layoutSpans_group]
+  rw [EbnfValue.layoutSpans_sequence]
+  rw [EbnfValues.layoutSpans_cons]
+  rw [EbnfValues.layoutSpans_cons]
+  rw [EbnfValues.layoutSpans_nil]
+  rw [EbnfValue.layoutSpans_terminalAtom]
+  rw [EbnfValue.layoutSpans_ruleAtom]
+  simp
+
+/-- The public fixed-infix builder exposes its operand and every operator/right
+operand pair in source order under the expression layout. -/
+theorem EbnfValue.fixedInfixRootValue_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (terminal : TerminalSymbol) (operand : GrammarRuleId)
+    (value : RuleValue operand ×
+      List (MatchedTerminal file tokens terminal × RuleValue operand)) :
+    (EbnfValue.fixedInfixRootValue terminal operand value).layoutSpans
+        expressionSpanLayout =
+      expressionLayoutSpans operand value.1 ++
+        value.2.flatMap fun pair =>
+          (if terminal = .endOfFile then [] else [pair.1.span]) ++
+            expressionLayoutSpans operand pair.2 := by
+  unfold EbnfValue.fixedInfixRootValue EbnfValue.fixedInfixRootExpr
+  rw [EbnfValue.layoutSpans_sequence]
+  rw [EbnfValues.layoutSpans_cons]
+  rw [EbnfValues.layoutSpans_cons]
+  rw [EbnfValues.layoutSpans_nil]
+  rw [EbnfValue.layoutSpans_ruleAtom]
+  rw [EbnfValue.layoutSpans_star]
+  simp only [List.flatMap_map,
+    EbnfValue.fixedInfixTailValue_layoutSpans,
+    List.append_nil, expressionSpanLayout]
+
+/-- A root consisting of one rule operand followed by a star of tail values
+preserves the rule span followed by every tail layout. -/
+theorem EbnfValue.ruleStarRootValue_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (focus : RuleSpanLayout) (operand : GrammarRuleId)
+    (tail : EbnfExpr) (left : RuleValue operand)
+    (rest : List (EbnfValue file tokens tail)) :
+    (EbnfValue.sequence [
+        .atom (.nonterminal operand), .star tail]
+      (EbnfValues.cons (.atom (.nonterminal operand)) [.star tail]
+        (EbnfValue.ruleAtom operand left)
+        (EbnfValues.cons (.star tail) []
+          (EbnfValue.star tail rest) EbnfValues.nil))).layoutSpans focus =
+      focus.spans operand left ++
+        rest.flatMap fun value => value.layoutSpans focus := by
+  rw [EbnfValue.layoutSpans_sequence]
+  rw [EbnfValues.layoutSpans_cons]
+  rw [EbnfValues.layoutSpans_cons]
+  rw [EbnfValues.layoutSpans_nil]
+  rw [EbnfValue.layoutSpans_ruleAtom]
+  rw [EbnfValue.layoutSpans_star]
+  simp
+
+/-- An additive tail exposes its selected token and right operand. -/
+theorem EbnfValue.additiveTailValue_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (focus : RuleSpanLayout)
+    (value : Sum
+      (MatchedTerminal file tokens (.symbol .plus))
+      (MatchedTerminal file tokens (.symbol .minus)) × Expression) :
+    (EbnfValue.additiveTailValue value).layoutSpans focus =
+      (match value.1 with
+        | .inl plus => [plus.span]
+        | .inr minus => [minus.span]) ++
+        focus.spans .multiplicative value.2 := by
+  cases value with
+  | mk operator right =>
+      cases operator with
+      | inl plus =>
+          unfold EbnfValue.additiveTailValue
+            EbnfValue.additiveTailExpr
+          simp only [EbnfValue.layoutSpans_group,
+            EbnfValue.layoutSpans_sequence,
+            EbnfValues.layoutSpans_cons,
+            EbnfValues.layoutSpans_nil,
+            EbnfValue.layoutSpans_choice,
+            EbnfValue.layoutSpans_ruleAtom,
+            List.append_nil, List.singleton_append]
+          change (EbnfValue.terminalAtom (.symbol .plus) plus).layoutSpans
+            focus ++ focus.spans .multiplicative right = _
+          rw [EbnfValue.layoutSpans_terminalAtom]
+          simp
+      | inr minus =>
+          unfold EbnfValue.additiveTailValue
+            EbnfValue.additiveTailExpr
+          simp only [EbnfValue.layoutSpans_group,
+            EbnfValue.layoutSpans_sequence,
+            EbnfValues.layoutSpans_cons,
+            EbnfValues.layoutSpans_nil,
+            EbnfValue.layoutSpans_choice,
+            EbnfValue.layoutSpans_ruleAtom,
+            List.append_nil, List.singleton_append]
+          change (EbnfValue.terminalAtom (.symbol .minus) minus).layoutSpans
+            focus ++ focus.spans .multiplicative right = _
+          rw [EbnfValue.layoutSpans_terminalAtom]
+          simp
+
+/-- A multiplicative tail exposes its selected token and right operand. -/
+theorem EbnfValue.multiplicativeTailValue_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (focus : RuleSpanLayout)
+    (value : Sum
+      (MatchedTerminal file tokens (.symbol .star))
+      (Sum
+        (MatchedTerminal file tokens (.symbol .slash))
+        (MatchedTerminal file tokens (.symbol .percent))) × Expression) :
+    (EbnfValue.multiplicativeTailValue value).layoutSpans focus =
+      (match value.1 with
+        | .inl star => [star.span]
+        | .inr (.inl slash) => [slash.span]
+        | .inr (.inr percent) => [percent.span]) ++
+        focus.spans .prefix value.2 := by
+  cases value with
+  | mk operator right =>
+      cases operator with
+      | inl star =>
+          unfold EbnfValue.multiplicativeTailValue
+            EbnfValue.multiplicativeTailExpr
+          simp only [EbnfValue.layoutSpans_group,
+            EbnfValue.layoutSpans_sequence,
+            EbnfValues.layoutSpans_cons,
+            EbnfValues.layoutSpans_nil,
+            EbnfValue.layoutSpans_choice,
+            EbnfValue.layoutSpans_ruleAtom,
+            List.append_nil, List.singleton_append]
+          change (EbnfValue.terminalAtom (.symbol .star) star).layoutSpans
+            focus ++ focus.spans .prefix right = _
+          rw [EbnfValue.layoutSpans_terminalAtom]
+          simp
+      | inr remaining =>
+          cases remaining with
+          | inl slash =>
+              unfold EbnfValue.multiplicativeTailValue
+                EbnfValue.multiplicativeTailExpr
+              simp only [EbnfValue.layoutSpans_group,
+                EbnfValue.layoutSpans_sequence,
+                EbnfValues.layoutSpans_cons,
+                EbnfValues.layoutSpans_nil,
+                EbnfValue.layoutSpans_choice,
+                EbnfValue.layoutSpans_ruleAtom,
+                List.append_nil, List.singleton_append]
+              change (EbnfValue.terminalAtom
+                (.symbol .slash) slash).layoutSpans focus ++
+                  focus.spans .prefix right = _
+              rw [EbnfValue.layoutSpans_terminalAtom]
+              simp
+          | inr percent =>
+              unfold EbnfValue.multiplicativeTailValue
+                EbnfValue.multiplicativeTailExpr
+              simp only [EbnfValue.layoutSpans_group,
+                EbnfValue.layoutSpans_sequence,
+                EbnfValues.layoutSpans_cons,
+                EbnfValues.layoutSpans_nil,
+                EbnfValue.layoutSpans_choice,
+                EbnfValue.layoutSpans_ruleAtom,
+                List.append_nil, List.singleton_append]
+              change (EbnfValue.terminalAtom
+                (.symbol .percent) percent).layoutSpans focus ++
+                  focus.spans .prefix right = _
+              rw [EbnfValue.layoutSpans_terminalAtom]
+              simp
+
+theorem logicalOr_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (left : Expression)
+    (rest : List
+      (MatchedTerminal file tokens (.symbol .logicalOr) × Expression)) :
+    (inputValue (RuleReduction.logicalOr origin finish left rest)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.logicalOr origin finish left rest).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.fixedInfixRootValue (.symbol .logicalOr)
+    .logicalAnd (left, rest)).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.fixedInfixRootValue_layoutSpans]
+  simp [ExpressionFoldLocationCase.focusedSpans,
+    infixFoldFocusedSpans, RuleReduction.infixOperator,
+    RuleReduction.terminalLoc, expressionLayoutSpans,
+    List.flatMap_map]
+  rfl
+
+theorem logicalAnd_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (left : Expression)
+    (rest : List
+      (MatchedTerminal file tokens (.symbol .logicalAnd) × Expression)) :
+    (inputValue (RuleReduction.logicalAnd origin finish left rest)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.logicalAnd origin finish left rest).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.fixedInfixRootValue (.symbol .logicalAnd)
+    .equality (left, rest)).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.fixedInfixRootValue_layoutSpans]
+  simp [ExpressionFoldLocationCase.focusedSpans,
+    infixFoldFocusedSpans, RuleReduction.infixOperator,
+    RuleReduction.terminalLoc, expressionLayoutSpans,
+    List.flatMap_map]
+  rfl
+
+theorem bitOr_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (left : Expression)
+    (rest : List
+      (MatchedTerminal file tokens (.symbol .pipe) × Expression)) :
+    (inputValue (RuleReduction.bitOr origin finish left rest)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.bitOr origin finish left rest).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.fixedInfixRootValue (.symbol .pipe)
+    .bitXor (left, rest)).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.fixedInfixRootValue_layoutSpans]
+  simp [ExpressionFoldLocationCase.focusedSpans,
+    infixFoldFocusedSpans, RuleReduction.infixOperator,
+    RuleReduction.terminalLoc, expressionLayoutSpans,
+    List.flatMap_map]
+  rfl
+
+theorem bitXor_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (left : Expression)
+    (rest : List
+      (MatchedTerminal file tokens (.symbol .caret) × Expression)) :
+    (inputValue (RuleReduction.bitXor origin finish left rest)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.bitXor origin finish left rest).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.fixedInfixRootValue (.symbol .caret)
+    .bitAnd (left, rest)).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.fixedInfixRootValue_layoutSpans]
+  simp [ExpressionFoldLocationCase.focusedSpans,
+    infixFoldFocusedSpans, RuleReduction.infixOperator,
+    RuleReduction.terminalLoc, expressionLayoutSpans,
+    List.flatMap_map]
+  rfl
+
+theorem bitAnd_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (left : Expression)
+    (rest : List
+      (MatchedTerminal file tokens (.symbol .amp) × Expression)) :
+    (inputValue (RuleReduction.bitAnd origin finish left rest)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.bitAnd origin finish left rest).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.fixedInfixRootValue (.symbol .amp)
+    .additive (left, rest)).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.fixedInfixRootValue_layoutSpans]
+  simp [ExpressionFoldLocationCase.focusedSpans,
+    infixFoldFocusedSpans, RuleReduction.infixOperator,
+    RuleReduction.terminalLoc, expressionLayoutSpans,
+    List.flatMap_map]
+  rfl
+
+theorem additive_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (left : Expression)
+    (rest : List
+      (Sum
+        (MatchedTerminal file tokens (.symbol .plus))
+        (MatchedTerminal file tokens (.symbol .minus)) × Expression)) :
+    (inputValue (RuleReduction.additive origin finish left rest)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.additive origin finish left rest).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.sequence [
+      .atom (.nonterminal .multiplicative),
+      .star EbnfValue.additiveTailExpr]
+    (EbnfValues.cons (.atom (.nonterminal .multiplicative))
+      [.star EbnfValue.additiveTailExpr]
+      (EbnfValue.ruleAtom .multiplicative left)
+      (EbnfValues.cons (.star EbnfValue.additiveTailExpr) []
+        (EbnfValue.star EbnfValue.additiveTailExpr
+          (rest.map EbnfValue.additiveTailValue))
+        EbnfValues.nil))).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.ruleStarRootValue_layoutSpans]
+  simp only [List.flatMap_map,
+    EbnfValue.additiveTailValue_layoutSpans,
+    expressionSpanLayout]
+  simp [ExpressionFoldLocationCase.focusedSpans,
+    infixFoldFocusedSpans, RuleReduction.infixOperator,
+    RuleReduction.terminalLoc, expressionLayoutSpans,
+    List.flatMap_map]
+  induction rest with
+  | nil => rfl
+  | cons pair rest induction =>
+      rcases pair with ⟨operator, right⟩
+      cases operator <;> simp [induction]
+
+theorem multiplicative_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (left : Expression)
+    (rest : List
+      (Sum
+        (MatchedTerminal file tokens (.symbol .star))
+        (Sum
+          (MatchedTerminal file tokens (.symbol .slash))
+          (MatchedTerminal file tokens (.symbol .percent))) × Expression)) :
+    (inputValue
+      (RuleReduction.multiplicative origin finish left rest)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.multiplicative
+        origin finish left rest).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.sequence [
+      .atom (.nonterminal .prefix),
+      .star EbnfValue.multiplicativeTailExpr]
+    (EbnfValues.cons (.atom (.nonterminal .prefix))
+      [.star EbnfValue.multiplicativeTailExpr]
+      (EbnfValue.ruleAtom .prefix left)
+      (EbnfValues.cons (.star EbnfValue.multiplicativeTailExpr) []
+        (EbnfValue.star EbnfValue.multiplicativeTailExpr
+          (rest.map EbnfValue.multiplicativeTailValue))
+        EbnfValues.nil))).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.ruleStarRootValue_layoutSpans]
+  simp only [List.flatMap_map,
+    EbnfValue.multiplicativeTailValue_layoutSpans,
+    expressionSpanLayout]
+  simp [ExpressionFoldLocationCase.focusedSpans,
+    infixFoldFocusedSpans, RuleReduction.infixOperator,
+    RuleReduction.terminalLoc, expressionLayoutSpans,
+    List.flatMap_map]
+  induction rest with
+  | nil => rfl
+  | cons pair rest induction =>
+      rcases pair with ⟨operator, right⟩
+      cases operator with
+      | inl star => simp [induction]
+      | inr remaining =>
+          cases remaining <;> simp [induction]
+
+theorem postfix_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens) (atom : Expression)
+    (parts : List PostfixPartValue) :
+    (inputValue (RuleReduction.postfix (file := file) (tokens := tokens)
+      origin finish atom parts)).layoutSpans
+        expressionSpanLayout =
+      (ExpressionFoldLocationCase.postfix (file := file) (tokens := tokens)
+        origin finish atom parts).focusedSpans := by
+  unfold inputValue
+  change (EbnfValue.sequence [
+      .atom (.nonterminal .atom),
+      .star (.atom (.nonterminal .postfixPart))]
+    (EbnfValues.cons (.atom (.nonterminal .atom))
+      [.star (.atom (.nonterminal .postfixPart))]
+      (EbnfValue.ruleAtom .atom atom)
+      (EbnfValues.cons (.star (.atom (.nonterminal .postfixPart))) []
+        (EbnfValue.star (.atom (.nonterminal .postfixPart))
+          (parts.map (EbnfValue.ruleAtom .postfixPart)))
+        EbnfValues.nil))).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.ruleStarRootValue_layoutSpans]
+  rw [List.flatMap_map]
+  simp only [EbnfValue.layoutSpans_ruleAtom,
+    expressionSpanLayout, expressionLayoutSpans]
+  rfl
+
+theorem postfixPartCall_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (openParen : MatchedTerminal file tokens (.symbol .leftParen))
+    (arguments : List Expression)
+    (closeParen : MatchedTerminal file tokens (.symbol .rightParen)) :
+    (inputValue
+      (RuleReduction.postfixPartCall origin finish openParen arguments
+        closeParen)).layoutSpans expressionSpanLayout =
+      expressionLayoutSpans .postfixPart
+        (.call openParen.span arguments closeParen.span) := by
+  change (EbnfValue.choice
+    (EbnfExpr.children (m2cV1.rhs .postfixPart))
+    ⟨⟨0, by decide⟩,
+      EbnfValue.sequence _
+        (EbnfValues.cons _ _
+          (EbnfValue.terminalAtom (.symbol .leftParen) openParen)
+          (EbnfValues.cons _ _
+            (EbnfValue.list0 _
+              (arguments.map (EbnfValue.ruleAtom .expression)))
+            (EbnfValues.cons _ []
+              (EbnfValue.terminalAtom (.symbol .rightParen) closeParen)
+              EbnfValues.nil)))⟩).layoutSpans expressionSpanLayout = _
+  have openNotEof :
+      (TerminalSymbol.symbol .leftParen) ≠ .endOfFile := by decide
+  have closeNotEof :
+      (TerminalSymbol.symbol .rightParen) ≠ .endOfFile := by decide
+  rw [EbnfValue.layoutSpans_choice]
+  change (EbnfValue.sequence _ _).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.layoutSpans_sequence]
+  rw [EbnfValues.layoutSpans_cons]
+  change (EbnfValue.terminalAtom (.symbol .leftParen)
+      openParen).layoutSpans expressionSpanLayout ++ _ = _
+  rw [EbnfValue.layoutSpans_terminalAtom, if_neg openNotEof]
+  rw [EbnfValues.layoutSpans_cons]
+  change [openParen.span] ++
+      ((EbnfValue.list0 (.atom (.nonterminal .expression))
+        (arguments.map (EbnfValue.ruleAtom .expression))).layoutSpans
+          expressionSpanLayout ++ _) = _
+  rw [EbnfValue.layoutSpans_list0]
+  simp only [List.flatMap_map, EbnfValue.layoutSpans_ruleAtom,
+    expressionSpanLayout, expressionLayoutSpans]
+  rw [EbnfValues.layoutSpans_cons]
+  change [openParen.span] ++ (_ ++
+      ((EbnfValue.terminalAtom (.symbol .rightParen)
+        closeParen).layoutSpans expressionSpanLayout ++ _)) = _
+  rw [EbnfValue.layoutSpans_terminalAtom, if_neg closeNotEof]
+  rw [EbnfValues.layoutSpans_nil]
+  simp only [postfixPartInitialFocusedSpans,
+    postfixPartEndpointSpan, List.append_nil,
+    List.singleton_append]
+  rw [List.map_eq_flatMap]
+  rfl
+
+theorem postfixPartSelect_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (dot : MatchedTerminal file tokens (.symbol .dot))
+    (field : MatchedTerminal file tokens (.category .identifier))
+    (spelling : String) (parsed : Identifier)
+    (projects : IdentifierProjects field spelling parsed) :
+    (inputValue
+      (RuleReduction.postfixPartSelect origin finish dot field spelling parsed
+        projects)).layoutSpans expressionSpanLayout =
+      expressionLayoutSpans .postfixPart
+        (.select dot.span (RuleReduction.terminalLoc field parsed)) := by
+  change (EbnfValue.choice
+    (EbnfExpr.children (m2cV1.rhs .postfixPart))
+    ⟨⟨1, by decide⟩,
+      EbnfValue.sequence _
+        (EbnfValues.cons _ _
+          (EbnfValue.terminalAtom (.symbol .dot) dot)
+          (EbnfValues.cons _ []
+            (EbnfValue.terminalAtom (.category .identifier) field)
+            EbnfValues.nil))⟩).layoutSpans expressionSpanLayout = _
+  have dotNotEof : (TerminalSymbol.symbol .dot) ≠ .endOfFile := by decide
+  have fieldNotEof :
+      (TerminalSymbol.category .identifier) ≠ .endOfFile := by decide
+  rw [EbnfValue.layoutSpans_choice]
+  change (EbnfValue.sequence _ _).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.layoutSpans_sequence]
+  rw [EbnfValues.layoutSpans_cons]
+  change (EbnfValue.terminalAtom (.symbol .dot)
+      dot).layoutSpans expressionSpanLayout ++ _ = _
+  rw [EbnfValue.layoutSpans_terminalAtom, if_neg dotNotEof]
+  rw [EbnfValues.layoutSpans_cons]
+  change [dot.span] ++
+      ((EbnfValue.terminalAtom (.category .identifier)
+        field).layoutSpans expressionSpanLayout ++ _) = _
+  rw [EbnfValue.layoutSpans_terminalAtom, if_neg fieldNotEof]
+  rw [EbnfValues.layoutSpans_nil]
+  simp only [expressionLayoutSpans,
+    postfixPartInitialFocusedSpans,
+    postfixPartEndpointSpan, RuleReduction.terminalLoc,
+    List.append_nil, List.singleton_append]
+
+theorem postfixPartIndex_input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    (origin finish : Boundary tokens)
+    (openBracket : MatchedTerminal file tokens (.symbol .leftBracket))
+    (index : Expression)
+    (closeBracket : MatchedTerminal file tokens (.symbol .rightBracket)) :
+    (inputValue
+      (RuleReduction.postfixPartIndex origin finish openBracket index
+        closeBracket)).layoutSpans expressionSpanLayout =
+      expressionLayoutSpans .postfixPart
+        (.index openBracket.span index closeBracket.span) := by
+  change (EbnfValue.choice
+    (EbnfExpr.children (m2cV1.rhs .postfixPart))
+    ⟨⟨2, by decide⟩,
+      EbnfValue.sequence _
+        (EbnfValues.cons _ _
+          (EbnfValue.terminalAtom (.symbol .leftBracket) openBracket)
+          (EbnfValues.cons _ _
+            (EbnfValue.ruleAtom .expression index)
+            (EbnfValues.cons _ []
+              (EbnfValue.terminalAtom (.symbol .rightBracket) closeBracket)
+              EbnfValues.nil)))⟩).layoutSpans expressionSpanLayout = _
+  have openNotEof :
+      (TerminalSymbol.symbol .leftBracket) ≠ .endOfFile := by decide
+  have closeNotEof :
+      (TerminalSymbol.symbol .rightBracket) ≠ .endOfFile := by decide
+  rw [EbnfValue.layoutSpans_choice]
+  change (EbnfValue.sequence _ _).layoutSpans expressionSpanLayout = _
+  rw [EbnfValue.layoutSpans_sequence]
+  rw [EbnfValues.layoutSpans_cons]
+  change (EbnfValue.terminalAtom (.symbol .leftBracket)
+      openBracket).layoutSpans expressionSpanLayout ++ _ = _
+  rw [EbnfValue.layoutSpans_terminalAtom, if_neg openNotEof]
+  rw [EbnfValues.layoutSpans_cons]
+  change [openBracket.span] ++
+      ((EbnfValue.ruleAtom .expression index).layoutSpans
+        expressionSpanLayout ++ _) = _
+  rw [EbnfValue.layoutSpans_ruleAtom]
+  rw [EbnfValues.layoutSpans_cons]
+  change [openBracket.span] ++ (_ ++
+      ((EbnfValue.terminalAtom (.symbol .rightBracket)
+        closeBracket).layoutSpans expressionSpanLayout ++ _)) = _
+  rw [EbnfValue.layoutSpans_terminalAtom, if_neg closeNotEof]
+  rw [EbnfValues.layoutSpans_nil]
+  simp only [expressionSpanLayout, expressionLayoutSpans,
+    postfixPartInitialFocusedSpans,
+    postfixPartEndpointSpan, List.append_nil,
+    List.singleton_append]
+  rfl
+
+theorem expressionRuleLayoutSound
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs rule)}
+    {output : RuleValue rule}
+    (reduction : RuleReduction file tokens rule origin finish input output)
+    (occupied : expressionSpanLayout.spans rule output ≠ [] →
+      origin.val < Nat.min finish.val tokens.length)
+    (inputEvidence : FocusedSpanEvidence file tokens origin finish
+      (input.layoutSpans expressionSpanLayout)) :
+    FocusedSpanEvidence file tokens origin finish
+      (expressionSpanLayout.spans rule output) := by
+  cases reduction <;>
+    simp only [expressionSpanLayout, expressionLayoutSpans] at occupied ⊢
+  all_goals try exact FocusedSpanEvidence.empty _ _
+  case expression value =>
+    have inside : EbnfValue.ContainsRuleValue file tokens
+        (inputValue (RuleReduction.expression origin finish value))
+        .annotation value :=
+      EbnfValue.ContainsRuleValue.rule .annotation value
+    simpa [expressionSpanLayout, expressionLayoutSpans, RuleValue] using
+      inputEvidence.select
+        (inside.layoutSpans_sublist expressionSpanLayout)
+  case annotationNone value =>
+    have inside : EbnfValue.ContainsRuleValue file tokens
+        (inputValue (RuleReduction.annotationNone origin finish value))
+        .conditional value :=
+      EbnfValue.ContainsRuleValue.sequence
+        (EbnfValues.ContainsRuleValue.head
+          (EbnfValue.ContainsRuleValue.rule .conditional value))
+    simpa [expressionSpanLayout, expressionLayoutSpans, RuleValue] using
+      inputEvidence.select
+        (inside.layoutSpans_sublist expressionSpanLayout)
+  case conditionalLogical value =>
+    have inside : EbnfValue.ContainsRuleValue file tokens
+        (inputValue (RuleReduction.conditionalLogical origin finish value))
+        .logicalOr value :=
+      EbnfValue.ContainsRuleValue.choice ⟨1, by decide⟩
+        (EbnfValue.ContainsRuleValue.sequence
+          (EbnfValues.ContainsRuleValue.head
+            (EbnfValue.ContainsRuleValue.rule .logicalOr value)))
+    simpa [expressionSpanLayout, expressionLayoutSpans, RuleValue] using
+      inputEvidence.select
+        (inside.layoutSpans_sublist expressionSpanLayout)
+  case equalityNone value =>
+    have inside : EbnfValue.ContainsRuleValue file tokens
+        (inputValue (RuleReduction.equalityNone origin finish value))
+        .relational value :=
+      EbnfValue.ContainsRuleValue.sequence
+        (EbnfValues.ContainsRuleValue.head
+          (EbnfValue.ContainsRuleValue.rule .relational value))
+    simpa [expressionSpanLayout, expressionLayoutSpans, RuleValue] using
+      inputEvidence.select
+        (inside.layoutSpans_sublist expressionSpanLayout)
+  case relationalNone value =>
+    have inside : EbnfValue.ContainsRuleValue file tokens
+        (inputValue (RuleReduction.relationalNone origin finish value))
+        .bitOr value :=
+      EbnfValue.ContainsRuleValue.sequence
+        (EbnfValues.ContainsRuleValue.head
+          (EbnfValue.ContainsRuleValue.rule .bitOr value))
+    simpa [expressionSpanLayout, expressionLayoutSpans, RuleValue] using
+      inputEvidence.select
+        (inside.layoutSpans_sublist expressionSpanLayout)
+  case prefixPostfix value =>
+    have inside : EbnfValue.ContainsRuleValue file tokens
+        (inputValue (RuleReduction.prefixPostfix origin finish value))
+        .postfix value :=
+      EbnfValue.ContainsRuleValue.choice ⟨1, by decide⟩
+        (EbnfValue.ContainsRuleValue.rule .postfix value)
+    simpa [expressionSpanLayout, expressionLayoutSpans, RuleValue] using
+      inputEvidence.select
+        (inside.layoutSpans_sublist expressionSpanLayout)
+  case atomLambda value =>
+    have inside : EbnfValue.ContainsRuleValue file tokens
+        (inputValue (RuleReduction.atomLambda origin finish value))
+        .lambda value :=
+      EbnfValue.ContainsRuleValue.choice ⟨4, by decide⟩
+        (EbnfValue.ContainsRuleValue.rule .lambda value)
+    simpa [expressionSpanLayout, expressionLayoutSpans, RuleValue] using
+      inputEvidence.select
+        (inside.layoutSpans_sublist expressionSpanLayout)
+  case annotationSome _expression _colon _typeValue witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case conditionalKeyword _ifKeyword _condition _thenKeyword _thenBranch
+      _elseKeyword _elseBranch witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case conditionalTernary _condition _question _thenBranch _colon _elseBranch
+      witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case equalityEqual _left _operator _right witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case equalityNotEqual _left _operator _right witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case relationalLess _left _operator _right witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case relationalGreater _left _operator _right witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case relationalLessEqual _left _operator _right witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case relationalGreaterEqual _left _operator _right witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case prefixLogicalNot _bang _operand witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomLiteral _literal witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomName _name _spelling _parsed _projects witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomDotConstructorWithoutArguments _dot _name _spelling _parsed
+      _projects witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomDotConstructorWithArguments _dot _name _spelling _parsed
+      _projects _openParen _arguments _closeParen witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomProxy _atTerminal _typeValue witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomEmptyTuple _openParen _closeParen witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomGroup _openParen _inner _closeParen witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case atomTuple _openParen _first _comma _second _rest _closeParen witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case lambda _lambdaKeyword _openParen _parameters _closeParen _returnType
+      _body witness =>
+    exact consumedSingletonFocusedSpanEvidence witness.consumed
+      (occupied (by simp))
+  case postfixPartCall openParen arguments closeParen =>
+    rw [postfixPartCall_input_layoutSpans origin finish
+      openParen arguments closeParen] at inputEvidence
+    exact inputEvidence
+  case postfixPartSelect dot field spelling parsed projects =>
+    rw [postfixPartSelect_input_layoutSpans origin finish
+      dot field spelling parsed projects] at inputEvidence
+    exact inputEvidence
+  case postfixPartIndex openBracket index closeBracket =>
+    rw [postfixPartIndex_input_layoutSpans origin finish
+      openBracket index closeBracket] at inputEvidence
+    exact inputEvidence
+  case logicalOr left rest =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.logicalOr origin finish left rest)
+      (.logicalOr origin finish left rest)
+    rw [logicalOr_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+  case logicalAnd left rest =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.logicalAnd origin finish left rest)
+      (.logicalAnd origin finish left rest)
+    rw [logicalAnd_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+  case bitOr left rest =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.bitOr origin finish left rest)
+      (.bitOr origin finish left rest)
+    rw [bitOr_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+  case bitXor left rest =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.bitXor origin finish left rest)
+      (.bitXor origin finish left rest)
+    rw [bitXor_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+  case bitAnd left rest =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.bitAnd origin finish left rest)
+      (.bitAnd origin finish left rest)
+    rw [bitAnd_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+  case additive left rest =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.additive origin finish left rest)
+      (.additive origin finish left rest)
+    rw [additive_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+  case multiplicative left rest =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.multiplicative origin finish left rest)
+      (.multiplicative origin finish left rest)
+    rw [multiplicative_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+  case «postfix» atom parts =>
+    apply foldFocusedSpanEvidence
+      (RuleReduction.postfix (file := file) (tokens := tokens)
+        origin finish atom parts)
+      (.postfix (file := file) (tokens := tokens)
+        origin finish atom parts)
+    rw [postfix_input_layoutSpans] at inputEvidence
+    exact inputEvidence
+
+/-- Every source-rule action preserves the closed expression span layout. -/
+theorem expressionSpanLayout_rootSound :
+    RootActionLayoutSpanSound expressionSpanLayout := by
+  intro file tokens rule origin finish input output reduction occupied
+    inputEvidence
+  apply expressionRuleLayoutSound reduction occupied
+  simpa only [RootAction.unpack_layoutSpans] using inputEvidence
+
+namespace ExpressionFoldLocationCase
+
+/-- The expression layout of a classified fold input is exactly its source
+ordered focus list. -/
+theorem input_layoutSpans
+    {file : WorkspaceFile} {tokens : List Token}
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    {input : EbnfValue file tokens (m2cV1.rhs rule)}
+    {output : RuleValue rule}
+    {reduces : RuleReduction file tokens rule origin finish input output}
+    (classified : ExpressionFoldLocationCase reduces) :
+    input.layoutSpans expressionSpanLayout = classified.focusedSpans := by
+  cases classified with
+  | logicalOr origin finish left rest =>
+      exact logicalOr_input_layoutSpans origin finish left rest
+  | logicalAnd origin finish left rest =>
+      exact logicalAnd_input_layoutSpans origin finish left rest
+  | bitOr origin finish left rest =>
+      exact bitOr_input_layoutSpans origin finish left rest
+  | bitXor origin finish left rest =>
+      exact bitXor_input_layoutSpans origin finish left rest
+  | bitAnd origin finish left rest =>
+      exact bitAnd_input_layoutSpans origin finish left rest
+  | additive origin finish left rest =>
+      exact additive_input_layoutSpans origin finish left rest
+  | multiplicative origin finish left rest =>
+      exact multiplicative_input_layoutSpans origin finish left rest
+  | «postfix» origin finish atom parts =>
+      exact postfix_input_layoutSpans origin finish atom parts
+
+end ExpressionFoldLocationCase
+
 /-- Lift any focused-anchor source transformation through the canonical root
 action wrapper used by coherent parser reductions. -/
 private theorem coherentRootLocationSound_of_focusedAnchors
@@ -1908,6 +2746,48 @@ private theorem coherentRootLocationSound_of_focusedAnchors
     ⟨anchors, anchorSpans, anchorsWithin, anchorsOrdered⟩
   exact sourceSound anchors anchorSpans anchorsWithin anchorsOrdered trace
     ruleInputEvidence
+
+/-- Canonical coherent location soundness for any of the eight classified
+expression folds. -/
+theorem ExpressionFoldLocationCase.coherentRootLocationSound
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {owned : TokensOwnedBy file tokens}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    {rule : GrammarRuleId} {origin finish : Boundary tokens}
+    {context : GuardContext tokens}
+    {priorValues : PrefixValues file tokens
+      (CanonicalRootLocationItem tokens rule origin finish context)}
+    {complete : CompleteItem
+      (CanonicalRootLocationItem tokens rule origin finish context).raw}
+    {coherentPrefix : CoherentPrefix file tokens memo correct final
+      (CanonicalRootLocationItem tokens rule origin finish context)
+        priorValues}
+    {ruleInput : EbnfValue file tokens (m2cV1.rhs rule)}
+    {output : RuleValue rule}
+    (reduces : RuleReduction file tokens rule origin finish ruleInput output)
+    (classified : ExpressionFoldLocationCase reduces)
+    (inputEq : ruleInput = RootAction.unpack rule
+      (PrefixValues.fullValue
+        (CanonicalRootLocationItem tokens rule origin finish context)
+        complete priorValues))
+    {trace : SourceAnchorTrace file tokens}
+    (carries : PrefixCarriesSourceTrace file tokens memo correct final owned
+      coherentPrefix trace) :
+    CoherentActionLocationSound complete coherentPrefix
+      (ActionReduces.root rule origin finish
+        (PrefixValues.fullValue
+          (CanonicalRootLocationItem tokens rule origin finish context)
+          complete priorValues)
+        output (inputEq ▸ reduces)) trace carries := by
+  have focusedEvidence := carries.rootInputLayoutSpanEvidence
+    expressionSpanLayout expressionSpanLayout_rootSound inputEq
+  rw [classified.input_layoutSpans] at focusedEvidence
+  exact coherentRootLocationSound_of_focusedAnchors reduces inputEq
+    focusedEvidence
+      (classified.locationSound_of_focusedAnchors tokensOrdered reduces)
 
 end RuleReduction
 
