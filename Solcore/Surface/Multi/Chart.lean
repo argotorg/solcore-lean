@@ -9096,6 +9096,59 @@ private def phaseAEvidenceEntryAt?
       else
         phaseAEvidenceEntryAt? rest address
 
+/-- A hash key that retains the complete evidence address. -/
+private structure PhaseAEvidenceHashKey (tokens : List Token) where
+  address : EvidenceIndexAddress tokens
+
+private def phaseAEvidenceHashKeyBEq {tokens : List Token}
+    (left right : PhaseAEvidenceHashKey tokens) : Bool :=
+  phaseAEvidenceAddressEqBool left.address right.address
+
+private instance {tokens : List Token} : BEq
+    (PhaseAEvidenceHashKey tokens) :=
+  ⟨phaseAEvidenceHashKeyBEq⟩
+
+private def phaseAEvidenceSubjectFastHash :
+    PriorityGuardId ⊕ GrammarRuleId → UInt64
+  | .inl guard =>
+      mixHash (hash (0 : Nat)) (hash guard.ctorIdx)
+  | .inr rule =>
+      mixHash (hash (1 : Nat)) (grammarRuleIdFastHash rule)
+
+private instance {tokens : List Token} : Hashable
+    (PhaseAEvidenceHashKey tokens) where
+  hash key :=
+    mixHash (hash key.address.kind.ctorIdx)
+      (mixHash (phaseAEvidenceSubjectFastHash key.address.subject)
+        (mixHash (hash key.address.contextStart.val)
+          (mixHash (hash key.address.siteCursor.val)
+            (hash key.address.resultEnd.val))))
+
+private def phaseAEvidenceHashKey {tokens : List Token}
+    (address : EvidenceIndexAddress tokens) :
+    PhaseAEvidenceHashKey tokens :=
+  ⟨address⟩
+
+private abbrev PhaseAEvidenceCache (tokens : List Token) :=
+  Std.HashMap (PhaseAEvidenceHashKey tokens) Bool
+
+private def phaseAEvidenceCachePairs {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens)) :
+    List (PhaseAEvidenceHashKey tokens × Bool) :=
+  entries.map fun entry =>
+    (phaseAEvidenceHashKey entry.address, entry.selected)
+
+/-- Build a cache whose duplicate policy is the reference list's first match. -/
+private def buildPhaseAEvidenceCache {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens)) :
+    PhaseAEvidenceCache tokens :=
+  Std.HashMap.ofList (phaseAEvidenceCachePairs entries).reverse
+
+private def phaseAEvidenceCacheEntryAt? {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (address : EvidenceIndexAddress tokens) : Option Bool :=
+  cache.get? (phaseAEvidenceHashKey address)
+
 end Chart
 
 namespace Chart
@@ -9533,6 +9586,294 @@ private def phaseBGuardDecisionFromIndexes?
       let positive ← phaseBG09Positive? entries key
       pure (if positive then .positive else .negative)
 
+/-- Read one evidence coordinate from the immutable Phase-B cache. -/
+private def phaseBReadCache?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (kind : EvidenceIndexKind)
+    (subject : PriorityGuardId ⊕ GrammarRuleId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseAEvidenceCacheEntryAt? cache {
+    kind := kind
+    subject := subject
+    contextStart := contextStart
+    siteCursor := siteCursor
+    resultEnd := resultEnd
+  }
+
+private def phaseBReadTerminalGuardCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseBReadCache? cache .terminalWindow (.inl guard)
+    contextStart siteCursor resultEnd
+
+private def phaseBReadExactSliceGuardCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseBReadCache? cache .exactSlice (.inl guard)
+    contextStart siteCursor resultEnd
+
+private def phaseBReadGreatestRuleCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (rule : GrammarRuleId)
+    (start upperBound finish : Boundary tokens) : Option Bool :=
+  phaseBReadCache? cache .greatestEnd (.inr rule)
+    start upperBound finish
+
+private def phaseBReadDelimiterGuardCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (guard : PriorityGuardId)
+    (contextStart siteCursor resultEnd : Boundary tokens) : Option Bool :=
+  phaseBReadCache? cache .delimiterOrRegion (.inl guard)
+    contextStart siteCursor resultEnd
+
+private def phaseBG01PositiveCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun openCursor =>
+    phaseBWithBoundary? tokens (key.siteCursor.val + 2) fun expressionStart =>
+      phaseBAllReads? [
+        phaseBAnyReads?
+          ((List.finRange (tokens.length + 2)).map fun closeCursor =>
+            phaseBAllReads? [
+              phaseBReadTerminalGuardCached? cache .G01_statementIf
+                key.siteCursor closeCursor closeCursor,
+              phaseBReadDelimiterGuardCached? cache .G01_statementIf
+                openCursor closeCursor closeCursor,
+              phaseBReadGreatestRuleCached? cache .expression
+                expressionStart closeCursor closeCursor
+            ])
+      ]
+
+private def phaseBG02ObservationsCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option (Bool × Bool) := do
+  let header ← phaseBReadDelimiterGuardCached? cache
+    .G02_matchArmBoundary key.contextStart key.siteCursor key.siteCursor
+  let pipe ← phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun after =>
+    phaseBReadTerminalGuardCached? cache .G02_matchArmBoundary
+      key.contextStart key.siteCursor after
+  pure (header, pipe)
+
+private def phaseBComptimeAtSitePositiveCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun after =>
+    phaseBReadTerminalGuardCached? cache key.guard
+      key.contextStart key.siteCursor after
+
+private def phaseBG06PositiveCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun expressionStart =>
+    phaseBAllReads? [
+      phaseBReadTerminalGuardCached? cache .G06_patternComptime
+        key.contextStart key.siteCursor expressionStart,
+      phaseBAnyReads?
+        ((List.finRange (tokens.length + 2)).map fun limit =>
+          phaseBAllReads? [
+            phaseBReadDelimiterGuardCached? cache .G06_patternComptime
+              expressionStart limit limit,
+            phaseBReadGreatestRuleCached? cache .expression
+              expressionStart limit limit
+          ])
+    ]
+
+private def phaseBG07PositiveCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBWithBoundary? tokens (key.siteCursor.val + 1) fun after =>
+    phaseBAllReads? [
+      phaseBReadExactSliceGuardCached? cache .G07_leadingDotArguments
+        key.contextStart key.siteCursor key.siteCursor,
+      phaseBReadTerminalGuardCached? cache .G07_leadingDotArguments
+        key.contextStart key.siteCursor after
+    ]
+
+private def phaseBG08PositiveCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBAnyReads?
+    ((List.finRange (tokens.length + 2)).map fun regionEnd =>
+      phaseBAllReads? [
+        phaseBReadDelimiterGuardCached? cache .G08_terminalExpression
+          key.contextStart key.siteCursor regionEnd,
+        phaseBReadGreatestRuleCached? cache .expression
+          key.siteCursor regionEnd regionEnd
+      ])
+
+private def phaseBG09PositiveCached?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option Bool :=
+  phaseBAnyReads?
+    ((List.finRange (tokens.length + 2)).map fun arrowCursor =>
+      phaseBAllReads? [
+        phaseBReadTerminalGuardCached? cache .G09_genericContext
+          key.contextStart key.siteCursor arrowCursor,
+        phaseBReadGreatestRuleCached? cache .predicateList
+          key.siteCursor arrowCursor arrowCursor
+      ])
+
+private def phaseBGuardDecisionFromCache?
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (key : GuardInstanceKey tokens) : Option GuardDecision :=
+  match key.guard with
+  | .G01_statementIf => do
+      let positive ← phaseBG01PositiveCached? cache key
+      pure (if positive then .positive else .negative)
+  | .G02_matchArmBoundary => do
+      let (header, pipe) ← phaseBG02ObservationsCached? cache key
+      pure (if header then .positive else if pipe then .negative else .neutral)
+  | .G03_parameterComptime | .G04_letComptime |
+      .G05_typeComptime => do
+      let positive ← phaseBComptimeAtSitePositiveCached? cache key
+      pure (if positive then .positive else .negative)
+  | .G06_patternComptime => do
+      let positive ← phaseBG06PositiveCached? cache key
+      pure (if positive then .positive else .negative)
+  | .G07_leadingDotArguments => do
+      let positive ← phaseBG07PositiveCached? cache key
+      pure (if positive then .positive else .negative)
+  | .G08_terminalExpression => do
+      let positive ← phaseBG08PositiveCached? cache key
+      pure (if positive then .positive else .negative)
+  | .G09_genericContext => do
+      let positive ← phaseBG09PositiveCached? cache key
+      pure (if positive then .positive else .negative)
+
+private instance : LawfulBEq EvidenceIndexKind where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq PriorityGuardId where
+  rfl := by intro value; cases value <;> decide
+  eq_of_beq := by
+    intro left right equal
+    cases left <;> cases right <;> first | rfl | contradiction
+
+private instance : LawfulBEq (PriorityGuardId ⊕ GrammarRuleId) where
+  rfl := by
+    intro value
+    cases value with
+    | inl guard => exact beq_self_eq_true guard
+    | inr rule => exact beq_self_eq_true rule
+  eq_of_beq := by
+    intro left right equal
+    cases left with
+    | inl leftGuard =>
+        cases right with
+        | inl rightGuard =>
+            congr
+            exact LawfulBEq.eq_of_beq equal
+        | inr rightRule => contradiction
+    | inr leftRule =>
+        cases right with
+        | inl rightGuard => contradiction
+        | inr rightRule =>
+            congr
+            exact LawfulBEq.eq_of_beq equal
+
+private theorem phaseAEvidenceAddressEqBool_eq_true_iff
+    {tokens : List Token}
+    (left right : EvidenceIndexAddress tokens) :
+    phaseAEvidenceAddressEqBool left right = true ↔ left = right := by
+  cases left
+  cases right
+  simp [phaseAEvidenceAddressEqBool, beq_iff_eq, and_assoc]
+
+private instance {tokens : List Token} : LawfulBEq
+    (PhaseAEvidenceHashKey tokens) where
+  rfl := by
+    intro key
+    exact (phaseAEvidenceAddressEqBool_eq_true_iff
+      key.address key.address).mpr rfl
+  eq_of_beq := by
+    intro left right equal
+    have addressEqual : left.address = right.address :=
+      (phaseAEvidenceAddressEqBool_eq_true_iff
+        left.address right.address).mp equal
+    cases left
+    cases right
+    cases addressEqual
+    rfl
+
+private theorem phaseAEvidenceHashKey_beq_eq_addressEqBool
+    {tokens : List Token}
+    (left right : EvidenceIndexAddress tokens) :
+    (phaseAEvidenceHashKey left == phaseAEvidenceHashKey right) =
+      phaseAEvidenceAddressEqBool left right := by
+  rfl
+
+private theorem phaseAEvidenceEntryAt?_eq_findSome?
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (address : EvidenceIndexAddress tokens) :
+    phaseAEvidenceEntryAt? entries address =
+      entries.findSome? fun entry =>
+        if phaseAEvidenceAddressEqBool entry.address address then
+          some entry.selected
+        else
+          none := by
+  induction entries with
+  | nil => rfl
+  | cons entry rest induction =>
+      rw [phaseAEvidenceEntryAt?, List.findSome?, induction]
+      cases comparison : phaseAEvidenceAddressEqBool entry.address address <;>
+        simp
+
+/-- The cache retains the reference list's first-match and absence behavior. -/
+private theorem phaseAEvidenceCacheEntryAt?_eq_reference
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (address : EvidenceIndexAddress tokens) :
+    phaseAEvidenceCacheEntryAt? (buildPhaseAEvidenceCache entries) address =
+      phaseAEvidenceEntryAt? entries address := by
+  rw [phaseAEvidenceEntryAt?_eq_findSome?]
+  simp [phaseAEvidenceCacheEntryAt?, buildPhaseAEvidenceCache,
+    phaseAEvidenceCachePairs, Std.HashMap.ofList_eq_insertMany_empty,
+    Std.HashMap.getElem?_insertMany_list]
+  rw [List.findSome?_map]
+  rfl
+
+private theorem phaseBGuardDecisionFromCache?_eq_reference
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens))
+    (key : GuardInstanceKey tokens) :
+    phaseBGuardDecisionFromCache? (buildPhaseAEvidenceCache entries) key =
+      phaseBGuardDecisionFromIndexes? entries key := by
+  rcases key with ⟨guard, contextStart, siteCursor, ordered⟩
+  cases guard <;>
+    simp [phaseBGuardDecisionFromCache?,
+      phaseBGuardDecisionFromIndexes?, phaseBG01PositiveCached?,
+      phaseBG01Positive?, phaseBG02ObservationsCached?,
+      phaseBG02Observations?, phaseBComptimeAtSitePositiveCached?,
+      phaseBComptimeAtSitePositive?, phaseBG06PositiveCached?,
+      phaseBG06Positive?, phaseBG07PositiveCached?, phaseBG07Positive?,
+      phaseBG08PositiveCached?, phaseBG08Positive?,
+      phaseBG09PositiveCached?, phaseBG09Positive?,
+      phaseBReadTerminalGuardCached?, phaseBReadTerminalGuard?,
+      phaseBReadExactSliceGuardCached?, phaseBReadExactSliceGuard?,
+      phaseBReadGreatestRuleCached?, phaseBReadGreatestRule?,
+      phaseBReadDelimiterGuardCached?, phaseBReadDelimiterGuard?,
+      phaseBReadCache?, phaseBReadIndex?,
+      phaseAEvidenceCacheEntryAt?_eq_reference]
+
 end Chart
 
 namespace Chart
@@ -9671,8 +10012,13 @@ private def finalizeIndexedGuardTransition
   indexes := state.indexes
 }
 
-private def finalizeNextIndexedGuardCertifiedCore?
+private abbrev PhaseBGuardDecisionSelector (tokens : List Token) :=
+  List (PhaseAEvidenceEntry tokens) → GuardInstanceKey tokens →
+    Option GuardDecision
+
+private def finalizeNextIndexedGuardCertifiedCoreWith?
     {file : WorkspaceFile} {tokens : List Token}
+    (selectDecision : PhaseBGuardDecisionSelector tokens)
     (current : CountedState tokens (PhaseBIndexed file tokens))
     (key : GuardInstanceKey tokens)
     (rest : List (GuardInstanceKey tokens))
@@ -9696,8 +10042,7 @@ private def finalizeNextIndexedGuardCertifiedCore?
   let lookedUp := chargeAddressesCertified initialized
     (guardFinalizeLookupAddresses key)
     (preFinalGuardAddresses_nodup_fast key) lookupFresh
-  let decision ← phaseBGuardDecisionFromIndexes?
-    lookedUp.payload.indexes key
+  let decision ← selectDecision lookedUp.payload.indexes key
   pure {
     payload := finalizeIndexedGuardTransition key rest decision
       lookedUp.payload
@@ -9705,9 +10050,34 @@ private def finalizeNextIndexedGuardCertifiedCore?
       (.guardFinalize .writeFinalDecision key) writeFresh
   }
 
-/-- Certified fast path for one known-fresh guard-finalization block. -/
-private def finalizeNextIndexedGuardCertified?
+private def finalizeNextIndexedGuardCertifiedCore?
     {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (initializeFresh :
+      UnitAddress.guardFinalize .initializeUndecided key ∉
+        current.counter.usedRev)
+    (lookupFresh : ∀ address,
+      address ∈ guardFinalizeLookupAddresses key →
+      address ∉ (initializeIndexedGuardCertified current key
+        initializeFresh).counter.usedRev)
+    (writeFresh :
+      UnitAddress.guardFinalize .writeFinalDecision key ∉
+        (chargeAddressesCertified
+          (initializeIndexedGuardCertified current key initializeFresh)
+          (guardFinalizeLookupAddresses key)
+          (preFinalGuardAddresses_nodup_fast key)
+          lookupFresh).counter.usedRev) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  finalizeNextIndexedGuardCertifiedCoreWith?
+    phaseBGuardDecisionFromIndexes? current key rest
+      initializeFresh lookupFresh writeFresh
+
+/-- Certified fast path for one known-fresh guard-finalization block. -/
+private def finalizeNextIndexedGuardCertifiedWith?
+    {file : WorkspaceFile} {tokens : List Token}
+    (selectDecision : PhaseBGuardDecisionSelector tokens)
     (current : CountedState tokens (PhaseBIndexed file tokens))
     (key : GuardInstanceKey tokens)
     (rest : List (GuardInstanceKey tokens))
@@ -9751,21 +10121,39 @@ private def finalizeNextIndexedGuardCertified?
       · cases equal
       · exact guardFinalizeAddress_fresh_of_keyFresh
           current.counter key clean .writeFinalDecision old
-  finalizeNextIndexedGuardCertifiedCore? current key rest
-    initializeFresh lookupFresh writeFresh
+  finalizeNextIndexedGuardCertifiedCoreWith? selectDecision
+    current key rest initializeFresh lookupFresh writeFresh
+
+private def finalizeNextIndexedGuardCertified?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (clean : guardFinalizeKeyFreshBool current.counter key = true) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  finalizeNextIndexedGuardCertifiedWith? phaseBGuardDecisionFromIndexes?
+    current key rest clean
 
 /-- Fast finalizer with an exact fallback for a previously used key. -/
-private def finalizeNextIndexedGuardFast?
+private def finalizeNextIndexedGuardFastWith?
     {file : WorkspaceFile} {tokens : List Token}
+    (selectDecision : PhaseBGuardDecisionSelector tokens)
     (current : CountedState tokens (PhaseBIndexed file tokens)) :
     Option (CountedState tokens (PhaseBIndexed file tokens)) :=
   match current.payload.phaseB.remaining with
   | [] => none
   | key :: rest =>
       if clean : guardFinalizeKeyFreshBool current.counter key = true then
-        finalizeNextIndexedGuardCertified? current key rest clean
+        finalizeNextIndexedGuardCertifiedWith? selectDecision
+          current key rest clean
       else
         finalizeNextIndexedGuard? current
+
+private def finalizeNextIndexedGuardFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  finalizeNextIndexedGuardFastWith? phaseBGuardDecisionFromIndexes? current
 
 private theorem finalizeNextIndexedGuardCertifiedCore?_eq_reference
     {file : WorkspaceFile} {tokens : List Token}
@@ -9820,7 +10208,16 @@ private theorem finalizeNextIndexedGuardCertifiedCore?_eq_reference
       lookedUp.payload.indexes key with
   | none =>
       unfold finalizeNextIndexedGuardCertifiedCore?
-      dsimp only
+        finalizeNextIndexedGuardCertifiedCoreWith?
+      change (do
+        let decision ← phaseBGuardDecisionFromIndexes?
+          lookedUp.payload.indexes key
+        pure {
+          payload := finalizeIndexedGuardTransition key rest decision
+            lookedUp.payload
+          counter := lookedUp.counter.charge
+            (.guardFinalize .writeFinalDecision key) writeFresh
+        }) = finalizeNextIndexedGuard? current
       rw [decisionEq]
       simp only [Option.bind_eq_bind, Option.bind_none]
       unfold finalizeNextIndexedGuard?
@@ -9856,7 +10253,16 @@ private theorem finalizeNextIndexedGuardCertifiedCore?_eq_reference
         rw [dif_pos writeFresh]
         simp [result, finalizeIndexedGuardTransition]
       unfold finalizeNextIndexedGuardCertifiedCore?
-      dsimp only
+        finalizeNextIndexedGuardCertifiedCoreWith?
+      change (do
+        let decision ← phaseBGuardDecisionFromIndexes?
+          lookedUp.payload.indexes key
+        pure {
+          payload := finalizeIndexedGuardTransition key rest decision
+            lookedUp.payload
+          counter := lookedUp.counter.charge
+            (.guardFinalize .writeFinalDecision key) writeFresh
+        }) = finalizeNextIndexedGuard? current
       rw [decisionEq]
       simp only [Option.bind_eq_bind, Option.bind_some]
       unfold finalizeNextIndexedGuard?
@@ -9891,13 +10297,231 @@ private theorem finalizeNextIndexedGuardFast?_eq_reference
       finalizeNextIndexedGuard? current := by
   unfold finalizeNextIndexedGuardFast?
   cases remaining : current.payload.phaseB.remaining with
-  | nil => simp [finalizeNextIndexedGuard?, remaining]
+  | nil =>
+      simp [finalizeNextIndexedGuardFastWith?,
+        finalizeNextIndexedGuard?, remaining]
   | cons key rest =>
-      simp only
+      simp only [finalizeNextIndexedGuardFastWith?, remaining]
       split
       · exact finalizeNextIndexedGuardCertified?_eq_reference
           current key rest remaining ‹_›
       · rfl
+
+private def phaseBGuardDecisionCacheSelector {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens) :
+    PhaseBGuardDecisionSelector tokens :=
+  fun _entries key => phaseBGuardDecisionFromCache? cache key
+
+private theorem finalizeNextIndexedGuardCertifiedCoreWithCache_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (initializeFresh :
+      UnitAddress.guardFinalize .initializeUndecided key ∉
+        current.counter.usedRev)
+    (lookupFresh : ∀ address,
+      address ∈ guardFinalizeLookupAddresses key →
+      address ∉ (initializeIndexedGuardCertified current key
+        initializeFresh).counter.usedRev)
+    (writeFresh :
+      UnitAddress.guardFinalize .writeFinalDecision key ∉
+        (chargeAddressesCertified
+          (initializeIndexedGuardCertified current key initializeFresh)
+          (guardFinalizeLookupAddresses key)
+          (preFinalGuardAddresses_nodup_fast key)
+          lookupFresh).counter.usedRev) :
+    finalizeNextIndexedGuardCertifiedCoreWith?
+        (phaseBGuardDecisionCacheSelector
+          (buildPhaseAEvidenceCache current.payload.indexes))
+        current key rest initializeFresh lookupFresh writeFresh =
+      finalizeNextIndexedGuardCertifiedCore? current key rest
+        initializeFresh lookupFresh writeFresh := by
+  let initialized := initializeIndexedGuardCertified
+    current key initializeFresh
+  let lookedUp := chargeAddressesCertified initialized
+    (guardFinalizeLookupAddresses key)
+    (preFinalGuardAddresses_nodup_fast key) lookupFresh
+  have indexes : lookedUp.payload.indexes = current.payload.indexes := rfl
+  unfold finalizeNextIndexedGuardCertifiedCore?
+    finalizeNextIndexedGuardCertifiedCoreWith?
+    phaseBGuardDecisionCacheSelector
+  change (do
+    let decision ← phaseBGuardDecisionFromCache?
+      (buildPhaseAEvidenceCache current.payload.indexes) key
+    pure ({
+      payload := finalizeIndexedGuardTransition key rest decision
+        lookedUp.payload
+      counter := lookedUp.counter.charge
+        (.guardFinalize .writeFinalDecision key) writeFresh
+    } : CountedState tokens (PhaseBIndexed file tokens))) = (do
+    let decision ← phaseBGuardDecisionFromIndexes?
+      lookedUp.payload.indexes key
+    pure ({
+      payload := finalizeIndexedGuardTransition key rest decision
+        lookedUp.payload
+      counter := lookedUp.counter.charge
+        (.guardFinalize .writeFinalDecision key) writeFresh
+    } : CountedState tokens (PhaseBIndexed file tokens)))
+  rw [indexes, phaseBGuardDecisionFromCache?_eq_reference]
+
+private def finalizeNextIndexedGuardCached?
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (clean : guardFinalizeKeyFreshBool current.counter key = true) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  finalizeNextIndexedGuardCertifiedWith?
+    (phaseBGuardDecisionCacheSelector cache) current key rest clean
+
+private theorem finalizeNextIndexedGuardCached?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (key : GuardInstanceKey tokens)
+    (rest : List (GuardInstanceKey tokens))
+    (clean : guardFinalizeKeyFreshBool current.counter key = true) :
+    finalizeNextIndexedGuardCached?
+        (buildPhaseAEvidenceCache current.payload.indexes)
+        current key rest clean =
+      finalizeNextIndexedGuardCertified? current key rest clean := by
+  unfold finalizeNextIndexedGuardCached?
+    finalizeNextIndexedGuardCertified?
+    finalizeNextIndexedGuardCertifiedWith?
+  exact finalizeNextIndexedGuardCertifiedCoreWithCache_eq_reference
+    current key rest _ _ _
+
+private def finalizeNextIndexedGuardCachedFast?
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  finalizeNextIndexedGuardFastWith?
+    (phaseBGuardDecisionCacheSelector cache) current
+
+private theorem finalizeNextIndexedGuardCachedFast?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    finalizeNextIndexedGuardCachedFast?
+        (buildPhaseAEvidenceCache current.payload.indexes) current =
+      finalizeNextIndexedGuardFast? current := by
+  unfold finalizeNextIndexedGuardCachedFast?
+    finalizeNextIndexedGuardFast?
+  cases remaining : current.payload.phaseB.remaining with
+  | nil =>
+      simp [finalizeNextIndexedGuardFastWith?, remaining]
+  | cons key rest =>
+      simp only [finalizeNextIndexedGuardFastWith?, remaining]
+      split
+      · exact finalizeNextIndexedGuardCached?_eq_reference
+          current key rest ‹_›
+      · rfl
+
+private theorem phaseBFast_runMappedPrimitive?_payload
+    {tokens : List Token} {before after : Type}
+    (current : CountedState tokens before)
+    (address : UnitAddress tokens) (transition : before → after)
+    {result : CountedState tokens after}
+    (selected : runMappedPrimitive? current address transition = some result) :
+    result.payload = transition current.payload := by
+  unfold runMappedPrimitive? at selected
+  split at selected
+  · cases selected
+    rfl
+  · contradiction
+
+private theorem phaseBFast_chargeAddresses?_payload
+    {tokens : List Token} {state : Type}
+    (current : CountedState tokens state) :
+    ∀ addresses (result : CountedState tokens state),
+      chargeAddresses? current addresses = some result →
+        result.payload = current.payload := by
+  intro addresses
+  induction addresses generalizing current with
+  | nil =>
+      intro result selected
+      cases selected
+      rfl
+  | cons address rest induction =>
+      intro result selected
+      rw [chargeAddresses?] at selected
+      cases charged : runMappedPrimitive? current address id with
+      | none => simp [charged] at selected
+      | some next =>
+          rw [charged] at selected
+          exact (induction next result selected).trans
+            (phaseBFast_runMappedPrimitive?_payload
+              current address id charged)
+
+private theorem finalizeNextIndexedGuard?_indexes_preserved
+    {file : WorkspaceFile} {tokens : List Token}
+    (current result : CountedState tokens (PhaseBIndexed file tokens))
+    (selected : finalizeNextIndexedGuard? current = some result) :
+    result.payload.indexes = current.payload.indexes := by
+  unfold finalizeNextIndexedGuard? at selected
+  cases remaining : current.payload.phaseB.remaining with
+  | nil => simp [remaining] at selected
+  | cons key rest =>
+      simp only [remaining, Option.bind_eq_bind,
+        Option.bind_eq_some_iff] at selected
+      rcases selected with ⟨afterInitialize, initialized,
+        afterLookups, charged, decision, _decided, finalSelected⟩
+      have initializePayload := phaseBFast_runMappedPrimitive?_payload
+        current (.guardFinalize .initializeUndecided key)
+        (fun (state : PhaseBIndexed file tokens) => ({
+          phaseB := {
+            state.phaseB with
+            cells := fun candidate =>
+              if candidate = key then some .undecided
+              else state.phaseB.cells candidate
+          }
+          indexes := state.indexes
+        } : PhaseBIndexed file tokens)) initialized
+      have lookupPayload := phaseBFast_chargeAddresses?_payload
+        afterInitialize
+        (preFinalGuardSlots.map fun slot => .guardFinalize slot key)
+        afterLookups charged
+      have finalPayload := phaseBFast_runMappedPrimitive?_payload
+        afterLookups (.guardFinalize .writeFinalDecision key)
+        (fun (state : PhaseBIndexed file tokens) => ({
+          phaseB := {
+            phaseA := state.phaseB.phaseA
+            cells := fun candidate =>
+              if candidate = key then some (.final decision)
+              else state.phaseB.cells candidate
+            remaining := rest
+            finalizedRev := key :: state.phaseB.finalizedRev
+          }
+          indexes := state.indexes
+        } : PhaseBIndexed file tokens)) finalSelected
+      rw [finalPayload, lookupPayload, initializePayload]
+
+private theorem finalizeNextIndexedGuardCachedFast?_indexes_preserved
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (current result : CountedState tokens (PhaseBIndexed file tokens))
+    (selected : finalizeNextIndexedGuardCachedFast? cache current =
+      some result) :
+    result.payload.indexes = current.payload.indexes := by
+  unfold finalizeNextIndexedGuardCachedFast?
+    finalizeNextIndexedGuardFastWith? at selected
+  cases remaining : current.payload.phaseB.remaining with
+  | nil => simp [remaining] at selected
+  | cons key rest =>
+      simp only [remaining] at selected
+      split at selected
+      next clean =>
+        unfold finalizeNextIndexedGuardCertifiedWith?
+          finalizeNextIndexedGuardCertifiedCoreWith? at selected
+        simp only [Option.bind_eq_bind,
+          Option.bind_eq_some_iff] at selected
+        rcases selected with ⟨decision, _decisionEq, resultEq⟩
+        cases resultEq
+        rfl
+      next =>
+        exact finalizeNextIndexedGuard?_indexes_preserved
+          current result selected
 
 /-- Run the external-decision-free Phase-B worklist. -/
 private def runIndexedPhaseB?
@@ -9947,6 +10571,75 @@ private theorem runIndexedPhaseBFast?_eq_reference
           apply Option.bind_congr
           intro next _selected
           exact induction next
+
+/-- Phase B with one immutable evidence cache shared by every guard key. -/
+private def runIndexedPhaseBWithCache?
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens) :
+    Nat → CountedState tokens (PhaseBIndexed file tokens) →
+      Option (CountedState tokens (PhaseBIndexed file tokens))
+  | 0, current =>
+      if current.payload.phaseB.remaining = [] then some current else none
+  | fuel + 1, current =>
+      match current.payload.phaseB.remaining with
+      | [] => some current
+      | _ :: _ => do
+          let next ← finalizeNextIndexedGuardCachedFast? cache current
+          runIndexedPhaseBWithCache? cache fuel next
+
+/-- Build the evidence cache once at fast Phase-B entry. -/
+private def runIndexedPhaseBCached?
+    {file : WorkspaceFile} {tokens : List Token}
+    (fuel : Nat)
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBIndexed file tokens)) :=
+  let cache := buildPhaseAEvidenceCache current.payload.indexes
+  runIndexedPhaseBWithCache? cache fuel current
+
+private theorem runIndexedPhaseBWithCache?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens)) :
+    ∀ fuel (current : CountedState tokens (PhaseBIndexed file tokens)),
+      current.payload.indexes = entries →
+      runIndexedPhaseBWithCache? (buildPhaseAEvidenceCache entries)
+          fuel current =
+        runIndexedPhaseB? fuel current := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current _indexes
+      rfl
+  | succ previous induction =>
+      intro current indexes
+      rw [runIndexedPhaseBWithCache?, runIndexedPhaseB?]
+      cases remaining : current.payload.phaseB.remaining with
+      | nil => rfl
+      | cons key rest =>
+          have finalizedEq :
+              finalizeNextIndexedGuardCachedFast?
+                  (buildPhaseAEvidenceCache entries) current =
+                finalizeNextIndexedGuard? current := by
+            have exact :=
+              (finalizeNextIndexedGuardCachedFast?_eq_reference current).trans
+                (finalizeNextIndexedGuardFast?_eq_reference current)
+            rw [indexes] at exact
+            exact exact
+          rw [finalizedEq]
+          apply Option.bind_congr
+          intro next selected
+          apply induction next
+          exact (finalizeNextIndexedGuard?_indexes_preserved
+            current next selected).trans indexes
+
+private theorem runIndexedPhaseBCached?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (fuel : Nat)
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    runIndexedPhaseBCached? fuel current =
+      runIndexedPhaseB? fuel current := by
+  unfold runIndexedPhaseBCached?
+  exact runIndexedPhaseBWithCache?_eq_reference
+    current.payload.indexes fuel current rfl
 
 /-- A successful Phase-B worklist run has consumed every guard key. -/
 private theorem runIndexedPhaseB?_remaining_empty
@@ -10272,7 +10965,7 @@ private def executeIndexedPhaseBOfCertifiedPhaseA?
     (indexed : CountedState tokens (PhaseAIndexed file tokens)) :
     Option (CountedState tokens (PhaseBSealed file tokens)) := do
   let entered ← enterIndexedPhaseBUnchecked? indexed
-  let finalized ← runIndexedPhaseBFast?
+  let finalized ← runIndexedPhaseBCached?
     (allGuardInstanceKeys tokens).length entered
   sealIndexedPhaseB? finalized
 
@@ -10672,8 +11365,7 @@ private theorem phaseAEvidenceAddressEqBool_self
     {tokens : List Token} (address : EvidenceIndexAddress tokens) :
     phaseAEvidenceAddressEqBool address address = true := by
   cases address
-  simp [phaseAEvidenceAddressEqBool, evidenceIndexKind_beq_self,
-    evidenceSubject_beq_self]
+  simp [phaseAEvidenceAddressEqBool]
 
 private theorem phaseAEvidenceEntryAt?_some_of_mem
     {tokens : List Token}
@@ -10838,7 +11530,7 @@ private theorem executeIndexedPhaseBOfCertifiedPhaseA?_eq_reference
   simp only [Option.bind_eq_bind]
   apply Option.bind_congr
   intro entered _enteredEq
-  rw [runIndexedPhaseBFast?_eq_reference]
+  rw [runIndexedPhaseBCached?_eq_reference]
 
 /-- The proof-erased fast Phase-A/B path selects exactly the original checked
 reference result. -/
@@ -17461,48 +18153,6 @@ private theorem observedExactSliceBool_eq_phaseA
     observedExactSliceBool tokens start finish classes =
       phaseAExactSliceBool tokens start finish classes :=
   rfl
-
-private instance : LawfulBEq EvidenceIndexKind where
-  rfl := by intro value; cases value <;> decide
-  eq_of_beq := by
-    intro left right equal
-    cases left <;> cases right <;> first | rfl | contradiction
-
-private instance : LawfulBEq PriorityGuardId where
-  rfl := by intro value; cases value <;> decide
-  eq_of_beq := by
-    intro left right equal
-    cases left <;> cases right <;> first | rfl | contradiction
-
-private instance : LawfulBEq (PriorityGuardId ⊕ GrammarRuleId) where
-  rfl := by
-    intro value
-    cases value with
-    | inl guard => exact beq_self_eq_true guard
-    | inr rule => exact beq_self_eq_true rule
-  eq_of_beq := by
-    intro left right equal
-    cases left with
-    | inl leftGuard =>
-        cases right with
-        | inl rightGuard =>
-            congr
-            exact LawfulBEq.eq_of_beq equal
-        | inr rightRule => contradiction
-    | inr leftRule =>
-        cases right with
-        | inl rightGuard => contradiction
-        | inr rightRule =>
-            congr
-            exact LawfulBEq.eq_of_beq equal
-
-private theorem phaseAEvidenceAddressEqBool_eq_true_iff
-    {tokens : List Token}
-    (left right : EvidenceIndexAddress tokens) :
-    phaseAEvidenceAddressEqBool left right = true ↔ left = right := by
-  cases left
-  cases right
-  simp [phaseAEvidenceAddressEqBool, beq_iff_eq, and_assoc]
 
 private theorem phaseAEvidenceEntryAt?_map_exact
     {file : WorkspaceFile} {tokens : List Token}
