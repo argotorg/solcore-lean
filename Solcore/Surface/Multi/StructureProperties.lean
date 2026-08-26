@@ -280,6 +280,164 @@ theorem leastSourceSpan?_eq_some_iff
       · intro spanLeast
         exact congrArg some (leastSpanIn_unique computedLeast spanLeast)
 
+/-- The executable wildcard projection is the declarative import projection. -/
+@[simp] theorem filterMap_importWildcardSpan?_eq_importWildcardSpans
+    (entries : List ImportSelectorEntry) :
+    entries.filterMap importWildcardSpan? =
+      StructuralDiagnostic.importWildcardSpans entries := by
+  rfl
+
+/-- The executable named-import projection is its declarative counterpart. -/
+@[simp] theorem namedImportEntries_eq_namedImportBindings
+    (entries : List ImportSelectorEntry) :
+    namedImportEntries entries =
+      StructuralDiagnostic.namedImportBindings entries := by
+  rfl
+
+/-- A mixed-wildcard collector emits exactly the least written wildcard when
+the surrounding selector has more or fewer than one entry. -/
+theorem mem_mixedWildcardDiagnostic?_iff
+    {entryCount : Nat} {spans : List SourceSpan}
+    {makeDiagnostic : SourceSpan → StructuralDiagnostic}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ mixedWildcardDiagnostic? entryCount spans makeDiagnostic ↔
+      entryCount ≠ 1 ∧ ∃ span,
+        LeastSpanIn span spans ∧ makeDiagnostic span = diagnostic := by
+  unfold mixedWildcardDiagnostic?
+  by_cases countOne : entryCount = 1
+  · simp [countOne]
+  · simp only [countOne, if_false]
+    cases selected : leastSourceSpan? spans with
+    | none =>
+        simp only [List.not_mem_nil, false_iff, not_and, not_exists]
+        intro _ span least
+        have emitted := leastSourceSpan?_eq_some_iff.mpr least
+        rw [selected] at emitted
+        contradiction
+    | some span =>
+        simp only [List.mem_singleton]
+        have spanLeast := leastSourceSpan?_eq_some_iff.mp selected
+        constructor
+        · intro equality
+          exact ⟨countOne, span, spanLeast, equality.symm⟩
+        · rintro ⟨_, candidate, least, equality⟩
+          have candidateSelected := leastSourceSpan?_eq_some_iff.mpr least
+          rw [selected] at candidateSelected
+          have candidateEq := Option.some.inj candidateSelected
+          subst candidate
+          exact equality.symm
+
+/-- The import-selection collector emits exactly the four local diagnostics
+described by the independent judgment. -/
+theorem mem_importSelectionDiagnostics_iff
+    {selection : ImportSelection}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ importSelectionDiagnostics selection ↔
+      (selection.payload.entries = [] ∧
+        diagnostic = .emptyImportSelection selection.span) ∨
+      (selection.payload.entries.length ≠ 1 ∧
+        ∃ span,
+          LeastSpanIn span
+            (StructuralDiagnostic.importWildcardSpans
+              selection.payload.entries) ∧
+          StructuralDiagnostic.mixedImportWildcard span = diagnostic) ∨
+      (∃ binding,
+        LaterDuplicate
+          (StructuralDiagnostic.namedImportBindings
+            selection.payload.entries)
+          (fun value => value.1.payload) binding ∧
+        StructuralDiagnostic.duplicateImportSourceName
+          binding.1.span binding.1.payload = diagnostic) ∨
+      ∃ binding,
+        LaterDuplicate
+          (StructuralDiagnostic.namedImportBindings
+            selection.payload.entries)
+          (fun value => value.2.payload) binding ∧
+        StructuralDiagnostic.duplicateImportLocalName
+          binding.2.span binding.2.payload = diagnostic := by
+  simp [importSelectionDiagnostics, mem_mixedWildcardDiagnostic?_iff,
+    mem_duplicateDiagnostics_iff_laterDuplicate]
+
+/-- The hiding-clause collector emits exactly its empty-list and later-key
+duplicate diagnostics. -/
+theorem mem_hidingDiagnostics_iff
+    {clause : HidingClause} {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ hidingDiagnostics clause ↔
+      (clause.payload.names = [] ∧
+        diagnostic = .emptyHidingClause clause.span) ∨
+      ∃ name,
+        LaterDuplicate clause.payload.names
+          (fun value => value.payload) name ∧
+        StructuralDiagnostic.duplicateHiddenName
+          name.span name.payload = diagnostic := by
+  simp [hidingDiagnostics, mem_duplicateDiagnostics_iff_laterDuplicate]
+
+/-- Every diagnostic emitted for a reached import selection is declaratively
+applicable. -/
+theorem mem_importSelectionDiagnostics_applies
+    {module : ParsedModuleV1} {selection : ImportSelection}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.importSelection selection))
+    (member : diagnostic ∈ importSelectionDiagnostics selection) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_importSelectionDiagnostics_iff] at member
+  rcases member with empty | mixed | sourceDuplicate | localDuplicate
+  · rcases empty with ⟨entries, diagnosticEq⟩
+    subst diagnostic
+    exact .emptyImportSelection occurrence entries
+  · rcases mixed with ⟨entryCount, span, least, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .mixedImportWildcard occurrence entryCount least
+  · rcases sourceDuplicate with ⟨binding, later, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .duplicateImportSourceName occurrence later
+  · rcases localDuplicate with ⟨binding, later, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .duplicateImportLocalName occurrence later
+
+/-- Every diagnostic emitted for a reached hiding clause is declaratively
+applicable. -/
+theorem mem_hidingDiagnostics_applies
+    {module : ParsedModuleV1} {clause : HidingClause}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module (.hidingClause clause))
+    (member : diagnostic ∈ hidingDiagnostics clause) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_hidingDiagnostics_iff] at member
+  rcases member with empty | duplicate
+  · rcases empty with ⟨names, diagnosticEq⟩
+    subst diagnostic
+    exact .emptyHidingClause occurrence names
+  · rcases duplicate with ⟨name, later, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .duplicateHiddenName occurrence later
+
+/-- Every diagnostic emitted for a top-level import declaration is
+declaratively applicable to the containing module. -/
+theorem mem_importDiagnostics_applies
+    {module : ParsedModuleV1} {item : TopItem}
+    {declaration : ImportDecl} {diagnostic : StructuralDiagnostic}
+    (itemMember : item ∈ module.payload.items)
+    (itemShape : item.payload = .importDecl declaration)
+    (member : diagnostic ∈ importDiagnostics declaration) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  cases modeShape : declaration.payload.mode with
+  | module alias =>
+      simp [importDiagnostics, modeShape] at member
+  | items selection hidingClause =>
+      rw [importDiagnostics, modeShape, List.mem_append] at member
+      rcases member with selectionMember | hidingMember
+      · exact mem_importSelectionDiagnostics_applies
+          (.importSelectionTop itemMember itemShape modeShape)
+          selectionMember
+      · cases hidingClause with
+        | none => simp at hidingMember
+        | some clause =>
+            exact mem_hidingDiagnostics_applies
+              (.hidingClauseTop itemMember itemShape modeShape)
+              hidingMember
+
 /-- The pragma collector emits exactly its empty-target and later-duplicate
 diagnostics. -/
 theorem mem_pragmaDiagnostics_iff
@@ -313,6 +471,18 @@ theorem mem_pragmaDiagnostics_applies
   · rcases duplicate with ⟨target, later, diagnosticEq⟩
     rw [← diagnosticEq]
     exact .duplicatePragmaTarget occurrence later
+
+/-- Every diagnostic emitted for a top-level pragma is declaratively
+applicable to the containing module. -/
+theorem mem_pragmaDiagnostics_top_applies
+    {module : ParsedModuleV1} {item : TopItem}
+    {declaration : PragmaDecl} {diagnostic : StructuralDiagnostic}
+    (itemMember : item ∈ module.payload.items)
+    (itemShape : item.payload = .pragmaDecl declaration)
+    (member : diagnostic ∈ pragmaDiagnostics declaration) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  mem_pragmaDiagnostics_applies
+    (.pragmaTop itemMember itemShape) member
 
 end Structure
 

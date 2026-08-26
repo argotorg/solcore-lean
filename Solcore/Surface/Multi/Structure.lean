@@ -43,7 +43,8 @@ def leastSourceSpan? : List SourceSpan → Option SourceSpan
       some (rest.foldl (fun least candidate =>
         if sourceSpanBefore candidate least then candidate else least) first)
 
-private def importWildcardSpan? (entry : ImportSelectorEntry) : Option SourceSpan :=
+/-- Return the marker span when an import selector entry is a wildcard. -/
+def importWildcardSpan? (entry : ImportSelectorEntry) : Option SourceSpan :=
   match entry.payload with
   | .wildcard marker => some marker.span
   | .named _ _ => none
@@ -59,7 +60,8 @@ private def remoteExportWildcardSpan?
   | .wildcard marker => some marker.span
   | .item _ => none
 
-private def mixedWildcardDiagnostic?
+/-- Emit the diagnostic for the least wildcard in a mixed selector list. -/
+def mixedWildcardDiagnostic?
     (entryCount : Nat) (spans : List SourceSpan)
     (makeDiagnostic : SourceSpan → StructuralDiagnostic) :
     List StructuralDiagnostic :=
@@ -69,7 +71,8 @@ private def mixedWildcardDiagnostic?
     | none => []
     | some span => [makeDiagnostic span]
 
-private def namedImportEntries
+/-- Project named import entries to their source and effective local names. -/
+def namedImportEntries
     (entries : List ImportSelectorEntry) :
     List (IdentifierOccurrence × IdentifierOccurrence) :=
   entries.filterMap fun entry =>
@@ -77,7 +80,8 @@ private def namedImportEntries
     | .wildcard _ => none
     | .named source alias => some (source, alias.getD source)
 
-private def importSelectionDiagnostics
+/-- Collect diagnostics local to an import selection. -/
+def importSelectionDiagnostics
     (selection : ImportSelection) : List StructuralDiagnostic :=
   let entries := selection.payload.entries
   let named := namedImportEntries entries
@@ -99,7 +103,8 @@ private def importSelectionDiagnostics
     named
   empty ++ mixed ++ duplicateSources ++ duplicateLocals
 
-private def hidingDiagnostics
+/-- Collect diagnostics local to an import hiding clause. -/
+def hidingDiagnostics
     (clause : HidingClause) : List StructuralDiagnostic :=
   let empty :=
     if clause.payload.names.isEmpty then
