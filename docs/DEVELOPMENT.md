@@ -147,12 +147,28 @@ Each command prints one machine-readable line containing the elapsed
 nanoseconds and observed result.
 
 Use an external timeout when profiling an untrusted performance change. Do not
-turn these wall-clock measurements into normative language limits. On the
-development host, the latest `empty` run reported 0.016 seconds and five
-fresh-process `tiny` runs ranged from 0.140 to 0.148 seconds (median 0.141
-seconds), compared with a pre-optimization baseline of about 89.0 seconds.
-`/usr/bin/time` reported a maximum resident set size of 60,604,416 bytes for
-`tiny`.
+turn these wall-clock measurements into normative language limits. The latest
+five-run measurements on the development host were:
+
+| Case | Elapsed seconds (range) | Median |
+| --- | ---: | ---: |
+| `empty` | 0.014505–0.014781 | 0.014609 |
+| `tiny` | 0.093648–0.094299 | 0.093837 |
+| `import-path` | 0.233372–0.237631 | 0.234023 |
+| `return-literal` | 0.899758–0.921011 | 0.917875 |
+| `data-constructors` | 0.411895–0.414846 | 0.412456 |
+| `contract-field` | 0.544452–0.568294 | 0.548575 |
+
+All six cases parsed successfully. For comparison, `tiny` took about 89.0
+seconds before the parser optimization work. `/usr/bin/time` reported these
+maximum resident set sizes:
+
+| Case | Maximum resident set size (bytes) |
+| --- | ---: |
+| `tiny` | 62,816,256 |
+| `return-literal` | 252,198,912 |
+| `data-constructors` | 157,237,248 |
+| `contract-field` | 199,098,368 |
 
 The counter keeps `usedRev` as the proof-carrying record of charged addresses.
 A hash set, proved to contain exactly the same addresses, now handles duplicate
@@ -175,6 +191,30 @@ checks while the ordered list remains the proof and discovery-order view. Its
 membership decision is exactly equal to the retained list search, including
 after normalization and bulk seed insertion. These figures are useful for
 local regression checks, but none is a normative bound.
+
+Phase B now builds one immutable lookup table from the Phase A evidence when
+it enters the phase and reuses it for every guard check. The lookup is proved
+to preserve the evidence list's first-match and missing-entry behavior. The
+whole cached runner is also proved to preserve charges, failures, and output
+state. The lookup table is temporary execution data and is not retained in the
+sealed parser result. This removes repeated evidence-list scans and accounts
+for much of the improvement in the representative cases. It does not remove
+the cubic-size evidence table or the cache built from it, so large-file memory
+readiness is still unproved and memory optimization remains required.
+
+## Structural-certification guidance
+
+`Solcore/Surface/Multi/StructureJudgment.lean` now provides an independent
+declarative foundation for structural checking. It describes which typed AST
+sites are reachable from a parsed module and supplies small relations for
+later duplicates, source-span ordering, least-span selection, and grouped unit
+types. It intentionally does not import or restate the executable structural
+validator.
+
+This is only the proof foundation. The per-diagnostic applicability judgments,
+the final structural-acceptance judgment, and the soundness/completeness
+connection to `validateStructure` still have to be implemented. Keep those
+claims distinct when reviewing or documenting later work.
 
 ## Documentation rule
 

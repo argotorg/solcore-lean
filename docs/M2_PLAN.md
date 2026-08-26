@@ -17,7 +17,7 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 | M2c workspace identity | ADR-0014 Accepted | complete and proof-audited | internal only |
 | M2c Multi source/token/AST and lexer | ADR-0015 Accepted | complete for the current internal boundary | internal only |
 | M2c Multi full-token parser | ADR-0015 Accepted | unconditional parser and file-only lexer/parser wrapper implemented; selected-outcome and soundness theorems complete | internal only |
-| M2c structural acceptance | ADR-0015 Accepted | pure all-diagnostics validator implemented and fully fixture-tested; independent judgments, correspondence proofs, certified module, and frontend integration remain | none |
+| M2c structural acceptance | ADR-0015 Accepted | pure all-diagnostics validator implemented and fully fixture-tested; independent reachability/helper foundation implemented; diagnostic and acceptance judgments, correspondence proofs, certified module, and frontend integration remain | none |
 | M2c structural syntax identity | ADR-0016 Accepted | design only; no implementation modules or tests yet | none |
 | M2c module and lexical resolution | ADR-0017 Proposed | blocked and not started | none |
 | M2d source checking and Core elaboration | decisions incomplete | not started | none |
@@ -170,7 +170,11 @@ step with reference-exact ordering. A proof-carrying left-hand-side index
 preserves source-production order and supplies candidates to Phase A,
 contextual recognition, and value evaluation. Phase B checks each fixed
 guard-finalization block through the coherent hash index and then batches its
-proved-fresh addresses.
+proved-fresh addresses. It builds one immutable lookup table from the Phase A
+evidence at Phase-B entry and shares it across all guard checks. Proofs preserve
+the list's first-match and missing-entry behavior as well as the runner's
+charges, failures, and resulting state. The temporary cache is not part of the
+sealed parser output.
 The raw-item discovery list is retained, but a coherent structural hash set now
 answers duplicate checks. Insertions update both views, normalization reuses
 the set after proving membership unchanged, and the fast decision is exactly
@@ -180,23 +184,34 @@ retained checked implementation. The counter continues to use `usedRev` as its
 proof ledger, with a coherent hash set accelerating duplicate checks. The
 proved correspondence between them means that charge order, failures, and
 resulting states are unchanged. Direct completion and production-activation
-prechecks also use this indexed membership decision. On the development host,
-the native `tiny` benchmark (`data A;`) improved from about 89.0 seconds to
-0.140–0.148 seconds across five fresh-process runs (median 0.141 seconds), and
-the latest `empty` elapsed time was 0.016 seconds. `/usr/bin/time` reported a
-maximum resident set size of 60,604,416 bytes for `tiny`.
-This is a substantial improvement, but the two synthetic cases do not establish
-interactive or high-throughput readiness.
+prechecks also use this indexed membership decision.
+
+All six representative cases pass. Five fresh-process runs on the development
+host measured `empty` at 0.014505–0.014781 seconds (median 0.014609), `tiny` at
+0.093648–0.094299 (median 0.093837), `import-path` at 0.233372–0.237631 (median
+0.234023), `return-literal` at 0.899758–0.921011 (median 0.917875),
+`data-constructors` at 0.411895–0.414846 (median 0.412456), and `contract-field`
+at 0.544452–0.568294 (median 0.548575). `/usr/bin/time` reported maximum
+resident set sizes of 62,816,256 bytes for `tiny`, 252,198,912 for
+`return-literal`, 157,237,248 for `data-constructors`, and 199,098,368 for
+`contract-field`. This is a large speed improvement from the earlier roughly
+89-second `tiny` baseline. It is not a production-readiness claim: the Phase A
+evidence and its cache still have cubic memory growth in the token count, so
+large-file readiness is unproved and memory optimization remains.
 
 ## Work still required to finish ADR-0015
 
 The current file-only wrapper stops after raw parsing. A pure structural
 executor now traverses the complete AST, emits all `MSS0001`–`MSS0020`
 diagnostics with their specified spans and payloads, canonicalizes the complete
-list, and accepts clean modules. The remaining parser-kernel work is:
+list, and accepts clean modules. `StructureJudgment.lean` independently defines
+the typed sites reachable from a parsed module, together with declarative
+helpers for duplicates, span ordering, least spans, and grouped unit types.
+This is a foundation for the remaining proofs, not yet the final structural
+specification. The remaining parser-kernel work is:
 
-1. implement the independent `StructurallyAccepts` and diagnostic-applicability
-   judgments;
+1. add the independent diagnostic-applicability and final structural-acceptance
+   judgments on top of the reachability/helper foundation;
 2. prove the structural executor sound, complete, canonical, and within its
    fixed resource bound;
 3. define the proof-carrying `CertifiedParsedModule` and the final
@@ -210,8 +225,8 @@ list, and accepts clean modules. The remaining parser-kernel work is:
    audits pass.
 
 The executable structural pass is implemented, but it is not yet a certified
-frontend boundary until the independent judgments and correspondence proofs
-are connected.
+frontend boundary until the remaining judgments and correspondence proofs are
+connected.
 
 ## Structural syntax identity: accepted design, no code yet
 
@@ -290,7 +305,7 @@ golden streams, and compatibility classification.
 
 | Order | Deliverable | Exit condition |
 | ---: | --- | --- |
-| 1 | parser performance pass | representative files have explicit runtime/memory regressions without weakening proofs |
+| 1 | parser performance and memory pass | representative files retain explicit runtime/memory regressions, and cubic evidence/cache memory is reduced without weakening proofs |
 | 2 | ADR-0015 structural certification | `parseModule` returns only certified modules or canonical lexical/parse/structural diagnostics |
 | 3 | six-file canonical parse gate | all shared standard bytes lex, parse, structurally pass, and re-encode in the kernel |
 | 4 | ADR-0016 structural identity | prepared modules and all identity/selection/enumeration theorems complete |
