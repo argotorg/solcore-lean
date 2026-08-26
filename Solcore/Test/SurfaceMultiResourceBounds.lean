@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.StructureDiagnosticInsertionUnits
+import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -22,6 +23,11 @@ private def expectPathSegment (text : String) : IO PathSegment := do
   match PathSegment.parse text with
   | some segment => pure segment
   | none => throw (IO.userError s!"invalid resource-bound path segment: {text}")
+
+private def expectIdentifier (text : String) : IO Identifier := do
+  match Identifier.parse text with
+  | some identifier => pure identifier
+  | none => throw (IO.userError s!"invalid resource-bound identifier: {text}")
 
 private def spanAt (source : SourceId)
     (startByte endByte : Nat) : SourceSpan := {
@@ -116,5 +122,29 @@ def testMultiResourceBounds : IO Unit := do
     ((Structure.diagnostics invalidModule).length ≤
       structureDiagnosticInsertionUnits invalidModule)
     "canonicalization created an uncharged structural diagnostic"
+
+  let duplicateName ← expectIdentifier "item"
+  let firstName : IdentifierOccurrence :=
+    locatedAt source 12 16 duplicateName
+  let secondName : IdentifierOccurrence :=
+    locatedAt source 18 22 duplicateName
+  let firstEntry : ImportSelectorEntry :=
+    locatedAt source 12 16 (.named firstName none)
+  let secondEntry : ImportSelectorEntry :=
+    locatedAt source 18 22 (.named secondName none)
+  let duplicateSelection : ImportSelection :=
+    locatedAt source 11 23 { entries := [firstEntry, secondEntry] }
+  let duplicateDeclaration : ImportDecl :=
+    locatedAt source 0 23 {
+      moduleRef := moduleReference
+      mode := .items duplicateSelection none
+    }
+  let duplicateItem : TopItem :=
+    locatedAt source 0 23 (.importDecl duplicateDeclaration)
+  let duplicateModule : ParsedModuleV1 :=
+    locatedAt source 0 23 { source, items := [duplicateItem] }
+  assertTrue
+    (Structure.structureDuplicateComparisonUnits duplicateModule == 2)
+    "two duplicate-name scans must perform two key comparisons"
 
 end Tests
