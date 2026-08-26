@@ -104,6 +104,17 @@ theorem statementTokenPlan?_allowsTerminal
   case «match» scrutinees arms terminator =>
     cases terminator <;> simp_all [statementTokenPlan?]
 
+/-- Lift exact-token evidence from a mandatory-terminator statement site to a
+site where a final terminal expression is also permitted. -/
+private theorem TokenPlanEvidence.allowTerminal
+    {statement : Statement} {actual : List Token}
+    (evidence : TokenPlanEvidence
+      (statementTokenPlan? false statement) actual) :
+    TokenPlanEvidence (statementTokenPlan? true statement) actual := by
+  apply evidence.mapSuccessfulCandidate
+  intro plan success
+  exact statementTokenPlan?_allowsTerminal success
+
 /-- A plan accepted by the conditional-expression entry has the same plan at
 the annotation-expression entry. -/
 theorem conditionalExpressionTokenPlan?_promotes
@@ -213,8 +224,9 @@ theorem RuleReduction.SemanticPassThrough.tokenPlanEvidence
         statementPassThroughBranches!
         ⟨⟨0, by decide⟩, EbnfValue.ruleAtom .letStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .letStatement value selected
+      exact child.allowTerminal
   | statementReturn origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
@@ -223,63 +235,70 @@ theorem RuleReduction.SemanticPassThrough.tokenPlanEvidence
         inputEvidence
       have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .returnStatement value selected
-      exact child
+      exact child.allowTerminal
   | statementMatch origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
         statementPassThroughBranches!
         ⟨⟨2, by decide⟩, EbnfValue.ruleAtom .matchStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .matchStatement value selected
+      exact child.allowTerminal
   | statementIf origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
         statementPassThroughBranches!
         ⟨⟨3, by decide⟩, EbnfValue.ruleAtom .ifStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .ifStatement value selected
+      exact child.allowTerminal
   | statementFor origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
         statementPassThroughBranches!
         ⟨⟨4, by decide⟩, EbnfValue.ruleAtom .forStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .forStatement value selected
+      exact child.allowTerminal
   | statementAssembly origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
         statementPassThroughBranches!
         ⟨⟨5, by decide⟩, EbnfValue.ruleAtom .assemblyStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .assemblyStatement value selected
+      exact child.allowTerminal
   | statementBlock origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
         statementPassThroughBranches!
         ⟨⟨6, by decide⟩, EbnfValue.ruleAtom .blockStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .blockStatement value selected
+      exact child.allowTerminal
   | statementBreak origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
         statementPassThroughBranches!
         ⟨⟨7, by decide⟩, EbnfValue.ruleAtom .breakStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .breakStatement value selected
+      exact child.allowTerminal
   | statementContinue origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
         statementPassThroughBranches!
         ⟨⟨8, by decide⟩, EbnfValue.ruleAtom .continueStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .continueStatement value selected
+      exact child.allowTerminal
   | statementAssignment origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
@@ -287,8 +306,9 @@ theorem RuleReduction.SemanticPassThrough.tokenPlanEvidence
         ⟨⟨9, by decide⟩,
           EbnfValue.ruleAtom .assignmentStatement value⟩
         inputEvidence
-      exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
+      have child := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .assignmentStatement value selected
+      exact child.allowTerminal
   | statementExpression origin finish value =>
       have selected := TokenPlanEvidence.choice
         (file := file) (tokens := tokens) sourceRuleTokenPlanLayout
@@ -300,9 +320,7 @@ theorem RuleReduction.SemanticPassThrough.tokenPlanEvidence
   | armStatement origin finish value =>
       have normal := TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .statement value inputEvidence
-      apply normal.mapSuccessfulCandidate
-      intro plan success
-      exact statementTokenPlan?_allowsTerminal success
+      exact normal
   | terminalExpression origin finish value =>
       exact TokenPlanEvidence.rule sourceRuleTokenPlanLayout
         .expression value inputEvidence

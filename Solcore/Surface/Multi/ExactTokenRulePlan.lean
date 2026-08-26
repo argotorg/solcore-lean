@@ -74,7 +74,7 @@ def ruleTokenPlan? :
   | .type, value => typeExprPlan? value
   | .typeAtom, value => typeAtomPlan? value
   | .qualifiedName, value => some (qualifiedNamePlan value)
-  | .statement, value => statementTokenPlan? false value
+  | .statement, value => statementTokenPlan? true value
   | .letStatement, value => statementTokenPlan? false value
   | .letBinding, value => letBindingTokenPlan? value
   | .returnStatement, value => statementTokenPlan? false value
@@ -91,7 +91,7 @@ def ruleTokenPlan? :
   | .armStatement, value => statementTokenPlan? true value
   | .assignmentStatement, value => statementTokenPlan? false value
   | .assignmentOperator, value => some (assignmentOperatorTokenPlan value)
-  | .expressionStatement, value => statementTokenPlan? false value
+  | .expressionStatement, value => statementTokenPlan? true value
   | .terminalExpression, value => expressionTokenPlan? value
   | .pattern, value => patternTokenPlan? value
   | .expression, value => expressionTokenPlan? value
