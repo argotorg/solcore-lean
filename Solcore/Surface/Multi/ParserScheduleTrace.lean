@@ -81,6 +81,14 @@ def insert (set : ScheduleRankSet) (rank : Nat)
     (set.insert rank fresh).contains rank = true := by
   simp [insert, contains]
 
+/-- Inserting one rank preserves membership answers for every other rank. -/
+theorem contains_insert_of_ne
+    (set : ScheduleRankSet) (inserted existing : Nat)
+    (fresh : inserted ∉ set.valuesRev)
+    (different : inserted ≠ existing) :
+    (set.insert inserted fresh).contains existing = set.contains existing := by
+  simp [insert, contains, Ne.symm different]
+
 theorem contains_eq_true_iff_mem
     (set : ScheduleRankSet) (rank : Nat) :
     set.contains rank = true ↔ rank ∈ set.valuesRev := by
@@ -136,6 +144,11 @@ def visited {tokens : List Token} (trace : FastParserScheduleTrace tokens) :
   | .fixed address => trace.fixedVisited.contains address.rank.val
   | .boundarySlot address => trace.boundaryVisited.contains address.rank.val
   | .memoSlot address => trace.memoVisited.contains address.rank.val
+
+@[simp] theorem empty_visited (tokens : List Token)
+    (address : FastParserUnitAddress tokens) :
+    (empty tokens).visited address = false := by
+  cases address <;> rfl
 
 private def chargeFixed? {tokens : List Token}
     (trace : FastParserScheduleTrace tokens)
@@ -363,6 +376,83 @@ theorem charge?_duplicate {tokens : List Token}
     result.charge? address = none := by
   rw [charge?_eq_none_iff_visited]
   exact charge?_success_visited selected
+
+/-- A successful charge preserves the non-visited status of every address with
+a different canonical rank. -/
+theorem charge?_success_preserves_not_visited {tokens : List Token}
+    {trace result : FastParserScheduleTrace tokens}
+    {charged existing : FastParserUnitAddress tokens}
+    (selected : trace.charge? charged = some result)
+    (different : charged.rank ≠ existing.rank)
+    (unvisited : trace.visited existing = false) :
+    result.visited existing = false := by
+  cases charged with
+  | fixed chargedAddress =>
+      change chargeFixed? trace chargedAddress = some result at selected
+      unfold chargeFixed? at selected
+      split at selected
+      · rename_i fresh
+        cases selected
+        cases existing with
+        | fixed existingAddress =>
+            simp only [visited] at unvisited ⊢
+            rw [ScheduleRankSet.contains_insert_of_ne]
+            · exact unvisited
+            · intro equal
+              apply different
+              have addressEqual : chargedAddress = existingAddress :=
+                FastFixedUnitAddress.rank_injective (Fin.ext equal)
+              cases addressEqual
+              rfl
+        | boundarySlot existingAddress =>
+            simpa only [visited] using unvisited
+        | memoSlot existingAddress =>
+            simpa only [visited] using unvisited
+      · cases selected
+  | boundarySlot chargedAddress =>
+      change chargeBoundary? trace chargedAddress = some result at selected
+      unfold chargeBoundary? at selected
+      split at selected
+      · rename_i fresh
+        cases selected
+        cases existing with
+        | fixed existingAddress =>
+            simpa only [visited] using unvisited
+        | boundarySlot existingAddress =>
+            simp only [visited] at unvisited ⊢
+            rw [ScheduleRankSet.contains_insert_of_ne]
+            · exact unvisited
+            · intro equal
+              apply different
+              have addressEqual : chargedAddress = existingAddress :=
+                FastBoundarySlotAddress.rank_injective (Fin.ext equal)
+              cases addressEqual
+              rfl
+        | memoSlot existingAddress =>
+            simpa only [visited] using unvisited
+      · cases selected
+  | memoSlot chargedAddress =>
+      change chargeMemo? trace chargedAddress = some result at selected
+      unfold chargeMemo? at selected
+      split at selected
+      · rename_i fresh
+        cases selected
+        cases existing with
+        | fixed existingAddress =>
+            simpa only [visited] using unvisited
+        | boundarySlot existingAddress =>
+            simpa only [visited] using unvisited
+        | memoSlot existingAddress =>
+            simp only [visited] at unvisited ⊢
+            rw [ScheduleRankSet.contains_insert_of_ne]
+            · exact unvisited
+            · intro equal
+              apply different
+              have addressEqual : chargedAddress = existingAddress :=
+                FastMemoSlotAddress.rank_injective (Fin.ext equal)
+              cases addressEqual
+              rfl
+      · cases selected
 
 /-- Every successful fresh charge increases the distinct-address total by
 exactly one. -/

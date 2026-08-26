@@ -217,6 +217,8 @@ def testMultiResourceBounds : IO Unit := do
     boundaryAddress,
     memoAddress
   ]
+  assertTrue (decide mixedScheduleAddresses.Nodup)
+    "the mixed schedule-address regression must be duplicate-free"
   match emptyScheduleTrace.chargeAll? mixedScheduleAddresses with
   | none =>
       throw (IO.userError "the mixed schedule-address list was rejected")
@@ -233,6 +235,16 @@ def testMultiResourceBounds : IO Unit := do
     ((emptyScheduleTrace.chargeAll?
       [fixedAddress, fixedAddress, boundaryAddress]).isNone)
     "the list transition accepted an immediate duplicate address"
+  let separatedDuplicateAddresses := [
+    fixedAddress,
+    boundaryAddress,
+    fixedAddress
+  ]
+  assertTrue (!(decide separatedDuplicateAddresses.Nodup))
+    "the separated-duplicate regression unexpectedly became unique"
+  assertTrue
+    ((emptyScheduleTrace.chargeAll? separatedDuplicateAddresses).isNone)
+    "the list transition accepted a separated duplicate address"
 
   let emptySelection : ImportSelection :=
     locatedAt source 12 14 { entries := [] }

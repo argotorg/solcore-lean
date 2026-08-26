@@ -76,6 +76,21 @@ end FastParserUnitAddress
 
 namespace FastParserScheduleTrace
 
+/-- An unvisited address has a successful single-address transition. -/
+theorem charge?_exists_of_not_visited {tokens : List Token}
+    (trace : FastParserScheduleTrace tokens)
+    (address : FastParserUnitAddress tokens)
+    (unvisited : trace.visited address = false) :
+    ∃ result, trace.charge? address = some result := by
+  cases selected : trace.charge? address with
+  | none =>
+      have present :=
+        (charge?_eq_none_iff_visited trace address).mp selected
+      rw [unvisited] at present
+      cases present
+  | some result =>
+      exact ⟨result, rfl⟩
+
 /-- Charge an ordered address list.  A repeated canonical rank is rejected
 before any charge in that list is returned to the caller. -/
 def chargeAll? {tokens : List Token}
@@ -290,6 +305,93 @@ theorem chargeAll?_addresses_nodup {tokens : List Token}
     (selected : initial.chargeAll? addresses = some final) :
     addresses.Nodup := by
   exact (chargeAll?_eq_some_iff_run.mp selected).addresses_nodup
+
+/-- A duplicate-free address list succeeds from any trace on which every
+listed address is initially unvisited. -/
+theorem chargeAll?_exists_of_nodup_unvisited {tokens : List Token}
+    {initial : FastParserScheduleTrace tokens}
+    {addresses : List (FastParserUnitAddress tokens)}
+    (unique : addresses.Nodup)
+    (unvisited : ∀ address, address ∈ addresses →
+      initial.visited address = false) :
+    ∃ final, initial.chargeAll? addresses = some final := by
+  induction addresses generalizing initial with
+  | nil =>
+      exact ⟨initial, rfl⟩
+  | cons address addresses induction =>
+      have rankUnique :
+          (FastParserUnitAddress.rankValues
+            (address :: addresses)).Nodup :=
+        FastParserUnitAddress.rankValues_nodup_iff.mpr unique
+      rw [FastParserUnitAddress.rankValues_cons,
+        List.nodup_cons] at rankUnique
+      rw [List.nodup_cons] at unique
+      have addressUnvisited : initial.visited address = false :=
+        unvisited address (by simp)
+      obtain ⟨next, selected⟩ :=
+        charge?_exists_of_not_visited initial address addressUnvisited
+      have remainingUnvisited : ∀ candidate, candidate ∈ addresses →
+          next.visited candidate = false := by
+        intro candidate candidateMember
+        apply charge?_success_preserves_not_visited selected
+        · intro equalRank
+          have equalValue : address.rankValue = candidate.rankValue :=
+            congrArg Fin.val equalRank
+          have equalAddress : address = candidate :=
+            FastParserUnitAddress.rankValue_injective equalValue
+          apply unique.1
+          rw [equalAddress]
+          exact candidateMember
+        · exact unvisited candidate (by simp [candidateMember])
+      obtain ⟨final, tailSelected⟩ :=
+        induction unique.2 remainingUnvisited
+      refine ⟨final, ?_⟩
+      unfold chargeAll?
+      rw [if_neg rankUnique.1, selected]
+      exact tailSelected
+
+/-- Every duplicate-free address list succeeds from the empty trace. -/
+theorem chargeAll?_empty_exists_of_nodup {tokens : List Token}
+    {addresses : List (FastParserUnitAddress tokens)}
+    (unique : addresses.Nodup) :
+    ∃ final, (empty tokens).chargeAll? addresses = some final := by
+  apply chargeAll?_exists_of_nodup_unvisited unique
+  intro address _member
+  exact empty_visited tokens address
+
+/-- Empty-trace totality can be chosen with its exact unit count and final
+ledger-capacity certificate exposed together. -/
+theorem chargeAll?_empty_exists_accounted_of_nodup {tokens : List Token}
+    {addresses : List (FastParserUnitAddress tokens)}
+    (unique : addresses.Nodup) :
+    ∃ final,
+      (empty tokens).chargeAll? addresses = some final ∧
+      final.actualUnits = addresses.length ∧
+      final.ledger.FitsWithin (fastParserScheduleAddressCapacity tokens) := by
+  obtain ⟨final, selected⟩ := chargeAll?_empty_exists_of_nodup unique
+  refine ⟨final, selected, ?_, ?_⟩
+  · simpa using chargeAll?_actualUnits selected
+  · exact chargeAll?_ledger_fitsWithin selected
+
+/-- Empty-trace execution succeeds exactly for duplicate-free address lists. -/
+theorem chargeAll?_empty_success_iff_nodup {tokens : List Token}
+    {addresses : List (FastParserUnitAddress tokens)} :
+    (∃ final, (empty tokens).chargeAll? addresses = some final) ↔
+      addresses.Nodup := by
+  constructor
+  · rintro ⟨final, selected⟩
+    exact chargeAll?_addresses_nodup selected
+  · exact chargeAll?_empty_exists_of_nodup
+
+/-- Duplicate-free address lists fit the same token-indexed parser bound that
+governs successful trace executions. -/
+theorem nodup_length_le_parseBound {tokens : List Token}
+    {addresses : List (FastParserUnitAddress tokens)}
+    (unique : addresses.Nodup) :
+    addresses.length ≤ parseBound (tokens.length + 1) := by
+  obtain ⟨final, selected⟩ :=
+    chargeAll?_empty_exists_of_nodup unique
+  exact chargeAll?_empty_length_le_parseBound selected
 
 /-- An adjacent repeated address always makes the list transition fail. -/
 @[simp] theorem chargeAll?_immediate_duplicate {tokens : List Token}
