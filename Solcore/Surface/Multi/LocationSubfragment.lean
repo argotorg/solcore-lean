@@ -49,6 +49,81 @@ theorem of_mem_merge
     rw [LocationFragment.merge_containments, List.mem_flatMap]
     exact ⟨fragment, member, containmentMember⟩
 
+/-- The empty fragment is a subfragment of every location fragment. -/
+theorem empty (outer : LocationFragment) :
+    LocationFragment.empty.IsSubfragmentOf outer := by
+  exact ⟨by simp, by simp, by simp⟩
+
+/-- Merge any finite family whose members are all subfragments of the same
+outer fragment. -/
+theorem merge
+    {fragments : List LocationFragment} {outer : LocationFragment}
+    (inside : ∀ fragment ∈ fragments,
+      fragment.IsSubfragmentOf outer) :
+    (LocationFragment.merge fragments).IsSubfragmentOf outer := by
+  refine ⟨?_, ?_, ?_⟩
+  · intro root member
+    rw [LocationFragment.merge_roots, List.mem_flatMap] at member
+    rcases member with ⟨fragment, fragmentMember, rootMember⟩
+    exact (inside fragment fragmentMember).1 root rootMember
+  · intro span member
+    rw [LocationFragment.merge_spans, List.mem_flatMap] at member
+    rcases member with ⟨fragment, fragmentMember, spanMember⟩
+    exact (inside fragment fragmentMember).2.1 span spanMember
+  · intro containment member
+    rw [LocationFragment.merge_containments, List.mem_flatMap] at member
+    rcases member with
+      ⟨fragment, fragmentMember, containmentMember⟩
+    exact (inside fragment fragmentMember).2.2 containment
+      containmentMember
+
+/-- Binary specialization of `merge`. -/
+theorem merge_pair
+    {first second outer : LocationFragment}
+    (firstInside : first.IsSubfragmentOf outer)
+    (secondInside : second.IsSubfragmentOf outer) :
+    (LocationFragment.merge [first, second]).IsSubfragmentOf outer := by
+  apply merge
+  intro fragment member
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+  exact member.elim (fun equality => equality ▸ firstInside)
+    (fun equality => equality ▸ secondInside)
+
+/-- Map-shaped specialization used by retained semantic lists. -/
+theorem merge_map
+    {alpha : Type} {values : List alpha}
+    {visit : alpha → LocationFragment} {outer : LocationFragment}
+    (inside : ∀ value ∈ values,
+      (visit value).IsSubfragmentOf outer) :
+    (LocationFragment.merge (values.map visit)).IsSubfragmentOf outer := by
+  apply merge
+  intro fragment member
+  rw [List.mem_map] at member
+  rcases member with ⟨value, valueMember, rfl⟩
+  exact inside value valueMember
+
+/-- One mapped child is a subfragment of the complete mapped merge. -/
+theorem of_mem_merge_map
+    {alpha : Type} {value : alpha} {values : List alpha}
+    {visit : alpha → LocationFragment}
+    (member : value ∈ values) :
+    (visit value).IsSubfragmentOf
+  (LocationFragment.merge (values.map visit)) := by
+  apply of_mem_merge
+  exact List.mem_map_of_mem member
+
+/-- A fragment containing a rooted subfragment is itself rooted. -/
+theorem roots_ne_nil
+    {inner outer : LocationFragment}
+    (inside : inner.IsSubfragmentOf outer)
+    (innerRooted : inner.roots ≠ []) :
+    outer.roots ≠ [] := by
+  intro outerEmpty
+  obtain ⟨root, rootMember⟩ := List.exists_mem_of_ne_nil _ innerRooted
+  have := inside.1 root rootMember
+  rw [outerEmpty] at this
+  simp at this
+
 end IsSubfragmentOf
 
 end LocationFragment

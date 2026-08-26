@@ -1311,6 +1311,12 @@ def ofBody (body : Body) : LocationFragment :=
   rcases body with ⟨span, origin, statements⟩
   cases origin <;> rfl
 
+/-- Every body exposes at least its own source span as a root. -/
+@[simp] theorem ofBody_roots_ne_nil (body : Body) :
+    (ofBody body).roots ≠ [] := by
+  rw [ofBody_roots]
+  cases body.payload.origin <;> simp
+
 /-- Proof-facing traversal of one match arm and all of its descendants. -/
 def ofMatchArm (arm : MatchArm) : LocationFragment :=
   matchArmFragment arm
