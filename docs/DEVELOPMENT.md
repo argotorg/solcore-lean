@@ -236,13 +236,14 @@ declarative applicability, and executable success is exactly
 Traversal fuel is distinct from ADR-0015's numeric structural-resource
 contract. The quadratic `structureBound` function now exists; the AST-node
 measure is proved equal to a concrete carrier enumeration. All six charged
-families now have executable traces: node visits, diagnostic insertions,
+families have executable traces: node visits, diagnostic insertions,
 duplicate-key comparisons, canonical deduplication comparisons, canonical
 ordering comparisons, and least-span comparisons. Their public ledger exposes
 the exact combined total, and the two canonical-list passes have quadratic
-upper bounds in the insertion count. The remaining work is to relate the three
-aggregate collector counts to the AST measure and use those inequalities to
-close the fixed structural-bound theorem.
+upper bounds in the insertion count. Diagnostic insertions and least-span
+comparisons are bounded by the AST measure, aggregate duplicate comparisons
+are bounded quadratically, and `structureBound_sufficient` combines those
+facts to prove the fixed structural bound sufficient for the complete ledger.
 
 `validateStructure` is a certified standalone structural phase. The
 proof-carrying `CertifiedParsedModule` and parameterized frontend phase core

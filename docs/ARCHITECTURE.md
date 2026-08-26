@@ -151,7 +151,7 @@ The common proof pattern is:
 | workspace | pure validator | validation/rejection judgments | soundness and completeness |
 | lexing | bounded lexer | lexical judgment and diagnostic applicability | accepted-token and rejection theorems |
 | parsing | bounded chart executor | `Parses` and parse-diagnostic applicability | selected-outcome, soundness, and parser-wide location-validity theorems |
-| structural validation | complete pure diagnostic collector | independent acceptance and applicability judgments | two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance; numeric accounting exposes all six charged families and their exact total, while aggregate AST inequalities and the combined work bound remain |
+| structural validation | complete pure diagnostic collector | independent acceptance and applicability judgments | two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance; numeric accounting exposes all six charged families and their exact total, with a proved sufficient fixed quadratic bound |
 | Core checking | Boolean/detailed checker | typing relation | soundness and completeness |
 | Core execution | fuelled CEK machine | big-step relation | two-way correspondence |
 

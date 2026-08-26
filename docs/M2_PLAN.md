@@ -18,7 +18,7 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 | M2c Multi source/token/AST and lexer | ADR-0015 Accepted | complete for the current internal boundary | internal only |
 | M2c Multi full-token parser | ADR-0015 Accepted | unconditional parser and file-only lexer/parser wrapper implemented; selected-outcome and soundness theorems complete | internal only |
 | M2c parser-wide source locations | ADR-0015 Accepted | `Parses.everyLocationValid` proves source validity and direct-parent nesting for every successful parse | internal only |
-| M2c structural acceptance | ADR-0015 Accepted | validator and independent judgments implemented; two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance proved; numeric work bound and certified-module integration remain | internal only |
+| M2c structural acceptance | ADR-0015 Accepted | validator and independent judgments implemented; two-way correspondence, sufficient traversal fuel, canonical reports, success iff acceptance, and the fixed numeric work bound proved; certified-module integration remains | internal only |
 | M2c structural syntax identity | ADR-0016 Accepted | design only; no implementation modules or tests yet | none |
 | M2c module and lexical resolution | ADR-0017 Proposed | blocked and not started | none |
 | M2d source checking and Core elaboration | decisions incomplete | not started | none |
@@ -229,9 +229,9 @@ duplicate-free, and `validateStructure` succeeds exactly when
 
 This closes logical traversal-fuel sufficiency. The ADR-fixed `parseBound` and
 `structureBound` functions now exist. All six structural unit families have
-executable accounting and an exact combined ledger. The aggregate
-AST-measure inequalities and combined sufficiency theorem are not yet
-implemented.
+executable accounting and an exact combined ledger. Their aggregate
+AST-measure inequalities compose into `structureBound_sufficient`, so the
+structural resource contract is complete.
 
 The remaining parser-kernel work is:
 
@@ -240,14 +240,11 @@ The remaining parser-kernel work is:
    the unconditional root theorem and expose `parseModule`;
 3. add executable frontend phase-precedence fixtures for lexical, parse,
    structural, and successful outcomes;
-4. connect the three remaining aggregate collector counts to
-   `astNodeMeasure` and prove `structureBound_sufficient`; AST carrier and all
-   six exact unit counters are complete;
-5. implement the separate fast `Parser`, prove exact result equality with
+4. implement the separate fast `Parser`, prove exact result equality with
    `Chart.G`, and establish its stated parser work bound;
-6. construct and kernel-check parser plus structural certificates for the six
+5. construct and kernel-check parser plus structural certificates for the six
    canonical standard files from the one shared raw-byte source; and
-7. add the internal umbrella only after proof, test, kernel-policy, and axiom
+6. add the internal umbrella only after proof, test, kernel-policy, and axiom
    audits pass.
 
 The executable structural pass and its independent specification both exist,

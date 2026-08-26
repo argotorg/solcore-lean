@@ -26,9 +26,10 @@
   closed, leaving match-arm, postfix-expression, and statement-body callbacks.
   All six structural unit families now have executable traces and exact
   projections, and a public ledger exposes their combined total. The two
-  canonical-list passes also have insertion-square comparison bounds.
+  canonical-list passes also have insertion-square comparison bounds, and the
+  complete ledger satisfies the ADR-fixed quadratic structural bound.
 - **Not yet implemented:** The separate fast `Parser`, final exact-token root
-  closure and proof-argument-free frontend wrapper, combined executor-unit sufficiency,
+  closure and proof-argument-free frontend wrapper, parser executor-unit sufficiency,
   the six complete canonical-standard parse certificates, and the public
   `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed
