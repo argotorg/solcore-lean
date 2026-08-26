@@ -228,8 +228,9 @@ duplicate-free, and `validateStructure` succeeds exactly when
 `StructurallyAccepts` holds.
 
 This closes logical traversal-fuel sufficiency. The ADR-fixed `parseBound` and
-`structureBound` functions now exist; their executor-unit accounting and
-sufficiency theorems are not yet implemented.
+`structureBound` functions now exist. AST visits, diagnostic insertions, and
+duplicate-key comparisons have executable accounting; canonical-list
+comparisons and the combined sufficiency theorems are not yet implemented.
 
 The remaining parser-kernel work is:
 
@@ -238,8 +239,9 @@ The remaining parser-kernel work is:
    the unconditional root theorem and expose `parseModule`;
 3. add executable frontend phase-precedence fixtures for lexical, parse,
    structural, and successful outcomes;
-4. implement numeric structural-unit accounting and prove
-   `structureBound_sufficient`; the AST-carrier measure equality is complete;
+4. finish canonical-list comparison accounting and prove
+   `structureBound_sufficient`; AST carrier, node-visit, insertion, and
+   duplicate-key accounting are complete;
 5. implement the separate fast `Parser`, prove exact result equality with
    `Chart.G`, and establish its stated parser work bound;
 6. construct and kernel-check parser plus structural certificates for the six

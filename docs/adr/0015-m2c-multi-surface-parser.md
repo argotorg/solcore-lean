@@ -24,6 +24,8 @@
   concrete AST-carrier cardinality theorem are also present. Exact-token
   dispatch is exhaustive; module-reference and let-binding callbacks are
   closed, leaving match-arm, postfix-expression, and statement-body callbacks.
+  Structural node visits, diagnostic insertions, and duplicate-key comparisons
+  now have executable traces and local correspondence theorems.
 - **Not yet implemented:** The separate fast `Parser`, final exact-token root
   closure and proof-argument-free frontend wrapper, executor-unit sufficiency,
   the six complete canonical-standard parse certificates, and the public

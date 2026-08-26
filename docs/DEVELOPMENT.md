@@ -236,7 +236,9 @@ declarative applicability, and executable success is exactly
 Traversal fuel is distinct from ADR-0015's numeric structural-resource
 contract. The quadratic `structureBound` function now exists; the
 AST-node measure is proved equal to a concrete carrier enumeration. The
-structural-unit counter and its sufficiency theorem are still pending.
+node-visit, diagnostic-insertion, and duplicate-key comparison families now
+have executable traces and local correspondence theorems. Canonical-list
+comparisons and the combined sufficiency theorem are still pending.
 
 `validateStructure` is a certified standalone structural phase. The
 proof-carrying `CertifiedParsedModule` and parameterized frontend phase core

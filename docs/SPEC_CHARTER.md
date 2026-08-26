@@ -36,8 +36,8 @@ and executable diagnostics are exactly the applicable diagnostics. The
 module-derived traversal fuel is sufficient, and validator success is exactly
 structural acceptance. Successful parses now also carry a proof that every AST
 location is valid for its source and properly nested. Exact token
-correspondence, formal resource accounting, and a certified parsed result
-remain. None of this widens
+root closure, complete resource accounting, and the proof-argument-free
+certified file wrapper remain. None of this widens
 Oracle v4, certifies a whole workspace, resolves a name, assigns a type,
 elaborates to Core, or executes a contract.
 
@@ -495,9 +495,10 @@ Before a complete M2c frontend can be claimed, at least the following remain:
 
 - implement the separate fast parser and prove exact result equality with the
   chart reference, including its stated parser work bound;
-- implement the numeric structural-unit accounting and prove the quadratic
-  `structureBound` sufficient; `astNodeMeasure` is already related to a
-  concrete enumeration of the full AST carrier;
+- finish canonical-list comparison accounting and prove the quadratic
+  `structureBound` sufficient; node visits, diagnostic insertions, and
+  duplicate-key comparisons are already counted, and `astNodeMeasure` is
+  related to a concrete enumeration of the full AST carrier;
 - prove exact token correspondence for successful parses, including retained
   leaves, grouping, literal spelling, and the absence of parser normalization;
 - connect the already certified structural phase to `CertifiedParsedModule`
