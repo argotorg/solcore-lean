@@ -5,7 +5,7 @@ import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 import Solcore.Surface.Multi.StructureLeastSpanComparisonUnits
 import Solcore.Surface.Multi.StructureResourceAccounting
 import Solcore.Surface.Multi.StructureResourceBound
-import Solcore.Surface.Multi.ParserSchedule
+import Solcore.Surface.Multi.ParserScheduleTrace
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -179,6 +179,39 @@ def testMultiResourceBounds : IO Unit := do
       decide (chargedCounter.ledger.memoSlotUnits ≤
         addressCapacity.memoSlotUnits))
     "the three-address regression counter must fit the empty-token schedule"
+  let emptyScheduleTrace := FastParserScheduleTrace.empty noTokens
+  assertTrue (emptyScheduleTrace.actualUnits == 0)
+    "the fresh schedule trace must contain no charged addresses"
+  match emptyScheduleTrace.charge? fixedAddress with
+  | none =>
+      throw (IO.userError "the fresh fixed address was rejected")
+  | some fixedTrace =>
+      assertTrue (fixedTrace.actualUnits == 1)
+        "the first fixed-address charge must add exactly one unit"
+      assertTrue ((fixedTrace.charge? fixedAddress).isNone)
+        "the fixed-address duplicate charge was accepted"
+      match fixedTrace.charge? boundaryAddress with
+      | none =>
+          throw (IO.userError "the fresh boundary address was rejected")
+      | some boundaryTrace =>
+          assertTrue (boundaryTrace.actualUnits == 2)
+            "the first boundary-address charge must add exactly one unit"
+          assertTrue ((boundaryTrace.charge? boundaryAddress).isNone)
+            "the boundary-address duplicate charge was accepted"
+          match boundaryTrace.charge? memoAddress with
+          | none =>
+              throw (IO.userError "the fresh memo address was rejected")
+          | some memoTrace =>
+              assertTrue (memoTrace.ledger == {
+                  fixedUnits := 1
+                  boundarySlotUnits := 1
+                  memoSlotUnits := 1
+                })
+                "the trace ledger must count one address in every component"
+              assertTrue (memoTrace.actualUnits == 3)
+                "three fresh trace charges must record exactly three units"
+              assertTrue ((memoTrace.charge? memoAddress).isNone)
+                "the memo-address duplicate charge was accepted"
 
   let emptySelection : ImportSelection :=
     locatedAt source 12 14 { entries := [] }
