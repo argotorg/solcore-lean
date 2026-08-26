@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.StructureDiagnosticInsertionUnits
+import Solcore.Surface.Multi.StructureCanonicalDedupComparisonUnits
 import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
@@ -146,5 +147,8 @@ def testMultiResourceBounds : IO Unit := do
   assertTrue
     (Structure.structureDuplicateComparisonUnits duplicateModule == 2)
     "two duplicate-name scans must perform two key comparisons"
+  assertTrue
+    (Structure.structureCanonicalDedupComparisonUnits duplicateModule == 1)
+    "two distinct diagnostic candidates must perform one dedup comparison"
 
 end Tests
