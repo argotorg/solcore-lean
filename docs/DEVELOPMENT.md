@@ -240,7 +240,10 @@ AST-carrier cardinality equality are still pending.
 `validateStructure` is a certified standalone structural phase. Do not yet
 describe the raw file frontend as certified: it still needs exact location and
 retained-token correspondence, `CertifiedParsedModule`, and structural-phase
-integration.
+integration. The location inventory and its executable checks are complete,
+and token ordering, consumed chart spans, nonempty interval containment, and
+assembly-internal locations are proved; the remaining gap is parser-wide
+propagation and exact correspondence.
 
 ## Documentation rule
 

@@ -271,8 +271,10 @@ collectors are sound for arbitrary fuel. Structural paths are bounded by the
 module AST measure, so the executable list and declarative applicability agree
 in both directions. Canonical reports are duplicate-free and ordered, and
 validator success is equivalent to structural acceptance. Formal resource
-accounting, exact location/token correspondence, and the certified frontend
-connection remain.
+accounting and the certified frontend connection remain. Exact location work
+now has a complete executable AST inventory plus token-order, chart-span, and
+assembly-location foundations; parser-wide propagation and exact token
+correspondence are not yet complete.
 
 [`ADR-0016`](adr/0016-m2c-structural-syntax-identity.md) accepts structural
 syntax identity over certified parser output.
@@ -490,8 +492,9 @@ Before a complete M2c frontend can be claimed, at least the following remain:
   chart reference, including its stated parser work bound;
 - implement the numeric structural-unit accounting, prove the quadratic
   `structureBound`, and relate `astNodeMeasure` to the full AST carrier;
-- prove exact location, nesting, source ownership, grouping, literal-spelling,
-  and retained-token correspondence for successful parses;
+- propagate the existing location inventory, token-order, chart-span, and
+  assembly-location facts through every parser reduction, then prove grouping,
+  literal-spelling, and retained-token correspondence for successful parses;
 - connect the already certified structural phase to `CertifiedParsedModule`
   and the file-only frontend with the specified diagnostic precedence;
 - reduce the cubic evidence/cache/counter memory cost and validate

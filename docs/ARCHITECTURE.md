@@ -100,6 +100,7 @@ The implementation is organized around these responsibilities:
 | chart state and execution | `Chart`, `ParserCore` |
 | declarative parsing | `ParserJudgment` |
 | implementation/proof correspondence | `ChartProperties`, `Properties` |
+| AST location inventory and parser-span geometry | `Location`, `LocationProperties` |
 | total parse selection | `ParseOutcomeTotality` |
 | structural diagnostic order and pure AST validation | `Diagnostic`, `Structure` |
 | structural judgments, traversal bounds, and correspondence | `StructureJudgment`, `StructureFuelProperties`, `StructureProperties` |
@@ -118,7 +119,11 @@ returns every applicable closed diagnostic, and canonicalizes the result. Its
 independent applicability and acceptance judgments agree exactly with the
 executor, including sufficient module-derived traversal fuel and the returned
 error list. It is not yet part of a certified parsed-module facade because
-exact location and retained-token correspondence are still separate work.
+the location facts have not yet been propagated through every parser
+reduction, and exact retained-token correspondence is still separate work.
+The inventory and executable checks themselves are complete, including all
+located AST carriers, retained raw spans, direct containment edges, token
+ordering, consumed chart spans, and opaque assembly locations.
 
 ## Why the parser has a static certificate
 

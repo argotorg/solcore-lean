@@ -235,7 +235,9 @@ The remaining parser-kernel work is:
    `Chart.G`, and establish its stated parser work bound;
 2. implement numeric structural-unit accounting, prove `structureBound`, and
    prove the AST-carrier measure equality;
-3. finish the location, nesting, source, grouping, literal-spelling, and
+3. carry the existing complete location inventory, executable checks, token
+   order, chart-span geometry, and assembly-location facts through every
+   parser reduction; then finish grouping, literal-spelling, exact-token, and
    no-normalization invariants at the certified boundary;
 4. define the proof-carrying `CertifiedParsedModule` and the final
    `parseModule` phase precedence;
