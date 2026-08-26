@@ -8167,6 +8167,116 @@ theorem lexer_tokensOwnedBy
   · rcases assembly with ⟨endByte, recognized⟩
     exact assemblyTokenAt_span_valid recognized
 
+/-- Retained token spans occur in source order and never overlap. -/
+def TokenSpansOrdered (tokens : List Token) : Prop :=
+  tokens.Pairwise
+    (fun left right => left.span.endByte ≤ right.span.startByte)
+
+private theorem assemblyTokenAt_endByte
+    {file : WorkspaceFile}
+    {startByte endByte : Nat}
+    {token : Token}
+    (recognized :
+      LexicalJudgment.AssemblyTokenAt file startByte endByte token) :
+    token.span.endByte = endByte := by
+  rcases recognized with ⟨slice, sliceAt, tokenEquation⟩
+  subst token
+  rfl
+
+private theorem lexesPrefix_tokenSpansOrdered
+    {file : WorkspaceFile}
+    {cursor : Nat}
+    {pendingAssembly : Bool}
+    {tokens : List Token}
+    {comments : List Comment}
+    (partition : LexicalJudgment.LexesPrefix file cursor pendingAssembly
+      tokens comments) :
+    TokenSpansOrdered tokens ∧
+      ∀ token ∈ tokens, token.span.endByte ≤ cursor := by
+  induction partition with
+  | start => simp [TokenSpansOrdered]
+  | whitespace cursor next pendingAssembly tokens comments prior recognized
+      inductionHypothesis =>
+      refine ⟨inductionHypothesis.1, ?_⟩
+      intro token member
+      exact Nat.le_trans (inductionHypothesis.2 token member)
+        (Nat.le_of_lt ((lexer_progress file).1 recognized))
+  | comment cursor pendingAssembly tokens comments comment prior winner
+      inductionHypothesis =>
+      refine ⟨inductionHypothesis.1, ?_⟩
+      intro token member
+      have progress := (lexer_progress file).2.1 winner.1
+      simp only [LexicalJudgment.Candidate.span] at progress
+      exact Nat.le_trans (inductionHypothesis.2 token member)
+        (Nat.le_of_lt progress)
+  | token cursor pendingAssembly nextPending tokens comments candidateClass
+      token prior winner nextState inductionHypothesis =>
+      have start := candidateAt_startByte winner.1
+      simp only [LexicalJudgment.Candidate.span] at start
+      have progress := (lexer_progress file).2.1 winner.1
+      simp only [LexicalJudgment.Candidate.span] at progress
+      constructor
+      · rw [TokenSpansOrdered, List.pairwise_append]
+        refine ⟨inductionHypothesis.1,
+          List.pairwise_singleton _ _, ?_⟩
+        intro earlier earlierMember later laterMember
+        simp only [List.mem_singleton] at laterMember
+        subst later
+        calc
+          earlier.span.endByte ≤ cursor :=
+            inductionHypothesis.2 earlier earlierMember
+          _ = token.span.startByte := start.symm
+      · intro retained member
+        rw [List.mem_append] at member
+        rcases member with earlierMember | addedMember
+        · exact Nat.le_trans
+            (inductionHypothesis.2 retained earlierMember)
+            (Nat.le_of_lt progress)
+        · simp only [List.mem_singleton] at addedMember
+          subst retained
+          exact Nat.le_refl _
+  | assemblyBlock cursor endByte tokens comments token prior recognized
+      inductionHypothesis =>
+      have start := assemblyTokenAt_startByte recognized
+      have finish := assemblyTokenAt_endByte recognized
+      have progress := (lexer_progress file).2.2 recognized
+      constructor
+      · rw [TokenSpansOrdered, List.pairwise_append]
+        refine ⟨inductionHypothesis.1,
+          List.pairwise_singleton _ _, ?_⟩
+        intro earlier earlierMember later laterMember
+        simp only [List.mem_singleton] at laterMember
+        subst later
+        calc
+          earlier.span.endByte ≤ cursor :=
+            inductionHypothesis.2 earlier earlierMember
+          _ = token.span.startByte := start.symm
+      · intro retained member
+        rw [List.mem_append] at member
+        rcases member with earlierMember | addedMember
+        · exact Nat.le_trans
+            (inductionHypothesis.2 retained earlierMember)
+            (Nat.le_of_lt progress)
+        · simp only [List.mem_singleton] at addedMember
+          subst retained
+          exact Nat.le_of_eq finish
+
+namespace Lexes
+
+/-- A successful lexical partition retains tokens in nonoverlapping source
+order. -/
+theorem tokenSpansOrdered
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {comments : List Comment}
+    (lexical : Lexes file tokens comments) :
+    TokenSpansOrdered tokens := by
+  cases lexical with
+  | complete pendingAssembly partition =>
+      exact (lexesPrefix_tokenSpansOrdered partition).1
+
+end Lexes
+
 private theorem byteAt_functional
     {file : WorkspaceFile}
     {cursor : Nat}
