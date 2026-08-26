@@ -651,4 +651,717 @@ private def topItemMeasure (item : TopItem) : Nat :=
 def astNodeMeasure (parsedModule : ParsedModuleV1) : Nat :=
   2 + measureList topItemMeasure parsedModule.payload.items
 
+namespace StructureFuelDepth
+
+/-- One AST carrier visited by the mutually recursive structural collectors. -/
+inductive RecursiveAstNode where
+  | expression (value : Expression)
+  | pattern (value : Pattern)
+  | body (loopDepth : Nat) (value : Body)
+  | statement (loopDepth : Nat) (value : Statement)
+  | forInit (value : ForInitItem)
+  | forPost (value : ForPostItem)
+
+/-- A collector entry point reached without consuming structural fuel. -/
+inductive RecursiveAstRoot
+    (module : ParsedModuleV1) : RecursiveAstNode → Prop where
+  | topLevelFunction
+      {itemSpan : SourceSpan}
+      {declaration : FunctionDecl}
+      (member :
+        (⟨itemSpan, .functionDecl declaration⟩ : TopItem) ∈
+          module.payload.items) :
+      RecursiveAstRoot module (.body 0 declaration.payload.body)
+  | instanceMethod
+      {itemSpan : SourceSpan}
+      {declaration : InstanceDecl}
+      {method : FunctionDecl}
+      (itemMember :
+        (⟨itemSpan, .instanceDecl declaration⟩ : TopItem) ∈
+          module.payload.items)
+      (methodMember : method ∈ declaration.payload.methods) :
+      RecursiveAstRoot module (.body 0 method.payload.body)
+  | contractFieldInitializer
+      {itemSpan : SourceSpan}
+      {declaration : ContractDecl}
+      {memberSpan : SourceSpan}
+      {field : FieldDecl}
+      {initializer : Expression}
+      (itemMember :
+        (⟨itemSpan, .contractDecl declaration⟩ : TopItem) ∈
+          module.payload.items)
+      (memberMember :
+        (⟨memberSpan, .field field⟩ : ContractMember) ∈
+          declaration.payload.members)
+      (initializer_eq : field.payload.initializer = some initializer) :
+      RecursiveAstRoot module (.expression initializer)
+  | contractFunction
+      {itemSpan : SourceSpan}
+      {declaration : ContractDecl}
+      {memberSpan : SourceSpan}
+      {functionDeclaration : FunctionDecl}
+      (itemMember :
+        (⟨itemSpan, .contractDecl declaration⟩ : TopItem) ∈
+          module.payload.items)
+      (memberMember :
+        (⟨memberSpan, .function functionDeclaration⟩ : ContractMember) ∈
+          declaration.payload.members) :
+      RecursiveAstRoot module (.body 0 functionDeclaration.payload.body)
+  | fallback
+      {itemSpan : SourceSpan}
+      {declaration : ContractDecl}
+      {memberSpan : SourceSpan}
+      {fallbackDeclaration : FallbackDecl}
+      (itemMember :
+        (⟨itemSpan, .contractDecl declaration⟩ : TopItem) ∈
+          module.payload.items)
+      (memberMember :
+        (⟨memberSpan, .fallback fallbackDeclaration⟩ : ContractMember) ∈
+          declaration.payload.members) :
+      RecursiveAstRoot module (.body 0 fallbackDeclaration.payload.body)
+  | constructor
+      {itemSpan : SourceSpan}
+      {declaration : ContractDecl}
+      {memberSpan : SourceSpan}
+      {constructorDeclaration : ContractConstructorDecl}
+      (itemMember :
+        (⟨itemSpan, .contractDecl declaration⟩ : TopItem) ∈
+          module.payload.items)
+      (memberMember :
+        (⟨memberSpan, .constructor constructorDeclaration⟩ : ContractMember) ∈
+          declaration.payload.members) :
+      RecursiveAstRoot module (.body 0 constructorDeclaration.payload.body)
+
+/-- One fuel-consuming recursive call made by a structural collector. -/
+inductive RecursiveAstChild : RecursiveAstNode → RecursiveAstNode → Prop where
+  | expressionCallCallee
+      {span : SourceSpan} {callee : Expression} {arguments : List Expression} :
+      RecursiveAstChild
+        (.expression ⟨span, .call callee arguments⟩)
+        (.expression callee)
+  | expressionCallArgument
+      {span : SourceSpan} {callee argument : Expression}
+      {arguments : List Expression}
+      (member : argument ∈ arguments) :
+      RecursiveAstChild
+        (.expression ⟨span, .call callee arguments⟩)
+        (.expression argument)
+  | expressionSelectReceiver
+      {span : SourceSpan} {receiver : Expression}
+      {field : IdentifierOccurrence} :
+      RecursiveAstChild
+        (.expression ⟨span, .select receiver field⟩)
+        (.expression receiver)
+  | expressionDotConstructorArgument
+      {span : SourceSpan} {marker : Located Unit}
+      {name : IdentifierOccurrence} {arguments : List Expression}
+      {argument : Expression}
+      (member : argument ∈ arguments) :
+      RecursiveAstChild
+        (.expression ⟨span, .dotConstructor marker name (some arguments)⟩)
+        (.expression argument)
+  | expressionLambdaBody
+      {span : SourceSpan} {parameters : List Parameter}
+      {returnType : Option TypeExpr} {body : Body} :
+      RecursiveAstChild
+        (.expression ⟨span, .lambda parameters returnType body⟩)
+        (.body 0 body)
+  | expressionAnnotationInner
+      {span : SourceSpan} {inner : Expression} {typeExpression : TypeExpr} :
+      RecursiveAstChild
+        (.expression ⟨span, .annotation inner typeExpression⟩)
+        (.expression inner)
+  | expressionKeywordCondition
+      {span : SourceSpan} {condition thenBranch elseBranch : Expression} :
+      RecursiveAstChild
+        (.expression
+          ⟨span, .keywordConditional condition thenBranch elseBranch⟩)
+        (.expression condition)
+  | expressionKeywordThen
+      {span : SourceSpan} {condition thenBranch elseBranch : Expression} :
+      RecursiveAstChild
+        (.expression
+          ⟨span, .keywordConditional condition thenBranch elseBranch⟩)
+        (.expression thenBranch)
+  | expressionKeywordElse
+      {span : SourceSpan} {condition thenBranch elseBranch : Expression} :
+      RecursiveAstChild
+        (.expression
+          ⟨span, .keywordConditional condition thenBranch elseBranch⟩)
+        (.expression elseBranch)
+  | expressionTernaryCondition
+      {span : SourceSpan} {condition thenBranch elseBranch : Expression} :
+      RecursiveAstChild
+        (.expression
+          ⟨span, .ternaryConditional condition thenBranch elseBranch⟩)
+        (.expression condition)
+  | expressionTernaryThen
+      {span : SourceSpan} {condition thenBranch elseBranch : Expression} :
+      RecursiveAstChild
+        (.expression
+          ⟨span, .ternaryConditional condition thenBranch elseBranch⟩)
+        (.expression thenBranch)
+  | expressionTernaryElse
+      {span : SourceSpan} {condition thenBranch elseBranch : Expression} :
+      RecursiveAstChild
+        (.expression
+          ⟨span, .ternaryConditional condition thenBranch elseBranch⟩)
+        (.expression elseBranch)
+  | expressionIndexReceiver
+      {span : SourceSpan} {receiver index : Expression} :
+      RecursiveAstChild
+        (.expression ⟨span, .index receiver index⟩)
+        (.expression receiver)
+  | expressionIndex
+      {span : SourceSpan} {receiver index : Expression} :
+      RecursiveAstChild
+        (.expression ⟨span, .index receiver index⟩)
+        (.expression index)
+  | expressionPrefixOperand
+      {span : SourceSpan} {operator : Located PrefixOperator}
+      {operand : Expression} :
+      RecursiveAstChild
+        (.expression ⟨span, .prefix operator operand⟩)
+        (.expression operand)
+  | expressionInfixLeft
+      {span : SourceSpan} {operator : Located InfixOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.expression ⟨span, .infix operator left right⟩)
+        (.expression left)
+  | expressionInfixRight
+      {span : SourceSpan} {operator : Located InfixOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.expression ⟨span, .infix operator left right⟩)
+        (.expression right)
+  | expressionTupleElement
+      {span : SourceSpan} {elements : List Expression} {element : Expression}
+      (member : element ∈ elements) :
+      RecursiveAstChild
+        (.expression ⟨span, .tuple elements⟩)
+        (.expression element)
+  | expressionGroupInner
+      {span : SourceSpan} {inner : Expression} :
+      RecursiveAstChild
+        (.expression ⟨span, .group inner⟩)
+        (.expression inner)
+  | patternNamedArgument
+      {span : SourceSpan} {name : QualifiedName}
+      {arguments : NonemptyList Pattern} {argument : Pattern}
+      (member : argument ∈ arguments.head :: arguments.tail) :
+      RecursiveAstChild
+        (.pattern ⟨span, .named name (some arguments)⟩)
+        (.pattern argument)
+  | patternDotConstructorArgument
+      {span : SourceSpan} {marker : Located Unit}
+      {name : IdentifierOccurrence} {arguments : NonemptyList Pattern}
+      {argument : Pattern}
+      (member : argument ∈ arguments.head :: arguments.tail) :
+      RecursiveAstChild
+        (.pattern ⟨span, .dotConstructor marker name (some arguments)⟩)
+        (.pattern argument)
+  | patternComptimeExpression
+      {span : SourceSpan} {marker : Marker} {expression : Expression} :
+      RecursiveAstChild
+        (.pattern ⟨span, .comptime marker expression⟩)
+        (.expression expression)
+  | patternTupleElement
+      {span : SourceSpan} {elements : List Pattern} {element : Pattern}
+      (member : element ∈ elements) :
+      RecursiveAstChild
+        (.pattern ⟨span, .tuple elements⟩)
+        (.pattern element)
+  | patternGroupInner
+      {span : SourceSpan} {inner : Pattern} :
+      RecursiveAstChild
+        (.pattern ⟨span, .group inner⟩)
+        (.pattern inner)
+  | bodyStatement
+      {loopDepth : Nat} {span : SourceSpan} {origin : BodyOrigin}
+      {statements : List Statement} {statement : Statement}
+      (member : statement ∈ statements) :
+      RecursiveAstChild
+        (.body loopDepth ⟨span, ⟨origin, statements⟩⟩)
+        (.statement loopDepth statement)
+  | statementAssignmentLeft
+      {loopDepth : Nat} {span : SourceSpan}
+      {operator : Located AssignmentOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .assignment operator left right⟩)
+        (.expression left)
+  | statementAssignmentRight
+      {loopDepth : Nat} {span : SourceSpan}
+      {operator : Located AssignmentOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .assignment operator left right⟩)
+        (.expression right)
+  | statementLetInitializer
+      {loopDepth : Nat} {span : SourceSpan}
+      {binding : LetBinding} {initializer : Expression}
+      (initializer_eq : binding.payload.initializer = some initializer) :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .letBinding binding⟩)
+        (.expression initializer)
+  | statementBlockBody
+      {loopDepth : Nat} {span : SourceSpan} {body : Body} :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .block body⟩)
+        (.body loopDepth body)
+  | statementExpression
+      {loopDepth : Nat} {span : SourceSpan} {expression : Expression}
+      {terminator : Option SourceSpan} :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .expression expression terminator⟩)
+        (.expression expression)
+  | statementReturnExpression
+      {loopDepth : Nat} {span : SourceSpan}
+      {expression : Expression} {terminator : SourceSpan} :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .return (some expression) terminator⟩)
+        (.expression expression)
+  | statementMatchScrutinee
+      {loopDepth : Nat} {span : SourceSpan}
+      {scrutinees : NonemptyList Expression}
+      {arms : NonemptyList MatchArm} {terminator : Option SourceSpan}
+      {scrutinee : Expression}
+      (member : scrutinee ∈ scrutinees.head :: scrutinees.tail) :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .match scrutinees arms terminator⟩)
+        (.expression scrutinee)
+  | statementMatchPattern
+      {loopDepth : Nat} {span : SourceSpan}
+      {scrutinees : NonemptyList Expression}
+      {arms : NonemptyList MatchArm} {terminator : Option SourceSpan}
+      {arm : MatchArm} {pattern : Pattern}
+      (armMember : arm ∈ arms.head :: arms.tail)
+      (patternMember :
+        pattern ∈ arm.payload.patterns.head :: arm.payload.patterns.tail) :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .match scrutinees arms terminator⟩)
+        (.pattern pattern)
+  | statementMatchBody
+      {loopDepth : Nat} {span : SourceSpan}
+      {scrutinees : NonemptyList Expression}
+      {arms : NonemptyList MatchArm} {terminator : Option SourceSpan}
+      {arm : MatchArm}
+      (armMember : arm ∈ arms.head :: arms.tail) :
+      RecursiveAstChild
+        (.statement loopDepth ⟨span, .match scrutinees arms terminator⟩)
+        (.body loopDepth arm.payload.body)
+  | statementIfCondition
+      {loopDepth : Nat} {span : SourceSpan} {condition : Expression}
+      {thenBody : Body} {elseBody : Option Body} :
+      RecursiveAstChild
+        (.statement loopDepth
+          ⟨span, .ifThenElse condition thenBody elseBody⟩)
+        (.expression condition)
+  | statementIfThenBody
+      {loopDepth : Nat} {span : SourceSpan} {condition : Expression}
+      {thenBody : Body} {elseBody : Option Body} :
+      RecursiveAstChild
+        (.statement loopDepth
+          ⟨span, .ifThenElse condition thenBody elseBody⟩)
+        (.body loopDepth thenBody)
+  | statementIfElseBody
+      {loopDepth : Nat} {span : SourceSpan} {condition : Expression}
+      {thenBody elseBody : Body} :
+      RecursiveAstChild
+        (.statement loopDepth
+          ⟨span, .ifThenElse condition thenBody (some elseBody)⟩)
+        (.body loopDepth elseBody)
+  | statementForInitializer
+      {loopDepth : Nat} {span : SourceSpan}
+      {initializers : List ForInitItem}
+      {condition : Expression} {post : List ForPostItem} {body : Body}
+      {initializer : ForInitItem}
+      (member : initializer ∈ initializers) :
+      RecursiveAstChild
+        (.statement loopDepth
+          ⟨span, .forLoop initializers condition post body⟩)
+        (.forInit initializer)
+  | statementForCondition
+      {loopDepth : Nat} {span : SourceSpan}
+      {initializers : List ForInitItem}
+      {condition : Expression} {post : List ForPostItem} {body : Body} :
+      RecursiveAstChild
+        (.statement loopDepth
+          ⟨span, .forLoop initializers condition post body⟩)
+        (.expression condition)
+  | statementForPost
+      {loopDepth : Nat} {span : SourceSpan}
+      {initializers : List ForInitItem}
+      {condition : Expression} {post : List ForPostItem} {body : Body}
+      {item : ForPostItem}
+      (member : item ∈ post) :
+      RecursiveAstChild
+        (.statement loopDepth
+          ⟨span, .forLoop initializers condition post body⟩)
+        (.forPost item)
+  | statementForBody
+      {loopDepth : Nat} {span : SourceSpan}
+      {initializers : List ForInitItem}
+      {condition : Expression} {post : List ForPostItem} {body : Body} :
+      RecursiveAstChild
+        (.statement loopDepth
+          ⟨span, .forLoop initializers condition post body⟩)
+        (.body (loopDepth + 1) body)
+  | forInitLetInitializer
+      {span : SourceSpan} {binding : LetBinding} {initializer : Expression}
+      (initializer_eq : binding.payload.initializer = some initializer) :
+      RecursiveAstChild
+        (.forInit ⟨span, .letBinding binding⟩)
+        (.expression initializer)
+  | forInitAssignmentLeft
+      {span : SourceSpan} {operator : Located AssignmentOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.forInit ⟨span, .assignment operator left right⟩)
+        (.expression left)
+  | forInitAssignmentRight
+      {span : SourceSpan} {operator : Located AssignmentOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.forInit ⟨span, .assignment operator left right⟩)
+        (.expression right)
+  | forInitExpression
+      {span : SourceSpan} {expression : Expression} :
+      RecursiveAstChild
+        (.forInit ⟨span, .expression expression⟩)
+        (.expression expression)
+  | forPostAssignmentLeft
+      {span : SourceSpan} {operator : Located AssignmentOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.forPost ⟨span, .assignment operator left right⟩)
+        (.expression left)
+  | forPostAssignmentRight
+      {span : SourceSpan} {operator : Located AssignmentOperator}
+      {left right : Expression} :
+      RecursiveAstChild
+        (.forPost ⟨span, .assignment operator left right⟩)
+        (.expression right)
+  | forPostExpression
+      {span : SourceSpan} {expression : Expression} :
+      RecursiveAstChild
+        (.forPost ⟨span, .expression expression⟩)
+        (.expression expression)
+
+/-- A recursive collector node reached from a module at an exact fuel depth. -/
+inductive StructuralFuelPath
+    (module : ParsedModuleV1) : RecursiveAstNode → Nat → Prop where
+  | root {node : RecursiveAstNode} :
+      RecursiveAstRoot module node → StructuralFuelPath module node 0
+  | child {parent child : RecursiveAstNode} {depth : Nat} :
+      StructuralFuelPath module parent depth →
+      RecursiveAstChild parent child →
+      StructuralFuelPath module child (depth + 1)
+
+private def recursiveAstNodeMeasure : RecursiveAstNode → Nat
+  | .expression value => expressionMeasure value
+  | .pattern value => patternMeasure value
+  | .body _ value => bodyMeasure value
+  | .statement _ value => statementMeasure value
+  | .forInit value => forInitItemMeasure value
+  | .forPost value => forPostItemMeasure value
+
+private theorem measure_le_measureList_of_mem
+    {α : Type} (measure : α → Nat) {value : α} {values : List α}
+    (member : value ∈ values) : measure value ≤ measureList measure values := by
+  induction values with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.mem_cons] at member
+      simp only [measureList, List.map_cons, List.sum_cons]
+      rcases member with rfl | member
+      · omega
+      · have bound := induction member
+        simp only [measureList] at bound
+        omega
+
+private theorem expressionListMeasure_eq_measureList
+    (values : List Expression) :
+    expressionListMeasure values = measureList expressionMeasure values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [expressionListMeasure, measureList, induction]
+
+private theorem patternListMeasure_eq_measureList
+    (values : List Pattern) :
+    patternListMeasure values = measureList patternMeasure values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [patternListMeasure, measureList, induction]
+
+private theorem statementListMeasure_eq_measureList
+    (values : List Statement) :
+    statementListMeasure values = measureList statementMeasure values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [statementListMeasure, measureList, induction]
+
+private theorem forInitItemListMeasure_eq_measureList
+    (values : List ForInitItem) :
+    forInitItemListMeasure values = measureList forInitItemMeasure values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [forInitItemListMeasure, measureList, induction]
+
+private theorem forPostItemListMeasure_eq_measureList
+    (values : List ForPostItem) :
+    forPostItemListMeasure values = measureList forPostItemMeasure values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [forPostItemListMeasure, measureList, induction]
+
+private theorem matchArmListMeasure_eq_measureList
+    (values : List MatchArm) :
+    matchArmListMeasure values = measureList matchArmMeasure values := by
+  induction values with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [matchArmListMeasure, measureList, induction]
+
+private theorem expressionMeasure_le_expressionListMeasure_of_mem
+    {value : Expression} {values : List Expression}
+    (member : value ∈ values) :
+    expressionMeasure value ≤ expressionListMeasure values := by
+  rw [expressionListMeasure_eq_measureList]
+  exact measure_le_measureList_of_mem expressionMeasure member
+
+private theorem patternMeasure_le_patternListMeasure_of_mem
+    {value : Pattern} {values : List Pattern}
+    (member : value ∈ values) :
+    patternMeasure value ≤ patternListMeasure values := by
+  rw [patternListMeasure_eq_measureList]
+  exact measure_le_measureList_of_mem patternMeasure member
+
+private theorem statementMeasure_le_statementListMeasure_of_mem
+    {value : Statement} {values : List Statement}
+    (member : value ∈ values) :
+    statementMeasure value ≤ statementListMeasure values := by
+  rw [statementListMeasure_eq_measureList]
+  exact measure_le_measureList_of_mem statementMeasure member
+
+private theorem forInitItemMeasure_le_forInitItemListMeasure_of_mem
+    {value : ForInitItem} {values : List ForInitItem}
+    (member : value ∈ values) :
+    forInitItemMeasure value ≤ forInitItemListMeasure values := by
+  rw [forInitItemListMeasure_eq_measureList]
+  exact measure_le_measureList_of_mem forInitItemMeasure member
+
+private theorem forPostItemMeasure_le_forPostItemListMeasure_of_mem
+    {value : ForPostItem} {values : List ForPostItem}
+    (member : value ∈ values) :
+    forPostItemMeasure value ≤ forPostItemListMeasure values := by
+  rw [forPostItemListMeasure_eq_measureList]
+  exact measure_le_measureList_of_mem forPostItemMeasure member
+
+private theorem matchArmMeasure_le_matchArmListMeasure_of_mem
+    {value : MatchArm} {values : List MatchArm}
+    (member : value ∈ values) :
+    matchArmMeasure value ≤ matchArmListMeasure values := by
+  rw [matchArmListMeasure_eq_measureList]
+  exact measure_le_measureList_of_mem matchArmMeasure member
+
+private theorem expressionMeasure_le_expressionNonemptyMeasure_of_mem
+    {value : Expression} {values : NonemptyList Expression}
+    (member : value ∈ values.head :: values.tail) :
+    expressionMeasure value ≤ expressionNonemptyMeasure values := by
+  cases values with
+  | mk head tail =>
+      simp only at member ⊢
+      rw [expressionNonemptyMeasure]
+      rcases List.mem_cons.mp member with rfl | member
+      · omega
+      · have bound :=
+          expressionMeasure_le_expressionListMeasure_of_mem member
+        omega
+
+private theorem patternMeasure_le_patternNonemptyMeasure_of_mem
+    {value : Pattern} {values : NonemptyList Pattern}
+    (member : value ∈ values.head :: values.tail) :
+    patternMeasure value ≤ patternNonemptyMeasure values := by
+  cases values with
+  | mk head tail =>
+      simp only at member ⊢
+      rw [patternNonemptyMeasure]
+      rcases List.mem_cons.mp member with rfl | member
+      · omega
+      · have bound := patternMeasure_le_patternListMeasure_of_mem member
+        omega
+
+private theorem matchArmMeasure_le_matchArmNonemptyMeasure_of_mem
+    {value : MatchArm} {values : NonemptyList MatchArm}
+    (member : value ∈ values.head :: values.tail) :
+    matchArmMeasure value ≤ matchArmNonemptyMeasure values := by
+  cases values with
+  | mk head tail =>
+      simp only at member ⊢
+      rw [matchArmNonemptyMeasure]
+      rcases List.mem_cons.mp member with rfl | member
+      · omega
+      · have bound := matchArmMeasure_le_matchArmListMeasure_of_mem member
+        omega
+
+private theorem expressionMeasure_le_letBindingMeasure_of_initializer
+    {binding : LetBinding} {initializer : Expression}
+    (initializer_eq : binding.payload.initializer = some initializer) :
+    expressionMeasure initializer ≤ letBindingMeasure binding := by
+  cases binding with
+  | mk span payload =>
+      cases payload with
+      | mk comptime name typeExpression initializerOption =>
+          simp only at initializer_eq ⊢
+          simp [letBindingMeasure, letBindingPayloadMeasure,
+            initializer_eq, expressionOptionMeasure]
+          omega
+
+private theorem patternMeasure_le_matchArmNonemptyMeasure_of_mem
+    {pattern : Pattern} {arm : MatchArm} {arms : NonemptyList MatchArm}
+    (armMember : arm ∈ arms.head :: arms.tail)
+    (patternMember :
+      pattern ∈ arm.payload.patterns.head :: arm.payload.patterns.tail) :
+    patternMeasure pattern ≤ matchArmNonemptyMeasure arms := by
+  cases arm with
+  | mk span payload =>
+      cases payload with
+      | mk patterns body =>
+          simp only at armMember patternMember ⊢
+          have patternBound :=
+            patternMeasure_le_patternNonemptyMeasure_of_mem patternMember
+          have armBound :=
+            matchArmMeasure_le_matchArmNonemptyMeasure_of_mem armMember
+          simp only [matchArmMeasure, matchArmPayloadMeasure] at armBound
+          omega
+
+private theorem bodyMeasure_le_matchArmNonemptyMeasure_of_mem
+    {arm : MatchArm} {arms : NonemptyList MatchArm}
+    (armMember : arm ∈ arms.head :: arms.tail) :
+    bodyMeasure arm.payload.body ≤ matchArmNonemptyMeasure arms := by
+  cases arm with
+  | mk span payload =>
+      cases payload with
+      | mk patterns body =>
+          simp only at armMember ⊢
+          have armBound :=
+            matchArmMeasure_le_matchArmNonemptyMeasure_of_mem armMember
+          simp only [matchArmMeasure, matchArmPayloadMeasure] at armBound
+          omega
+
+private theorem RecursiveAstChild.measure_add_one_le
+    {parent child : RecursiveAstNode}
+    (edge : RecursiveAstChild parent child) :
+    recursiveAstNodeMeasure child + 1 ≤ recursiveAstNodeMeasure parent := by
+  cases edge
+  all_goals
+    try
+      have expressionListBound :=
+        expressionMeasure_le_expressionListMeasure_of_mem (by assumption)
+    try
+      have patternListBound :=
+        patternMeasure_le_patternListMeasure_of_mem (by assumption)
+    try
+      have statementListBound :=
+        statementMeasure_le_statementListMeasure_of_mem (by assumption)
+    try
+      have forInitListBound :=
+        forInitItemMeasure_le_forInitItemListMeasure_of_mem (by assumption)
+    try
+      have forPostListBound :=
+        forPostItemMeasure_le_forPostItemListMeasure_of_mem (by assumption)
+    try
+      have expressionNonemptyBound :=
+        expressionMeasure_le_expressionNonemptyMeasure_of_mem (by assumption)
+    try
+      have patternNonemptyBound :=
+        patternMeasure_le_patternNonemptyMeasure_of_mem (by assumption)
+    try
+      have letInitializerBound :=
+        expressionMeasure_le_letBindingMeasure_of_initializer (by assumption)
+    try
+      have matchPatternBound :=
+        patternMeasure_le_matchArmNonemptyMeasure_of_mem
+          (by assumption) (by assumption)
+    try
+      have matchBodyBound :=
+        bodyMeasure_le_matchArmNonemptyMeasure_of_mem (by assumption)
+  all_goals
+    simp_all only [
+      recursiveAstNodeMeasure,
+      expressionMeasure,
+      expressionPayloadMeasure,
+      expressionListOptionMeasure,
+      patternMeasure,
+      patternPayloadMeasure,
+      patternArgumentsMeasure,
+      bodyMeasure,
+      bodyPayloadMeasure,
+      statementMeasure,
+      statementPayloadMeasure,
+      expressionOptionMeasure,
+      bodyOptionMeasure,
+      forInitItemMeasure,
+      forInitItemPayloadMeasure,
+      forPostItemMeasure,
+      forPostItemPayloadMeasure]
+  all_goals omega
+
+private theorem RecursiveAstRoot.measure_lt_astNodeMeasure
+    {module : ParsedModuleV1} {node : RecursiveAstNode}
+    (root : RecursiveAstRoot module node) :
+    recursiveAstNodeMeasure node < astNodeMeasure module := by
+  cases root
+  all_goals
+    have topItemBound :=
+      measure_le_measureList_of_mem topItemMeasure (by assumption)
+    try
+      have functionBound :=
+        measure_le_measureList_of_mem functionDeclMeasure (by assumption)
+    try
+      have contractMemberBound :=
+        measure_le_measureList_of_mem contractMemberMeasure (by assumption)
+  all_goals
+    simp_all only [
+      recursiveAstNodeMeasure,
+      astNodeMeasure,
+      topItemMeasure,
+      instanceDeclMeasure,
+      contractDeclMeasure,
+      contractMemberMeasure,
+      functionDeclMeasure,
+      fieldDeclMeasure,
+      fallbackDeclMeasure,
+      contractConstructorDeclMeasure,
+      measureOption]
+  all_goals omega
+
+private theorem StructuralFuelPath.depth_add_measure_lt
+    {module : ParsedModuleV1} {node : RecursiveAstNode} {depth : Nat}
+    (path : StructuralFuelPath module node depth) :
+    depth + recursiveAstNodeMeasure node < astNodeMeasure module := by
+  induction path with
+  | root root =>
+      simpa using root.measure_lt_astNodeMeasure
+  | child path edge induction =>
+      have decrease := edge.measure_add_one_le
+      omega
+
+/-- A structural collector path is shorter than its module-wide fuel bound. -/
+theorem StructuralFuelPath.depth_lt_astNodeMeasure
+    {module : ParsedModuleV1} {node : RecursiveAstNode} {depth : Nat}
+    (path : StructuralFuelPath module node depth) :
+    depth < astNodeMeasure module := by
+  have invariant := path.depth_add_measure_lt
+  omega
+
+end StructureFuelDepth
+
 end Solcore.Surface.Multi
