@@ -105,6 +105,30 @@ theorem EbnfValue.merge_locationFragments_transport_site
   cases equality
   rfl
 
+/-- Unpacking a source-rule root preserves the complete semantic fragment of
+its canonical singleton input. -/
+@[simp] theorem RootAction.unpack_locationFragment
+    {file : WorkspaceFile} {tokens : List Token}
+    (rule : GrammarRuleId)
+    (values : GrammarSymbolValues file tokens
+      (ProductionId.root rule).rhs) :
+    (RootAction.unpack rule values).locationFragment =
+      GrammarSymbolValues.locationFragment
+        (ProductionId.root rule).rhs values := by
+  rw [RootAction.unpack_eq]
+  rw [EbnfValue.locationFragment_atShape]
+  let viewed := GrammarSymbolValues.view
+    (ProductionId.rhs_root rule) values
+  calc
+    _ = GrammarSymbolValues.locationFragment
+          [.nonterminal (.aux (GrammarSite.root rule))] viewed := by
+        exact (GrammarSymbolValues.locationFragment_singleton
+          (.nonterminal (.aux (GrammarSite.root rule))) viewed.1).symm
+    _ = GrammarSymbolValues.locationFragment
+          (ProductionId.root rule).rhs values :=
+        GrammarSymbolValues.locationFragment_view
+          (ProductionId.rhs_root rule) values
+
 @[simp] theorem AtomSite.pack_locationFragment
     {file : WorkspaceFile} {tokens : List Token}
     (site : AtomSite)
@@ -818,4 +842,3 @@ theorem ActionReduces.auxiliary_locationEquation
       | cons => exact ListSite.pack_cons_rhs_locationFragment site input
 
 end Solcore.Surface.Multi
-

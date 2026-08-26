@@ -25,6 +25,61 @@ def ActionLocationSound
         (NonterminalValue.locationFragment action.production.lhs output)
         trace
 
+/-- One semantic action preserves interval evidence while retaining the exact
+coherent prefix derivation that produced its input.  Source-rule actions whose
+spans depend on named endpoints use this stronger boundary; generated actions
+may discharge it through `ActionLocationSound`. -/
+def CoherentActionLocationSound
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {owned : TokensOwnedBy file tokens}
+    {item : ContextualItemKey tokens}
+    {priorValues : PrefixValues file tokens item}
+    {output : NonterminalValue file tokens item.raw.production.lhs}
+    (complete : CompleteItem item.raw)
+    (coherentPrefix : CoherentPrefix file tokens memo correct final
+      item priorValues)
+    (_action : ActionReduces file tokens (.actionFor item.raw.production)
+      item.raw.origin item.raw.current
+      (PrefixValues.fullValue item complete priorValues) output)
+    (trace : SourceAnchorTrace file tokens)
+    (_carries : PrefixCarriesSourceTrace
+      file tokens memo correct final owned coherentPrefix trace) : Prop :=
+  IntervalLocationEvidence file tokens item.raw.origin item.raw.current
+      (GrammarSymbolValues.locationFragment item.raw.production.rhs
+        (PrefixValues.fullValue item complete priorValues)) trace →
+    IntervalLocationEvidence file tokens item.raw.origin item.raw.current
+      (NonterminalValue.locationFragment item.raw.production.lhs output) trace
+
+namespace ActionLocationSound
+
+/-- Context-free action soundness is sufficient at every coherent prefix. -/
+theorem coherent
+    {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {owned : TokensOwnedBy file tokens}
+    {item : ContextualItemKey tokens}
+    {priorValues : PrefixValues file tokens item}
+    {output : NonterminalValue file tokens item.raw.production.lhs}
+    {complete : CompleteItem item.raw}
+    {coherentPrefix : CoherentPrefix file tokens memo correct final
+      item priorValues}
+    {action : ActionReduces file tokens (.actionFor item.raw.production)
+      item.raw.origin item.raw.current
+      (PrefixValues.fullValue item complete priorValues) output}
+    {trace : SourceAnchorTrace file tokens}
+    {carries : PrefixCarriesSourceTrace
+      file tokens memo correct final owned coherentPrefix trace}
+    (sound : ActionLocationSound action) :
+    CoherentActionLocationSound complete coherentPrefix action trace carries :=
+  sound trace
+
+end ActionLocationSound
+
 private def PrefixIntervalLocationMotive
     (file : WorkspaceFile) (tokens : List Token)
     (memo : GuardMemo tokens)
@@ -198,13 +253,21 @@ private theorem reductionIntervalLocationCase
     {correct : PhaseBCorrect file tokens memo}
     {final : AllGuardsFinal memo}
     (owned : TokensOwnedBy file tokens)
-    (sound : ∀ {action : ActionId}
-        {origin finish : Boundary tokens}
-        {input : GrammarSymbolValues file tokens action.production.rhs}
-        {output : NonterminalValue file tokens action.production.lhs}
-        (_notModule : action.production.lhs ≠ .rule .module)
-        (reduces : ActionReduces file tokens action origin finish input output),
-      ActionLocationSound reduces)
+    (sound : ∀ {item : ContextualItemKey tokens}
+        {priorValues : PrefixValues file tokens item}
+        {output : NonterminalValue file tokens item.raw.production.lhs}
+        (complete : CompleteItem item.raw)
+        (coherentPrefix : CoherentPrefix file tokens memo correct final
+          item priorValues)
+        (action : ActionReduces file tokens (.actionFor item.raw.production)
+          item.raw.origin item.raw.current
+          (PrefixValues.fullValue item complete priorValues) output)
+        (trace : SourceAnchorTrace file tokens)
+        (carries : PrefixCarriesSourceTrace
+          file tokens memo correct final owned coherentPrefix trace)
+        (_notModule : item.raw.production.lhs ≠ .rule .module),
+      CoherentActionLocationSound complete coherentPrefix action trace
+        carries)
     (item : ContextualItemKey tokens)
     (priorValues : PrefixValues file tokens item)
     (output : NonterminalValue file tokens item.raw.production.lhs)
@@ -229,7 +292,7 @@ private theorem reductionIntervalLocationCase
   unfold PrefixIntervalLocationMotive at prefixIH
   unfold ReductionIntervalLocationMotive
   intro notModule
-  apply sound notModule action trace
+  apply sound complete coherentPrefix action trace prefixCarries notModule
   exact IntervalLocationEvidence.replaceFragment
     (PrefixValues.locationFragment_fullValue item complete priorValues).symm
     prefixIH
@@ -242,13 +305,21 @@ theorem locationEvidence
     {correct : PhaseBCorrect file tokens memo}
     {final : AllGuardsFinal memo}
     {owned : TokensOwnedBy file tokens}
-    (sound : ∀ {action : ActionId}
-        {origin finish : Boundary tokens}
-        {input : GrammarSymbolValues file tokens action.production.rhs}
-        {output : NonterminalValue file tokens action.production.lhs}
-        (_notModule : action.production.lhs ≠ .rule .module)
-        (reduces : ActionReduces file tokens action origin finish input output),
-      ActionLocationSound reduces)
+    (sound : ∀ {item : ContextualItemKey tokens}
+        {priorValues : PrefixValues file tokens item}
+        {output : NonterminalValue file tokens item.raw.production.lhs}
+        (complete : CompleteItem item.raw)
+        (coherentPrefix : CoherentPrefix file tokens memo correct final
+          item priorValues)
+        (action : ActionReduces file tokens (.actionFor item.raw.production)
+          item.raw.origin item.raw.current
+          (PrefixValues.fullValue item complete priorValues) output)
+        (trace : SourceAnchorTrace file tokens)
+        (carries : PrefixCarriesSourceTrace
+          file tokens memo correct final owned coherentPrefix trace)
+        (_notModule : item.raw.production.lhs ≠ .rule .module),
+      CoherentActionLocationSound complete coherentPrefix action trace
+        carries)
     {item : ContextualItemKey tokens}
     {values : PrefixValues file tokens item}
     {coherent : CoherentPrefix file tokens memo correct final item values}
@@ -278,13 +349,21 @@ theorem locationEvidence
     {correct : PhaseBCorrect file tokens memo}
     {final : AllGuardsFinal memo}
     {owned : TokensOwnedBy file tokens}
-    (sound : ∀ {action : ActionId}
-        {origin finish : Boundary tokens}
-        {input : GrammarSymbolValues file tokens action.production.rhs}
-        {output : NonterminalValue file tokens action.production.lhs}
-        (_notModule : action.production.lhs ≠ .rule .module)
-        (reduces : ActionReduces file tokens action origin finish input output),
-      ActionLocationSound reduces)
+    (sound : ∀ {item : ContextualItemKey tokens}
+        {priorValues : PrefixValues file tokens item}
+        {output : NonterminalValue file tokens item.raw.production.lhs}
+        (complete : CompleteItem item.raw)
+        (coherentPrefix : CoherentPrefix file tokens memo correct final
+          item priorValues)
+        (action : ActionReduces file tokens (.actionFor item.raw.production)
+          item.raw.origin item.raw.current
+          (PrefixValues.fullValue item complete priorValues) output)
+        (trace : SourceAnchorTrace file tokens)
+        (carries : PrefixCarriesSourceTrace
+          file tokens memo correct final owned coherentPrefix trace)
+        (_notModule : item.raw.production.lhs ≠ .rule .module),
+      CoherentActionLocationSound complete coherentPrefix action trace
+        carries)
     {item : ContextualItemKey tokens}
     {value : NonterminalValue file tokens item.raw.production.lhs}
     {coherent : CoherentReduction file tokens memo correct final item value}
