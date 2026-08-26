@@ -318,6 +318,21 @@ def predicateListPlan?
   let plans ← nonemptyPlans? predicatePlan? predicates
   pure (.commaSeparated plans)
 
+/-- Predicate-list planning exposes the same head/tail traversal as the list1
+grammar value used by the parser. -/
+theorem predicateListPlan?_eq_mapM
+    (predicates : NonemptyList Predicate) :
+    predicateListPlan? predicates = (do
+      let headPlan ← predicatePlan? predicates.head
+      let tailPlans ← predicates.tail.mapM predicatePlan?
+      pure (.commaSeparated (headPlan :: tailPlans))) := by
+  unfold predicateListPlan? nonemptyPlans?
+  rw [plans?_eq_mapM]
+  cases headEq : predicatePlan? predicates.head with
+  | none => simp
+  | some headPlan =>
+      cases tailEq : predicates.tail.mapM predicatePlan? <;> simp
+
 def genericPrefixPlan? (generic : GenericPrefix) : Option TokenPlan := do
   let forallPlan ← forallClausePlan? generic.payload.forallClause
   let contextPlan ← match generic.payload.context with
