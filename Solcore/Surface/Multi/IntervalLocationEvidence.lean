@@ -189,6 +189,39 @@ theorem mergeAcross
     · exact leftNested
     · exact rightNested
 
+/-- Any exposed semantic root proves that its containing parser interval
+retains at least one physical token. -/
+theorem occupied_of_roots_ne_nil
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    {fragment : LocationFragment}
+    {trace : SourceAnchorTrace file tokens}
+    (evidence : IntervalLocationEvidence file tokens origin finish
+      fragment trace)
+    (hasRoot : fragment.roots ≠ []) :
+    origin.val < Nat.min finish.val tokens.length := by
+  rcases evidence with
+    ⟨rootAnchors, rootSpans, rootsWithin, _traceWithin,
+      _traceOrdered, _valid, _nested⟩
+  cases rootAnchors with
+  | nil =>
+      exact (hasRoot (by simpa using rootSpans.symm)).elim
+  | cons first rest =>
+      have inside := rootsWithin first (by simp)
+      have occupied := first.occupied.2
+      change origin.val ≤ first.origin.val ∧
+        first.finish.val ≤ finish.val at inside
+      change first.origin.val <
+        Nat.min first.finish.val tokens.length at occupied
+      apply Nat.lt_min.mpr
+      constructor
+      · have beforeFinish : first.origin.val < first.finish.val :=
+          Nat.lt_of_lt_of_le occupied (Nat.min_le_left _ _)
+        omega
+      · have beforeLength : first.origin.val < tokens.length :=
+          Nat.lt_of_lt_of_le occupied (Nat.min_le_right _ _)
+        omega
+
 /-- An exact source anchor may become the semantic root for the value carried
 by the same parser interval.  Existing child roots become its direct children,
 while the physical terminal trace remains unchanged. -/
@@ -225,6 +258,30 @@ theorem located
       rcases direct with ⟨child, childMember, rfl⟩
       exact contains child (by simpa using childMember)
     · exact childNested containment (by simpa using nestedMember)
+
+/-- A checked consumed span becomes an exact source anchor whenever the
+semantic input exposes a root, which also certifies interval occupancy. -/
+theorem locatedByWitness
+    {file : WorkspaceFile} {tokens : List Token}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    {origin finish : Boundary tokens}
+    (witness : ConsumedSpanWitness file tokens origin finish)
+    {children : LocationFragment}
+    {trace : SourceAnchorTrace file tokens}
+    (evidence : IntervalLocationEvidence file tokens
+      origin finish children trace)
+    (hasRoot : children.roots ≠ []) :
+    IntervalLocationEvidence file tokens origin finish
+      (LocationFragment.located witness.span [children]) trace := by
+  let anchor : SourceAnchor file tokens := {
+    origin := origin
+    finish := finish
+    span := witness.span
+    occupied := ⟨witness.consumed,
+      occupied_of_roots_ne_nil evidence hasRoot⟩
+  }
+  exact located tokensOrdered anchor evidence
+    (rootsContainedBy tokensOrdered witness.consumed evidence)
 
 /-- Discarding a leading punctuation fragment from a semantic tuple preserves
 the remaining value evidence and the complete physical trace. -/
