@@ -82,31 +82,6 @@ private theorem TokenSlot.ListMatches.beforeAndTwoExactToPlain
               middleRelation.append <|
                 .required secondMatch.toPlain afterSecond
 
-private theorem TokenPlanEvidence.splitAppend
-    {headCandidate tailCandidate : Option TokenPlan}
-    {actual : List Token}
-    (evidence : TokenPlanEvidence
-      (do
-        let headPlan ← headCandidate
-        let tailPlan ← tailCandidate
-        pure (headPlan.append tailPlan)) actual) :
-    ∃ headActual tailActual,
-      actual = headActual ++ tailActual ∧
-        TokenPlanEvidence headCandidate headActual ∧
-        TokenPlanEvidence tailCandidate tailActual := by
-  rcases evidence with ⟨plan, success, relation⟩
-  rcases Option.bind_eq_some_iff.mp success with
-    ⟨headPlan, headEq, afterHeadEq⟩
-  rcases Option.bind_eq_some_iff.mp afterHeadEq with
-    ⟨tailPlan, tailEq, resultEq⟩
-  injection resultEq with planEq
-  subst plan
-  rcases relation.split_append with
-    ⟨headActual, tailActual, actualEq, headRelation, tailRelation⟩
-  exact ⟨headActual, tailActual, actualEq,
-    ⟨headPlan, headEq, headRelation⟩,
-    ⟨tailPlan, tailEq, tailRelation⟩⟩
-
 private theorem TokenPlanEvidence.exactToPlain
     {kind : TokenKind} {span : SourceSpan} {actual : List Token}
     (evidence : TokenPlanEvidence
