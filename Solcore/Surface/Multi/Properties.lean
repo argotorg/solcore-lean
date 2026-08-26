@@ -600,6 +600,49 @@ private theorem candidateAt_span_valid
       subst token
       exact (sourceSpan_valid_iff file cursor endByte).mpr sourceText.1
 
+/-- Normal maximal-munch candidates never synthesize opaque assembly
+payloads; those are admitted only by the dedicated assembly transition. -/
+private theorem candidateAt_token_not_assembly
+    {file : WorkspaceFile}
+    {pendingAssembly : Bool}
+    {cursor : Nat}
+    {candidateClass : LexicalJudgment.CandidateClass}
+    {token : Token}
+    {slice : AssemblySlice}
+    (recognized : LexicalJudgment.CandidateAt file pendingAssembly cursor
+      (.token candidateClass token))
+    (payload : token.payload = .assemblyBlock slice) : False := by
+  cases recognized with
+  | string endByte token recognized =>
+      rcases recognized with
+        ⟨spelling, decoded, _quote, _contents, _sourceText,
+          tokenEquation⟩
+      subst token
+      simp at payload
+  | pragmaName endByte token recognized =>
+      rcases recognized with ⟨kind, _spelling, tokenEquation⟩
+      subst token
+      simp at payload
+  | identifier endByte token recognized =>
+      rcases recognized with
+        ⟨text, kind, _valid, _sourceText, classification, tokenEquation⟩
+      subst token
+      cases classification <;> simp at payload
+  | decimal endByte token recognized =>
+      rcases recognized with ⟨digits, _valid, _sourceText, tokenEquation⟩
+      subst token
+      simp at payload
+  | hexadecimal endByte token recognized =>
+      rcases recognized with ⟨digits, _valid, _sourceText, tokenEquation⟩
+      subst token
+      simp at payload
+  | symbol endByte symbol token recognized kind =>
+      rcases recognized with
+        ⟨written, _sourceText, _slashGuard, _assemblyGuard,
+          tokenEquation⟩
+      subst token
+      simp at payload
+
 /-- Every opaque assembly token carries the exact owned source span. -/
 private theorem assemblyTokenAt_span_valid
     {file : WorkspaceFile}
@@ -8315,6 +8358,18 @@ theorem tokenSpansOrdered
 
 end Lexes
 
+/-- Source validity and direct containment of every location retained by one
+opaque assembly slice. -/
+structure AssemblySliceLocationFacts
+    (file : WorkspaceFile) (slice : AssemblySlice) : Prop where
+  sliceValid : slice.span.ValidFor file
+  openBraceValid : slice.payload.openBrace.ValidFor file
+  contentsValid : slice.payload.contents.ValidFor file
+  closeBraceValid : slice.payload.closeBrace.ValidFor file
+  containsOpenBrace : slice.span.Contains slice.payload.openBrace
+  containsContents : slice.span.Contains slice.payload.contents
+  containsCloseBrace : slice.span.Contains slice.payload.closeBrace
+
 private theorem byteAt_functional
     {file : WorkspaceFile}
     {cursor : Nat}
@@ -8819,6 +8874,70 @@ private theorem assemblyTokenAt_nextSuffix
   rw [closeSize, ← endEquation] at afterClose
   exact ⟨remaining, afterClose⟩
 
+private theorem assemblyTokenAt_locationFacts_of_suffix
+    {file : WorkspaceFile}
+    {cursor endByte : Nat}
+    {characters : List Char}
+    {token : Token}
+    {slice : AssemblySlice}
+    (suffix : SuffixAt file cursor characters)
+    (recognized :
+      LexicalJudgment.AssemblyTokenAt file cursor endByte token)
+    (payload : token.payload = .assemblyBlock slice) :
+    token.span = slice.span ∧ AssemblySliceLocationFacts file slice := by
+  rcases recognized with
+    ⟨recognizedSlice, sliceAt, tokenEquation⟩
+  subst token
+  change TokenKind.assemblyBlock recognizedSlice =
+    .assemblyBlock slice at payload
+  have sliceEquality : recognizedSlice = slice :=
+    TokenKind.assemblyBlock.inj payload
+  subst slice
+  rcases sliceAt with
+    ⟨openByte, closeCursor, run, _closeByte, endEquation, range,
+      sliceEquation⟩
+  subst recognizedSlice
+  rcases suffix.characters_eq_cons_of_byteAtAscii
+      (expected := '{') openByte (by decide) with
+    ⟨body, decomposition⟩
+  subst characters
+  have afterOpen := suffix.advanceOne
+  have openSize : '{'.utf8Size = 1 := by decide
+  rw [openSize] at afterOpen
+  rcases assemblyRun_nextSuffix afterOpen run with
+    ⟨_atCloseCharacters, atClose⟩
+  have runOrder : cursor + 1 ≤ closeCursor :=
+    assemblyRun_cursor_le run
+  rcases range with
+    ⟨parentOrdered, parentBound, parentStartBoundary,
+      parentEndBoundary⟩
+  have parentValid :
+      (LexicalJudgment.sourceSpan file cursor endByte).ValidFor file :=
+    (sourceSpan_valid_iff file cursor endByte).mpr
+      ⟨parentOrdered, parentBound, parentStartBoundary,
+        parentEndBoundary⟩
+  have openValid :
+      (LexicalJudgment.sourceSpan file cursor (cursor + 1)).ValidFor file :=
+    (sourceSpan_valid_iff file cursor (cursor + 1)).mpr ⟨by omega,
+      by omega, suffix.boundary, afterOpen.boundary⟩
+  have contentsValid :
+      (LexicalJudgment.sourceSpan file (cursor + 1) closeCursor).ValidFor
+        file :=
+    (sourceSpan_valid_iff file (cursor + 1) closeCursor).mpr ⟨runOrder,
+      by omega, afterOpen.boundary, atClose.boundary⟩
+  have closeValid :
+      (LexicalJudgment.sourceSpan file closeCursor endByte).ValidFor file :=
+    (sourceSpan_valid_iff file closeCursor endByte).mpr ⟨by omega,
+      parentBound, atClose.boundary, parentEndBoundary⟩
+  refine ⟨rfl, ⟨parentValid, openValid, contentsValid, closeValid,
+    ?_, ?_, ?_⟩⟩
+  · simp [SourceSpan.Contains, LexicalJudgment.sourceSpan]
+    omega
+  · simp [SourceSpan.Contains, LexicalJudgment.sourceSpan]
+    omega
+  · simp [SourceSpan.Contains, LexicalJudgment.sourceSpan]
+    omega
+
 private theorem whitespaceAt_nextSuffix
     {file : WorkspaceFile}
     {cursor endByte : Nat}
@@ -9232,6 +9351,47 @@ private theorem lexPath_nextSuffix
         ⟨nextCharacters, nextSuffix⟩
       exact inductionHypothesis nextSuffix
 
+private theorem lexesPrefix_assemblySlice_locations
+    {file : WorkspaceFile}
+    {cursor : Nat}
+    {pendingAssembly : Bool}
+    {tokens : List Token}
+    {comments : List Comment}
+    (partition : LexicalJudgment.LexesPrefix file cursor pendingAssembly
+      tokens comments)
+    {token : Token}
+    {slice : AssemblySlice}
+    (member : token ∈ tokens)
+    (payload : token.payload = .assemblyBlock slice) :
+    token.span = slice.span ∧ AssemblySliceLocationFacts file slice := by
+  induction partition generalizing token slice with
+  | start => simp at member
+  | whitespace cursor next pendingAssembly tokens comments prior recognized
+      inductionHypothesis =>
+      exact inductionHypothesis member payload
+  | comment cursor pendingAssembly tokens comments comment prior winner
+      inductionHypothesis =>
+      exact inductionHypothesis member payload
+  | token cursor pendingAssembly nextPending tokens comments candidateClass
+      added prior winner nextState inductionHypothesis =>
+      simp only [List.mem_append, List.mem_singleton] at member
+      rcases member with old | addedEquality
+      · exact inductionHypothesis old payload
+      · subst token
+        exact False.elim
+          (candidateAt_token_not_assembly winner.1 payload)
+  | assemblyBlock cursor endByte tokens comments added prior recognized
+      inductionHypothesis =>
+      simp only [List.mem_append, List.mem_singleton] at member
+      rcases member with old | addedEquality
+      · exact inductionHypothesis old payload
+      · subst token
+        have path := lexesPrefix_to_path prior
+        rcases lexPath_nextSuffix (SuffixAt.initial file) path with
+          ⟨characters, suffix⟩
+        exact assemblyTokenAt_locationFacts_of_suffix
+          suffix recognized payload
+
 private theorem lexPath_prefix_of_cursor_le
     {file : WorkspaceFile}
     {start shorterFinal longerFinal : LexState}
@@ -9289,6 +9449,23 @@ private theorem lexPath_functional_of_cursor
           exact inductionHypothesis nextSuffix secondTail endCursor
 
 namespace Lexes
+
+/-- Every opaque assembly token retained by a successful lexical partition
+exposes the exact slice span together with valid, directly contained delimiter
+and contents spans. -/
+theorem assemblySlice_locations
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {comments : List Comment}
+    (lexical : Lexes file tokens comments)
+    {token : Token}
+    {slice : AssemblySlice}
+    (member : token ∈ tokens)
+    (payload : token.payload = .assemblyBlock slice) :
+    token.span = slice.span ∧ AssemblySliceLocationFacts file slice := by
+  cases lexical with
+  | complete pendingAssembly partition =>
+      exact lexesPrefix_assemblySlice_locations partition member payload
 
 /-- The independent successful lexical partition has a unique output. -/
 theorem functional
