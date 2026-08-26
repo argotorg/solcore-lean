@@ -313,6 +313,54 @@ def predicatePlan? (predicate : Predicate) : Option TokenPlan := do
     qualifiedNamePlan predicate.payload.className,
     parameters])
 
+/-- The predicate visitor's computation rule when no type arguments follow
+the class name. -/
+theorem predicatePlan?_parameters_none
+    (span : SourceSpan) (main : TypeExpr) (className : QualifiedName) :
+    predicatePlan? ({
+      span := span
+      payload := {
+        main := main
+        className := className
+        parameters := none
+      }
+    } : Predicate) = (do
+      let mainPlan ← typeAtomPlan? main
+      pure (.enclose span (.concat [
+        mainPlan,
+        .plain (.symbol .colon),
+        qualifiedNamePlan className,
+        .empty]))) := by
+  rfl
+
+/-- The predicate visitor's computation rule for a nonempty type-argument
+list. -/
+theorem predicatePlan?_parameters_some
+    (span : SourceSpan) (main : TypeExpr) (className : QualifiedName)
+    (parameters : NonemptyList TypeExpr) :
+    predicatePlan? ({
+      span := span
+      payload := {
+        main := main
+        className := className
+        parameters := some parameters
+      }
+    } : Predicate) = (do
+      let mainPlan ← typeAtomPlan? main
+      let plans ← nonemptyTypeExprPlans? parameters
+      pure (.enclose span (.concat [
+        mainPlan,
+        .plain (.symbol .colon),
+        qualifiedNamePlan className,
+        .parens (.commaSeparated plans)]))) := by
+  unfold predicatePlan? optionalNonemptyTypePlans? nonemptyTypePlans?
+  cases mainEq : typeAtomPlan? main with
+  | none => simp
+  | some mainPlan =>
+      cases plansEq : nonemptyTypeExprPlans? parameters with
+      | none => simp [plansEq]
+      | some plans => simp [plansEq]
+
 def predicateListPlan?
     (predicates : NonemptyList Predicate) : Option TokenPlan := do
   let plans ← nonemptyPlans? predicatePlan? predicates
