@@ -310,7 +310,7 @@ theorem forallClausePlan?_wellAnchored
   apply TokenPlan.WellAnchored.enclose
   apply TokenPlan.WellAnchored.concat_plain_bookended_two
 
-private theorem forallClausePlan?_startsRequired
+theorem forallClausePlan?_startsRequired
     (clause : ForallClause) (plan : TokenPlan)
     (success : forallClausePlan? clause = some plan) :
     TokenPlan.WellAnchored.StartsRequired plan := by

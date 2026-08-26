@@ -173,6 +173,27 @@ theorem split_append
               exact ⟨_ :: leftActual, rightActual, by simp [equation],
                 .optionalPresent head leftRelation, rightRelation⟩
 
+/-- A source-exact fixed token may forget its span constraints at any point
+inside a larger plan while preserving the complete token correspondence. -/
+theorem exactBetweenToPlain
+    {left right : TokenPlan} {kind : TokenKind} {span : SourceSpan}
+    {actual : List Token}
+    (relation : ListMatches
+      (left.append ((TokenPlan.exact kind span).append right)).slots actual) :
+    ListMatches
+      (left.append ((TokenPlan.plain kind).append right)).slots actual := by
+  change ListMatches
+    (left.slots ++
+      .required (ExpectedToken.exact kind span) :: right.slots) actual
+      at relation
+  change ListMatches
+    (left.slots ++
+      .required (ExpectedToken.plain kind) :: right.slots) actual
+  rcases relation.split_append with
+    ⟨leftActual, rightActual, actualEq, leftRelation, rightRelation⟩
+  rw [actualEq]
+  exact leftRelation.append rightRelation.requiredHeadToPlain
+
 /-- An enclosing span is sound when the generated plan has mandatory physical
 endpoints and the actual first and last tokens realize those endpoints. -/
 theorem enclose

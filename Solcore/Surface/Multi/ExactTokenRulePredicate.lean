@@ -8,27 +8,6 @@ namespace Solcore.Surface.Multi
 
 open Grammar Solcore.Workspace
 
-/-- Replace one source-exact fixed token inside a larger matched plan by its
-grammar-level plain spelling. -/
-private theorem TokenSlot.ListMatches.fixedToPlain
-    {left right : TokenPlan} {kind : TokenKind} {span : SourceSpan}
-    {actual : List Token}
-    (relation : TokenSlot.ListMatches
-      (left.append ((TokenPlan.exact kind span).append right)).slots actual) :
-    TokenSlot.ListMatches
-      (left.append ((TokenPlan.plain kind).append right)).slots actual := by
-  change TokenSlot.ListMatches
-    (left.slots ++
-      .required (ExpectedToken.exact kind span) :: right.slots) actual
-      at relation
-  change TokenSlot.ListMatches
-    (left.slots ++
-      .required (ExpectedToken.plain kind) :: right.slots) actual
-  rcases relation.split_append with
-    ⟨leftActual, rightActual, actualEq, leftRelation, rightRelation⟩
-  rw [actualEq]
-  exact leftRelation.append rightRelation.requiredHeadToPlain
-
 /-- The recursive type-list visitor agrees with the standard monadic
 left-to-right traversal. -/
 private theorem typeExprPlans_eq_mapM (values : List TypeExpr) :
@@ -80,7 +59,7 @@ theorem predicate_tokenPlanSound :
             ((TokenPlan.plain (.symbol .colon)).append classPlan)
           have innerRelation : TokenSlot.ListMatches innerPlan.slots
               (PhysicalTokens tokens origin finish) := by
-            apply TokenSlot.ListMatches.fixedToPlain
+            apply TokenSlot.ListMatches.exactBetweenToPlain
               (left := mainPlan) (right := classPlan) relation
           have innerAnchored : innerPlan.WellAnchored := by
             apply TokenPlan.WellAnchored.append
@@ -189,7 +168,7 @@ theorem predicate_tokenPlanSound :
                   have colonRelation : TokenSlot.ListMatches
                       afterColon.slots
                       (PhysicalTokens tokens origin finish) := by
-                    apply TokenSlot.ListMatches.fixedToPlain
+                    apply TokenSlot.ListMatches.exactBetweenToPlain
                       (left := mainPlan)
                       (right := classPlan.append
                         ((TokenPlan.exact (.symbol .leftParen)
@@ -209,7 +188,7 @@ theorem predicate_tokenPlanSound :
                       afterOpen.slots
                       (PhysicalTokens tokens origin finish) := by
                     have converted :=
-                      TokenSlot.ListMatches.fixedToPlain
+                      TokenSlot.ListMatches.exactBetweenToPlain
                         (left := mainPlan.append
                           ((TokenPlan.plain (.symbol .colon)).append classPlan))
                         (right := parameterPlan.append
@@ -230,7 +209,7 @@ theorem predicate_tokenPlanSound :
                   have innerRelation : TokenSlot.ListMatches innerPlan.slots
                       (PhysicalTokens tokens origin finish) := by
                     have converted :=
-                      TokenSlot.ListMatches.fixedToPlain
+                      TokenSlot.ListMatches.exactBetweenToPlain
                         (left := mainPlan.append
                           ((TokenPlan.plain (.symbol .colon)).append
                             (classPlan.append
