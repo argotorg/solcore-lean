@@ -15,7 +15,7 @@ profile” are deliberately different claims.
 | --- | --- | --- |
 | M1c Semantic Core | Closed checker and evaluator with correspondence proofs | Published by Oracle v3 as `solcore/0.1.0-draft.3` / `core-m1c-v1` |
 | M2b Surface | Closed one-file parser with lexer/parser correspondence proofs | Published by Oracle v4 as `solcore/0.1.0-draft.4` / `frontend-m2b-v1` |
-| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result and soundness theorems; separately certified 20-code structural validator with two-way correspondence; the fast parser, formal resource bounds, and certified frontend integration are pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
+| M2c Multi Surface | Unconditional chart-based lexer/parser path with selected-result, soundness, and parser-wide location-validity theorems; separately certified 20-code structural validator with two-way correspondence; exact token correspondence, the fast parser, formal resource bounds, and certified frontend integration are pending | Internal Lean API; no new schema, profile, capability, or Oracle query |
 | M2c workspace and syntax identity | Pure workspace validation and accepted structural-identity design | Internal only |
 | Resolution, checking, elaboration, execution | Not connected as one executable source frontend | Not published |
 
@@ -34,8 +34,10 @@ and `StructurallyAccepts` is proved equivalent to having no applicable
 diagnostic. Primitive rules are exact, the executable layers are connected,
 and executable diagnostics are exactly the applicable diagnostics. The
 module-derived traversal fuel is sufficient, and validator success is exactly
-structural acceptance. Formal resource accounting and a certified parsed
-result remain. None of this widens
+structural acceptance. Successful parses now also carry a proof that every AST
+location is valid for its source and properly nested. Exact token
+correspondence, formal resource accounting, and a certified parsed result
+remain. None of this widens
 Oracle v4, certifies a whole workspace, resolves a name, assigns a type,
 elaborates to Core, or executes a contract.
 
@@ -98,7 +100,7 @@ This is not yet the ADR-0015 `Multi.parseModule` interface returning a
 
 ### What is proved
 
-The kernel-checked parser proof has three user-visible consequences:
+The kernel-checked parser proof has four user-visible consequences:
 
 - the fixed grammar has a finite decreasing rank, so callers do not supply a
   termination or progress proof;
@@ -106,7 +108,9 @@ The kernel-checked parser proof has three user-visible consequences:
   outcome; and
 - successful parsing satisfies `Parses`, while lexical and parse failures
   satisfy their independent diagnostic judgments with exact source
-  provenance.
+  provenance; and
+- `Parses.everyLocationValid` proves that every successfully parsed module has
+  source-valid locations and direct parent-child nesting throughout its AST.
 
 These are soundness and implementation-selection claims. They do not by
 themselves certify structural acceptance, resolution, typing, or elaboration.
@@ -271,10 +275,11 @@ collectors are sound for arbitrary fuel. Structural paths are bounded by the
 module AST measure, so the executable list and declarative applicability agree
 in both directions. Canonical reports are duplicate-free and ordered, and
 validator success is equivalent to structural acceptance. Formal resource
-accounting and the certified frontend connection remain. Exact location work
-now has a complete executable AST inventory plus token-order, chart-span, and
-assembly-location foundations; parser-wide propagation and exact token
-correspondence are not yet complete.
+accounting and the certified frontend connection remain. Location
+certification is complete: the executable inventory, token order, parser-span
+geometry, and assembly-location facts compose into
+`Parses.everyLocationValid` for every successful parse. Exact token
+correspondence is the remaining source-fidelity proof.
 
 [`ADR-0016`](adr/0016-m2c-structural-syntax-identity.md) accepts structural
 syntax identity over certified parser output.
@@ -492,9 +497,8 @@ Before a complete M2c frontend can be claimed, at least the following remain:
   chart reference, including its stated parser work bound;
 - implement the numeric structural-unit accounting, prove the quadratic
   `structureBound`, and relate `astNodeMeasure` to the full AST carrier;
-- propagate the existing location inventory, token-order, chart-span, and
-  assembly-location facts through every parser reduction, then prove grouping,
-  literal-spelling, and retained-token correspondence for successful parses;
+- prove exact token correspondence for successful parses, including retained
+  leaves, grouping, literal spelling, and the absence of parser normalization;
 - connect the already certified structural phase to `CertifiedParsedModule`
   and the file-only frontend with the specified diagnostic precedence;
 - reduce the cubic evidence/cache/counter memory cost and validate

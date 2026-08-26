@@ -21,12 +21,13 @@ raw workspace
 ```
 
 The repository implements workspace validation, per-file lexing and parsing,
-and structural validation as separate internal M2c kernels. The parser and
-structural validator are each proof-connected to an independent judgment, but
-the proof-carrying facade that joins them and certifies exact locations and
-tokens is not yet present. Resolution, source checking, and elaboration remain
-future stages. The public Oracle v4 follows the older M2b single-source parser
-path and stops after parsing.
+and structural validation as separate internal M2c kernels. The parser proves
+that every successful result has source-valid, properly nested AST locations,
+and the structural validator is proof-connected to an independent judgment.
+The proof-carrying facade that joins these results is not yet present because
+exact token correspondence and phase integration remain. Resolution, source
+checking, and elaboration are future stages. The public Oracle v4 follows the
+older M2b single-source parser path and stops after parsing.
 
 ## Main components
 
@@ -100,7 +101,7 @@ The implementation is organized around these responsibilities:
 | chart state and execution | `Chart`, `ParserCore` |
 | declarative parsing | `ParserJudgment` |
 | implementation/proof correspondence | `ChartProperties`, `Properties` |
-| AST location inventory and parser-span geometry | `Location`, `LocationProperties` |
+| AST location inventory, parser-span geometry, and whole-parse location proof | `Location`, `LocationProperties`, `RuleCoherent*`, `EndpointActionIntervalLocation` |
 | total parse selection | `ParseOutcomeTotality` |
 | structural diagnostic order and pure AST validation | `Diagnostic`, `Structure` |
 | structural judgments, traversal bounds, and correspondence | `StructureJudgment`, `StructureFuelProperties`, `StructureProperties` |
@@ -119,11 +120,10 @@ returns every applicable closed diagnostic, and canonicalizes the result. Its
 independent applicability and acceptance judgments agree exactly with the
 executor, including sufficient module-derived traversal fuel and the returned
 error list. It is not yet part of a certified parsed-module facade because
-the location facts have not yet been propagated through every parser
-reduction, and exact retained-token correspondence is still separate work.
-The inventory and executable checks themselves are complete, including all
-located AST carriers, retained raw spans, direct containment edges, token
-ordering, consumed chart spans, and opaque assembly locations.
+exact retained-token correspondence and phase integration are still separate
+work. Location propagation is complete: `Parses.everyLocationValid` combines
+the inventory, token ordering, parser-span geometry, and opaque-assembly facts
+to prove valid and properly nested locations for every successful parse.
 
 ## Why the parser has a static certificate
 
@@ -149,7 +149,7 @@ The common proof pattern is:
 | --- | --- | --- | --- |
 | workspace | pure validator | validation/rejection judgments | soundness and completeness |
 | lexing | bounded lexer | lexical judgment and diagnostic applicability | accepted-token and rejection theorems |
-| parsing | bounded chart executor | `Parses` and parse-diagnostic applicability | selected-outcome and soundness theorems |
+| parsing | bounded chart executor | `Parses` and parse-diagnostic applicability | selected-outcome, soundness, and parser-wide location-validity theorems |
 | structural validation | complete pure diagnostic collector | independent acceptance and applicability judgments | two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance; numeric work bound remains |
 | Core checking | Boolean/detailed checker | typing relation | soundness and completeness |
 | Core execution | fuelled CEK machine | big-step relation | two-way correspondence |

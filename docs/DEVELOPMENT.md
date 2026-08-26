@@ -238,12 +238,12 @@ contract. The structural-unit counter, quadratic `structureBound`, and
 AST-carrier cardinality equality are still pending.
 
 `validateStructure` is a certified standalone structural phase. Do not yet
-describe the raw file frontend as certified: it still needs exact location and
-retained-token correspondence, `CertifiedParsedModule`, and structural-phase
-integration. The location inventory and its executable checks are complete,
-and token ordering, consumed chart spans, nonempty interval containment, and
-assembly-internal locations are proved; the remaining gap is parser-wide
-propagation and exact correspondence.
+describe the raw file frontend as certified: exact retained-token
+correspondence, `CertifiedParsedModule`, and structural-phase integration are
+still missing. Location certification itself is complete. The inventory and
+its executable checks cover the whole AST, and `Parses.everyLocationValid`
+combines token ordering, parser-span containment, and assembly-internal facts
+to prove valid, properly nested locations for every successful parse.
 
 ## Documentation rule
 

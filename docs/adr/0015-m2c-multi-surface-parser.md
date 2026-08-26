@@ -18,9 +18,10 @@
   present. The structural judgment and validator are also present, with
   two-way diagnostic correspondence, sufficient traversal fuel, canonical
   reports, and executable acceptance equivalence. Strict UTF-8 and
-  canonical-byte facts are present.
-- **Not yet implemented:** The separate fast `Parser`, exact whole-AST location
-  and token correspondence, formal structural-resource accounting,
+  canonical-byte facts are present. Parser-wide source-location validity and
+  nesting are proved by `Parses.everyLocationValid`.
+- **Not yet implemented:** The separate fast `Parser`, exact token
+  correspondence, formal structural-resource accounting,
   `CertifiedParsedModule`, the six complete canonical-standard parse
   certificates, and the public `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed
@@ -4371,6 +4372,13 @@ the exact source slice, every container span against its grammar children and
 delimiters, source ownership, token order, absence versus presence fields,
 and complete token consumption. It does not compare only pretty-printed text.
 
+The location half of this certified boundary is already implemented:
+`Parses.everyLocationValid` derives `EveryLocationValid file module` from the
+lexer and parser judgments. In plain terms, every retained AST location in a
+successful parse belongs to the input file and every direct child location is
+inside its parent. Exact token correspondence and the facade that bundles all
+of these proofs remain to be implemented.
+
 ### Termination and resource bounds
 
 The public parser has no caller-selected fuel. Lexer loops advance a UTF-8 byte
@@ -4846,8 +4854,7 @@ structural_diagnostics_canonical
 structureBound_sufficient
 astNodeMeasure_eq_astCarrier_cardinality
 
-all_locations_valid
-all_locations_nested
+Parses.everyLocationValid
 module_source_exact
 qualified_components_exact
 module_reference_shape_exact
@@ -5280,8 +5287,9 @@ An implementation that still exposes `Polarity -> Bool -> Bool` is not
 conforming to this Accepted ADR. The repository now uses the closed
 `GuardDecision` algebra and has passed the ParserCore closedness gate, so
 `ParserJudgment.lean`, `Chart.lean`, and the total chart-based parser have been
-implemented. This milestone does not complete the still-missing fast parser,
-exact location/token certification and the proof-carrying facade,
+implemented. Parser-wide location certification is also complete through
+`Parses.everyLocationValid`. This milestone does not complete the still-missing
+fast parser, exact token correspondence and the proof-carrying facade,
 canonical-standard parse certificates, or umbrella.
 
 Implementation proceeds in this order:
@@ -5301,7 +5309,8 @@ Implementation proceeds in this order:
    and the separate fast full-token parser, their phase barriers, bounds,
    correspondence, and exact result-equality proof;
 7. independent structural acceptance and the structural validator;
-8. location, token-correspondence, diagnostic, and resource theorems;
+8. parser-wide location certification (now complete), followed by exact token
+   correspondence and the remaining diagnostic and resource theorems;
 9. checked compatibility, strict UTF-8, byte-round-trip, and six-file standard
    certificates; and
 10. the internal `Solcore.Surface.Multi` umbrella.

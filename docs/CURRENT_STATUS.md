@@ -21,12 +21,14 @@ means exactly that no structural diagnostic applies. The executable and
 declarative sides now agree in both directions: every reported diagnostic
 applies, every applicable diagnostic is reported, and the module-derived
 traversal fuel is sufficient. Structural validation succeeds exactly for an
-accepted module. What remains is integration with the proof-carrying
-parsed-module frontend. The complete AST-location inventory, executable
-validity and nesting checks, retained-token ordering, chart-span validity and
-containment, and opaque-assembly location facts now exist. The remaining
-location work is to carry those facts through every parser reduction and then
-finish exact token correspondence. Formal resource accounting also remains.
+accepted module. The source-location proof is now complete across the parser:
+the inventory and executable checks cover every located AST field, and
+`Parses.everyLocationValid` proves that every successful lex/parse derivation
+produces a module whose locations are valid for the source file and properly
+nested. The remaining certification work is exact correspondence between the
+retained syntax and the original token/comment stream, followed by the
+proof-carrying frontend that combines parsing, locations, and structural
+acceptance. Formal resource accounting also remains.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -46,7 +48,7 @@ or fuzzing-speed parser.
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
 | M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome, soundness, and exact cache equivalence | No; internal API | Total; all six representative benchmarks pass, but large-file memory readiness is unproved |
 | M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Two-way correspondence, sufficient traversal fuel, canonical error-list properties, and executable success exactly equivalent to acceptance | No; internal API | Certified as a separate decision procedure; formal resource accounting and file-frontend integration remain |
-| M2c source-location evidence | Complete AST inventory and executable validity/nesting checks | Token order, consumed chart-span validity, occupied subinterval containment, and assembly slice location facts | No; internal API | Parser-wide reduction induction and exact token correspondence remain |
+| M2c source-location evidence | Complete AST inventory and executable validity/nesting checks | `Parses.everyLocationValid` proves validity and direct-parent nesting for every successful parse, using token order, parser-span containment, and assembly-slice facts | No; internal API | Parser-wide location propagation is complete; exact token correspondence and certified frontend integration remain |
 | M2c structural syntax identity | No | No | No | Design accepted in ADR-0016 |
 | M2c module and name resolution | No | No | No | ADR-0017 is proposed |
 | M2d checking and Core elaboration | No | No | No | Planned |
@@ -101,14 +103,14 @@ report contains exactly the applicable diagnostics, without duplicates and in
 canonical order.
 
 The remaining frontend boundary must attach this certified phase to parsing.
-All 54 located AST carrier sorts and all 12 retained raw span fields are now
-covered by one executable inventory, with direct-parent containment tested.
-Lexer derivations provide token ordering and exact assembly-internal location
-facts, while consumed parser intervals now have validity and nonempty
-subinterval-containment theorems. These facts still have to be propagated
-through every parser reduction, and exact retained-token correspondence must
-then be completed. The resulting evidence belongs in
-`CertifiedParsedModule`, not in the already closed structural validator.
+All 54 located AST carrier sorts and all 12 retained raw span fields are
+covered by one executable inventory. Lexer token ordering, parser-interval
+containment, and assembly-internal facts are now carried through every parser
+reduction. The resulting theorem, `Parses.everyLocationValid`, says that every
+successful parse has valid and properly nested source locations. What is still
+missing is exact retained-token correspondence and the
+`CertifiedParsedModule`/frontend layer that bundles it with the existing parse,
+location, and structural proofs.
 
 The separate numeric resource theorem required by ADR-0015 remains to be
 implemented and proved.
@@ -144,7 +146,7 @@ node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
-The full build checks 184 jobs. The semantic-kernel audit rejects `sorry`,
+The full build checks 213 jobs. The semantic-kernel audit rejects `sorry`,
 `admit`, `partial`, `unsafe`, `axiom`, `noncomputable`, `extern`, and
 `implemented_by` in the audited roots. The final parser certificate is also
 checked at `trust = 0`; its dependencies use only Lean's expected logical
@@ -204,9 +206,9 @@ is:
 1. implement the separate fast parser, prove exact result equality with the
    chart reference, and continue memory profiling on larger inputs;
 2. complete the ADR-defined formal resource bounds;
-3. lift the completed location foundations through all parser reductions,
-   prove exact token correspondence, then connect parsing and structural
-   acceptance through `CertifiedParsedModule` and the file frontend;
+3. prove exact token correspondence, then combine the existing parse,
+   location, and structural proofs in `CertifiedParsedModule` and the file
+   frontend;
 4. accept and implement module/name resolution;
 5. implement source checking and elaboration into Semantic Core;
 6. expose a new versioned workspace Oracle only after its profile, schemas,

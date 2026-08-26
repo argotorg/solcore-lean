@@ -17,6 +17,7 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 | M2c workspace identity | ADR-0014 Accepted | complete and proof-audited | internal only |
 | M2c Multi source/token/AST and lexer | ADR-0015 Accepted | complete for the current internal boundary | internal only |
 | M2c Multi full-token parser | ADR-0015 Accepted | unconditional parser and file-only lexer/parser wrapper implemented; selected-outcome and soundness theorems complete | internal only |
+| M2c parser-wide source locations | ADR-0015 Accepted | `Parses.everyLocationValid` proves source validity and direct-parent nesting for every successful parse | internal only |
 | M2c structural acceptance | ADR-0015 Accepted | validator and independent judgments implemented; two-way correspondence, sufficient traversal fuel, canonical reports, and success iff acceptance proved; numeric work bound and certified-module integration remain | internal only |
 | M2c structural syntax identity | ADR-0016 Accepted | design only; no implementation modules or tests yet | none |
 | M2c module and lexical resolution | ADR-0017 Proposed | blocked and not started | none |
@@ -24,11 +25,11 @@ For module boundaries, see [architecture](ARCHITECTURE.md).
 | M2e polymorphism, classes, and staging | direction accepted in part | not started | none |
 
 The **unconditional raw-parser milestone is complete**: callers can lex and
-parse one `WorkspaceFile` without supplying a termination proof. The full
-ADR-0015 parser delivery and the whole M2 frontend are not complete because the
-implemented structural validator is fully connected to its independent
-judgments but is not yet connected to the certified-module boundary, while
-resolution, checking, and elaboration do not exist yet.
+parse one `WorkspaceFile` without supplying a termination proof. Every
+successful parse is also proved to have valid, properly nested source
+locations. The full ADR-0015 frontend is not complete because exact token
+correspondence and the certified-module integration are still missing.
+Resolution, checking, and elaboration do not exist yet.
 
 ## Published M2b boundary
 
@@ -235,10 +236,9 @@ The remaining parser-kernel work is:
    `Chart.G`, and establish its stated parser work bound;
 2. implement numeric structural-unit accounting, prove `structureBound`, and
    prove the AST-carrier measure equality;
-3. carry the existing complete location inventory, executable checks, token
-   order, chart-span geometry, and assembly-location facts through every
-   parser reduction; then finish grouping, literal-spelling, exact-token, and
-   no-normalization invariants at the certified boundary;
+3. finish exact token correspondence at the certified boundary, including
+   grouping, literal spelling, complete token consumption, and
+   no-normalization invariants;
 4. define the proof-carrying `CertifiedParsedModule` and the final
    `parseModule` phase precedence;
 5. prove that structural success and failure select the corresponding
@@ -249,8 +249,9 @@ The remaining parser-kernel work is:
    audits pass.
 
 The executable structural pass and its independent specification both exist,
-and their correspondence is complete. They are not yet a certified file
-frontend until location/token evidence and phase integration are connected.
+and their correspondence is complete. Parser-wide location evidence is also
+complete. A certified file frontend still needs exact token correspondence and
+phase integration.
 
 ## Structural syntax identity: accepted design, no code yet
 
@@ -330,7 +331,7 @@ golden streams, and compatibility classification.
 | Order | Deliverable | Exit condition |
 | ---: | --- | --- |
 | 1 | parser performance and memory pass | representative files retain explicit runtime/memory regressions, and cubic evidence/cache/counter memory is reduced without weakening proofs |
-| 2 | ADR-0015 structural certification | `parseModule` returns only certified modules or canonical lexical/parse/structural diagnostics |
+| 2 | ADR-0015 certified frontend | exact token correspondence is proved and `parseModule` returns only certified modules or canonical lexical/parse/structural diagnostics |
 | 3 | six-file canonical parse gate | all shared standard bytes lex, parse, structurally pass, and re-encode in the kernel |
 | 4 | ADR-0016 structural identity | prepared modules and all identity/selection/enumeration theorems complete |
 | 5 | ADR-0017 feasibility and acceptance | SHA and actual canonical resolver gates record reproducible counts |
