@@ -725,6 +725,87 @@ theorem mem_exportDiagnostics_applies
       exact mem_remoteExportDiagnostics_applies
         (.remoteExportSelectionTop itemMember itemShape modeShape) member
 
+/-- Missing-parameter diagnostics retain the original parameter occurrence
+and exactly characterize an absent required type annotation. -/
+theorem mem_missingParameterTypeDiagnostics_iff
+    {context : ParameterContext} {parameters : List Parameter}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈ missingParameterTypeDiagnostics context parameters ↔
+      ∃ parameter,
+        parameter ∈ parameters ∧
+        parameter.payload.type = none ∧
+        StructuralDiagnostic.requiredParameterTypeMissing
+          parameter.payload.name.span context = diagnostic := by
+  rw [missingParameterTypeDiagnostics, List.mem_filterMap]
+  constructor
+  · rintro ⟨parameter, member, selected⟩
+    cases typeShape : parameter.payload.type with
+    | none =>
+        simp only [typeShape, Option.some.injEq] at selected
+        exact ⟨parameter, member, typeShape, selected⟩
+    | some typeExpression => simp [typeShape] at selected
+  · rintro ⟨parameter, member, missing, diagnosticEq⟩
+    exact ⟨parameter, member, by simp [missing, diagnosticEq]⟩
+
+/-- Disallowed-signature diagnostics are exactly the selected public or
+payable modifier markers, including when both positions yield one value. -/
+theorem mem_disallowedSignatureModifierDiagnostics_iff
+    {context : ModifierContext} {signature : FunctionSignature}
+    {diagnostic : StructuralDiagnostic} :
+    diagnostic ∈
+        disallowedSignatureModifierDiagnostics context signature ↔
+      (∃ marker,
+        signature.payload.public = some marker ∧
+        StructuralDiagnostic.modifierNotAllowed
+          marker.span context marker.payload = diagnostic) ∨
+      ∃ marker,
+        signature.payload.payable = some marker ∧
+        StructuralDiagnostic.modifierNotAllowed
+          marker.span context marker.payload = diagnostic := by
+  cases publicShape : signature.payload.public <;>
+    cases payableShape : signature.payload.payable <;>
+      simp [disallowedSignatureModifierDiagnostics, publicShape,
+        payableShape, eq_comm]
+
+/-- Every missing-parameter diagnostic emitted for a reached signature is
+declaratively applicable. -/
+theorem mem_missingParameterTypeDiagnostics_applies
+    {module : ParsedModuleV1}
+    {modifierContext : Option ModifierContext}
+    {parameterContext : ParameterContext}
+    {signature : FunctionSignature}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.signature modifierContext parameterContext signature))
+    (member : diagnostic ∈ missingParameterTypeDiagnostics
+      parameterContext signature.payload.parameters) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_missingParameterTypeDiagnostics_iff] at member
+  rcases member with ⟨parameter, parameterMember, missing, diagnosticEq⟩
+  rw [← diagnosticEq]
+  exact .signatureParameterTypeMissing occurrence parameterMember missing
+
+/-- Every disallowed modifier emitted for a reached restricted signature is
+declaratively applicable. -/
+theorem mem_disallowedSignatureModifierDiagnostics_applies
+    {module : ParsedModuleV1} {context : ModifierContext}
+    {parameterContext : ParameterContext}
+    {signature : FunctionSignature}
+    {diagnostic : StructuralDiagnostic}
+    (occurrence : StructuralSite.Occurs module
+      (.signature (some context) parameterContext signature))
+    (member : diagnostic ∈
+      disallowedSignatureModifierDiagnostics context signature) :
+    StructuralDiagnostic.Applies module diagnostic := by
+  rw [mem_disallowedSignatureModifierDiagnostics_iff] at member
+  rcases member with publicSelected | payableSelected
+  · rcases publicSelected with ⟨marker, selected, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .signatureModifierNotAllowed occurrence (.publicMarker selected)
+  · rcases payableSelected with ⟨marker, selected, diagnosticEq⟩
+    rw [← diagnosticEq]
+    exact .signatureModifierNotAllowed occurrence (.payableMarker selected)
+
 /-- The pragma collector emits exactly its empty-target and later-duplicate
 diagnostics. -/
 theorem mem_pragmaDiagnostics_iff

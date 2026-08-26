@@ -230,7 +230,8 @@ def pragmaDiagnostics (declaration : PragmaDecl) : List StructuralDiagnostic :=
     declaration.payload.targets
   empty ++ duplicates
 
-private def missingParameterTypeDiagnostics
+/-- Collect parameters whose required type annotation is absent. -/
+def missingParameterTypeDiagnostics
     (context : ParameterContext) (parameters : List Parameter) :
     List StructuralDiagnostic :=
   parameters.filterMap fun parameter =>
@@ -238,7 +239,8 @@ private def missingParameterTypeDiagnostics
     | some _ => none
     | none => some (.requiredParameterTypeMissing parameter.payload.name.span context)
 
-private def disallowedSignatureModifierDiagnostics
+/-- Collect signature modifiers rejected by the surrounding declaration. -/
+def disallowedSignatureModifierDiagnostics
     (context : ModifierContext) (signature : FunctionSignature) :
     List StructuralDiagnostic :=
   let publicDiagnostic :=
