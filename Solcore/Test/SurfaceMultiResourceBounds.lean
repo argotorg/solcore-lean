@@ -5,7 +5,7 @@ import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 import Solcore.Surface.Multi.StructureLeastSpanComparisonUnits
 import Solcore.Surface.Multi.StructureResourceAccounting
 import Solcore.Surface.Multi.StructureResourceBound
-import Solcore.Surface.Multi.ParserScheduleTrace
+import Solcore.Surface.Multi.ParserScheduleTransition
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -212,6 +212,27 @@ def testMultiResourceBounds : IO Unit := do
                 "three fresh trace charges must record exactly three units"
               assertTrue ((memoTrace.charge? memoAddress).isNone)
                 "the memo-address duplicate charge was accepted"
+  let mixedScheduleAddresses := [
+    fixedAddress,
+    boundaryAddress,
+    memoAddress
+  ]
+  match emptyScheduleTrace.chargeAll? mixedScheduleAddresses with
+  | none =>
+      throw (IO.userError "the mixed schedule-address list was rejected")
+  | some mixedTrace =>
+      assertTrue (mixedTrace.ledger == {
+          fixedUnits := 1
+          boundarySlotUnits := 1
+          memoSlotUnits := 1
+        })
+        "the mixed list transition must charge every schedule family once"
+      assertTrue (mixedTrace.actualUnits == mixedScheduleAddresses.length)
+        "the mixed list transition must charge exactly its address count"
+  assertTrue
+    ((emptyScheduleTrace.chargeAll?
+      [fixedAddress, fixedAddress, boundaryAddress]).isNone)
+    "the list transition accepted an immediate duplicate address"
 
   let emptySelection : ImportSelection :=
     locatedAt source 12 14 { entries := [] }
