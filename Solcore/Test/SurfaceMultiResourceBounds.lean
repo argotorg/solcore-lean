@@ -5,6 +5,7 @@ import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 import Solcore.Surface.Multi.StructureLeastSpanComparisonUnits
 import Solcore.Surface.Multi.StructureResourceAccounting
 import Solcore.Surface.Multi.StructureResourceBound
+import Solcore.Surface.Multi.ParserResourceAccounting
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -122,6 +123,11 @@ def testMultiResourceBounds : IO Unit := do
     "the executable node-visit count diverged from the AST measure"
   assertTrue (parseBound 0 < parseBound 1)
     "the parser bound must grow when one terminal is added"
+  let parserCapacity := parserScheduleCapacity 4
+  assertTrue (parserCapacity.total == parseBound 4)
+    "the parser schedule capacity diverged from the fixed parser bound"
+  assertTrue (parserCapacity.fixedUnits == 1)
+    "the parser schedule must retain its one fixed startup unit"
 
   let emptySelection : ImportSelection :=
     locatedAt source 12 14 { entries := [] }
