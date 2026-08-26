@@ -884,4 +884,375 @@ theorem Occurs.forBody
 
 end StructuralSite
 
+namespace StructuralDiagnostic
+
+/-- Wildcard marker spans written in an import selection. -/
+def importWildcardSpans
+    (entries : List ImportSelectorEntry) : List SourceSpan :=
+  entries.filterMap fun entry =>
+    match entry.payload with
+    | .wildcard marker => some marker.span
+    | .named _ _ => none
+
+/-- Named import entries paired with their effective local names. -/
+def namedImportBindings
+    (entries : List ImportSelectorEntry) :
+    List (IdentifierOccurrence × IdentifierOccurrence) :=
+  entries.filterMap fun entry =>
+    match entry.payload with
+    | .wildcard _ => none
+    | .named source alias => some (source, alias.getD source)
+
+/-- Wildcard marker spans written in a local export list. -/
+def localExportWildcardSpans
+    (entries : List ExportEntry) : List SourceSpan :=
+  entries.filterMap fun entry =>
+    match entry.payload with
+    | .wildcard marker => some marker.span
+    | .item _ | .allFrom _ _ => none
+
+/-- Named export items written in a local export list. -/
+def localExportItems (entries : List ExportEntry) : List ExportItem :=
+  entries.filterMap fun entry =>
+    match entry.payload with
+    | .item item => some item
+    | .wildcard _ | .allFrom _ _ => none
+
+/-- Module references written in local `all-from` export entries. -/
+def localExportReferences
+    (entries : List ExportEntry) : List ModuleReference :=
+  entries.filterMap fun entry =>
+    match entry.payload with
+    | .allFrom reference _ => some reference
+    | .wildcard _ | .item _ => none
+
+/-- Wildcard marker spans written in a braced remote export selection. -/
+def remoteExportWildcardSpans
+    (entries : List RemoteExportEntry) : List SourceSpan :=
+  entries.filterMap fun entry =>
+    match entry.payload with
+    | .wildcard marker => some marker.span
+    | .item _ => none
+
+/-- Named export items written in a braced remote export selection. -/
+def remoteExportItems
+    (entries : List RemoteExportEntry) : List ExportItem :=
+  entries.filterMap fun entry =>
+    match entry.payload with
+    | .item item => some item
+    | .wildcard _ => none
+
+/-- A signature marker selected by either modifier position. -/
+inductive SignatureModifierIn
+    (signature : FunctionSignature) : Marker → Prop where
+  | publicMarker {marker : Marker}
+      (selected : signature.payload.public = some marker) :
+      SignatureModifierIn signature marker
+  | payableMarker {marker : Marker}
+      (selected : signature.payload.payable = some marker) :
+      SignatureModifierIn signature marker
+
+/--
+Declarative applicability of a structural diagnostic to a parsed module.
+Each rule names the AST site and the local structural fact that gives rise to
+the diagnostic; it does not call the executable structural validator.
+-/
+inductive Applies (module : ParsedModuleV1) : StructuralDiagnostic → Prop where
+  | emptyImportSelection
+      {selection : ImportSelection}
+      (occurrence : StructuralSite.Occurs module
+        (.importSelection selection))
+      (empty : selection.payload.entries = []) :
+      Applies module (.emptyImportSelection selection.span)
+  | mixedImportWildcard
+      {selection : ImportSelection} {span : SourceSpan}
+      (occurrence : StructuralSite.Occurs module
+        (.importSelection selection))
+      (mixed : selection.payload.entries.length ≠ 1)
+      (least : LeastSpanIn span
+        (importWildcardSpans selection.payload.entries)) :
+      Applies module (.mixedImportWildcard span)
+  | duplicateImportSourceName
+      {selection : ImportSelection}
+      {binding : IdentifierOccurrence × IdentifierOccurrence}
+      (occurrence : StructuralSite.Occurs module
+        (.importSelection selection))
+      (duplicate : LaterDuplicate
+        (namedImportBindings selection.payload.entries)
+        (fun value => value.1.payload) binding) :
+      Applies module
+        (.duplicateImportSourceName binding.1.span binding.1.payload)
+  | duplicateImportLocalName
+      {selection : ImportSelection}
+      {binding : IdentifierOccurrence × IdentifierOccurrence}
+      (occurrence : StructuralSite.Occurs module
+        (.importSelection selection))
+      (duplicate : LaterDuplicate
+        (namedImportBindings selection.payload.entries)
+        (fun value => value.2.payload) binding) :
+      Applies module
+        (.duplicateImportLocalName binding.2.span binding.2.payload)
+  | emptyHidingClause
+      {clause : HidingClause}
+      (occurrence : StructuralSite.Occurs module (.hidingClause clause))
+      (empty : clause.payload.names = []) :
+      Applies module (.emptyHidingClause clause.span)
+  | duplicateHiddenName
+      {clause : HidingClause} {name : IdentifierOccurrence}
+      (occurrence : StructuralSite.Occurs module (.hidingClause clause))
+      (duplicate : LaterDuplicate clause.payload.names
+        (fun value => value.payload) name) :
+      Applies module (.duplicateHiddenName name.span name.payload)
+  | emptyLocalExportList
+      {selection : LocalExportList}
+      (occurrence : StructuralSite.Occurs module
+        (.localExportList selection))
+      (empty : selection.payload.entries = []) :
+      Applies module (.emptyLocalExportList selection.span)
+  | emptyRemoteExportList
+      {selection : RemoteExportSelection}
+      (entries : List RemoteExportEntry)
+      (occurrence : StructuralSite.Occurs module
+        (.remoteExportSelection selection))
+      (braced : selection.payload = .braced entries)
+      (empty : entries = []) :
+      Applies module (.emptyRemoteExportList selection.span)
+  | mixedLocalExportWildcard
+      {selection : LocalExportList} {span : SourceSpan}
+      (occurrence : StructuralSite.Occurs module
+        (.localExportList selection))
+      (mixed : selection.payload.entries.length ≠ 1)
+      (least : LeastSpanIn span
+        (localExportWildcardSpans selection.payload.entries)) :
+      Applies module (.mixedExportWildcard span)
+  | mixedRemoteExportWildcard
+      {selection : RemoteExportSelection}
+      {entries : List RemoteExportEntry} {span : SourceSpan}
+      (occurrence : StructuralSite.Occurs module
+        (.remoteExportSelection selection))
+      (braced : selection.payload = .braced entries)
+      (mixed : entries.length ≠ 1)
+      (least : LeastSpanIn span (remoteExportWildcardSpans entries)) :
+      Applies module (.mixedExportWildcard span)
+  | duplicateLocalExportName
+      {selection : LocalExportList} {item : ExportItem}
+      (occurrence : StructuralSite.Occurs module
+        (.localExportList selection))
+      (duplicate : LaterDuplicate
+        (localExportItems selection.payload.entries)
+        (fun value => value.payload.name.payload) item) :
+      Applies module
+        (.duplicateExportName item.payload.name.span
+          item.payload.name.payload)
+  | duplicateRemoteExportName
+      {selection : RemoteExportSelection}
+      {entries : List RemoteExportEntry} {item : ExportItem}
+      (occurrence : StructuralSite.Occurs module
+        (.remoteExportSelection selection))
+      (braced : selection.payload = .braced entries)
+      (duplicate : LaterDuplicate (remoteExportItems entries)
+        (fun value => value.payload.name.payload) item) :
+      Applies module
+        (.duplicateExportName item.payload.name.span
+          item.payload.name.payload)
+  | duplicateExportModuleReference
+      {selection : LocalExportList} {reference : ModuleReference}
+      (occurrence : StructuralSite.Occurs module
+        (.localExportList selection))
+      (duplicate : LaterDuplicate
+        (localExportReferences selection.payload.entries)
+        ModuleReference.eraseLocations reference) :
+      Applies module
+        (.duplicateExportModuleReference reference.span
+          reference.eraseLocations)
+  | duplicateExportConstructor
+      {item : ExportItem} {selection : ConstructorSelection}
+      {constructors : NonemptyList IdentifierOccurrence}
+      {name : IdentifierOccurrence}
+      (occurrence : StructuralSite.Occurs module (.exportItem item))
+      (selectionPresent : item.payload.constructors = some selection)
+      (named : selection.payload = .named constructors)
+      (duplicate : LaterDuplicate constructors.toList
+        (fun value => value.payload) name) :
+      Applies module (.duplicateExportConstructor name.span name.payload)
+  | matchPatternArityMismatch
+      {loopDepth : Nat} {statement : Statement}
+      {scrutinees : NonemptyList Expression}
+      {arms : NonemptyList MatchArm} {terminator : Option SourceSpan}
+      {arm : MatchArm}
+      (occurrence : StructuralSite.Occurs module
+        (.statement loopDepth statement))
+      (shape : statement.payload = .match scrutinees arms terminator)
+      (armMember : arm ∈ arms.toList)
+      (mismatch : arm.payload.patterns.toList.length ≠
+        scrutinees.toList.length) :
+      Applies module (.matchPatternArityMismatch arm.span
+        scrutinees.toList.length arm.payload.patterns.toList.length)
+  | emptyGenericPragmaTargets
+      {declaration : PragmaDecl}
+      (occurrence : StructuralSite.Occurs module (.pragma declaration))
+      (kind : declaration.payload.kind.payload = .noGenericInstanceFor)
+      (empty : declaration.payload.targets = []) :
+      Applies module
+        (.emptyGenericPragmaTargets declaration.payload.kind.span)
+  | duplicatePragmaTarget
+      {declaration : PragmaDecl} {target : IdentifierOccurrence}
+      (occurrence : StructuralSite.Occurs module (.pragma declaration))
+      (duplicate : LaterDuplicate declaration.payload.targets
+        (fun value => value.payload) target) :
+      Applies module (.duplicatePragmaTarget target.span target.payload)
+  | signatureModifierNotAllowed
+      {context : ModifierContext} {parameterContext : ParameterContext}
+      {signature : FunctionSignature} {marker : Marker}
+      (occurrence : StructuralSite.Occurs module
+        (.signature (some context) parameterContext signature))
+      (selected : SignatureModifierIn signature marker) :
+      Applies module (.modifierNotAllowed marker.span context marker.payload)
+  | fallbackModifierNotAllowed
+      {declaration : FallbackDecl} {marker : Marker}
+      (occurrence : StructuralSite.Occurs module (.fallback declaration))
+      (selected : declaration.payload.public = some marker) :
+      Applies module
+        (.modifierNotAllowed marker.span .fallback marker.payload)
+  | constructorModifierNotAllowed
+      {declaration : ContractConstructorDecl} {marker : Marker}
+      (occurrence : StructuralSite.Occurs module
+        (.contractConstructor declaration))
+      (selected : declaration.payload.public = some marker) :
+      Applies module
+        (.modifierNotAllowed marker.span .contractConstructor marker.payload)
+  | fallbackHasParameters
+      {declaration : FallbackDecl}
+      (occurrence : StructuralSite.Occurs module (.fallback declaration))
+      (nonempty : declaration.payload.parameters ≠ []) :
+      Applies module (.fallbackHasParameters declaration.payload.marker.span
+        declaration.payload.parameters.length)
+  | fallbackHasNonUnitReturn
+      {declaration : FallbackDecl} {returnType : TypeExpr}
+      (occurrence : StructuralSite.Occurs module (.fallback declaration))
+      (returnPresent : declaration.payload.returnType = some returnType)
+      (notUnit : ¬GroupedUnit returnType) :
+      Applies module (.fallbackHasNonUnitReturn returnType.span)
+  | signatureParameterTypeMissing
+      {modifierContext : Option ModifierContext}
+      {parameterContext : ParameterContext}
+      {signature : FunctionSignature} {parameter : Parameter}
+      (occurrence : StructuralSite.Occurs module
+        (.signature modifierContext parameterContext signature))
+      (member : parameter ∈ signature.payload.parameters)
+      (missing : parameter.payload.type = none) :
+      Applies module (.requiredParameterTypeMissing
+        parameter.payload.name.span parameterContext)
+  | constructorParameterTypeMissing
+      {declaration : ContractConstructorDecl} {parameter : Parameter}
+      (occurrence : StructuralSite.Occurs module
+        (.contractConstructor declaration))
+      (member : parameter ∈ declaration.payload.parameters)
+      (missing : parameter.payload.type = none) :
+      Applies module (.requiredParameterTypeMissing
+        parameter.payload.name.span .contractConstructor)
+  | breakOutsideLoop
+      {statement : Statement} {terminator : SourceSpan}
+      (occurrence : StructuralSite.Occurs module (.statement 0 statement))
+      (shape : statement.payload = .break terminator) :
+      Applies module (.controlOutsideLoop statement.span .breakControl)
+  | continueOutsideLoop
+      {statement : Statement} {terminator : SourceSpan}
+      (occurrence : StructuralSite.Occurs module (.statement 0 statement))
+      (shape : statement.payload = .continue terminator) :
+      Applies module (.controlOutsideLoop statement.span .continueControl)
+
+/-- Every applicable diagnostic is justified by a reached structural site. -/
+theorem Applies.hasSite
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic}
+    (applies : Applies module diagnostic) :
+    ∃ site, StructuralSite.Occurs module site := by
+  cases applies <;> exact ⟨_, by assumption⟩
+
+/-- Characterization of an empty import-selection diagnostic. -/
+@[simp] theorem applies_emptyImportSelection_iff
+    {module : ParsedModuleV1} {span : SourceSpan} :
+    Applies module (.emptyImportSelection span) ↔
+      ∃ selection : ImportSelection,
+        StructuralSite.Occurs module (.importSelection selection) ∧
+          selection.span = span ∧ selection.payload.entries = [] := by
+  constructor
+  · intro applies
+    cases applies with
+    | emptyImportSelection occurrence empty =>
+        exact ⟨_, occurrence, rfl, empty⟩
+  · rintro ⟨selection, occurrence, spanEq, empty⟩
+    subst span
+    exact .emptyImportSelection occurrence empty
+
+/-- Characterization of a fallback-parameter diagnostic. -/
+@[simp] theorem applies_fallbackHasParameters_iff
+    {module : ParsedModuleV1} {span : SourceSpan} {count : Nat} :
+    Applies module (.fallbackHasParameters span count) ↔
+      ∃ declaration : FallbackDecl,
+        StructuralSite.Occurs module (.fallback declaration) ∧
+          declaration.payload.marker.span = span ∧
+          declaration.payload.parameters.length = count ∧
+          declaration.payload.parameters ≠ [] := by
+  constructor
+  · intro applies
+    cases applies with
+    | fallbackHasParameters occurrence nonempty =>
+        exact ⟨_, occurrence, rfl, rfl, nonempty⟩
+  · rintro ⟨declaration, occurrence, spanEq, countEq, nonempty⟩
+    subst span
+    subst count
+    exact .fallbackHasParameters occurrence nonempty
+
+/-- Characterization of a fallback return-type diagnostic. -/
+@[simp] theorem applies_fallbackHasNonUnitReturn_iff
+    {module : ParsedModuleV1} {span : SourceSpan} :
+    Applies module (.fallbackHasNonUnitReturn span) ↔
+      ∃ declaration : FallbackDecl, ∃ returnType : TypeExpr,
+        StructuralSite.Occurs module (.fallback declaration) ∧
+          declaration.payload.returnType = some returnType ∧
+          returnType.span = span ∧ ¬GroupedUnit returnType := by
+  constructor
+  · intro applies
+    cases applies with
+    | fallbackHasNonUnitReturn occurrence returnPresent notUnit =>
+        exact ⟨_, _, occurrence, returnPresent, rfl, notUnit⟩
+  · rintro ⟨declaration, returnType, occurrence, returnPresent,
+      spanEq, notUnit⟩
+    subst span
+    exact .fallbackHasNonUnitReturn occurrence returnPresent notUnit
+
+/-- Inversion of a loop-control diagnostic into the corresponding statement. -/
+theorem applies_controlOutsideLoop_iff
+    {module : ParsedModuleV1} {span : SourceSpan} {control : ControlKind} :
+    Applies module (.controlOutsideLoop span control) ↔
+      (control = .breakControl ∧
+        ∃ statement terminator,
+          StructuralSite.Occurs module (.statement 0 statement) ∧
+            statement.span = span ∧ statement.payload = .break terminator) ∨
+      (control = .continueControl ∧
+        ∃ statement terminator,
+          StructuralSite.Occurs module (.statement 0 statement) ∧
+            statement.span = span ∧
+            statement.payload = .continue terminator) := by
+  constructor
+  · intro applies
+    cases applies with
+    | breakOutsideLoop occurrence shape =>
+        exact Or.inl ⟨rfl, _, _, occurrence, rfl, shape⟩
+    | continueOutsideLoop occurrence shape =>
+        exact Or.inr ⟨rfl, _, _, occurrence, rfl, shape⟩
+  · intro witness
+    rcases witness with
+      ⟨controlEq, statement, terminator, occurrence, spanEq, shape⟩ |
+      ⟨controlEq, statement, terminator, occurrence, spanEq, shape⟩
+    · subst control
+      subst span
+      exact .breakOutsideLoop occurrence shape
+    · subst control
+      subst span
+      exact .continueOutsideLoop occurrence shape
+
+end StructuralDiagnostic
+
 end Solcore.Surface.Multi
