@@ -30,8 +30,16 @@ callback consumed by coherent parser recursion. -/
 theorem ofRules
     (sound : ∀ rule : GrammarRuleId, GrammarRuleTokenPlanSound rule) :
     RootActionTokenPlanSound sourceRuleTokenPlanLayout := by
-  intro file tokens rule origin finish input output owned reduces inputEvidence
-  exact sound rule owned reduces inputEvidence
+  intro rule file tokens memo correct final origin finish context priorValues
+    output complete owned _sourceExact _coherentPrefix reduces inputEvidence
+  apply sound rule owned reduces
+  apply inputEvidence.candidate_eq
+  symm
+  rw [RootAction.unpack_tokenPlan?]
+  simpa only [CanonicalCompleteRootItem] using
+    (PrefixValues.tokenPlan?_fullValue sourceRuleTokenPlanLayout
+      (CanonicalCompleteRootItem tokens rule origin finish context)
+      complete priorValues)
 
 end RootActionTokenPlanSound
 

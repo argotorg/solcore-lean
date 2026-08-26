@@ -8,23 +8,11 @@ namespace Solcore.Surface.Multi
 open Grammar
 open Solcore.Workspace
 
-/-- The only semantic callback required by token-plan action dispatch: for an
-owned token stream, a source-rule reduction transforms complete input-plan
-evidence into evidence for the rule visitor's output plan over the same parser
-interval. -/
+/-- The only semantic callback required by token-plan action dispatch: every
+coherent source-rule reduction preserves its complete interval plan. -/
 def RootActionTokenPlanSound (layout : RuleTokenPlanLayout) : Prop :=
-  ∀ {file : WorkspaceFile} {tokens : List Token}
-    {rule : GrammarRuleId} {origin finish : Boundary tokens}
-    {input : EbnfValue file tokens (m2cV1.rhs rule)}
-    {output : RuleValue rule},
-    TokensOwnedBy file tokens →
-      RuleReduction file tokens rule origin finish input output →
-      TokenPlanEvidence
-        (EbnfValue.tokenPlan? layout input)
-        (PhysicalTokens tokens origin finish) →
-      TokenPlanEvidence
-        (layout.plan? rule output)
-        (PhysicalTokens tokens origin finish)
+  ∀ rule : GrammarRuleId,
+    CoherentGrammarRuleTokenPlanSound layout rule
 
 namespace ActionTokenPlanSound
 
@@ -35,53 +23,74 @@ theorem ofRoot
     {layout : RuleTokenPlanLayout}
     (rootSound : RootActionTokenPlanSound layout) :
     ActionTokenPlanSound layout := by
-  intro file tokens actionId origin finish input output owned action inputEvidence
-  cases action with
-  | root rule origin finish input output reduction =>
-      simp only [ActionId.production_actionFor] at inputEvidence ⊢
-      apply rootSound owned reduction
-      rw [RootAction.unpack_tokenPlan?]
-      exact inputEvidence
-  | atom site origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .atom site) layout trivial
-        (ActionReduces.atom site origin finish input) inputEvidence
-  | seq site origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .seq site) layout trivial
-        (ActionReduces.seq site origin finish input) inputEvidence
-  | group site origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .group site) layout trivial
-        (ActionReduces.group site origin finish input) inputEvidence
-  | choice site branch origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .choice site branch) layout trivial
-        (ActionReduces.choice site branch origin finish input) inputEvidence
-  | opt site branch origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .opt site branch) layout trivial
-        (ActionReduces.opt site branch origin finish input) inputEvidence
-  | star site branch origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .star site branch) layout trivial
-        (ActionReduces.star site branch origin finish input) inputEvidence
-  | plus site branch origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .plus site branch) layout trivial
-        (ActionReduces.plus site branch origin finish input) inputEvidence
-  | list0 site branch origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .list0 site branch) layout trivial
-        (ActionReduces.list0 site branch origin finish input) inputEvidence
-  | list1 site origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .list1 site) layout trivial
-        (ActionReduces.list1 site origin finish input) inputEvidence
-  | tail site branch origin finish input =>
-      exact ActionReduces.generated_tokenPlanEvidence
-        (production := .tail site branch) layout trivial
-        (ActionReduces.tail site branch origin finish input) inputEvidence
+  intro file tokens memo correct final item priorValues output owned sourceExact
+    reached complete coherentPrefix action inputEvidence
+  cases item with
+  | mk raw context =>
+    cases raw with
+    | mk production dot itemOrigin itemFinish =>
+      have fullInputEvidence : TokenPlanEvidence
+          (GrammarSymbolValues.tokenPlan? layout production.rhs
+            (PrefixValues.fullValue
+              ⟨⟨production, dot, itemOrigin, itemFinish⟩, context⟩
+              complete priorValues))
+          (PhysicalTokens tokens itemOrigin itemFinish) := by
+        apply inputEvidence.candidate_eq
+        exact (PrefixValues.tokenPlan?_fullValue layout
+          ⟨⟨production, dot, itemOrigin, itemFinish⟩, context⟩
+          complete priorValues).symm
+      cases production with
+      | root rule =>
+          cases action with
+          | root _ _ _ _ _ reduction =>
+              have dotEq : dot =
+                  ⟨(ProductionId.root rule).rhs.length,
+                    Nat.lt_succ_self _⟩ := by
+                apply Fin.ext
+                exact complete
+              subst dot
+              exact rootSound rule complete owned sourceExact coherentPrefix
+                reduction inputEvidence
+      | atom site =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .atom site) layout trivial action
+            fullInputEvidence
+      | seq site =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .seq site) layout trivial action
+            fullInputEvidence
+      | group site =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .group site) layout trivial action
+            fullInputEvidence
+      | choice site branch =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .choice site branch) layout trivial action
+            fullInputEvidence
+      | opt site branch =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .opt site branch) layout trivial action
+            fullInputEvidence
+      | star site branch =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .star site branch) layout trivial action
+            fullInputEvidence
+      | plus site branch =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .plus site branch) layout trivial action
+            fullInputEvidence
+      | list0 site branch =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .list0 site branch) layout trivial action
+            fullInputEvidence
+      | list1 site =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .list1 site) layout trivial action
+            fullInputEvidence
+      | tail site branch =>
+          exact ActionReduces.generated_tokenPlanEvidence
+            (production := .tail site branch) layout trivial action
+            fullInputEvidence
 
 end ActionTokenPlanSound
 

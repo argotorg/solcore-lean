@@ -1,5 +1,6 @@
 import Solcore.Surface.Multi.CoherentSourceTrace
 import Solcore.Surface.Multi.ExactTokenCoherenceBase
+import Solcore.Surface.Multi.ExactTokenReachability
 import Solcore.Surface.Multi.ExactTokenRuleLayout
 
 set_option autoImplicit false
@@ -13,19 +14,27 @@ token-plan match carried by its parser interval. Source ownership supplies the
 file identity needed by spans synthesized from child values. -/
 def ActionTokenPlanSound (layout : RuleTokenPlanLayout) : Prop :=
   ∀ {file : WorkspaceFile} {tokens : List Token}
-    {actionId : ActionId} {origin finish : Boundary tokens}
-    {input : GrammarSymbolValues file tokens actionId.production.rhs}
-    {output : NonterminalValue file tokens actionId.production.lhs},
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {item : ContextualItemKey tokens}
+    {priorValues : PrefixValues file tokens item}
+    {output : NonterminalValue file tokens item.raw.production.lhs},
     TokensOwnedBy file tokens →
-      ActionReduces file tokens actionId origin finish input output →
+      TokensSourceExact file tokens →
+      ContextualReach file tokens memo correct final item →
+      (complete : CompleteItem item.raw) →
+      CoherentPrefix file tokens memo correct final item priorValues →
+      ActionReduces file tokens (.actionFor item.raw.production)
+        item.raw.origin item.raw.current
+        (PrefixValues.fullValue item complete priorValues) output →
       TokenPlanEvidence
-        (GrammarSymbolValues.tokenPlan? layout
-          actionId.production.rhs input)
-        (PhysicalTokens tokens origin finish) →
+        (PrefixValues.tokenPlan? layout item priorValues)
+        (PhysicalTokens tokens item.raw.origin item.raw.current) →
       TokenPlanEvidence
         (NonterminalValue.tokenPlan? layout
-          actionId.production.lhs output)
-        (PhysicalTokens tokens origin finish)
+          item.raw.production.lhs output)
+        (PhysicalTokens tokens item.raw.origin item.raw.current)
 
 private def PrefixTokenPlanMotive
     (layout : RuleTokenPlanLayout)
@@ -170,6 +179,7 @@ private theorem reductionTokenPlanCase
     (layout : RuleTokenPlanLayout)
     (actionSound : ActionTokenPlanSound layout)
     (owned : TokensOwnedBy file tokens)
+    (sourceExact : TokensSourceExact file tokens)
     (item : ContextualItemKey tokens)
     (priorValues : PrefixValues file tokens item)
     (output : NonterminalValue file tokens item.raw.production.lhs)
@@ -192,10 +202,8 @@ private theorem reductionTokenPlanCase
         trace prefixCarries) := by
   unfold PrefixTokenPlanMotive at prefixIH
   unfold ReductionTokenPlanMotive
-  apply actionSound owned action
-  simp only [ActionId.production_actionFor]
-  rw [PrefixValues.tokenPlan?_fullValue]
-  exact prefixIH
+  exact actionSound owned sourceExact reached complete coherentPrefix action
+    prefixIH
 
 namespace PrefixCarriesSourceTrace
 
@@ -209,6 +217,7 @@ theorem tokenPlanEvidence
     {owned : TokensOwnedBy file tokens}
     (layout : RuleTokenPlanLayout)
     (actionSound : ActionTokenPlanSound layout)
+    (sourceExact : TokensSourceExact file tokens)
     {item : ContextualItemKey tokens}
     {values : PrefixValues file tokens item}
     {coherent : CoherentPrefix file tokens memo correct final item values}
@@ -226,7 +235,7 @@ theorem tokenPlanEvidence
     (prefixTokenPlanZeroCase layout owned)
     (prefixTokenPlanScanCase layout owned)
     (prefixTokenPlanCompleteCase layout owned)
-    (reductionTokenPlanCase layout actionSound owned)
+    (reductionTokenPlanCase layout actionSound owned sourceExact)
     carries
 
 end PrefixCarriesSourceTrace
@@ -243,6 +252,7 @@ theorem tokenPlanEvidence
     {owned : TokensOwnedBy file tokens}
     (layout : RuleTokenPlanLayout)
     (actionSound : ActionTokenPlanSound layout)
+    (sourceExact : TokensSourceExact file tokens)
     {item : ContextualItemKey tokens}
     {value : NonterminalValue file tokens item.raw.production.lhs}
     {coherent : CoherentReduction file tokens memo correct final item value}
@@ -260,7 +270,7 @@ theorem tokenPlanEvidence
     (prefixTokenPlanZeroCase layout owned)
     (prefixTokenPlanScanCase layout owned)
     (prefixTokenPlanCompleteCase layout owned)
-    (reductionTokenPlanCase layout actionSound owned)
+    (reductionTokenPlanCase layout actionSound owned sourceExact)
     carries
 
 end ReductionCarriesSourceTrace

@@ -92,4 +92,40 @@ def ReachableGrammarRuleTokenPlanSound
         (layout.plan? rule output)
         (PhysicalTokens tokens origin finish)
 
+/-- Exact-token preservation for one source rule when its input is the full
+semantic value of a coherent, complete root item. Keeping the prefix evidence
+in the callback preserves the guarded derivation chosen by the parser. -/
+def CoherentGrammarRuleTokenPlanSound
+    (layout : RuleTokenPlanLayout) (rule : GrammarRuleId) : Prop :=
+  ∀ {file : WorkspaceFile} {tokens : List Token}
+    {memo : GuardMemo tokens}
+    {correct : PhaseBCorrect file tokens memo}
+    {final : AllGuardsFinal memo}
+    {origin finish : Boundary tokens}
+    {context : GuardContext tokens}
+    {priorValues : PrefixValues file tokens
+      (CanonicalCompleteRootItem tokens rule origin finish context)}
+    {output : RuleValue rule}
+    (complete : CompleteItem
+      (CanonicalCompleteRootItem tokens rule origin finish context).raw),
+    TokensOwnedBy file tokens →
+      TokensSourceExact file tokens →
+      CoherentPrefix file tokens memo correct final
+        (CanonicalCompleteRootItem tokens rule origin finish context)
+        priorValues →
+      RuleReduction file tokens rule origin finish
+        (RootAction.unpack rule <|
+          PrefixValues.fullValue
+            (CanonicalCompleteRootItem tokens rule origin finish context)
+            complete priorValues)
+        output →
+      TokenPlanEvidence
+        (PrefixValues.tokenPlan? layout
+          (CanonicalCompleteRootItem tokens rule origin finish context)
+          priorValues)
+        (PhysicalTokens tokens origin finish) →
+      TokenPlanEvidence
+        (layout.plan? rule output)
+        (PhysicalTokens tokens origin finish)
+
 end Solcore.Surface.Multi
