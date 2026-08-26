@@ -2687,6 +2687,106 @@ theorem applies_mem_diagnosticCandidates
       StructuralDiagnostic.Applies module diagnostic := by
   rw [mem_diagnostics, mem_diagnosticCandidates_iff_applies]
 
+/-- Every reported canonical structural diagnostic is declaratively valid. -/
+theorem structure_sound
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic}
+    (member : diagnostic ∈ diagnostics module) :
+    StructuralDiagnostic.Applies module diagnostic :=
+  mem_diagnostics_iff_applies.mp member
+
+/-- Every declaratively valid structural diagnostic is reported. -/
+theorem structure_complete
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic}
+    (applies : StructuralDiagnostic.Applies module diagnostic) :
+    diagnostic ∈ diagnostics module :=
+  mem_diagnostics_iff_applies.mpr applies
+
+/-- The module-derived traversal bound reaches every applicable diagnostic. -/
+theorem structureBound_sufficient
+    {module : ParsedModuleV1} {diagnostic : StructuralDiagnostic}
+    (applies : StructuralDiagnostic.Applies module diagnostic) :
+    diagnostic ∈ diagnosticCandidates module :=
+  applies_mem_diagnosticCandidates applies
+
+/-- The structural report is duplicate-free, ordered, and extensionally exact. -/
+theorem structural_diagnostics_canonical
+    (module : ParsedModuleV1) :
+    (diagnostics module).Nodup ∧
+      (diagnostics module).Pairwise
+        (fun left right => StructuralDiagnostic.le left right) ∧
+      ∀ diagnostic, diagnostic ∈ diagnostics module ↔
+        StructuralDiagnostic.Applies module diagnostic :=
+  ⟨diagnostics_nodup module, diagnostics_sorted module,
+    fun _ => mem_diagnostics_iff_applies⟩
+
+/-- An empty structural report is exactly declarative module acceptance. -/
+@[simp] theorem diagnostics_eq_nil_iff_structurallyAccepts
+    (module : ParsedModuleV1) :
+    diagnostics module = [] ↔ StructurallyAccepts module := by
+  rw [List.eq_nil_iff_forall_not_mem, structurallyAccepts_iff_no_applies]
+  simp only [mem_diagnostics_iff_applies]
+
+/-- Executable structural validation succeeds exactly on accepted modules. -/
+@[simp] theorem validateStructure_eq_ok_iff_structurallyAccepts
+    (module : ParsedModuleV1) :
+    validateStructure module = .ok () ↔ StructurallyAccepts module := by
+  rw [validateStructure_eq_ok_iff,
+    diagnostics_eq_nil_iff_structurallyAccepts]
+
+/-- Every element of a returned error list, and only such an element, applies. -/
+theorem mem_validateStructure_error_iff_applies
+    {module : ParsedModuleV1}
+    {reported : NonemptyList StructuralDiagnostic}
+    {diagnostic : StructuralDiagnostic}
+    (result : validateStructure module = .error reported) :
+    diagnostic ∈ reported.head :: reported.tail ↔
+      StructuralDiagnostic.Applies module diagnostic := by
+  have exactList :=
+    (validateStructure_eq_error_iff module reported).mp result
+  rw [← exactList, mem_diagnostics_iff_applies]
+
+/-- A returned structural error list contains no duplicate diagnostics. -/
+theorem validateStructure_error_nodup
+    {module : ParsedModuleV1}
+    {reported : NonemptyList StructuralDiagnostic}
+    (result : validateStructure module = .error reported) :
+    (reported.head :: reported.tail).Nodup := by
+  have exactList :=
+    (validateStructure_eq_error_iff module reported).mp result
+  rw [← exactList]
+  exact diagnostics_nodup module
+
+/-- A returned structural error list follows the canonical diagnostic order. -/
+theorem validateStructure_error_sorted
+    {module : ParsedModuleV1}
+    {reported : NonemptyList StructuralDiagnostic}
+    (result : validateStructure module = .error reported) :
+    (reported.head :: reported.tail).Pairwise
+      (fun left right => StructuralDiagnostic.le left right) := by
+  have exactList :=
+    (validateStructure_eq_error_iff module reported).mp result
+  rw [← exactList]
+  exact diagnostics_sorted module
+
+/-- Structural validation returns an error exactly for a rejected module. -/
+@[simp] theorem exists_validateStructure_error_iff_not_structurallyAccepts
+    (module : ParsedModuleV1) :
+    (∃ reported, validateStructure module = .error reported) ↔
+      ¬StructurallyAccepts module := by
+  constructor
+  · rintro ⟨reported, result⟩ accepted
+    have success :=
+      validateStructure_eq_ok_iff_structurallyAccepts module |>.mpr accepted
+    rw [result] at success
+    simp at success
+  · intro rejected
+    cases result : validateStructure module with
+    | error reported => exact ⟨reported, rfl⟩
+    | ok value =>
+        cases value
+        exact False.elim (rejected
+          (validateStructure_eq_ok_iff_structurallyAccepts module |>.mp result))
+
 end Structure
 
 end Solcore.Surface.Multi
