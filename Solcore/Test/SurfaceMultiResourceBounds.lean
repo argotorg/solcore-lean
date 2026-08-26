@@ -1,4 +1,4 @@
-import Solcore.Surface.Multi.StructureNodeVisitUnits
+import Solcore.Surface.Multi.StructureDiagnosticInsertionUnits
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
 
@@ -96,5 +96,25 @@ def testMultiResourceBounds : IO Unit := do
     "the executable node-visit count diverged from the AST measure"
   assertTrue (parseBound 0 < parseBound 1)
     "the parser bound must grow when one terminal is added"
+
+  let emptySelection : ImportSelection :=
+    locatedAt source 12 14 { entries := [] }
+  let emptyHiding : HidingClause :=
+    locatedAt source 15 17 { names := [] }
+  let invalidDeclaration : ImportDecl :=
+    locatedAt source 0 17 {
+      moduleRef := moduleReference
+      mode := .items emptySelection (some emptyHiding)
+    }
+  let invalidItem : TopItem :=
+    locatedAt source 0 17 (.importDecl invalidDeclaration)
+  let invalidModule : ParsedModuleV1 :=
+    locatedAt source 0 17 { source, items := [invalidItem] }
+  assertTrue (structureDiagnosticInsertionUnits invalidModule == 2)
+    "the two empty import clauses must produce two charged insertions"
+  assertTrue
+    ((Structure.diagnostics invalidModule).length ≤
+      structureDiagnosticInsertionUnits invalidModule)
+    "canonicalization created an uncharged structural diagnostic"
 
 end Tests
