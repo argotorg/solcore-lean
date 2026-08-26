@@ -11,6 +11,7 @@ import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
 import Solcore.Test.SurfaceMultiExactToken
 import Solcore.Test.SurfaceMultiLocation
+import Solcore.Test.SurfaceMultiResourceBounds
 import Solcore.Test.SurfaceMultiStructure
 
 set_option autoImplicit false
@@ -4823,6 +4824,7 @@ def run : IO Unit := do
   testCanonicalRawLexing
   testMultiExactTokenCorrespondence
   testMultiLocationInventory
+  testMultiResourceBounds
   testMultiStructuralValidation
 
 end Tests
