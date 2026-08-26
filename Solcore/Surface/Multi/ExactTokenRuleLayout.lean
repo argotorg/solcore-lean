@@ -21,7 +21,7 @@ def TokenPlanFamily
     (index : EbnfValueIndex) → EbnfFamily file tokens index →
       Option TokenPlan
   | .expression (.atom (.terminal terminal)), matched =>
-      some (MatchedTerminal.grammarTokenPlan terminal
+      some (MatchedTerminal.physicalTokenPlan
         (Eq.mp (ebnfValue_atom_terminal_eq terminal) matched))
   | .expression (.atom (.nonterminal rule)), value =>
       layout.plan? rule
@@ -103,7 +103,7 @@ abbrev EbnfValues.tokenPlan?
     (layout : RuleTokenPlanLayout) (terminal : TerminalSymbol)
     (matched : MatchedTerminal file tokens terminal) :
     (EbnfValue.terminalAtom terminal matched).tokenPlan? layout =
-      some (matched.grammarTokenPlan terminal) := by
+      some matched.physicalTokenPlan := by
   simp [EbnfValue.tokenPlan?, TokenPlanFamily,
     EbnfValue.terminalAtom, cast_cast]
 
@@ -417,8 +417,8 @@ def GrammarSymbolValue.tokenPlan?
     (layout : RuleTokenPlanLayout) :
     (symbol : GrammarSymbol) → GrammarSymbolValue file tokens symbol →
       Option TokenPlan
-  | .terminal terminal, matched =>
-      some (matched.grammarTokenPlan terminal)
+  | .terminal _terminal, matched =>
+      some matched.physicalTokenPlan
   | .nonterminal symbol, value =>
       NonterminalValue.tokenPlan? layout symbol value
 
@@ -466,7 +466,7 @@ def GrammarSymbolValues.tokenPlan?
     (layout : RuleTokenPlanLayout) (terminal : TerminalSymbol)
     (matched : MatchedTerminal file tokens terminal) :
     GrammarSymbolValue.tokenPlan? layout (.terminal terminal) matched =
-      some (matched.grammarTokenPlan terminal) := by
+      some matched.physicalTokenPlan := by
   rfl
 
 @[simp] theorem GrammarSymbolValue.tokenPlan?_nonterminal
@@ -688,7 +688,7 @@ abbrev PrefixValues.tokenPlan?
         (PrefixValues.scanValue before after terminal next matched advance
           priorValues) = (do
       let priorPlan ← PrefixValues.tokenPlan? layout before priorValues
-      pure (.append priorPlan (matched.grammarTokenPlan terminal))) := by
+      pure (.append priorPlan matched.physicalTokenPlan)) := by
   unfold PrefixValues.tokenPlan? PrefixValues.scanValue
   rw [GrammarSymbolValues.tokenPlan?_transport]
   rw [GrammarSymbolValues.tokenPlan?_append]

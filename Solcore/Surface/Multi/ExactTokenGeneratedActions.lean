@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.ExactTokenRuleLayout
+import Solcore.Surface.Multi.ExactTokenEvidence
 
 set_option autoImplicit false
 
@@ -622,15 +623,43 @@ private theorem commaTail_mapM_cons
   exact GrammarSymbolValues.tokenPlan?_view layout
     (ProductionId.rhs_tail_nil site) values
 
-@[simp] theorem ListSite.pack_cons_tokenPlan?
+private theorem MatchedTerminal.commaPrefix_toPlain
+    {file : WorkspaceFile} {tokens : List Token}
+    (comma : MatchedTerminal file tokens (.symbol .comma))
+    (rest : TokenPlan) {actual : List Token}
+    (relation : TokenSlot.ListMatches
+      (comma.physicalTokenPlan.append rest).slots actual) :
+    TokenSlot.ListMatches
+      ((TokenPlan.plain (.symbol .comma)).append rest).slots actual := by
+  rcases comma with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  cases terminalAt with
+  | retained token inRange lookup valid =>
+      change TokenSlot.ListMatches
+        (.required (ExpectedToken.exact token.payload token.span) ::
+          rest.slots) actual at relation
+      have weakened := relation.requiredHeadToPlain
+      change TokenSlot.ListMatches
+        (.required (ExpectedToken.plain token.payload) :: rest.slots)
+        actual at weakened
+      rw [matchedEvidence] at weakened
+      exact weakened
+  | endOfFile atEnd =>
+      simp [TerminalMatches] at matchedEvidence
+
+/-- Comma-tail packing preserves complete token evidence while weakening the
+scanned comma's exact span constraint to the grammar-generated plain comma. -/
+theorem ListSite.pack_cons_tokenPlanEvidence
     {file : WorkspaceFile} {tokens : List Token}
     (layout : RuleTokenPlanLayout) (site : ListSite)
     (values : GrammarSymbolValues file tokens
-      (ProductionId.tail site .cons).rhs) :
-    NonterminalValue.tokenPlan? layout (.tail site)
-        (ListSite.pack site .cons values) =
-      GrammarSymbolValues.tokenPlan? layout
-        (ProductionId.tail site .cons).rhs values := by
+      (ProductionId.tail site .cons).rhs)
+    {actual : List Token}
+    (inputEvidence : TokenPlanEvidence
+      (GrammarSymbolValues.tokenPlan? layout
+        (ProductionId.tail site .cons).rhs values) actual) :
+    TokenPlanEvidence
+      (NonterminalValue.tokenPlan? layout (.tail site)
+        (ListSite.pack site .cons values)) actual := by
   rw [ListSite.pack_cons_eq]
   rw [NonterminalValue.tokenPlan?_tail]
   generalize viewedEq : GrammarSymbolValues.view
@@ -638,51 +667,47 @@ private theorem commaTail_mapM_cons
   rcases viewed with ⟨comma, head, tail, restUnit⟩
   cases restUnit
   change EbnfValue file tokens site.element.expression at head
-  change (do
-    let plans ← (head :: tail).mapM
-      fun element => EbnfValue.tokenPlan? layout element
-    pure (TokenPlan.commaTail plans)) = _
+  rw [← GrammarSymbolValues.tokenPlan?_view layout
+    (ProductionId.rhs_tail_cons site) values] at inputEvidence
+  rw [viewedEq] at inputEvidence
+  change TokenPlanEvidence
+    (do
+      let plans ← (head :: tail).mapM
+        fun element => EbnfValue.tokenPlan? layout element
+      pure (TokenPlan.commaTail plans)) actual
   rw [commaTail_mapM_cons
     (fun element : EbnfValue file tokens site.element.expression =>
       EbnfValue.tokenPlan? layout element)]
-  rw [← NonterminalValue.tokenPlan?_tail layout site tail]
-  rw [← GrammarSymbolValues.tokenPlan?_view layout
-    (ProductionId.rhs_tail_cons site) values]
-  rw [viewedEq]
-  simp only [GrammarSymbolValues.tokenPlan?_cons,
-    GrammarSymbolValues.tokenPlan?_nil,
-    GrammarSymbolValue.tokenPlan?_terminal,
-    GrammarSymbolValue.tokenPlan?_nonterminal,
-    NonterminalValue.tokenPlan?_aux,
-    NonterminalValue.tokenPlan?_tail,
-    MatchedTerminal.grammarTokenPlan]
   generalize headEq : EbnfValue.tokenPlan? layout head = headPlan?
   cases headPlan? with
-  | none => simp
+  | none =>
+      rcases inputEvidence with ⟨plan, candidateEq, relation⟩
+      simp [headEq] at candidateEq
   | some headPlan =>
       generalize tailEq : tail.mapM
         (fun value => EbnfValue.tokenPlan? layout value) = tailPlans?
       cases tailPlans? with
-      | none => simp
-      | some tailPlans => simp
+      | none =>
+          rcases inputEvidence with ⟨plan, candidateEq, relation⟩
+          simp [headEq, tailEq] at candidateEq
+      | some tailPlans =>
+          rcases inputEvidence with ⟨plan, candidateEq, relation⟩
+          simp only [GrammarSymbolValues.tokenPlan?_cons,
+            GrammarSymbolValues.tokenPlan?_nil,
+            GrammarSymbolValue.tokenPlan?_terminal,
+            GrammarSymbolValue.tokenPlan?_nonterminal,
+            NonterminalValue.tokenPlan?_aux,
+            NonterminalValue.tokenPlan?_tail] at candidateEq
+          simp [headEq, tailEq] at candidateEq
+          subst plan
+          apply TokenPlanEvidence.some
+          exact comma.commaPrefix_toPlain
+            (headPlan.append (TokenPlan.commaTail tailPlans)) relation
 
-@[simp] theorem ListSite.pack_tokenPlan?
-    {file : WorkspaceFile} {tokens : List Token}
-    (layout : RuleTokenPlanLayout) (site : ListSite)
-    (branch : NilConsBranch)
-    (values : GrammarSymbolValues file tokens
-      (ProductionId.tail site branch).rhs) :
-    NonterminalValue.tokenPlan? layout (.tail site)
-        (ListSite.pack site branch values) =
-      GrammarSymbolValues.tokenPlan? layout
-        (ProductionId.tail site branch).rhs values := by
-  cases branch with
-  | nil => exact ListSite.pack_nil_tokenPlan? layout site values
-  | cons => exact ListSite.pack_cons_tokenPlan? layout site values
-
-/-- Every generated parser action preserves the exact token plan of its RHS.
-This is the action-level rewrite used when folding a completed candidate. -/
-@[simp] theorem ActionReduces.generated_tokenPlan?
+/-- Every generated parser action preserves complete token-plan evidence.
+Comma-tail cons packing performs the sole constraint weakening required by
+the grammar-generated punctuation plan. -/
+theorem ActionReduces.generated_tokenPlanEvidence
     {file : WorkspaceFile} {tokens : List Token}
     (layout : RuleTokenPlanLayout)
     {production : ProductionId}
@@ -691,31 +716,50 @@ This is the action-level rewrite used when folding a completed candidate. -/
     {output : NonterminalValue file tokens production.lhs}
     (auxiliary : AuxiliaryProduction production)
     (reduces : ActionReduces file tokens (.actionFor production)
-      origin finish input output) :
-    NonterminalValue.tokenPlan? layout production.lhs output =
-      GrammarSymbolValues.tokenPlan? layout production.rhs input := by
+      origin finish input output)
+    (inputEvidence : TokenPlanEvidence
+      (GrammarSymbolValues.tokenPlan? layout production.rhs input)
+      (PhysicalTokens tokens origin finish)) :
+    TokenPlanEvidence
+      (NonterminalValue.tokenPlan? layout production.lhs output)
+      (PhysicalTokens tokens origin finish) := by
   cases reduces with
   | root rule origin finish input output reduction =>
       exact False.elim auxiliary
   | atom site origin finish input =>
-      exact AtomSite.pack_tokenPlan? layout site input
+      exact inputEvidence.candidate_eq
+        (AtomSite.pack_tokenPlan? layout site input).symm
   | seq site origin finish input =>
-      exact SequenceSite.pack_tokenPlan? layout site input
+      exact inputEvidence.candidate_eq
+        (SequenceSite.pack_tokenPlan? layout site input).symm
   | group site origin finish input =>
-      exact GroupSite.pack_tokenPlan? layout site input
+      exact inputEvidence.candidate_eq
+        (GroupSite.pack_tokenPlan? layout site input).symm
   | choice site branch origin finish input =>
-      exact ChoiceSite.pack_tokenPlan? layout site branch input
+      exact inputEvidence.candidate_eq
+        (ChoiceSite.pack_tokenPlan? layout site branch input).symm
   | opt site branch origin finish input =>
-      exact OptionalSite.pack_tokenPlan? layout site branch input
+      exact inputEvidence.candidate_eq
+        (OptionalSite.pack_tokenPlan? layout site branch input).symm
   | star site branch origin finish input =>
-      exact StarSite.pack_tokenPlan? layout site branch input
+      exact inputEvidence.candidate_eq
+        (StarSite.pack_tokenPlan? layout site branch input).symm
   | plus site branch origin finish input =>
-      exact PlusSite.pack_tokenPlan? layout site branch input
+      exact inputEvidence.candidate_eq
+        (PlusSite.pack_tokenPlan? layout site branch input).symm
   | list0 site branch origin finish input =>
-      exact List0Site.pack_tokenPlan? layout site branch input
+      exact inputEvidence.candidate_eq
+        (List0Site.pack_tokenPlan? layout site branch input).symm
   | list1 site origin finish input =>
-      exact List1Site.pack_tokenPlan? layout site input
+      exact inputEvidence.candidate_eq
+        (List1Site.pack_tokenPlan? layout site input).symm
   | tail site branch origin finish input =>
-      exact ListSite.pack_tokenPlan? layout site branch input
+      cases branch with
+      | nil =>
+          exact inputEvidence.candidate_eq
+            (ListSite.pack_nil_tokenPlan? layout site input).symm
+      | cons =>
+          exact ListSite.pack_cons_tokenPlanEvidence layout site input
+            inputEvidence
 
 end Solcore.Surface.Multi
