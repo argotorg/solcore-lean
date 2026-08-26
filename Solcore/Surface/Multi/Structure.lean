@@ -541,7 +541,7 @@ def diagnosticCandidates (module : ParsedModuleV1) :
   let fuel := astNodeMeasure module + 1
   module.payload.items.flatMap (topItemDiagnostics fuel)
 
-private def diagnosticOccurs
+def diagnosticOccurs
     (diagnostic : StructuralDiagnostic) : List StructuralDiagnostic → Bool
   | [] => false
   | value :: rest =>
@@ -556,7 +556,7 @@ private def diagnosticOccurs
   | cons value rest induction =>
       simp [diagnosticOccurs, induction]
 
-private def deduplicateDiagnostics :
+def deduplicateDiagnostics :
     List StructuralDiagnostic → List StructuralDiagnostic
   | [] => []
   | diagnostic :: rest =>
