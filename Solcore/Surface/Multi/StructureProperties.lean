@@ -1222,6 +1222,53 @@ theorem mem_forPostDiagnosticsFuel_mono
   | @step larger fuelLe induction =>
       exact (recursiveDiagnosticsFuel_step larger).forPost induction
 
+/-- A mismatched reached match arm emits its arity diagnostic with one unit of
+statement traversal fuel. -/
+theorem matchPatternArityMismatch_mem_statementDiagnosticsFuel_one
+    {loopDepth : Nat} {statement : Statement}
+    {scrutinees : NonemptyList Expression}
+    {arms : NonemptyList MatchArm} {terminator : Option SourceSpan}
+    {arm : MatchArm}
+    (shape : statement.payload = .match scrutinees arms terminator)
+    (armMember : arm ∈ arms.toList)
+    (mismatch : arm.payload.patterns.toList.length ≠
+      scrutinees.toList.length) :
+    StructuralDiagnostic.matchPatternArityMismatch arm.span
+        scrutinees.toList.length arm.payload.patterns.toList.length ∈
+      statementDiagnosticsFuel 1 loopDepth statement := by
+  rw [statementDiagnosticsFuel, shape, List.mem_append]
+  apply Or.inr
+  rw [List.mem_flatMap]
+  refine ⟨arm, ?_, ?_⟩
+  · simpa [nonemptyToList, NonemptyList.toList] using armMember
+  simp only [List.mem_append]
+  apply Or.inl
+  apply Or.inl
+  have internalMismatch :
+      (nonemptyToList arm.payload.patterns).length ≠
+        (nonemptyToList scrutinees).length := by
+    simpa [nonemptyToList, NonemptyList.toList] using mismatch
+  rw [if_neg internalMismatch]
+  simp [nonemptyToList, NonemptyList.toList]
+
+/-- A break statement at loop depth zero emits its control diagnostic with one
+unit of statement traversal fuel. -/
+theorem breakOutsideLoop_mem_statementDiagnosticsFuel_one
+    {statement : Statement} {terminator : SourceSpan}
+    (shape : statement.payload = .break terminator) :
+    StructuralDiagnostic.controlOutsideLoop statement.span .breakControl ∈
+      statementDiagnosticsFuel 1 0 statement := by
+  simp [statementDiagnosticsFuel, shape]
+
+/-- A continue statement at loop depth zero emits its control diagnostic with
+one unit of statement traversal fuel. -/
+theorem continueOutsideLoop_mem_statementDiagnosticsFuel_one
+    {statement : Statement} {terminator : SourceSpan}
+    (shape : statement.payload = .continue terminator) :
+    StructuralDiagnostic.controlOutsideLoop statement.span .continueControl ∈
+      statementDiagnosticsFuel 1 0 statement := by
+  simp [statementDiagnosticsFuel, shape]
+
 private structure RecursiveDiagnosticsFuelSound (fuel : Nat) : Prop where
   expression :
     ∀ {module : ParsedModuleV1} {expression : Expression}
