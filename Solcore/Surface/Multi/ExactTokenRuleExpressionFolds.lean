@@ -806,6 +806,97 @@ private theorem logicalOrExpressionTokenPlan?_encloses
       logicalAndExpressionTokenPlan?_encloses
         (show Expression from ⟨span, _⟩) plan success
 
+private theorem conditionalExpressionTokenPlan?_encloses
+    (expression : Expression) (plan : TokenPlan)
+    (success : conditionalExpressionTokenPlan? expression = some plan) :
+    EnclosesExpressionSpan expression plan := by
+  rcases expression with ⟨span, payload⟩
+  unfold EnclosesExpressionSpan
+  cases payload <;> simp only [conditionalExpressionTokenPlan?] at success
+  all_goals unfold expressionTokenPlanAt? at success
+  all_goals simp only at success
+  case keywordConditional condition thenBranch elseBranch =>
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨conditionPlan, conditionPlanEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨thenPlan, thenPlanEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨elsePlan, elsePlanEq, result⟩
+      exact encloses_result result (by
+        simp [TokenPlan.concat, TokenPlan.plain])
+  case ternaryConditional condition thenBranch elseBranch =>
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨conditionPlan, conditionPlanEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨thenPlan, thenPlanEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨elsePlan, elsePlanEq, result⟩
+      exact encloses_result result (by
+        simp [TokenPlan.concat, TokenPlan.plain])
+  all_goals
+    simpa [EnclosesExpressionSpan] using
+      logicalOrExpressionTokenPlan?_encloses
+        (show Expression from ⟨span, _⟩) plan success
+
+private theorem annotationExpressionTokenPlan?_encloses
+    (expression : Expression) (plan : TokenPlan)
+    (success : annotationExpressionTokenPlan? expression = some plan) :
+    EnclosesExpressionSpan expression plan := by
+  rcases expression with ⟨span, payload⟩
+  unfold EnclosesExpressionSpan
+  cases payload <;> simp only [annotationExpressionTokenPlan?] at success
+  all_goals unfold expressionTokenPlanAt? at success
+  all_goals simp only at success
+  case annotation inner typeExpression =>
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨innerPlan, innerPlanEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨typePlan, typePlanEq, result⟩
+      exact encloses_result result (by
+        simp [TokenPlan.concat, TokenPlan.plain])
+  all_goals
+    simpa [EnclosesExpressionSpan] using
+      conditionalExpressionTokenPlan?_encloses
+        (show Expression from ⟨span, _⟩) plan success
+
+/-- Every successful expression plan at every precedence level encloses a
+nonempty core by the expression's exact retained source span. -/
+theorem expressionTokenPlanAt?_encloses
+    (level : ExpressionTokenLevel) (expression : Expression)
+    (plan : TokenPlan)
+    (success : expressionTokenPlanAt? level expression = some plan) :
+    EnclosesExpressionSpan expression plan := by
+  cases level with
+  | annotation =>
+      exact annotationExpressionTokenPlan?_encloses expression plan success
+  | conditional =>
+      exact conditionalExpressionTokenPlan?_encloses expression plan success
+  | logicalOr =>
+      exact logicalOrExpressionTokenPlan?_encloses expression plan success
+  | logicalAnd =>
+      exact logicalAndExpressionTokenPlan?_encloses expression plan success
+  | equality =>
+      exact equalityExpressionTokenPlan?_encloses expression plan success
+  | relational =>
+      exact relationalExpressionTokenPlan?_encloses expression plan success
+  | bitOr =>
+      exact bitOrExpressionTokenPlan?_encloses expression plan success
+  | bitXor =>
+      exact bitXorExpressionTokenPlan?_encloses expression plan success
+  | bitAnd =>
+      exact bitAndExpressionTokenPlan?_encloses expression plan success
+  | additive =>
+      exact additiveExpressionTokenPlan?_encloses expression plan success
+  | multiplicative =>
+      exact multiplicativeExpressionTokenPlan?_encloses expression plan
+        success
+  | «prefix» =>
+      exact prefixExpressionTokenPlan?_encloses expression plan success
+  | «postfix» =>
+      exact postfixExpressionTokenPlan?_encloses expression plan success
+  | atom =>
+      exact atomExpressionTokenPlan?_encloses expression plan success
+
 /-- Matching a successful expression plan fixes the first and last physical
 tokens at the expression's retained source-span endpoints. -/
 theorem expressionPlan_matches_endpoints
