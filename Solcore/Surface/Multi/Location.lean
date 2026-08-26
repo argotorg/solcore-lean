@@ -1571,6 +1571,207 @@ location combinators. -/
         ofList, listFragment, merge, ofGenericPrefix,
         ofTypeExpr_eq_fragment]
 
+/-- A data constructor exposes its name and optional nonempty field list. -/
+@[simp] theorem ofDataConstructor_mk (span : SourceSpan)
+    (name : IdentifierOccurrence)
+    (fields : Option (NonemptyList TypeExpr)) :
+    ofDataConstructor ⟨span, {
+      name := name
+      fields := fields
+    }⟩ = located span [
+      ofIdentifier name,
+      ofOption (ofNonempty ofTypeExpr) fields
+    ] := by
+  have typeVisitor : ofTypeExpr = typeExprFragment := by
+    funext value
+    exact ofTypeExpr_eq_fragment value
+  rw [typeVisitor]
+  rfl
+
+/-- A data declaration exposes its name, parameters, and constructors. -/
+@[simp] theorem ofDataDecl_mk (span : SourceSpan)
+    (name : IdentifierOccurrence)
+    (parameters : Option (NonemptyList IdentifierOccurrence))
+    (constructors : Option (NonemptyList DataConstructor)) :
+    ofDataDecl ⟨span, {
+      name := name
+      parameters := parameters
+      constructors := constructors
+    }⟩ = located span [
+      ofIdentifier name,
+      ofOption (ofNonempty ofIdentifier) parameters,
+      ofOption (ofNonempty ofDataConstructor) constructors
+    ] := by
+  cases parameters <;> cases constructors <;> rfl
+
+/-- A type alias exposes its name, parameters, and body type. -/
+@[simp] theorem ofTypeAliasDecl_mk (span : SourceSpan)
+    (name : IdentifierOccurrence)
+    (parameters : Option (NonemptyList IdentifierOccurrence))
+    (body : TypeExpr) :
+    ofTypeAliasDecl ⟨span, {
+      name := name
+      parameters := parameters
+      body := body
+    }⟩ = located span [
+      ofIdentifier name,
+      ofOption (ofNonempty ofIdentifier) parameters,
+      ofTypeExpr body
+    ] := by
+  rw [ofTypeExpr_eq_fragment]
+  rfl
+
+/-- A class declaration exposes every source-ordered syntactic field. -/
+@[simp] theorem ofClassDecl_mk (span : SourceSpan)
+    (genericPrefix : Option GenericPrefix) (main : TypeExpr)
+    (className : IdentifierOccurrence)
+    (parameters : Option (NonemptyList TypeExpr))
+    (methods : List ClassMethodDecl) :
+    ofClassDecl ⟨span, {
+      genericPrefix := genericPrefix
+      main := main
+      className := className
+      parameters := parameters
+      methods := methods
+    }⟩ = located span [
+      ofOption ofGenericPrefix genericPrefix,
+      ofTypeExpr main,
+      ofIdentifier className,
+      ofTypeExprArguments parameters,
+      ofList ofClassMethodDecl methods
+    ] := by
+  have genericVisitor : ofGenericPrefix = genericPrefixFragment := by
+    rfl
+  have methodVisitor : ofClassMethodDecl = classMethodDeclFragment := by
+    rfl
+  rw [genericVisitor, methodVisitor, ofTypeExpr_eq_fragment,
+    ofTypeExprArguments_eq_fragment,
+    ← predicateParameters_eq_typeExprArgumentsFragment]
+  rfl
+
+/-- An instance declaration exposes every source-ordered syntactic field. -/
+@[simp] theorem ofInstanceDecl_mk (span : SourceSpan)
+    (genericPrefix : Option GenericPrefix) (defaultMarker : Option Marker)
+    (main : TypeExpr) (className : QualifiedName)
+    (parameters : Option (NonemptyList TypeExpr))
+    (methods : List FunctionDecl) :
+    ofInstanceDecl ⟨span, {
+      genericPrefix := genericPrefix
+      «default» := defaultMarker
+      main := main
+      className := className
+      parameters := parameters
+      methods := methods
+    }⟩ = located span [
+      ofOption ofGenericPrefix genericPrefix,
+      ofOption (fun marker => leaf marker.span) defaultMarker,
+      ofTypeExpr main,
+      ofQualifiedName className,
+      ofTypeExprArguments parameters,
+      ofList ofFunctionDecl methods
+    ] := by
+  have genericVisitor : ofGenericPrefix = genericPrefixFragment := by
+    rfl
+  have functionVisitor : ofFunctionDecl = functionDeclFragment := by
+    rfl
+  rw [genericVisitor, functionVisitor, ofTypeExpr_eq_fragment,
+    ofTypeExprArguments_eq_fragment,
+    ← predicateParameters_eq_typeExprArgumentsFragment]
+  rfl
+
+/-- A contract declaration exposes its name, parameters, and members. -/
+@[simp] theorem ofContractDecl_mk (span : SourceSpan)
+    (name : IdentifierOccurrence)
+    (parameters : Option (NonemptyList IdentifierOccurrence))
+    (members : List ContractMember) :
+    ofContractDecl ⟨span, {
+      name := name
+      parameters := parameters
+      members := members
+    }⟩ = located span [
+      ofIdentifier name,
+      ofOption (ofNonempty ofIdentifier) parameters,
+      ofList ofContractMember members
+    ] := by
+  cases parameters <;> rfl
+
+/-- A contract field exposes its name, type, and optional initializer. -/
+@[simp] theorem ofFieldDecl_mk (span : SourceSpan)
+    (name : IdentifierOccurrence) (typeValue : TypeExpr)
+    (initializer : Option Expression) :
+    ofFieldDecl ⟨span, {
+      name := name
+      «type» := typeValue
+      initializer := initializer
+    }⟩ = located span [
+      ofIdentifier name,
+      ofTypeExpr typeValue,
+      ofOption ofExpression initializer
+    ] := by
+  cases initializer <;>
+    simp [ofFieldDecl, fieldDeclFragment, ofOption, optionFragment,
+      empty, located, ofIdentifier, ofExpression,
+      ofTypeExpr_eq_fragment]
+
+/-- A fallback declaration exposes every source-ordered syntactic field. -/
+@[simp] theorem ofFallbackDecl_mk (span : SourceSpan)
+    (genericPrefix : Option GenericPrefix)
+    (publicMarker payableMarker : Option Marker) (marker : Marker)
+    (parameters : List Parameter) (returnType : Option TypeExpr)
+    (body : Body) :
+    ofFallbackDecl ⟨span, {
+      genericPrefix := genericPrefix
+      «public» := publicMarker
+      payable := payableMarker
+      marker := marker
+      parameters := parameters
+      returnType := returnType
+      body := body
+    }⟩ = located span [
+      ofOption ofGenericPrefix genericPrefix,
+      ofOption (fun value => leaf value.span) publicMarker,
+      ofOption (fun value => leaf value.span) payableMarker,
+      leaf marker.span,
+      ofList ofParameter parameters,
+      ofOption ofTypeExpr returnType,
+      ofBody body
+    ] := by
+  have genericVisitor : ofGenericPrefix = genericPrefixFragment := by
+    rfl
+  have parameterVisitor : ofParameter = parameterFragment := by
+    rfl
+  have typeVisitor : ofTypeExpr = typeExprFragment := by
+    funext value
+    exact ofTypeExpr_eq_fragment value
+  have bodyVisitor : ofBody = bodyFragment := by
+    rfl
+  rw [genericVisitor, parameterVisitor, typeVisitor, bodyVisitor]
+  rfl
+
+/-- A contract constructor exposes its modifiers, parameters, and body. -/
+@[simp] theorem ofContractConstructorDecl_mk (span : SourceSpan)
+    (publicMarker payableMarker : Option Marker) (marker : Marker)
+    (parameters : List Parameter) (body : Body) :
+    ofContractConstructorDecl ⟨span, {
+      «public» := publicMarker
+      payable := payableMarker
+      marker := marker
+      parameters := parameters
+      body := body
+    }⟩ = located span [
+      ofOption (fun value => leaf value.span) publicMarker,
+      ofOption (fun value => leaf value.span) payableMarker,
+      leaf marker.span,
+      ofList ofParameter parameters,
+      ofBody body
+    ] := by
+  have parameterVisitor : ofParameter = parameterFragment := by
+    rfl
+  have bodyVisitor : ofBody = bodyFragment := by
+    rfl
+  rw [parameterVisitor, bodyVisitor]
+  rfl
+
 /-- The exact child fragment below one type-expression wrapper. -/
 def ofTypeExprPayload : TypeExprPayload → LocationFragment
   | .named name arguments =>
