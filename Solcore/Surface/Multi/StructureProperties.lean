@@ -1,4 +1,4 @@
-import Solcore.Surface.Multi.StructureJudgment
+import Solcore.Surface.Multi.StructureFuelProperties
 import Solcore.Surface.Multi.Structure
 
 set_option autoImplicit false
