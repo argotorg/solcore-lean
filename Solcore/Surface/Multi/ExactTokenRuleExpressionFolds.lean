@@ -921,6 +921,19 @@ theorem expressionPlan_matches_endpoints
     exact nonempty this
   · exact relation
 
+/-- Successful expression-plan evidence directly exposes the exact first and
+last physical-token endpoints of the expression span. -/
+theorem expressionTokenPlanAt?_matches_endpoints
+    (level : ExpressionTokenLevel) (expression : Expression)
+    (plan : TokenPlan)
+    (success : expressionTokenPlanAt? level expression = some plan)
+    {actual : List Token}
+    (relation : TokenSlot.ListMatches plan.slots actual) :
+    TokenSlot.FirstSatisfies (.starts expression.span) actual ∧
+      TokenSlot.LastSatisfies (.ends expression.span) actual :=
+  expressionPlan_matches_endpoints level expression plan success
+    (expressionTokenPlanAt?_encloses level expression plan success) relation
+
 private theorem TokenSlot.FirstSatisfies.append
     {constraint : TokenSpanConstraint} {left right : List Token}
     (satisfies : TokenSlot.FirstSatisfies constraint left) :
