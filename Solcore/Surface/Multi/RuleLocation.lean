@@ -32,6 +32,17 @@ def ofPredicateList (predicates : NonemptyList Predicate) :
     (LocationFragment.ofPredicate predicates.head ::
       predicates.tail.map LocationFragment.ofPredicate)
 
+/-- The rule-level predicate-list view agrees with the public nonempty
+location combinator. -/
+@[simp] theorem ofPredicateList_eq_ofNonempty
+    (predicates : NonemptyList Predicate) :
+    ofPredicateList predicates =
+      LocationFragment.ofNonempty LocationFragment.ofPredicate predicates := by
+  rcases predicates with ⟨head, tail⟩
+  apply LocationFragment.eq_of_fields <;>
+    simp [ofPredicateList, LocationFragment.ofNonempty,
+      LocationFragment.ofList]
+
 @[simp] private theorem predicateList_roots (predicates : List Predicate) :
     (predicates.map LocationFragment.ofPredicate).flatMap
         (fun fragment => fragment.roots) =

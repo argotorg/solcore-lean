@@ -1426,6 +1426,151 @@ private theorem ofTypeExprArguments_eq_fragment
         typeExprNonemptyFragment, merge, ofTypeExpr_eq_fragment,
         ofTypeExprList_eq_fragment]
 
+private theorem listFragment_typeExpr_eq
+    (values : List TypeExpr) :
+    listFragment typeExprFragment values = typeExprListFragment values := by
+  induction values with
+  | nil =>
+      simp [listFragment, typeExprListFragment,
+        mergeFragments, emptyFragment]
+  | cons head tail inductionHypothesis =>
+      rw [typeExprListFragment, ← inductionHypothesis]
+      apply LocationFragment.eq_of_fields <;>
+        simp [listFragment, mergeFragments]
+
+private theorem predicateParameters_eq_typeExprArgumentsFragment
+    (parameters : Option (NonemptyList TypeExpr)) :
+    optionFragment (nonemptyFragment typeExprFragment) parameters =
+      typeExprArgumentsFragment parameters := by
+  cases parameters with
+  | none =>
+      simp [optionFragment, typeExprArgumentsFragment, emptyFragment]
+  | some values =>
+      rcases values with ⟨head, tail⟩
+      simp [optionFragment, nonemptyFragment,
+        typeExprArgumentsFragment, typeExprNonemptyFragment,
+        listFragment_typeExpr_eq]
+
+/-- A predicate visitor is exactly its outer span around its three public
+payload fragments. -/
+@[simp] theorem ofPredicate_mk (span : SourceSpan)
+    (main : TypeExpr) (className : QualifiedName)
+    (parameters : Option (NonemptyList TypeExpr)) :
+    ofPredicate ⟨span, {
+      main := main
+      className := className
+      parameters := parameters
+    }⟩ = located span [
+      ofTypeExpr main,
+      ofQualifiedName className,
+      ofTypeExprArguments parameters
+    ] := by
+  unfold ofPredicate predicateFragment located
+  rw [ofTypeExpr_eq_fragment, ofTypeExprArguments_eq_fragment,
+    predicateParameters_eq_typeExprArgumentsFragment]
+  rfl
+
+/-- A generic prefix visitor exposes its quantified clause and optional
+predicate context through public location combinators. -/
+@[simp] theorem ofGenericPrefix_mk (span : SourceSpan)
+    (forallClause : ForallClause)
+    (context : Option (NonemptyList Predicate)) :
+    ofGenericPrefix ⟨span, {
+      forallClause := forallClause
+      context := context
+    }⟩ = located span [
+      ofForallClause forallClause,
+      ofOption (ofNonempty ofPredicate) context
+    ] := by
+  rfl
+
+/-- A forall-binder visitor exposes the binder name, class name, and
+optional type arguments through public location combinators. -/
+@[simp] theorem ofForallBinder_mk (span : SourceSpan)
+    (payload : ForallBinderPayload) :
+    ofForallBinder ⟨span, payload⟩ =
+      match payload with
+      | .bare name => located span [ofIdentifier name]
+      | .bounded name className arguments =>
+          located span [
+            ofIdentifier name,
+            ofQualifiedName className,
+            ofTypeExprArguments arguments
+          ] := by
+  cases payload with
+  | bare name => rfl
+  | bounded name className arguments =>
+      change locatedFragment span [
+        identifierFragment name,
+        qualifiedNameFragment className,
+        optionFragment (nonemptyFragment typeExprFragment) arguments
+      ] = locatedFragment span [
+        identifierFragment name,
+        qualifiedNameFragment className,
+        ofTypeExprArguments arguments
+      ]
+      rw [predicateParameters_eq_typeExprArgumentsFragment,
+        ofTypeExprArguments_eq_fragment]
+
+/-- A forall-clause visitor exposes its nonempty binder sequence through the
+public location combinator. -/
+@[simp] theorem ofForallClause_mk (span : SourceSpan)
+    (binders : NonemptyList ForallBinder) :
+    ofForallClause ⟨span, { binders := binders }⟩ =
+      located span [ofNonempty ofForallBinder binders] := by
+  rfl
+
+/-- A parameter visitor exposes its optional modifier, name, and optional
+type through public location combinators. -/
+@[simp] theorem ofParameter_mk (span : SourceSpan)
+    (comptime : Option Marker) (name : IdentifierOccurrence)
+    (parameterType : Option TypeExpr) :
+    ofParameter ⟨span, {
+      comptime := comptime
+      name := name
+      type := parameterType
+    }⟩ = located span [
+      ofOption (fun marker => leaf marker.span) comptime,
+      ofIdentifier name,
+      ofOption ofTypeExpr parameterType
+    ] := by
+  cases comptime <;> cases parameterType <;>
+    simp [ofParameter, parameterFragment, ofOption, optionFragment,
+      empty, leaf, located, markerFragment, ofIdentifier,
+      ofTypeExpr_eq_fragment]
+
+/-- A function-signature visitor exposes each syntactic field through public
+location combinators. -/
+@[simp] theorem ofFunctionSignature_mk (span : SourceSpan)
+    (genericPrefix : Option GenericPrefix)
+    (publicMarker payableMarker : Option Marker)
+    (name : IdentifierOccurrence) (parameters : List Parameter)
+    (returnType : Option TypeExpr) :
+    ofFunctionSignature ⟨span, {
+      genericPrefix := genericPrefix
+      «public» := publicMarker
+      payable := payableMarker
+      name := name
+      parameters := parameters
+      returnType := returnType
+    }⟩ = located span [
+      ofOption ofGenericPrefix genericPrefix,
+      ofOption (fun marker => leaf marker.span) publicMarker,
+      ofOption (fun marker => leaf marker.span) payableMarker,
+      ofIdentifier name,
+      ofList ofParameter parameters,
+      ofOption ofTypeExpr returnType
+    ] := by
+  have parameterVisitor : ofParameter = parameterFragment := by
+    rfl
+  rw [parameterVisitor]
+  cases genericPrefix <;> cases publicMarker <;> cases payableMarker <;>
+    cases returnType <;>
+      simp [ofFunctionSignature, functionSignatureFragment, ofOption,
+        optionFragment, empty, leaf, located, markerFragment, ofIdentifier,
+        ofList, listFragment, merge, ofGenericPrefix,
+        ofTypeExpr_eq_fragment]
+
 /-- The exact child fragment below one type-expression wrapper. -/
 def ofTypeExprPayload : TypeExprPayload → LocationFragment
   | .named name arguments =>
