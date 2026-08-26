@@ -217,6 +217,146 @@ theorem containedBy
 
 end OccupiedConsumedSpan
 
+/-- One nonempty physical parser interval together with its exact source span. -/
+structure SourceAnchor (file : WorkspaceFile) (tokens : List Token) where
+  origin : Boundary tokens
+  finish : Boundary tokens
+  span : SourceSpan
+  occupied : OccupiedConsumedSpan file tokens origin finish span
+
+namespace SourceAnchor
+
+/-- One anchor interval lies inside an enclosing parser interval. -/
+def Within {file : WorkspaceFile} {tokens : List Token}
+    (anchor : SourceAnchor file tokens)
+    (outerOrigin outerFinish : Boundary tokens) : Prop :=
+  outerOrigin.val ≤ anchor.origin.val ∧
+    anchor.finish.val ≤ outerFinish.val
+
+/-- Every anchored source span is valid when retained tokens are ordered. -/
+theorem span_validFor
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    (anchor : SourceAnchor file tokens) :
+    anchor.span.ValidFor file :=
+  anchor.occupied.validFor tokensOrdered
+
+/-- An anchor inside a consumed interval is contained by that interval's span. -/
+theorem containedBy
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {outerOrigin outerFinish : Boundary tokens}
+    {outerSpan : SourceSpan}
+    (tokensOrdered : TokenSpansOrdered tokens)
+    (outer : ConsumedSpan file tokens outerOrigin outerFinish outerSpan)
+    (anchor : SourceAnchor file tokens)
+    (inside : anchor.Within outerOrigin outerFinish) :
+    outerSpan.Contains anchor.span :=
+  anchor.occupied.containedBy tokensOrdered outer inside.1 inside.2
+
+end SourceAnchor
+
+/-- A ghost trace of physical source anchors retained while EBNF actions
+reshape their semantic values. -/
+abbrev SourceAnchorTrace (file : WorkspaceFile) (tokens : List Token) :=
+  List (SourceAnchor file tokens)
+
+namespace SourceAnchorTrace
+
+/-- The exact source spans carried by an anchor trace, in trace order. -/
+def spans {file : WorkspaceFile} {tokens : List Token}
+    (trace : SourceAnchorTrace file tokens) : List SourceSpan :=
+  trace.map SourceAnchor.span
+
+/-- Every trace interval lies inside one enclosing parser interval. -/
+def Within {file : WorkspaceFile} {tokens : List Token}
+    (trace : SourceAnchorTrace file tokens)
+    (outerOrigin outerFinish : Boundary tokens) : Prop :=
+  ∀ anchor ∈ trace, anchor.Within outerOrigin outerFinish
+
+/-- Earlier physical anchors finish no later than later anchors begin. -/
+def Ordered {file : WorkspaceFile} {tokens : List Token}
+    (trace : SourceAnchorTrace file tokens) : Prop :=
+  trace.Pairwise fun earlier later =>
+    earlier.finish.val ≤ later.origin.val
+
+@[simp] theorem spans_nil {file : WorkspaceFile} {tokens : List Token} :
+    spans ([] : SourceAnchorTrace file tokens) = [] := by
+  rfl
+
+@[simp] theorem spans_cons
+    {file : WorkspaceFile} {tokens : List Token}
+    (head : SourceAnchor file tokens)
+    (tail : SourceAnchorTrace file tokens) :
+    spans (head :: tail) = head.span :: spans tail := by
+  rfl
+
+@[simp] theorem spans_append
+    {file : WorkspaceFile} {tokens : List Token}
+    (left right : SourceAnchorTrace file tokens) :
+    spans (left ++ right) = spans left ++ spans right := by
+  simp [spans]
+
+@[simp] theorem within_nil
+    {file : WorkspaceFile} {tokens : List Token}
+    {outerOrigin outerFinish : Boundary tokens} :
+    Within ([] : SourceAnchorTrace file tokens) outerOrigin outerFinish := by
+  simp [Within]
+
+@[simp] theorem within_cons
+    {file : WorkspaceFile} {tokens : List Token}
+    (head : SourceAnchor file tokens)
+    (tail : SourceAnchorTrace file tokens)
+    (outerOrigin outerFinish : Boundary tokens) :
+    Within (head :: tail) outerOrigin outerFinish ↔
+      head.Within outerOrigin outerFinish ∧
+        Within tail outerOrigin outerFinish := by
+  simp [Within]
+
+@[simp] theorem within_append
+    {file : WorkspaceFile} {tokens : List Token}
+    (left right : SourceAnchorTrace file tokens)
+    (outerOrigin outerFinish : Boundary tokens) :
+    Within (left ++ right) outerOrigin outerFinish ↔
+      Within left outerOrigin outerFinish ∧
+        Within right outerOrigin outerFinish := by
+  constructor
+  · intro allInside
+    constructor
+    · intro anchor member
+      exact allInside anchor (List.mem_append.mpr (Or.inl member))
+    · intro anchor member
+      exact allInside anchor (List.mem_append.mpr (Or.inr member))
+  · rintro ⟨leftInside, rightInside⟩ anchor member
+    rcases List.mem_append.mp member with member | member
+    · exact leftInside anchor member
+    · exact rightInside anchor member
+
+@[simp] theorem ordered_nil
+    {file : WorkspaceFile} {tokens : List Token} :
+    Ordered ([] : SourceAnchorTrace file tokens) := by
+  simp [Ordered]
+
+@[simp] theorem ordered_singleton
+    {file : WorkspaceFile} {tokens : List Token}
+    (anchor : SourceAnchor file tokens) :
+    Ordered [anchor] := by
+  simp [Ordered]
+
+/-- Appending traces preserves order exactly when both sides are ordered and
+every anchor on the left precedes every anchor on the right. -/
+theorem ordered_append_iff
+    {file : WorkspaceFile} {tokens : List Token}
+    (left right : SourceAnchorTrace file tokens) :
+    Ordered (left ++ right) ↔
+      Ordered left ∧ Ordered right ∧
+        ∀ earlier ∈ left, ∀ later ∈ right,
+          earlier.finish.val ≤ later.origin.val := by
+  simp [Ordered, List.pairwise_append]
+
+end SourceAnchorTrace
+
 namespace ConsumedSpanWitness
 
 /-- Every checked chart-span witness is valid for its source file when the
@@ -281,6 +421,118 @@ theorem sourceLocates_span_validFor
 end Lexes
 
 namespace MatchedTerminal
+
+/-- Every checked terminal observation has a source-valid span. -/
+theorem span_validFor
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {terminal : Grammar.TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal) :
+    matched.span.ValidFor file := by
+  rcases matched with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  dsimp only
+  cases terminalAt with
+  | retained _token _inRange _lookup valid =>
+      exact valid
+  | endOfFile _atEnd =>
+      exact ⟨rfl, Nat.le_refl _, Nat.le_refl _,
+        isUtf8Boundary_end file.content,
+        isUtf8Boundary_end file.content⟩
+
+/-- A non-EOF terminal is exactly one occupied retained-token interval. -/
+theorem occupiedConsumedSpan
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {terminal : Grammar.TerminalSymbol}
+    (owned : TokensOwnedBy file tokens)
+    (matched : MatchedTerminal file tokens terminal)
+    (notEof : terminal ≠ .endOfFile) :
+    OccupiedConsumedSpan file tokens matched.cursor.beforeBoundary
+      matched.cursor.afterBoundary matched.span := by
+  rcases matched with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  dsimp only
+  cases terminalAt with
+  | retained token inRange lookup valid =>
+      have occupied :
+          cursor.val < Nat.min (cursor.val + 1) tokens.length :=
+        Nat.lt_min.mpr ⟨Nat.lt_succ_self _, inRange⟩
+      have boundaries := terminalCursor_boundary_coercions_exact cursor
+      have occupiedAtBoundaries :
+          cursor.beforeBoundary.val <
+            Nat.min cursor.afterBoundary.val tokens.length := by
+        rw [boundaries.1, boundaries.2]
+        exact occupied
+      constructor
+      · unfold ConsumedSpan
+        refine ⟨owned, ?_, ?_⟩
+        · rw [boundaries.1, boundaries.2]
+          exact Nat.le_succ _
+        · simp only [occupiedAtBoundaries, ↓reduceDIte]
+          have lookupEq : tokens[cursor.val] = token :=
+            Option.some.inj
+              ((List.getElem?_eq_getElem inRange).symm.trans lookup)
+          have capped : Nat.min (cursor.val + 1) tokens.length =
+              cursor.val + 1 :=
+            Nat.min_eq_left (Nat.succ_le_iff.mpr inRange)
+          simp only [boundaries.1, boundaries.2, capped,
+            Nat.add_sub_cancel]
+          rw [lookupEq]
+          rcases token with ⟨⟨tokenSource, startByte, endByte⟩, payload⟩
+          simp only [SourceSpan.ValidFor] at valid
+          simp only
+          rw [valid.1]
+      · exact occupiedAtBoundaries
+  | endOfFile atEnd =>
+      have terminalEq : terminal = .endOfFile := by
+        cases terminal <;>
+          simp [TerminalMatches] at matchedEvidence ⊢
+      exact (notEof terminalEq).elim
+
+/-- Package one non-EOF matched terminal as a physical source anchor. -/
+def sourceAnchor
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {terminal : Grammar.TerminalSymbol}
+    (owned : TokensOwnedBy file tokens)
+    (matched : MatchedTerminal file tokens terminal)
+    (notEof : terminal ≠ .endOfFile) : SourceAnchor file tokens := {
+  origin := matched.cursor.beforeBoundary
+  finish := matched.cursor.afterBoundary
+  span := matched.span
+  occupied := matched.occupiedConsumedSpan owned notEof
+}
+
+@[simp] theorem sourceAnchor_origin
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {terminal : Grammar.TerminalSymbol}
+    (owned : TokensOwnedBy file tokens)
+    (matched : MatchedTerminal file tokens terminal)
+    (notEof : terminal ≠ .endOfFile) :
+    (matched.sourceAnchor owned notEof).origin =
+      matched.cursor.beforeBoundary := by
+  rfl
+
+@[simp] theorem sourceAnchor_finish
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {terminal : Grammar.TerminalSymbol}
+    (owned : TokensOwnedBy file tokens)
+    (matched : MatchedTerminal file tokens terminal)
+    (notEof : terminal ≠ .endOfFile) :
+    (matched.sourceAnchor owned notEof).finish =
+      matched.cursor.afterBoundary := by
+  rfl
+
+@[simp] theorem sourceAnchor_span
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {terminal : Grammar.TerminalSymbol}
+    (owned : TokensOwnedBy file tokens)
+    (matched : MatchedTerminal file tokens terminal)
+    (notEof : terminal ≠ .endOfFile) :
+    (matched.sourceAnchor owned notEof).span = matched.span := by
+  rfl
 
 /-- A retained terminal observation exposes both membership in the parser's
 token stream and equality with that token's source span. -/
