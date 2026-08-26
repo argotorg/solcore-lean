@@ -280,4 +280,56 @@ theorem sourceLocates_span_validFor
 
 end Lexes
 
+namespace MatchedTerminal
+
+/-- A retained terminal observation exposes both membership in the parser's
+token stream and equality with that token's source span. -/
+theorem retained_member_and_span
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {terminal : Grammar.TerminalSymbol}
+    (matched : MatchedTerminal file tokens terminal)
+    {token : Token}
+    (valueEq : matched.value = .retained token) :
+    token ∈ tokens ∧ matched.span = token.span := by
+  rcases matched with ⟨cursor, value, span, terminalAt, matchedEvidence⟩
+  dsimp only at valueEq ⊢
+  cases terminalAt with
+  | retained retained inRange lookup valid =>
+      simp only [TerminalStreamValue.retained.injEq] at valueEq
+      subst token
+      have retainedEq : tokens[cursor.val] = retained :=
+        Option.some.inj
+          ((List.getElem?_eq_getElem inRange).symm.trans lookup)
+      have member : tokens[cursor.val] ∈ tokens :=
+        List.getElem_mem inRange
+      rw [retainedEq] at member
+      exact ⟨member, rfl⟩
+  | endOfFile atEnd =>
+      simp at valueEq
+
+end MatchedTerminal
+
+namespace Lexes
+
+/-- An assembly slice projected by the parser inherits every location fact
+proved by the independent lexical partition. -/
+theorem assemblySlice_locations_of_projects
+    {file : WorkspaceFile}
+    {tokens : List Token}
+    {comments : List Comment}
+    (lexical : Lexes file tokens comments)
+    (terminal : MatchedTerminal file tokens (.category .assemblyBlock))
+    {slice : AssemblySlice}
+    (projects : AssemblySliceProjects terminal slice) :
+    terminal.span = slice.span ∧ AssemblySliceLocationFacts file slice := by
+  rcases projects with ⟨token, valueEq, payload⟩
+  rcases terminal.retained_member_and_span valueEq with
+    ⟨member, terminalSpan⟩
+  rcases lexical.assemblySlice_locations member payload with
+    ⟨tokenSpan, facts⟩
+  exact ⟨terminalSpan.trans tokenSpan, facts⟩
+
+end Lexes
+
 end Solcore.Surface.Multi
