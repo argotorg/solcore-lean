@@ -1,4 +1,5 @@
 import Solcore.Surface.Multi.ExactTokenEvidence
+import Solcore.Surface.Multi.ExactTokenRuleLeaf
 import Solcore.Surface.Multi.ExactTokenRuleLayout
 
 set_option autoImplicit false
@@ -37,16 +38,18 @@ theorem RuleReduction.optionalComma_tokenPlanEvidence
   | optionalCommaPresent origin finish comma =>
       rw [EbnfValue.tokenPlan?_transport,
         EbnfValue.tokenPlan?_optional_some,
-        EbnfValue.tokenPlan?_terminalAtom] at inputEvidence
+        EbnfValue.tokenPlan?_terminalAtom,
+        MatchedTerminal.physicalTokenPlan_symbol] at inputEvidence
       rcases inputEvidence with ⟨plan, candidateEq, relation⟩
       simp only [Option.some.injEq] at candidateEq
       subst plan
       change TokenSlot.ListMatches
-        [.required (ExpectedToken.plain (.symbol .comma))] _ at relation
+        [.required (ExpectedToken.exact (.symbol .comma) comma.span)] _
+        at relation
       cases relation with
       | required head tail =>
           cases tail
           exact TokenPlanEvidence.some
-            (.optionalPresent head .nil)
+            (.optionalPresent head.toPlain .nil)
 
 end Solcore.Surface.Multi
