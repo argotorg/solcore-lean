@@ -115,7 +115,8 @@ private theorem letBindingInitializerPlan?_wellAnchored
         (expressionTokenPlanAt?_wellAnchored
           .annotation expression expressionPlan expressionEq)
 
-private theorem letBindingTokenPlan?_wellAnchored
+/-- Every accepted let-binding plan has mandatory physical endpoints. -/
+theorem letBindingTokenPlan?_wellAnchored
     (binding : LetBinding) (plan : TokenPlan)
     (success : letBindingTokenPlan? binding = some plan) :
     plan.WellAnchored := by
@@ -208,6 +209,136 @@ private theorem forAssignmentTokenPlan?_wellAnchored
       (assignmentOperatorTokenPlan_wellAnchored operator)
       (expressionTokenPlanAt?_wellAnchored
         .annotation right rightPlan rightEq))
+
+/-- Every accepted for-loop initializer plan has mandatory endpoints. -/
+theorem forInitTokenPlan?_wellAnchored
+    (item : ForInitItem) (plan : TokenPlan)
+    (success : forInitTokenPlan? item = some plan) :
+    plan.WellAnchored := by
+  rcases item with ⟨span, payload⟩
+  cases payload with
+  | letBinding binding =>
+      simp only [forInitTokenPlan?] at success
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨bindingPlan, bindingEq, resultEq⟩
+      injection resultEq with planEq
+      subst plan
+      exact TokenPlan.WellAnchored.enclose
+        (letBindingTokenPlan?_wellAnchored binding bindingPlan bindingEq) span
+  | assignment operator left right =>
+      simp only [forInitTokenPlan?] at success
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨leftPlan, leftEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨rightPlan, rightEq, resultEq⟩
+      injection resultEq with planEq
+      subst plan
+      apply TokenPlan.WellAnchored.enclose
+      simp only [TokenPlan.concat_cons, TokenPlan.concat_nil,
+        TokenPlan.append_empty]
+      exact TokenPlan.WellAnchored.append
+        (expressionTokenPlanAt?_wellAnchored
+          .annotation left leftPlan leftEq)
+        (TokenPlan.WellAnchored.append
+          (assignmentOperatorTokenPlan_wellAnchored operator)
+          (expressionTokenPlanAt?_wellAnchored
+            .annotation right rightPlan rightEq))
+  | expression expression =>
+      simp only [forInitTokenPlan?] at success
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨expressionPlan, expressionEq, resultEq⟩
+      injection resultEq with planEq
+      subst plan
+      exact TokenPlan.WellAnchored.enclose
+        (expressionTokenPlanAt?_wellAnchored
+          .annotation expression expressionPlan expressionEq) span
+
+/-- Every successful initializer-list traversal returns anchored plans. -/
+theorem forInitTokenPlans?_allWellAnchored
+    (items : List ForInitItem) (plans : List TokenPlan)
+    (success : forInitTokenPlans? items = some plans) :
+    ∀ plan ∈ plans, plan.WellAnchored := by
+  induction items generalizing plans with
+  | nil =>
+      simp [forInitTokenPlans?] at success
+      subst plans
+      simp
+  | cons head tail induction =>
+      rw [forInitTokenPlans?] at success
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨headPlan, headEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨tailPlans, tailEq, resultEq⟩
+      injection resultEq with plansEq
+      subst plans
+      intro plan member
+      simp only [List.mem_cons] at member
+      have headAnchored :=
+        forInitTokenPlan?_wellAnchored head headPlan headEq
+      rcases member with rfl | member
+      · exact headAnchored
+      · exact induction tailPlans tailEq plan member
+
+/-- Every accepted for-loop post-item plan has mandatory endpoints. -/
+theorem forPostTokenPlan?_wellAnchored
+    (item : ForPostItem) (plan : TokenPlan)
+    (success : forPostTokenPlan? item = some plan) :
+    plan.WellAnchored := by
+  rcases item with ⟨span, payload⟩
+  cases payload with
+  | assignment operator left right =>
+      simp only [forPostTokenPlan?] at success
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨leftPlan, leftEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨rightPlan, rightEq, resultEq⟩
+      injection resultEq with planEq
+      subst plan
+      apply TokenPlan.WellAnchored.enclose
+      simp only [TokenPlan.concat_cons, TokenPlan.concat_nil,
+        TokenPlan.append_empty]
+      exact TokenPlan.WellAnchored.append
+        (expressionTokenPlanAt?_wellAnchored
+          .annotation left leftPlan leftEq)
+        (TokenPlan.WellAnchored.append
+          (assignmentOperatorTokenPlan_wellAnchored operator)
+          (expressionTokenPlanAt?_wellAnchored
+            .annotation right rightPlan rightEq))
+  | expression expression =>
+      simp only [forPostTokenPlan?] at success
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨expressionPlan, expressionEq, resultEq⟩
+      injection resultEq with planEq
+      subst plan
+      exact TokenPlan.WellAnchored.enclose
+        (expressionTokenPlanAt?_wellAnchored
+          .annotation expression expressionPlan expressionEq) span
+
+/-- Every successful post-list traversal returns anchored plans. -/
+theorem forPostTokenPlans?_allWellAnchored
+    (items : List ForPostItem) (plans : List TokenPlan)
+    (success : forPostTokenPlans? items = some plans) :
+    ∀ plan ∈ plans, plan.WellAnchored := by
+  induction items generalizing plans with
+  | nil =>
+      simp [forPostTokenPlans?] at success
+      subst plans
+      simp
+  | cons head tail induction =>
+      rw [forPostTokenPlans?] at success
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨headPlan, headEq, success⟩
+      rcases Option.bind_eq_some_iff.mp success with
+        ⟨tailPlans, tailEq, resultEq⟩
+      injection resultEq with plansEq
+      subst plans
+      intro plan member
+      simp only [List.mem_cons] at member
+      have headAnchored :=
+        forPostTokenPlan?_wellAnchored head headPlan headEq
+      rcases member with rfl | member
+      · exact headAnchored
+      · exact induction tailPlans tailEq plan member
 
 private abbrev forInitSourceBranches : List EbnfExpr := [
   .atom (.nonterminal .letBinding),
