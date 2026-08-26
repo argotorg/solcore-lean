@@ -24,10 +24,11 @@
   concrete AST-carrier cardinality theorem are also present. Exact-token
   dispatch is exhaustive; module-reference and let-binding callbacks are
   closed, leaving match-arm, postfix-expression, and statement-body callbacks.
-  Structural node visits, diagnostic insertions, and duplicate-key comparisons
-  now have executable traces and local correspondence theorems.
+  All six structural unit families now have executable traces and exact
+  projections, and a public ledger exposes their combined total. The two
+  canonical-list passes also have insertion-square comparison bounds.
 - **Not yet implemented:** The separate fast `Parser`, final exact-token root
-  closure and proof-argument-free frontend wrapper, executor-unit sufficiency,
+  closure and proof-argument-free frontend wrapper, combined executor-unit sufficiency,
   the six complete canonical-standard parse certificates, and the public
   `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed

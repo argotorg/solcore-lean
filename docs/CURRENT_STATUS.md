@@ -31,10 +31,12 @@ remaining proof work is confined to three reachability-sensitive rules. The
 proof-carrying frontend core already combines parsing, locations, exact-token
 correspondence, and structural acceptance when given that final root theorem;
 the proof-argument-free public wrapper remains to be connected. The fixed
-parser and structural bound functions now exist, while executor counters and
-their sufficiency proofs are being connected. Structural node visits,
-diagnostic insertions, and duplicate-key comparisons now have executable
-traces; canonical-list comparisons and the combined bound remain.
+parser and structural bound functions now exist, while their final sufficiency
+proofs are being connected. Structural validation exposes exact executable
+traces for all six charged families and one ledger that sums them. The
+remaining structural-bound work is the aggregate connection from diagnostic
+insertions, duplicate comparisons, and least-span comparisons to the AST
+measure.
 
 Module resolution, lexical name resolution, source checking, Core elaboration,
 and end-to-end workspace execution are not implemented. The Multi chart
@@ -53,7 +55,7 @@ or fuzzing-speed parser.
 | M2b single-file parser publication | Yes | Yes | Oracle v4 / Surface v1 | Current public parse boundary |
 | M2c workspace identity and validation | Yes | Yes | No; internal API | Complete |
 | M2c unconditional chart-parser milestone | Yes, through raw file parsing | Selected outcome, soundness, and exact cache equivalence | No; internal API | Total; all six representative benchmarks pass, but large-file memory readiness is unproved |
-| M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Two-way correspondence, sufficient traversal fuel, canonical error-list properties, and executable success exactly equivalent to acceptance | No; internal API | Certified as a separate decision procedure; numeric unit accounting is partial |
+| M2c structural acceptance | Validator for all 20 codes; independent applicability and acceptance judgments | Two-way correspondence, sufficient traversal fuel, canonical error-list properties, and executable success exactly equivalent to acceptance | No; internal API | Certified as a separate decision procedure; all six unit families are counted, while their combined fixed-bound proof remains |
 | M2c source-location evidence | Complete AST inventory and executable validity/nesting checks | `Parses.everyLocationValid` proves validity and direct-parent nesting for every successful parse, using token order, parser-span containment, and assembly-slice facts | No; internal API | Parser-wide location propagation is complete |
 | M2c exact-token correspondence | Executable token-plan visitor and complete rule dispatch | Parser lifting is proved once three remaining coherent rule callbacks are supplied | No; internal API | Final reachability-sensitive rule proofs remain |
 | M2c certified frontend | Proof-carrying result and lexical/parse/structural phase core | Phase precedence, success/failure characterization, determinism, total result selection, and success/failure exclusivity | No; internal API | Final proof-argument-free wrapper waits on exact-token root closure |
@@ -129,11 +131,13 @@ behavior.
 The ADR-fixed `parseBound` and `structureBound` functions are now executable
 and proved positive and monotone. The AST-node measure is also proved equal to
 the length of a concrete, source-ordered carrier enumeration. Executable
-traces now count AST-node visits, diagnostic insertions, and all seven uses of
-the duplicate-key helper. Their exact projections are proved; node visits and
-individual duplicate scans have fixed-bound lemmas, and canonicalization never
-creates an uncharged diagnostic. Canonical deduplication/sorting comparisons,
-the combined
+traces now count AST-node visits, diagnostic insertions, all seven uses of the
+duplicate-key helper, both canonical-list passes, and mixed-wildcard least-span
+selection. Their exact projections are proved and one public ledger sums the
+six families into `structureActualUnits`. Node visits and individual duplicate
+scans have fixed-bound lemmas, canonicalization never creates an uncharged
+diagnostic, and each canonical-list comparison count is bounded by the square
+of the insertion count. The aggregate collector inequalities, the combined
 `structureBound_sufficient` theorem, and parser-bound sufficiency remain.
 
 Termination no longer depends on a proof supplied by the caller. A finite
