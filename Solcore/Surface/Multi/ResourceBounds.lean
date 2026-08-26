@@ -36,4 +36,23 @@ theorem structureBound_positive (nodeCount : Nat) :
     0 < structureBound nodeCount := by
   simp [structureBound]
 
+theorem parseBound_monotone {left right : Nat} (less : left ≤ right) :
+    parseBound left ≤ parseBound right := by
+  simp only [parseBound]
+  have boundaryLess : left + 1 ≤ right + 1 :=
+    Nat.add_le_add_right less 1
+  apply Nat.add_le_add
+  · exact Nat.add_le_add_left
+      (Nat.mul_le_mul_left (32 * Grammar.F) boundaryLess) 1
+  · exact Nat.mul_le_mul
+      (Nat.mul_le_mul_left (256 * Grammar.F) boundaryLess)
+      boundaryLess
+
+theorem structureBound_monotone {left right : Nat} (less : left ≤ right) :
+    structureBound left ≤ structureBound right := by
+  simp only [structureBound]
+  have nodeLess : left + 1 ≤ right + 1 :=
+    Nat.add_le_add_right less 1
+  exact Nat.mul_le_mul (Nat.mul_le_mul_left 32 nodeLess) nodeLess
+
 end Solcore.Surface.Multi
