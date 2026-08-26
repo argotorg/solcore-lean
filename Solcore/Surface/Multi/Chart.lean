@@ -9132,6 +9132,12 @@ private def phaseAEvidenceHashKey {tokens : List Token}
 private abbrev PhaseAEvidenceCache (tokens : List Token) :=
   Std.HashMap (PhaseAEvidenceHashKey tokens) Bool
 
+/-- Phase B after the evidence list has been consumed into its lookup cache. -/
+private structure PhaseBCached
+    (file : WorkspaceFile) (tokens : List Token) where
+  phaseB : PhaseBOpen file tokens
+  evidenceCache : PhaseAEvidenceCache tokens
+
 private def insertPhaseAEvidenceCacheEntry {tokens : List Token}
     (cache : PhaseAEvidenceCache tokens)
     (entry : PhaseAEvidenceEntry tokens) :
@@ -9945,6 +9951,120 @@ private def finalizeNextIndexedGuard?
           indexes := state.indexes
         } : PhaseBIndexed file tokens)
 
+/-- Finalize one Phase-B key using only the immutable evidence cache.  The
+same fixed schedule and cache selector are used even when a counter collision
+causes the step to fail; there is no retained-list fallback. -/
+private def finalizeNextPhaseBCached?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBCached file tokens)) :
+    Option (CountedState tokens (PhaseBCached file tokens)) :=
+  match current.payload.phaseB.remaining with
+  | [] => none
+  | key :: rest => do
+      let initialized ← runMappedPrimitive? current
+        (.guardFinalize .initializeUndecided key)
+        fun (state : PhaseBCached file tokens) => ({
+          phaseB := {
+            state.phaseB with
+            cells := fun candidate =>
+              if candidate = key then some .undecided
+              else state.phaseB.cells candidate
+          }
+          evidenceCache := state.evidenceCache
+        } : PhaseBCached file tokens)
+      let lookups ← chargeAddresses? initialized
+        (preFinalGuardSlots.map fun slot => .guardFinalize slot key)
+      let decision ← phaseBGuardDecisionFromCache?
+        lookups.payload.evidenceCache key
+      runMappedPrimitive? lookups
+        (.guardFinalize .writeFinalDecision key)
+        fun (state : PhaseBCached file tokens) => ({
+          phaseB := {
+            phaseA := state.phaseB.phaseA
+            cells := fun candidate =>
+              if candidate = key then some (.final decision)
+              else state.phaseB.cells candidate
+            remaining := rest
+            finalizedRev := key :: state.phaseB.finalizedRev
+          }
+          evidenceCache := state.evidenceCache
+        } : PhaseBCached file tokens)
+
+/-- Forget the retained evidence list while pairing an indexed Phase-B state
+with an independently supplied cache. -/
+private def phaseBCachedPayloadOfIndexed
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (state : PhaseBIndexed file tokens) : PhaseBCached file tokens :=
+  ⟨state.phaseB, cache⟩
+
+private def phaseBCachedOfIndexed
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    CountedState tokens (PhaseBCached file tokens) := {
+  payload := phaseBCachedPayloadOfIndexed cache current.payload
+  counter := current.counter
+}
+
+/-- The cache and list select the same decision for every Phase-B key. -/
+private def PhaseBCacheRepresents
+    {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (entries : List (PhaseAEvidenceEntry tokens)) : Prop :=
+  ∀ key, phaseBGuardDecisionFromCache? cache key =
+    phaseBGuardDecisionFromIndexes? entries key
+
+private theorem buildPhaseAEvidenceCache_represents
+    {tokens : List Token}
+    (entries : List (PhaseAEvidenceEntry tokens)) :
+    PhaseBCacheRepresents (buildPhaseAEvidenceCache entries) entries := by
+  intro key
+  exact phaseBGuardDecisionFromCache?_eq_reference entries key
+
+private theorem runMappedPrimitive?_phaseBCachedOfIndexed
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (address : UnitAddress tokens)
+    (indexedTransition : PhaseBIndexed file tokens →
+      PhaseBIndexed file tokens)
+    (cachedTransition : PhaseBCached file tokens →
+      PhaseBCached file tokens)
+    (commutes : ∀ state,
+      cachedTransition (phaseBCachedPayloadOfIndexed cache state) =
+        phaseBCachedPayloadOfIndexed cache (indexedTransition state)) :
+    runMappedPrimitive? (phaseBCachedOfIndexed cache current)
+        address cachedTransition =
+      (runMappedPrimitive? current address indexedTransition).map
+        (phaseBCachedOfIndexed cache) := by
+  unfold runMappedPrimitive? phaseBCachedOfIndexed
+  split <;> simp_all [phaseBCachedPayloadOfIndexed]
+
+private theorem chargeAddresses?_phaseBCachedOfIndexed
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens) :
+    ∀ (addresses : List (UnitAddress tokens))
+      (current : CountedState tokens (PhaseBIndexed file tokens)),
+      chargeAddresses? (phaseBCachedOfIndexed cache current) addresses =
+        (chargeAddresses? current addresses).map
+          (phaseBCachedOfIndexed cache) := by
+  intro addresses
+  induction addresses with
+  | nil =>
+      intro current
+      rfl
+  | cons address rest induction =>
+      intro current
+      rw [chargeAddresses?, chargeAddresses?,
+        runMappedPrimitive?_phaseBCachedOfIndexed cache current
+          address id id (by intro state; rfl)]
+      cases selected : runMappedPrimitive? current address id with
+      | none => simp
+      | some next =>
+          simp only [Option.map_some]
+          exact induction next
+
 /-- The complete fixed schedule for one guard-finalization key. -/
 private def guardFinalizeSlots : List GuardFinalizeSlot := [
   .initializeUndecided,
@@ -10522,6 +10642,129 @@ private theorem finalizeNextIndexedGuard?_indexes_preserved
         } : PhaseBIndexed file tokens)) finalSelected
       rw [finalPayload, lookupPayload, initializePayload]
 
+private theorem finalizeNextPhaseBCached?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (current : CountedState tokens (PhaseBIndexed file tokens))
+    (represents : PhaseBCacheRepresents cache current.payload.indexes) :
+    finalizeNextPhaseBCached? (phaseBCachedOfIndexed cache current) =
+      (finalizeNextIndexedGuard? current).map
+        (phaseBCachedOfIndexed cache) := by
+  cases remaining : current.payload.phaseB.remaining with
+  | nil =>
+      simp [finalizeNextPhaseBCached?, phaseBCachedOfIndexed,
+        phaseBCachedPayloadOfIndexed, finalizeNextIndexedGuard?, remaining]
+  | cons key rest =>
+      rw [finalizeNextPhaseBCached?, show
+        (phaseBCachedOfIndexed cache current).payload.phaseB.remaining =
+          key :: rest by simpa [phaseBCachedOfIndexed,
+            phaseBCachedPayloadOfIndexed] using remaining]
+      rw [finalizeNextIndexedGuard?, remaining]
+      simp only
+      have initializedMap :=
+        runMappedPrimitive?_phaseBCachedOfIndexed cache current
+          (.guardFinalize .initializeUndecided key)
+          (fun (state : PhaseBIndexed file tokens) => ({
+            phaseB := {
+              state.phaseB with
+              cells := fun candidate =>
+                if candidate = key then some .undecided
+                else state.phaseB.cells candidate
+            }
+            indexes := state.indexes
+          } : PhaseBIndexed file tokens))
+          (fun (state : PhaseBCached file tokens) => ({
+            phaseB := {
+              state.phaseB with
+              cells := fun candidate =>
+                if candidate = key then some .undecided
+                else state.phaseB.cells candidate
+            }
+            evidenceCache := state.evidenceCache
+          } : PhaseBCached file tokens))
+          (by intro state; rfl)
+      rw [initializedMap]
+      cases initializedEq : runMappedPrimitive? current
+          (.guardFinalize .initializeUndecided key)
+          (fun (state : PhaseBIndexed file tokens) => ({
+            phaseB := {
+              state.phaseB with
+              cells := fun candidate =>
+                if candidate = key then some .undecided
+                else state.phaseB.cells candidate
+            }
+            indexes := state.indexes
+          } : PhaseBIndexed file tokens)) with
+      | none => simp
+      | some initialized =>
+          simp only [Option.map_some, Option.bind_eq_bind,
+            Option.bind_some]
+          rw [chargeAddresses?_phaseBCachedOfIndexed cache
+            (preFinalGuardSlots.map fun slot => .guardFinalize slot key)
+            initialized]
+          cases lookupsEq : chargeAddresses? initialized
+              (preFinalGuardSlots.map fun slot =>
+                .guardFinalize slot key) with
+          | none => simp
+          | some lookups =>
+              simp only [Option.map_some, Option.bind_some,
+                phaseBCachedOfIndexed, phaseBCachedPayloadOfIndexed]
+              have initializedPayload :=
+                phaseBFast_runMappedPrimitive?_payload current
+                  (.guardFinalize .initializeUndecided key)
+                  (fun (state : PhaseBIndexed file tokens) => ({
+                    phaseB := {
+                      state.phaseB with
+                      cells := fun candidate =>
+                        if candidate = key then some .undecided
+                        else state.phaseB.cells candidate
+                    }
+                    indexes := state.indexes
+                  } : PhaseBIndexed file tokens)) initializedEq
+              have lookupsPayload := phaseBFast_chargeAddresses?_payload
+                initialized
+                (preFinalGuardSlots.map fun slot => .guardFinalize slot key)
+                lookups lookupsEq
+              have indexes : lookups.payload.indexes =
+                  current.payload.indexes := by
+                rw [lookupsPayload, initializedPayload]
+              have decisionEq :
+                  phaseBGuardDecisionFromCache? cache key =
+                    phaseBGuardDecisionFromIndexes?
+                      lookups.payload.indexes key := by
+                rw [indexes]
+                exact represents key
+              rw [decisionEq]
+              rw [Option.map_bind]
+              apply Option.bind_congr
+              intro decision _selected
+              simp only [Function.comp_apply]
+              exact runMappedPrimitive?_phaseBCachedOfIndexed cache lookups
+                (.guardFinalize .writeFinalDecision key)
+                (fun (state : PhaseBIndexed file tokens) => ({
+                  phaseB := {
+                    phaseA := state.phaseB.phaseA
+                    cells := fun candidate =>
+                      if candidate = key then some (.final decision)
+                      else state.phaseB.cells candidate
+                    remaining := rest
+                    finalizedRev := key :: state.phaseB.finalizedRev
+                  }
+                  indexes := state.indexes
+                } : PhaseBIndexed file tokens))
+                (fun (state : PhaseBCached file tokens) => ({
+                  phaseB := {
+                    phaseA := state.phaseB.phaseA
+                    cells := fun candidate =>
+                      if candidate = key then some (.final decision)
+                      else state.phaseB.cells candidate
+                    remaining := rest
+                    finalizedRev := key :: state.phaseB.finalizedRev
+                  }
+                  evidenceCache := state.evidenceCache
+                } : PhaseBCached file tokens))
+                (by intro state; rfl)
+
 private theorem finalizeNextIndexedGuardCachedFast?_indexes_preserved
     {file : WorkspaceFile} {tokens : List Token}
     (cache : PhaseAEvidenceCache tokens)
@@ -10621,6 +10864,30 @@ private def runIndexedPhaseBCached?
   let cache := buildPhaseAEvidenceCache current.payload.indexes
   runIndexedPhaseBWithCache? cache fuel current
 
+/-- Run Phase B after the materialized evidence list has been consumed. -/
+private def runPhaseBCached?
+    {file : WorkspaceFile} {tokens : List Token} :
+    Nat → CountedState tokens (PhaseBCached file tokens) →
+      Option (CountedState tokens (PhaseBCached file tokens))
+  | 0, current =>
+      if current.payload.phaseB.remaining = [] then some current else none
+  | fuel + 1, current =>
+      match current.payload.phaseB.remaining with
+      | [] => some current
+      | _ :: _ => do
+          let next ← finalizeNextPhaseBCached? current
+          runPhaseBCached? fuel next
+
+/-- Seal Phase B without retaining the evidence cache in the result. -/
+private def sealPhaseBCached?
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBCached file tokens)) :
+    Option (CountedState tokens (PhaseBSealed file tokens)) :=
+  sealPhaseB? {
+    payload := current.payload.phaseB
+    counter := current.counter
+  }
+
 private theorem runIndexedPhaseBWithCache?_eq_reference
     {file : WorkspaceFile} {tokens : List Token}
     (entries : List (PhaseAEvidenceEntry tokens)) :
@@ -10665,6 +10932,55 @@ private theorem runIndexedPhaseBCached?_eq_reference
   unfold runIndexedPhaseBCached?
   exact runIndexedPhaseBWithCache?_eq_reference
     current.payload.indexes fuel current rfl
+
+private theorem runPhaseBCached?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens) :
+    ∀ fuel (current : CountedState tokens (PhaseBIndexed file tokens)),
+      PhaseBCacheRepresents cache current.payload.indexes →
+      runPhaseBCached? fuel (phaseBCachedOfIndexed cache current) =
+        (runIndexedPhaseB? fuel current).map
+          (phaseBCachedOfIndexed cache) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro current _represents
+      unfold runPhaseBCached? runIndexedPhaseB?
+      simp [phaseBCachedOfIndexed, phaseBCachedPayloadOfIndexed]
+  | succ previous induction =>
+      intro current represents
+      rw [runPhaseBCached?, runIndexedPhaseB?]
+      cases remaining : current.payload.phaseB.remaining with
+      | nil =>
+          simp [phaseBCachedOfIndexed, phaseBCachedPayloadOfIndexed,
+            remaining]
+      | cons key rest =>
+          have cachedRemaining :
+              (phaseBCachedOfIndexed cache current).payload.phaseB.remaining =
+                key :: rest := by
+            simpa [phaseBCachedOfIndexed,
+              phaseBCachedPayloadOfIndexed] using remaining
+          simp only [cachedRemaining]
+          rw [finalizeNextPhaseBCached?_eq_reference
+            cache current represents]
+          cases finalizedEq : finalizeNextIndexedGuard? current with
+          | none => simp
+          | some next =>
+              simp only [Option.map_some, Option.bind_eq_bind,
+                Option.bind_some]
+              apply induction next
+              have indexes := finalizeNextIndexedGuard?_indexes_preserved
+                current next finalizedEq
+              rw [indexes]
+              exact represents
+
+private theorem sealPhaseBCached?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (cache : PhaseAEvidenceCache tokens)
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    sealPhaseBCached? (phaseBCachedOfIndexed cache current) =
+      sealIndexedPhaseB? current := by
+  rfl
 
 /-- A successful Phase-B worklist run has consumed every guard key. -/
 private theorem runIndexedPhaseB?_remaining_empty
@@ -10976,6 +11292,58 @@ private def enterIndexedPhaseBUnchecked?
     counter := enteredPhase.counter
   }
 
+/-- Consume the retained evidence list into the cache-only Phase-B carrier. -/
+private def consumeIndexedPhaseBEvidence
+    {file : WorkspaceFile} {tokens : List Token} :
+    CountedState tokens (PhaseBIndexed file tokens) →
+      CountedState tokens (PhaseBCached file tokens)
+  | ⟨⟨phaseB, entries⟩, counter⟩ => {
+      payload := ⟨phaseB, buildPhaseAEvidenceCache entries⟩
+      counter := counter
+    }
+
+private theorem consumeIndexedPhaseBEvidence_eq
+    {file : WorkspaceFile} {tokens : List Token}
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    consumeIndexedPhaseBEvidence current =
+      phaseBCachedOfIndexed
+        (buildPhaseAEvidenceCache current.payload.indexes) current := by
+  cases current with
+  | mk payload counter =>
+      cases payload
+      rfl
+
+/-- Enter Phase B and immediately consume the materialized evidence list. -/
+private def enterPhaseBCachedUnchecked?
+    {file : WorkspaceFile} {tokens : List Token}
+    (indexed : CountedState tokens (PhaseAIndexed file tokens)) :
+    Option (CountedState tokens (PhaseBCached file tokens)) := do
+  let entered ← enterIndexedPhaseBUnchecked? indexed
+  pure (consumeIndexedPhaseBEvidence entered)
+
+private theorem runAndSealPhaseBCached?_eq_reference
+    {file : WorkspaceFile} {tokens : List Token}
+    (fuel : Nat)
+    (current : CountedState tokens (PhaseBIndexed file tokens)) :
+    (do
+      let cached := consumeIndexedPhaseBEvidence current
+      let finalized ← runPhaseBCached? fuel cached
+      sealPhaseBCached? finalized) =
+      (do
+        let finalized ← runIndexedPhaseB? fuel current
+        sealIndexedPhaseB? finalized) := by
+  rw [consumeIndexedPhaseBEvidence_eq]
+  simp only
+  rw [runPhaseBCached?_eq_reference
+    (buildPhaseAEvidenceCache current.payload.indexes) fuel current
+    (buildPhaseAEvidenceCache_represents current.payload.indexes)]
+  cases selected : runIndexedPhaseB? fuel current with
+  | none => simp
+  | some finalized =>
+      simp only [Option.map_some, Option.bind_eq_bind, Option.bind_some]
+      exact sealPhaseBCached?_eq_reference
+        (buildPhaseAEvidenceCache current.payload.indexes) finalized
+
 /-- Enter and run Phase B from an index result certified to come from the
 already-proved-total Phase-A worklist.  The proof arguments erase at runtime;
 the transition is the same one used by the checked reference gates. -/
@@ -10989,10 +11357,10 @@ private def executeIndexedPhaseBOfCertifiedPhaseA?
         canonicalRawItems tokens (rawSaturation tokens))
     (indexed : CountedState tokens (PhaseAIndexed file tokens)) :
     Option (CountedState tokens (PhaseBSealed file tokens)) := do
-  let entered ← enterIndexedPhaseBUnchecked? indexed
-  let finalized ← runIndexedPhaseBCached?
+  let entered ← enterPhaseBCachedUnchecked? indexed
+  let finalized ← runPhaseBCached?
     (allGuardInstanceKeys tokens).length entered
-  sealIndexedPhaseB? finalized
+  sealPhaseBCached? finalized
 
 end Chart
 
@@ -11550,12 +11918,15 @@ private theorem executeIndexedPhaseBOfCertifiedPhaseA?_eq_reference
       enterIndexedPhaseBUnchecked? indexed := by
     unfold enterIndexedPhaseB? enterIndexedPhaseBUnchecked? enterPhaseB?
     rw [dif_pos itemsDone, dif_pos edgesDone, dif_pos saturated]
-  unfold executeIndexedPhaseBOfCertifiedPhaseA? executeIndexedPhaseB?
+  unfold executeIndexedPhaseBOfCertifiedPhaseA?
+    enterPhaseBCachedUnchecked? executeIndexedPhaseB?
   rw [enteredReference]
-  simp only [Option.bind_eq_bind]
-  apply Option.bind_congr
-  intro entered _enteredEq
-  rw [runIndexedPhaseBCached?_eq_reference]
+  cases enteredEq : enterIndexedPhaseBUnchecked? indexed with
+  | none => simp
+  | some entered =>
+      simp only [Option.bind_eq_bind, Option.bind_some]
+      exact runAndSealPhaseBCached?_eq_reference
+        (allGuardInstanceKeys tokens).length entered
 
 /-- The proof-erased fast Phase-A/B path selects exactly the original checked
 reference result. -/
