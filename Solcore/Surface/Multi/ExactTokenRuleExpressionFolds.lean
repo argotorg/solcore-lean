@@ -329,7 +329,9 @@ private theorem lastSatisfies_of_carries
             exact induction
   exact (firstReverse_iff_last actual).mp firstOnReverse
 
-private theorem listMatches_enclose_endpoints
+/-- A nonempty, well-anchored enclosed plan forces its first and last matched
+tokens to satisfy the enclosing source span's endpoint constraints. -/
+theorem listMatches_enclose_endpoints
     {span : SourceSpan} {inner : TokenPlan} {actual : List Token}
     (anchored : (inner.enclose span).WellAnchored)
     (nonempty : (inner.enclose span).slots ≠ [])
@@ -371,7 +373,9 @@ private theorem listMatches_enclose_endpoints
     apply addLastView_carries_of_result_required
     simpa [TokenPlan.enclose, enclose_eq_view] using shapes.2
 
-private def EnclosesExpressionSpan
+/-- A successful expression plan has a nonempty core enclosed by the exact
+source span retained on that expression. -/
+def EnclosesExpressionSpan
     (expression : Expression) (plan : TokenPlan) : Prop :=
   ∃ inner : TokenPlan,
     plan = inner.enclose expression.span ∧ inner.slots ≠ []
@@ -802,7 +806,9 @@ private theorem logicalOrExpressionTokenPlan?_encloses
       logicalAndExpressionTokenPlan?_encloses
         (show Expression from ⟨span, _⟩) plan success
 
-private theorem expressionPlan_matches_endpoints
+/-- Matching a successful expression plan fixes the first and last physical
+tokens at the expression's retained source-span endpoints. -/
+theorem expressionPlan_matches_endpoints
     (level : ExpressionTokenLevel) (expression : Expression)
     (plan : TokenPlan)
     (success : expressionTokenPlanAt? level expression = some plan)
@@ -2074,5 +2080,457 @@ theorem grammarRuleTokenPlanSound_multiplicative :
               RuleReduction.terminalLoc]
       · exact physicalTokens_haveSource owned
       · exact promotedEvidence
+
+/-- The token plan contributed by one postfix suffix after the source-exact
+delimiter spans have been consumed into the enclosing expression span. -/
+private def postfixPartPlainTokenPlan? :
+    PostfixPartValue → Option TokenPlan
+  | .call _ arguments _ => do
+      let argumentPlans ← expressionTokenPlans? arguments
+      pure (.parens (.commaSeparated argumentPlans))
+  | .select _ field =>
+      some (.append (.plain (.symbol .dot)) (identifierPlan field))
+  | .index _ index _ => do
+      let indexPlan ← expressionTokenPlan? index
+      pure (.concat [
+        .plain (.symbol .leftBracket), indexPlan,
+        .plain (.symbol .rightBracket)])
+
+/-- The physical right endpoint contributed by one postfix suffix. -/
+private def postfixPartEndSpan : PostfixPartValue → SourceSpan
+  | .call _ _ closeParen => closeParen
+  | .select _ field => field.span
+  | .index _ _ closeBracket => closeBracket
+
+private theorem TokenSlot.ListMatches.twoExactToPlainAndEnds
+    {firstKind secondKind : TokenKind}
+    {firstSpan secondSpan : SourceSpan}
+    {middle : TokenPlan} {actual : List Token}
+    (relation : TokenSlot.ListMatches
+      (TokenPlan.concat [
+        .exact firstKind firstSpan, middle,
+        .exact secondKind secondSpan]).slots actual) :
+    TokenSlot.ListMatches
+        (TokenPlan.concat [
+          .plain firstKind, middle,
+          .plain secondKind]).slots actual ∧
+      TokenSlot.LastSatisfies (.ends secondSpan) actual := by
+  simp only [TokenPlan.concat, List.flatMap_cons, List.flatMap_nil,
+    TokenPlan.exact, TokenPlan.plain, List.append_nil,
+    List.singleton_append] at relation ⊢
+  cases relation with
+  | required firstMatch afterFirst =>
+      rcases afterFirst.split_append with
+        ⟨middleActual, afterMiddleActual, rfl,
+          middleRelation, afterMiddleRelation⟩
+      cases afterMiddleRelation with
+      | required secondMatch afterSecond =>
+          cases afterSecond
+          rename_i firstToken secondToken
+          constructor
+          · exact .required firstMatch.toPlain <|
+              middleRelation.append <|
+                .required secondMatch.toPlain .nil
+          · have exactSpan :=
+                secondMatch.2 (.exact secondSpan)
+                  (List.mem_cons_self ..)
+            change secondToken.span = secondSpan at exactSpan
+            have singletonEnd : TokenSlot.LastSatisfies
+                (.ends secondSpan) [secondToken] := by
+              change TokenSpanConstraint.Holds (.ends secondSpan) secondToken
+              simpa [TokenSpanConstraint.Holds, exactSpan]
+            have prefixed := TokenSlot.LastSatisfies.prepend
+              (left := firstToken :: middleActual) singletonEnd
+            simpa [List.append_assoc] using prefixed
+
+private theorem TokenSlot.ListMatches.firstExactToPlainAndEnds
+    {firstKind secondKind : TokenKind}
+    {firstSpan secondSpan : SourceSpan}
+    {actual : List Token}
+    (relation : TokenSlot.ListMatches
+      (TokenPlan.append
+        (.exact firstKind firstSpan)
+        (.exact secondKind secondSpan)).slots actual) :
+    TokenSlot.ListMatches
+        (TokenPlan.append
+          (.plain firstKind)
+          (.exact secondKind secondSpan)).slots actual ∧
+      TokenSlot.LastSatisfies (.ends secondSpan) actual := by
+  simp only [TokenPlan.append, TokenPlan.exact, TokenPlan.plain,
+    List.singleton_append] at relation ⊢
+  cases relation with
+  | required firstMatch afterFirst =>
+      cases afterFirst with
+      | required secondMatch afterSecond =>
+          cases afterSecond
+          rename_i firstToken secondToken
+          constructor
+          · exact .required firstMatch.toPlain <|
+              .required secondMatch .nil
+          · change TokenSpanConstraint.Holds (.ends secondSpan) _
+            have exactSpan := secondMatch.2 (.exact secondSpan)
+              (List.mem_cons_self ..)
+            change secondToken.span = secondSpan at exactSpan
+            simpa [TokenSpanConstraint.Holds, exactSpan]
+
+/-- Source suffix evidence can forget only its delimiter locations while
+retaining the endpoint needed to locate the folded expression. -/
+private theorem postfixPart_relation_plainAndEnds
+    (part : PostfixPartValue) (sourcePlan : TokenPlan)
+    (sourceSuccess : postfixPartTokenPlan? part = some sourcePlan)
+    {actual : List Token}
+    (relation : TokenSlot.ListMatches sourcePlan.slots actual) :
+    ∃ plainPlan,
+      postfixPartPlainTokenPlan? part = some plainPlan ∧
+        TokenSlot.ListMatches plainPlan.slots actual ∧
+        TokenSlot.LastSatisfies
+          (.ends (postfixPartEndSpan part)) actual := by
+  cases part with
+  | call openParen arguments closeParen =>
+      cases plansEq : expressionTokenPlans? arguments with
+      | none => simp [postfixPartTokenPlan?, plansEq] at sourceSuccess
+      | some plans =>
+          simp [postfixPartTokenPlan?, plansEq] at sourceSuccess
+          subst sourcePlan
+          refine ⟨.parens (.commaSeparated plans), ?_, ?_⟩
+          · simp [postfixPartPlainTokenPlan?, plansEq]
+          · simpa [TokenPlan.parens, postfixPartEndSpan] using
+              TokenSlot.ListMatches.twoExactToPlainAndEnds relation
+  | select dot field =>
+      simp [postfixPartTokenPlan?] at sourceSuccess
+      subst sourcePlan
+      refine ⟨.append (.plain (.symbol .dot)) (identifierPlan field),
+        rfl, ?_⟩
+      simpa [postfixPartPlainTokenPlan?, postfixPartEndSpan,
+        identifierPlan] using
+          (TokenSlot.ListMatches.firstExactToPlainAndEnds relation)
+  | index openBracket index closeBracket =>
+      cases planEq : expressionTokenPlan? index with
+      | none => simp [postfixPartTokenPlan?, planEq] at sourceSuccess
+      | some indexPlan =>
+          simp [postfixPartTokenPlan?, planEq] at sourceSuccess
+          subst sourcePlan
+          refine ⟨.concat [
+              .plain (.symbol .leftBracket), indexPlan,
+              .plain (.symbol .rightBracket)], ?_, ?_⟩
+          · simp [postfixPartPlainTokenPlan?, planEq]
+          · exact TokenSlot.ListMatches.twoExactToPlainAndEnds relation
+
+private theorem postfixPartPlainTokenPlan?_wellAnchored
+    (part : PostfixPartValue) (plan : TokenPlan)
+    (success : postfixPartPlainTokenPlan? part = some plan) :
+    plan.WellAnchored := by
+  cases part with
+  | call openParen arguments closeParen =>
+      cases plansEq : expressionTokenPlans? arguments with
+      | none => simp [postfixPartPlainTokenPlan?, plansEq] at success
+      | some plans =>
+          simp [postfixPartPlainTokenPlan?, plansEq] at success
+          subst plan
+          exact TokenPlan.WellAnchored.parens _
+  | select dot field =>
+      simp [postfixPartPlainTokenPlan?] at success
+      subst plan
+      exact TokenPlan.WellAnchored.append
+        (TokenPlan.WellAnchored.plain _)
+        (identifierPlan_wellAnchored field)
+  | index openBracket index closeBracket =>
+      cases planEq : expressionTokenPlan? index with
+      | none => simp [postfixPartPlainTokenPlan?, planEq] at success
+      | some indexPlan =>
+          simp [postfixPartPlainTokenPlan?, planEq] at success
+          subst plan
+          exact TokenPlan.WellAnchored.append
+            (TokenPlan.WellAnchored.plain _)
+            (TokenPlan.WellAnchored.append
+              (expressionTokenPlan?_wellAnchored index indexPlan planEq)
+              (TokenPlan.WellAnchored.plain _))
+
+/-- The sole AST-shape side condition of postfix folding: a leading-dot
+constructor without arguments cannot be reinterpreted as the callee of a
+following call suffix. -/
+def PostfixFoldAdmissible
+    (receiver : Expression) : List PostfixPartValue → Prop
+  | .call .. :: _ =>
+      match receiver.payload with
+      | .dotConstructor _ _ none => False
+      | _ => True
+  | _ => True
+
+private def postfixStep
+    (file : WorkspaceFile) (receiver : Expression) :
+    PostfixPartValue → Expression
+  | .call _ arguments closeParen =>
+      RuleReduction.between file receiver.span closeParen
+        (.call receiver arguments)
+  | .select _ field =>
+      RuleReduction.between file receiver.span field.span
+        (.select receiver field)
+  | .index _ index closeBracket =>
+      RuleReduction.between file receiver.span closeBracket
+        (.index receiver index)
+
+private theorem foldPostfix_cons
+    (file : WorkspaceFile) (receiver : Expression)
+    (part : PostfixPartValue) (rest : List PostfixPartValue) :
+    RuleReduction.foldPostfix file receiver (part :: rest) =
+      RuleReduction.foldPostfix file
+        (postfixStep file receiver part) rest := by
+  cases part <;> rfl
+
+/-- The exact source candidate before postfix suffixes are folded into the
+left-associated expression AST. -/
+def postfixFoldSourceTokenPlan?
+    (receiver : Expression) (parts : List PostfixPartValue) :
+    Option TokenPlan := do
+  let receiverPlan ← atomExpressionTokenPlan? receiver
+  let partPlans ← parts.mapM postfixPartTokenPlan?
+  pure (receiverPlan.append (.concat partPlans))
+
+private def postfixFoldWorkingTokenPlan?
+    (receiver : Expression) (parts : List PostfixPartValue) :
+    Option TokenPlan := do
+  let receiverPlan ← postfixExpressionTokenPlan? receiver
+  let partPlans ← parts.mapM postfixPartTokenPlan?
+  pure (receiverPlan.append (.concat partPlans))
+
+private theorem postfixFoldSourceTokenPlan?_promotes
+    (receiver : Expression) (parts : List PostfixPartValue)
+    (plan : TokenPlan)
+    (success : postfixFoldSourceTokenPlan? receiver parts = some plan) :
+    postfixFoldWorkingTokenPlan? receiver parts = some plan := by
+  rcases Option.bind_eq_some_iff.mp success with
+    ⟨receiverPlan, receiverEq, success⟩
+  rcases Option.bind_eq_some_iff.mp success with
+    ⟨partPlans, partPlansEq, result⟩
+  injection result with planEq
+  subst plan
+  simp [postfixFoldWorkingTokenPlan?,
+    atomExpressionTokenPlan?_promotesPostfix receiverEq, partPlansEq]
+
+private theorem PostfixFoldAdmissible.afterStep
+    (file : WorkspaceFile) (receiver : Expression)
+    (part : PostfixPartValue) (rest : List PostfixPartValue) :
+    PostfixFoldAdmissible (postfixStep file receiver part) rest := by
+  cases part <;> cases rest with
+  | nil => trivial
+  | cons head tail => cases head <;> trivial
+
+private theorem postfixStep_span
+    (file : WorkspaceFile) (receiver : Expression)
+    (part : PostfixPartValue) :
+    (postfixStep file receiver part).span =
+      (RuleReduction.between file receiver.span
+        (postfixPartEndSpan part) ()).span := by
+  cases part <;> rfl
+
+private theorem postfixStep_tokenPlan
+    (file : WorkspaceFile) (receiver : Expression)
+    (part : PostfixPartValue)
+    (receiverPlan plainPartPlan : TokenPlan)
+    (admissible : PostfixFoldAdmissible receiver (part :: []))
+    (receiverEq : postfixExpressionTokenPlan? receiver = some receiverPlan)
+    (plainPartEq :
+      postfixPartPlainTokenPlan? part = some plainPartPlan) :
+    postfixExpressionTokenPlan? (postfixStep file receiver part) =
+      some ((receiverPlan.append plainPartPlan).enclose
+        (postfixStep file receiver part).span) := by
+  change expressionTokenPlanAt? .postfix receiver =
+    some receiverPlan at receiverEq
+  cases part with
+  | call openParen arguments closeParen =>
+      cases plansEq : expressionTokenPlans? arguments with
+      | none =>
+          simp [postfixPartPlainTokenPlan?, plansEq] at plainPartEq
+      | some plans =>
+          simp [postfixPartPlainTokenPlan?, plansEq] at plainPartEq
+          subst plainPartPlan
+          rcases receiver with ⟨receiverSpan, receiverPayload⟩
+          cases receiverPayload <;>
+            simp_all [PostfixFoldAdmissible, postfixStep,
+              postfixExpressionTokenPlan?, expressionTokenPlanAt?,
+              RuleReduction.between, plansEq]
+          case dotConstructor constructorArguments =>
+            cases constructorArguments <;>
+              simp_all [PostfixFoldAdmissible, postfixStep,
+                postfixExpressionTokenPlan?, expressionTokenPlanAt?,
+                RuleReduction.between, plansEq]
+  | select dot field =>
+      simp [postfixPartPlainTokenPlan?] at plainPartEq
+      subst plainPartPlan
+      simp [postfixStep, postfixExpressionTokenPlan?,
+        expressionTokenPlanAt?, RuleReduction.between, receiverEq]
+  | index openBracket index closeBracket =>
+      cases indexEq : expressionTokenPlan? index with
+      | none =>
+          have directEq : expressionTokenPlanAt? .annotation index = none :=
+            indexEq
+          change ((expressionTokenPlanAt? .annotation index).bind fun plan =>
+            some (.concat [
+              .plain (.symbol .leftBracket), plan,
+              .plain (.symbol .rightBracket)])) =
+            some plainPartPlan at plainPartEq
+          simp [postfixPartPlainTokenPlan?, directEq] at plainPartEq
+      | some indexPlan =>
+          have directEq : expressionTokenPlanAt? .annotation index =
+              some indexPlan := indexEq
+          change ((expressionTokenPlanAt? .annotation index).bind fun plan =>
+            some (.concat [
+              .plain (.symbol .leftBracket), plan,
+              .plain (.symbol .rightBracket)])) =
+            some plainPartPlan at plainPartEq
+          simp [postfixPartPlainTokenPlan?, directEq] at plainPartEq
+          subst plainPartPlan
+          simp [postfixStep, postfixExpressionTokenPlan?,
+            expressionTokenPlanAt?, RuleReduction.between,
+            receiverEq, directEq]
+
+private theorem postfixFoldWorkingTokenPlan?_evidence
+    {file : WorkspaceFile}
+    (receiver : Expression) (parts : List PostfixPartValue)
+    (admissible : PostfixFoldAdmissible receiver parts)
+    {actual : List Token}
+    (sources : TokensHaveSource file.id actual)
+    (evidence : TokenPlanEvidence
+      (postfixFoldWorkingTokenPlan? receiver parts) actual) :
+    TokenPlanEvidence
+      (postfixExpressionTokenPlan?
+        (RuleReduction.foldPostfix file receiver parts)) actual := by
+  induction parts generalizing receiver actual with
+  | nil =>
+      simpa [postfixFoldWorkingTokenPlan?,
+        RuleReduction.foldPostfix] using evidence
+  | cons part rest induction =>
+      rcases evidence with ⟨wholePlan, candidateEq, relation⟩
+      cases receiverEq : postfixExpressionTokenPlan? receiver with
+      | none =>
+          simp [postfixFoldWorkingTokenPlan?, receiverEq] at candidateEq
+      | some receiverPlan =>
+          cases partEq : postfixPartTokenPlan? part with
+          | none =>
+              simp [postfixFoldWorkingTokenPlan?, receiverEq,
+                List.mapM_cons, partEq] at candidateEq
+          | some partPlan =>
+              cases restPlansEq : rest.mapM postfixPartTokenPlan? with
+              | none =>
+                  simp [postfixFoldWorkingTokenPlan?, receiverEq,
+                    List.mapM_cons, partEq, restPlansEq] at candidateEq
+              | some restPlans =>
+                  simp [postfixFoldWorkingTokenPlan?, receiverEq,
+                    List.mapM_cons, partEq, restPlansEq] at candidateEq
+                  subst wholePlan
+                  rw [← TokenPlan.append_assoc] at relation
+                  rcases TokenSlot.ListMatches.split_append relation with
+                    ⟨prefixActual, restActual, actualEq,
+                      prefixRelation, restRelation⟩
+                  rcases TokenSlot.ListMatches.split_append prefixRelation with
+                    ⟨receiverActual, partActual, prefixEq,
+                      receiverRelation, partRelation⟩
+                  have splitSources : TokensHaveSource file.id
+                      (prefixActual ++ restActual) := by
+                    intro token member
+                    exact sources token (by rw [actualEq]; exact member)
+                  have prefixSources : TokensHaveSource file.id prefixActual :=
+                    splitSources.of_append_left
+                  have receiverSources : TokensHaveSource file.id
+                      receiverActual := by
+                    intro token member
+                    apply prefixSources token
+                    rw [prefixEq]
+                    exact List.mem_append_left _ member
+                  rcases postfixPart_relation_plainAndEnds
+                      part partPlan partEq partRelation with
+                    ⟨plainPartPlan, plainPartEq, plainPartRelation,
+                      partEnds⟩
+                  have receiverEndpoints := expressionPlan_matches_endpoints
+                    .postfix receiver receiverPlan receiverEq
+                    (postfixExpressionTokenPlan?_encloses
+                      receiver receiverPlan receiverEq)
+                    receiverRelation
+                  let next : Expression := postfixStep file receiver part
+                  let nextInner := receiverPlan.append plainPartPlan
+                  let nextPlan := nextInner.enclose next.span
+                  have nextInnerRelation : TokenSlot.ListMatches
+                      nextInner.slots (receiverActual ++ partActual) :=
+                    receiverRelation.append plainPartRelation
+                  have nextInnerAnchored : nextInner.WellAnchored :=
+                    TokenPlan.WellAnchored.append
+                      (expressionTokenPlanAt?_wellAnchored
+                        .postfix receiver receiverPlan receiverEq)
+                      (postfixPartPlainTokenPlan?_wellAnchored
+                        part plainPartPlan plainPartEq)
+                  have prefixSourceParts : TokensHaveSource file.id
+                      (receiverActual ++ partActual) := by
+                    intro token member
+                    apply prefixSources token
+                    simpa [prefixEq] using member
+                  have nextRelation : TokenSlot.ListMatches nextPlan.slots
+                      (receiverActual ++ partActual) := by
+                    apply TokenSlot.ListMatches.enclose
+                      nextInnerRelation nextInnerAnchored
+                    · simp only [next]
+                      rw [postfixStep_span]
+                      apply firstSatisfies_between prefixSourceParts
+                      exact TokenSlot.FirstSatisfies.append
+                        receiverEndpoints.1
+                    · simp only [next]
+                      rw [postfixStep_span]
+                      apply lastSatisfies_between prefixSourceParts
+                      exact TokenSlot.LastSatisfies.prepend partEnds
+                  have nextEq :
+                      postfixExpressionTokenPlan? next = some nextPlan := by
+                    have headAdmissible :
+                        PostfixFoldAdmissible receiver (part :: []) := by
+                      cases part <;> simpa [PostfixFoldAdmissible] using
+                        admissible
+                    simpa [next, nextPlan, nextInner] using
+                      postfixStep_tokenPlan file receiver part
+                        receiverPlan plainPartPlan headAdmissible
+                        receiverEq plainPartEq
+                  have recursiveEvidence : TokenPlanEvidence
+                      (postfixFoldWorkingTokenPlan? next rest)
+                      ((receiverActual ++ partActual) ++ restActual) := by
+                    refine ⟨nextPlan.append (.concat restPlans), ?_, ?_⟩
+                    · simp [postfixFoldWorkingTokenPlan?, nextEq,
+                        restPlansEq]
+                    · exact nextRelation.append restRelation
+                  have recursiveSources : TokensHaveSource file.id
+                      ((receiverActual ++ partActual) ++ restActual) := by
+                    intro token member
+                    apply splitSources token
+                    rw [prefixEq]
+                    simpa [List.append_assoc] using member
+                  have result := induction next
+                    (PostfixFoldAdmissible.afterStep
+                      file receiver part rest)
+                    recursiveSources recursiveEvidence
+                  have resultAtActual := result.actual_eq (show
+                      (receiverActual ++ partActual) ++ restActual =
+                        actual from by
+                        rw [← prefixEq, ← actualEq])
+                  rw [foldPostfix_cons]
+                  exact resultAtActual
+
+/-- Exact source token evidence survives admissible postfix folding. -/
+theorem postfixFold_tokenPlanEvidence
+    {file : WorkspaceFile} {tokens : List Token}
+    {origin finish : Boundary tokens}
+    (receiver : Expression) (parts : List PostfixPartValue)
+    (admissible : PostfixFoldAdmissible receiver parts)
+    (owned : TokensOwnedBy file tokens)
+    (evidence : TokenPlanEvidence
+      (postfixFoldSourceTokenPlan? receiver parts)
+      (PhysicalTokens tokens origin finish)) :
+    TokenPlanEvidence
+      (postfixExpressionTokenPlan?
+        (RuleReduction.foldPostfix file receiver parts))
+      (PhysicalTokens tokens origin finish) := by
+  have promoted : TokenPlanEvidence
+      (postfixFoldWorkingTokenPlan? receiver parts)
+      (PhysicalTokens tokens origin finish) :=
+    evidence.mapSuccessfulCandidate fun plan success =>
+      postfixFoldSourceTokenPlan?_promotes receiver parts plan success
+  exact postfixFoldWorkingTokenPlan?_evidence receiver parts admissible
+    (physicalTokens_haveSource owned) promoted
 
 end Solcore.Surface.Multi
