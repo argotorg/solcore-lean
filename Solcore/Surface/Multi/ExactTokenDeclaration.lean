@@ -531,6 +531,31 @@ def declarationModulePlan?
   let items ← plans? topItemPlan? module.payload.items
   pure (.concat items)
 
+/-- An empty module contributes no retained-token slots. -/
+@[simp] theorem declarationModulePlan?_nil
+    (span : SourceSpan) (source : Solcore.Workspace.SourceId) :
+    declarationModulePlan? ⟨span, ⟨source, []⟩⟩ = some .empty := by
+  rfl
+
+/-- Module planning composes the first top-level item with the recursively
+planned suffix in source order. -/
+@[simp] theorem declarationModulePlan?_cons
+    (span : SourceSpan) (source : Solcore.Workspace.SourceId)
+    (item : TopItem) (rest : List TopItem) :
+    declarationModulePlan? ⟨span, ⟨source, item :: rest⟩⟩ = (do
+      let head ← topItemPlan? item
+      let tail ← declarationModulePlan? ⟨span, ⟨source, rest⟩⟩
+      pure (head.append tail)) := by
+  unfold declarationModulePlan?
+  simp only [plans?]
+  cases headEq : topItemPlan? item with
+  | none => simp
+  | some head =>
+      cases tailEq : plans? topItemPlan? rest with
+      | none => simp
+      | some tail =>
+          simp [TokenPlan.concat, TokenPlan.append]
+
 /-!
 Rejected AST shapes are explicit `none` results:
 
