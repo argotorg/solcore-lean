@@ -18,6 +18,17 @@ theorem Lexes.tokensSourceExact
   intro token member
   exact lexical.tokenSourceExact member
 
+namespace ExpectedToken
+
+/-- Forgetting endpoint constraints preserves a successful token-kind match. -/
+theorem Matches.toPlain
+    {expected : ExpectedToken} {actual : Token}
+    (relation : expected.Matches actual) :
+    (ExpectedToken.plain expected.kind).Matches actual := by
+  exact ⟨relation.1, by intro constraint member; cases member⟩
+
+end ExpectedToken
+
 namespace TokenSlot
 
 def FirstSatisfies
@@ -97,6 +108,58 @@ theorem optional_present
     (head : expected.Matches actual) :
     ListMatches [.optional expected] [actual] :=
   .optionalPresent head .nil
+
+/-- A mandatory singleton plan consumes exactly one matching token. -/
+theorem required_singleton_iff
+    {expected : ExpectedToken} {actual : List Token} :
+    ListMatches [.required expected] actual ↔
+      ∃ token, actual = [token] ∧ expected.Matches token := by
+  constructor
+  · intro relation
+    cases relation with
+    | required head tail =>
+        cases tail
+        exact ⟨_, rfl, head⟩
+  · rintro ⟨token, rfl, head⟩
+    exact .required head .nil
+
+/-- Matching a concatenated slot language determines matching physical
+prefix and suffix slices. The split need not be unique when optional slots
+are present, so the result is deliberately existential. -/
+theorem split_append
+    {leftSlots rightSlots : List TokenSlot} {actual : List Token}
+    (relation : ListMatches (leftSlots ++ rightSlots) actual) :
+    ∃ leftActual rightActual,
+      actual = leftActual ++ rightActual ∧
+        ListMatches leftSlots leftActual ∧
+        ListMatches rightSlots rightActual := by
+  induction leftSlots generalizing actual with
+  | nil =>
+      exact ⟨[], actual, rfl, .nil, relation⟩
+  | cons slot leftSlots induction =>
+      cases slot with
+      | required expected =>
+          cases relation with
+          | required head tail =>
+              rcases induction tail with
+                ⟨leftActual, rightActual, equation,
+                  leftRelation, rightRelation⟩
+              exact ⟨_ :: leftActual, rightActual, by simp [equation],
+                .required head leftRelation, rightRelation⟩
+      | optional expected =>
+          cases relation with
+          | optionalAbsent tail =>
+              rcases induction tail with
+                ⟨leftActual, rightActual, equation,
+                  leftRelation, rightRelation⟩
+              exact ⟨leftActual, rightActual, equation,
+                .optionalAbsent leftRelation, rightRelation⟩
+          | optionalPresent head tail =>
+              rcases induction tail with
+                ⟨leftActual, rightActual, equation,
+                  leftRelation, rightRelation⟩
+              exact ⟨_ :: leftActual, rightActual, by simp [equation],
+                .optionalPresent head leftRelation, rightRelation⟩
 
 /-- An enclosing span is sound when the generated plan has mandatory physical
 endpoints and the actual first and last tokens realize those endpoints. -/
