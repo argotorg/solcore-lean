@@ -1267,6 +1267,13 @@ def HasElement {α : Type} (values : List α) : Prop :=
     HasElement (head :: tail) := by
   exact ⟨head, by simp⟩
 
+/-- Any list known not to be empty has a written element. -/
+theorem HasElement.of_ne_nil {α : Type} {values : List α}
+    (notEmpty : values ≠ []) : HasElement values := by
+  cases values with
+  | nil => exact False.elim (notEmpty rfl)
+  | cons head tail => exact hasElement_cons head tail
+
 /-- The keys of a finite list are pairwise distinct. -/
 def UniqueBy {α κ : Type} (key : α → κ) (values : List α) : Prop :=
   (values.map key).Nodup
@@ -1289,6 +1296,110 @@ theorem UniqueBy.not_laterDuplicate
         apply List.mem_map.mpr
         exact ⟨candidate, member, keyEq.symm⟩
 
+/-- Failure of finite key uniqueness supplies a concrete later duplicate. -/
+theorem UniqueBy.failure_witness
+    {α κ : Type} [DecidableEq κ]
+    {key : α → κ} {values : List α}
+    (notUnique : ¬UniqueBy key values) :
+    ∃ later, LaterDuplicate values key later := by
+  induction values with
+  | nil =>
+      exact False.elim (notUnique (by simp [UniqueBy]))
+  | cons head tail induction =>
+      rw [UniqueBy, List.map_cons, List.nodup_cons] at notUnique
+      by_cases headRepeated : key head ∈ tail.map key
+      · rcases List.mem_map.mp headRepeated with
+          ⟨candidate, member, keyEq⟩
+        exact ⟨candidate,
+          LaterDuplicate.of_head member rfl keyEq.symm⟩
+      · have tailNotUnique : ¬UniqueBy key tail := by
+          intro tailUnique
+          exact notUnique ⟨headRepeated, tailUnique⟩
+        rcases induction tailNotUnique with ⟨later, duplicate⟩
+        exact ⟨later, LaterDuplicate.of_tail duplicate⟩
+
+/-- Absence of every concrete later duplicate establishes key uniqueness. -/
+theorem UniqueBy.of_no_laterDuplicate
+    {α κ : Type} [DecidableEq κ]
+    {key : α → κ} {values : List α}
+    (noneLater : ∀ later, ¬LaterDuplicate values key later) :
+    UniqueBy key values := by
+  by_cases unique : UniqueBy key values
+  · exact unique
+  · rcases UniqueBy.failure_witness unique with ⟨later, duplicate⟩
+    exact False.elim (noneLater later duplicate)
+
+/-- Strict span order is transitive. -/
+theorem SpanBefore.trans
+    {left middle right : SourceSpan}
+    (leftMiddle : SpanBefore left middle)
+    (middleRight : SpanBefore middle right) :
+    SpanBefore left right := by
+  rcases leftMiddle with sourceLeftMiddle |
+      ⟨sameSourceLeftMiddle, positionLeftMiddle⟩
+  · rcases middleRight with sourceMiddleRight |
+        ⟨sameSourceMiddleRight, positionMiddleRight⟩
+    · exact SpanBefore.of_source
+        (Std.TransCmp.lt_trans sourceLeftMiddle sourceMiddleRight)
+    · apply SpanBefore.of_source
+      rw [← sameSourceMiddleRight]
+      exact sourceLeftMiddle
+  · rcases middleRight with sourceMiddleRight |
+        ⟨sameSourceMiddleRight, positionMiddleRight⟩
+    · apply SpanBefore.of_source
+      rw [sameSourceLeftMiddle]
+      exact sourceMiddleRight
+    · refine Or.inr ⟨sameSourceLeftMiddle.trans sameSourceMiddleRight, ?_⟩
+      rcases positionLeftMiddle with startLeftMiddle |
+          ⟨sameStartLeftMiddle, endLeftMiddle⟩
+      · rcases positionMiddleRight with startMiddleRight |
+            ⟨sameStartMiddleRight, endMiddleRight⟩
+        · exact Or.inl (Nat.lt_trans startLeftMiddle startMiddleRight)
+        · apply Or.inl
+          rw [← sameStartMiddleRight]
+          exact startLeftMiddle
+      · rcases positionMiddleRight with startMiddleRight |
+            ⟨sameStartMiddleRight, endMiddleRight⟩
+        · apply Or.inl
+          rw [sameStartLeftMiddle]
+          exact startMiddleRight
+        · exact Or.inr ⟨sameStartLeftMiddle.trans sameStartMiddleRight,
+            Nat.lt_trans endLeftMiddle endMiddleRight⟩
+
+/-- Every finite nonempty span list contains a least listed span. -/
+theorem exists_leastSpanIn_of_hasElement
+    (spans : List SourceSpan) (hasElement : HasElement spans) :
+    ∃ span, LeastSpanIn span spans := by
+  induction spans with
+  | nil => exact False.elim (hasElement_nil hasElement)
+  | cons head tail induction =>
+      cases tail with
+      | nil => exact ⟨head, leastSpanIn_singleton head⟩
+      | cons next rest =>
+          have tailHasElement : HasElement (next :: rest) :=
+            hasElement_cons next rest
+          rcases induction tailHasElement with ⟨least, leastInTail⟩
+          by_cases headBefore : SpanBefore head least
+          · refine ⟨head, ?_⟩
+            constructor
+            · simp
+            · rw [noSpanBefore_iff]
+              intro candidate member candidateBefore
+              rcases List.mem_cons.mp member with equal | tailMember
+              · subst candidate
+                exact spanBefore_self head candidateBefore
+              · exact leastInTail.not_before tailMember
+                  (SpanBefore.trans candidateBefore headBefore)
+          · refine ⟨least, ?_⟩
+            constructor
+            · exact List.mem_cons_of_mem head leastInTail.member
+            · rw [noSpanBefore_iff]
+              intro candidate member
+              rcases List.mem_cons.mp member with equal | tailMember
+              · subst candidate
+                exact headBefore
+              · exact leastInTail.not_before tailMember
+
 /-- A wildcard is valid alone, or the finite entry list has no wildcard. -/
 def WildcardListShape
     (entryCount : Nat) (wildcardSpans : List SourceSpan) : Prop :=
@@ -1305,6 +1416,23 @@ theorem WildcardListShape.not_mixed_least
   · exact mixed countOne
   · have member := least.member
     simp [noWildcard] at member
+
+/-- No mixed-wildcard witness establishes the accepted wildcard-list shape. -/
+theorem WildcardListShape.of_no_mixed_least
+    {entryCount : Nat} {wildcardSpans : List SourceSpan}
+    (noMixed : ∀ span,
+      entryCount ≠ 1 → LeastSpanIn span wildcardSpans → False) :
+    WildcardListShape entryCount wildcardSpans := by
+  by_cases countOne : entryCount = 1
+  · exact Or.inl countOne
+  · apply Or.inr
+    by_cases empty : wildcardSpans = []
+    · exact empty
+    · have hasElement : HasElement wildcardSpans :=
+        HasElement.of_ne_nil empty
+      rcases exists_leastSpanIn_of_hasElement wildcardSpans hasElement with
+        ⟨least, leastProof⟩
+      exact False.elim (noMixed least countOne leastProof)
 
 namespace StructuralSite
 
@@ -1612,5 +1740,227 @@ theorem StructurallyAccepts.not_applies
       simp only [StructuralSite.Accepts] at site
       rw [shape] at site
       exact Nat.lt_irrefl 0 site
+
+/-- Absence of every structural diagnostic establishes module acceptance. -/
+theorem StructurallyAccepts.of_not_applies
+    {module : ParsedModuleV1}
+    (noApplies : ∀ diagnostic,
+      ¬StructuralDiagnostic.Applies module diagnostic) :
+    StructurallyAccepts module := by
+  refine ⟨fun {site} occurrence => ?_⟩
+  cases site with
+  | importSelection selection =>
+      simp only [StructuralSite.Accepts]
+      constructor
+      · apply HasElement.of_ne_nil
+        intro empty
+        exact noApplies _
+          (.emptyImportSelection occurrence empty)
+      · constructor
+        · apply WildcardListShape.of_no_mixed_least
+          intro span mixed least
+          exact noApplies _
+            (.mixedImportWildcard occurrence mixed least)
+        · constructor
+          · apply UniqueBy.of_no_laterDuplicate
+            intro binding duplicate
+            exact noApplies _
+              (.duplicateImportSourceName occurrence duplicate)
+          · apply UniqueBy.of_no_laterDuplicate
+            intro binding duplicate
+            exact noApplies _
+              (.duplicateImportLocalName occurrence duplicate)
+  | hidingClause clause =>
+      simp only [StructuralSite.Accepts]
+      constructor
+      · apply HasElement.of_ne_nil
+        intro empty
+        exact noApplies _ (.emptyHidingClause occurrence empty)
+      · apply UniqueBy.of_no_laterDuplicate
+        intro name duplicate
+        exact noApplies _ (.duplicateHiddenName occurrence duplicate)
+  | localExportList selection =>
+      simp only [StructuralSite.Accepts]
+      constructor
+      · apply HasElement.of_ne_nil
+        intro empty
+        exact noApplies _ (.emptyLocalExportList occurrence empty)
+      · constructor
+        · apply WildcardListShape.of_no_mixed_least
+          intro span mixed least
+          exact noApplies _
+            (.mixedLocalExportWildcard occurrence mixed least)
+        · constructor
+          · apply UniqueBy.of_no_laterDuplicate
+            intro item duplicate
+            exact noApplies _
+              (.duplicateLocalExportName occurrence duplicate)
+          · apply UniqueBy.of_no_laterDuplicate
+            intro reference duplicate
+            exact noApplies _
+              (.duplicateExportModuleReference occurrence duplicate)
+  | remoteExportSelection selection =>
+      simp only [StructuralSite.Accepts]
+      cases payloadEq : selection.payload with
+      | dotWildcard marker => exact True.intro
+      | braced entries =>
+          constructor
+          · apply HasElement.of_ne_nil
+            intro empty
+            exact noApplies _
+              (.emptyRemoteExportList entries occurrence payloadEq empty)
+          · constructor
+            · apply WildcardListShape.of_no_mixed_least
+              intro span mixed least
+              exact noApplies _
+                (.mixedRemoteExportWildcard occurrence payloadEq mixed least)
+            · apply UniqueBy.of_no_laterDuplicate
+              intro item duplicate
+              exact noApplies _
+                (.duplicateRemoteExportName occurrence payloadEq duplicate)
+  | exportItem item =>
+      simp only [StructuralSite.Accepts]
+      cases selectionPresent : item.payload.constructors with
+      | none =>
+          exact True.intro
+      | some selection =>
+          cases selectionShape : selection.payload with
+          | all marker =>
+              simp only [StructuralSite.ConstructorSelectionAccepts,
+                selectionShape]
+          | named constructors =>
+              simp only [StructuralSite.ConstructorSelectionAccepts,
+                selectionShape]
+              apply UniqueBy.of_no_laterDuplicate
+              intro name duplicate
+              exact noApplies _ (.duplicateExportConstructor occurrence
+                selectionPresent selectionShape duplicate)
+  | pragma declaration =>
+      simp only [StructuralSite.Accepts]
+      constructor
+      · unfold StructuralSite.PragmaTargetsPresentWhenRequired
+        cases kindEq : declaration.payload.kind.payload with
+        | noCoverageCondition => exact True.intro
+        | noPattersonCondition => exact True.intro
+        | noBoundedVariableCondition => exact True.intro
+        | noGenericInstanceFor =>
+            apply HasElement.of_ne_nil
+            intro empty
+            exact noApplies _
+              (.emptyGenericPragmaTargets occurrence kindEq empty)
+      · apply UniqueBy.of_no_laterDuplicate
+        intro target duplicate
+        exact noApplies _ (.duplicatePragmaTarget occurrence duplicate)
+  | signature modifierContext parameterContext functionSignature =>
+      simp only [StructuralSite.Accepts]
+      constructor
+      · unfold StructuralSite.SignatureModifiersAllowed
+        cases modifierContext with
+        | none => exact True.intro
+        | some context =>
+            constructor
+            · cases publicEq : functionSignature.payload.public with
+              | none => exact rfl
+              | some marker =>
+                  exact False.elim (noApplies _
+                    (.signatureModifierNotAllowed occurrence
+                      (.publicMarker publicEq)))
+            · cases payableEq : functionSignature.payload.payable with
+              | none => exact rfl
+              | some marker =>
+                  exact False.elim (noApplies _
+                    (.signatureModifierNotAllowed occurrence
+                      (.payableMarker payableEq)))
+      · unfold StructuralSite.ParameterTypesPresent
+        intro parameter member
+        cases typeEq : parameter.payload.type with
+        | none =>
+            exact False.elim (noApplies _
+              (.signatureParameterTypeMissing occurrence member typeEq))
+        | some typeExpression => exact ⟨typeExpression, rfl⟩
+  | fallback declaration =>
+      simp only [StructuralSite.Accepts]
+      constructor
+      · cases publicEq : declaration.payload.public with
+        | none => exact rfl
+        | some marker =>
+            exact False.elim (noApplies _
+              (.fallbackModifierNotAllowed occurrence publicEq))
+      · constructor
+        · by_cases empty : declaration.payload.parameters = []
+          · exact empty
+          · exact False.elim (noApplies _
+              (.fallbackHasParameters occurrence empty))
+        · cases returnEq : declaration.payload.returnType with
+          | none => exact True.intro
+          | some returnType =>
+              by_cases grouped : GroupedUnit returnType
+              · exact grouped
+              · exact False.elim (noApplies _
+                  (.fallbackHasNonUnitReturn occurrence returnEq grouped))
+  | contractConstructor declaration =>
+      simp only [StructuralSite.Accepts]
+      constructor
+      · cases publicEq : declaration.payload.public with
+        | none => exact rfl
+        | some marker =>
+            exact False.elim (noApplies _
+              (.constructorModifierNotAllowed occurrence publicEq))
+      · unfold StructuralSite.ParameterTypesPresent
+        intro parameter member
+        cases typeEq : parameter.payload.type with
+        | none =>
+            exact False.elim (noApplies _
+              (.constructorParameterTypeMissing occurrence member typeEq))
+        | some typeExpression => exact ⟨typeExpression, rfl⟩
+  | statement loopDepth statementNode =>
+      simp only [StructuralSite.Accepts]
+      cases payloadEq : statementNode.payload with
+      | assignment operator left right => exact True.intro
+      | letBinding binding => exact True.intro
+      | block body => exact True.intro
+      | expression expressionNode terminator => exact True.intro
+      | «return» value terminator => exact True.intro
+      | «match» scrutinees arms terminator =>
+          unfold StructuralSite.MatchAritiesAgree
+          intro arm member
+          by_cases arityEq : arm.payload.patterns.toList.length =
+              scrutinees.toList.length
+          · exact arityEq
+          · exact False.elim (noApplies _
+              (.matchPatternArityMismatch occurrence payloadEq member arityEq))
+      | assembly slice => exact True.intro
+      | ifThenElse condition thenBody elseBody => exact True.intro
+      | forLoop initializers condition post body => exact True.intro
+      | «break» terminator =>
+          cases loopDepth with
+          | zero =>
+              exact False.elim (noApplies _
+                (.breakOutsideLoop occurrence payloadEq))
+          | succ depth => exact Nat.zero_lt_succ depth
+      | «continue» terminator =>
+          cases loopDepth with
+          | zero =>
+              exact False.elim (noApplies _
+                (.continueOutsideLoop occurrence payloadEq))
+          | succ depth => exact Nat.zero_lt_succ depth
+  | expression expressionNode =>
+      exact StructuralSite.accepts_expression expressionNode
+  | pattern patternNode =>
+      exact StructuralSite.accepts_pattern patternNode
+  | body loopDepth bodyNode =>
+      exact StructuralSite.accepts_body loopDepth bodyNode
+  | forInit item => exact StructuralSite.accepts_forInit item
+  | forPost item => exact StructuralSite.accepts_forPost item
+
+/-- Positive structural acceptance is exactly absence of applicable diagnostics. -/
+@[simp] theorem structurallyAccepts_iff_no_applies
+    (module : ParsedModuleV1) :
+    StructurallyAccepts module ↔
+      ∀ diagnostic, ¬StructuralDiagnostic.Applies module diagnostic := by
+  constructor
+  · intro accepted diagnostic
+    exact accepted.not_applies
+  · exact StructurallyAccepts.of_not_applies
 
 end Solcore.Surface.Multi
