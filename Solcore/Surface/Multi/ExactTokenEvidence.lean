@@ -64,6 +64,33 @@ theorem append
   · simp [leftEq, rightEq]
   · exact leftRelation.append rightRelation
 
+/-- Decompose evidence for an appended pair of successful candidates into
+the exact token subsequences matched by each side. -/
+theorem splitAppend
+    {headCandidate tailCandidate : Option TokenPlan}
+    {actual : List Token}
+    (evidence : TokenPlanEvidence
+      (do
+        let headPlan ← headCandidate
+        let tailPlan ← tailCandidate
+        pure (headPlan.append tailPlan)) actual) :
+    ∃ headActual tailActual,
+      actual = headActual ++ tailActual ∧
+        TokenPlanEvidence headCandidate headActual ∧
+        TokenPlanEvidence tailCandidate tailActual := by
+  rcases evidence with ⟨plan, success, relation⟩
+  rcases Option.bind_eq_some_iff.mp success with
+    ⟨headPlan, headEq, afterHeadEq⟩
+  rcases Option.bind_eq_some_iff.mp afterHeadEq with
+    ⟨tailPlan, tailEq, resultEq⟩
+  injection resultEq with planEq
+  subst plan
+  rcases relation.split_append with
+    ⟨headActual, tailActual, actualEq, headRelation, tailRelation⟩
+  exact ⟨headActual, tailActual, actualEq,
+    ⟨headPlan, headEq, headRelation⟩,
+    ⟨tailPlan, tailEq, tailRelation⟩⟩
+
 /-- Pointwise evidence for a list of values concatenates into evidence for
 the corresponding list visitor and flattened physical token sequence. -/
 theorem concat
