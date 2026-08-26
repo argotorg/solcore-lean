@@ -1,5 +1,6 @@
 import Solcore.Surface.Multi.StructureDiagnosticInsertionUnits
 import Solcore.Surface.Multi.StructureCanonicalDedupComparisonUnits
+import Solcore.Surface.Multi.StructureCanonicalOrderingComparisonUnits
 import Solcore.Surface.Multi.StructureDuplicateComparisonUnits
 
 /-! Executable regressions for the M2c resource-bound primitives. -/
@@ -150,5 +151,8 @@ def testMultiResourceBounds : IO Unit := do
   assertTrue
     (Structure.structureCanonicalDedupComparisonUnits duplicateModule == 1)
     "two distinct diagnostic candidates must perform one dedup comparison"
+  assertTrue
+    (Structure.structureCanonicalOrderingComparisonUnits duplicateModule == 1)
+    "sorting two canonical diagnostics must perform one ordering comparison"
 
 end Tests
