@@ -313,7 +313,9 @@ def MatchArmStatementLayout
     anchors.spans = statements.map (fun statement => statement.span) ∧
       anchors.Within origin finish ∧ anchors.Ordered
 
-private def matchArmStatementSpans :
+/-- Select the semantic span carried by every statement-shaped grammar rule.
+Other rules contribute no semantic statement span. -/
+def matchArmStatementSpans :
     (rule : GrammarRuleId) → RuleValue rule → List SourceSpan
   | .statement, value => [value.span]
   | .letStatement, value => [value.span]
@@ -330,7 +332,9 @@ private def matchArmStatementSpans :
   | .expressionStatement, value => [value.span]
   | _, _ => []
 
-private def matchArmStatementSpanLayout : RuleSpanLayout := {
+/-- The grammar-wide span layout used to retain repeated statements in a body
+or match arm. -/
+def matchArmStatementSpanLayout : RuleSpanLayout := {
   spans := matchArmStatementSpans
   safe := by
     intro rule value nonempty
@@ -524,7 +528,8 @@ private theorem matchArmStatementSourceSound
       simpa [matchArmStatementSpanLayout, matchArmStatementSpans] using
         FocusedSpanEvidence.empty (file := file) origin finish
 
-private theorem matchArmStatementRootSound :
+/-- Every coherent root action preserves the repeated-statement span layout. -/
+theorem matchArmStatementRootSound :
     RootActionLayoutSpanSound matchArmStatementSpanLayout := by
   intro file tokens rule origin finish input output reduction occupied
     inputEvidence
@@ -644,7 +649,9 @@ local macro "layoutSeq![" children:term "|" values:term,* "]" : term =>
         matchArmLayout_patternRuleAtoms]
       rfl
 
-private theorem matchArm_statementLayout_of_coherentRoot
+/-- A coherent completed match-arm root retains its repeated statement spans
+in grammar order inside the root token interval. -/
+theorem matchArm_statementLayout_of_coherentRoot
     {file : WorkspaceFile} {tokens : List Token}
     {memo : GuardMemo tokens}
     {correct : PhaseBCorrect file tokens memo}
