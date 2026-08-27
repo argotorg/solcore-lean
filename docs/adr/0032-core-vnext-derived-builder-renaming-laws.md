@@ -3,13 +3,13 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: fourteenth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
 ADR-0029 added general de Bruijn renaming after several derived-expression
-interfaces were already complete. Those older interfaces expose weakening laws,
-but eight builders do not expose the corresponding arbitrary renaming law:
+interfaces were already complete. Those older interfaces exposed weakening
+laws, but eight builders lacked the corresponding arbitrary renaming law:
 
 - `boolToWord`, `wordToBool`, `wordIsZero`, and `wordIsNonzero`;
 - `boolAnd` and `boolOr`; and
@@ -18,9 +18,9 @@ but eight builders do not expose the corresponding arbitrary renaming law:
 The generic `Expr.rename` operation can already rename their expansions. The
 missing results are API and regression gaps, not missing semantics.
 
-`Expr.rename_boolToWord` currently appears in `DerivedComparisonFlags` because
-that later module needed it. The theorem belongs with the `boolToWord` builder
-in `Conversions` so earlier and unrelated modules can use it without importing
+`Expr.rename_boolToWord` was located in `DerivedComparisonFlags` because that
+later module needed it. It now belongs with the `boolToWord` builder in
+`Conversions`, so earlier and unrelated modules can use it without importing
 the derived comparison flags.
 
 ## Decision
@@ -51,17 +51,21 @@ Move `Expr.rename_boolToWord` from `DerivedComparisonFlags` to `Conversions`.
 The later comparison-flag proofs continue to consume that theorem through the
 owning module. Do not duplicate the declaration or introduce an import cycle.
 
-## Required verification
+## Implemented verification
 
 Compile-time examples instantiate every public law. Focused executable
-regressions use a genuinely non-insertion mapping that reorders free-variable
-indices. They check that:
+regressions use `swap01`, a genuinely non-insertion mapping that exchanges free
+variable indices zero and one. Golden expressions check that:
 
 - each renamed expansion contains the expected free variables;
 - unary and binary derived builders rename every operand exactly once;
 - the two short-circuit builders retain their branch positions; and
 - evaluating a renamed closed witness under the corresponding environment
   produces the expected value.
+
+Runtime witnesses cover all three owning families: conversions, short-circuit
+booleans, and original word comparison flags. Each is evaluated in the runtime
+environment corresponding to the swapped free variables.
 
 Identity, composition, and insertion behavior remain covered by the general
 ADR-0029 renaming foundation. This slice adds focused coverage for the eight

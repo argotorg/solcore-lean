@@ -37,7 +37,7 @@ These results remain regression obligations for every extension.
 | 11 | Renaming and environment insertion | Complete | Establishes static and dynamic weakening without changing semantics |
 | 12 | Derived boolean word comparisons | Complete | Completes proof interfaces for the existing comparison builders |
 | 13 | Derived word comparison flags | Complete | Wraps existing boolean comparisons with canonical word conversion |
-| 14 | Derived-builder arbitrary renaming laws | Active | Backfills the general renaming API for eight existing builders |
+| 14 | Derived-builder arbitrary renaming laws | Complete | Backfills the general renaming API for eight existing builders |
 | 15 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
 | 16 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 17 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -284,14 +284,17 @@ variable index across the internal binding. The slice keeps left-to-right
 exactly-once evaluation and adds no Core or wire tag. The next feature is
 selected by a separate ADR.
 
-## Active Core vNext slice: derived-builder renaming laws
+## Completed Core vNext slice: derived-builder renaming laws
 
 [ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) backfills
 arbitrary `Expr.rename` laws for exactly eight older derived builders:
 `boolToWord`, `wordToBool`, `wordIsZero`, `wordIsNonzero`, `boolAnd`, `boolOr`,
-`wordEqFlag`, and `wordGtFlag`. The work also relocates `rename_boolToWord` to
-`Conversions`, its owning module, and adds non-insertion/free-variable
-regressions. It changes no weakening law, runtime semantics, or wire behavior.
+`wordEqFlag`, and `wordGtFlag`. Each law lives in its builder's module, with
+`rename_boolToWord` relocated to `Conversions`. The non-insertion `swap01`
+goldens exchange free variables zero and one. Runtime witnesses cover the
+conversion, short-circuit, and comparison-flag families under corresponding
+environments. No weakening law, runtime semantics, or wire behavior changes.
+The next feature is selected by a separate ADR.
 
 ## State and contracts
 

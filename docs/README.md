@@ -74,13 +74,15 @@ weakening boundary under the less-than binders. The builders preserve evaluation
 order, stores, and fuel through ordinary `boolToWord` composition and add no
 Core form, wire tag, or public behavior. The next feature is selected by a
 separate ADR.
-The active fourteenth slice,
+The completed fourteenth slice,
 [ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md), adds arbitrary
 renaming laws for the eight older conversion, short-circuit, and comparison-flag
 builders that previously exposed only weakening laws. It also places
-`rename_boolToWord` with `boolToWord` in `Conversions`. Focused tests use a
-non-insertion mapping and free variables. Runtime and wire behavior do not
-change.
+`rename_boolToWord` with `boolToWord` in `Conversions`; every law lives with its
+builder. `swap01` golden tests exchange two free variables, and runtime tests
+evaluate all three builder families in corresponding environments. Weakening,
+runtime semantics, and wire behavior do not change. The next feature is
+selected by a separate ADR.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
