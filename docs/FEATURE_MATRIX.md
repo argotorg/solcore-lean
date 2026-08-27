@@ -58,7 +58,8 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Word byte selection | ADR-0040 Accepted | Complete | internal BinaryOp.wordByte and big-endian Word.byteAt; five Word, one apply, and three evaluation theorems; values/types/faults/effects/fuel and frozen v1/v2 plus v2-op rejection complete | None |
 | Arithmetic right shift | ADR-0041 Accepted | Complete | internal BinaryOp.wordSar and two's-complement Word.shiftArithmeticRight; five Word, one apply, and five evaluation theorems; values/types/faults/effects/fuel and frozen v1/v2 plus v2-op rejection complete | None |
 | Modular exponentiation | ADR-0042 Accepted | Complete | internal BinaryOp.wordPow and proved square-and-multiply Word.pow; eight Word, one apply, and five evaluations; values/types/faults/effects/fuel and frozen v1/v2 plus v2-op rejection complete | None |
-| Additional conversions and primitives | Per-feature decisions needed | Planned | slice 25 onward; separate closed decisions, total application, and typed results | None |
+| Signed word greater-than | ADR-0043 Accepted | Active | internal boolean BinaryOp.wordSgt basis; four sign cases, strict order, ordered effects, and frozen v1/v2 rejection | None |
+| Additional conversions and primitives | Per-feature decisions needed | Planned | slice 26 onward; separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 
 ## Static semantics after Core

@@ -48,11 +48,12 @@ These results remain regression obligations for every extension.
 | 22 | Word byte selection | Complete | Adds internal big-endian byte selection with index-left/value-right order |
 | 23 | Arithmetic right shift | Complete | Adds internal two's-complement wordSar with value-left/shift-right order |
 | 24 | Modular exponentiation | Complete | Adds internal bounded square-and-multiply wordPow |
-| 25 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
-| 26 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 27 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 28 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 29 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 25 | Signed word greater-than | Active | Adds an internal boolean two's-complement comparison basis |
+| 26 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
+| 27 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 28 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 29 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 30 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -419,6 +420,14 @@ ordered-fault, effect, store, exact-fuel, and frozen Wire plus v2-operation
 rejection tests pass. Public Oracle, schema, JSON, source, ABI, opcode, and gas
 rules remain unchanged. The independent audit found no remaining P0-P3 issue;
 further primitives are planned one closed ADR at a time.
+
+## Active Core vNext slice: signed word greater-than
+
+[ADR-0043](adr/0043-core-vnext-signed-word-greater-than.md) adds internal
+boolean `BinaryOp.wordSgt`. Words at or above `2^255` are negative. Same-sign
+operands use unsigned order; nonnegative words are above negative words. Raw
+Core evaluates left then right exactly once. Signed less-than and word flags
+remain separate future slices, and frozen Wire versions reject the new tag.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
