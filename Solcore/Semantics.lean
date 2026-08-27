@@ -8,6 +8,7 @@ import Solcore.Semantics.FrameOutcome
 import Solcore.Semantics.FrameOutcomeProperties
 import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
+import Solcore.Semantics.WorldState
 
 /-!
 Umbrella module for syntax-independent runtime values, observations, and their
