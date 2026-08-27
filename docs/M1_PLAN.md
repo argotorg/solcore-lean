@@ -56,11 +56,12 @@ These results remain regression obligations for every extension.
 | 30 | Signed division and remainder | Complete | Fixes zero, rounding, sign, and minimum-value behavior |
 | 31 | Signed non-strict comparison flags | Complete | Converts the completed boolean comparisons to canonical words |
 | 32 | Ternary modular arithmetic | Complete | Reduces full-precision sums and products after three ordered operands |
-| 33 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
-| 34 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 35 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 36 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 37 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 33 | Canonical runtime scalar observations | Active | Fixes byte, address, and word representation before contract state |
+| 34 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
+| 35 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 36 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 37 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 38 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.

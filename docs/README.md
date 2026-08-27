@@ -173,6 +173,11 @@ and returns zero for modulus zero only after every operand evaluates. The new
 form, its dedicated raw fault, generic static/safety support, exact fourteen
 focused theorems, and value/order/effect/fuel/Wire regressions are complete and
 remain internal. The independent audit found no P0-P3 issue.
+The active runtime-foundation slice,
+[ADR-0051](adr/0051-canonical-runtime-scalars.md), defines canonical byte,
+address, and word observations independently of source syntax and contract
+state. It fixes strict lowercase `0x` text and a 32-byte big-endian word view
+without changing any published Wire or Oracle profile.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -303,6 +308,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   its independent audit found no P0-P3 issue.
 - ADR-0050 completes dedicated internal ternary modular arithmetic; its
   independent audit found no P0-P3 issue.
+- ADR-0051 accepts canonical internal runtime scalar observations.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -85,6 +85,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 
 | Feature | Status | Missing decision or implementation | Syntax coupling |
 | --- | --- | --- | --- |
+| Canonical runtime scalar observations | Active | ADR-0051 accepted; strict Bytes/Address/Word hex and Word big-endian proofs in progress | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
 | Revert and rollback | Planned | nested rollback and surviving observation policy | None |

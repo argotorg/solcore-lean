@@ -87,6 +87,9 @@ public Wire representation. Its independent audit found no P0-P3 issue.
 [ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) completes the
 internal three-operand modular arithmetic slice with no public Wire
 representation. Its independent audit found no P0-P3 issue.
+[ADR-0051](adr/0051-canonical-runtime-scalars.md) accepts the active internal
+canonical runtime scalar slice. It fixes strict byte, address, and word
+representations without publishing a contract observation format.
 
 ## Implementation status
 
@@ -124,6 +127,7 @@ representation. Its independent audit found no P0-P3 issue.
 | Internal word sign extension | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal signed division and remainder | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal ternary modular arithmetic | Complete | Complete | Explicitly excluded from Wire v1/v2 |
+| Canonical runtime scalar observations | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -646,6 +650,15 @@ and 42/43 fuel, no-prewrap, and frozen v1/v2 rejection regressions are complete.
 Focused/full builds and tests, kernel policy, metadata, trust-zero, and axiom
 checks pass. There is no public format or source commitment; the independent
 audit found no P0-P3 issue.
+
+## Active canonical runtime scalar slice
+
+[ADR-0051](adr/0051-canonical-runtime-scalars.md) fixes internal `Bytes`,
+160-bit `Address`, existing 256-bit `Word`, strict lowercase `0x` hexadecimal,
+and a 32-byte big-endian Word representation. It changes no Core expression,
+public Wire format, source syntax, ABI rule, contract state, or observation
+profile. Implementation proceeds through a reusable proof kernel, scalar APIs,
+sixteen focused theorems, rejection tests, and frozen-Wire compatibility tests.
 
 ## Meaning of completion
 

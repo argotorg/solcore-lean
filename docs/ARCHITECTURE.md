@@ -359,6 +359,12 @@ will record normative state effects rather than bytecode layout, optimizer
 traces, generated names, or wall-clock behavior. Gas belongs to a separate
 fork-pinned profile.
 
+ADR-0051 starts the internal observation foundation without publishing a
+profile. `Bytes`, 160-bit addresses, and existing 256-bit words receive strict
+lowercase `0x` text; words also receive an exact 32-byte big-endian view that
+agrees with Core byte selection. This layer defines representation only, not
+contract state, ABI conversion, hashing, rollback, or EVM behavior.
+
 ## Proof pattern
 
 Each semantic feature follows the same vertical structure:

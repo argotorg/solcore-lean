@@ -42,6 +42,9 @@ Before implementation:
 
 During implementation:
 
+Keep each commit at roughly 300 changed lines or fewer. Split larger features
+at independently buildable and testable boundaries.
+
 1. extend the internal Core algebra;
 2. extend declarative typing and evaluation;
 3. extend total executable inference and evaluation;
