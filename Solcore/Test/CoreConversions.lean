@@ -228,12 +228,112 @@ private def testWordIsZero : IO Unit := do
       Solcore.Core.Wire.V2.Expr.ofCore? handwritten)
     "wordIsZero must project exactly like its handwritten expansion"
 
-/-- Cover truth conversion and the word-valued zero predicate, including
+private def testWordIsNonzero : IO Unit := do
+  let one := Word.ofNatModulo 1
+  let two := Word.ofNatModulo 2
+  let zeroProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsNonzero (.word Word.zero)
+  }
+  let oneProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsNonzero (.word one)
+  }
+  let twoProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsNonzero (.word two)
+  }
+  let maximumProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsNonzero (.word Word.maximum)
+  }
+
+  for program in [zeroProgram, oneProgram, twoProgram, maximumProgram] do
+    assertTrue program.check
+      s!"wordIsNonzero failed to type-check as word: {reprStr program.body}"
+
+  assertTrue (zeroProgram.run 10 == .done (.word Word.zero))
+    "wordIsNonzero must map zero to word zero"
+  assertTrue (oneProgram.run 10 == .done (.word one))
+    "wordIsNonzero must map word one to word one"
+  assertTrue (twoProgram.run 10 == .done (.word one))
+    "wordIsNonzero must map word two to word one"
+  assertTrue (maximumProgram.run 10 == .done (.word one))
+    "wordIsNonzero must map the maximum word to word one"
+
+  let wrongInput : Program := {
+    resultType := .word
+    body := Expr.wordIsNonzero .unit
+  }
+  let wrongDeclaredType : Program := {
+    resultType := .bool
+    body := Expr.wordIsNonzero (.word one)
+  }
+  assertTrue (!wrongInput.check)
+    "wordIsNonzero must reject a non-word operand"
+  assertTrue (!wrongDeclaredType.check)
+    "wordIsNonzero must retain its word result type"
+  assertTrue
+    (wrongInput.run 6 ==
+      .fault (.invalidBinaryOperands .wordEq .unit (.word Word.zero)))
+    "the unchecked expansion must expose its inner word comparison fault"
+
+  assertTrue (zeroProgram.run 9 == .outOfFuel)
+    "nine transitions must be insufficient for canonical wordIsNonzero"
+  assertTrue (zeroProgram.run 10 == .done (.word Word.zero))
+    "canonical wordIsNonzero must finish at its ten-transition boundary"
+
+  let effectfulOperand : Expr :=
+    .letE
+      (.newCell .word (.word Word.zero))
+      (.letE
+        (.storeCell (.var 0) (.word Word.maximum))
+        (.word one))
+  let effectfulProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsNonzero effectfulOperand
+  }
+  assertTrue effectfulProgram.check
+    "wordIsNonzero must accept an allocating and writing word operand"
+  assertTrue
+    (effectfulProgram.runStateful 22 ==
+      .done (.word one) [.word Word.maximum])
+    "wordIsNonzero must evaluate its operand once and preserve its updated store"
+
+  let booleanTruthiness : Program := {
+    resultType := .bool
+    body := Expr.wordToBool (.word one)
+  }
+  let zeroPredicate : Program := {
+    resultType := .word
+    body := Expr.wordIsZero (.word one)
+  }
+  assertTrue (booleanTruthiness.run 7 == .done (.bool true))
+    "wordToBool must remain boolean-valued"
+  assertTrue (zeroPredicate.run 8 == .done (.word Word.zero))
+    "wordIsZero must remain the inverse word-valued predicate"
+  assertTrue (oneProgram.run 10 == .done (.word one))
+    "wordIsNonzero must remain distinct from wordToBool and wordIsZero"
+
+  let projection := Expr.wordIsNonzero (.word Word.maximum)
+  let handwritten :=
+    Expr.boolToWord (Expr.wordToBool (.word Word.maximum))
+  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? projection).isNone
+    "v1 must reject the primitives used by wordIsNonzero"
+  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? projection).isSome
+    "wordIsNonzero must project through existing v2 forms"
+  assertTrue
+    (Solcore.Core.Wire.V2.Expr.ofCore? projection ==
+      Solcore.Core.Wire.V2.Expr.ofCore? handwritten)
+    "wordIsNonzero must project exactly like its canonical expansion"
+
+/-- Cover truth conversion and the word-valued zero/nonzero predicates, including
 typing, raw faults, evaluation order, exact fuel, and frozen-wire boundaries. -/
 def testCoreConversions : IO Unit := do
   testConversionValuesAndTypes
   testExactFuelAndSingleEvaluation
   testFrozenWireProjection
   testWordIsZero
+  testWordIsNonzero
 
 end Tests
