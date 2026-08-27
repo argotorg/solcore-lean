@@ -36,8 +36,8 @@ builders. Core vNext remains active.
 word-valued flags for the four existing derived comparisons.
 [ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) completes the
 arbitrary renaming-law backfill for eight older derived builders.
-[ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md) makes the
-focused interface for the existing direct unary primitives the active slice.
+[ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md) completes
+the focused interface for the existing direct unary primitives.
 
 ## Implementation status
 
@@ -60,7 +60,7 @@ focused interface for the existing direct unary primitives the active slice.
 | Internal derived boolean word comparisons | Complete | Complete | Not published |
 | Internal derived word comparison flags | Complete | Complete | Not published |
 | Internal derived-builder arbitrary renaming laws | Complete | Complete | Not published |
-| Internal direct unary primitive interface | In progress | In progress | Not published |
+| Internal direct unary primitive interface | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -357,14 +357,18 @@ corresponding environments. Existing weakening laws and all semantic, fuel,
 fault, effect, store, and wire behavior remain unchanged. The next feature is
 selected by a separate ADR.
 
-## Active Core vNext direct unary primitive interface
+## Completed Core vNext direct unary primitive interface
 
 [ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md) completes
 the named proof and regression surface for the existing raw `boolNot` and
 `wordNot` unary expressions. It adds no Expr alias or operation tag. The work
-covers typing, inference, store-threaded evaluation cases, arbitrary renaming,
-weakening, complement boundaries, exact fuel, faults, effects, and existing
-Wire v1/v2 boundaries without re-proving generic Safety.
+covers named typing, inference, general and value-case evaluation, arbitrary
+renaming, and weakening. `Word.bitNot` has zero, maximum, and universal
+involution theorems. Tests cover both boolean values, word boundaries, raw
+faults, the effectful final store, exact 2/3 and 14/15 fuel, Wire v1 rejection,
+and exact Wire v2 projection and round trips. Generic Safety is reused. No
+alias, tag, meaning, or byte changes. The next feature is selected by a separate
+ADR.
 
 ## Meaning of completion
 

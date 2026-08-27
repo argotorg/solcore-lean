@@ -178,13 +178,15 @@ short-circuit, and comparison-flag witnesses. Existing weakening, evaluation,
 store, fault, fuel, and wire behavior remain unchanged. The next feature is
 selected by a separate ADR.
 
-The active ADR-0033 slice keeps boolean negation and word complement as direct
+The completed ADR-0033 slice keeps boolean negation and word complement as direct
 `.unary` expressions. Named typing, inference, store-threaded evaluation cases,
 arbitrary renaming, and weakening theorems make the existing primitives easier
-to use without adding aliases. Boundary and effect tests cover both boolean
-values, word complement, exact fuel, raw faults, and the existing Wire v1/v2
-split. Generic Safety and machine correspondence remain unchanged, as do all
-tags and bytes.
+to use without adding aliases. Zero, maximum, and universal involution theorems
+characterize word complement. Boundary and effect tests cover both boolean
+values, exact 2/3 and 14/15 fuel, raw faults, final stores, Wire v1 rejection,
+and exact Wire v2 projection and round trips. Generic Safety and machine
+correspondence remain unchanged, as do semantics, tags, and bytes. The next
+feature is selected by a separate ADR.
 
 ### Contract runtime
 

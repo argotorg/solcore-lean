@@ -38,7 +38,7 @@ These results remain regression obligations for every extension.
 | 12 | Derived boolean word comparisons | Complete | Completes proof interfaces for the existing comparison builders |
 | 13 | Derived word comparison flags | Complete | Wraps existing boolean comparisons with canonical word conversion |
 | 14 | Derived-builder arbitrary renaming laws | Complete | Backfills the general renaming API for eight existing builders |
-| 15 | Direct unary primitive interface | Active | Completes focused APIs and regressions for existing boolNot and wordNot |
+| 15 | Direct unary primitive interface | Complete | Completes focused APIs and regressions for existing boolNot and wordNot |
 | 16 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
 | 17 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 18 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -285,14 +285,16 @@ variable index across the internal binding. The slice keeps left-to-right
 exactly-once evaluation and adds no Core or wire tag. The next feature is
 selected by a separate ADR.
 
-## Active Core vNext slice: direct unary primitives
+## Completed Core vNext slice: direct unary primitives
 
 [ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md) keeps
 `boolNot` and `wordNot` as raw `.unary` expressions and adds their named typing,
-inference, evaluation-case, renaming, and weakening interfaces. Focused tests
-cover values, complement boundaries and involution samples, types, faults,
-effects, exact fuel, and the existing Wire v1/v2 boundary. No alias, tag,
-runtime meaning, or byte encoding changes.
+inference, general and case evaluation, renaming, and weakening interfaces.
+Zero, maximum, and universal involution facts characterize `Word.bitNot`.
+Focused tests cover values, types, raw faults, an exactly-once effectful operand
+and final store, exact 2/3 and 14/15 fuel, Wire v1 rejection, and exact Wire v2
+projection and round trips. No alias, tag, runtime meaning, or byte encoding
+changes. The next feature is selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

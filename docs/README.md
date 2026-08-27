@@ -83,12 +83,15 @@ builder. `swap01` golden tests exchange two free variables, and runtime tests
 evaluate all three builder families in corresponding environments. Weakening,
 runtime semantics, and wire behavior do not change. The next feature is
 selected by a separate ADR.
-The active fifteenth slice,
+The completed fifteenth slice,
 [ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md), completes
 the focused proof and test interface for the existing raw `boolNot` and
-`wordNot` expressions. It adds named typing, inference, evaluation, renaming,
-and weakening results plus value, fuel, fault, effect, and Wire regressions. It
-adds no Expr alias, operation tag, or public behavior.
+`wordNot` expressions. Named typing, inference, general and case evaluation,
+renaming, and weakening results are complete, as are zero, maximum, and
+universal word-complement facts. Tests cover exact 2/3 and 14/15 fuel, raw
+faults, effects and final store, Wire v1 rejection, and exact Wire v2 projection
+and round trips. It adds no Expr alias, operation tag, meaning, bytes, or public
+behavior. The next feature is selected by a separate ADR.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the

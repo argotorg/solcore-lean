@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: fifteenth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -46,14 +46,11 @@ Prove `Word.bitNot_zero` and `Word.bitNot_maximum`. These facts state the two
 important 256-bit boundaries without changing the existing definition
 `maximum - value`.
 
-A universal `Word.bitNot_involutive` theorem is desirable but is not required
-for this slice if the proof needs disproportionate new modular-arithmetic
-infrastructure for `Fin (2^256)`. The implementation must attempt the compact
-proof and record the result. Executable regressions must still check double
-complement at zero, one, and maximum, so involution behavior remains protected
-even if the universal lemma is deferred.
+A compact `Word.bitNot_involutive` theorem proves universal double complement
+over `Fin (2^256)`. Executable regressions also check double complement at zero,
+one, and maximum.
 
-## Required tests
+## Implemented tests
 
 Focused semantic tests cover:
 
@@ -68,9 +65,10 @@ Focused semantic tests cover:
   `wordNot` tags.
 
 Compile-time examples exercise every named theorem. Literal unary expressions
-retain their existing three-transition completion boundary. The effectful fuel
-boundary is measured from the unchanged operand expression and unary machine
-frames rather than introduced as a new cost rule.
+stop at fuel two and complete at three. The allocating and writing `wordNot`
+operand stops at fourteen and completes at fifteen with its final store intact.
+Wire v1 rejects both raw forms; Wire v2 projects and round-trips the exact
+existing tags.
 
 ## Existing generic proofs
 
