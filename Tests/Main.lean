@@ -11,6 +11,7 @@ import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
 import Solcore.Test.CoreBooleanConnectives
 import Solcore.Test.CoreCells
+import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
 import Solcore.Test.CoreFunctions
 import Solcore.Test.CoreNamedData
@@ -4793,6 +4794,7 @@ def run : IO Unit := do
   testCoreSums
   testCoreCells
   testCoreBooleanConnectives
+  testCoreComparisonFlags
   testCoreConversions
   testCoreNamedData
   testM1bProfile
