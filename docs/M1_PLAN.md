@@ -33,7 +33,7 @@ These results remain regression obligations for every extension.
 | 7 | Word zero test | Complete | Derives a canonical word result from existing expressions |
 | 8 | Short-circuit boolean operators | Complete | Fixes selected-branch-only effects without a new Core tag |
 | 9 | Word nonzero test | Complete | Composes total truthiness and canonical word conversion without a new tag |
-| 10 | Word comparison flags | Active | Derives canonical word equality and unsigned-greater results without new tags |
+| 10 | Word comparison flags | Complete | Derives canonical word equality and unsigned-greater results without new tags |
 | 11 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
 | 12 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 13 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -229,14 +229,18 @@ general and zero/nonzero store theorems, and weakening are complete. Tests cover
 writes with final-store preservation, semantic distinctions, and exact v1/v2
 projection. Audits pass. Additional primitives remain planned.
 
-## Active Core vNext slice: word comparison flags
+## Completed Core vNext slice: word comparison flags
 
 [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md) derives
 `wordEqFlag` and unsigned `wordGtFlag` by applying `boolToWord` to the existing
 boolean comparisons. Both return canonical word one or zero and preserve
 left-to-right exactly-once evaluation, stores, and faults. They add no tag;
 wire v1 rejects and wire v2 projects the exact expansions. Existing boolean
-comparisons remain unchanged, and additional primitives remain planned.
+comparisons remain unchanged. Named expansions, typing, inference, general and
+eq/ne/gt/not-gt store theorems, and weakening are complete. Tests cover values,
+boundaries, types, raw fault order, two allocating/writing operands and final
+store, exact 7/8 and 31/32 fuel, boolean comparison preservation, and exact
+v1/v2 projections. Audits pass. Additional primitives remain planned.
 
 ## State and contracts
 

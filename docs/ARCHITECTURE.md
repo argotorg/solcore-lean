@@ -122,11 +122,15 @@ store-threaded evaluation, and weakening interfaces are complete. Value,
 type/fault, 9/10 fuel, exactly-once allocation/write, distinction, and exact
 v1/v2 wire tests pass with the repository audits.
 
-The active word-comparison-flags slice derives `wordEqFlag` and `wordGtFlag` by
+The completed word-comparison-flags slice derives `wordEqFlag` and `wordGtFlag` by
 converting the existing boolean equality and unsigned greater-than results to
 canonical word one or zero. Operands retain left-to-right, exactly-once store
 and fault behavior. Existing boolean comparisons remain unchanged, and no Core
 or wire tag is added.
+Named expansion, typing, inference, general and four case-specific
+store-threaded evaluation, and weakening results are complete. Value, boundary,
+type, fault-order, two-operand effect, exact-fuel, boolean-preservation, and
+exact wire regressions pass with the repository audits.
 
 ### Contract runtime
 

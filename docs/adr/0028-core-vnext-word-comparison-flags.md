@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: tenth internal Semantic Core vNext vertical slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -82,3 +82,11 @@ optimizer rule.
 
 Internal consumers gain explicit word-valued comparison flags while the Core's
 existing boolean comparisons and all published boundaries remain unchanged.
+
+The implementation provides named expansions, typing and inference, general
+store-threaded evaluation and equality, inequality, greater, and not-greater
+case theorems, plus weakening. Tests cover values and unsigned boundaries,
+types and raw fault order, two allocating and writing operands with the exact
+final store, literal 7/8 and effectful 31/32 fuel boundaries, preservation of
+the existing boolean comparisons, wire v1 rejection, and exact wire v2
+projections. Warning, trust, axiom, test, and whitespace audits pass.

@@ -26,8 +26,8 @@ expression form. The `wordIsZero` slice accepted by ADR-0025 is complete and
 likewise adds no new Core expression form. The derived short-circuit `boolAnd`
 and `boolOr` slice accepted by ADR-0026 is complete. The derived word-valued
 nonzero predicate accepted by ADR-0027 is also complete. Core vNext as a whole
-remains active. ADR-0028 makes word-valued equality and unsigned greater-than
-flags the active tenth slice, with additional conversions and primitives planned.
+remains active. The word-valued equality and unsigned greater-than flags from
+ADR-0028 are complete, with additional conversions and primitives planned.
 
 ## Implementation status
 
@@ -45,7 +45,7 @@ flags the active tenth slice, with additional conversions and primitives planned
 | Internal word zero test | Complete | Complete | Not published |
 | Internal short-circuit boolean operators | Complete | Complete | Not published |
 | Internal word nonzero test | Complete | Complete | Not published |
-| Internal word comparison flags | In progress | In progress | Not published |
+| Internal word comparison flags | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -277,7 +277,7 @@ and weakening are proved. Tests cover 0/1/2/maximum, types and raw faults,
 exact 9/10 fuel, exactly-once allocation and writes with store threading, its
 semantic distinctions, and exact v1/v2 projection. All audits pass.
 
-## Active Core vNext word comparison flags
+## Completed Core vNext word comparison flags
 
 [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md) derives word-valued
 equality and unsigned greater-than flags from the existing boolean comparisons
@@ -285,6 +285,10 @@ and `boolToWord`. They return canonical word one or zero while preserving
 left-to-right exactly-once evaluation, store threading, and fault order. The
 existing boolean operations remain unchanged; no new tag or published API is
 introduced. Wire v1 rejects and wire v2 projects each exact expansion.
+Named expansions, typing, inference, general and eq/ne/gt/not-gt store theorems,
+and weakening are proved. Tests cover values, boundaries, types, raw fault
+order, two allocating/writing operands and final store, exact 7/8 and 31/32
+fuel, existing boolean comparisons, and exact v1/v2 boundaries. Audits pass.
 
 ## Meaning of completion
 

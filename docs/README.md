@@ -42,10 +42,13 @@ Its named expansion, typing, inference, store-preserving evaluations, weakening,
 effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
 Additional conversions and primitives remain planned.
-The active tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
+The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
 adds no tag or source, standard-library, ABI, opcode, or gas commitment.
+Its named expansions, typing, inference, store-threaded cases, weakening,
+effects and fault order, exact fuel, boolean preservation, and exact v1/v2
+boundaries are proved and tested; the audits pass. Core vNext remains active.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
