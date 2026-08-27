@@ -61,6 +61,7 @@ import Solcore.Test.CoreUnaryPrimitives
 import Solcore.Test.CoreUnsignedDivision
 import Solcore.Test.CoreUnsignedDivisionWire
 import Solcore.Test.AddressBytesBE
+import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameOutcome
 import Solcore.Test.RuntimeScalars
@@ -4888,6 +4889,7 @@ def run : IO Unit := do
   testCoreUnsignedDivision
   testCoreUnsignedDivisionWire
   testAddressBytesBE
+  testAddressCodecCoherence
   testAddressWordBridge
   testFrameOutcome
   testRuntimeScalars
