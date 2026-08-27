@@ -15,6 +15,7 @@ import Solcore.Core.DerivedComparisonFlagEval
 import Solcore.Core.Conversions
 import Solcore.Core.ComparisonFlags
 import Solcore.Core.UnaryPrimitives
+import Solcore.Core.CountLeadingZeros
 import Solcore.Core.UnsignedDivision
 import Solcore.Core.LogicalShifts
 import Solcore.Core.ModularArithmetic
