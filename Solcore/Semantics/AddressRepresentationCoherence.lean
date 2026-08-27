@@ -216,4 +216,59 @@ private theorem addressDigitListsEqual (value : Address) :
         omega
       simpa [positionEq] using addressDigitOdd value index
 
+theorem encodeBytesText_encodeAddressBytesBE (value : Address) :
+    encodeBytesText (encodeAddressBytesBE value) = encodeAddressText value := by
+  unfold encodeBytesText encodeAddressText FixedHex.encodeText
+  rw [addressDigitListsEqual]
+
+@[simp] theorem decodeBytesText?_encodeAddressText (value : Address) :
+    decodeBytesText? (encodeAddressText value) =
+      some (encodeAddressBytesBE value) := by
+  rw [← encodeBytesText_encodeAddressBytesBE]
+  exact decodeBytesText?_encodeBytesText _
+
+theorem decodeAddressText?_encodeBytesText (bytes : ByteArray) :
+    decodeAddressText? (encodeBytesText bytes) =
+      decodeAddressBytesBE? bytes := by
+  cases decodedBytes : decodeAddressBytesBE? bytes with
+  | some value =>
+      have bytesEqual :=
+        encodeAddressBytesBE_of_decodeAddressBytesBE?_eq_some
+          bytes value decodedBytes
+      rw [← bytesEqual, encodeBytesText_encodeAddressBytesBE]
+      exact decodeAddressText?_encodeAddressText value
+  | none =>
+      cases decodedText : decodeAddressText? (encodeBytesText bytes) with
+      | none => rfl
+      | some value =>
+          have textEqual :=
+            encodeAddressText_of_decodeAddressText?_eq_some
+              (encodeBytesText bytes) value decodedText
+          rw [← encodeBytesText_encodeAddressBytesBE] at textEqual
+          have bytesEqual := encodeBytesText_injective textEqual
+          have roundTrip := decodeAddressBytesBE?_encodeAddressBytesBE value
+          rw [bytesEqual, decodedBytes] at roundTrip
+          contradiction
+
+theorem decodeAddressText?_eq_decodeBytesText?_bind (text : String) :
+    decodeAddressText? text =
+      (decodeBytesText? text).bind decodeAddressBytesBE? := by
+  cases decodedBytes : decodeBytesText? text with
+  | some bytes =>
+      have textEqual :=
+        encodeBytesText_of_decodeBytesText?_eq_some text bytes decodedBytes
+      rw [← textEqual]
+      rw [decodeAddressText?_encodeBytesText]
+      simp
+  | none =>
+      cases decodedAddress : decodeAddressText? text with
+      | none => rfl
+      | some value =>
+          have textEqual :=
+            encodeAddressText_of_decodeAddressText?_eq_some
+              text value decodedAddress
+          rw [← textEqual] at decodedBytes
+          rw [← encodeBytesText_encodeAddressBytesBE] at decodedBytes
+          simp at decodedBytes
+
 end Solcore.Semantics

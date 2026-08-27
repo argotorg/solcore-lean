@@ -1,6 +1,7 @@
 import Solcore.Semantics.RuntimeScalars
 import Solcore.Semantics.AddressBytesBE
 import Solcore.Semantics.AddressBytesBEProperties
+import Solcore.Semantics.AddressRepresentationCoherence
 import Solcore.Semantics.AddressWordBridge
 import Solcore.Semantics.AddressWordBridgeProperties
 import Solcore.Semantics.FrameOutcome
