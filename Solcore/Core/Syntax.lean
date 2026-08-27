@@ -112,17 +112,20 @@ end Ty
 inductive UnaryOp where
   | boolNot
   | wordNot
+  | wordClz
   deriving Repr, BEq, DecidableEq
 
 namespace UnaryOp
 
 def operandType : UnaryOp → Ty
   | .boolNot => .bool
-  | .wordNot => .word
+  | .wordNot
+  | .wordClz => .word
 
 def resultType : UnaryOp → Ty
   | .boolNot => .bool
-  | .wordNot => .word
+  | .wordNot
+  | .wordClz => .word
 
 end UnaryOp
 

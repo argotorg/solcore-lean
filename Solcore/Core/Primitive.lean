@@ -39,6 +39,10 @@ def bitXor (left right : Word) : Word :=
 def bitNot (value : Word) : Word :=
   maximum - value
 
+def clz (value : Word) : Word :=
+  if value.val = 0 then ofNatModulo 256
+  else ofNatModulo (255 - Nat.log2 value.val)
+
 def shiftLeft (value shift : Word) : Word :=
   if shift.val < 256 then value <<< shift else zero
 
@@ -52,6 +56,7 @@ namespace UnaryOp
 def apply : UnaryOp → Value → Option Value
   | .boolNot, .bool value => some (.bool (!value))
   | .wordNot, .word value => some (.word value.bitNot)
+  | .wordClz, .word value => some (.word value.clz)
   | _, _ => none
 
 theorem apply_total_of_type
