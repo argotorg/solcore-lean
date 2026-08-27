@@ -132,6 +132,13 @@ store-threaded evaluation, and weakening results are complete. Value, boundary,
 type, fault-order, two-operand effect, exact-fuel, boolean-preservation, and
 exact wire regressions pass with the repository audits.
 
+The active renaming-simulation slice adds proof infrastructure for general
+de Bruijn renaming and typed runtime environment insertion. Static typing is
+preserved under context-respecting renaming; dynamic results use a binary value
+relation because renamed closures are behaviorally related but not raw-equal.
+The word-result insertion corollary preserves the exact word and store. This
+changes no Core execution or wire behavior.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

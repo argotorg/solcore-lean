@@ -49,6 +49,11 @@ adds no tag or source, standard-library, ABI, opcode, or gas commitment.
 Its named expansions, typing, inference, store-threaded cases, weakening,
 effects and fault order, exact fuel, boolean preservation, and exact v1/v2
 boundaries are proved and tested; the audits pass. Core vNext remains active.
+The active eleventh slice, [ADR-0029](adr/0029-core-vnext-renaming-simulation.md),
+builds binder-aware renaming and typed environment-insertion simulation as
+proof infrastructure. It changes no execution, source, or wire meaning and
+leaves later comparison-interface completion separate. Additional primitives
+remain planned.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -92,6 +97,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0026 defines derived short-circuit boolean conjunction and disjunction.
 - ADR-0027 defines the derived word-valued nonzero test.
 - ADR-0028 defines derived word-valued equality and unsigned-greater flags.
+- ADR-0029 defines the renaming and environment-insertion proof foundation.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

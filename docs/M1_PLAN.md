@@ -34,11 +34,12 @@ These results remain regression obligations for every extension.
 | 8 | Short-circuit boolean operators | Complete | Fixes selected-branch-only effects without a new Core tag |
 | 9 | Word nonzero test | Complete | Composes total truthiness and canonical word conversion without a new tag |
 | 10 | Word comparison flags | Complete | Derives canonical word equality and unsigned-greater results without new tags |
-| 11 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 12 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 13 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 14 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 15 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 11 | Renaming and environment insertion | Active | Establishes static and dynamic weakening without changing semantics |
+| 12 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 13 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 14 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 15 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 16 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -241,6 +242,15 @@ eq/ne/gt/not-gt store theorems, and weakening are complete. Tests cover values,
 boundaries, types, raw fault order, two allocating/writing operands and final
 store, exact 7/8 and 31/32 fuel, boolean comparison preservation, and exact
 v1/v2 projections. Audits pass. Additional primitives remain planned.
+
+## Active Core vNext slice: renaming and environment insertion
+
+[ADR-0029](adr/0029-core-vnext-renaming-simulation.md) establishes general
+de Bruijn renaming and lift, preservation of expression and branch typing, and
+a typed binary runtime simulation. Base results and stores remain equal while
+closures use a relation over renamed bodies and captured environments. Its exit
+theorem preserves the identical word and final store after head insertion,
+enabling later `wordLt` and `wordGe` proofs without changing their semantics.
 
 ## State and contracts
 
