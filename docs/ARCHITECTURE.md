@@ -318,6 +318,13 @@ and fuel boundaries. Core evaluates index then value exactly once. Frozen
 public Wire formats continue to reject the operation; the independent audit
 found no P0-P3 issue.
 
+The active ADR-0048 slice adds internal signed division and remainder. The
+dividend evaluates before the divisor. Division uses magnitude division,
+rounds toward zero, and derives the quotient sign from both operands;
+remainder keeps the dividend's sign. A zero divisor returns zero only after
+both operands evaluate, and minimum signed word divided by negative one wraps
+to the minimum word. Frozen public Wire formats reject both operations.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

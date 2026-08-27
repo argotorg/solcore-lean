@@ -78,6 +78,9 @@ representation. Its independent audit found no P0-P3 issue.
 [ADR-0047](adr/0047-core-vnext-word-sign-extension.md) completes internal word
 sign extension with index-left/value-right evaluation and no public Wire
 representation. Its independent audit found no P0-P3 issue.
+[ADR-0048](adr/0048-core-vnext-signed-word-division.md) accepts the active
+internal signed division and remainder slice with dividend-left/divisor-right
+evaluation and no public Wire representation.
 
 ## Implementation status
 
@@ -592,6 +595,16 @@ types, raw and ordered faults, effects and final stores, exact 4/5 and 28/29
 fuel, and frozen v1/v2 rejection. Focused/full builds, tests, kernel policy,
 and metadata verification pass. There is no public format or source
 commitment; the independent audit found no P0-P3 issue.
+
+## Active Core vNext signed division and remainder slice
+
+[ADR-0048](adr/0048-core-vnext-signed-word-division.md) adds internal
+`BinaryOp.wordSdiv` and `BinaryOp.wordSmod`. Both evaluate dividend then
+divisor. Division rounds toward zero; remainder follows the dividend's sign;
+zero divisors return zero after both operands evaluate; and minimum divided by
+negative one wraps. The planned exact fourteen theorems and focused sign,
+zero, minimum, type, fault, effect/store, exact 4/5 and 28/29 fuel, and frozen
+v1/v2 rejection regressions add no public format or source commitment.
 
 ## Meaning of completion
 
