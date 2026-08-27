@@ -49,11 +49,12 @@ These results remain regression obligations for every extension.
 | 23 | Arithmetic right shift | Complete | Adds internal two's-complement wordSar with value-left/shift-right order |
 | 24 | Modular exponentiation | Complete | Adds internal bounded square-and-multiply wordPow |
 | 25 | Signed word greater-than | Complete | Adds an internal boolean two's-complement comparison basis |
-| 26 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
-| 27 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 28 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 29 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 30 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 26 | Derived signed word less-than | Active | Preserves source order while reusing signed greater-than |
+| 27 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
+| 28 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 29 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 30 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 31 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -432,6 +433,14 @@ The exact eleven-theorem interface and value, type, raw and ordered-fault,
 effect, store, exact 4/5 and 28/29 fuel, and frozen-Wire rejection tests are
 complete. Public formats are unchanged; the independent audit found no P0-P3
 issue.
+
+## Active Core vNext slice: derived signed word less-than
+
+[ADR-0044](adr/0044-core-vnext-derived-signed-word-less-than.md) derives
+boolean `Expr.wordSlt` from `wordSgt` with two nested bindings. Source left is
+evaluated before source right, each exactly once; only their bound values are
+reordered for comparison. The exact ten-theorem proof and regression surface is
+active. No primitive or public Wire tag is added.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

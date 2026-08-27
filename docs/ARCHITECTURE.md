@@ -277,6 +277,12 @@ Its exact eleven-theorem interface and value, type, ordered-fault, effect,
 store, and exact-fuel regressions are complete. Public formats are unchanged;
 the independent audit found no P0-P3 issue.
 
+The active ADR-0044 slice derives boolean `Expr.wordSlt` with nested bindings.
+Core evaluates the source left expression and then the source right expression,
+weakening the latter under the first binding. Only the resulting values are
+passed to `wordSgt` in right/left order. This avoids changing faults, effects,
+stores, or fuel and adds no primitive or public Wire tag.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

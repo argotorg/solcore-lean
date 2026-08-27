@@ -66,6 +66,9 @@ selected by a separate ADR.
 [ADR-0043](adr/0043-core-vnext-signed-word-greater-than.md) completes internal
 boolean signed word greater-than with strict left-to-right evaluation and no
 public Wire representation. Its independent audit found no P0-P3 issue.
+[ADR-0044](adr/0044-core-vnext-derived-signed-word-less-than.md) accepts the
+next internal slice: effect-safe derived signed less-than with no new tag or
+public representation.
 
 ## Implementation status
 
@@ -530,6 +533,14 @@ Core evaluates left then right exactly once. The exact eleven theorems and
 value, type, raw and ordered-fault, effect, final-store, exact 4/5 and 28/29
 fuel, and frozen-Wire rejection tests are complete. Public formats are
 unchanged; the independent audit found no P0-P3 issue.
+
+## Active Core vNext derived signed-less-than slice
+
+[ADR-0044](adr/0044-core-vnext-derived-signed-word-less-than.md) fixes the
+nested-let `Expr.wordSlt` expansion. Source left evaluates before source right,
+each exactly once; the computed values alone are reversed for `wordSgt`. The
+exact ten-theorem interface and value, type, ordered-fault, effect, store,
+10/11 and 34/35 fuel, and frozen-Wire rejection scope is active.
 
 ## Meaning of completion
 
