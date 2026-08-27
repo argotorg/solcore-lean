@@ -42,6 +42,7 @@ import Solcore.Test.CoreRenaming
 import Solcore.Test.CoreRenamingRuntime
 import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSignedComparison
+import Solcore.Test.CoreSignedComparisonFlagWire
 import Solcore.Test.CoreSignedComparisonWire
 import Solcore.Test.CoreSums
 import Solcore.Test.CoreUnaryPrimitiveWire
@@ -4854,6 +4855,7 @@ def run : IO Unit := do
   testCoreRenaming
   testCoreRenamingRuntime
   testCoreSignedComparison
+  testCoreSignedComparisonFlagWire
   testCoreSignedComparisonWire
   testCoreUnaryPrimitiveWire
   testCoreUnaryPrimitives
