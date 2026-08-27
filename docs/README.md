@@ -1,79 +1,69 @@
 # Documentation guide
 
-This directory explains what `solcore-lean` specifies, what is executable
-today, and which decisions are still only plans. Start here if you are reading
-the repository for the first time.
+The root README explains what can be run. The documents in this directory
+explain what the implementation means, what is proved, and what remains.
 
-## Choose a starting point
+## Where to start
 
-| If you want to… | Read… |
+| Question | Document |
 | --- | --- |
-| understand the project in five minutes | [the project README](../README.md) |
-| see exactly what is finished and what remains | [current status](CURRENT_STATUS.md) |
-| understand the implementation and proof boundaries | [architecture](ARCHITECTURE.md) |
-| build, test, or review a change | [development guide](DEVELOPMENT.md) |
-| understand the normative authority and publication rules | [specification charter](SPEC_CHARTER.md) |
-| check support for individual language features | [feature matrix](FEATURE_MATRIX.md) |
-| compare Solcore with the pinned Haskell and Rust implementations | [compatibility matrix](COMPATIBILITY_MATRIX.md) |
-| follow the completed Semantic Core work | [M1 plan](M1_PLAN.md) |
-| follow the frontend work and remaining stages | [M2 plan](M2_PLAN.md) |
+| What works today? | [Current status](CURRENT_STATUS.md) |
+| What is the active development direction? | [Semantic Core roadmap](M1_PLAN.md) |
+| Why is parser work paused? | [Frontend freeze and resumption plan](M2_PLAN.md) |
+| How are the layers separated? | [Architecture](ARCHITECTURE.md) |
+| Which features exist? | [Feature matrix](FEATURE_MATRIX.md) |
+| What makes a rule normative? | [Specification charter](SPEC_CHARTER.md) |
+| How do I build and review changes? | [Development guide](DEVELOPMENT.md) |
+| What can be compared with other compilers? | [Compatibility matrix](COMPATIBILITY_MATRIX.md) |
 
-## How status words are used
+## Current development policy
 
-The documents deliberately keep four questions separate:
+Concrete Solcore syntax may change substantially. The published parsers remain
+available as versioned reference implementations, but new grammar-dependent
+proof work is paused. Active work is directed toward a syntax-independent
+Semantic Core and explicit runtime semantics.
 
-- **Implemented** — executable Lean code exists.
-- **Proved** — the implementation is connected to its declarative judgment by
-  the stated theorem boundary.
-- **Published** — a versioned profile, schema, or Oracle protocol exposes the
-  behavior to external tools.
-- **Performance-ready** — representative execution has been measured and is
-  fast enough for its intended use.
+This policy is recorded by
+[ADR-0018](adr/0018-semantics-first-development-order.md). It changes
+development order, not the meaning of any published protocol.
 
-For example, the M2c one-file certified frontend is implemented and proved,
-including exact retained-token correspondence for all 75 grammar rules, but no
-Oracle publishes it. Its chart executor also needs a counted fast replacement
-and larger-file performance work before it is suitable for high-volume
-differential testing.
+## Status vocabulary
 
-An accepted ADR records a decision. It does not, by itself, prove that every
-piece of the decision has been implemented. The status page and matrices are
-the implementation ledger.
+The repository keeps four claims separate:
+
+- Implemented: executable Lean code exists.
+- Proved: stated theorems connect the code to independent judgments.
+- Published: a versioned schema, profile, and Oracle expose the behavior.
+- Runtime-ready: performance has been measured for the intended workload.
+
+An Accepted ADR fixes a decision. It does not imply that the decision has been
+implemented. Conversely, an internal implementation does not silently expand
+a published profile.
 
 ## Decision records
 
-The [ADR directory](adr/) contains the durable decisions behind the code. The
-recommended reading order is:
+The [ADR directory](adr/) contains durable decisions and rationale.
 
-1. [ADR-0001](adr/0001-specification-authority-and-versioning.md) through
-   [ADR-0008](adr/0008-observation-and-evm-revision.md) for project-wide rules,
-   authority, profiles, verdicts, and observation.
-2. [ADR-0009](adr/0009-m1a-core-machine-and-evaluation-order.md) through
-   [ADR-0011](adr/0011-m1c-primitive-semantics-and-publication.md) for Semantic
-   Core and its public wire protocols.
-3. [ADR-0012](adr/0012-m2a-surface-parser-kernel.md) and
-   [ADR-0013](adr/0013-m2b-surface-parser-publication.md) for the published
-   single-file parser.
-4. [ADR-0014](adr/0014-m2c-workspace-identity.md) through
-   [ADR-0016](adr/0016-m2c-structural-syntax-identity.md) for the internal M2c
-   workspace and Multi parser work.
-5. [ADR-0017](adr/0017-m2c-module-resolution.md) for the proposed resolver. It
-   is not an implemented feature.
+- ADR-0001 through ADR-0008 define authority, semantic layers, verdicts,
+  resolution direction, ABI boundaries, standard-library pinning, and
+  observations.
+- ADR-0009 through ADR-0011 define the published Semantic Core.
+- ADR-0012 through ADR-0017 record the parser, workspace, identity, and
+  proposed resolution work.
+- ADR-0018 records the semantics-first development pivot.
+- ADR-0019 defines the first internal Core vNext feature.
 
-ADRs preserve detailed rationale and rejected alternatives. Their short
-reader summaries are the quickest way to decide whether the full record is
-relevant.
+Historical ADRs are retained even when their implementation is no longer the
+active priority.
 
 ## Sources of truth
 
-When sources appear to disagree, use the authority order fixed by ADR-0001:
+When two sources disagree, use this order:
 
-1. the versioned declarative Lean specification;
-2. accepted ADRs and the version manifests they designate, including checked-in
-   profiles and schemas;
-3. Lean executors proved to correspond to that declarative specification;
-4. normative conformance tests; and
-5. other documentation and Haskell/Rust comparison evidence.
+1. versioned declarative Lean definitions;
+2. Accepted ADRs and the manifests or schemas they designate;
+3. executable Lean definitions proved to implement those rules;
+4. normative conformance tests;
+5. explanatory documentation and comparison evidence.
 
-The pinned Haskell and Rust repositories are comparison evidence. They are not
-the authority for Solcore semantics.
+Pinned Haskell and Rust behavior is evidence, never specification authority.

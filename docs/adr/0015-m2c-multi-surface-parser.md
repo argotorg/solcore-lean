@@ -42,6 +42,9 @@
   `Solcore.Surface.Multi` umbrella are absent.
   Consequently ADR-0015 is Accepted as a decision but is not yet a completed
   implementation or publication boundary.
+- **Development status:** ADR-0018 freezes this grammar as an internal
+  reference and pauses the remaining fast parser, canonical-file gate,
+  identity, and resolver work while Semantic Core vNext is developed.
 - **Suggested reading:** Read “Acceptance scope and frozen published
   boundaries”, “Closed source-preserving AST”, and “Complete syntactic grammar”
   for the language; then “Independent judgments and pure executors”,

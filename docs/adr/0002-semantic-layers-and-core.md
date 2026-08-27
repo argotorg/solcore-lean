@@ -8,10 +8,11 @@
 
 - **Decision:** Keep source-preserving `Surface`, name-resolved `Resolved`, and
   typed executable `Semantic Core` as separate semantic layers.
-- **Current implementation:** Semantic Core v1/v2, published single-file Surface
-  v1, and the unconditional file-only Multi lexer/parser milestone are
-  implemented and sound. ADR-0015's certified structural boundary, a `Resolved`
-  language, and source-to-Core elaboration are not yet implemented.
+- **Current implementation:** Semantic Core v1/v2 and published Surface v1 are
+  implemented and sound. The internal Multi frontend also reaches a certified
+  one-file structural boundary. A Resolved language and source-to-Core
+  elaboration do not exist. ADR-0018 therefore moves active work to
+  syntax-independent Core semantics and freezes new Multi grammar work.
 - **Boundary:** Hull, Yul, EVM bytecode, and compiler lowering behavior do not
   define Core semantics.
 - **Suggested reading:** Read “Decision” for the layer contract and

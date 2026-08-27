@@ -12,11 +12,13 @@
   without using spans or compiler allocation identity.
 - **Current implementation:** The ADR is Accepted, so implementation is
   authorized against the frozen ADR-0015 boundary. No Structural identity
-  modules are currently present in `Solcore`; implementation has not started.
+  modules are currently present in Solcore; implementation has not started
+  and is paused by ADR-0018.
 - **Not yet implemented:** `prepareGraphModule`, structural selection and
   inventories, `CertifiedModuleIndex`, identity lifting, scope/owner tables,
-  primary-span proofs, and the required traversal and injectivity audits. Work
-  also depends on ADR-0015 producing `CertifiedParsedModule`.
+  primary-span proofs, and the required traversal and injectivity audits.
+  ADR-0015 now produces CertifiedParsedModule; the remaining blocker is the
+  deliberate semantics-first development freeze.
 - **Suggested reading:** Read “Dependency and frozen boundaries”, “One absolute
   address scheme”, and “Exact direct-child inventory” first; then read
   “Virtual lexical scopes”, “Construction boundary and diagnostics”, and

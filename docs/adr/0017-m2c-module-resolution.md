@@ -11,9 +11,9 @@
   lexical lookup, typed diagnostics, certificate replay, and an outer resolver
   API over ADR-0014 through ADR-0016 values.
 - **Current implementation:** None. This ADR remains Proposed; there are no
-  `Foundation/Sha256`, Structural identity, or Resolution modules. ADR-0015's
-  unconditional file-only parser exists, but its certified structural boundary
-  remains incomplete, and ADR-0016 has no code.
+  Foundation/Sha256, Structural identity, or Resolution modules. ADR-0015's
+  certified one-file structural boundary exists, while ADR-0016 has no code.
+  Review and implementation are paused by ADR-0018.
 - **Open gates:** The production SHA-256 path and six-source resolver run must
   succeed in ordinary CI; exact `E`, `A`, `R`, strict-round, and final-atom
   counts must replace the planning estimates; independent adversarial and

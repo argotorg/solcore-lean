@@ -1,172 +1,95 @@
 # Feature matrix
 
-This document is the human-readable implementation ledger for `solcore-lean`.
-Accepted ADRs and the declarative Lean definitions remain authoritative; this
-matrix records what is published, what exists only as an internal kernel, and
-what is still missing.
+This is the human-readable implementation ledger. It does not enable a profile
+or alter a published protocol.
 
-## How to read the status columns
+Status meanings:
 
-Specification status:
+- complete: executable behavior and the required proof boundary exist;
+- active: implementation is currently being developed;
+- planned: the feature has an implementation order but no complete code;
+- blocked: a semantic decision or prerequisite is missing;
+- frozen: retained at a versioned boundary with no active expansion;
+- unsupported: the selected public profile deliberately has no meaning for it.
 
-- `directionAccepted`: an ADR fixes the direction, but the complete rules are
-  not yet normative;
-- `normative`: the declarative rules and conformance conditions are complete;
-- `proposed`: a decision is still under review;
-- `deferred`: intentionally left for a later milestone; and
-- `unsupported`: intentionally has no semantics in the current version.
+## Published and stable features
 
-Lean status for profile features:
-
-- `implemented`: executable behavior, correspondence proofs, and conformance
-  tests are complete for the published boundary;
-- `partialSupport`: only the named subset is complete;
-- `planned`: implementation has not reached the feature;
-- `blocked`: implementation must wait for an Accepted decision or prerequisite;
-  and
-- `unsupported`: the Oracle explicitly returns `unsupported`.
-
-Internal M2 components use `complete`, `partial`, `design only`, and `not
-started`. These labels do **not** enable a profile feature or change a wire
-protocol.
-
-## Published profiles
-
-| Profile | Language | Scope | Enabled features | Current role |
+| Feature | Specification | Implementation and proof | Published | Syntax coupling |
 | --- | --- | --- | --- | --- |
-| `core-m1c-v1` | `solcore/0.1.0-draft.3` | Core | the five M1b features plus four M1c primitive features | closed Core checking and evaluation through Oracle v3 |
-| `frontend-m2b-v1` | `solcore/0.1.0-draft.4` | frontend | `surfaceGrammar` only | closed single-file parse-only observations through Oracle v4 |
+| Version and profile separation | Normative | Complete | Oracle v1 and later | None |
+| Verdict categories | Normative | Complete | Oracle v1 and later | None |
+| Core unit, bool, word | Normative | Complete | Oracle v2/v3 | None |
+| Immutable Core binding | Normative | Complete | Oracle v2/v3 | None |
+| Core conditional | Normative | Complete | Oracle v2/v3 | None |
+| M1c primitive subset | Normative | Complete | Oracle v3 | None |
+| Surface v1 parser | Normative | Complete | Oracle v4 | High; frozen |
 
-The profiles are complementary. The frontend profile does not inherit Core
-features, and neither profile exposes the internal M2c workspace or Multi
-Surface work.
+The M1c primitive subset contains boolean and word negation, modular word
+addition/subtraction/multiplication, total unsigned division/modulo, word
+equality and greater-than, bitwise operations, and bounded logical shifts.
 
-## Normative and planned feature matrix
+## Active Semantic Core work
 
-| Feature ID | Description | Specification status | Lean status | Milestone | Basis |
-| --- | --- | --- | --- | --- | --- |
-| `meta.versioning` | separation of language version, profile, and baseline | normative | implemented | M0 | ADR-0001 |
-| `meta.verdicts` | six language verdicts are distinct from protocol errors | normative | implemented | M0 | ADR-0003 |
-| `meta.observation` | versioned observation envelope | directionAccepted | partialSupport | M0 | ADR-0008 |
-| `coreUnit` | unit type, literal, value, typing, and evaluation | normative | implemented | M1b | ADR-0010 |
-| `coreBool` | bool type, literals, values, typing, and evaluation | normative | implemented | M1b | ADR-0010 |
-| `coreWord` | range-checked 256-bit word type, literal, and value | normative | implemented | M1b | ADR-0010 |
-| `coreImmutableLet` | initialized immutable de Bruijn binding | normative | implemented | M1b | ADR-0010 |
-| `coreConditional` | condition-first, selected-branch-only conditional | normative | implemented | M1b | ADR-0010 |
-| `corePrimitives` | aggregate primitive family; only the M1c subset is complete | directionAccepted | partialSupport | M1 | ADR-0009, ADR-0011 |
-| `coreBoolNot` | total boolean negation | normative | implemented | M1c | ADR-0011 |
-| `coreWordArithmetic` | modular add/subtract/multiply and total unsigned divide/modulo | normative | implemented | M1c | ADR-0011 |
-| `coreWordComparison` | word equality and unsigned greater-than | normative | implemented | M1c | ADR-0011 |
-| `coreWordBitwise` | 256-bit not/and/or/xor and bounded logical shifts | normative | implemented | M1c | ADR-0011 |
-| `core.function` | function definition, application, and return | directionAccepted | planned | M1 | ADR-0002, ADR-0005 |
-| `core.let` | aggregate source-level local-binding feature | directionAccepted | partialSupport | M1 | ADR-0009 |
-| `core.assignment` | mutable local assignment | directionAccepted | planned | M1 | ADR-0002 |
-| `core.if` | aggregate source-level conditional feature | directionAccepted | partialSupport | M1 | ADR-0009 |
-| `core.product` | product/tuple values | directionAccepted | planned | M1 | ADR-0002 |
-| `core.sum` | sum values | directionAccepted | planned | M1 | ADR-0002 |
-| `core.adt` | user-defined algebraic data types | directionAccepted | planned | M1 | ADR-0002 |
-| `core.match` | direct pattern matching | directionAccepted | planned | M1 | ADR-0002 |
-| `core.lambda` | lexical closures | directionAccepted | planned | M1 | ADR-0002, ADR-0005 |
-| `surfaceGrammar` | published M2b lexer, restricted Surface syntax, parser, spans, comments, and diagnostics | normative | implemented | M2b | ADR-0012, ADR-0013 |
-| `syntax.for-post-let` | `let` in a `for` post clause | proposed | blocked | M2 | requires re-verification against the current baseline |
-| `modules.import-export` | module graph, imports, exports, and lexical resolution | proposed | blocked | M2c | ADR-0017 is Proposed; syntax recognition alone is not resolution |
-| `types.polymorphism` | parametric polymorphism | directionAccepted | planned | M2 | ADR-0002 |
-| `classes.tabled` | tabled class resolution and evidence | directionAccepted | planned | M2 | ADR-0004 |
-| `staging.comptime` | comptime/runtime staging | proposed | blocked | M2 | requires a staging ADR |
-| `contracts.main` | zero-argument source runtime entry point | directionAccepted | planned | M3 | ADR-0005 |
-| `contracts.dispatch` | generated external dispatch | directionAccepted | blocked | M3 | ADR-0006 |
-| `abi.support-rule` | complete metadata/signature/decode/encode path | directionAccepted | planned | M3 | ADR-0006 |
-| `abi.uint256` | external `uint256` | proposed | planned | M3 | requires a current standard-library audit |
-| `abi.address` | external `address` | proposed | planned | M3 | requires a current standard-library audit |
-| `abi.bytes32` | external `bytes32` | proposed | planned | M3 | requires a current standard-library audit |
-| `abi.string` | external `memory(string)` | proposed | planned | M3 | requires a current standard-library audit |
-| `abi.bytes` | external `memory(bytes)` | proposed | planned | M3 | requires a current standard-library audit |
-| `abi.unit` | external unit | proposed | planned | M3 | requires a current standard-library audit |
-| `abi.word` | external ABI for source `word` | unsupported | unsupported | M3 | insufficient standard-library evidence |
-| `abi.bool-input` | boolean parameter decoding/signature | unsupported | unsupported | M3 | insufficient standard-library evidence |
-| `abi.user-adt` | external ABI for user ADTs | unsupported | unsupported | M3 | ADR-0006 |
-| `abi.nested-tuple` | wire mapping for nested tuple boundaries | proposed | blocked | M3 | requires a tuple ABI ADR |
-| `abi.selector-collision` | pre-generation rejection of signature/selector collisions | directionAccepted | planned | M3 | ADR-0006 |
-| `runtime.storage` | concrete storage layout and operations | deferred | blocked | M3 | requires a layout ADR |
-| `runtime.revert` | revert and state rollback | directionAccepted | planned | M3 | ADR-0008 |
-| `runtime.external-call` | call traces and external state transitions | proposed | planned | M3 | ADR-0008 |
-| `assembly.inline-yul` | inline Yul/EVM semantics | deferred | unsupported | M4 | ADR-0002 |
-| `observation.gas` | fork-pinned gas observation | deferred | unsupported | M4+ | ADR-0008 |
-
-## Internal M2 implementation ledger
-
-These components are prerequisites for a future multi-file frontend. None is
-published by Oracle v4 or enabled by `frontend-m2b-v1`.
-
-| Internal component | Design status | Lean status | What is established now | Still outside the boundary |
+| Feature | Decision | Lean status | Required proof boundary | Syntax coupling |
 | --- | --- | --- | --- | --- |
-| Workspace identity and validation | ADR-0014 Accepted | complete | canonical ASCII `.solc` paths; structured library/source/module IDs; pure validation; all eight error families; soundness, completeness, uniqueness, lookup, measure, and permutation invariants | standard-bundle assembly, parsing, resolution, wire format |
-| Multi source, token, and AST algebra | ADR-0015 Accepted | implemented | `SourceId`-owned UTF-8 byte spans; 30 hard keywords, 2 contextual keywords, 4 pragma names, 40 symbols; recovery-free source-preserving `ParsedModuleV1`; imports, exports, declarations, statements, patterns, types, and expressions | no external schema or profile |
-| Multi lexer | ADR-0015 Accepted | complete for the implemented boundary | pure total maximal-munch lexer; nested comments; exact strings and UTF-8 spans; opaque balanced assembly slices; declarative lexical soundness/completeness; explicit sufficient bound | no workspace-wide traversal |
-| Multi grammar and parser core | ADR-0015 Accepted | implemented | 75 grammar rules, 736 EBNF sites, 1,039 production/action IDs; typed reductions; contextual chart; closed parse diagnostics; source-backed `Parses` judgment; executable `parseBound`; exact finite fixed/boundary/memo schedule address spaces and a duplicate-rejecting trace with component `FitsWithin`, fresh-charge increment, and total-bound theorems | fast executor transitions, trace correspondence, exact equality with `Chart.G`, and published parser API |
-| Static parser totality certificate | ADR-0015 Accepted | complete | a kernel-checked table covers all 2,375 fixed dotted-rank rows; it closes bounded rank search without `native_decide` or extra axioms | certificate is grammar-specific and internal |
-| Unconditional file-only frontend | ADR-0015 Accepted | implemented and sound | `executeObservedContextualFrontend` always selects lexical failure, parse failure, or a parsed module; successful and diagnostic branches satisfy their declarative judgments | it cannot emit or check structural diagnostics; it is not an Oracle query |
-| Structural acceptance pass | ADR-0015 Accepted | executable pass, logical correspondence, and resource bound complete | all 20 structural conditions and 26 diagnostic forms are covered; `diagnosticCandidates` membership is exactly `Applies`; module-derived traversal fuel is sufficient; canonical reports are sorted and duplicate-free; `validateStructure` succeeds exactly for `StructurallyAccepts` modules; all six charged families have exact accounting and their combined total satisfies the fixed quadratic bound | workspace traversal and publication remain |
-| Multi source-location evidence | ADR-0015 Accepted | parser-wide proof complete | one executable inventory covers all 54 located AST carriers and 12 retained raw spans; token order, parser-span containment, and assembly-internal facts compose into `Parses.everyLocationValid`, so every successful parse has valid and properly nested locations | workspace traversal and publication remain |
-| Multi exact-token correspondence | ADR-0015 Accepted | complete for the current grammar | the executable visitor and coherent rule proofs compose in `rootActionTokenPlanSound`, covering all 75 grammar rules and lifting exact retained-token correspondence to every successful parse | grammar-specific proof maintenance, canonical-file certificates, and publication remain |
-| Certified one-file frontend | ADR-0015 Accepted | complete for the current internal boundary | proof-argument-free `Solcore.Surface.Multi.parseModule` reports nonempty lexical/parse/structural diagnostics or returns `CertifiedParsedModule` with `Lexes`, `Parses`, `StructurallyAccepts`, `EveryLocationValid`, and `ExactTokenCorrespondence`; four phase fixtures pass | reachable-workspace traversal, canonical six-file certificates, umbrella/publication, resolution, checking, and elaboration remain |
-| Canonical six-file parser gate | ADR-0015 Accepted | partial | canonical raw bytes, metadata, strict UTF-8 round trip, lexer fingerprints, and lexer success are checked | kernel-checked parsing and structural acceptance of all six files are not yet present |
-| Structural syntax identity | ADR-0016 Accepted | design only | role-tagged address, scope, prepared-module, index, and identity rules are fixed by the ADR | no `Surface/Multi/Structural` implementation or tests exist yet |
-| Module and lexical resolution | ADR-0017 Proposed | blocked / not started | proposed graph, interface fixed point, scope, intrinsic, and standard verification rules are documented | no `Solcore/Resolution` code, resolver theorem, or resolve query exists |
-| Multi wire and publication | no publication ADR | not started | none | new Surface schema, limits, profile, capabilities, Oracle query, and golden streams |
+| Binary products and projections | ADR-0019 Accepted | Active | typing/checker equivalence, CEK/big-step correspondence, safety, old-wire rejection | None |
+| Functions and application | Direction accepted | Planned | typing, closure evaluation, application order, machine and safety | None |
+| Lexical closures | Direction accepted | Planned with functions | capture typing, environment correspondence, invocation | None |
+| Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
+| Mutable locals and assignment | Direction accepted | Planned | cell identity, evaluation order, state typing, preservation | None |
+| Sum values | Direction accepted | Planned | injections, elimination, value typing, safety | None |
+| User algebraic data | Direction accepted | Planned | constructor identity and value algebra | Low |
+| Direct pattern matching | Direction accepted | Planned | matching order, exhaustiveness, failure policy | Low |
+| Additional conversions and primitives | Per-feature decisions needed | Planned | total application and typed results | None |
 
-## M1c publication boundary
+## Static semantics after Core
 
-The four M1c feature rows denote exactly these primitive tags:
+| Feature | Status | Missing work | Syntax coupling |
+| --- | --- | --- | --- |
+| Abstract resolved-name language | Planned | structured identities, declarations, occurrences, scopes | Low |
+| Source type checking | Planned after resolved IR | type and effect rules over abstract identities | Medium |
+| Parametric polymorphism | Planned | type application and preservation | Low |
+| Tabled class resolution | Planned | evidence language, finite search, inconclusive boundary | Low |
+| Comptime/runtime staging | Blocked | staging decision and effect rules | Low |
+| Surface-to-Resolved adapter | Frozen | wait for a stable Surface version | High |
+| Surface-to-Core elaboration | Frozen | adapter plus type/effect/stage preservation | High |
 
-- unary: `boolNot`, `wordNot`;
-- arithmetic: `wordAdd`, `wordSub`, `wordMul`, `wordDiv`, `wordMod`;
-- comparison: `wordEq`, `wordGt`; and
-- bitwise: `wordAnd`, `wordOr`, `wordXor`, `wordShl`, `wordShr`.
+## Contract and runtime semantics
 
-Arithmetic is modulo `2^256`; unsigned division and modulo by zero return zero.
-Shifts take `(value, amount)` and return zero when `amount >= 256`. Binary
-operands are evaluated exactly once, left to right. Derived `wordNe`, `wordLt`,
-`wordLe`, and `wordGe` do not expand the primitive tag set.
+| Feature | Status | Missing decision or implementation | Syntax coupling |
+| --- | --- | --- | --- |
+| Contract entry | Planned | return, payability, fallback, constructor rules | Low |
+| Explicit runtime state | Planned | accounts, frames, transactions, balances | None |
+| Revert and rollback | Planned | nested rollback and surviving observation policy | None |
+| Storage | Blocked | storage-layout ADR | Low |
+| External calls and creation | Planned | host transition and call-depth rules | None |
+| Logs and canonical observations | Planned | value schemas and normalization | None |
+| ABI support rule | Planned | complete metadata/signature/decode/encode path | Medium |
+| Selector collision rejection | Planned | canonical signatures and collision executor | Low |
+| EVM revision policy | Direction accepted | execution implementation absent | None |
+| Gas observation | Deferred | fork and gas schedule | None |
+| Inline Yul execution | Unsupported | separate future language boundary | High |
 
-Short-circuit boolean conjunction/disjunction, conversions, signed operations,
-exponentiation, ternary modular operations, byte selection, arithmetic shift,
-count-leading-zero, functions, closures, application, and return remain outside
-M1c. A query needing them cannot succeed under `core-m1c-v1`.
+## Frozen frontend snapshot
 
-M1c is exposed through `solcore-semantic-core/v2`, `solcore-oracle/v3`, and
-`solcore-capabilities/v3`. All earlier profile arrays, digests, schemas,
-capability bytes, and golden streams remain immutable.
+| Internal component | State at freeze |
+| --- | --- |
+| Workspace identity and validation | Complete and proved |
+| Multi lexer | Complete for the frozen token language |
+| Multi chart parser | Total selected result and soundness for the frozen grammar |
+| Structural validator | Complete executable/declarative correspondence |
+| Source locations | Parser-wide validity and nesting proof complete |
+| Retained tokens | Exact correspondence complete for all frozen grammar rules |
+| Certified one-file frontend | Complete internal proof-carrying result |
+| Fast parser | Finite schedule and terminal base only; full executor incomplete |
+| Structural identity | Accepted design, no implementation |
+| Module/name resolution | Proposed design, no implementation |
 
-## M2b publication boundary
+No frozen row is a promise that the same AST or grammar will be used by the
+next Surface version.
 
-[ADR-0012](adr/0012-m2a-surface-parser-kernel.md) defines the restricted
-single-file parser kernel. [ADR-0013](adr/0013-m2b-surface-parser-publication.md)
-publishes that exact fragment as `surfaceGrammar` under
-`solcore/0.1.0-draft.4`, with `grammarVersion = 1`. Oracle v4 exposes
-`solcore-surface/v1` inside `solcore-parse-result/v1` through only
-`capabilities` and `parse`.
+## Public compatibility rule
 
-The request contains one source string and a nonempty opaque label. The label
-is copied unchanged into spans and is never interpreted as a path. The parser
-preserves half-open UTF-8 byte spans, comments, raw integer spelling, grouping,
-calls, and keyword conditionals for the published restricted fixture. A
-`sourceBytes` overflow is `inconclusive`, not `rejected`.
-
-The internal Multi frontend is additive and separate. It uses structured
-`SourceId`s and a much larger AST, but does not modify Surface v1, Oracle v4,
-or the meaning of `surfaceGrammar`.
-
-## Profile inclusion rules
-
-- `known` means only that a stable feature ID exists.
-- Only `normative` features may appear in `enabledFeatures`.
-- A query succeeds only when every required feature is enabled and implemented;
-  therefore `implemented ⊆ enabled ⊆ normative ⊆ known`.
-- A query requiring a `directionAccepted`, `proposed`, `deferred`, or
-  `unsupported` feature returns `unsupported`.
-- `partialSupport` maintains an explicit allowlist; it does not make the
-  aggregate feature implemented.
-- Internal implementation progress does not change a profile. Publication
-  requires the feature row, language/profile version, schemas, capabilities,
-  limits, and golden artifacts to change together under an Accepted ADR.
+Semantic Core v1, Semantic Core v2, and Surface v1 are closed algebras.
+Internal Core vNext values and expressions must fail their old wire projection.
+Publication occurs only through a new additive version.

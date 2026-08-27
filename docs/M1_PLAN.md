@@ -1,158 +1,107 @@
-# M1: Semantic Core plan and completion record
+# Semantic Core roadmap
 
-M1 defines a small typed Core language that can be checked and evaluated
-without the source parser or backend. Its completion standard is deliberately
-strong: declarative semantics, total executable procedures, correspondence
-proofs, stable wire formats, and conformance tests must agree.
+The active goal is a syntax-independent executable semantics rich enough to
+represent Solcore programs after resolution and typing. The existing published
+Core remains frozen while the internal Core grows additively.
 
-For the revision-local project summary, see [current status](CURRENT_STATUS.md).
-For component boundaries, see [architecture](ARCHITECTURE.md).
+## Completed foundation
 
-## Status at a glance
+The current Core already has:
 
-| Stage | Scope | Implementation | Proof | Publication |
-| --- | --- | --- | --- | --- |
-| M1a | unit/bool/word literals, de Bruijn variables, immutable `let`, conditionals, CEK machine | complete | complete | internal foundation for later releases |
-| M1b | five independently named Core features plus Core v1 wire | complete | complete | draft.2, `core-m1a-v1`, Oracle v2 |
-| M1c | bool-not and the specified word primitive subset plus Core v2 wire | complete | complete | draft.3, `core-m1c-v1`, Oracle v3 |
-| Remaining aggregate M1 language | functions, mutation, products, sums, ADTs, matches, closures, and deferred primitives | not implemented | not started | not published |
+- a closed value and type algebra for unit, boolean, and word;
+- immutable de Bruijn bindings and conditionals;
+- a specified primitive subset;
+- declarative typing and big-step evaluation;
+- a deterministic CEK machine and fuelled runner;
+- executable inference and detailed diagnostics;
+- static and dynamic correspondence;
+- progress, preservation, typed results, and sufficient fuel; and
+- two frozen wire versions with Oracle v2 and v3.
 
-The current public Core boundary is M1c. “M1c complete” does not mean every
-feature originally considered for M1 has been implemented.
+These results remain regression obligations for every extension.
 
-## Completed semantic kernel
+## Implementation order
 
-The closed M1c fragment contains:
+| Order | Feature family | Why it is here |
+| ---: | --- | --- |
+| 1 | Binary products and projections | Exercises every Core layer without introducing divergence |
+| 2 | Functions, application, and lexical closures | Establishes callable values and reusable computation |
+| 3 | Sum values, algebraic data, and pattern matching | Adds structured branching and user data |
+| 4 | Mutable locals and assignment | Introduces explicit local state after pure values are stable |
+| 5 | Additional primitives and conversions | Added one closed, typed family at a time |
+| 6 | Recursion and divergence | Requires a deliberate change to termination and resource claims |
+| 7 | Contract runtime state and observations | Adds external effects independently of source syntax |
+| 8 | ABI and storage | Follows accepted layout and admissibility decisions |
+| 9 | Resolved static semantics and elaboration adapters | Connects stabilized source syntax last |
 
-- unit, bool, and range-checked 256-bit word literals and values;
-- de Bruijn variables and initialized immutable bindings;
-- condition-first, selected-branch-only conditionals;
-- `boolNot` and `wordNot`;
-- modular `wordAdd`, `wordSub`, and `wordMul`;
-- total unsigned `wordDiv` and `wordMod`, returning zero on a zero divisor;
-- `wordEq` and unsigned `wordGt`; and
-- `wordAnd`, `wordOr`, `wordXor`, `wordShl`, and `wordShr`, with shifts at
-  least 256 returning zero.
+This order can change when a prerequisite is discovered, but grammar work does
+not become a prerequisite for Core execution.
 
-Unary operands are evaluated once. Binary operands are evaluated exactly once,
-left to right, before primitive application. Operation results are bounded
-words; wire literals are range-checked rather than silently reduced.
-`wordNe`, `wordLt`, `wordLe`, and `wordGe` are derived Core forms, not new wire
-primitive tags.
+## Active slice: products
 
-The kernel establishes:
+ADR-0019 fixes:
 
-- soundness and completeness of executable inference against declarative
-  typing, plus typing uniqueness;
-- agreement of detailed checking, inference, and declarative typing;
-- totality and result-type preservation of primitive application;
-- determinism of declarative evaluation and machine transitions;
-- correspondence between CEK transitions and executable `advance`;
-- soundness and completeness of the fuelled runner;
-- bidirectional correspondence between big-step evaluation and the CEK
-  machine;
-- value, environment, and state typing;
-- progress and preservation; and
-- sufficient-fuel termination and fault unreachability for well-typed closed
-  programs.
+- binary product types and pair values;
+- pair construction;
+- first and second projection;
+- left-to-right, exactly-once component evaluation;
+- exactly-once evaluation of a projected operand;
+- no product equality, ABI mapping, source tuple nesting, or public wire tag;
+- rejection by Semantic Core v1 and v2 projections.
 
-## Published boundaries and compatibility
+The slice is complete when all of the following hold:
 
-| Boundary | Fixed contract | Status |
-| --- | --- | --- |
-| Semantic Core v1 | strict decoder, canonical encoder, fixed-width lowercase word hex, stable type-error codes and AST paths | frozen with Oracle v2 |
-| Oracle v2 | `capabilities`, `coreCheck`, and `coreEval` under draft.2 and `core-m1a-v1` | frozen |
-| Semantic Core v2 | separate closed AST and codec adding unary and binary expression tags | current Core wire |
-| Oracle v3 | `capabilities`, `coreCheck`, and `coreEval` under draft.3 and `core-m1c-v1` | current public Core Oracle |
-| Capabilities v3 | exact profile digest, schema IDs, enabled features, limits, and observation schemas | current public Core capabilities |
+1. Declarative typing covers pair construction and both projections.
+2. Executable inference is sound and complete.
+3. Detailed checking agrees with ordinary inference.
+4. Big-step evaluation is deterministic.
+5. CEK transitions execute the same order and result.
+6. Machine and big-step evaluation correspond in both directions.
+7. Value, environment, frame, and state typing cover products.
+8. Progress, preservation, typed-result, sufficient-fuel, and no-fault
+   theorems still hold.
+9. Tests cover nesting, evaluation order, invalid projection, exact fuel, and
+   old-wire rejection.
 
-Core depth/node limits and CEK fuel produce independent `inconclusive`
-outcomes. Positive, rejection, malformed-wire, cross-version, exact-fuel,
-mixed-stream, round-trip, and canonicalization cases cover the published
-boundary.
+## Functions and closures
 
-Publication is additive. Draft.1 and draft.2 profiles, Core v1, Oracle v1 and
-v2, their schemas, capability documents, digests, and golden bytes remain
-immutable. Oracle v2 rejects Core v2 and Oracle v3 rejects Core v1 rather than
-guessing a wire version from expression shape.
+The next decision must fix:
 
-## Boundary to M2
+- parameter and argument representation;
+- left-to-right argument evaluation;
+- closure environments and their typing;
+- direct versus recursive binding;
+- return and control transfer;
+- recursion support; and
+- the relation between divergence and explicit fuel.
 
-Source text does not enter M1 directly. M2 is responsible for parsing,
-workspace validation, name resolution, source checking, and elaboration into a
-published Core version.
+Non-recursive functions can be delivered separately if doing so preserves a
+clear later path to recursion.
 
-The repository now has two parser layers beyond M1:
+## State and contracts
 
-- the published M2b single-file parser in Oracle v4; and
-- an internal M2c workspace identity kernel and source-preserving Multi
-  lexer/parser with an unconditional file-only entry point.
+Local mutation should use explicit typed cells rather than hidden host
+mutation. Contract execution should then add an explicit world state, call
+frames, transaction inputs, and rollback checkpoints.
 
-Neither layer currently resolves modules or names, checks source types, or
-elaborates source into Core. Therefore Oracle v3 remains a reference for closed
-Core fixtures, not an end-to-end source conformance oracle.
+Runtime observations are defined over semantic effects. They do not require
+executing compiler-generated EVM bytecode.
 
-## What remains outside M1c
+## Per-feature workflow
 
-| Family | Current status | Required decision or work |
-| --- | --- | --- |
-| functions, application, and return | planned | argument order, recursion, control transfer, closure environment |
-| lexical closures | planned | capture identity, recursion, divergence boundary |
-| mutable locals and assignment | planned | cell identity and assignment evaluation order |
-| products and sums | planned | value and wire algebra |
-| user ADTs and pattern matching | planned | constructor identity/order, selection order, exhaustiveness, match failure |
-| short-circuit boolean conjunction/disjunction | outside M1c | source typing and selected-branch elaboration into Core |
-| conversions and additional primitives | outside M1c | source rules, feature split, wire and proof impact |
-| divergence | undecided | relation to the explicit-fuel evaluator |
+For each feature:
 
-Modules, import/export resolution, type inference, polymorphism, type-class
-resolution, and staging belong to M2. ABI, storage, contract hosting, and EVM
-execution belong to M3.
+1. Accept a small ADR fixing observable meaning.
+2. Extend syntax, types, values, and declarative rules.
+3. Extend executable checking and evaluation.
+4. Extend the CEK machine.
+5. re-establish correspondence and safety.
+6. Add compatibility rejection for old wires.
+7. Add focused tests and run the full repository audit.
+8. Keep the feature internal until a separate publication decision.
 
-## Implementation order for future M1 extensions
+## Publication
 
-The first six steps are complete for the published fragment:
-
-1. Core types, expressions, values, environments, and control results.
-2. Well-formedness and declarative typing.
-3. CEK transition relation and multi-step closure.
-4. Total explicit-fuel evaluator.
-5. Mapping to `rejected`, `inconclusive`, and `executed`.
-6. Versioned Core codecs, capability reports, and Oracle queries through Core
-   v2 / Oracle v3.
-
-Future work proceeds feature by feature:
-
-7. Accept the semantic ADR for the feature and its evaluation order.
-8. Extend declarative syntax, typing, evaluation, and machine state.
-9. Extend the executable checker and evaluator without weakening old versions.
-10. Re-establish determinism, correspondence, progress, preservation, and a
-    sufficient-fuel theorem.
-11. Publish a new feature/profile/wire boundary only when the schema, limits,
-    capabilities, and golden corpus are closed.
-
-Pinned Haskell and Rust behavior remains comparison evidence, not authority.
-Minimal source witnesses are retained for later elaboration tests; discrepancies
-are summarized in the [compatibility matrix](COMPATIBILITY_MATRIX.md).
-
-## Completion criteria for each feature
-
-A feature is `normative` / `implemented` only when all applicable items hold:
-
-- an Accepted ADR fixes every observable semantic choice;
-- declarative typing and evaluation rules exist;
-- pure total checker and evaluator procedures exist;
-- checker soundness and completeness are proved;
-- evaluator/machine correspondence and determinism are proved;
-- progress and preservation cover the target fragment;
-- sufficient fuel is proved, or the exact missing direction is documented;
-- resource exhaustion cannot be misclassified as source rejection;
-- positive, negative, boundary, and canonical wire cases exist;
-- old language/profile/wire versions retain their previous meaning; and
-- the semantic kernel passes the repository policy and public-theorem axiom
-  audit.
-
-An aggregate feature such as `corePrimitives` remains `partialSupport` while
-only an allowlisted subset is complete. Splitting or promoting it requires an
-ADR and a coordinated update to feature metadata, language/profile versions,
-schemas, capabilities, and documentation.
+Core vNext has no public schema or profile. When a useful closed subset is
+ready, publication must be additive. Existing Core schemas and Oracle behavior
+remain byte-for-byte compatible.
