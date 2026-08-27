@@ -89,6 +89,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Contract frame halt outcomes | Complete | Parametric return/revert/trap carrier and four observations; exactly six laws and 10 executable runtime assertions cover empty versus absent payloads, zero-octet preservation, distinct trap reasons, and constructor boundaries; no state or publication; audit clean | None |
 | Strict Address↔Word bridge | Complete | Lossless widening and strict non-truncating narrowing; two definitions, exactly six axiom-free laws, and 10 runtime assertions cover zero, one, middle, maximum, and overflow rejection; no source, ABI, state, or publication; audit clean | None |
 | Strict 20-byte Address representation | Complete | Two definitions, exactly six laws, and 10 runtime assertions cover leading zeros, exact width, 19/21-byte rejection, representative round trips, injectivity, and all 20 widened-Word suffix indices; no ABI, state, or publication; audit clean | None |
+| Address text and byte coherence | Active | ADR-0055 accepted; no new executable API; exact four laws and eight runtime assertions will connect canonical text, exact bytes, and arbitrary-input decoder agreement; no ABI, state, or publication | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
 | Revert and rollback | Planned | nested rollback and surviving observation policy | None |

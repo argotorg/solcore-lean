@@ -60,10 +60,11 @@ These results remain regression obligations for every extension.
 | 34 | Contract frame halt outcomes | Complete | Separates return data, revert data, and parametric trap reasons before state |
 | 35 | Strict Address↔Word bridge | Complete | Adds lossless widening and a strict partial inverse before contract state |
 | 36 | Strict 20-byte Address representation | Complete | Fixes exact big-endian bytes and strict width before contract state |
-| 37 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 38 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 39 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 40 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 37 | Address text and byte coherence | Active | Proves the completed strict representations agree without a new API |
+| 38 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 39 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 40 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 41 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -603,6 +604,19 @@ P0-P3 issue.
 
 Address text, the numeric Address↔Word bridge, source casts, ABI behavior,
 contract state, EVM rules, and every public format remain unchanged.
+
+## Active Address representation coherence slice
+
+[ADR-0055](adr/0055-address-representation-coherence.md) adds no executable API.
+It proves that canonical Address text is exactly the text of its 20-byte
+big-endian encoding and that the direct and byte-mediated decoders agree for
+all input strings. The planned exact four laws and eight runtime assertions
+cover canonical boundaries, 19/20/21-byte inputs, and malformed or noncanonical
+text.
+
+The slice changes no codec, ABI or source rule, contract state, EVM behavior,
+or public format. Standard Lean dependencies are audited; no custom axiom or
+unchecked declaration is permitted.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

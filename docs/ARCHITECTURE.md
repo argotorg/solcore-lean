@@ -373,6 +373,11 @@ Its bytes agree with indices 12 through 31 of the completed widened Word view.
 The completed internal slice has two definitions and six proved laws. It adds
 no ABI padding, source conversion, state, or published observation.
 
+ADR-0055 connects the two completed Address representations without adding a
+new codec. Canonical 40-digit text equals the text of exact 20-byte encoding,
+and both decoder paths agree for arbitrary input text. This active proof-only
+slice changes no ABI, state, or publication boundary.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
