@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: fourth internal contract-runtime foundation slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -90,6 +90,25 @@ Keep every commit below 300 changed lines and leave the tree green:
 3. add the exact six focused laws;
 4. add the exact ten executable runtime assertions; and
 5. independently audit the slice and update completion documentation.
+
+## Completion evidence
+
+The completed internal layer contains exactly two executable definitions for
+20-byte big-endian encoding and strict-width decoding. Exactly six focused laws
+prove size, both round-trip directions, the exact decoder success domain,
+injectivity, and agreement with widened Word byte indices 12 through 31.
+
+Exactly ten runtime assertions cover independent zero, one, and maximum
+fixtures in both directions; rejection of 19- and 21-byte inputs; a round-trip
+table containing zero, one, a nontrivial middle value, and the maximum address;
+and all 20 suffix indices for each of those four representative values. The one
+fixture explicitly retains all 19 leading zero octets.
+
+The axiom audit reports `propext` and `Quot.sound` for laws one through five;
+the byte-index agreement law additionally reports `Classical.choice`. There
+are no custom axioms, `sorryAx`, or unchecked declarations. Focused and full
+builds and tests, trust-zero, semantic-kernel, metadata, document-link, and diff
+checks pass. The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions
 
