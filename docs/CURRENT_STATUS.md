@@ -82,8 +82,8 @@ representation. Its independent audit found no P0-P3 issue.
 signed division and remainder with dividend-left/divisor-right evaluation and
 no public Wire representation. Its independent audit found no P0-P3 issue.
 [ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md)
-accepts the active internal word-valued signed ≤ and ≥ flag slice with no new
-Core tag or public Wire representation.
+completes internal word-valued signed ≤ and ≥ flags with no new Core tag or
+public Wire representation. Its independent audit found no P0-P3 issue.
 
 ## Implementation status
 
@@ -611,16 +611,19 @@ zero, minimum, type, raw and ordered fault, effect/final-store, exact 4/5 and
 builds and tests, kernel policy, and metadata verification pass. They add no
 public format or source commitment; the independent audit found no P0-P3 issue.
 
-## Active Core vNext signed non-strict comparison flag slice
+## Completed Core vNext signed non-strict comparison flag slice
 
 [ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md)
 derives `wordSleFlag` and `wordSgeFlag` from the existing boolean comparisons.
 Both return canonical word one or zero and keep source left-to-right evaluation;
-only `wordSgeFlag` swaps already computed bound values. The planned exact ten
-static and ten evaluation theorems cover same-sign, cross-sign, and equality
-results. Focused type, raw and ordered fault, effect/final-store, exact 9/10,
-33/34, 15/16, and 39/40 fuel, and frozen builder/expansion/v2-operation
-rejection regressions add no public format or source commitment.
+only `wordSgeFlag` swaps already computed bound values. The exact ten static
+and ten evaluation theorems cover same-sign, cross-sign, equality, and
+canonical word one/zero results. Focused type, underlying and ordered fault,
+effect/final-store, exact 9/10, 33/34, 15/16, and 39/40 fuel, and frozen
+builder/handwritten-expansion/v2-`wordSgt` rejection regressions are complete.
+Focused/full builds and tests, kernel policy, and metadata verification pass.
+There is no public format or source commitment; the independent audit found no
+P0-P3 issue.
 
 ## Meaning of completion
 

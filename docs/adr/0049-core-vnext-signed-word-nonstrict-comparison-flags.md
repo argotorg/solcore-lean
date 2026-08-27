@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: thirty-first internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete; independent audit found no P0-P3 issue
 
 ## Context
 
@@ -27,7 +27,7 @@ final store. `wordSgeFlag` inherits `wordSge`'s nested bindings: only already
 computed bound values are swapped for the underlying signed comparison. The
 source expressions themselves must never be reordered.
 
-## Required proof interface
+## Implemented proof interface
 
 Publish exactly twenty focused theorems. Each builder owns five static laws:
 
@@ -46,7 +46,7 @@ constant canonical word, and equal operands produce word one for both builders.
 Do not add a Word operation, primitive application theorem, Core tag, or
 duplicate generic typing, machine, Safety, or renaming infrastructure.
 
-## Required tests
+## Implemented tests
 
 Focused regressions cover:
 
@@ -78,3 +78,19 @@ Frozen Wire v1/v2 and their public operation enums remain unchanged.
 Internal Core gains canonical word-valued signed non-strict comparisons while
 preserving the established truth conditions, source evaluation order, faults,
 effects, stores, and publication boundary.
+
+## Implementation result
+
+The exact twenty-theorem interface is complete: five static and five
+store-threaded evaluation theorems for each builder. Focused regressions cover
+canonical word one and zero, same-sign order, both cross-sign directions,
+equality, types, underlying invalid-operation payloads, ordered faults,
+left-to-right effects evaluated exactly once, and the retained final store.
+Exact CEK boundaries pass at 9/10 and 33/34 for `wordSleFlag`, and 15/16 and
+39/40 for `wordSgeFlag`.
+
+Frozen Wire v1/v2 reject each builder and handwritten expansion, and Wire v2
+rejects the underlying `wordSgt` operation. Public schemas and bytes remain
+unchanged. Focused and full warning-free builds, the full test runner, kernel
+policy, and metadata verification pass. The independent audit found no P0-P3
+issue.
