@@ -54,8 +54,9 @@ vNext remains active; the next feature is selected separately.
 [ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md) completes the
 internal 256-bit word leading-zero count. Core vNext remains active; the next
 feature is selected separately.
-[ADR-0040](adr/0040-core-vnext-word-byte-selection.md) makes internal big-endian
-256-bit word byte selection the active Core vNext slice.
+[ADR-0040](adr/0040-core-vnext-word-byte-selection.md) completes internal
+big-endian 256-bit word byte selection. Core vNext remains active; the next
+feature is selected separately.
 
 ## Implementation status
 
@@ -85,7 +86,7 @@ feature is selected separately.
 | Internal binary bitwise logic interface | Complete | Complete | Not published |
 | Internal direct word comparison interface | Complete | Complete | Not published |
 | Internal word leading-zero count | Complete | Complete | Explicitly excluded from Wire v1/v2 |
-| Internal word byte selection | In progress | In progress | Explicitly excluded from Wire v1/v2 |
+| Internal word byte selection | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -467,17 +468,18 @@ and final store, exact 2/3 and 14/15 fuel, and rejection by both frozen Wire
 versions. The public Oracle and schemas remain unchanged. The independent audit
 found no P0-P3 issue.
 
-## Active Core vNext word byte-selection slice
+## Completed Core vNext word byte-selection slice
 
 [ADR-0040](adr/0040-core-vnext-word-byte-selection.md) adds internal
 `BinaryOp.wordByte` and `Word.byteAt(index, value)`. Left is index and right is
 value; index zero is the most significant byte, 31 the least significant, and
 indices at least 32 return zero. The exact nine-theorem interface is five Word
-laws, one application equation, and three store-threaded evaluations. Tests
+laws, one application equation, and three store-threaded evaluations; all are
+complete. Tests
 cover `0x1122` indices 0/29/30/31/32/maximum, zero/maximum values, types, raw
 and ordered faults, both effects and final store, exact 4/5 and 28/29 fuel, and
 frozen Wire v1/v2 plus v2-operation rejection. Public Oracle, schema, and JSON
-formats remain unchanged. Implementation is in progress.
+formats remain unchanged. The independent audit found no P0-P3 issue.
 
 ## Meaning of completion
 

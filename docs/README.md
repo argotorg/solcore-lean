@@ -80,13 +80,14 @@ once, and retains the final store. All eleven focused theorems and value, type,
 raw-fault, effect, exact-fuel, and frozen Wire v1/v2 rejection tests pass. The
 public Oracle and schemas remain unchanged. The independent audit found no
 P0-P3 issue.
-The active twenty-second slice,
+The completed twenty-second slice,
 [ADR-0040](adr/0040-core-vnext-word-byte-selection.md), adds internal big-endian
 byte selection for 256-bit words. Left is index and right is value; Core
 evaluates both exactly once in that order, and indices at least 32 return zero.
-Nine focused theorems and value, type, ordered-fault, effect, store, fuel, and
-frozen Wire v1/v2 rejection tests are required. Public Oracle, schema, and JSON
-formats remain unchanged.
+All nine focused theorems and value, type, raw and ordered-fault, effect, store,
+exact-fuel, and frozen Wire v1/v2 plus v2-operation rejection tests pass. Public
+Oracle, schema, and JSON formats remain unchanged. The independent audit found
+no P0-P3 issue.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -201,7 +202,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0037 completes focused interfaces for binary bitwise logic.
 - ADR-0038 completes focused interfaces for direct word comparisons.
 - ADR-0039 completes an internal 256-bit word leading-zero count.
-- ADR-0040 specifies internal big-endian word byte selection.
+- ADR-0040 completes internal big-endian word byte selection.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

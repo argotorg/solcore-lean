@@ -45,7 +45,7 @@ These results remain regression obligations for every extension.
 | 19 | Binary bitwise logic | Complete | Completes focused APIs for existing wordAnd, wordOr, and wordXor |
 | 20 | Direct word comparisons | Complete | Completes focused APIs for existing wordEq and wordGt |
 | 21 | Word leading-zero count | Complete | Adds an internal-only total unary wordClz primitive |
-| 22 | Word byte selection | Active | Adds internal big-endian byte selection with index-left/value-right order |
+| 22 | Word byte selection | Complete | Adds internal big-endian byte selection with index-left/value-right order |
 | 23 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
 | 24 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 25 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -379,17 +379,18 @@ exactly-once effect, final-store, exact 2/3 and 14/15 fuel, and frozen Wire v1/v
 rejection tests pass. No public Oracle or schema changed. The independent audit
 found no P0-P3 issue; the next feature is selected by a separate ADR.
 
-## Active Core vNext slice: word byte selection
+## Completed Core vNext slice: word byte selection
 
 [ADR-0040](adr/0040-core-vnext-word-byte-selection.md) adds internal
 `BinaryOp.wordByte` and `Word.byteAt(index, value)`. Index is left, value is
 right, and Core evaluates them in that order exactly once. Big-endian indices
 0 through 31 select bytes; larger indices return zero. Five Word laws, one
-application equation, and three store-threaded evaluations form the exact
-nine-theorem interface. Tests require value/type/fault/effect/store boundaries,
+application equation, and three store-threaded evaluations complete the exact
+nine-theorem interface. Value/type/fault/effect/store boundaries,
 exact 4/5 and 28/29 fuel, and frozen Wire v1/v2 rejection including the v2
-operation conversion. No public Oracle, schema, JSON, source, ABI, opcode, or
-gas change.
+operation conversion pass. No public Oracle, schema, JSON, source, ABI, opcode,
+or gas rule changed. The independent audit found no P0-P3 issue; the next
+feature is selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

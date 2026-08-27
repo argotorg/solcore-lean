@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-second internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -81,3 +81,25 @@ order, and publication boundaries remain unchanged.
 
 Internal Core gains total, explicitly ordered, big-endian byte selection while
 public formats remain frozen. Further primitives require separate ADRs.
+
+## Implementation result
+
+Internal Core now has `BinaryOp.wordByte` and total `Word.byteAt`. All nine
+focused theorems are implemented: five Word laws, one exact application
+equation, and three store-threaded general/range-case evaluations.
+
+Compile-time and runtime tests cover `0x1122` at indices 0, 29, 30, 31, 32,
+and maximum; zero and maximum values; Word result typing and wrong result,
+index, and value types; raw invalid operands on both sides; ordered index/value
+faults; and two allocating, writing operands evaluated exactly once with their
+final store.
+Literal evaluation has the exact 4/5 fuel boundary and effectful evaluation the
+exact 28/29 boundary.
+
+Frozen Wire v1 and v2 expression projections reject `wordByte`, and the Wire v2
+`BinaryOp` conversion rejects the tag directly. No Core or JSON round trip is
+introduced. The implementation and focused semantic/Wire validation are
+complete. The independent audit found no P0-P3 issue, no source trust escape
+hatch, and only the repository-approved Lean foundational dependencies. Public
+Wire, Oracle behavior, schemas, metadata, versions, encodings, and golden
+streams remain unchanged.
