@@ -109,6 +109,8 @@ theorem HasType.rename
         (scrutineeIH respect) (branchesIH respect)
   | unary _ operandIH => exact .unary (operandIH respect)
   | binary _ _ leftIH rightIH => exact .binary (leftIH respect) (rightIH respect)
+  | ternary _ _ _ firstIH secondIH thirdIH =>
+      exact .ternary (firstIH respect) (secondIH respect) (thirdIH respect)
   | letE _ _ valueIH bodyIH =>
       exact .letE (valueIH respect) (bodyIH (respect.lift _))
   | ifE _ _ _ conditionIH thenIH elseIH =>

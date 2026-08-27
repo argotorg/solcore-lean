@@ -124,6 +124,13 @@ mutual
         HasType context left op.leftType definitions →
         HasType context right op.rightType definitions →
         HasType context (.binary op left right) op.resultType definitions
+    | ternary
+        {context : Context} {definitions : DataEnvironment}
+        {op : TernaryOp} {first second third : Expr} :
+        HasType context first op.firstType definitions →
+        HasType context second op.secondType definitions →
+        HasType context third op.thirdType definitions →
+        HasType context (.ternary op first second third) op.resultType definitions
     | letE
         {context : Context} {definitions : DataEnvironment}
         {value body : Expr} {valueType bodyType : Ty} :
@@ -280,7 +287,17 @@ mutual
             none
         else
           none
-    | .ternary _ _ _ _ => none
+    | .ternary op first second third =>
+        if inferWithDefinitions? definitions context first = some op.firstType then
+          if inferWithDefinitions? definitions context second = some op.secondType then
+            if inferWithDefinitions? definitions context third = some op.thirdType then
+              some op.resultType
+            else
+              none
+          else
+            none
+        else
+          none
     | .letE value body =>
         match inferWithDefinitions? definitions context value with
         | some valueType =>
@@ -387,6 +404,8 @@ theorem infer_complete
   | unary _ operandIH => simp [inferWithDefinitions?, operandIH]
   | binary _ _ leftIH rightIH =>
       simp [inferWithDefinitions?, leftIH, rightIH]
+  | ternary _ _ _ firstIH secondIH thirdIH =>
+      simp [inferWithDefinitions?, firstIH, secondIH, thirdIH]
   | letE _ _ valueIH bodyIH =>
       simp [inferWithDefinitions?, valueIH, bodyIH]
   | ifE _ _ _ conditionIH thenIH elseIH =>
@@ -722,7 +741,24 @@ theorem infer_sound
           exact .binary (leftIH leftInferred) (rightIH rightInferred)
         · simp [inferWithDefinitions?, leftInferred, rightInferred] at inferred
       · simp [inferWithDefinitions?, leftInferred] at inferred
-  | ternary => simp [inferWithDefinitions?] at inferred
+  | ternary op first second third firstIH secondIH thirdIH =>
+      by_cases firstInferred :
+          inferWithDefinitions? definitions context first = some op.firstType
+      · by_cases secondInferred :
+            inferWithDefinitions? definitions context second = some op.secondType
+        · by_cases thirdInferred :
+              inferWithDefinitions? definitions context third = some op.thirdType
+          · have resultEquality : op.resultType = type := by
+              exact Option.some.inj (by
+                simpa [inferWithDefinitions?, firstInferred, secondInferred,
+                  thirdInferred] using inferred)
+            subst type
+            exact .ternary (firstIH firstInferred) (secondIH secondInferred)
+              (thirdIH thirdInferred)
+          · simp [inferWithDefinitions?, firstInferred, secondInferred,
+              thirdInferred] at inferred
+        · simp [inferWithDefinitions?, firstInferred, secondInferred] at inferred
+      · simp [inferWithDefinitions?, firstInferred] at inferred
   | letE value body valueIH bodyIH =>
       cases valueInferred : inferWithDefinitions? definitions context value with
       | none => simp [inferWithDefinitions?, valueInferred] at inferred

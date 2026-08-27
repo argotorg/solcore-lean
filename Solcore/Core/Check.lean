@@ -27,6 +27,9 @@ inductive CheckPathStep where
   | unaryOperand
   | binaryLeft
   | binaryRight
+  | ternaryFirst
+  | ternarySecond
+  | ternaryThird
   | letValue
   | letBody
   | ifCondition
@@ -433,7 +436,34 @@ mutual
                 else
                   { path := leftPath,
                     data := .primitiveOperandTypeMismatch op.leftType leftType }
-        | .ternary _ _ _ _ => { path, data := .inferenceFailure }
+        | .ternary op firstExpr secondExpr thirdExpr =>
+            let firstPath := path.child .ternaryFirst
+            match infer? context firstExpr definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context firstPath firstExpr
+            | some firstType =>
+                if firstType = op.firstType then
+                  let secondPath := path.child .ternarySecond
+                  match infer? context secondExpr definitions with
+                  | none =>
+                      diagnoseWithFuel fuel definitions context secondPath secondExpr
+                  | some secondType =>
+                      if secondType = op.secondType then
+                        let thirdPath := path.child .ternaryThird
+                        match infer? context thirdExpr definitions with
+                        | none =>
+                            diagnoseWithFuel fuel definitions context thirdPath thirdExpr
+                        | some thirdType =>
+                            { path := thirdPath,
+                              data := .primitiveOperandTypeMismatch
+                                op.thirdType thirdType }
+                      else
+                        { path := secondPath,
+                          data := .primitiveOperandTypeMismatch
+                            op.secondType secondType }
+                else
+                  { path := firstPath,
+                    data := .primitiveOperandTypeMismatch op.firstType firstType }
         | .letE value body =>
             let valuePath := path.child .letValue
             match infer? context value definitions with

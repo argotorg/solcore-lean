@@ -645,7 +645,7 @@ theorem BranchesHaveType.lookup
       (motive_1 := fun _ _ _ _ _ => True) generalizing index with
   | unit | bool | word | var | pair | first | second | lambda | apply
   | inLeft | inRight | caseE | newCell | loadCell | storeCell | construct
-  | matchData | unary | binary | letE | ifE =>
+  | matchData | unary | binary | ternary | letE | ifE =>
       exact True.intro
   | nil => simp at payloadLookup
   | cons headTyping _ _ tailIH =>
@@ -671,7 +671,7 @@ theorem BranchesHaveType.length_eq
       (motive_1 := fun _ _ _ _ _ => True) with
   | unit | bool | word | var | pair | first | second | lambda | apply
   | inLeft | inRight | caseE | newCell | loadCell | storeCell | construct
-  | matchData | unary | binary | letE | ifE =>
+  | matchData | unary | binary | ternary | letE | ifE =>
       exact True.intro
   | nil => rfl
   | cons _ _ _ tailIH => simp [tailIH]
@@ -934,7 +934,24 @@ theorem evaluation_preserves_type
             resultStoreTyping,
             binary_apply_result_has_runtime_type applied
               (definitions := definitions)⟩
-  | ternary => cases typing
+  | ternary _ _ _ applied firstIH secondIH thirdIH =>
+      cases typing with
+      | ternary firstTyping secondTyping thirdTyping =>
+          obtain ⟨secondWorld, firstExtension, secondStoreTyping, _⟩ :=
+            firstIH firstTyping environmentTyping storeTyping
+          obtain ⟨thirdWorld, secondExtension, thirdStoreTyping, _⟩ :=
+            secondIH secondTyping
+              (environmentTyping.weaken firstExtension) secondStoreTyping
+          obtain ⟨resultWorld, thirdExtension, resultStoreTyping, _⟩ :=
+            thirdIH thirdTyping
+              (environmentTyping.weaken
+                (firstExtension.trans secondExtension))
+              thirdStoreTyping
+          exact ⟨resultWorld,
+            (firstExtension.trans secondExtension).trans thirdExtension,
+            resultStoreTyping,
+            ternary_apply_result_has_runtime_type applied
+              (definitions := definitions)⟩
   | letE _ _ boundIH bodyIH =>
       cases typing with
       | letE boundTyping bodyTyping =>
@@ -1257,6 +1274,17 @@ theorem binary_apply_result_reducible
     (typing := binary_apply_result_has_type applied (definitions := []))
   cases op <;> constructor
 
+theorem ternary_apply_result_reducible
+    {world : StoreTyping} {op : TernaryOp}
+    {first second third result : Value}
+    (applied : op.apply first second third = some result)
+    (definitions : DataEnvironment := []) :
+    ReducibleValue world op.resultType result definitions := by
+  apply CellPayload.reducible
+    (definitions := definitions)
+    (typing := ternary_apply_result_has_type applied (definitions := []))
+  cases op <;> constructor
+
 theorem reducibility_fundamental
     {definitions : DataEnvironment}
     {context : Context} {expr : Expr} {type : Ty}
@@ -1542,6 +1570,29 @@ theorem reducibility_fundamental
         leftExtension.trans rightExtension, resultStoreTyping,
         .binary leftEvaluation rightEvaluation applied,
         binary_apply_result_reducible (definitions := _) applied⟩
+  | ternary firstTyping secondTyping thirdTyping firstIH secondIH thirdIH =>
+      obtain ⟨secondWorld, secondStore, firstValue, firstExtension,
+        secondStoreTyping, firstEvaluation, firstReducible⟩ :=
+          firstIH definitionsWellFormed environmentReducible storeTyping
+      obtain ⟨thirdWorld, thirdStore, secondValue, secondExtension,
+        thirdStoreTyping, secondEvaluation, secondReducible⟩ :=
+          secondIH definitionsWellFormed
+            (environmentReducible.weaken firstExtension) secondStoreTyping
+      obtain ⟨resultWorld, resultStore, thirdValue, thirdExtension,
+        resultStoreTyping, thirdEvaluation, thirdReducible⟩ :=
+          thirdIH definitionsWellFormed
+            (environmentReducible.weaken
+              (firstExtension.trans secondExtension))
+            thirdStoreTyping
+      obtain ⟨result, applied, _⟩ :=
+        TernaryOp.apply_total_of_types _ firstValue secondValue thirdValue
+          firstReducible.hasType.type_eq secondReducible.hasType.type_eq
+          thirdReducible.hasType.type_eq
+      exact ⟨resultWorld, resultStore, result,
+        (firstExtension.trans secondExtension).trans thirdExtension,
+        resultStoreTyping,
+        .ternary firstEvaluation secondEvaluation thirdEvaluation applied,
+        ternary_apply_result_reducible (definitions := _) applied⟩
   | letE boundTyping bodyTyping boundIH bodyIH =>
       obtain ⟨bodyWorld, bodyStore, boundValue, boundExtension,
         bodyStoreTyping, boundEvaluation, boundReducible⟩ :=
@@ -2493,7 +2544,13 @@ theorem transition_preserves_state_type
                       (definitions := definitions) applied) restTyping
   | enterTernary =>
       cases stateTyping with
-      | eval _ _ exprTyping _ => cases exprTyping
+      | eval storeTyping environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | ternary firstTyping secondTyping thirdTyping =>
+              exact .eval storeTyping environmentTyping firstTyping
+                (.cons
+                  (.ternarySecond environmentTyping secondTyping thirdTyping)
+                  continuationTyping)
   | enterTernarySecond =>
       cases stateTyping with
       | ret storeTyping firstTyping continuationTyping =>
@@ -2597,6 +2654,7 @@ theorem state_progress
       | matchData => exact .inr ⟨_, .enterMatchData⟩
       | unary => exact .inr ⟨_, .enterUnary⟩
       | binary => exact .inr ⟨_, .enterBinary⟩
+      | ternary => exact .inr ⟨_, .enterTernary⟩
       | letE => exact .inr ⟨_, .enterLet⟩
       | ifE => exact .inr ⟨_, .enterIf⟩
   | @ret _ world value continuation store controlType resultType
