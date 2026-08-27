@@ -43,11 +43,12 @@ These results remain regression obligations for every extension.
 | 17 | Bounded logical shifts | Complete | Completes focused APIs for existing wordShl and wordShr without new syntax |
 | 18 | Modular word arithmetic | Complete | Completes focused APIs for existing wordAdd, wordSub, and wordMul |
 | 19 | Binary bitwise logic | Complete | Completes focused APIs for existing wordAnd, wordOr, and wordXor |
-| 20 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
-| 21 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 22 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 23 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 24 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 20 | Direct word comparisons | Active | Completes focused APIs for existing wordEq and wordGt |
+| 21 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
+| 22 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 23 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 24 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 25 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -350,6 +351,18 @@ ordered faults, effects, final stores, exact 4/5 and 28/29 fuel, and v1/v2 Core
 plus JSON round trips pass. The audit found no P0-P3 issue. No alias, generic
 proof duplicate, tag, schema, Oracle, source or standard-library API, opcode, or
 gas rule changed. The next feature is selected by a separate ADR.
+
+## Active Core vNext slice: direct word comparisons
+
+[ADR-0038](adr/0038-core-vnext-direct-word-comparisons.md) retains raw
+`wordEq` and `wordGt`, boolean results, strict unsigned greater-than, and
+left-to-right exactly-once evaluation. Two application equations and six
+general/case evaluation theorems form the exact eight-theorem interface.
+Zero/one/maximum values, equality and order cases, types, raw and ordered
+faults, effects, final stores, exact 4/5 and 28/29 fuel, and v1/v2 Core plus
+JSON boundaries are required. No expression alias, Word duplicate, generic
+typing/inference/renaming/weakening/Safety proof, tag, signed/source API,
+opcode, or gas rule is added. Implementation is in progress.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

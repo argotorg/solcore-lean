@@ -225,6 +225,13 @@ effect, exact-fuel, and Wire/Core/JSON regressions pass with no P0-P3 finding.
 No alias, generic proof duplicate, tag, schema, or Oracle behavior changed. The
 next feature is selected by a separate ADR.
 
+The active ADR-0038 slice completes the focused interface for raw `wordEq` and
+`wordGt`. Both return booleans; greater-than remains strict and unsigned. Two
+application equations and six store-threaded general/case evaluations are
+required. Operands evaluate left then right exactly once, retaining the final
+store. No expression alias, Word duplicate, generic proof duplicate, tag,
+schema, or Oracle behavior is added.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

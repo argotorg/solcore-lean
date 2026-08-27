@@ -64,6 +64,13 @@ or, and xor. Mask, identity, order, effect, exact-fuel, and Wire/Core/JSON tests
 pass. Word values commute, but expressions remain left-to-right and exactly
 once. No alias, generic proof duplicate, tag, schema, or Oracle behavior
 changed. The next feature is selected by a separate ADR.
+The active twentieth slice,
+[ADR-0038](adr/0038-core-vnext-direct-word-comparisons.md), completes eight
+focused application and evaluation results for existing raw boolean word
+equality and strict unsigned greater-than. Operands remain left-to-right and
+exactly once. Type, fault, effect, exact-fuel, and Wire/Core/JSON regressions
+are required without an expression alias, Word or generic proof duplicate,
+tag, schema, or Oracle change. Further primitives remain planned.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -176,6 +183,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0035 completes focused interfaces for bounded logical shifts.
 - ADR-0036 completes focused interfaces for modular word arithmetic.
 - ADR-0037 completes focused interfaces for binary bitwise logic.
+- ADR-0038 specifies focused interfaces for direct word comparisons.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
