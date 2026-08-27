@@ -11,6 +11,7 @@ import Solcore.Core.RenamingInsertion
 import Solcore.Core.DerivedComparisons
 import Solcore.Core.DerivedComparisonEval
 import Solcore.Core.DerivedComparisonFlags
+import Solcore.Core.DerivedComparisonFlagEval
 import Solcore.Core.Conversions
 import Solcore.Core.ComparisonFlags
 import Solcore.Core.ShortCircuit
