@@ -29,8 +29,9 @@ nonzero predicate accepted by ADR-0027 is also complete. Core vNext as a whole
 remains active. The word-valued equality and unsigned greater-than flags from
 ADR-0028 are complete, with additional conversions and primitives planned.
 ADR-0029 completes the renaming and environment-insertion proof foundation.
-The next work completes the arbitrary-expression proof interfaces for the
-existing `wordLt` and `wordGe` builders. Core vNext remains active.
+[ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md) makes completion of
+the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe` proof interfaces the
+active next slice. Core vNext remains active.
 
 ## Implementation status
 
@@ -50,6 +51,7 @@ existing `wordLt` and `wordGe` builders. Core vNext remains active.
 | Internal word nonzero test | Complete | Complete | Not published |
 | Internal word comparison flags | Complete | Complete | Not published |
 | Internal renaming and environment simulation | Complete | Complete | Not published |
+| Internal derived boolean word comparisons | Complete | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -305,7 +307,18 @@ returns the same word and final store after arbitrary environment-head
 insertion. Static and dynamic tests cover binders, closures, application,
 cells, named data, and store effects. This proof infrastructure changes no
 observable semantics or wire behavior. The next work completes the
-arbitrary-expression proof interfaces for the existing `wordLt` and `wordGe`.
+arbitrary-expression proof interfaces for the existing comparisons under
+[ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md).
+
+## Active Core vNext derived word comparisons
+
+[ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md) retains the existing
+ADR-0011 expansions of `wordNe`, `wordLt`, `wordLe`, and `wordGe`. The active
+work adds named expansion, typing, inference, renaming, weakening, and
+store-threaded evaluation theorems plus focused regressions. In particular,
+`wordLt` and `wordGe` keep their nested lets and weakened right operand so left
+then right evaluation, faults, effects, and fuel remain unchanged. No new
+syntax, semantic rule, tag, or public behavior is introduced.
 
 ## Meaning of completion
 

@@ -34,12 +34,13 @@ These results remain regression obligations for every extension.
 | 8 | Short-circuit boolean operators | Complete | Fixes selected-branch-only effects without a new Core tag |
 | 9 | Word nonzero test | Complete | Composes total truthiness and canonical word conversion without a new tag |
 | 10 | Word comparison flags | Complete | Derives canonical word equality and unsigned-greater results without new tags |
-| 11 | Renaming and environment insertion | Active | Establishes static and dynamic weakening without changing semantics |
-| 12 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 13 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 14 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 15 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 16 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 11 | Renaming and environment insertion | Complete | Establishes static and dynamic weakening without changing semantics |
+| 12 | Derived boolean word comparisons | Active | Completes proof interfaces for the existing comparison builders |
+| 13 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 14 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 15 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 16 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 17 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -253,6 +254,17 @@ covers every evaluation form. `CellPayload` exactness and
 store after head insertion. Static and dynamic tests cover the full foundation.
 The next work completes arbitrary-expression proof interfaces for the existing
 `wordLt` and `wordGe` builders without changing their semantics.
+
+## Active Core vNext slice: derived word comparisons
+
+[ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md) completes the proof
+interfaces for the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe`
+builders. Their ADR-0011 expansions do not change. `wordLt` and `wordGe` retain
+nested lets and right-operand weakening, which preserves left-to-right,
+exactly-once evaluation for effectful and faulting expressions. The work adds
+named expansion, typing, inference, renaming, weakening, general evaluation,
+truth-case theorems, and focused fuel/fault/effect/wire tests without a new tag
+or public behavior.
 
 ## State and contracts
 

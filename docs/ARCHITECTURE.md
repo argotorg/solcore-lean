@@ -141,7 +141,15 @@ recovers equal ground values and typed stores, and the word head-insertion
 corollary preserves the exact word and final store. Static and dynamic tests
 cover binders, closures, application, cells, named data, and effects. This
 changes no Core execution or wire behavior. The next work completes the
-arbitrary-expression proof interfaces for existing `wordLt` and `wordGe`.
+arbitrary-expression proof interfaces for existing comparisons.
+
+The active ADR-0030 slice retains the ADR-0011 definitions of `wordNe`,
+`wordLt`, `wordLe`, and `wordGe` and completes their proof API. The nested-let
+shape of `wordLt` and `wordGe`, including weakening the right operand under the
+left binding, is part of the semantic boundary: it preserves left-to-right,
+exactly-once effects and fault order. A syntax-level operand swap is not an
+equivalent implementation for arbitrary expressions. This work adds proofs and
+tests only; it does not add a Core form or change a wire or Oracle contract.
 
 ### Contract runtime
 

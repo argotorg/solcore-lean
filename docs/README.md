@@ -55,8 +55,13 @@ syntax renaming, typing preservation, structural value/environment/store
 relations, simulation for every evaluation form, ground-value and typed-store
 exactness, and an exact word-result head-insertion theorem. Static and dynamic
 tests cover the foundation. It changes no execution, source, or wire meaning.
-The next work completes arbitrary-expression proof interfaces for the existing
-`wordLt` and `wordGe` builders. Additional primitives remain planned.
+The active twelfth slice,
+[ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md), completes the proof
+interfaces for the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe`
+builders. Their expansions remain unchanged; the nested-let comparisons keep
+left-to-right exactly-once evaluation for arbitrary effectful expressions. No
+new syntax, tag, or public behavior is added. Additional primitives remain
+planned.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -101,6 +106,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0027 defines the derived word-valued nonzero test.
 - ADR-0028 defines derived word-valued equality and unsigned-greater flags.
 - ADR-0029 defines the renaming and environment-insertion proof foundation.
+- ADR-0030 completes proof interfaces for existing derived word comparisons.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
