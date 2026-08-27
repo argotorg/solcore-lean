@@ -36,11 +36,12 @@ These results remain regression obligations for every extension.
 | 10 | Word comparison flags | Complete | Derives canonical word equality and unsigned-greater results without new tags |
 | 11 | Renaming and environment insertion | Complete | Establishes static and dynamic weakening without changing semantics |
 | 12 | Derived boolean word comparisons | Complete | Completes proof interfaces for the existing comparison builders |
-| 13 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 14 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 15 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 16 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 17 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 13 | Derived word comparison flags | Active | Wraps existing boolean comparisons with canonical word conversion |
+| 14 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 15 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 16 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 17 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 18 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -266,7 +267,17 @@ nested lets and right-operand weakening, which preserves left-to-right,
 exactly-once evaluation for effectful and faulting expressions. Value, type,
 fuel, fault, effect, Wire v1 rejection, and exact Wire v2 projection and
 round-trip tests pass without a new tag or public behavior. The next additional
-primitive or conversion is selected by a separate ADR.
+primitive or conversion is selected by a separate ADR; ADR-0031 is that next
+decision.
+
+## Active Core vNext slice: derived word comparison flags
+
+[ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md) derives
+`wordNeFlag`, `wordLtFlag`, `wordLeFlag`, and `wordGeFlag` by applying
+`boolToWord` to the existing boolean comparisons. The slice adds named proof
+interfaces and value, type, fuel, fault, effect, and wire regressions. It keeps
+the existing left-to-right exactly-once evaluation and adds no Core or wire
+tag.
 
 ## State and contracts
 

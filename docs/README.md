@@ -63,8 +63,13 @@ store-threaded evaluation, and two truth-case results. Value, type, fuel, fault,
 effect, Wire v1 rejection, and exact Wire v2 projection and round-trip tests
 pass. Their expansions remain unchanged; the nested-let comparisons keep
 left-to-right exactly-once evaluation for arbitrary effectful expressions. No
-new syntax, tag, or public behavior is added. The next additional primitive or
-conversion will be selected by its own ADR.
+new syntax, tag, or public behavior is added.
+The active thirteenth slice,
+[ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md), derives
+canonical word-zero-or-one flags for the existing boolean `wordNe`, `wordLt`,
+`wordLe`, and `wordGe` builders. It preserves their evaluation order, faults,
+effects, stores, and fuel through ordinary `boolToWord` composition and adds no
+Core form, wire tag, or public behavior.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -110,6 +115,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0028 defines derived word-valued equality and unsigned-greater flags.
 - ADR-0029 defines the renaming and environment-insertion proof foundation.
 - ADR-0030 completes proof interfaces for existing derived word comparisons.
+- ADR-0031 derives word-valued flags for the remaining word comparisons.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -46,6 +46,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Word comparison flags | ADR-0028 Accepted | Complete | named expansions, typing, inference, general and four-case store evaluation, weakening, effects, exact fuel, bool preservation, and v1/v2 boundaries complete | None |
 | Renaming and environment insertion | ADR-0029 Accepted | Complete | syntax renaming, typing preservation, value/environment/store relations, full evaluation simulation, CellPayload exactness, head-insertion word theorem, and static/dynamic tests complete | None |
 | Derived boolean word comparisons | ADR-0030 Accepted | Complete | four expansion/typing/infer/rename/weaken APIs, untyped wordNe/wordLe and typed wordLt/wordGe store evaluation, eight truth cases, values/types/fuel/fault/effects, v1 rejection, and exact v2 projection/round-trip tests complete | None |
+| Derived word comparison flags | ADR-0031 Accepted | Active | boolToWord wrappers for existing wordNe/wordLt/wordLe/wordGe, with proof APIs and semantic regressions in progress | None |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 
