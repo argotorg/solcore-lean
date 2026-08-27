@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: nineteenth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -78,3 +78,19 @@ version, byte encoding, Oracle behavior, profile, capability, or golden stream.
 Callers gain concise algebraic and evaluation results for the existing binary
 bitwise operations without changing semantics or publication boundaries. The
 next feature is selected by a separate ADR.
+
+## Implementation result
+
+All fifteen theorems are complete: nine Word laws, three exact
+primitive-application equations, and three store-threaded evaluations. The
+commutativity theorems apply only to Word values; no theorem or implementation
+swaps operand expressions.
+
+Tests confirm `0xAA` and `0xCC` produce `0x88`, `0xEE`, and `0x66`, together
+with zero, maximum, and self boundaries. Type rejection, raw and ordered faults,
+two exactly-once effectful operands, and the final store are covered for all
+three operations. Literal execution has the exact 4/5 fuel boundary and
+effectful execution the exact 28/29 boundary. Wire v1 rejects every expression;
+Wire v2 has exact projection, Core round trips, and JSON round trips. The final
+audit found no P0-P3 issue. No alias, generic proof duplicate, tag, schema, or
+Oracle behavior changed. The next feature is selected by a separate ADR.

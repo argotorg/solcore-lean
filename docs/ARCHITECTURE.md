@@ -217,13 +217,13 @@ faults, effects, exact fuel, and Wire/Core/JSON round trips pass with no P0-P3
 finding. No alias, generic proof duplicate, tag, schema, or Oracle behavior
 changed. The next feature is selected by a separate ADR.
 
-The active ADR-0037 slice completes focused interfaces for raw `wordAnd`,
-`wordOr`, and `wordXor`. It requires nine Word laws, three exact application
-equations, and three store-threaded evaluations. Core evaluates left then right
-exactly once and retains the final store; commutative values never authorize
-swapping effectful expressions. Mask, identity, fault, effect, fuel, and Wire
-regressions are required without an alias, generic proof duplicate, new tag,
-schema, or Oracle behavior.
+The completed ADR-0037 slice gives raw `wordAnd`, `wordOr`, and `wordXor` nine
+Word, three application, and three store-threaded evaluation theorems. Core
+evaluates left then right exactly once and retains the final store. Commutativity
+is a Word-value theorem only and never swaps expressions. Mask, identity, fault,
+effect, exact-fuel, and Wire/Core/JSON regressions pass with no P0-P3 finding.
+No alias, generic proof duplicate, tag, schema, or Oracle behavior changed. The
+next feature is selected by a separate ADR.
 
 ### Contract runtime
 

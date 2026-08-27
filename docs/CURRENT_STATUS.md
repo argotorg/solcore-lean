@@ -45,8 +45,9 @@ interface for the existing bounded logical shifts.
 [ADR-0036](adr/0036-core-vnext-modular-word-arithmetic.md) completes the focused
 interface for modular addition, subtraction, and multiplication. Core vNext
 remains active; the next feature is selected separately.
-[ADR-0037](adr/0037-core-vnext-binary-bitwise-logic.md) makes the focused
-interface for binary word and, or, and xor the active slice.
+[ADR-0037](adr/0037-core-vnext-binary-bitwise-logic.md) completes the focused
+interface for binary word and, or, and xor. Core vNext remains active; the next
+feature is selected separately.
 
 ## Implementation status
 
@@ -73,7 +74,7 @@ interface for binary word and, or, and xor the active slice.
 | Internal totalized unsigned division and modulo interface | Complete | Complete | Not published |
 | Internal bounded logical shift interface | Complete | Complete | Not published |
 | Internal modular word arithmetic interface | Complete | Complete | Not published |
-| Internal binary bitwise logic interface | In progress | In progress | Not published |
+| Internal binary bitwise logic interface | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -418,15 +419,17 @@ Wire v2 Core and JSON round trips. The audit found no P0-P3 issue. No alias,
 generic proof, tag, schema, or Oracle behavior changed. The next feature is
 selected by a separate ADR.
 
-## Active Core vNext binary bitwise logic slice
+## Completed Core vNext binary bitwise logic slice
 
 [ADR-0037](adr/0037-core-vnext-binary-bitwise-logic.md) retains raw `wordAnd`,
-`wordOr`, and `wordXor` with strict left-to-right, exactly-once evaluation. It
-targets nine Word laws, three application equations, and three store-threaded
-evaluations. Tests cover AA/CC masks and 88/EE/66 results, zero/maximum/self,
-types, raw and ordered faults, effects and final stores, exact 4/5 and 28/29
-fuel, Wire v1 rejection, and exact Wire v2 Core and JSON round trips.
-Implementation is in progress; further primitives remain planned.
+`wordOr`, and `wordXor` with strict left-to-right, exactly-once evaluation. Nine
+Word laws, three application equations, and three evaluations are complete.
+Tests cover AA/CC masks and 88/EE/66 results, zero/maximum/self, types, raw and
+ordered faults, effects and final stores, exact 4/5 and 28/29 fuel, Wire v1
+rejection, and exact Wire v2 Core and JSON round trips. Commutativity applies
+only to Word values; expressions are not swapped. The audit found no P0-P3
+issue. No alias, generic proof, tag, schema, or Oracle behavior changed. The
+next feature is selected by a separate ADR.
 
 ## Meaning of completion
 

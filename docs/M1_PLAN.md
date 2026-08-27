@@ -42,7 +42,7 @@ These results remain regression obligations for every extension.
 | 16 | Totalized unsigned division and modulo | Complete | Completes focused APIs and strict zero-divisor regressions |
 | 17 | Bounded logical shifts | Complete | Completes focused APIs for existing wordShl and wordShr without new syntax |
 | 18 | Modular word arithmetic | Complete | Completes focused APIs for existing wordAdd, wordSub, and wordMul |
-| 19 | Binary bitwise logic | Active | Completes focused APIs for existing wordAnd, wordOr, and wordXor |
+| 19 | Binary bitwise logic | Complete | Completes focused APIs for existing wordAnd, wordOr, and wordXor |
 | 20 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
 | 21 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 22 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -339,17 +339,17 @@ round trips pass. The audit found no P0-P3 issue. No alias, generic proof
 duplicate, tag, schema, Oracle, checked/signed/source/opcode/gas rule changed.
 The next feature is selected by a separate ADR.
 
-## Active Core vNext slice: binary bitwise logic
+## Completed Core vNext slice: binary bitwise logic
 
 [ADR-0037](adr/0037-core-vnext-binary-bitwise-logic.md) retains raw `wordAnd`,
 `wordOr`, and `wordXor`. Nine Word laws, three application equations, and three
 store-threaded evaluations form the exact fifteen-theorem interface. Core
-evaluates left then right exactly once; commutative results never justify
-swapping effectful expressions. AA/CC masks, zero/maximum/self, types, faults,
-effects, final stores, exact 4/5 and 28/29 fuel, and v1/v2 Core plus JSON
-boundaries are required. No alias, generic proof duplicate, new tag, source or
-standard-library API, opcode, or gas rule is added. Implementation is in
-progress.
+evaluates left then right exactly once; Word commutativity never swaps effectful
+expressions. AA/CC masks and 88/EE/66 results, zero/maximum/self, types, raw and
+ordered faults, effects, final stores, exact 4/5 and 28/29 fuel, and v1/v2 Core
+plus JSON round trips pass. The audit found no P0-P3 issue. No alias, generic
+proof duplicate, tag, schema, Oracle, source or standard-library API, opcode, or
+gas rule changed. The next feature is selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

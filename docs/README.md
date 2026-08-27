@@ -57,13 +57,13 @@ effects, exact fuel, and Wire/Core/JSON round trips pass. Results remain modulo
 `2^256` and expressions evaluate left to right exactly once. No alias, generic
 proof duplicate, tag, schema, or Oracle behavior changed. The next feature is
 selected by a separate ADR.
-The active nineteenth slice,
+The completed nineteenth slice,
 [ADR-0037](adr/0037-core-vnext-binary-bitwise-logic.md), completes fifteen
 focused Word, application, and evaluation results for existing raw word and,
-or, and xor. Expressions remain left-to-right and exactly once even though the
-value operations commute. It adds no alias, generic proof duplicate, tag,
-source or standard-library API, opcode rule, gas rule, or Wire change.
-Implementation is in progress; further primitives remain planned.
+or, and xor. Mask, identity, order, effect, exact-fuel, and Wire/Core/JSON tests
+pass. Word values commute, but expressions remain left-to-right and exactly
+once. No alias, generic proof duplicate, tag, schema, or Oracle behavior
+changed. The next feature is selected by a separate ADR.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
