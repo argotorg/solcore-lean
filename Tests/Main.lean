@@ -25,6 +25,7 @@ import Solcore.Test.CoreRenamingRuntime
 import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSums
 import Solcore.Test.CoreUnaryPrimitiveWire
+import Solcore.Test.CoreUnaryPrimitives
 import Solcore.Test.SurfaceMultiCertifiedFrontend
 import Solcore.Test.SurfaceMultiExactToken
 import Solcore.Test.SurfaceMultiFastParser
@@ -4813,6 +4814,7 @@ def run : IO Unit := do
   testCoreRenaming
   testCoreRenamingRuntime
   testCoreUnaryPrimitiveWire
+  testCoreUnaryPrimitives
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile
