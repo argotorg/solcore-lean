@@ -26,8 +26,8 @@ ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
 complete internal slices. The derived boolean and word conversions from
 [ADR-0024](adr/0024-core-vnext-bool-word-conversions.md) are complete as ordinary
-existing Core expressions. [ADR-0025](adr/0025-core-vnext-word-is-zero.md) is
-the active slice: it derives a word-valued zero test from those expressions.
+existing Core expressions. The derived word-valued zero test from
+[ADR-0025](adr/0025-core-vnext-word-is-zero.md) is also complete.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: seventh internal Semantic Core vNext vertical slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
