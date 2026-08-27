@@ -65,6 +65,7 @@ import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameOutcome
 import Solcore.Test.RuntimeScalars
+import Solcore.Test.WorldState
 import Solcore.Test.SurfaceMultiCertifiedFrontend
 import Solcore.Test.SurfaceMultiExactToken
 import Solcore.Test.SurfaceMultiFastParser
@@ -4893,6 +4894,7 @@ def run : IO Unit := do
   testAddressWordBridge
   testFrameOutcome
   testRuntimeScalars
+  testWorldState
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile
