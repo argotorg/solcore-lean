@@ -25,8 +25,11 @@ Semantic Core and explicit runtime semantics. First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
 complete internal slices. They deliberately do not choose source spellings for
-mutable declarations, assignment, data declarations, or patterns. Further Core
-work follows the roadmap through separate semantic decisions.
+mutable declarations, assignment, data declarations, or patterns. The active
+slice, [ADR-0024](adr/0024-core-vnext-bool-word-conversions.md), defines boolean
+and word conversions as ordinary existing Core expressions. It adds no syntax
+tag and remains separate from future ABI decoding. Further Core work follows
+the roadmap through separate semantic decisions.
 
 This policy is recorded by
 [ADR-0018](adr/0018-semantics-first-development-order.md). It changes
@@ -61,6 +64,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0021 defines binary sums and exhaustive elimination.
 - ADR-0022 defines first-order local cells and their explicit local store.
 - ADR-0023 defines named algebraic data and direct normalized matching.
+- ADR-0024 defines derived boolean and word conversions.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

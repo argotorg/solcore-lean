@@ -39,7 +39,8 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | First-order local cells | ADR-0022 Accepted | Complete | explicit store threading, checker correspondence, CEK/big-step correspondence, store-indexed safety, sufficient fuel, and old-wire rejection complete | None |
 | Named algebraic data | ADR-0023 Accepted | Complete | whole-table validity, nominal constructor typing, recursive and mutually recursive finite-value safety, totality, sufficient fuel, diagnostics, and old-wire rejection complete | None |
 | Direct normalized matching | ADR-0023 Accepted | Complete | constructor-order exhaustiveness, payload binding, selected-branch store threading, CEK/big-step correspondence, safety, exact fuel, and diagnostics complete | None |
-| Additional conversions and primitives | Per-feature decisions needed | Planned | total application and typed results | None |
+| Boolean/word conversions | ADR-0024 Accepted | Active | derived-expression typing, exact values, exactly-once evaluation, store threading, and version-boundary tests in progress | None |
+| Additional conversions and primitives | Per-feature decisions needed | Planned | separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 
 ## Static semantics after Core
@@ -90,9 +91,10 @@ next Surface version.
 
 ## Public compatibility rule
 
-Semantic Core v1, Semantic Core v2, and Surface v1 are closed algebras.
-Internal Core vNext values and expressions must fail their old wire projection.
-This includes the cell types, references, allocation, load, and store accepted
-by ADR-0022. It also includes every named-data form and every nonempty internal
-definition table accepted by ADR-0023. Publication occurs only through a new
-additive version.
+Semantic Core v1, Semantic Core v2, and Surface v1 are closed algebras. New Core
+vNext constructors outside those algebras must fail their old wire projection.
+This includes the cell forms accepted by ADR-0022 and every named-data form or
+nonempty definition table accepted by ADR-0023. ADR-0024 adds no constructor:
+its conversions expand into existing expressions, so each projection treats
+them exactly like the corresponding handwritten expansion. Publication of any
+new tag still requires a new additive version.

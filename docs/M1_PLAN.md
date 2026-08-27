@@ -29,7 +29,7 @@ These results remain regression obligations for every extension.
 | 3 | Binary sums and elimination | Complete | Adds structured branching without choosing source pattern syntax |
 | 4 | First-order local cells | Complete | Introduces explicit local state after pure values are stable; source assignment elaborates later |
 | 5 | Named algebraic data and direct matching | Complete | Adds program-local constructor identity without source pattern syntax |
-| 6 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 6 | Additional primitives and conversions | Active | The first active family derives boolean/word conversions without a new Core tag |
 | 7 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 8 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
 | 9 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
@@ -162,6 +162,27 @@ validity, declarative and executable typing, recursive-data safety and
 termination, store-threaded evaluation, CEK execution, machine correspondence,
 detailed diagnostics, exact fuel, and rejection of named forms and nonempty
 definition tables by both frozen Core wires.
+
+## Active Core vNext slice: boolean and word conversions
+
+[ADR-0024](adr/0024-core-vnext-bool-word-conversions.md) fixes the first active
+conversion family:
+
+- `boolToWord(false)` is word zero and `boolToWord(true)` is word one;
+- `wordToBool(0)` is `false`, while every nonzero word becomes `true`;
+- both operations are derived builders for existing conditional and primitive
+  expressions rather than new expression tags; and
+- each operand is evaluated exactly once and its resulting store is preserved.
+
+The implementation therefore does not extend the CEK machine or big-step
+relation. It must provide focused typing and evaluation theorems, effectful
+exactly-once tests, zero/nonzero and word-boundary tests, and projection tests
+showing that frozen wires see only the ordinary expanded expressions.
+
+This slice is independent of ABI decoding. Total nonzero truthiness does not
+validate a canonical ABI boolean: strict zero-or-one admissibility, byte layout,
+and rejection behavior remain a later ABI decision. No wire schema, Oracle
+operation, profile, capability, or source spelling changes here.
 
 ## State and contracts
 

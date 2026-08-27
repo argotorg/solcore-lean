@@ -76,6 +76,18 @@ supports elimination of an empty data type. Source wildcards, nested patterns,
 guards, arm ordering, names, and field shapes belong to a later resolved
 adapter, not this execution layer.
 
+The active boolean/word conversion slice is deliberately smaller than an
+algebra extension. `boolToWord` expands to a conditional selecting word zero or
+one, and `wordToBool` expands to a nonzero test built from existing primitives.
+The operand occurs once in either expansion. Because there is no new expression
+tag, the existing evaluator, CEK machine, safety results, and wire projections
+remain the architectural boundary; the slice adds named builders, focused
+theorems, and tests rather than parallel semantics.
+
+This conversion layer is not an ABI layer. Total nonzero truthiness and strict
+ABI zero-or-one admissibility are separate rules. ABI byte layout, validation,
+decoding, and rejection remain in the future contract boundary.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,
@@ -105,8 +117,9 @@ Each semantic feature follows the same vertical structure:
 | Safety | Progress, preservation, and typed result properties |
 | Local state | Explicit store threading, typed allocation/update, and final-store agreement |
 | Named definitions | Whole-table validity, stable constructor ownership, and recursive finite-value reasoning |
+| Derived expressions | Expansion typing, exact result semantics, exactly-once use, and unchanged version boundaries |
 | Resource behavior | Explicit fuel or a proved finite bound |
-| Compatibility | Old wires reject new syntax unless a new version publishes it |
+| Compatibility | Old wires reject new syntax; derived forms preserve existing projection behavior |
 | Regression protection | Positive, negative, order, boundary, and version tests |
 
 An executable function is not used as its own specification.
