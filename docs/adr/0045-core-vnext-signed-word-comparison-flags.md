@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-seventh internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -27,9 +27,10 @@ source right, and the result retains the right operand's final store.
 `wordSltFlag` inherits `wordSlt`'s nested bindings: only the computed values are
 reversed before `wordSgt`; swapping the source expressions is forbidden.
 
-## Required proof interface
+## Implemented proof interface
 
-Publish exactly twenty focused theorems. Each builder owns five static laws:
+The implementation publishes exactly twenty focused theorems. Each builder
+owns five static laws:
 
 - its named expansion;
 - `HasType` and executable `infer?` results;
@@ -45,7 +46,7 @@ Every result is canonical word one or zero.
 Do not add a Word operation, primitive application theorem, Core tag, or
 duplicate generic typing and Safety APIs.
 
-## Required tests
+## Implemented tests
 
 Focused regressions cover:
 
@@ -75,3 +76,13 @@ published operation enums remain unchanged.
 Internal Core gains canonical word-valued strict signed comparisons while
 retaining the established boolean basis, evaluation order, faults, effects,
 stores, and publication boundary.
+
+The ten static and ten evaluation theorems cover both exact builders. Same-sign
+cases conditionally return canonical word one or zero from their order;
+cross-sign cases return the corresponding constant result. Executable
+regressions cover values and types, invalid payloads on both sides, ordered
+faults, effects and final stores, and exact fuel boundaries: 7/8 and 31/32 for
+`wordSgtFlag`, and 13/14 and 37/38 for `wordSltFlag`. Frozen Wire v1/v2 reject
+both builders and both handwritten expansions, and Wire v2 rejects `wordSgt`.
+Public formats and bytes are unchanged. The independent audit found no P0-P3
+issue.

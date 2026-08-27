@@ -69,9 +69,9 @@ public Wire representation. Its independent audit found no P0-P3 issue.
 [ADR-0044](adr/0044-core-vnext-derived-signed-word-less-than.md) completes
 effect-safe derived signed less-than with no new tag or public representation.
 Its independent audit found no P0-P3 issue.
-[ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) accepts the
-active internal slice: canonical word-valued signed strict comparison flags
-with no new tag or public representation.
+[ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) completes
+canonical word-valued signed strict comparison flags with no new tag or public
+representation. Its independent audit found no P0-P3 issue.
 
 ## Implementation status
 
@@ -549,14 +549,19 @@ underlying invalid faults, ordered faults, effects and final store, 10/11 and
 rejections are complete. Public formats are unchanged; independent audit is
 clean with no P0-P3 issue.
 
-## Active Core vNext signed comparison flag slice
+## Completed Core vNext signed comparison flag slice
 
 [ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) derives
 `wordSgtFlag` and `wordSltFlag` by applying `boolToWord` to the existing signed
 boolean comparisons. True becomes word one and false becomes word zero. Source
 left remains before source right, with only `wordSlt`'s bound values reversed.
-The exact twenty-theorem and value/type, fault-order, effect/store, fuel, and
-frozen-Wire regression scope is active. Public behavior remains unchanged.
+The two exact builders have ten static and ten evaluation theorems. Same-sign
+cases conditionally produce canonical word one or zero, while cross-sign cases
+produce constant results. Values/types, invalid payloads on both sides, ordered
+faults, effects/final store, exact 7/8 and 31/32 `wordSgtFlag` fuel, exact 13/14
+and 37/38 `wordSltFlag` fuel, and frozen v1/v2 builder, handwritten expansion,
+and `wordSgt` rejection are complete. Public behavior remains unchanged;
+the independent audit found no P0-P3 issue.
 
 ## Meaning of completion
 

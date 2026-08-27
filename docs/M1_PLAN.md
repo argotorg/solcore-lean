@@ -50,7 +50,7 @@ These results remain regression obligations for every extension.
 | 24 | Modular exponentiation | Complete | Adds internal bounded square-and-multiply wordPow |
 | 25 | Signed word greater-than | Complete | Adds an internal boolean two's-complement comparison basis |
 | 26 | Derived signed word less-than | Complete | Preserves source order while reusing signed greater-than |
-| 27 | Signed word comparison flags | Active | Derives canonical word results from signed boolean comparisons |
+| 27 | Signed word comparison flags | Complete | Derives canonical word results from signed boolean comparisons |
 | 28 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
 | 29 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 30 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -446,14 +446,16 @@ and ordered faults, effects/final store, exact 10/11 and 34/35 fuel, and frozen
 v1/v2 rejection are complete. No primitive or public Wire tag is added; public
 behavior is unchanged; the independent audit found no P0-P3 issue.
 
-## Active Core vNext slice: signed word comparison flags
+## Completed Core vNext slice: signed word comparison flags
 
 [ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) wraps boolean
 signed greater-than and the effect-safe signed less-than builder with
 `boolToWord`. True becomes word one and false becomes word zero. The exact
-twenty-theorem interface and value/type, ordered-fault, effect/store, fuel, and
-frozen-Wire regression scope is active. It adds no operation tag or public
-behavior.
+ten static and ten evaluation theorems cover conditional same-sign and constant
+cross-sign results. Values/types, both-side invalid and ordered faults,
+effects/final store, exact 7/8, 31/32, 13/14, and 37/38 fuel, and frozen v1/v2
+builder, handwritten, and `wordSgt` rejection are complete. It adds no operation
+tag or public behavior; the independent audit found no P0-P3 issue.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -288,12 +288,17 @@ effect/store, exact 10/11 and 34/35 fuel, and frozen-Wire rejection regressions
 are complete. Public behavior is unchanged; the independent audit found no
 P0-P3 issue.
 
-The active ADR-0045 slice derives word-valued strict signed comparison flags.
+The completed ADR-0045 slice derives word-valued strict signed comparison flags.
 `wordSgtFlag` wraps raw signed greater-than with `boolToWord`; `wordSltFlag`
 wraps the effect-safe nested signed-less-than builder. Both preserve source
 left-to-right evaluation and the final store, returning word one for true and
 word zero for false. The slice adds no Word operation, Core tag, generic rule,
-or public Wire representation.
+or public Wire representation. Ten static and ten evaluation theorems cover
+same-sign conditional and cross-sign constant word-one/word-zero results.
+Value/type, both-side invalid payload, ordered-fault, effect/store, exact
+7/8, 31/32, 13/14, and 37/38 fuel, and frozen-Wire rejection regressions are
+complete. Public behavior is unchanged; the independent audit found no P0-P3
+issue.
 
 ### Contract runtime
 
