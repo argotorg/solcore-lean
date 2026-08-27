@@ -60,6 +60,7 @@ import Solcore.Test.CoreUnaryPrimitiveWire
 import Solcore.Test.CoreUnaryPrimitives
 import Solcore.Test.CoreUnsignedDivision
 import Solcore.Test.CoreUnsignedDivisionWire
+import Solcore.Test.AddressBytesBE
 import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameOutcome
 import Solcore.Test.RuntimeScalars
@@ -4886,6 +4887,7 @@ def run : IO Unit := do
   testCoreUnaryPrimitives
   testCoreUnsignedDivision
   testCoreUnsignedDivisionWire
+  testAddressBytesBE
   testAddressWordBridge
   testFrameOutcome
   testRuntimeScalars
