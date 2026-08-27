@@ -87,11 +87,6 @@ theorem infer_wordGeFlag
   infer_complete
     ((infer_sound leftInferred).wordGeFlag (infer_sound rightInferred))
 
-@[simp] theorem Expr.rename_boolToWord
-    (value : Expr) (mapping : Renaming) :
-    value.boolToWord.rename mapping = (value.rename mapping).boolToWord := by
-  simp [Expr.boolToWord, Expr.rename]
-
 @[simp] theorem Expr.rename_wordNeFlag
     (left right : Expr) (mapping : Renaming) :
     (left.wordNeFlag right).rename mapping =

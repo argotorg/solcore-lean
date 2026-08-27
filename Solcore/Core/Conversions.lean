@@ -1,4 +1,5 @@
 import Solcore.Core.Eval
+import Solcore.Core.RenamingSyntax
 
 set_option autoImplicit false
 
@@ -204,6 +205,29 @@ end Evaluates
     value.wordIsZero =
       (Expr.binary .wordEq value (.word Word.zero)).boolToWord :=
   rfl
+
+@[simp] theorem Expr.rename_boolToWord
+    (value : Expr) (mapping : Renaming) :
+    value.boolToWord.rename mapping = (value.rename mapping).boolToWord := by
+  simp [Expr.boolToWord, Expr.rename]
+
+@[simp] theorem Expr.rename_wordToBool
+    (value : Expr) (mapping : Renaming) :
+    value.wordToBool.rename mapping = (value.rename mapping).wordToBool := by
+  simp [Expr.wordToBool, Expr.wordNe, Expr.rename]
+
+@[simp] theorem Expr.rename_wordIsZero
+    (value : Expr) (mapping : Renaming) :
+    value.wordIsZero.rename mapping = (value.rename mapping).wordIsZero := by
+  rw [Expr.wordIsZero_expansion, Expr.rename_boolToWord]
+  simp [Expr.rename, Expr.wordIsZero_expansion]
+
+@[simp] theorem Expr.rename_wordIsNonzero
+    (value : Expr) (mapping : Renaming) :
+    value.wordIsNonzero.rename mapping =
+      (value.rename mapping).wordIsNonzero := by
+  rw [Expr.wordIsNonzero_expansion, Expr.rename_boolToWord,
+    Expr.rename_wordToBool, Expr.wordIsNonzero_expansion]
 
 @[simp] theorem Expr.weakenAt_boolToWord
     (value : Expr) (cutoff : Nat) :
