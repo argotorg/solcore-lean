@@ -187,6 +187,9 @@ def wordToBool (value : Expr) : Expr :=
 def wordIsZero (value : Expr) : Expr :=
   boolToWord (.binary .wordEq value (.word Word.zero))
 
+def wordIsNonzero (value : Expr) : Expr :=
+  boolToWord (wordToBool value)
+
 def wordLt (left right : Expr) : Expr :=
   wordGtWithSwappedValues left right
 
