@@ -15,6 +15,7 @@ import Solcore.Test.CoreBitwiseLogicWire
 import Solcore.Test.CoreCells
 import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
+import Solcore.Test.CoreCountLeadingZeros
 import Solcore.Test.CoreCountLeadingZerosWire
 import Solcore.Test.CoreDerivedComparisonFlags
 import Solcore.Test.CoreDerivedComparisonFlagWire
@@ -4818,6 +4819,7 @@ def run : IO Unit := do
   testCoreBitwiseLogicWire
   testCoreComparisonFlags
   testCoreConversions
+  testCoreCountLeadingZeros
   testCoreCountLeadingZerosWire
   testCoreDerivedComparisonFlags
   testCoreDerivedComparisonFlagWire
