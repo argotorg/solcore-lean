@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: ninth internal Semantic Core vNext vertical slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -67,3 +67,12 @@ capabilities, and golden bytes do not change.
 The Core gains a canonical word-valued nonzero predicate while reusing the
 already accepted truthiness conversion and preserving all existing semantic
 boundaries.
+
+The implementation provides the named canonical expansion, typing and
+inference, general and zero/nonzero store-preserving evaluation, and weakening
+theorems. Tests cover zero, one, two, and maximum word values; operand types and
+the raw unchecked fault; exact insufficient/sufficient fuel at 9/10 steps;
+allocation and write effects exactly once with final-store preservation; the
+distinctions from `wordToBool`, `wordIsZero`, and ABI decoding; and exact wire
+v1 rejection and v2 projection. Warning, trust, axiom, and whitespace audits
+pass.

@@ -33,11 +33,14 @@ selected-branch-only boolean conjunction and disjunction using existing
 conditionals without adding a Core tag. Its expansion, typing, inference, four
 store-threaded branches, effects, faults, exact fuel, weakening, and exact wire
 v1/v2 projection are proved and tested. Core vNext remains active, with
-`wordIsNonzero` from
-[ADR-0027](adr/0027-core-vnext-word-is-nonzero.md) as its active ninth slice.
+the completed `wordIsNonzero` from
+[ADR-0027](adr/0027-core-vnext-word-is-nonzero.md) as its ninth slice.
 It composes `boolToWord(wordToBool(x))`, maps zero to word zero and nonzero words
 to word one, evaluates its operand exactly once, and preserves its final store.
 It adds no tag and is separate from boolean truthiness and ABI decoding.
+Its named expansion, typing, inference, store-preserving evaluations, weakening,
+effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
+tested, and the audits pass.
 Additional conversions and primitives remain planned.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
