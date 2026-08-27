@@ -98,6 +98,8 @@ theorem extend
             simp [Renaming.lift] at sourceBound ⊢
             exact targetBounds index sourceBound
 
+end EnvironmentsRelated
+
 mutual
 
   theorem ValuesRelated.refl : ∀ value : Value, ValuesRelated value value
@@ -122,8 +124,6 @@ mutual
         simpa using (EnvironmentsRelated.refl rest).extend (ValuesRelated.refl value)
 
 end
-
-end EnvironmentsRelated
 
 namespace ValuesRelated
 
@@ -163,6 +163,12 @@ inductive StoresRelated : Store → Store → Prop where
       StoresRelated (value :: rest) (value' :: rest')
 
 namespace StoresRelated
+
+theorem refl (store : Store) : StoresRelated store store := by
+  induction store with
+  | nil => exact .nil
+  | cons value rest inductionHypothesis =>
+      exact .cons (ValuesRelated.refl value) inductionHypothesis
 
 @[simp] theorem length_eq
     {source target : Store} (related : StoresRelated source target) :
