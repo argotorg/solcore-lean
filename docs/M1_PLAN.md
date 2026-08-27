@@ -50,11 +50,12 @@ These results remain regression obligations for every extension.
 | 24 | Modular exponentiation | Complete | Adds internal bounded square-and-multiply wordPow |
 | 25 | Signed word greater-than | Complete | Adds an internal boolean two's-complement comparison basis |
 | 26 | Derived signed word less-than | Complete | Preserves source order while reusing signed greater-than |
-| 27 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
-| 28 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 29 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 30 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 31 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 27 | Signed word comparison flags | Active | Derives canonical word results from signed boolean comparisons |
+| 28 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
+| 29 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 30 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 31 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 32 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -444,6 +445,15 @@ static and five evaluation theorems, value/type boundaries, underlying invalid
 and ordered faults, effects/final store, exact 10/11 and 34/35 fuel, and frozen
 v1/v2 rejection are complete. No primitive or public Wire tag is added; public
 behavior is unchanged; the independent audit found no P0-P3 issue.
+
+## Active Core vNext slice: signed word comparison flags
+
+[ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) wraps boolean
+signed greater-than and the effect-safe signed less-than builder with
+`boolToWord`. True becomes word one and false becomes word zero. The exact
+twenty-theorem interface and value/type, ordered-fault, effect/store, fuel, and
+frozen-Wire regression scope is active. It adds no operation tag or public
+behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

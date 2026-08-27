@@ -1,0 +1,77 @@
+# ADR-0045: Derive word-valued signed comparison flags
+
+- Status: Accepted
+- Decision date: 2026-08-27
+- Scope: twenty-seventh internal Semantic Core vNext slice
+- Implementation: In progress
+
+## Context
+
+ADR-0043 provides boolean signed greater-than, and ADR-0044 derives boolean
+signed less-than without reversing source evaluation. Internal semantic
+composition also needs canonical word-valued results, but it does not need
+another primitive or operation tag.
+
+## Decision
+
+Add two derived builders with these exact expansions:
+
+```text
+wordSgtFlag(left, right) = boolToWord(binary wordSgt left right)
+wordSltFlag(left, right) = boolToWord(wordSlt(left, right))
+```
+
+Both builders return `Word.ofNatModulo 1` when the signed comparison is true
+and `Word.zero` when it is false. Source left evaluates exactly once before
+source right, and the result retains the right operand's final store.
+`wordSltFlag` inherits `wordSlt`'s nested bindings: only the computed values are
+reversed before `wordSgt`; swapping the source expressions is forbidden.
+
+## Required proof interface
+
+Publish exactly twenty focused theorems. Each builder owns five static laws:
+
+- its named expansion;
+- `HasType` and executable `infer?` results;
+- arbitrary `Expr.rename`; and
+- `Expr.weakenAt`.
+
+Each builder also owns five evaluation laws: one general store-threaded theorem
+and four sign-quadrant corollaries covering both-nonnegative, both-negative,
+nonnegative/negative, and negative/nonnegative operands. Same-sign results use
+the corresponding unsigned-order decision; cross-sign results reduce directly.
+Every result is canonical word one or zero.
+
+Do not add a Word operation, primitive application theorem, Core tag, or
+duplicate generic typing and Safety APIs.
+
+## Required tests
+
+Focused regressions cover:
+
+- compile-time use of all twenty theorem names;
+- zero, the sign boundary, maximum, same-sign order, cross-sign order, and
+  equality;
+- word result types, a wrong declared result, and wrong left/right operands;
+- unchecked operands exposing the underlying `wordSgt` invalid-operation fault;
+- a left fault that skips the right and a right fault that observes the
+  completed left store;
+- allocating and writing operands evaluated left then right exactly once with
+  the final store retained;
+- insufficient/sufficient literal and effectful CEK fuel boundaries:
+  7/8 and 31/32 for `wordSgtFlag`, 13/14 and 37/38 for `wordSltFlag`; and
+- frozen Wire v1/v2 rejection of each builder and handwritten expansion, plus
+  Wire v2 rejection of the underlying `wordSgt` operation.
+
+## Publication and exclusions
+
+This slice composes existing internal expressions. It adds no Core form,
+primitive tag, source spelling, ABI rule, opcode lowering, gas rule, schema,
+Oracle behavior, Wire version, or public byte. Frozen Wire v1/v2 and their
+published operation enums remain unchanged.
+
+## Consequences
+
+Internal Core gains canonical word-valued strict signed comparisons while
+retaining the established boolean basis, evaluation order, faults, effects,
+stores, and publication boundary.

@@ -120,6 +120,12 @@ right; only their bound values are reordered for signed greater-than. The exact
 five static and five evaluation theorems and the value/type, fault-order,
 effect/store, fuel, and frozen-Wire regressions add no primitive or public Wire
 tag. Public behavior is unchanged; the independent audit found no P0-P3 issue.
+The active twenty-seventh slice,
+[ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md), derives
+canonical word-valued signed greater-than and less-than flags. Both preserve
+source left-to-right evaluation and return word one or zero. The exact
+twenty-theorem and focused regression scope adds no operation tag or public
+Wire behavior.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -239,6 +245,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0042 completes internal modular word exponentiation.
 - ADR-0043 completes internal boolean signed word greater-than.
 - ADR-0044 completes effect-safe derived signed word less-than.
+- ADR-0045 accepts canonical word-valued signed strict comparison flags.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

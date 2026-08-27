@@ -288,6 +288,13 @@ effect/store, exact 10/11 and 34/35 fuel, and frozen-Wire rejection regressions
 are complete. Public behavior is unchanged; the independent audit found no
 P0-P3 issue.
 
+The active ADR-0045 slice derives word-valued strict signed comparison flags.
+`wordSgtFlag` wraps raw signed greater-than with `boolToWord`; `wordSltFlag`
+wraps the effect-safe nested signed-less-than builder. Both preserve source
+left-to-right evaluation and the final store, returning word one for true and
+word zero for false. The slice adds no Word operation, Core tag, generic rule,
+or public Wire representation.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

@@ -69,6 +69,9 @@ public Wire representation. Its independent audit found no P0-P3 issue.
 [ADR-0044](adr/0044-core-vnext-derived-signed-word-less-than.md) completes
 effect-safe derived signed less-than with no new tag or public representation.
 Its independent audit found no P0-P3 issue.
+[ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) accepts the
+active internal slice: canonical word-valued signed strict comparison flags
+with no new tag or public representation.
 
 ## Implementation status
 
@@ -545,6 +548,15 @@ underlying invalid faults, ordered faults, effects and final store, 10/11 and
 34/35 fuel, and frozen v1/v2 builder, handwritten expansion, and `wordSgt`
 rejections are complete. Public formats are unchanged; independent audit is
 clean with no P0-P3 issue.
+
+## Active Core vNext signed comparison flag slice
+
+[ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) derives
+`wordSgtFlag` and `wordSltFlag` by applying `boolToWord` to the existing signed
+boolean comparisons. True becomes word one and false becomes word zero. Source
+left remains before source right, with only `wordSlt`'s bound values reversed.
+The exact twenty-theorem and value/type, fault-order, effect/store, fuel, and
+frozen-Wire regression scope is active. Public behavior remains unchanged.
 
 ## Meaning of completion
 
