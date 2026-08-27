@@ -49,6 +49,19 @@ def shiftLeft (value shift : Word) : Word :=
 def shiftRight (value shift : Word) : Word :=
   if shift.val < 256 then value >>> shift else zero
 
+def shiftArithmeticRight (value shift : Word) : Word :=
+  if shift.val < 256 then
+    if value.val < 2 ^ 255 then
+      ofNatModulo (value.val / 2 ^ shift.val)
+    else
+      ofNatModulo
+        (wordModulus - 1 -
+          ((wordModulus - 1 - value.val) / 2 ^ shift.val))
+  else if value.val < 2 ^ 255 then
+    zero
+  else
+    maximum
+
 def byteAt (index value : Word) : Word :=
   if index.val < 32 then
     ofNatModulo ((value.val / 2 ^ (8 * (31 - index.val))) % 256)
@@ -102,6 +115,8 @@ def apply : BinaryOp → Value → Value → Option Value
   | .wordShl, .word value, .word shift => some (.word (value.shiftLeft shift))
   | .wordShr, .word value, .word shift => some (.word (value.shiftRight shift))
   | .wordByte, .word index, .word value => some (.word (index.byteAt value))
+  | .wordSar, .word value, .word shift =>
+      some (.word (value.shiftArithmeticRight shift))
   | _, _, _ => none
 
 theorem apply_total_of_types
