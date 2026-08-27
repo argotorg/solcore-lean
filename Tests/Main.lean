@@ -17,6 +17,7 @@ import Solcore.Test.CoreDerivedComparisonFlags
 import Solcore.Test.CoreDerivedComparisonFlagWire
 import Solcore.Test.CoreDerivedComparisonWire
 import Solcore.Test.CoreDerivedComparisons
+import Solcore.Test.CoreDerivedRenamingLaws
 import Solcore.Test.CoreFunctions
 import Solcore.Test.CoreNamedData
 import Solcore.Test.CoreRenaming
@@ -4806,6 +4807,7 @@ def run : IO Unit := do
   testCoreDerivedComparisonFlagWire
   testCoreDerivedComparisonWire
   testCoreDerivedComparisons
+  testCoreDerivedRenamingLaws
   testCoreNamedData
   testCoreRenaming
   testCoreRenamingRuntime
