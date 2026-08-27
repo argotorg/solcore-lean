@@ -180,6 +180,23 @@ def resultType : BinaryOp → Ty
 
 end BinaryOp
 
+inductive TernaryOp where
+  | wordAddMod
+  | wordMulMod
+  deriving Repr, BEq, DecidableEq
+
+namespace TernaryOp
+
+def firstType (_ : TernaryOp) : Ty := .word
+
+def secondType (_ : TernaryOp) : Ty := .word
+
+def thirdType (_ : TernaryOp) : Ty := .word
+
+def resultType (_ : TernaryOp) : Ty := .word
+
+end TernaryOp
+
 abbrev Location := Nat
 
 inductive Expr where

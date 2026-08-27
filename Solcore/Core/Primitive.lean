@@ -21,6 +21,14 @@ def sub (left right : Word) : Word :=
 def mul (left right : Word) : Word :=
   left * right
 
+def addMod (left right modulus : Word) : Word :=
+  if modulus.val = 0 then zero
+  else ofNatModulo ((left.val + right.val) % modulus.val)
+
+def mulMod (left right modulus : Word) : Word :=
+  if modulus.val = 0 then zero
+  else ofNatModulo ((left.val * right.val) % modulus.val)
+
 def modularPowLoop (base accumulator exponent : Nat) : Nat :=
   if zero : exponent = 0 then
     accumulator % wordModulus
@@ -219,6 +227,39 @@ theorem apply_result_type
     cases applied <;> rfl
 
 end BinaryOp
+
+namespace TernaryOp
+
+def apply : TernaryOp → Value → Value → Value → Option Value
+  | .wordAddMod, .word left, .word right, .word modulus =>
+      some (.word (left.addMod right modulus))
+  | .wordMulMod, .word left, .word right, .word modulus =>
+      some (.word (left.mulMod right modulus))
+  | _, _, _, _ => none
+
+theorem apply_total_of_types
+    (op : TernaryOp)
+    (first second third : Value)
+    (firstType : first.type = op.firstType)
+    (secondType : second.type = op.secondType)
+    (thirdType : third.type = op.thirdType) :
+    ∃ result,
+      op.apply first second third = some result ∧
+      result.type = op.resultType := by
+  cases op <;> cases first <;> cases second <;> cases third <;>
+    simp_all [apply, TernaryOp.firstType, TernaryOp.secondType,
+      TernaryOp.thirdType, TernaryOp.resultType, Value.type]
+
+theorem apply_result_type
+    {op : TernaryOp}
+    {first second third result : Value}
+    (applied : op.apply first second third = some result) :
+    result.type = op.resultType := by
+  cases op <;> cases first <;> cases second <;> cases third <;>
+    simp [apply] at applied <;>
+    cases applied <;> rfl
+
+end TernaryOp
 
 namespace Expr
 
