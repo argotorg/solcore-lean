@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = join(fileURLToPath(new URL("..", import.meta.url)));
 const kernelRoots = [
   "Solcore/Core",
+  "Solcore/Foundation",
   "Solcore/Semantics",
   "Solcore/Standard",
   "Solcore/Surface",
