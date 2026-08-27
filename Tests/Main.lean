@@ -26,6 +26,7 @@ import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSums
 import Solcore.Test.CoreUnaryPrimitiveWire
 import Solcore.Test.CoreUnaryPrimitives
+import Solcore.Test.CoreUnsignedDivision
 import Solcore.Test.CoreUnsignedDivisionWire
 import Solcore.Test.SurfaceMultiCertifiedFrontend
 import Solcore.Test.SurfaceMultiExactToken
@@ -4816,6 +4817,7 @@ def run : IO Unit := do
   testCoreRenamingRuntime
   testCoreUnaryPrimitiveWire
   testCoreUnaryPrimitives
+  testCoreUnsignedDivision
   testCoreUnsignedDivisionWire
   testM1bProfile
   testM1cProfile
