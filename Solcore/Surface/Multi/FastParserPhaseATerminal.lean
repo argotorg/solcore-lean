@@ -89,6 +89,21 @@ private theorem filterMap_nodup_of_functional
       exact different
         (functional left right result leftSelected otherSelected))
 
+private theorem nodup_of_map_nodup
+    {alpha beta : Type} (function : alpha → beta)
+    {values : List alpha} (unique : (values.map function).Nodup) :
+    values.Nodup := by
+  induction values with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.map_cons, List.nodup_cons] at unique
+      rw [List.nodup_cons]
+      constructor
+      · intro member
+        apply unique.1
+        exact List.mem_map.mpr ⟨head, member, rfl⟩
+      · exact induction unique.2
+
 /-- Terminal atom sites in the canonical grammar-site order. -/
 def allFastTerminalAtomSites : List FastTerminalAtomSite :=
   Grammar.allAtomSites.filterMap FastTerminalAtomSite.ofAtomSite?
@@ -405,6 +420,61 @@ theorem allFastTerminalAddresses_nodup (tokens : List Token) :
       1 + (allFastTerminalWorkItems tokens).length := by
   simp [allFastTerminalAddresses, allFastTerminalEvents, Nat.add_comm]
 
+private theorem terminalWorkAddressLedger
+    {tokens : List Token} (works : List (FastTerminalWorkItem tokens)) :
+    FastParserUnitAddress.addressLedger
+        (works.map FastTerminalWorkItem.address) = {
+      fixedUnits := 0
+      boundarySlotUnits := 0
+      memoSlotUnits := works.length
+    } := by
+  induction works with
+  | nil => rfl
+  | cons work works induction =>
+      rw [List.map_cons, FastParserUnitAddress.addressLedger_cons, induction]
+      simp [FastTerminalWorkItem.address,
+        FastParserUnitAddress.ledgerContribution,
+        ParserResourceLedger.add]
+      omega
+
+/-- The terminal-base address list contains startup once, no boundary-local
+address, and one memo address per terminal work item. -/
+@[simp] theorem allFastTerminalAddresses_ledger (tokens : List Token) :
+    FastParserUnitAddress.addressLedger
+        (allFastTerminalAddresses tokens) = {
+      fixedUnits := 1
+      boundarySlotUnits := 0
+      memoSlotUnits := (allFastTerminalWorkItems tokens).length
+    } := by
+  rw [show allFastTerminalAddresses tokens =
+      FastParserUnitAddress.fixed FastFixedUnitAddress.startup ::
+        (allFastTerminalWorkItems tokens).map
+          FastTerminalWorkItem.address by
+    simp [allFastTerminalAddresses, allFastTerminalEvents,
+      FastTerminalEvent.address]]
+  rw [FastParserUnitAddress.addressLedger_cons,
+    terminalWorkAddressLedger]
+  simp [FastParserUnitAddress.ledgerContribution,
+    ParserResourceLedger.add]
+
+@[simp] theorem allFastTerminalAddresses_fixedUnits (tokens : List Token) :
+    (FastParserUnitAddress.addressLedger
+      (allFastTerminalAddresses tokens)).fixedUnits = 1 := by
+  rw [allFastTerminalAddresses_ledger]
+
+@[simp] theorem allFastTerminalAddresses_boundarySlotUnits
+    (tokens : List Token) :
+    (FastParserUnitAddress.addressLedger
+      (allFastTerminalAddresses tokens)).boundarySlotUnits = 0 := by
+  rw [allFastTerminalAddresses_ledger]
+
+@[simp] theorem allFastTerminalAddresses_memoSlotUnits
+    (tokens : List Token) :
+    (FastParserUnitAddress.addressLedger
+      (allFastTerminalAddresses tokens)).memoSlotUnits =
+        (allFastTerminalWorkItems tokens).length := by
+  rw [allFastTerminalAddresses_ledger]
+
 /-- One work item paired with its checked terminal-comparison result. -/
 structure FastTerminalObservation
     (file : WorkspaceFile) (tokens : List Token) where
@@ -419,6 +489,31 @@ structure FastTerminalFact
     value.cursor = work.cursor }
 
 namespace FastTerminalFact
+
+/-- A terminal fact is determined by its canonical terminal work item. -/
+theorem work_injective
+    {file : WorkspaceFile} {tokens : List Token} :
+    Function.Injective
+      (@FastTerminalFact.work file tokens) := by
+  intro left right workEqual
+  rcases left with ⟨leftWork, ⟨leftMatched, leftCursor⟩⟩
+  rcases right with ⟨rightWork, ⟨rightMatched, rightCursor⟩⟩
+  simp only at workEqual
+  subst rightWork
+  congr 1
+  apply Subtype.ext
+  rcases leftMatched with
+    ⟨leftMatchedCursor, leftValue, leftSpan, leftAt, leftMatches⟩
+  rcases rightMatched with
+    ⟨rightMatchedCursor, rightValue, rightSpan, rightAt, rightMatches⟩
+  simp only at leftCursor rightCursor
+  subst leftMatchedCursor
+  subst rightMatchedCursor
+  obtain ⟨valueEqual, spanEqual⟩ :=
+    TerminalAt.functional leftAt rightAt
+  subst rightValue
+  subst rightSpan
+  rfl
 
 /-- Every retained terminal fact satisfies both declarative terminal
 relations. -/
@@ -457,6 +552,30 @@ def fact?
       work := observation.work
       matched
     }
+
+/-- A successful fact selection determines its source observation. -/
+private theorem fact?_functional
+    {file : WorkspaceFile} {tokens : List Token}
+    (left right : FastTerminalObservation file tokens)
+    (fact : FastTerminalFact file tokens)
+    (leftSelected : left.fact? = some fact)
+    (rightSelected : right.fact? = some fact) :
+    left = right := by
+  rcases left with ⟨leftWork, leftResult⟩
+  rcases right with ⟨rightWork, rightResult⟩
+  cases leftResult with
+  | none =>
+      simp [fact?] at leftSelected
+  | some leftMatched =>
+      cases rightResult with
+      | none =>
+          simp [fact?] at rightSelected
+      | some rightMatched =>
+          simp only [fact?] at leftSelected rightSelected
+          have selectedEqual := leftSelected.trans rightSelected.symm
+          have factEqual := Option.some.inj selectedEqual
+          cases factEqual
+          rfl
 
 end FastTerminalObservation
 
@@ -500,6 +619,35 @@ theorem allFastTerminalObservations_work_nodup
       FastTerminalObservation.work).Nodup := by
   rw [allFastTerminalObservations_work_map]
   exact allFastTerminalWorkItems_nodup tokens
+
+/-- The canonical observation table itself contains no repeated entry. -/
+theorem allFastTerminalObservations_nodup
+    (file : WorkspaceFile) {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    (allFastTerminalObservations file owned).Nodup := by
+  exact nodup_of_map_nodup FastTerminalObservation.work
+    (allFastTerminalObservations_work_nodup file owned)
+
+/-- The canonical successful fact table contains no repeated fact. -/
+theorem allFastTerminalFacts_nodup
+    (file : WorkspaceFile) {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    (allFastTerminalFacts file owned).Nodup := by
+  apply filterMap_nodup_of_functional
+    FastTerminalObservation.fact?
+    (allFastTerminalObservations file owned)
+    (allFastTerminalObservations_nodup file owned)
+  exact FastTerminalObservation.fact?_functional
+
+/-- No successful fact repeats a canonical terminal work identity. -/
+theorem allFastTerminalFacts_work_nodup
+    (file : WorkspaceFile) {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    ((allFastTerminalFacts file owned).map
+      FastTerminalFact.work).Nodup := by
+  exact map_nodup_of_injective FastTerminalFact.work _
+    (allFastTerminalFacts_nodup file owned)
+    FastTerminalFact.work_injective
 
 /-- Every canonical work item has an evaluated observation entry. -/
 theorem allFastTerminalObservations_work_complete
@@ -669,6 +817,47 @@ theorem executeFastTerminalPhaseA?_facts
     cases executionEqual
     rfl
 
+/-- Successful terminal execution has the exact component ledger: one startup
+unit, no boundary-local units, and one memo unit per work item. -/
+theorem executeFastTerminalPhaseA?_ledger
+    {file : WorkspaceFile} {tokens : List Token}
+    {owned : TokensOwnedBy file tokens}
+    {execution : FastTerminalPhaseAExecution file tokens}
+    (selected : executeFastTerminalPhaseA? file owned = some execution) :
+    execution.trace.ledger = {
+      fixedUnits := 1
+      boundarySlotUnits := 0
+      memoSlotUnits := (allFastTerminalWorkItems tokens).length
+    } := by
+  have traceSelected := executeFastTerminalPhaseA?_trace selected
+  rw [FastParserScheduleTrace.chargeAll?_empty_ledger traceSelected,
+    allFastTerminalAddresses_ledger]
+
+theorem executeFastTerminalPhaseA?_fixedUnits
+    {file : WorkspaceFile} {tokens : List Token}
+    {owned : TokensOwnedBy file tokens}
+    {execution : FastTerminalPhaseAExecution file tokens}
+    (selected : executeFastTerminalPhaseA? file owned = some execution) :
+    execution.trace.ledger.fixedUnits = 1 := by
+  rw [executeFastTerminalPhaseA?_ledger selected]
+
+theorem executeFastTerminalPhaseA?_boundarySlotUnits
+    {file : WorkspaceFile} {tokens : List Token}
+    {owned : TokensOwnedBy file tokens}
+    {execution : FastTerminalPhaseAExecution file tokens}
+    (selected : executeFastTerminalPhaseA? file owned = some execution) :
+    execution.trace.ledger.boundarySlotUnits = 0 := by
+  rw [executeFastTerminalPhaseA?_ledger selected]
+
+theorem executeFastTerminalPhaseA?_memoSlotUnits
+    {file : WorkspaceFile} {tokens : List Token}
+    {owned : TokensOwnedBy file tokens}
+    {execution : FastTerminalPhaseAExecution file tokens}
+    (selected : executeFastTerminalPhaseA? file owned = some execution) :
+    execution.trace.ledger.memoSlotUnits =
+      (allFastTerminalWorkItems tokens).length := by
+  rw [executeFastTerminalPhaseA?_ledger selected]
+
 /-- The trace charges startup and every terminal comparison exactly once. -/
 theorem executeFastTerminalPhaseA?_actualUnits
     {file : WorkspaceFile} {tokens : List Token}
@@ -677,9 +866,9 @@ theorem executeFastTerminalPhaseA?_actualUnits
     (selected : executeFastTerminalPhaseA? file owned = some execution) :
     execution.trace.actualUnits =
       1 + (allFastTerminalWorkItems tokens).length := by
-  have traceSelected := executeFastTerminalPhaseA?_trace selected
-  have charged := FastParserScheduleTrace.chargeAll?_actualUnits traceSelected
-  simpa using charged
+  rw [FastParserScheduleTrace.actualUnits,
+    executeFastTerminalPhaseA?_ledger selected]
+  rfl
 
 /-- The terminal base fits the fixed parser schedule bound. -/
 theorem executeFastTerminalPhaseA?_actualUnits_le_parseBound
@@ -715,6 +904,38 @@ theorem fastTerminalEventCount_le_parseBound (tokens : List Token) :
       allFastTerminalFacts file owned := by
   exact executeFastTerminalPhaseA?_facts
     (executeFastTerminalPhaseA?_selected file owned)
+
+/-- The total executor exposes the exact terminal-base component ledger. -/
+@[simp] theorem executeFastTerminalPhaseA_ledger
+    (file : WorkspaceFile) {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    (executeFastTerminalPhaseA file owned).trace.ledger = {
+      fixedUnits := 1
+      boundarySlotUnits := 0
+      memoSlotUnits := (allFastTerminalWorkItems tokens).length
+    } := by
+  exact executeFastTerminalPhaseA?_ledger
+    (executeFastTerminalPhaseA?_selected file owned)
+
+@[simp] theorem executeFastTerminalPhaseA_fixedUnits
+    (file : WorkspaceFile) {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    (executeFastTerminalPhaseA file owned).trace.ledger.fixedUnits = 1 := by
+  rw [executeFastTerminalPhaseA_ledger]
+
+@[simp] theorem executeFastTerminalPhaseA_boundarySlotUnits
+    (file : WorkspaceFile) {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    (executeFastTerminalPhaseA file owned).trace.ledger.boundarySlotUnits =
+      0 := by
+  rw [executeFastTerminalPhaseA_ledger]
+
+@[simp] theorem executeFastTerminalPhaseA_memoSlotUnits
+    (file : WorkspaceFile) {tokens : List Token}
+    (owned : TokensOwnedBy file tokens) :
+    (executeFastTerminalPhaseA file owned).trace.ledger.memoSlotUnits =
+      (allFastTerminalWorkItems tokens).length := by
+  rw [executeFastTerminalPhaseA_ledger]
 
 /-- The total executor charges startup and every comparison exactly once. -/
 @[simp] theorem executeFastTerminalPhaseA_actualUnits

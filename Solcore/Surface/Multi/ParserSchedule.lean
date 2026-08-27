@@ -349,6 +349,35 @@ inductive FastParserUnitAddress (tokens : List Token) where
   | memoSlot (address : FastMemoSlotAddress tokens)
   deriving Repr, DecidableEq
 
+namespace FastParserUnitAddress
+
+/-- Exact three-component ledger contribution of one schedule address. -/
+def ledgerContribution {tokens : List Token}
+    (address : FastParserUnitAddress tokens) : ParserResourceLedger :=
+  match address with
+  | .fixed _ => {
+      fixedUnits := 1
+      boundarySlotUnits := 0
+      memoSlotUnits := 0
+    }
+  | .boundarySlot _ => {
+      fixedUnits := 0
+      boundarySlotUnits := 1
+      memoSlotUnits := 0
+    }
+  | .memoSlot _ => {
+      fixedUnits := 0
+      boundarySlotUnits := 0
+      memoSlotUnits := 1
+    }
+
+@[simp] theorem ledgerContribution_total {tokens : List Token}
+    (address : FastParserUnitAddress tokens) :
+    address.ledgerContribution.total = 1 := by
+  cases address <;> rfl
+
+end FastParserUnitAddress
+
 /-- Address capacities packaged in the public parser-resource ledger shape. -/
 def fastParserScheduleAddressCapacity
     (tokens : List Token) : ParserResourceLedger := {

@@ -72,6 +72,37 @@ theorem rankValues_nodup_iff {tokens : List Token}
           exact addressUnique.1 (sameAddress ▸ candidateMember)
         · exact induction.mpr addressUnique.2
 
+/-- Componentwise ledger contribution of an ordered schedule-address list. -/
+def addressLedger {tokens : List Token} :
+    List (FastParserUnitAddress tokens) → ParserResourceLedger
+  | [] => ParserResourceLedger.zero
+  | address :: addresses =>
+      address.ledgerContribution.add (addressLedger addresses)
+
+@[simp] theorem addressLedger_nil {tokens : List Token} :
+    addressLedger ([] : List (FastParserUnitAddress tokens)) =
+      ParserResourceLedger.zero := by
+  rfl
+
+@[simp] theorem addressLedger_cons {tokens : List Token}
+    (address : FastParserUnitAddress tokens)
+    (addresses : List (FastParserUnitAddress tokens)) :
+    addressLedger (address :: addresses) =
+      address.ledgerContribution.add (addressLedger addresses) := by
+  rfl
+
+/-- The aggregate ledger total is exactly the number of addresses. -/
+@[simp] theorem addressLedger_total {tokens : List Token}
+    (addresses : List (FastParserUnitAddress tokens)) :
+    (addressLedger addresses).total = addresses.length := by
+  induction addresses with
+  | nil => rfl
+  | cons address addresses induction =>
+      rw [addressLedger_cons, ParserResourceLedger.total_add,
+        ledgerContribution_total, induction]
+      simp only [List.length_cons]
+      omega
+
 end FastParserUnitAddress
 
 namespace FastParserScheduleTrace
@@ -206,18 +237,31 @@ theorem chargeAll?_deterministic {tokens : List Token}
   rw [leftSelected] at rightSelected
   exact Option.some.inj rightSelected
 
+/-- A successful run adds exactly the aggregate address-family ledger to its
+initial ledger. -/
+theorem Run.ledger {tokens : List Token}
+    {initial final : FastParserScheduleTrace tokens}
+    {addresses : List (FastParserUnitAddress tokens)}
+    (run : Run initial addresses final) :
+    final.ledger = initial.ledger.add
+      (FastParserUnitAddress.addressLedger addresses) := by
+  induction run with
+  | nil trace =>
+      simp
+  | cons rankFresh selected tail induction =>
+      rw [induction, charge?_ledger selected,
+        FastParserUnitAddress.addressLedger_cons]
+      exact ParserResourceLedger.add_assoc _ _ _
+
 /-- Every successful run increases the charged-unit count by its list length. -/
 theorem Run.actualUnits {tokens : List Token}
     {initial final : FastParserScheduleTrace tokens}
     {addresses : List (FastParserUnitAddress tokens)}
     (run : Run initial addresses final) :
     final.actualUnits = initial.actualUnits + addresses.length := by
-  induction run with
-  | nil trace => simp
-  | cons rankFresh selected tail induction =>
-      rw [induction, charge?_actualUnits selected]
-      simp
-      omega
+  change final.ledger.total = initial.ledger.total + addresses.length
+  rw [run.ledger, ParserResourceLedger.total_add,
+    FastParserUnitAddress.addressLedger_total]
 
 /-- The final ledger of every successful run fits the fixed schedule. -/
 theorem Run.finalLedgerFits {tokens : List Token}
@@ -264,6 +308,28 @@ theorem Run.addresses_nodup {tokens : List Token}
     addresses.Nodup := by
   exact FastParserUnitAddress.rankValues_nodup_iff.mp
     run.rankValues_nodup
+
+/-- Executable success exposes exact componentwise ledger addition. -/
+theorem chargeAll?_ledger {tokens : List Token}
+    {initial final : FastParserScheduleTrace tokens}
+    {addresses : List (FastParserUnitAddress tokens)}
+    (selected : initial.chargeAll? addresses = some final) :
+    final.ledger = initial.ledger.add
+      (FastParserUnitAddress.addressLedger addresses) := by
+  exact (chargeAll?_eq_some_iff_run.mp selected).ledger
+
+/-- From the empty trace, the final ledger is exactly the aggregate address
+ledger. -/
+theorem chargeAll?_empty_ledger {tokens : List Token}
+    {final : FastParserScheduleTrace tokens}
+    {addresses : List (FastParserUnitAddress tokens)}
+    (selected : (empty tokens).chargeAll? addresses = some final) :
+    final.ledger = FastParserUnitAddress.addressLedger addresses := by
+  have accounted := chargeAll?_ledger selected
+  rw [empty_ledger] at accounted
+  change final.ledger = ParserResourceLedger.zero.add
+    (FastParserUnitAddress.addressLedger addresses) at accounted
+  simpa using accounted
 
 /-- Executable success exposes the exact charged-unit equation. -/
 theorem chargeAll?_actualUnits {tokens : List Token}

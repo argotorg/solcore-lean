@@ -25,6 +25,50 @@ deriving DecidableEq, Repr
 
 namespace ParserResourceLedger
 
+/-- The componentwise-zero parser ledger. -/
+def zero : ParserResourceLedger := {
+  fixedUnits := 0
+  boundarySlotUnits := 0
+  memoSlotUnits := 0
+}
+
+/-- Componentwise addition of parser ledgers. -/
+def add (left right : ParserResourceLedger) : ParserResourceLedger := {
+  fixedUnits := left.fixedUnits + right.fixedUnits
+  boundarySlotUnits := left.boundarySlotUnits + right.boundarySlotUnits
+  memoSlotUnits := left.memoSlotUnits + right.memoSlotUnits
+}
+
+@[simp] theorem add_fixedUnits (left right : ParserResourceLedger) :
+    (left.add right).fixedUnits = left.fixedUnits + right.fixedUnits := by
+  rfl
+
+@[simp] theorem add_boundarySlotUnits (left right : ParserResourceLedger) :
+    (left.add right).boundarySlotUnits =
+      left.boundarySlotUnits + right.boundarySlotUnits := by
+  rfl
+
+@[simp] theorem add_memoSlotUnits (left right : ParserResourceLedger) :
+    (left.add right).memoSlotUnits = left.memoSlotUnits + right.memoSlotUnits := by
+  rfl
+
+@[simp] theorem add_zero (ledger : ParserResourceLedger) :
+    ledger.add zero = ledger := by
+  cases ledger
+  simp [add, zero]
+
+@[simp] theorem zero_add (ledger : ParserResourceLedger) :
+    zero.add ledger = ledger := by
+  cases ledger
+  simp [add, zero]
+
+theorem add_assoc (first second third : ParserResourceLedger) :
+    (first.add second).add third = first.add (second.add third) := by
+  cases first
+  cases second
+  cases third
+  simp [add, Nat.add_assoc]
+
 /-- Total units represented by a parser-resource ledger. -/
 def total (ledger : ParserResourceLedger) : Nat :=
   ledger.fixedUnits + ledger.boundarySlotUnits + ledger.memoSlotUnits
@@ -33,6 +77,14 @@ def total (ledger : ParserResourceLedger) : Nat :=
     ledger.total =
       ledger.fixedUnits + ledger.boundarySlotUnits + ledger.memoSlotUnits := by
   rfl
+
+@[simp] theorem total_zero : zero.total = 0 := by
+  rfl
+
+@[simp] theorem total_add (left right : ParserResourceLedger) :
+    (left.add right).total = left.total + right.total := by
+  simp only [add, total]
+  omega
 
 theorem fixedUnits_le_total (ledger : ParserResourceLedger) :
     ledger.fixedUnits ≤ ledger.total := by

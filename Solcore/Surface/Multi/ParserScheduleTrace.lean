@@ -454,13 +454,13 @@ theorem charge?_success_preserves_not_visited {tokens : List Token}
               rfl
       · cases selected
 
-/-- Every successful fresh charge increases the distinct-address total by
-exactly one. -/
-theorem charge?_actualUnits {tokens : List Token}
+/-- Every successful charge adds exactly its address-family contribution to
+the three-component ledger. -/
+theorem charge?_ledger {tokens : List Token}
     {trace result : FastParserScheduleTrace tokens}
     {address : FastParserUnitAddress tokens}
     (selected : trace.charge? address = some result) :
-    result.actualUnits = trace.actualUnits + 1 := by
+    result.ledger = trace.ledger.add address.ledgerContribution := by
   cases address with
   | fixed address =>
       change chargeFixed? trace address = some result at selected
@@ -468,13 +468,8 @@ theorem charge?_actualUnits {tokens : List Token}
       split at selected
       · rename_i fresh
         cases selected
-        change
-          (trace.fixedVisited.insert address.rank.val fresh).card +
-              trace.boundaryVisited.card + trace.memoVisited.card =
-            trace.fixedVisited.card + trace.boundaryVisited.card +
-              trace.memoVisited.card + 1
-        rw [ScheduleRankSet.card_insert]
-        omega
+        simp [ledger, ParserResourceLedger.add,
+          FastParserUnitAddress.ledgerContribution]
       · cases selected
   | boundarySlot address =>
       change chargeBoundary? trace address = some result at selected
@@ -482,14 +477,8 @@ theorem charge?_actualUnits {tokens : List Token}
       split at selected
       · rename_i fresh
         cases selected
-        change
-          trace.fixedVisited.card +
-              (trace.boundaryVisited.insert address.rank.val fresh).card +
-                trace.memoVisited.card =
-            trace.fixedVisited.card + trace.boundaryVisited.card +
-              trace.memoVisited.card + 1
-        rw [ScheduleRankSet.card_insert]
-        omega
+        simp [ledger, ParserResourceLedger.add,
+          FastParserUnitAddress.ledgerContribution]
       · cases selected
   | memoSlot address =>
       change chargeMemo? trace address = some result at selected
@@ -497,14 +486,30 @@ theorem charge?_actualUnits {tokens : List Token}
       split at selected
       · rename_i fresh
         cases selected
-        change
-          trace.fixedVisited.card + trace.boundaryVisited.card +
-              (trace.memoVisited.insert address.rank.val fresh).card =
-            trace.fixedVisited.card + trace.boundaryVisited.card +
-              trace.memoVisited.card + 1
+        change ({
+            fixedUnits := trace.fixedVisited.card
+            boundarySlotUnits := trace.boundaryVisited.card
+            memoSlotUnits :=
+              (trace.memoVisited.insert address.rank.val fresh).card
+          } : ParserResourceLedger) = ({
+            fixedUnits := trace.fixedVisited.card + 0
+            boundarySlotUnits := trace.boundaryVisited.card + 0
+            memoSlotUnits := trace.memoVisited.card + 1
+          } : ParserResourceLedger)
         rw [ScheduleRankSet.card_insert]
-        omega
+        simp
       · cases selected
+
+/-- Every successful fresh charge increases the distinct-address total by
+exactly one. -/
+theorem charge?_actualUnits {tokens : List Token}
+    {trace result : FastParserScheduleTrace tokens}
+    {address : FastParserUnitAddress tokens}
+    (selected : trace.charge? address = some result) :
+    result.actualUnits = trace.actualUnits + 1 := by
+  change result.ledger.total = trace.ledger.total + 1
+  rw [charge?_ledger selected, ParserResourceLedger.total_add,
+    FastParserUnitAddress.ledgerContribution_total]
 
 end FastParserScheduleTrace
 

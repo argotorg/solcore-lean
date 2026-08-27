@@ -1,4 +1,4 @@
-import Solcore.Surface.Multi.FastParserPhaseATerminal
+import Solcore.Surface.Multi.FastParserPhaseAAtom
 
 /-! Executable regressions for the terminal-atom fast-parser base. -/
 
@@ -47,13 +47,29 @@ def testMultiFastParser : IO Unit := do
     "the canonical terminal Phase-A option executor returned none"
 
   let execution := executeFastTerminalPhaseA file owned
+  let atomSeeds := execution.atomSeeds
   assertTrue
     (execution.trace.actualUnits ==
       1 + (allFastTerminalWorkItems tokens).length)
     "the terminal Phase-A unit count diverged from startup plus its worklist"
+  assertTrue (execution.trace.ledger == {
+      fixedUnits := 1
+      boundarySlotUnits := 0
+      memoSlotUnits := (allFastTerminalWorkItems tokens).length
+    })
+    "the terminal Phase-A component ledger diverged from its address families"
+  assertTrue
+    (FastParserUnitAddress.addressLedger
+      (allFastTerminalAddresses tokens) == execution.trace.ledger)
+    "the terminal Phase-A trace ledger diverged from its address ledger"
   assertTrue
     (decide (execution.trace.actualUnits <= parseBound (tokens.length + 1)))
     "the terminal Phase-A execution exceeded parseBound"
+  assertTrue (atomSeeds.length == execution.facts.length)
+    "terminal atom materialization changed the successful fact count"
+  assertTrue
+    (decide (allFastTerminalAtomScannedEdges file owned).Nodup)
+    "terminal atom materialization repeated a canonical raw scan edge"
 
   let hasIdentifierAtToken := execution.facts.any fun fact =>
     fact.work.cursor.val == 0 &&
@@ -61,11 +77,24 @@ def testMultiFastParser : IO Unit := do
   assertTrue hasIdentifierAtToken
     "the identifier token did not produce an identifier terminal fact"
 
+  let hasIdentifierAtomSeed := atomSeeds.any fun seed =>
+    seed.fact.work.cursor.val == 0 &&
+      seed.fact.work.atom.terminal ==
+        Grammar.TerminalSymbol.category .identifier
+  assertTrue hasIdentifierAtomSeed
+    "the identifier terminal fact did not materialize an atom seed"
+
   let hasEofAtEnd := execution.facts.any fun fact =>
     fact.work.cursor.val == 1 &&
       fact.work.atom.terminal == Grammar.TerminalSymbol.endOfFile
   assertTrue hasEofAtEnd
     "logical EOF did not produce an end-of-file terminal fact"
+
+  let hasEofAtomSeed := atomSeeds.any fun seed =>
+    seed.fact.work.cursor.val == 1 &&
+      seed.fact.work.atom.terminal == Grammar.TerminalSymbol.endOfFile
+  assertTrue hasEofAtomSeed
+    "the logical EOF terminal fact did not materialize an atom seed"
 
   let hasEofAtToken := execution.facts.any fun fact =>
     fact.work.cursor.val == 0 &&
