@@ -9,6 +9,7 @@ import Solcore.Standard.CanonicalData
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
+import Solcore.Test.CoreArithmeticShift
 import Solcore.Test.CoreArithmeticShiftWire
 import Solcore.Test.CoreBooleanConnectives
 import Solcore.Test.CoreBitwiseLogic
@@ -4813,6 +4814,7 @@ def run : IO Unit := do
   testSemanticCore
   testPrimitiveAlgebra
   testM1cKernel
+  testCoreArithmeticShift
   testCoreArithmeticShiftWire
   testCoreProducts
   testCoreFunctions
