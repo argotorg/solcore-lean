@@ -60,6 +60,8 @@ feature is selected separately.
 [ADR-0041](adr/0041-core-vnext-arithmetic-right-shift.md) completes internal
 256-bit arithmetic right shift. Core vNext remains active; the next feature is
 selected separately.
+[ADR-0042](adr/0042-core-vnext-modular-exponentiation.md) makes internal modular
+word exponentiation the active Core vNext slice.
 
 ## Implementation status
 
@@ -91,6 +93,7 @@ selected separately.
 | Internal word leading-zero count | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal word byte selection | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal arithmetic right shift | Complete | Complete | Explicitly excluded from Wire v1/v2 |
+| Internal modular exponentiation | In progress | In progress | Explicitly excluded from Wire v1/v2 |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -498,6 +501,18 @@ frozen Wire v1/v2 plus v2-operation rejection. Future source `(shift, value)`
 elaboration must bind source-order evaluation before reordering bound values.
 Public Oracle, schema, and JSON formats remain unchanged. The independent audit
 found no P0-P3 issue.
+
+## Active Core vNext modular-exponentiation slice
+
+[ADR-0042](adr/0042-core-vnext-modular-exponentiation.md) adds internal
+`BinaryOp.wordPow` and `Word.pow(base, exponent)`. Core evaluates base then
+exponent exactly once. A square-and-multiply helper halves the exponent and is
+proved equal to exponentiation modulo `2^256`; `0^0 = 1`. Its iterations remain
+inside one CEK primitive step. The exact fourteen-theorem interface is eight
+Word laws, one application equation, and five evaluations. Tests cover small,
+boundary, maximum, and huge exponents; types; raw and ordered faults; effects
+and final store; exact 4/5 and 28/29 fuel; and frozen Wire v1/v2 plus v2-op
+rejection. Public formats remain unchanged. Implementation is in progress.
 
 ## Meaning of completion
 
