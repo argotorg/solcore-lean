@@ -58,7 +58,7 @@ These results remain regression obligations for every extension.
 | 32 | Ternary modular arithmetic | Complete | Reduces full-precision sums and products after three ordered operands |
 | 33 | Canonical runtime scalar observations | Complete | Fixes byte, address, and word representation before contract state |
 | 34 | Contract frame halt outcomes | Complete | Separates return data, revert data, and parametric trap reasons before state |
-| 35 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
+| 35 | Strict Address↔Word bridge | Active | Adds lossless widening and a strict partial inverse before contract state |
 | 36 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 37 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
 | 38 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
@@ -569,6 +569,19 @@ distinction. Focused and full builds and tests, trust-zero, semantic-kernel,
 metadata, axiom, document-link, and diff checks pass; the independent audit
 found no P0-P3 issue. State, rollback, calls, entry and ABI rules, evaluator
 limits, EVM revision, and every public format remain later decisions.
+
+## Active strict address and word bridge slice
+
+[ADR-0053](adr/0053-strict-address-word-bridge.md) fixes the next small
+syntax-independent conversion boundary. An address widens to a word with the
+same natural-number value. A word narrows to an address only when it is below
+`2^160`; larger words are rejected rather than truncated or reduced modulo the
+address width.
+
+Implementation is limited to two conversions, exactly six focused laws, and
+exactly ten executable runtime assertions. Source casts, ABI behavior, Core
+operations, contract state, rollback, and every public format remain separate
+work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

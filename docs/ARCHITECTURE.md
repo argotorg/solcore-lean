@@ -360,6 +360,13 @@ successful payload projections. This completed carrier does not define an
 evaluator, state transition, checkpoint, rollback policy, trap taxonomy, or
 resource-limit result.
 
+ADR-0053 specifies a strict bridge between the existing scalar types without
+adding contract state. An address zero-extends to a word with the same numeric
+value; a word becomes an address only when it is below `2^160`. Overflow is
+explicit failure, never truncation or modulo reduction. This internal bridge
+does not define a source cast, ABI decoding, a Core operation, or a public
+observation.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

@@ -27,7 +27,7 @@ likewise adds no new Core expression form. The derived short-circuit `boolAnd`
 and `boolOr` slice accepted by ADR-0026 is complete. The derived word-valued
 nonzero predicate accepted by ADR-0027 is also complete. Core vNext as a whole
 remains active. The word-valued equality and unsigned greater-than flags from
-ADR-0028 are complete, with additional conversions and primitives planned.
+ADR-0028 are complete, with further Core conversions and primitives planned.
 ADR-0029 completes the renaming and environment-insertion proof foundation.
 [ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md) completes the proof
 interfaces for the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe`
@@ -96,6 +96,10 @@ contract-frame outcome slice. Exactly six laws and 10 executable runtime
 assertions cover return data, revert data, and a parametric trap reason without
 defining state, rollback, or an execution profile. Its independent audit found
 no P0-P3 issue.
+[ADR-0053](adr/0053-strict-address-word-bridge.md) activates a strict internal
+bridge between addresses and words. Widening preserves the numeric value;
+narrowing rejects values at or above `2^160` rather than truncating them. Its
+implementation and proofs are in progress and are not published.
 
 ## Implementation status
 
@@ -135,6 +139,7 @@ no P0-P3 issue.
 | Internal ternary modular arithmetic | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Canonical runtime scalar observations | Complete | Complete | Not published |
 | Internal contract frame outcomes | Complete | Complete | Not published |
+| Strict address and word bridge | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -174,7 +179,8 @@ language. The following remain:
 - source-level mutable declarations, assignment syntax, and their elaboration;
 - source-level data declarations, pattern syntax, and elaboration into the
   completed internal named-data Core;
-- additional conversions and primitives beyond the completed short-circuit slice;
+- the active strict address-and-word bridge and further closed Core conversions
+  or primitives;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
 - contract entry and call semantics;
@@ -692,6 +698,18 @@ an EVM revision, or publish a Wire, Oracle, verdict, or observation format.
 Focused and full builds and tests, trust-zero, semantic-kernel, metadata,
 axiom, document-link, and diff checks pass. The independent audit found no
 P0-P3 issue.
+
+## Active strict address and word bridge slice
+
+[ADR-0053](adr/0053-strict-address-word-bridge.md) specifies a lossless
+conversion from the existing 160-bit `Address` to `Core.Word` and a strict
+partial inverse. Narrowing succeeds only below `2^160` and preserves the same
+natural-number value; overflow returns `none` instead of truncating high bits.
+
+The planned implementation contains two conversions, exactly six focused
+laws, and exactly ten direct runtime assertions. It changes no scalar text,
+Core operation, source or ABI rule, contract state, rollback behavior, or
+published interface.
 
 ## Meaning of completion
 

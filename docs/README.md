@@ -41,7 +41,8 @@ It adds no tag and is separate from boolean truthiness and ABI decoding.
 Its named expansion, typing, inference, store-preserving evaluations, weakening,
 effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
-Additional conversions and primitives remain planned.
+The strict address-and-word bridge is active; further Core conversions and
+primitives remain planned.
 The completed seventeenth slice,
 [ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md), completes focused
 proof and regression interfaces for the existing raw `wordShl` and `wordShr`
@@ -195,6 +196,13 @@ than an absent one. The carrier, four total observations, exactly six laws, and
 ABI behavior, resource-limit meaning, or published Wire or Oracle format. The
 independent audit found no P0-P3 issue.
 
+The active strict address-and-word bridge,
+[ADR-0053](adr/0053-strict-address-word-bridge.md), keeps an address's numeric
+value when widening it to a word and accepts a word as an address only below
+`2^160`. Larger words fail explicitly instead of losing their upper bits. The
+planned two conversions, exact six laws, and 10 runtime assertions add no
+source cast, ABI behavior, contract state, or public format.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -329,6 +337,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   independent audit found no P0-P3 issue.
 - ADR-0052 completes parametric internal contract-frame halt outcomes; its
   independent audit found no P0-P3 issue.
+- ADR-0053 accepts the strict internal address-to-word bridge and its
+  non-truncating partial inverse.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
