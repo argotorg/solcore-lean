@@ -42,6 +42,7 @@ import Solcore.Test.CoreModularArithmeticWire
 import Solcore.Test.CoreModularExponentiation
 import Solcore.Test.CoreModularExponentiationWire
 import Solcore.Test.CoreTernaryModularArithmetic
+import Solcore.Test.CoreTernaryModularArithmeticWire
 import Solcore.Test.CoreNamedData
 import Solcore.Test.CoreRenaming
 import Solcore.Test.CoreRenamingRuntime
@@ -4866,6 +4867,7 @@ def run : IO Unit := do
   testCoreModularExponentiation
   testCoreModularExponentiationWire
   testCoreTernaryModularArithmetic
+  testCoreTernaryModularArithmeticWire
   testCoreNamedData
   testCoreRenaming
   testCoreRenamingRuntime
