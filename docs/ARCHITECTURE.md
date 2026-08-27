@@ -310,11 +310,13 @@ exact 6/7, 30/31, 12/13, and 36/37 fuel, and frozen-Wire rejection regressions
 pass. No Word operation, Core tag, generic rule, or public Wire form is added;
 the independent audit found no P0-P3 issue.
 
-The active ADR-0047 slice adds internal `BinaryOp.wordSignExtend`, with the
-byte index on the left and the value on the right. Indices below 32 extend the
-selected low-order signed byte width to 256 bits; indices at least 32 and index
-31 at full width preserve the input. Core evaluates index then value exactly
-once. Frozen public Wire formats continue to reject the operation.
+The completed ADR-0047 slice adds internal `BinaryOp.wordSignExtend`, with the
+byte index on the left and the value on the right. Its exact five Word laws,
+one application equation, and four evaluation theorems cover indices 0, 1, 31,
+32, and the maximum word, plus types, ordered faults, effects, final stores,
+and fuel boundaries. Core evaluates index then value exactly once. Frozen
+public Wire formats continue to reject the operation; the independent audit
+found no P0-P3 issue.
 
 ### Contract runtime
 

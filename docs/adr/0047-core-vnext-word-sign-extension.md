@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-ninth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete; independent audit found no P0-P3 issue
 
 ## Context
 
@@ -59,7 +59,7 @@ The general evaluation theorem exposes the intermediate store after the index
 and the final store after the value. Do not duplicate generic typing,
 inference, renaming, correspondence, machine, or Safety theorems.
 
-## Required tests
+## Implemented tests
 
 Focused regressions cover:
 
@@ -95,3 +95,18 @@ lowering, or gas rule.
 Internal Core gains a total, fixed-width sign-extension operation with explicit
 operand order and reusable boundary laws. Public behavior and bytes remain
 unchanged.
+
+## Implementation result
+
+The exact ten-theorem interface is complete: five Word laws, one binary
+application equation, and four store-threaded evaluation theorems. Focused
+regressions cover zero and maximum values; indices 0, 1, 31, 32, and the
+maximum word; result and operand types; raw invalid operands; ordered faults;
+left-to-right effects evaluated exactly once with the final store retained;
+and exact literal 4/5 and effectful 28/29 fuel boundaries.
+
+Frozen Wire v1/v2 expression projection and the Wire v2 binary-operation
+conversion reject the internal operation, so public schemas and bytes remain
+unchanged. Focused and full warning-free builds, the full test runner, kernel
+policy, and metadata verification pass. The independent audit found no P0-P3
+issue.

@@ -470,16 +470,19 @@ Focused/full builds, tests, kernel policy, and metadata verification pass. No
 new operation tag or public behavior is added; the independent audit found no
 P0-P3 issue. The next feature is selected by a separate ADR.
 
-## Active Core vNext slice: word sign extension
+## Completed Core vNext slice: word sign extension
 
 [ADR-0047](adr/0047-core-vnext-word-sign-extension.md) adds internal
 `BinaryOp.wordSignExtend(index, value)`. Index is evaluated before value.
 Indices below 32 select an 8-, 16-, through 256-bit signed low-order width;
 indices at least 32 preserve the original value. Five Word laws, one application
-equation, and four evaluations form the planned exact ten-theorem interface.
-Value and sign boundaries, types, raw and ordered faults, effects/final store,
-exact 4/5 and 28/29 fuel, and frozen v1/v2 rejection are required. Public
-formats, source syntax, ABI, opcode, and gas rules remain unchanged.
+equation, and four evaluations form the completed exact ten-theorem interface.
+Indices 0, 1, 31, 32, and maximum, values and types, raw and ordered faults,
+effects/final store, exact 4/5 and 28/29 fuel, and frozen v1/v2 rejection are
+covered. Focused/full builds, tests, kernel policy, and metadata verification
+pass. Public formats, source syntax, ABI, opcode, and gas rules remain
+unchanged; the independent audit found no P0-P3 issue. The next feature is
+selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

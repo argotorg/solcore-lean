@@ -135,12 +135,16 @@ source left-to-right evaluation and equality returns true. Its exact ten static
 and ten evaluation theorems and value/type, fault/effect/store, exact-fuel, and
 frozen-Wire regressions are complete. It adds no operation tag or public Wire
 behavior; the independent audit found no P0-P3 issue.
-The active twenty-ninth slice,
+The completed twenty-ninth slice,
 [ADR-0047](adr/0047-core-vnext-word-sign-extension.md), adds internal word sign
 extension. The left operand selects a low-order byte width and the right operand
 is the value. In-range indices copy the selected sign bit through the upper
-word; indices at least 32 leave the value unchanged. The slice is internal and
-does not change frozen Wire formats or public behavior.
+word; indices at least 32 leave the value unchanged. Its exact ten theorems and
+regressions cover indices 0, 1, 31, 32, and maximum, types, faults, effects,
+final stores, exact fuel, and frozen-Wire rejection. Focused/full builds, tests,
+kernel policy, and metadata verification pass. The slice is internal and does
+not change frozen Wire formats or public behavior; the independent audit found
+no P0-P3 issue.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -263,7 +267,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0045 completes canonical word-valued signed strict comparison flags.
 - ADR-0046 completes effect-safe boolean signed non-strict comparisons; its
   independent audit found no P0-P3 issue.
-- ADR-0047 accepts internal index-left/value-right word sign extension.
+- ADR-0047 completes internal index-left/value-right word sign extension; its
+  independent audit found no P0-P3 issue.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

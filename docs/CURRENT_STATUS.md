@@ -75,9 +75,9 @@ representation. Its independent audit found no P0-P3 issue.
 [ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md) completes
 effect-safe boolean signed ≤ and ≥ builders with no new tag or public
 representation. Its independent audit found no P0-P3 issue.
-[ADR-0047](adr/0047-core-vnext-word-sign-extension.md) accepts the active
-internal word sign-extension slice with index-left/value-right evaluation and
-no public Wire representation.
+[ADR-0047](adr/0047-core-vnext-word-sign-extension.md) completes internal word
+sign extension with index-left/value-right evaluation and no public Wire
+representation. Its independent audit found no P0-P3 issue.
 
 ## Implementation status
 
@@ -581,14 +581,17 @@ Focused and full builds, the full test runner, kernel policy, and metadata
 verification pass. Public behavior remains unchanged; the independent audit
 found no P0-P3 issue.
 
-## Active Core vNext word sign-extension slice
+## Completed Core vNext word sign-extension slice
 
 [ADR-0047](adr/0047-core-vnext-word-sign-extension.md) adds internal
 `BinaryOp.wordSignExtend`. The left word selects a byte width and the right word
 is the value. Indices below 32 extend the selected sign bit through the upper
-word; indices at least 32 return the value unchanged. The planned exact ten
-theorems and focused value/type/fault/effect/store/fuel/Wire regressions add no
-public format or source commitment.
+word; indices at least 32 return the value unchanged. The exact ten theorems
+and focused regressions cover indices 0, 1, 31, 32, and maximum, values and
+types, raw and ordered faults, effects and final stores, exact 4/5 and 28/29
+fuel, and frozen v1/v2 rejection. Focused/full builds, tests, kernel policy,
+and metadata verification pass. There is no public format or source
+commitment; the independent audit found no P0-P3 issue.
 
 ## Meaning of completion
 
