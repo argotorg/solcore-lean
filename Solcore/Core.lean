@@ -24,6 +24,7 @@ import Solcore.Core.LogicalShifts
 import Solcore.Core.ModularArithmetic
 import Solcore.Core.BitwiseLogic
 import Solcore.Core.DirectWordComparisons
+import Solcore.Core.SignedComparison
 import Solcore.Core.ShortCircuit
 
 /-!
