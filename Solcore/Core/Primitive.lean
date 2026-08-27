@@ -21,6 +21,26 @@ def sub (left right : Word) : Word :=
 def mul (left right : Word) : Word :=
   left * right
 
+def modularPowLoop (base accumulator exponent : Nat) : Nat :=
+  if zero : exponent = 0 then
+    accumulator % wordModulus
+  else
+    let accumulator :=
+      if exponent % 2 = 1 then
+        (accumulator * base) % wordModulus
+      else
+        accumulator % wordModulus
+    modularPowLoop
+      ((base * base) % wordModulus)
+      accumulator
+      (exponent / 2)
+termination_by exponent
+decreasing_by
+  exact Nat.div_lt_self (Nat.zero_lt_of_ne_zero zero) (by decide)
+
+def pow (base exponent : Word) : Word :=
+  ofNatModulo (modularPowLoop base.val 1 exponent.val)
+
 def udiv (left right : Word) : Word :=
   if right.val = 0 then zero else left / right
 
@@ -117,6 +137,7 @@ def apply : BinaryOp → Value → Value → Option Value
   | .wordByte, .word index, .word value => some (.word (index.byteAt value))
   | .wordSar, .word value, .word shift =>
       some (.word (value.shiftArithmeticRight shift))
+  | .wordPow, .word base, .word exponent => some (.word (base.pow exponent))
   | _, _, _ => none
 
 theorem apply_total_of_types
