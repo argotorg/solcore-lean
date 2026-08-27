@@ -41,6 +41,9 @@ private def checkPathStepName : Core.CheckPathStep → String
   | .loadCellReference => "loadCellReference"
   | .storeCellReference => "storeCellReference"
   | .storeCellValue => "storeCellValue"
+  | .constructPayload => "constructPayload"
+  | .matchScrutinee => "matchScrutinee"
+  | .matchBranch index => "matchBranch[" ++ toString index ++ "]"
   | .unaryOperand => "unaryOperand"
   | .binaryLeft => "binaryLeft"
   | .binaryRight => "binaryRight"
@@ -112,6 +115,16 @@ private def checkErrorArguments : Core.CheckErrorData → Option Lean.Json
         ("expected", expected),
         ("actual", actual)
       ])
+  | .invalidDefinitionPayload ..
+  | .unknownNamedDataType ..
+  | .unknownDataType ..
+  | .unknownConstructor ..
+  | .constructorPayloadTypeMismatch ..
+  | .expectedNamedData ..
+  | .matchDataTypeMismatch ..
+  | .matchBranchCountMismatch ..
+  | .matchBranchResultTypeMismatch ..
+  | .invalidResultType .. => none
   | .primitiveOperandTypeMismatch expected actual => do
       let expected ← encodeCoreType? expected
       let actual ← encodeCoreType? actual
@@ -133,6 +146,7 @@ private def checkErrorArguments : Core.CheckErrorData → Option Lean.Json
         ("declaredType", declaredType),
         ("inferredType", inferredType)
       ])
+  | .inferenceFailure => none
 
 private def diagnosticOfCheckError (error : Core.CheckError) : Option Diagnostic := do
   let arguments ← checkErrorArguments error.data

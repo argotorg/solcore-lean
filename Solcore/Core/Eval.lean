@@ -115,6 +115,25 @@ inductive Evaluates : Environment → Store → Expr → Value → Store → Pro
       Evaluates environment referenceStore value newValue valueStore →
       Store.write? valueStore location newValue = some finalStore →
       Evaluates environment initialStore (.storeCell reference value) .unit finalStore
+  | construct
+      {environment : Environment} {initialStore finalStore : Store}
+      {constructor : ConstructorId} {payload : Expr} {payloadValue : Value} :
+      Evaluates environment initialStore payload payloadValue finalStore →
+      Evaluates environment initialStore (.construct constructor payload)
+        (.constructed constructor payloadValue) finalStore
+  | matchData
+      {environment : Environment}
+      {initialStore branchStore finalStore : Store}
+      {dataType : DataTypeId} {resultType : Ty}
+      {scrutinee branch : Expr} {branches : List Expr}
+      {constructor : ConstructorId} {payload result : Value} :
+      Evaluates environment initialStore scrutinee
+        (.constructed constructor payload) branchStore →
+      constructor.owner = dataType →
+      branches[constructor.index]? = some branch →
+      Evaluates (payload :: environment) branchStore branch result finalStore →
+      Evaluates environment initialStore
+        (.matchData dataType resultType scrutinee branches) result finalStore
   | unary
       {environment : Environment} {initialStore finalStore : Store}
       {op : UnaryOp} {operand : Expr} {operandValue result : Value} :
@@ -258,6 +277,20 @@ theorem evaluation_deterministic
           rw [leftWrite] at rightWrite
           cases rightWrite
           exact ⟨rfl, rfl⟩
+  | construct _ payloadIH =>
+      cases rightEvaluation with
+      | construct otherPayload =>
+          obtain ⟨rfl, rfl⟩ := payloadIH otherPayload
+          exact ⟨rfl, rfl⟩
+  | matchData _ _ leftBranchLookup _ scrutineeIH branchIH =>
+      cases rightEvaluation with
+      | matchData otherScrutinee _ rightBranchLookup otherBranch =>
+          obtain ⟨scrutineeEquality, rfl⟩ :=
+            scrutineeIH otherScrutinee
+          cases scrutineeEquality
+          rw [leftBranchLookup] at rightBranchLookup
+          cases rightBranchLookup
+          exact branchIH otherBranch
   | unary _ leftApplied operandIH =>
       cases rightEvaluation with
       | unary rightOperand rightApplied =>
@@ -314,10 +347,12 @@ theorem evaluation_store_length_monotone
   | inLeft _ operandIH
   | inRight _ operandIH
   | loadCell _ _ operandIH
+  | construct _ operandIH
   | unary _ _ operandIH =>
       exact operandIH
   | caseLeft _ _ scrutineeIH branchIH
   | caseRight _ _ scrutineeIH branchIH
+  | matchData _ _ _ _ scrutineeIH branchIH
   | letE _ _ scrutineeIH branchIH
   | ifTrue _ _ scrutineeIH branchIH
   | ifFalse _ _ scrutineeIH branchIH =>
@@ -339,8 +374,10 @@ theorem evaluation_store_length_monotone
 namespace Expr
 
 /--
-`CellFree` identifies the frozen Core fragment: it rejects all three cell
-operations and checks every nested function body and branch structurally.
+`CellFree` identifies the store-passive syntactic fragment: it rejects all
+three cell operations and checks every nested function body and branch
+structurally. Every frozen Core expression is in this fragment, as are newer
+effect-free internal forms such as named-data construction and matching.
 -/
 inductive CellFree : Expr → Prop where
   | unit : CellFree .unit
@@ -364,6 +401,14 @@ inductive CellFree : Expr → Prop where
       CellFree leftBranch →
       CellFree rightBranch →
       CellFree (.caseE scrutinee leftBranch rightBranch)
+  | construct {constructor : ConstructorId} {payload : Expr} :
+      CellFree payload → CellFree (.construct constructor payload)
+  | matchData
+      {dataType : DataTypeId} {resultType : Ty}
+      {scrutinee : Expr} {branches : List Expr} :
+      CellFree scrutinee →
+      (∀ branch ∈ branches, CellFree branch) →
+      CellFree (.matchData dataType resultType scrutinee branches)
   | unary {op : UnaryOp} {operand : Expr} :
       CellFree operand → CellFree (.unary op operand)
   | binary {op : BinaryOp} {left right : Expr} :
@@ -408,6 +453,9 @@ mutual
         StorePassiveValue (.inRight leftType payload)
     | cellRef {elementType : Ty} {location : Location} :
         StorePassiveValue (.cellRef elementType location)
+    | constructed {constructor : ConstructorId} {payload : Value} :
+        StorePassiveValue payload →
+        StorePassiveValue (.constructed constructor payload)
 
   inductive StorePassiveEnvironment : Environment → Prop where
     | nil : StorePassiveEnvironment []
@@ -426,7 +474,8 @@ theorem StorePassiveEnvironment.lookup
     StorePassiveValue value := by
   induction passive using StorePassiveEnvironment.rec
       (motive_1 := fun _ _ => True) generalizing index with
-  | unit | bool | word | pair | closure | inLeft | inRight | cellRef =>
+  | unit | bool | word | pair | closure | inLeft | inRight | cellRef
+  | constructed =>
       exact True.intro
   | nil => simp at found
   | cons headPassive _ _ tailIH =>
@@ -443,15 +492,21 @@ private theorem unaryResult_storePassive
     {op : UnaryOp} {operand result : Value}
     (applied : op.apply operand = some result) :
     StorePassiveValue result := by
-  cases op <;> cases operand <;>
-    simp [UnaryOp.apply] at applied <;> cases applied <;> constructor
+  have resultType := UnaryOp.apply_result_type applied
+  clear applied operand
+  cases op <;> cases result <;>
+    simp [Value.type, UnaryOp.resultType] at resultType
+  all_goals constructor
 
 private theorem binaryResult_storePassive
     {op : BinaryOp} {left right result : Value}
     (applied : op.apply left right = some result) :
     StorePassiveValue result := by
-  cases op <;> cases left <;> cases right <;>
-    simp [BinaryOp.apply] at applied <;> cases applied <;> constructor
+  have resultType := BinaryOp.apply_result_type applied
+  clear applied left right
+  cases op <;> cases result <;>
+    simp [Value.type, BinaryOp.resultType] at resultType
+  all_goals constructor
 
 /--
 Cell-free evaluation under a passive environment cannot allocate or write: it
@@ -541,6 +596,22 @@ theorem evaluation_preserves_store_of_cellFree
   | newCell => cases exprFree
   | loadCell => cases exprFree
   | storeCell => cases exprFree
+  | construct _ payloadIH =>
+      cases exprFree with
+      | construct payloadFree =>
+          obtain ⟨storeEq, payloadPassive⟩ :=
+            payloadIH payloadFree environmentPassive
+          exact ⟨storeEq, .constructed payloadPassive⟩
+  | matchData _ _ branchLookup _ scrutineeIH branchIH =>
+      cases exprFree with
+      | matchData scrutineeFree branchesFree =>
+          obtain ⟨rfl, scrutineePassive⟩ :=
+            scrutineeIH scrutineeFree environmentPassive
+          cases scrutineePassive with
+          | constructed payloadPassive =>
+              exact branchIH
+                (branchesFree _ (List.mem_of_getElem? branchLookup))
+                (.cons payloadPassive environmentPassive)
   | unary _ applied operandIH =>
       cases exprFree with
       | unary operandFree =>

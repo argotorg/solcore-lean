@@ -21,6 +21,9 @@ inductive CheckPathStep where
   | loadCellReference
   | storeCellReference
   | storeCellValue
+  | constructPayload
+  | matchScrutinee
+  | matchBranch (index : Nat)
   | unaryOperand
   | binaryLeft
   | binaryRight
@@ -49,9 +52,20 @@ inductive CheckErrorCode where
   | cellInitializerTypeMismatch
   | expectedCell
   | cellValueTypeMismatch
+  | invalidDefinitionPayload
+  | unknownNamedDataType
+  | unknownDataType
+  | unknownConstructor
+  | constructorPayloadTypeMismatch
+  | expectedNamedData
+  | matchDataTypeMismatch
+  | matchBranchCountMismatch
+  | matchBranchResultTypeMismatch
+  | invalidResultType
   | primitiveOperandTypeMismatch
   | branchTypeMismatch
   | declaredResultTypeMismatch
+  | inferenceFailure
   deriving Repr, BEq, DecidableEq
 
 def CheckErrorCode.name : CheckErrorCode → String
@@ -69,10 +83,23 @@ def CheckErrorCode.name : CheckErrorCode → String
       "core.check.cell-initializer-type-mismatch"
   | .expectedCell => "core.check.expected-cell"
   | .cellValueTypeMismatch => "core.check.cell-value-type-mismatch"
+  | .invalidDefinitionPayload => "core.check.invalid-definition-payload"
+  | .unknownNamedDataType => "core.check.unknown-named-data-type"
+  | .unknownDataType => "core.check.unknown-data-type"
+  | .unknownConstructor => "core.check.unknown-constructor"
+  | .constructorPayloadTypeMismatch =>
+      "core.check.constructor-payload-type-mismatch"
+  | .expectedNamedData => "core.check.expected-named-data"
+  | .matchDataTypeMismatch => "core.check.match-data-type-mismatch"
+  | .matchBranchCountMismatch => "core.check.match-branch-count-mismatch"
+  | .matchBranchResultTypeMismatch =>
+      "core.check.match-branch-result-type-mismatch"
+  | .invalidResultType => "core.check.invalid-result-type"
   | .primitiveOperandTypeMismatch =>
       "core.check.primitive-operand-type-mismatch"
   | .branchTypeMismatch => "core.check.branch-type-mismatch"
   | .declaredResultTypeMismatch => "core.check.declared-result-type-mismatch"
+  | .inferenceFailure => "core.check.inference-failure"
 
 inductive CheckErrorData where
   | unboundVariable (index contextSize : Nat)
@@ -87,9 +114,24 @@ inductive CheckErrorData where
   | cellInitializerTypeMismatch (expected actual : Ty)
   | expectedCell (actual : Ty)
   | cellValueTypeMismatch (expected actual : Ty)
+  | invalidDefinitionPayload
+      (dataTypeIndex constructorIndex : Nat)
+      (actual : Ty)
+  | unknownNamedDataType (dataType : DataTypeId)
+  | unknownDataType (dataType : DataTypeId)
+  | unknownConstructor (constructor : ConstructorId)
+  | constructorPayloadTypeMismatch (expected actual : Ty)
+  | expectedNamedData (actual : Ty)
+  | matchDataTypeMismatch (expected actual : DataTypeId)
+  | matchBranchCountMismatch (expected actual : Nat)
+  | matchBranchResultTypeMismatch
+      (branchIndex : Nat)
+      (expected actual : Ty)
+  | invalidResultType (actual : Ty)
   | primitiveOperandTypeMismatch (expected actual : Ty)
   | branchTypeMismatch (thenType elseType : Ty)
   | declaredResultTypeMismatch (declaredType inferredType : Ty)
+  | inferenceFailure
   deriving Repr, BEq, DecidableEq
 
 def CheckErrorData.code : CheckErrorData → CheckErrorCode
@@ -105,9 +147,20 @@ def CheckErrorData.code : CheckErrorData → CheckErrorCode
   | .cellInitializerTypeMismatch .. => .cellInitializerTypeMismatch
   | .expectedCell .. => .expectedCell
   | .cellValueTypeMismatch .. => .cellValueTypeMismatch
+  | .invalidDefinitionPayload .. => .invalidDefinitionPayload
+  | .unknownNamedDataType .. => .unknownNamedDataType
+  | .unknownDataType .. => .unknownDataType
+  | .unknownConstructor .. => .unknownConstructor
+  | .constructorPayloadTypeMismatch .. => .constructorPayloadTypeMismatch
+  | .expectedNamedData .. => .expectedNamedData
+  | .matchDataTypeMismatch .. => .matchDataTypeMismatch
+  | .matchBranchCountMismatch .. => .matchBranchCountMismatch
+  | .matchBranchResultTypeMismatch .. => .matchBranchResultTypeMismatch
+  | .invalidResultType .. => .invalidResultType
   | .primitiveOperandTypeMismatch .. => .primitiveOperandTypeMismatch
   | .branchTypeMismatch .. => .branchTypeMismatch
   | .declaredResultTypeMismatch .. => .declaredResultTypeMismatch
+  | .inferenceFailure => .inferenceFailure
 
 structure CheckError where
   path : CheckPath
@@ -120,1188 +173,519 @@ def CheckError.code (error : CheckError) : CheckErrorCode :=
 def CheckError.codeName (error : CheckError) : String :=
   error.code.name
 
-def inferDetailed (context : Context) (path : CheckPath := []) : Expr → Except CheckError Ty
-  | .unit => .ok .unit
-  | .bool _ => .ok .bool
-  | .word _ => .ok .word
-  | .var index =>
-      match context[index]? with
-      | some type => .ok type
+private def firstUnknownNamedDataType?
+    (definitions : DataEnvironment) : Ty → Option DataTypeId
+  | .unit
+  | .bool
+  | .word => none
+  | .product left right
+  | .function left right
+  | .sum left right =>
+      match firstUnknownNamedDataType? definitions left with
+      | some dataType => some dataType
+      | none => firstUnknownNamedDataType? definitions right
+  | .cell elementType => firstUnknownNamedDataType? definitions elementType
+  | .namedData dataType =>
+      match definitions.lookupDataType? dataType with
+      | some _ => none
+      | none => some dataType
+
+private def invalidTypeError
+    (definitions : DataEnvironment)
+    (path : CheckPath)
+    (type : Ty) : CheckError :=
+  match firstUnknownNamedDataType? definitions type with
+  | some dataType => { path, data := .unknownNamedDataType dataType }
+  | none => { path, data := .invalidResultType type }
+
+private def firstInvalidPayloadInDefinition?
+    (definitions : DataEnvironment)
+    (dataTypeIndex constructorIndex : Nat) : List Ty → Option CheckErrorData
+  | [] => none
+  | payloadType :: payloadTypes =>
+      if payloadType.isConstructorPayload definitions then
+        firstInvalidPayloadInDefinition?
+          definitions dataTypeIndex (constructorIndex + 1) payloadTypes
+      else
+        some (.invalidDefinitionPayload
+          dataTypeIndex constructorIndex payloadType)
+
+private def firstInvalidDefinitionPayloadAux?
+    (definitions : DataEnvironment)
+    (dataTypeIndex : Nat) : List DataDefinition → Option CheckErrorData
+  | [] => none
+  | definition :: remaining =>
+      match firstInvalidPayloadInDefinition?
+          definitions dataTypeIndex 0 definition.constructorPayloadTypes with
+      | some error => some error
       | none =>
-          .error {
-            path
-            data := .unboundVariable index context.length
-          }
-  | .pair left right =>
-      match inferDetailed context (path.child .pairLeft) left with
-      | .error error => .error error
-      | .ok leftType =>
-          match inferDetailed context (path.child .pairRight) right with
-          | .error error => .error error
-          | .ok rightType => .ok (.product leftType rightType)
-  | .first operand =>
-      let operandPath := path.child .firstOperand
-      match inferDetailed context operandPath operand with
-      | .error error => .error error
-      | .ok (.product leftType _) => .ok leftType
-      | .ok actualType =>
-          .error {
-            path := operandPath
-            data := .expectedProduct actualType
-          }
-  | .second operand =>
-      let operandPath := path.child .secondOperand
-      match inferDetailed context operandPath operand with
-      | .error error => .error error
-      | .ok (.product _ rightType) => .ok rightType
-      | .ok actualType =>
-          .error {
-            path := operandPath
-            data := .expectedProduct actualType
-          }
-  | .lambda parameterType resultType body =>
-      let bodyPath := path.child .lambdaBody
-      match inferDetailed (parameterType :: context) bodyPath body with
-      | .error error => .error error
-      | .ok actualType =>
-          if actualType = resultType then
-            .ok (.function parameterType resultType)
-          else
-            .error {
-              path := bodyPath
-              data := .lambdaResultTypeMismatch resultType actualType
-            }
-  | .apply function argument =>
-      let functionPath := path.child .applyFunction
-      match inferDetailed context functionPath function with
-      | .error error => .error error
-      | .ok (.function parameterType resultType) =>
-          let argumentPath := path.child .applyArgument
-          match inferDetailed context argumentPath argument with
-          | .error error => .error error
-          | .ok actualType =>
-              if actualType = parameterType then
-                .ok resultType
+          firstInvalidDefinitionPayloadAux?
+            definitions (dataTypeIndex + 1) remaining
+
+def DataEnvironment.firstInvalidPayload?
+    (definitions : DataEnvironment) : Option CheckErrorData :=
+  firstInvalidDefinitionPayloadAux? definitions 0 definitions
+
+private def definitionTableError (definitions : DataEnvironment) : CheckError :=
+  match definitions.firstInvalidPayload? with
+  | some data => { path := [], data }
+  | none => { path := [], data := .inferenceFailure }
+
+mutual
+
+  private def diagnoseWithFuel :
+      Nat → DataEnvironment → Context → CheckPath → Expr → CheckError
+    | 0, _, _, path, _ => { path, data := .inferenceFailure }
+    | fuel + 1, definitions, context, path, expr =>
+        match expr with
+        | .unit
+        | .bool _
+        | .word _ => { path, data := .inferenceFailure }
+        | .var index =>
+            { path, data := .unboundVariable index context.length }
+        | .pair left right =>
+            match infer? context left definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context
+                  (path.child .pairLeft) left
+            | some _ =>
+                diagnoseWithFuel fuel definitions context
+                  (path.child .pairRight) right
+        | .first operand =>
+            let operandPath := path.child .firstOperand
+            match infer? context operand definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context operandPath operand
+            | some (.product _ _) => { path, data := .inferenceFailure }
+            | some actual => { path := operandPath, data := .expectedProduct actual }
+        | .second operand =>
+            let operandPath := path.child .secondOperand
+            match infer? context operand definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context operandPath operand
+            | some (.product _ _) => { path, data := .inferenceFailure }
+            | some actual => { path := operandPath, data := .expectedProduct actual }
+        | .lambda parameterType resultType body =>
+            if parameterType.isWellFormed definitions then
+              if resultType.isWellFormed definitions then
+                let bodyPath := path.child .lambdaBody
+                match infer? (parameterType :: context) body definitions with
+                | none =>
+                    diagnoseWithFuel fuel definitions (parameterType :: context)
+                      bodyPath body
+                | some actual =>
+                    { path := bodyPath,
+                      data := .lambdaResultTypeMismatch resultType actual }
               else
-                .error {
-                  path := argumentPath
-                  data := .functionArgumentTypeMismatch parameterType actualType
-                }
-      | .ok actualType =>
-          .error {
-            path := functionPath
-            data := .expectedFunction actualType
-          }
-  | .inLeft rightType payload =>
-      match inferDetailed context (path.child .inLeftPayload) payload with
-      | .error error => .error error
-      | .ok leftType => .ok (.sum leftType rightType)
-  | .inRight leftType payload =>
-      match inferDetailed context (path.child .inRightPayload) payload with
-      | .error error => .error error
-      | .ok rightType => .ok (.sum leftType rightType)
-  | .caseE scrutinee leftBranch rightBranch =>
-      let scrutineePath := path.child .caseScrutinee
-      match inferDetailed context scrutineePath scrutinee with
-      | .error error => .error error
-      | .ok (.sum leftType rightType) =>
-          match
-              inferDetailed
-                (leftType :: context)
-                (path.child .caseLeftBranch)
-                leftBranch with
-          | .error error => .error error
-          | .ok leftResultType =>
-              match
-                  inferDetailed
-                    (rightType :: context)
-                    (path.child .caseRightBranch)
-                    rightBranch with
-              | .error error => .error error
-              | .ok rightResultType =>
-                  if leftResultType = rightResultType then
-                    .ok leftResultType
-                  else
-                    .error {
-                      path := path.child .caseRightBranch
-                      data := .caseBranchTypeMismatch
-                        leftResultType
-                        rightResultType
-                    }
-      | .ok actualType =>
-          .error {
-            path := scrutineePath
-            data := .expectedSum actualType
-          }
-  | .newCell elementType initializer =>
-      let initializerPath := path.child .newCellInitializer
-      match inferDetailed context initializerPath initializer with
-      | .error error => .error error
-      | .ok actualType =>
-          if actualType = elementType then
-            if elementType.isCellPayload then
-              .ok (.cell elementType)
+                invalidTypeError definitions path resultType
             else
-              .error {
-                path
-                data := .invalidCellPayload elementType
-              }
-          else
-            .error {
-              path := initializerPath
-              data := .cellInitializerTypeMismatch elementType actualType
-            }
-  | .loadCell reference =>
-      let referencePath := path.child .loadCellReference
-      match inferDetailed context referencePath reference with
-      | .error error => .error error
-      | .ok (.cell elementType) =>
-          if elementType.isCellPayload then
-            .ok elementType
-          else
-            .error {
-              path := referencePath
-              data := .invalidCellPayload elementType
-            }
-      | .ok actualType =>
-          .error {
-            path := referencePath
-            data := .expectedCell actualType
-          }
-  | .storeCell reference value =>
-      let referencePath := path.child .storeCellReference
-      match inferDetailed context referencePath reference with
-      | .error error => .error error
-      | .ok (.cell elementType) =>
-          if elementType.isCellPayload then
-            let valuePath := path.child .storeCellValue
-            match inferDetailed context valuePath value with
-            | .error error => .error error
-            | .ok actualType =>
-                if actualType = elementType then
-                  .ok .unit
+              invalidTypeError definitions path parameterType
+        | .apply function argument =>
+            let functionPath := path.child .applyFunction
+            match infer? context function definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context functionPath function
+            | some (.function parameterType _) =>
+                let argumentPath := path.child .applyArgument
+                match infer? context argument definitions with
+                | none =>
+                    diagnoseWithFuel fuel definitions context argumentPath argument
+                | some actual =>
+                    { path := argumentPath,
+                      data := .functionArgumentTypeMismatch parameterType actual }
+            | some actual =>
+                { path := functionPath, data := .expectedFunction actual }
+        | .inLeft rightType payload =>
+            if rightType.isWellFormed definitions then
+              diagnoseWithFuel fuel definitions context
+                (path.child .inLeftPayload) payload
+            else
+              invalidTypeError definitions path rightType
+        | .inRight leftType payload =>
+            if leftType.isWellFormed definitions then
+              diagnoseWithFuel fuel definitions context
+                (path.child .inRightPayload) payload
+            else
+              invalidTypeError definitions path leftType
+        | .caseE scrutinee leftBranch rightBranch =>
+            let scrutineePath := path.child .caseScrutinee
+            match infer? context scrutinee definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context scrutineePath scrutinee
+            | some (.sum leftType rightType) =>
+                let leftPath := path.child .caseLeftBranch
+                match infer? (leftType :: context) leftBranch definitions with
+                | none =>
+                    diagnoseWithFuel fuel definitions (leftType :: context)
+                      leftPath leftBranch
+                | some leftResultType =>
+                    let rightPath := path.child .caseRightBranch
+                    match infer? (rightType :: context) rightBranch definitions with
+                    | none =>
+                        diagnoseWithFuel fuel definitions (rightType :: context)
+                          rightPath rightBranch
+                    | some rightResultType =>
+                        { path := rightPath,
+                          data := .caseBranchTypeMismatch
+                            leftResultType rightResultType }
+            | some actual =>
+                { path := scrutineePath, data := .expectedSum actual }
+        | .newCell elementType initializer =>
+            let initializerPath := path.child .newCellInitializer
+            match infer? context initializer definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context initializerPath initializer
+            | some actual =>
+                if actual = elementType then
+                  { path, data := .invalidCellPayload elementType }
                 else
-                  .error {
-                    path := valuePath
-                    data := .cellValueTypeMismatch elementType actualType
-                  }
-          else
-            .error {
-              path := referencePath
-              data := .invalidCellPayload elementType
-            }
-      | .ok actualType =>
-          .error {
-            path := referencePath
-            data := .expectedCell actualType
-          }
-  | .unary op operand =>
-      let operandPath := path.child .unaryOperand
-      match inferDetailed context operandPath operand with
-      | .error error => .error error
-      | .ok operandType =>
-          if operandType = op.operandType then
-            .ok op.resultType
-          else
-            .error {
-              path := operandPath
-              data := .primitiveOperandTypeMismatch op.operandType operandType
-            }
-  | .binary op left right =>
-      let leftPath := path.child .binaryLeft
-      match inferDetailed context leftPath left with
-      | .error error => .error error
-      | .ok leftType =>
-          if leftType = op.leftType then
-            let rightPath := path.child .binaryRight
-            match inferDetailed context rightPath right with
-            | .error error => .error error
-            | .ok rightType =>
-                if rightType = op.rightType then
-                  .ok op.resultType
+                  { path := initializerPath,
+                    data := .cellInitializerTypeMismatch elementType actual }
+        | .loadCell reference =>
+            let referencePath := path.child .loadCellReference
+            match infer? context reference definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context referencePath reference
+            | some (.cell elementType) =>
+                { path := referencePath, data := .invalidCellPayload elementType }
+            | some actual => { path := referencePath, data := .expectedCell actual }
+        | .storeCell reference value =>
+            let referencePath := path.child .storeCellReference
+            match infer? context reference definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context referencePath reference
+            | some (.cell elementType) =>
+                if elementType.isCellPayload then
+                  let valuePath := path.child .storeCellValue
+                  match infer? context value definitions with
+                  | none =>
+                      diagnoseWithFuel fuel definitions context valuePath value
+                  | some actual =>
+                      { path := valuePath,
+                        data := .cellValueTypeMismatch elementType actual }
                 else
-                  .error {
-                    path := rightPath
-                    data := .primitiveOperandTypeMismatch op.rightType rightType
-                  }
-          else
-            .error {
-              path := leftPath
-              data := .primitiveOperandTypeMismatch op.leftType leftType
-            }
-  | .letE value body =>
-      match inferDetailed context (path.child .letValue) value with
-      | .error error => .error error
-      | .ok valueType =>
-          inferDetailed (valueType :: context) (path.child .letBody) body
-  | .ifE condition thenBranch elseBranch =>
-      match inferDetailed context (path.child .ifCondition) condition with
-      | .error error => .error error
-      | .ok conditionType =>
-          if conditionType = .bool then
-            match inferDetailed context (path.child .ifThen) thenBranch with
-            | .error error => .error error
-            | .ok thenType =>
-                match inferDetailed context (path.child .ifElse) elseBranch with
-                | .error error => .error error
-                | .ok elseType =>
-                    if thenType = elseType then
-                      .ok thenType
-                    else
-                      .error {
-                        path := path.child .ifElse
-                        data := .branchTypeMismatch thenType elseType
-                      }
-          else
-            .error {
-              path := path.child .ifCondition
-              data := .expectedBool conditionType
-            }
+                  { path := referencePath, data := .invalidCellPayload elementType }
+            | some actual => { path := referencePath, data := .expectedCell actual }
+        | .construct constructor payload =>
+            match definitions.lookupDataType? constructor.owner with
+            | none => { path, data := .unknownDataType constructor.owner }
+            | some definition =>
+                match definition.constructorPayloadTypes[constructor.index]? with
+                | none => { path, data := .unknownConstructor constructor }
+                | some payloadType =>
+                    let payloadPath := path.child .constructPayload
+                    match infer? context payload definitions with
+                    | none =>
+                        diagnoseWithFuel fuel definitions context payloadPath payload
+                    | some actual =>
+                        { path := payloadPath,
+                          data := .constructorPayloadTypeMismatch payloadType actual }
+        | .matchData dataType resultType scrutinee branches =>
+            if resultType.isWellFormed definitions then
+              match definitions.lookupDataType? dataType with
+              | none => { path, data := .unknownDataType dataType }
+              | some definition =>
+                  let scrutineePath := path.child .matchScrutinee
+                  match infer? context scrutinee definitions with
+                  | none =>
+                      diagnoseWithFuel fuel definitions context
+                        scrutineePath scrutinee
+                  | some (.namedData actualDataType) =>
+                      if actualDataType = dataType then
+                        let expectedCount :=
+                          definition.constructorPayloadTypes.length
+                        if branches.length = expectedCount then
+                          diagnoseBranchesWithFuel fuel definitions context path
+                            resultType definition.constructorPayloadTypes branches 0
+                        else
+                          { path,
+                            data := .matchBranchCountMismatch
+                              expectedCount branches.length }
+                      else
+                        { path := scrutineePath,
+                          data := .matchDataTypeMismatch dataType actualDataType }
+                  | some actual =>
+                      { path := scrutineePath, data := .expectedNamedData actual }
+            else
+              invalidTypeError definitions path resultType
+        | .unary op operand =>
+            let operandPath := path.child .unaryOperand
+            match infer? context operand definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context operandPath operand
+            | some actual =>
+                { path := operandPath,
+                  data := .primitiveOperandTypeMismatch op.operandType actual }
+        | .binary op left right =>
+            let leftPath := path.child .binaryLeft
+            match infer? context left definitions with
+            | none => diagnoseWithFuel fuel definitions context leftPath left
+            | some leftType =>
+                if leftType = op.leftType then
+                  let rightPath := path.child .binaryRight
+                  match infer? context right definitions with
+                  | none =>
+                      diagnoseWithFuel fuel definitions context rightPath right
+                  | some rightType =>
+                      { path := rightPath,
+                        data := .primitiveOperandTypeMismatch
+                          op.rightType rightType }
+                else
+                  { path := leftPath,
+                    data := .primitiveOperandTypeMismatch op.leftType leftType }
+        | .letE value body =>
+            let valuePath := path.child .letValue
+            match infer? context value definitions with
+            | none => diagnoseWithFuel fuel definitions context valuePath value
+            | some valueType =>
+                diagnoseWithFuel fuel definitions (valueType :: context)
+                  (path.child .letBody) body
+        | .ifE condition thenBranch elseBranch =>
+            let conditionPath := path.child .ifCondition
+            match infer? context condition definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions context conditionPath condition
+            | some conditionType =>
+                if conditionType = .bool then
+                  let thenPath := path.child .ifThen
+                  match infer? context thenBranch definitions with
+                  | none =>
+                      diagnoseWithFuel fuel definitions context thenPath thenBranch
+                  | some thenType =>
+                      let elsePath := path.child .ifElse
+                      match infer? context elseBranch definitions with
+                      | none =>
+                          diagnoseWithFuel fuel definitions context elsePath elseBranch
+                      | some elseType =>
+                          { path := elsePath,
+                            data := .branchTypeMismatch thenType elseType }
+                else
+                  { path := conditionPath, data := .expectedBool conditionType }
+
+  private def diagnoseBranchesWithFuel :
+      Nat → DataEnvironment → Context → CheckPath → Ty →
+        List Ty → List Expr → Nat → CheckError
+    | 0, _, _, path, _, _, _, _ => { path, data := .inferenceFailure }
+    | fuel + 1, definitions, context, path, resultType,
+        payloadTypes, branches, branchIndex =>
+        match payloadTypes, branches with
+        | payloadType :: remainingPayloadTypes, branch :: remainingBranches =>
+            let branchPath := path.child (.matchBranch branchIndex)
+            match infer? (payloadType :: context) branch definitions with
+            | none =>
+                diagnoseWithFuel fuel definitions (payloadType :: context)
+                  branchPath branch
+            | some actual =>
+                if actual = resultType then
+                  diagnoseBranchesWithFuel fuel definitions context path resultType
+                    remainingPayloadTypes remainingBranches (branchIndex + 1)
+                else
+                  { path := branchPath,
+                    data := .matchBranchResultTypeMismatch
+                      branchIndex resultType actual }
+        | _, _ => { path, data := .inferenceFailure }
+
+end
+
+mutual
+
+  private def diagnosticFuelExpr : Expr → Nat
+    | .unit
+    | .bool _
+    | .word _
+    | .var _ => 1
+    | .first operand
+    | .second operand
+    | .loadCell operand
+    | .unary _ operand => diagnosticFuelExpr operand + 1
+    | .pair left right
+    | .apply left right
+    | .storeCell left right
+    | .letE left right =>
+        diagnosticFuelExpr left + diagnosticFuelExpr right + 1
+    | .lambda _ _ body
+    | .inLeft _ body
+    | .inRight _ body
+    | .newCell _ body
+    | .construct _ body => diagnosticFuelExpr body + 1
+    | .caseE scrutinee leftBranch rightBranch
+    | .ifE scrutinee leftBranch rightBranch =>
+        diagnosticFuelExpr scrutinee +
+          diagnosticFuelExpr leftBranch + diagnosticFuelExpr rightBranch + 1
+    | .matchData _ _ scrutinee branches =>
+        diagnosticFuelExpr scrutinee + diagnosticFuelList branches + 1
+    | .binary _ left right =>
+        diagnosticFuelExpr left + diagnosticFuelExpr right + 1
+
+  private def diagnosticFuelList : List Expr → Nat
+    | [] => 1
+    | expr :: expressions =>
+        diagnosticFuelExpr expr + diagnosticFuelList expressions + 1
+
+end
+
+private def diagnose
+    (definitions : DataEnvironment)
+    (context : Context)
+    (path : CheckPath)
+    (expr : Expr) : CheckError :=
+  diagnoseWithFuel (diagnosticFuelExpr expr + 1) definitions context path expr
+
+def inferDetailedWithDefinitions
+    (definitions : DataEnvironment)
+    (context : Context)
+    (path : CheckPath)
+    (expr : Expr) : Except CheckError Ty :=
+  match infer? context expr definitions with
+  | some type => .ok type
+  | none => .error (diagnose definitions context path expr)
+
+/--
+Detailed checking keeps the historical argument order. The immutable data
+definition table is the optional final argument so pre-ADT call sites keep
+their meaning.
+-/
+def inferDetailed
+    (context : Context)
+    (path : CheckPath := [])
+    (expr : Expr)
+    (definitions : DataEnvironment := []) : Except CheckError Ty :=
+  inferDetailedWithDefinitions definitions context path expr
 
 theorem inferDetailed_toOption
-    (context : Context) (path : CheckPath) (expr : Expr) :
-    (inferDetailed context path expr).toOption = infer? context expr := by
-  induction expr generalizing context path with
-  | unit | bool | word => rfl
-  | var index =>
-      cases lookup : context[index]? <;>
-        simp [inferDetailed, infer?, Except.toOption, lookup]
-  | pair left right leftIH rightIH =>
-      cases leftDetailed :
-          inferDetailed context (path.child .pairLeft) left with
-      | error error =>
-          have leftNotInferred : infer? context left = none := by
-            simpa [leftDetailed, Except.toOption] using
-              (leftIH context (path.child .pairLeft)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            leftDetailed,
-            leftNotInferred
-          ]
-      | ok leftType =>
-          have leftInferred : infer? context left = some leftType := by
-            simpa [leftDetailed, Except.toOption] using
-              (leftIH context (path.child .pairLeft)).symm
-          cases rightDetailed :
-              inferDetailed context (path.child .pairRight) right with
-          | error error =>
-              have rightNotInferred : infer? context right = none := by
-                simpa [rightDetailed, Except.toOption] using
-                  (rightIH context (path.child .pairRight)).symm
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                leftDetailed,
-                leftInferred,
-                rightDetailed,
-                rightNotInferred
-              ]
-          | ok rightType =>
-              have rightInferred : infer? context right = some rightType := by
-                simpa [rightDetailed, Except.toOption] using
-                  (rightIH context (path.child .pairRight)).symm
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                leftDetailed,
-                leftInferred,
-                rightDetailed,
-                rightInferred
-              ]
-  | first operand operandIH =>
-      cases operandDetailed :
-          inferDetailed context (path.child .firstOperand) operand with
-      | error error =>
-          have operandNotInferred : infer? context operand = none := by
-            simpa [operandDetailed, Except.toOption] using
-              (operandIH context (path.child .firstOperand)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            operandDetailed,
-            operandNotInferred
-          ]
-      | ok operandType =>
-          have operandInferred : infer? context operand = some operandType := by
-            simpa [operandDetailed, Except.toOption] using
-              (operandIH context (path.child .firstOperand)).symm
-          cases operandType <;>
-            simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              operandDetailed,
-              operandInferred
-            ]
-  | second operand operandIH =>
-      cases operandDetailed :
-          inferDetailed context (path.child .secondOperand) operand with
-      | error error =>
-          have operandNotInferred : infer? context operand = none := by
-            simpa [operandDetailed, Except.toOption] using
-              (operandIH context (path.child .secondOperand)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            operandDetailed,
-            operandNotInferred
-          ]
-      | ok operandType =>
-          have operandInferred : infer? context operand = some operandType := by
-            simpa [operandDetailed, Except.toOption] using
-              (operandIH context (path.child .secondOperand)).symm
-          cases operandType <;>
-            simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              operandDetailed,
-              operandInferred
-            ]
-  | lambda parameterType resultType body bodyIH =>
-      cases bodyDetailed :
-          inferDetailed
-            (parameterType :: context)
-            (path.child .lambdaBody)
-            body with
-      | error error =>
-          have bodyNotInferred :
-              infer? (parameterType :: context) body = none := by
-            simpa [bodyDetailed, Except.toOption] using
-              (bodyIH (parameterType :: context) (path.child .lambdaBody)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            bodyDetailed,
-            bodyNotInferred
-          ]
-      | ok bodyType =>
-          have bodyInferred :
-              infer? (parameterType :: context) body = some bodyType := by
-            simpa [bodyDetailed, Except.toOption] using
-              (bodyIH (parameterType :: context) (path.child .lambdaBody)).symm
-          by_cases matchingResult : bodyType = resultType
-          · subst bodyType
-            simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              bodyDetailed,
-              bodyInferred
-            ]
-          · simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              bodyDetailed,
-              bodyInferred,
-              matchingResult
-            ]
-  | apply function argument functionIH argumentIH =>
-      cases functionDetailed :
-          inferDetailed context (path.child .applyFunction) function with
-      | error error =>
-          have functionNotInferred : infer? context function = none := by
-            simpa [functionDetailed, Except.toOption] using
-              (functionIH context (path.child .applyFunction)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            functionDetailed,
-            functionNotInferred
-          ]
-      | ok functionType =>
-          have functionInferred : infer? context function = some functionType := by
-            simpa [functionDetailed, Except.toOption] using
-              (functionIH context (path.child .applyFunction)).symm
-          cases functionType with
-          | unit =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                functionDetailed,
-                functionInferred
-              ]
-          | bool =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                functionDetailed,
-                functionInferred
-              ]
-          | word =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                functionDetailed,
-                functionInferred
-              ]
-          | product leftType rightType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                functionDetailed,
-                functionInferred
-              ]
-          | function parameterType resultType =>
-              cases argumentDetailed :
-                  inferDetailed context (path.child .applyArgument) argument with
-              | error error =>
-                  have argumentNotInferred : infer? context argument = none := by
-                    simpa [argumentDetailed, Except.toOption] using
-                      (argumentIH context (path.child .applyArgument)).symm
-                  simp [
-                    inferDetailed,
-                    infer?,
-                    Except.toOption,
-                    functionDetailed,
-                    functionInferred,
-                    argumentDetailed,
-                    argumentNotInferred
-                  ]
-              | ok argumentType =>
-                  have argumentInferred :
-                      infer? context argument = some argumentType := by
-                    simpa [argumentDetailed, Except.toOption] using
-                      (argumentIH context (path.child .applyArgument)).symm
-                  by_cases matchingArgument : argumentType = parameterType
-                  · subst argumentType
-                    simp [
-                      inferDetailed,
-                      infer?,
-                      Except.toOption,
-                      functionDetailed,
-                      functionInferred,
-                      argumentDetailed,
-                      argumentInferred
-                    ]
-                  · simp [
-                      inferDetailed,
-                      infer?,
-                      Except.toOption,
-                      functionDetailed,
-                      functionInferred,
-                      argumentDetailed,
-                      argumentInferred,
-                      matchingArgument
-                    ]
-          | sum leftType rightType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                functionDetailed,
-                functionInferred
-              ]
-          | cell elementType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                functionDetailed,
-                functionInferred
-              ]
-  | inLeft rightType payload payloadIH =>
-      cases payloadDetailed :
-          inferDetailed context (path.child .inLeftPayload) payload with
-      | error error =>
-          have payloadNotInferred : infer? context payload = none := by
-            simpa [payloadDetailed, Except.toOption] using
-              (payloadIH context (path.child .inLeftPayload)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            payloadDetailed,
-            payloadNotInferred
-          ]
-      | ok leftType =>
-          have payloadInferred : infer? context payload = some leftType := by
-            simpa [payloadDetailed, Except.toOption] using
-              (payloadIH context (path.child .inLeftPayload)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            payloadDetailed,
-            payloadInferred
-          ]
-  | inRight leftType payload payloadIH =>
-      cases payloadDetailed :
-          inferDetailed context (path.child .inRightPayload) payload with
-      | error error =>
-          have payloadNotInferred : infer? context payload = none := by
-            simpa [payloadDetailed, Except.toOption] using
-              (payloadIH context (path.child .inRightPayload)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            payloadDetailed,
-            payloadNotInferred
-          ]
-      | ok rightType =>
-          have payloadInferred : infer? context payload = some rightType := by
-            simpa [payloadDetailed, Except.toOption] using
-              (payloadIH context (path.child .inRightPayload)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            payloadDetailed,
-            payloadInferred
-          ]
-  | caseE scrutinee leftBranch rightBranch scrutineeIH leftIH rightIH =>
-      cases scrutineeDetailed :
-          inferDetailed context (path.child .caseScrutinee) scrutinee with
-      | error error =>
-          have scrutineeNotInferred : infer? context scrutinee = none := by
-            simpa [scrutineeDetailed, Except.toOption] using
-              (scrutineeIH context (path.child .caseScrutinee)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            scrutineeDetailed,
-            scrutineeNotInferred
-          ]
-      | ok scrutineeType =>
-          have scrutineeInferred :
-              infer? context scrutinee = some scrutineeType := by
-            simpa [scrutineeDetailed, Except.toOption] using
-              (scrutineeIH context (path.child .caseScrutinee)).symm
-          cases scrutineeType with
-          | unit =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                scrutineeDetailed,
-                scrutineeInferred
-              ]
-          | bool =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                scrutineeDetailed,
-                scrutineeInferred
-              ]
-          | word =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                scrutineeDetailed,
-                scrutineeInferred
-              ]
-          | product firstType secondType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                scrutineeDetailed,
-                scrutineeInferred
-              ]
-          | function parameterType resultType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                scrutineeDetailed,
-                scrutineeInferred
-              ]
-          | sum leftType rightType =>
-              cases leftDetailed :
-                  inferDetailed
-                    (leftType :: context)
-                    (path.child .caseLeftBranch)
-                    leftBranch with
-              | error error =>
-                  have leftNotInferred :
-                      infer? (leftType :: context) leftBranch = none := by
-                    simpa [leftDetailed, Except.toOption] using
-                      (leftIH
-                        (leftType :: context)
-                        (path.child .caseLeftBranch)).symm
-                  simp [
-                    inferDetailed,
-                    infer?,
-                    Except.toOption,
-                    scrutineeDetailed,
-                    scrutineeInferred,
-                    leftDetailed,
-                    leftNotInferred
-                  ]
-              | ok leftResultType =>
-                  have leftInferred :
-                      infer? (leftType :: context) leftBranch =
-                        some leftResultType := by
-                    simpa [leftDetailed, Except.toOption] using
-                      (leftIH
-                        (leftType :: context)
-                        (path.child .caseLeftBranch)).symm
-                  cases rightDetailed :
-                      inferDetailed
-                        (rightType :: context)
-                        (path.child .caseRightBranch)
-                        rightBranch with
-                  | error error =>
-                      have rightNotInferred :
-                          infer? (rightType :: context) rightBranch = none := by
-                        simpa [rightDetailed, Except.toOption] using
-                          (rightIH
-                            (rightType :: context)
-                            (path.child .caseRightBranch)).symm
-                      simp [
-                        inferDetailed,
-                        infer?,
-                        Except.toOption,
-                        scrutineeDetailed,
-                        scrutineeInferred,
-                        leftDetailed,
-                        leftInferred,
-                        rightDetailed,
-                        rightNotInferred
-                      ]
-                  | ok rightResultType =>
-                      have rightInferred :
-                          infer? (rightType :: context) rightBranch =
-                            some rightResultType := by
-                        simpa [rightDetailed, Except.toOption] using
-                          (rightIH
-                            (rightType :: context)
-                            (path.child .caseRightBranch)).symm
-                      by_cases equalTypes : leftResultType = rightResultType
-                      · subst rightResultType
-                        simp [
-                          inferDetailed,
-                          infer?,
-                          Except.toOption,
-                          scrutineeDetailed,
-                          scrutineeInferred,
-                          leftDetailed,
-                          leftInferred,
-                          rightDetailed,
-                          rightInferred
-                        ]
-                      · simp [
-                          inferDetailed,
-                          infer?,
-                          Except.toOption,
-                          scrutineeDetailed,
-                          scrutineeInferred,
-                          leftDetailed,
-                          leftInferred,
-                          rightDetailed,
-                          rightInferred,
-                          equalTypes
-                        ]
-          | cell elementType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                scrutineeDetailed,
-                scrutineeInferred
-              ]
-  | newCell elementType initializer initializerIH =>
-      cases initializerDetailed :
-          inferDetailed context (path.child .newCellInitializer) initializer with
-      | error error =>
-          have initializerNotInferred : infer? context initializer = none := by
-            simpa [initializerDetailed, Except.toOption] using
-              (initializerIH context (path.child .newCellInitializer)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            initializerDetailed,
-            initializerNotInferred
-          ]
-      | ok initializerType =>
-          have initializerInferred :
-              infer? context initializer = some initializerType := by
-            simpa [initializerDetailed, Except.toOption] using
-              (initializerIH context (path.child .newCellInitializer)).symm
-          by_cases matchingType : initializerType = elementType
-          · subst initializerType
-            by_cases payloadAccepted : elementType.isCellPayload = true
-            · simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                initializerDetailed,
-                initializerInferred,
-                payloadAccepted
-              ]
-            · simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                initializerDetailed,
-                initializerInferred,
-                payloadAccepted
-              ]
-          · simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              initializerDetailed,
-              initializerInferred,
-              matchingType
-            ]
-  | loadCell reference referenceIH =>
-      cases referenceDetailed :
-          inferDetailed context (path.child .loadCellReference) reference with
-      | error error =>
-          have referenceNotInferred : infer? context reference = none := by
-            simpa [referenceDetailed, Except.toOption] using
-              (referenceIH context (path.child .loadCellReference)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            referenceDetailed,
-            referenceNotInferred
-          ]
-      | ok referenceType =>
-          have referenceInferred : infer? context reference = some referenceType := by
-            simpa [referenceDetailed, Except.toOption] using
-              (referenceIH context (path.child .loadCellReference)).symm
-          cases referenceType with
-          | unit | bool | word | product | function | sum =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                referenceDetailed,
-                referenceInferred
-              ]
-          | cell elementType =>
-              by_cases payloadAccepted : elementType.isCellPayload = true
-              · simp [
-                  inferDetailed,
-                  infer?,
-                  Except.toOption,
-                  referenceDetailed,
-                  referenceInferred,
-                  payloadAccepted
-                ]
-              · simp [
-                  inferDetailed,
-                  infer?,
-                  Except.toOption,
-                  referenceDetailed,
-                  referenceInferred,
-                  payloadAccepted
-                ]
-  | storeCell reference value referenceIH valueIH =>
-      cases referenceDetailed :
-          inferDetailed context (path.child .storeCellReference) reference with
-      | error error =>
-          have referenceNotInferred : infer? context reference = none := by
-            simpa [referenceDetailed, Except.toOption] using
-              (referenceIH context (path.child .storeCellReference)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            referenceDetailed,
-            referenceNotInferred
-          ]
-      | ok referenceType =>
-          have referenceInferred : infer? context reference = some referenceType := by
-            simpa [referenceDetailed, Except.toOption] using
-              (referenceIH context (path.child .storeCellReference)).symm
-          cases referenceType with
-          | unit | bool | word | product | function | sum =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                referenceDetailed,
-                referenceInferred
-              ]
-          | cell elementType =>
-              by_cases payloadAccepted : elementType.isCellPayload = true
-              · cases valueDetailed :
-                    inferDetailed context (path.child .storeCellValue) value with
-                | error error =>
-                    have valueNotInferred : infer? context value = none := by
-                      simpa [valueDetailed, Except.toOption] using
-                        (valueIH context (path.child .storeCellValue)).symm
-                    simp [
-                      inferDetailed,
-                      infer?,
-                      Except.toOption,
-                      referenceDetailed,
-                      referenceInferred,
-                      payloadAccepted,
-                      valueDetailed,
-                      valueNotInferred
-                    ]
-                | ok valueType =>
-                    have valueInferred : infer? context value = some valueType := by
-                      simpa [valueDetailed, Except.toOption] using
-                        (valueIH context (path.child .storeCellValue)).symm
-                    by_cases matchingType : valueType = elementType
-                    · subst valueType
-                      simp [
-                        inferDetailed,
-                        infer?,
-                        Except.toOption,
-                        referenceDetailed,
-                        referenceInferred,
-                        payloadAccepted,
-                        valueDetailed,
-                        valueInferred
-                      ]
-                    · simp [
-                        inferDetailed,
-                        infer?,
-                        Except.toOption,
-                        referenceDetailed,
-                        referenceInferred,
-                        payloadAccepted,
-                        valueDetailed,
-                        valueInferred,
-                        matchingType
-                      ]
-              · simp [
-                  inferDetailed,
-                  infer?,
-                  Except.toOption,
-                  referenceDetailed,
-                  referenceInferred,
-                  payloadAccepted
-                ]
-  | unary op operand operandIH =>
-      cases operandDetailed :
-          inferDetailed context (path.child .unaryOperand) operand with
-      | error error =>
-          have operandNotInferred : infer? context operand = none := by
-            simpa [operandDetailed, Except.toOption] using
-              (operandIH context (path.child .unaryOperand)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            operandDetailed,
-            operandNotInferred
-          ]
-      | ok operandType =>
-          have operandInferred : infer? context operand = some operandType := by
-            simpa [operandDetailed, Except.toOption] using
-              (operandIH context (path.child .unaryOperand)).symm
-          by_cases matchingType : operandType = op.operandType
-          · subst operandType
-            simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              operandDetailed,
-              operandInferred
-            ]
-          · simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              operandDetailed,
-              operandInferred,
-              matchingType
-            ]
-  | binary op left right leftIH rightIH =>
-      cases leftDetailed :
-          inferDetailed context (path.child .binaryLeft) left with
-      | error error =>
-          have leftNotInferred : infer? context left = none := by
-            simpa [leftDetailed, Except.toOption] using
-              (leftIH context (path.child .binaryLeft)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            leftDetailed,
-            leftNotInferred
-          ]
-      | ok leftType =>
-          have leftInferred : infer? context left = some leftType := by
-            simpa [leftDetailed, Except.toOption] using
-              (leftIH context (path.child .binaryLeft)).symm
-          by_cases matchingLeft : leftType = op.leftType
-          · subst leftType
-            cases rightDetailed :
-                inferDetailed context (path.child .binaryRight) right with
-            | error error =>
-                have rightNotInferred : infer? context right = none := by
-                  simpa [rightDetailed, Except.toOption] using
-                    (rightIH context (path.child .binaryRight)).symm
-                simp [
-                  inferDetailed,
-                  infer?,
-                  Except.toOption,
-                  leftDetailed,
-                  leftInferred,
-                  rightDetailed,
-                  rightNotInferred
-                ]
-            | ok rightType =>
-                have rightInferred : infer? context right = some rightType := by
-                  simpa [rightDetailed, Except.toOption] using
-                    (rightIH context (path.child .binaryRight)).symm
-                by_cases matchingRight : rightType = op.rightType
-                · subst rightType
-                  simp [
-                    inferDetailed,
-                    infer?,
-                    Except.toOption,
-                    leftDetailed,
-                    leftInferred,
-                    rightDetailed,
-                    rightInferred
-                  ]
-                · simp [
-                    inferDetailed,
-                    infer?,
-                    Except.toOption,
-                    leftDetailed,
-                    leftInferred,
-                    rightDetailed,
-                    rightInferred,
-                    matchingRight
-                  ]
-          · simp [
-              inferDetailed,
-              infer?,
-              Except.toOption,
-              leftDetailed,
-              leftInferred,
-              matchingLeft
-            ]
-  | letE value body valueIH bodyIH =>
-      cases valueDetailed :
-          inferDetailed context (path.child .letValue) value with
-      | error error =>
-          have valueNotInferred : infer? context value = none := by
-            simpa [valueDetailed, Except.toOption] using
-              (valueIH context (path.child .letValue)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            valueDetailed,
-            valueNotInferred
-          ]
-      | ok valueType =>
-          have valueInferred : infer? context value = some valueType := by
-            simpa [valueDetailed, Except.toOption] using
-              (valueIH context (path.child .letValue)).symm
-          simpa [inferDetailed, infer?, valueDetailed, valueInferred] using
-            bodyIH (valueType :: context) (path.child .letBody)
-  | ifE condition thenBranch elseBranch conditionIH thenIH elseIH =>
-      cases conditionDetailed :
-          inferDetailed context (path.child .ifCondition) condition with
-      | error error =>
-          have conditionNotInferred : infer? context condition = none := by
-            simpa [conditionDetailed, Except.toOption] using
-              (conditionIH context (path.child .ifCondition)).symm
-          simp [
-            inferDetailed,
-            infer?,
-            Except.toOption,
-            conditionDetailed,
-            conditionNotInferred
-          ]
-      | ok conditionType =>
-          have conditionInferred : infer? context condition = some conditionType := by
-            simpa [conditionDetailed, Except.toOption] using
-              (conditionIH context (path.child .ifCondition)).symm
-          cases conditionType with
-          | unit =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                conditionDetailed,
-                conditionInferred
-              ]
-          | word =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                conditionDetailed,
-                conditionInferred
-              ]
-          | product leftType rightType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                conditionDetailed,
-                conditionInferred
-              ]
-          | function parameterType resultType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                conditionDetailed,
-                conditionInferred
-              ]
-          | sum leftType rightType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                conditionDetailed,
-                conditionInferred
-              ]
-          | cell elementType =>
-              simp [
-                inferDetailed,
-                infer?,
-                Except.toOption,
-                conditionDetailed,
-                conditionInferred
-              ]
-          | bool =>
-              cases thenDetailed :
-                  inferDetailed context (path.child .ifThen) thenBranch with
-              | error error =>
-                  have thenNotInferred : infer? context thenBranch = none := by
-                    simpa [thenDetailed, Except.toOption] using
-                      (thenIH context (path.child .ifThen)).symm
-                  simp [
-                    inferDetailed,
-                    infer?,
-                    Except.toOption,
-                    conditionDetailed,
-                    conditionInferred,
-                    thenDetailed,
-                    thenNotInferred
-                  ]
-              | ok thenType =>
-                  have thenInferred : infer? context thenBranch = some thenType := by
-                    simpa [thenDetailed, Except.toOption] using
-                      (thenIH context (path.child .ifThen)).symm
-                  cases elseDetailed :
-                      inferDetailed context (path.child .ifElse) elseBranch with
-                  | error error =>
-                      have elseNotInferred : infer? context elseBranch = none := by
-                        simpa [elseDetailed, Except.toOption] using
-                          (elseIH context (path.child .ifElse)).symm
-                      simp [
-                        inferDetailed,
-                        infer?,
-                        Except.toOption,
-                        conditionDetailed,
-                        conditionInferred,
-                        thenDetailed,
-                        thenInferred,
-                        elseDetailed,
-                        elseNotInferred
-                      ]
-                  | ok elseType =>
-                      have elseInferred : infer? context elseBranch = some elseType := by
-                        simpa [elseDetailed, Except.toOption] using
-                          (elseIH context (path.child .ifElse)).symm
-                      by_cases equalTypes : thenType = elseType
-                      · subst elseType
-                        simp [
-                          inferDetailed,
-                          infer?,
-                          Except.toOption,
-                          conditionDetailed,
-                          conditionInferred,
-                          thenDetailed,
-                          thenInferred,
-                          elseDetailed,
-                          elseInferred
-                        ]
-                      · simp [
-                          inferDetailed,
-                          infer?,
-                          Except.toOption,
-                          conditionDetailed,
-                          conditionInferred,
-                          thenDetailed,
-                          thenInferred,
-                          elseDetailed,
-                          elseInferred,
-                          equalTypes
-                        ]
+    (context : Context)
+    (path : CheckPath)
+    (expr : Expr)
+    (definitions : DataEnvironment := []) :
+    (inferDetailed context path expr definitions).toOption =
+      infer? context expr definitions := by
+  cases inferred : infer? context expr definitions <;>
+    simp [inferDetailed, inferDetailedWithDefinitions, inferred, Except.toOption]
 
 theorem inferDetailed_iff_infer
-    {context : Context} {path : CheckPath} {expr : Expr} {type : Ty} :
-    inferDetailed context path expr = .ok type ↔ infer? context expr = some type := by
-  rw [← inferDetailed_toOption context path expr]
-  cases inferDetailed context path expr <;> simp [Except.toOption]
+    {context : Context}
+    {path : CheckPath}
+    {expr : Expr}
+    {type : Ty}
+    {definitions : DataEnvironment} :
+    inferDetailed context path expr definitions = .ok type ↔
+      infer? context expr definitions = some type := by
+  rw [← inferDetailed_toOption context path expr definitions]
+  cases inferDetailed context path expr definitions <;> simp [Except.toOption]
 
 theorem inferDetailed_iff_typing
-    {context : Context} {path : CheckPath} {expr : Expr} {type : Ty} :
-    inferDetailed context path expr = .ok type ↔ HasType context expr type := by
+    {context : Context}
+    {path : CheckPath}
+    {expr : Expr}
+    {type : Ty}
+    {definitions : DataEnvironment} :
+    inferDetailed context path expr definitions = .ok type ↔
+      HasType context expr type definitions := by
   rw [inferDetailed_iff_infer, typing_iff_infer]
 
 def Program.checkDetailed (program : Program) : Except CheckError Ty :=
-  match inferDetailed [] [] program.body with
-  | .error error => .error error
-  | .ok inferredType =>
-      if inferredType = program.resultType then
-        .ok inferredType
-      else
-        .error {
-          path := []
-          data := .declaredResultTypeMismatch program.resultType inferredType
-        }
-
-theorem Program.checkDetailed_iff_typing {program : Program} :
-    program.checkDetailed = .ok program.resultType ↔
-      HasType [] program.body program.resultType := by
-  constructor
-  · intro checked
-    cases detailed : inferDetailed [] [] program.body with
-    | error error =>
-        simp [Program.checkDetailed, detailed] at checked
-    | ok inferredType =>
-        by_cases equalTypes : inferredType = program.resultType
-        · subst inferredType
-          exact inferDetailed_iff_typing.mp detailed
-        · simp [Program.checkDetailed, detailed, equalTypes] at checked
-  · intro typing
-    have detailed :
-        inferDetailed [] [] program.body = .ok program.resultType :=
-      inferDetailed_iff_typing.mpr typing
-    simp [Program.checkDetailed, detailed]
+  if program.dataDefinitions.isWellFormed then
+    if program.resultType.isWellFormed program.dataDefinitions then
+      match inferDetailed [] [] program.body program.dataDefinitions with
+      | .error error => .error error
+      | .ok inferredType =>
+          if inferredType = program.resultType then
+            .ok program.resultType
+          else
+            .error {
+              path := []
+              data := .declaredResultTypeMismatch
+                program.resultType inferredType
+            }
+    else
+      .error (invalidTypeError
+        program.dataDefinitions [] program.resultType)
+  else
+    .error (definitionTableError program.dataDefinitions)
 
 theorem Program.checkDetailed_iff_check {program : Program} :
-    program.checkDetailed = .ok program.resultType ↔ program.check = true := by
-  rw [Program.checkDetailed_iff_typing]
-  exact ⟨Program.check_complete, Program.check_sound⟩
+    program.checkDetailed = .ok program.resultType ↔
+      program.check = true := by
+  by_cases definitionsAccepted :
+      program.dataDefinitions.isWellFormed = true
+  · by_cases resultAccepted :
+        program.resultType.isWellFormed program.dataDefinitions = true
+    · cases detailed :
+        inferDetailed [] [] program.body program.dataDefinitions with
+      | error error =>
+          have notInferred :
+              infer? [] program.body program.dataDefinitions = none := by
+            simpa [detailed, Except.toOption] using
+              (inferDetailed_toOption
+                [] [] program.body program.dataDefinitions).symm
+          simp [
+            Program.checkDetailed,
+            Program.check,
+            definitionsAccepted,
+            resultAccepted,
+            detailed,
+            notInferred
+          ]
+      | ok inferredType =>
+          have inferred :
+              infer? [] program.body program.dataDefinitions =
+                some inferredType := by
+            simpa [detailed, Except.toOption] using
+              (inferDetailed_toOption
+                [] [] program.body program.dataDefinitions).symm
+          by_cases equalTypes : inferredType = program.resultType
+          · subst inferredType
+            simp [
+              Program.checkDetailed,
+              Program.check,
+              definitionsAccepted,
+              resultAccepted,
+              detailed,
+              inferred
+            ]
+          · simp [
+              Program.checkDetailed,
+              Program.check,
+              definitionsAccepted,
+              resultAccepted,
+              detailed,
+              inferred,
+              equalTypes
+            ]
+    · simp [
+        Program.checkDetailed,
+        Program.check,
+        definitionsAccepted,
+        resultAccepted
+      ]
+  · simp [Program.checkDetailed, Program.check, definitionsAccepted]
+
+theorem Program.checkDetailed_iff_wellTyped {program : Program} :
+    program.checkDetailed = .ok program.resultType ↔ program.WellTyped := by
+  rw [Program.checkDetailed_iff_check, Program.check_iff_wellTyped]
+
+/-- Historical theorem name. Full program checking now includes table and
+result-type validity, so its right-hand side is `Program.WellTyped`. -/
+theorem Program.checkDetailed_iff_typing {program : Program} :
+    program.checkDetailed = .ok program.resultType ↔ program.WellTyped :=
+  Program.checkDetailed_iff_wellTyped
+
+theorem Program.checkDetailed_full_sound
+    {program : Program}
+    (checked : program.checkDetailed = .ok program.resultType) :
+    program.WellTyped :=
+  Program.checkDetailed_iff_wellTyped.mp checked
 
 theorem Program.checkDetailed_sound
     {program : Program}
     (checked : program.checkDetailed = .ok program.resultType) :
-    HasType [] program.body program.resultType :=
-  Program.checkDetailed_iff_typing.mp checked
+    HasType [] program.body program.resultType program.dataDefinitions :=
+  (Program.checkDetailed_full_sound checked).bodyHasType
 
 theorem Program.checkDetailed_complete
     {program : Program}
-    (typing : HasType [] program.body program.resultType) :
+    (wellTyped : program.WellTyped) :
     program.checkDetailed = .ok program.resultType :=
-  Program.checkDetailed_iff_typing.mpr typing
+  Program.checkDetailed_iff_wellTyped.mpr wellTyped
 
 end Solcore.Core

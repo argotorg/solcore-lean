@@ -264,6 +264,45 @@ theorem Evaluates.toStepsWithContinuation
           (referencePath.trans
             (beginValuePath.trans
               (valuePath.trans applyPath)))⟩
+  | @construct environment initialStore finalStore constructor payload payloadValue
+      payloadEvaluation payloadIH =>
+      obtain ⟨payloadSteps, payloadPath⟩ :=
+        payloadIH (.constructApply constructor :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.construct constructor payload) environment, continuation,
+            initialStore⟩
+          ⟨.eval payload environment,
+            .constructApply constructor :: continuation, initialStore⟩ :=
+        .cons .enterConstruct .refl
+      let applyPath : Steps 1
+          ⟨.ret payloadValue, .constructApply constructor :: continuation,
+            finalStore⟩
+          ⟨.ret (.constructed constructor payloadValue), continuation, finalStore⟩ :=
+        .cons .applyConstruct .refl
+      exact ⟨_, enterPath.trans (payloadPath.trans applyPath)⟩
+  | @matchData environment initialStore branchStore finalStore dataType resultType
+      scrutinee branch branches constructor payload result scrutineeEvaluation
+      sameOwner branchLookup branchEvaluation scrutineeIH branchIH =>
+      obtain ⟨scrutineeSteps, scrutineePath⟩ :=
+        scrutineeIH
+          (.matchDataApply dataType branches environment :: continuation)
+      obtain ⟨branchSteps, branchPath⟩ := branchIH continuation
+      let enterPath : Steps 1
+          ⟨.eval (.matchData dataType resultType scrutinee branches) environment,
+            continuation, initialStore⟩
+          ⟨.eval scrutinee environment,
+            .matchDataApply dataType branches environment :: continuation,
+            initialStore⟩ :=
+        .cons .enterMatchData .refl
+      let choosePath : Steps 1
+          ⟨.ret (.constructed constructor payload),
+            .matchDataApply dataType branches environment :: continuation,
+            branchStore⟩
+          ⟨.eval branch (payload :: environment), continuation, branchStore⟩ :=
+        .cons (.chooseData sameOwner branchLookup) .refl
+      exact ⟨_,
+        enterPath.trans
+          (scrutineePath.trans (choosePath.trans branchPath))⟩
   | @unary environment initialStore finalStore op operand operandValue result
       operandEvaluation applied operandIH =>
       obtain ⟨operandSteps, operandPath⟩ :=
@@ -513,6 +552,26 @@ inductive Continues :
       Continues
         (.storeCellApply elementType location :: continuation)
         value store finalValue finalStore
+  | constructApply
+      {constructor : ConstructorId} {payload finalValue : Value}
+      {continuation : List Frame} {store finalStore : Store} :
+      Continues continuation (.constructed constructor payload) store
+        finalValue finalStore →
+      Continues
+        (.constructApply constructor :: continuation)
+        payload store finalValue finalStore
+  | matchDataApply
+      {dataType : DataTypeId} {branches : List Expr}
+      {environment : Environment} {constructor : ConstructorId}
+      {payload result finalValue : Value} {branch : Expr}
+      {continuation : List Frame} {initialStore branchStore finalStore : Store} :
+      constructor.owner = dataType →
+      branches[constructor.index]? = some branch →
+      Evaluates (payload :: environment) initialStore branch result branchStore →
+      Continues continuation result branchStore finalValue finalStore →
+      Continues
+        (.matchDataApply dataType branches environment :: continuation)
+        (.constructed constructor payload) initialStore finalValue finalStore
   | applyArgument
       {argument : Expr} {callerEnvironment capturedEnvironment : Environment}
       {parameterType resultType : Ty} {body : Expr}
@@ -714,6 +773,30 @@ theorem transition_reflects_denotation
       cases denotes with
       | ret continuation =>
           exact .ret (.storeCellApply written continuation)
+  | enterConstruct =>
+      cases denotes with
+      | eval payloadEvaluation continuation =>
+          cases continuation with
+          | constructApply rest =>
+              exact .eval (.construct payloadEvaluation) rest
+  | applyConstruct =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.constructApply continuation)
+  | enterMatchData =>
+      cases denotes with
+      | eval scrutineeEvaluation continuation =>
+          cases continuation with
+          | matchDataApply sameOwner branchLookup branchEvaluation rest =>
+              exact .eval
+                (.matchData scrutineeEvaluation sameOwner branchLookup
+                  branchEvaluation)
+                rest
+  | chooseData sameOwner branchLookup =>
+      cases denotes with
+      | eval branchEvaluation continuation =>
+          exact .ret
+            (.matchDataApply sameOwner branchLookup branchEvaluation continuation)
   | lambda =>
       cases denotes with
       | ret continuation => exact .eval .lambda continuation

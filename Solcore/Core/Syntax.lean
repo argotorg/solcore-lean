@@ -18,6 +18,10 @@ def zero : Word := ⟨0, by simp [wordModulus]⟩
 
 end Word
 
+structure DataTypeId where
+  index : Nat
+  deriving Repr, BEq, DecidableEq
+
 inductive Ty where
   | unit
   | bool
@@ -26,7 +30,19 @@ inductive Ty where
   | function (parameter : Ty) (result : Ty)
   | sum (left : Ty) (right : Ty)
   | cell (elementType : Ty)
+  | namedData (dataType : DataTypeId)
   deriving Repr, BEq, DecidableEq
+
+structure ConstructorId where
+  owner : DataTypeId
+  index : Nat
+  deriving Repr, BEq, DecidableEq
+
+structure DataDefinition where
+  constructorPayloadTypes : List Ty
+  deriving Repr, BEq, DecidableEq
+
+abbrev DataEnvironment := List DataDefinition
 
 inductive CellPayload : Ty → Prop where
   | unit : CellPayload .unit
@@ -50,7 +66,8 @@ def isCellPayload : Ty → Bool
   | .product left right
   | .sum left right => left.isCellPayload && right.isCellPayload
   | .function _ _
-  | .cell _ => false
+  | .cell _
+  | .namedData _ => false
 
 theorem isCellPayload_sound
     {type : Ty}
@@ -69,6 +86,8 @@ theorem isCellPayload_sound
       simp [isCellPayload] at accepted
       exact .sum (leftIH accepted.1) (rightIH accepted.2)
   | cell elementType elementIH =>
+      simp [isCellPayload] at accepted
+  | namedData dataType =>
       simp [isCellPayload] at accepted
 
 theorem isCellPayload_complete
@@ -162,11 +181,146 @@ inductive Expr where
   | newCell (elementType : Ty) (initializer : Expr)
   | loadCell (reference : Expr)
   | storeCell (reference value : Expr)
+  | construct (constructor : ConstructorId) (payload : Expr)
+  | matchData
+      (dataType : DataTypeId)
+      (resultType : Ty)
+      (scrutinee : Expr)
+      (branches : List Expr)
   | unary (op : UnaryOp) (operand : Expr)
   | binary (op : BinaryOp) (left : Expr) (right : Expr)
   | letE (value : Expr) (body : Expr)
   | ifE (condition : Expr) (thenBranch : Expr) (elseBranch : Expr)
-  deriving Repr, BEq, DecidableEq
+  deriving Repr
+
+mutual
+
+  def Expr.equal : Expr → Expr → Bool
+    | .unit, .unit => true
+    | .bool left, .bool right
+    | .word left, .word right
+    | .var left, .var right => decide (left = right)
+    | .pair leftFirst leftSecond, .pair rightFirst rightSecond
+    | .apply leftFirst leftSecond, .apply rightFirst rightSecond
+    | .storeCell leftFirst leftSecond, .storeCell rightFirst rightSecond
+    | .letE leftFirst leftSecond, .letE rightFirst rightSecond =>
+        leftFirst.equal rightFirst && leftSecond.equal rightSecond
+    | .first left, .first right
+    | .second left, .second right
+    | .loadCell left, .loadCell right => left.equal right
+    | .lambda leftParameter leftResult leftBody,
+        .lambda rightParameter rightResult rightBody =>
+        decide (leftParameter = rightParameter) &&
+          decide (leftResult = rightResult) &&
+          leftBody.equal rightBody
+    | .inLeft leftType leftPayload, .inLeft rightType rightPayload
+    | .inRight leftType leftPayload, .inRight rightType rightPayload
+    | .newCell leftType leftPayload, .newCell rightType rightPayload =>
+        decide (leftType = rightType) && leftPayload.equal rightPayload
+    | .caseE leftScrutinee leftBranch rightBranch,
+        .caseE rightScrutinee leftOtherBranch rightOtherBranch
+    | .ifE leftScrutinee leftBranch rightBranch,
+        .ifE rightScrutinee leftOtherBranch rightOtherBranch =>
+        leftScrutinee.equal rightScrutinee &&
+          leftBranch.equal leftOtherBranch &&
+          rightBranch.equal rightOtherBranch
+    | .construct leftConstructor leftPayload,
+        .construct rightConstructor rightPayload =>
+        decide (leftConstructor = rightConstructor) &&
+          leftPayload.equal rightPayload
+    | .matchData leftDataType leftResult leftScrutinee leftBranches,
+        .matchData rightDataType rightResult rightScrutinee rightBranches =>
+        decide (leftDataType = rightDataType) &&
+          decide (leftResult = rightResult) &&
+          leftScrutinee.equal rightScrutinee &&
+          Expr.listEqual leftBranches rightBranches
+    | .unary leftOp leftOperand, .unary rightOp rightOperand =>
+        decide (leftOp = rightOp) && leftOperand.equal rightOperand
+    | .binary leftOp leftLeft leftRight, .binary rightOp rightLeft rightRight =>
+        decide (leftOp = rightOp) &&
+          leftLeft.equal rightLeft &&
+          leftRight.equal rightRight
+    | _, _ => false
+
+  def Expr.listEqual : List Expr → List Expr → Bool
+    | [], [] => true
+    | leftHead :: leftTail, rightHead :: rightTail =>
+        leftHead.equal rightHead && Expr.listEqual leftTail rightTail
+    | _, _ => false
+
+end
+
+mutual
+
+  theorem Expr.equal_sound
+      (left right : Expr)
+      (accepted : left.equal right = true) :
+      left = right := by
+    cases left <;> cases right <;> simp_all [Expr.equal]
+    all_goals repeat first | apply And.intro
+    all_goals first | apply And.intro | skip
+    all_goals first
+      | apply Expr.equal_sound <;> simp_all
+      | apply Expr.listEqual_sound <;> simp_all
+  termination_by sizeOf left
+
+  theorem Expr.listEqual_sound
+      (left right : List Expr)
+      (accepted : Expr.listEqual left right = true) :
+      left = right := by
+    cases left <;> cases right <;> simp_all [Expr.listEqual]
+    all_goals repeat first | apply And.intro
+    all_goals first | apply And.intro | skip
+    all_goals first
+      | apply Expr.equal_sound <;> simp_all
+      | apply Expr.listEqual_sound <;> simp_all
+  termination_by sizeOf left
+
+end
+
+
+mutual
+
+  theorem Expr.equal_self (expr : Expr) : expr.equal expr = true := by
+    cases expr <;> simp_all [Expr.equal]
+    all_goals repeat first | apply And.intro
+    all_goals first | apply And.intro | skip
+    all_goals first
+      | exact Expr.equal_self _
+      | exact Expr.listEqual_self _
+  termination_by sizeOf expr
+
+  theorem Expr.listEqual_self (expressions : List Expr) :
+      Expr.listEqual expressions expressions = true := by
+    cases expressions <;> simp_all [Expr.listEqual]
+    all_goals repeat first | apply And.intro
+    all_goals first | apply And.intro | skip
+    all_goals first
+      | exact Expr.equal_self _
+      | exact Expr.listEqual_self _
+  termination_by sizeOf expressions
+
+end
+
+
+instance : DecidableEq Expr := fun left right =>
+  if accepted : left.equal right then
+    isTrue (Expr.equal_sound left right accepted)
+  else
+    isFalse (fun equality => accepted (by cases equality; exact Expr.equal_self left))
+
+instance : BEq Expr :=
+  ⟨fun left right => decide (left = right)⟩
+
+instance : LawfulBEq Expr where
+  rfl := by
+    intro expr
+    change decide (expr = expr) = true
+    exact of_decide_eq_self_eq_true expr
+  eq_of_beq := by
+    intro left right equal
+    change decide (left = right) = true at equal
+    exact of_decide_eq_true equal
 
 inductive Value where
   | unit
@@ -180,6 +334,7 @@ inductive Value where
   | inLeft (rightType : Ty) (payload : Value)
   | inRight (leftType : Ty) (payload : Value)
   | cellRef (elementType : Ty) (location : Location)
+  | constructed (constructor : ConstructorId) (payload : Value)
   deriving Repr
 
 mutual
@@ -302,6 +457,25 @@ mutual
             intro referenceEquality
             cases referenceEquality
             exact typeEquality rfl)
+    | .constructed leftConstructor leftPayload,
+        .constructed rightConstructor rightPayload =>
+        if constructorEquality : leftConstructor = rightConstructor then
+          match Value.decEq leftPayload rightPayload with
+          | isFalse notEqual =>
+              isFalse (by
+                intro valueEquality
+                cases valueEquality
+                exact notEqual rfl)
+          | isTrue payloadEquality =>
+              isTrue (by
+                cases constructorEquality
+                cases payloadEquality
+                rfl)
+        else
+          isFalse (by
+            intro valueEquality
+            cases valueEquality
+            exact constructorEquality rfl)
     | .unit, .bool _
     | .unit, .word _
     | .unit, .pair _ _
@@ -309,6 +483,7 @@ mutual
     | .unit, .inLeft _ _
     | .unit, .inRight _ _
     | .unit, .cellRef _ _
+    | .unit, .constructed _ _
     | .bool _, .unit
     | .bool _, .word _
     | .bool _, .pair _ _
@@ -316,6 +491,7 @@ mutual
     | .bool _, .inLeft _ _
     | .bool _, .inRight _ _
     | .bool _, .cellRef _ _
+    | .bool _, .constructed _ _
     | .word _, .unit
     | .word _, .bool _
     | .word _, .pair _ _
@@ -323,6 +499,7 @@ mutual
     | .word _, .inLeft _ _
     | .word _, .inRight _ _
     | .word _, .cellRef _ _
+    | .word _, .constructed _ _
     | .pair _ _, .unit
     | .pair _ _, .bool _
     | .pair _ _, .word _
@@ -330,6 +507,7 @@ mutual
     | .pair _ _, .inLeft _ _
     | .pair _ _, .inRight _ _
     | .pair _ _, .cellRef _ _
+    | .pair _ _, .constructed _ _
     | .closure _ _ _ _, .unit
     | .closure _ _ _ _, .bool _
     | .closure _ _ _ _, .word _
@@ -337,6 +515,7 @@ mutual
     | .closure _ _ _ _, .inLeft _ _
     | .closure _ _ _ _, .inRight _ _
     | .closure _ _ _ _, .cellRef _ _
+    | .closure _ _ _ _, .constructed _ _
     | .inLeft _ _, .unit
     | .inLeft _ _, .bool _
     | .inLeft _ _, .word _
@@ -344,6 +523,7 @@ mutual
     | .inLeft _ _, .closure _ _ _ _
     | .inLeft _ _, .inRight _ _
     | .inLeft _ _, .cellRef _ _
+    | .inLeft _ _, .constructed _ _
     | .inRight _ _, .unit
     | .inRight _ _, .bool _
     | .inRight _ _, .word _
@@ -351,13 +531,23 @@ mutual
     | .inRight _ _, .closure _ _ _ _
     | .inRight _ _, .inLeft _ _
     | .inRight _ _, .cellRef _ _
+    | .inRight _ _, .constructed _ _
     | .cellRef _ _, .unit
     | .cellRef _ _, .bool _
     | .cellRef _ _, .word _
     | .cellRef _ _, .pair _ _
     | .cellRef _ _, .closure _ _ _ _
     | .cellRef _ _, .inLeft _ _
-    | .cellRef _ _, .inRight _ _ =>
+    | .cellRef _ _, .inRight _ _
+    | .cellRef _ _, .constructed _ _
+    | .constructed _ _, .unit
+    | .constructed _ _, .bool _
+    | .constructed _ _, .word _
+    | .constructed _ _, .pair _ _
+    | .constructed _ _, .closure _ _ _ _
+    | .constructed _ _, .inLeft _ _
+    | .constructed _ _, .inRight _ _
+    | .constructed _ _, .cellRef _ _ =>
         isFalse (by intro equality; cases equality)
   termination_by sizeOf left + sizeOf right
   decreasing_by all_goals simp_wf <;> omega
@@ -414,6 +604,7 @@ def Value.type : Value → Ty
   | .inLeft rightType payload => .sum payload.type rightType
   | .inRight leftType payload => .sum leftType payload.type
   | .cellRef elementType _ => .cell elementType
+  | .constructed constructor _ => .namedData constructor.owner
 
 abbrev Context := List Ty
 
@@ -426,6 +617,7 @@ abbrev StoreTyping := List Ty
 structure Program where
   resultType : Ty
   body : Expr
+  dataDefinitions : DataEnvironment := []
   deriving Repr, BEq, DecidableEq
 
 end Solcore.Core

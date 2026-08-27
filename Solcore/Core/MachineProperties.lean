@@ -60,6 +60,14 @@ theorem advance_next_iff {state next : State} :
             simp [advance] at advanced
             cases advanced
             exact .enterStoreCell
+        | construct constructor payload =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterConstruct
+        | matchData dataType resultType scrutinee branches =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterMatchData
         | lambda parameterType resultType body =>
             simp [advance] at advanced
             cases advanced
@@ -124,7 +132,8 @@ theorem advance_next_iff {state next : State} :
                 exact .applyPair
             | firstApply =>
                 cases value with
-                | unit | bool | word | inLeft | inRight | closure | cellRef =>
+                | unit | bool | word | inLeft | inRight | closure | cellRef |
+                    constructed =>
                     simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
@@ -132,7 +141,8 @@ theorem advance_next_iff {state next : State} :
                     exact .applyFirst
             | secondApply =>
                 cases value with
-                | unit | bool | word | inLeft | inRight | closure | cellRef =>
+                | unit | bool | word | inLeft | inRight | closure | cellRef |
+                    constructed =>
                     simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
@@ -148,7 +158,7 @@ theorem advance_next_iff {state next : State} :
                 exact .applyInRight
             | caseBranches leftBranch rightBranch environment =>
                 cases value with
-                | unit | bool | word | pair | closure | cellRef =>
+                | unit | bool | word | pair | closure | cellRef | constructed =>
                     simp [advance] at advanced
                 | inLeft rightType payload =>
                     simp [advance] at advanced
@@ -164,7 +174,8 @@ theorem advance_next_iff {state next : State} :
                 exact .applyNewCell
             | loadCellApply =>
                 cases value with
-                | unit | bool | word | pair | closure | inLeft | inRight =>
+                | unit | bool | word | pair | closure | inLeft | inRight |
+                    constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
                     cases lookup : store.read? location with
@@ -175,7 +186,8 @@ theorem advance_next_iff {state next : State} :
                         exact .applyLoadCell lookup
             | storeCellValue valueExpr environment =>
                 cases value with
-                | unit | bool | word | pair | closure | inLeft | inRight =>
+                | unit | bool | word | pair | closure | inLeft | inRight |
+                    constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
                     cases lookup : store.read? location with
@@ -191,9 +203,28 @@ theorem advance_next_iff {state next : State} :
                     simp [advance, written] at advanced
                     cases advanced
                     exact .applyStoreCell written
+            | constructApply constructor =>
+                simp [advance] at advanced
+                cases advanced
+                exact .applyConstruct
+            | matchDataApply dataType branches environment =>
+                cases value with
+                | unit | bool | word | pair | closure | inLeft | inRight | cellRef =>
+                    simp [advance] at advanced
+                | constructed constructor payload =>
+                    by_cases sameOwner : constructor.owner = dataType
+                    · cases branchLookup : branches[constructor.index]? with
+                      | none =>
+                          simp [advance, sameOwner, branchLookup] at advanced
+                      | some branch =>
+                          simp [advance, sameOwner, branchLookup] at advanced
+                          cases advanced
+                          exact .chooseData sameOwner branchLookup
+                    · simp [advance, sameOwner] at advanced
             | applyArgument argument callerEnvironment =>
                 cases value with
-                | unit | bool | word | pair | inLeft | inRight | cellRef =>
+                | unit | bool | word | pair | inLeft | inRight | cellRef |
+                    constructed =>
                     simp [advance] at advanced
                 | closure parameterType resultType body capturedEnvironment =>
                     simp [advance] at advanced
@@ -209,7 +240,8 @@ theorem advance_next_iff {state next : State} :
                 exact .bindLet
             | ifBranches thenBranch elseBranch environment =>
                 cases value with
-                | unit | word | pair | inLeft | inRight | closure | cellRef =>
+                | unit | word | pair | inLeft | inRight | closure | cellRef |
+                    constructed =>
                     simp [advance] at advanced
                 | bool decision =>
                     cases decision with
@@ -234,8 +266,8 @@ theorem advance_done_iff {state : State} {value : Value} :
     | eval expr environment =>
         cases expr with
         | unit | bool | word | pair | first | second | inLeft | inRight | caseE |
-            newCell | loadCell | storeCell | lambda | apply | unary | binary |
-            letE | ifE =>
+            newCell | loadCell | storeCell | construct | matchData | lambda |
+            apply | unary | binary | letE | ifE =>
             simp [advance] at advanced
         | var index =>
             cases lookup : environment[index]? <;> simp [advance, lookup] at advanced
@@ -268,14 +300,16 @@ theorem advance_done_iff {state : State} {value : Value} :
             | newCellApply elementType => simp [advance] at advanced
             | loadCellApply =>
                 cases returned with
-                | unit | bool | word | pair | closure | inLeft | inRight =>
+                | unit | bool | word | pair | closure | inLeft | inRight |
+                    constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
                     cases lookup : store.read? location <;>
                       simp [advance, lookup] at advanced
             | storeCellValue valueExpr environment =>
                 cases returned with
-                | unit | bool | word | pair | closure | inLeft | inRight =>
+                | unit | bool | word | pair | closure | inLeft | inRight |
+                    constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
                     cases lookup : store.read? location <;>
@@ -283,6 +317,17 @@ theorem advance_done_iff {state : State} {value : Value} :
             | storeCellApply elementType location =>
                 cases written : store.write? location returned <;>
                   simp [advance, written] at advanced
+            | constructApply constructor =>
+                simp [advance] at advanced
+            | matchDataApply dataType branches environment =>
+                cases returned with
+                | unit | bool | word | pair | closure | inLeft | inRight | cellRef =>
+                    simp [advance] at advanced
+                | constructed constructor payload =>
+                    by_cases sameOwner : constructor.owner = dataType
+                    · cases branchLookup : branches[constructor.index]? <;>
+                        simp [advance, sameOwner, branchLookup] at advanced
+                    · simp [advance, sameOwner] at advanced
             | applyArgument argument callerEnvironment =>
                 cases returned <;> simp [advance] at advanced
             | applyClosure parameterType resultType body capturedEnvironment =>
@@ -290,7 +335,8 @@ theorem advance_done_iff {state : State} {value : Value} :
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with
-                | unit | word | pair | inLeft | inRight | closure | cellRef =>
+                | unit | word | pair | inLeft | inRight | closure | cellRef |
+                    constructed =>
                     simp [advance] at advanced
                 | bool decision =>
                     cases decision <;> simp [advance] at advanced

@@ -28,7 +28,7 @@ These results remain regression obligations for every extension.
 | 2 | Functions, application, and lexical closures | Complete | Establishes callable values and reusable computation |
 | 3 | Binary sums and elimination | Complete | Adds structured branching without choosing source pattern syntax |
 | 4 | First-order local cells | Complete | Introduces explicit local state after pure values are stable; source assignment elaborates later |
-| 5 | Named algebraic data and direct matching | Next | Builds on sums after constructor identity is accepted |
+| 5 | Named algebraic data and direct matching | Complete | Adds program-local constructor identity without source pattern syntax |
 | 6 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
 | 7 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 8 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -135,6 +135,33 @@ evaluation, CEK execution, correspondence, store-indexed safety, logical
 reducibility, sufficient fuel, detailed diagnostics, composite-payload and
 aliasing tests, and old-wire rejection. Existing public Core and Oracle
 behavior remains unchanged.
+
+## Completed Core vNext slice: named algebraic data
+
+[ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) fixes the semantic
+shape implemented by this slice:
+
+- every program has an immutable, program-local data-definition table;
+- a data type is identified by its table index, while a constructor is
+  identified by its owning data type and constructor index;
+- each constructor carries one payload (`unit` for a nullary constructor and a
+  product for multiple fields after later elaboration);
+- definitions may be recursive or mutually recursive;
+- constructor payloads are first-order, excluding functions while allowing
+  named data and admissible local-cell references;
+- a match has one branch per constructor in table order and binds the selected
+  payload at de Bruijn index zero; and
+- an explicit result type makes elimination of an empty data type well formed.
+
+This match form is already normalized. It has no wildcard, nested source
+pattern, guard, overlap, or textual first-match behavior. A future resolved
+adapter will translate those source concepts into constructor-order branches.
+
+The implementation covers the full vertical proof boundary: whole-table
+validity, declarative and executable typing, recursive-data safety and
+termination, store-threaded evaluation, CEK execution, machine correspondence,
+detailed diagnostics, exact fuel, and rejection of named forms and nonempty
+definition tables by both frozen Core wires.
 
 ## State and contracts
 

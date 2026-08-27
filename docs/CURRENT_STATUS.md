@@ -18,10 +18,12 @@ now frozen because the concrete Solcore syntax may change.
 Active development has moved to Semantic Core vNext. The goal is to define
 types, evaluation, state, and observations independently of concrete source
 spelling, then connect a stabilized future Surface language through a separate
-adapter. The explicit local-cell store accepted by ADR-0022 is complete; the
-next Core work is named algebraic data and direct matching.
+adapter. The explicit local-cell store accepted by ADR-0022 and the
+program-local named algebraic data and normalized constructor matching accepted
+by ADR-0023 are complete internal slices. Core vNext as a whole remains the
+active development program.
 
-## Stable implementation
+## Implementation status
 
 | Area | Implementation | Proof | Publication |
 | --- | --- | --- | --- |
@@ -32,6 +34,7 @@ next Core work is named algebraic data and direct matching.
 | Internal non-recursive functions | Complete | Complete, including totality | Not published |
 | Internal binary sums | Complete | Complete, including totality | Not published |
 | Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
+| Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -69,7 +72,8 @@ language. The following remain:
 
 - explicit return, recursion, and divergence;
 - source-level mutable declarations, assignment syntax, and their elaboration;
-- user-defined algebraic data and direct pattern matching;
+- source-level data declarations, pattern syntax, and elaboration into the
+  completed internal named-data Core;
 - conversions and additional primitives;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
@@ -138,8 +142,9 @@ The third vertical slice adds:
 - logical-reducibility, CEK correspondence, safety, exact-fuel, interaction,
   and old-wire rejection coverage.
 
-Named algebraic data and source-level pattern syntax remain later decisions.
-See [ADR-0021](adr/0021-core-vnext-binary-sums.md).
+This binary-sum slice deliberately did not add named algebraic data. Named data
+was added by the later ADR-0023 slice; source-level pattern syntax remains
+deferred. See [ADR-0021](adr/0021-core-vnext-binary-sums.md).
 
 ## Completed Core vNext local-cell result
 
@@ -165,6 +170,36 @@ store-indexed safety, logical reducibility, sufficient fuel, diagnostics,
 focused tests, and old-wire rejection. The internal stateful runner returns
 the final local store; the existing `Program.run` and Oracle path erase it for
 compatibility. No public schema or Oracle version was added.
+
+## Completed Core vNext named-data result
+
+[ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) is Accepted, and its
+Lean implementation and proof boundary are complete. It adds an immutable
+data-definition table to each internal Core program. Data types use
+program-local table indices; constructors use an owning data-type index plus a
+constructor index. No source name or namespace becomes part of Core identity.
+
+Every constructor has one payload. Nullary constructors use `unit`, while a
+future adapter can combine multiple fields into a product. Definitions may be
+recursive or mutually recursive. Payloads exclude functions but may contain
+named data and admissible local-cell references.
+
+Matching is exhaustive and already normalized: the branch list is in
+constructor-table order, the chosen payload is de Bruijn index zero, and only
+the selected branch runs. The match carries an explicit result type, so an
+empty data type can have a typed eliminator with no branches. Wildcards,
+nested source patterns, guards, overlap, and textual first-match ordering are
+outside this Core slice.
+
+All Core layers now cover this slice: whole-table validity, declarative and
+executable typing, detailed diagnostics, store-threaded big-step evaluation,
+CEK execution, evaluator/machine correspondence, runtime and machine-state
+safety, recursive-data totality, sufficient fuel, and focused regressions.
+Recursive, mutually recursive, empty, effectful, cell-reference, exact-fuel,
+diagnostic, raw-fault, and version-boundary cases are covered.
+
+Semantic Core v1 and v2 reject every named form and every nonempty definition
+table, so no published Oracle behavior changes.
 
 ## Meaning of completion
 

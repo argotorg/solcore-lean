@@ -151,6 +151,14 @@ def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
   | .loadCell reference => .loadCell (reference.weakenAt cutoff)
   | .storeCell reference value =>
       .storeCell (reference.weakenAt cutoff) (value.weakenAt cutoff)
+  | .construct constructor payload =>
+      .construct constructor (payload.weakenAt cutoff)
+  | .matchData dataType resultType scrutinee branches =>
+      .matchData
+        dataType
+        resultType
+        (scrutinee.weakenAt cutoff)
+        (branches.map fun branch => branch.weakenAt (cutoff + 1))
   | .unary op operand => .unary op (operand.weakenAt cutoff)
   | .binary op left right =>
       .binary op (left.weakenAt cutoff) (right.weakenAt cutoff)

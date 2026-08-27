@@ -63,6 +63,19 @@ word, and products or sums made recursively from those types. Function-valued
 and cell-valued contents wait for the recursion-and-divergence decision because
 higher-order cells can encode nontermination.
 
+The completed named-data slice gives each internal Core program an immutable
+definition table. A data type is identified by its position in that table; a
+constructor is identified by its owning type and position within that type.
+These are local semantic identities, not source names. Definitions may be
+recursive or mutually recursive, while runtime values remain finite.
+
+Named-data matching is a normalized Core operation. Its branch list is
+exhaustive and follows constructor-table order, and the selected constructor's
+single payload becomes de Bruijn index zero. An explicit result type also
+supports elimination of an empty data type. Source wildcards, nested patterns,
+guards, arm ordering, names, and field shapes belong to a later resolved
+adapter, not this execution layer.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,
@@ -91,6 +104,7 @@ Each semantic feature follows the same vertical structure:
 | Dynamic correspondence | Machine and big-step agreement |
 | Safety | Progress, preservation, and typed result properties |
 | Local state | Explicit store threading, typed allocation/update, and final-store agreement |
+| Named definitions | Whole-table validity, stable constructor ownership, and recursive finite-value reasoning |
 | Resource behavior | Explicit fuel or a proved finite bound |
 | Compatibility | Old wires reject new syntax unless a new version publishes it |
 | Regression protection | Positive, negative, order, boundary, and version tests |

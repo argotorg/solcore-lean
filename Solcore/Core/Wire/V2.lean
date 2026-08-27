@@ -40,6 +40,7 @@ def ofCore? : Solcore.Core.Ty → Option Ty
   | .function _ _ => none
   | .sum _ _ => none
   | .cell _ => none
+  | .namedData _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (type : Ty) :
@@ -80,6 +81,7 @@ def ofCore? : Solcore.Core.Value → Option Value
   | .inLeft _ _ => none
   | .inRight _ _ => none
   | .cellRef _ _ => none
+  | .constructed _ _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (value : Value) :
@@ -237,6 +239,8 @@ def ofCore? : Solcore.Core.Expr → Option Expr
   | .newCell _ _ => none
   | .loadCell _ => none
   | .storeCell _ _ => none
+  | .construct _ _ => none
+  | .matchData _ _ _ _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (expr : Expr) :
@@ -262,12 +266,19 @@ def toCore (program : Program) : Solcore.Core.Program := {
 }
 
 def ofCore? (program : Solcore.Core.Program) : Option Program := do
+  if !program.dataDefinitions.isEmpty then none
   let resultType ← Ty.ofCore? program.resultType
   let body ← Expr.ofCore? program.body
   some {
     resultType
     body
   }
+
+theorem ofCore?_eq_none_of_nonempty_dataDefinitions
+    (program : Solcore.Core.Program)
+    (nonempty : program.dataDefinitions ≠ []) :
+    ofCore? program = none := by
+  simp [ofCore?, nonempty]
 
 @[simp] theorem ofCore?_toCore (program : Program) :
     ofCore? program.toCore = some program := by

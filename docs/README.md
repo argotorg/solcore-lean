@@ -22,8 +22,11 @@ Concrete Solcore syntax may change substantially. The published parsers remain
 available as versioned reference implementations, but new grammar-dependent
 proof work is paused. Active work is directed toward a syntax-independent
 Semantic Core and explicit runtime semantics. First-order local cells from
-ADR-0022 are complete; they deliberately do not choose a source spelling for
-mutable declarations or assignment.
+ADR-0022 and the program-local named algebraic data and normalized constructor
+matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
+complete internal slices. They deliberately do not choose source spellings for
+mutable declarations, assignment, data declarations, or patterns. Further Core
+work follows the roadmap through separate semantic decisions.
 
 This policy is recorded by
 [ADR-0018](adr/0018-semantics-first-development-order.md). It changes
@@ -57,6 +60,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0020 defines non-recursive functions and lexical closures.
 - ADR-0021 defines binary sums and exhaustive elimination.
 - ADR-0022 defines first-order local cells and their explicit local store.
+- ADR-0023 defines named algebraic data and direct normalized matching.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

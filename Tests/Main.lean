@@ -11,6 +11,7 @@ import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
 import Solcore.Test.CoreCells
 import Solcore.Test.CoreFunctions
+import Solcore.Test.CoreNamedData
 import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSums
 import Solcore.Test.SurfaceMultiCertifiedFrontend
@@ -4789,6 +4790,7 @@ def run : IO Unit := do
   testCoreFunctions
   testCoreSums
   testCoreCells
+  testCoreNamedData
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile

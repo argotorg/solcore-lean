@@ -26,6 +26,11 @@ inductive Frame where
   | loadCellApply
   | storeCellValue (valueExpr : Expr) (environment : Environment)
   | storeCellApply (elementType : Ty) (location : Location)
+  | constructApply (constructor : ConstructorId)
+  | matchDataApply
+      (dataType : DataTypeId)
+      (branches : List Expr)
+      (environment : Environment)
   | applyArgument (argument : Expr) (environment : Environment)
   | applyClosure
       (parameterType resultType : Ty)
@@ -213,6 +218,39 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.ret value, .storeCellApply elementType location :: continuation, store⟩
         ⟨.ret .unit, continuation, updatedStore⟩
+  | enterConstruct
+      {environment : Environment} {constructor : ConstructorId} {payload : Expr}
+      {continuation : List Frame} {store : Store} :
+      Transition
+        ⟨.eval (.construct constructor payload) environment, continuation, store⟩
+        ⟨.eval payload environment,
+          .constructApply constructor :: continuation, store⟩
+  | applyConstruct
+      {constructor : ConstructorId} {payload : Value}
+      {continuation : List Frame} {store : Store} :
+      Transition
+        ⟨.ret payload, .constructApply constructor :: continuation, store⟩
+        ⟨.ret (.constructed constructor payload), continuation, store⟩
+  | enterMatchData
+      {environment : Environment} {dataType : DataTypeId} {resultType : Ty}
+      {scrutinee : Expr} {branches : List Expr}
+      {continuation : List Frame} {store : Store} :
+      Transition
+        ⟨.eval (.matchData dataType resultType scrutinee branches) environment,
+          continuation, store⟩
+        ⟨.eval scrutinee environment,
+          .matchDataApply dataType branches environment :: continuation, store⟩
+  | chooseData
+      {environment : Environment} {dataType : DataTypeId}
+      {branches : List Expr} {constructor : ConstructorId}
+      {payload : Value} {branch : Expr}
+      {continuation : List Frame} {store : Store} :
+      constructor.owner = dataType →
+      branches[constructor.index]? = some branch →
+      Transition
+        ⟨.ret (.constructed constructor payload),
+          .matchDataApply dataType branches environment :: continuation, store⟩
+        ⟨.eval branch (payload :: environment), continuation, store⟩
   | lambda
       {environment : Environment} {parameterType resultType : Ty}
       {body : Expr} {continuation : List Frame} {store : Store} :
@@ -328,6 +366,9 @@ inductive MachineFault where
   | expectedFunction (actual : Value)
   | expectedCell (actual : Value)
   | invalidCellLocation (location : Location)
+  | expectedNamedData (actual : Value)
+  | namedDataTypeMismatch (expected actual : DataTypeId)
+  | invalidConstructorBranch (constructor : ConstructorId)
   | invalidUnaryOperand (op : UnaryOp) (actual : Value)
   | invalidBinaryOperands (op : BinaryOp) (left right : Value)
   deriving Repr, BEq, DecidableEq
@@ -375,6 +416,13 @@ def advance (state : State) : AdvanceResult :=
       | .storeCell reference valueExpr =>
           .next ⟨.eval reference environment,
             .storeCellValue valueExpr environment :: state.continuation, state.store⟩
+      | .construct constructor payload =>
+          .next ⟨.eval payload environment,
+            .constructApply constructor :: state.continuation, state.store⟩
+      | .matchData dataType _ scrutinee branches =>
+          .next ⟨.eval scrutinee environment,
+            .matchDataApply dataType branches environment :: state.continuation,
+            state.store⟩
       | .lambda parameterType resultType body =>
           .next ⟨.ret (.closure parameterType resultType body environment),
             state.continuation, state.store⟩
@@ -463,6 +511,20 @@ def advance (state : State) : AdvanceResult :=
           match state.store.write? location value with
           | some updatedStore => .next ⟨.ret .unit, continuation, updatedStore⟩
           | none => .fault (.invalidCellLocation location)
+      | .constructApply constructor :: continuation =>
+          .next ⟨.ret (.constructed constructor value), continuation, state.store⟩
+      | .matchDataApply dataType branches environment :: continuation =>
+          match value with
+          | .constructed constructor payload =>
+              if constructor.owner = dataType then
+                match branches[constructor.index]? with
+                | some branch =>
+                    .next ⟨.eval branch (payload :: environment), continuation,
+                      state.store⟩
+                | none => .fault (.invalidConstructorBranch constructor)
+              else
+                .fault (.namedDataTypeMismatch dataType constructor.owner)
+          | actual => .fault (.expectedNamedData actual)
       | .applyArgument argument callerEnvironment :: continuation =>
           match value with
           | .closure parameterType resultType body capturedEnvironment =>
