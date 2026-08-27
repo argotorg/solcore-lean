@@ -26,7 +26,8 @@ expression form. The `wordIsZero` slice accepted by ADR-0025 is complete and
 likewise adds no new Core expression form. The derived short-circuit `boolAnd`
 and `boolOr` slice accepted by ADR-0026 is complete. The derived word-valued
 nonzero predicate accepted by ADR-0027 is also complete. Core vNext as a whole
-remains active, with additional conversions and primitives planned.
+remains active. ADR-0028 makes word-valued equality and unsigned greater-than
+flags the active tenth slice, with additional conversions and primitives planned.
 
 ## Implementation status
 
@@ -44,6 +45,7 @@ remains active, with additional conversions and primitives planned.
 | Internal word zero test | Complete | Complete | Not published |
 | Internal short-circuit boolean operators | Complete | Complete | Not published |
 | Internal word nonzero test | Complete | Complete | Not published |
+| Internal word comparison flags | In progress | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -274,6 +276,15 @@ Named expansion, typing, inference, general and zero/nonzero store theorems,
 and weakening are proved. Tests cover 0/1/2/maximum, types and raw faults,
 exact 9/10 fuel, exactly-once allocation and writes with store threading, its
 semantic distinctions, and exact v1/v2 projection. All audits pass.
+
+## Active Core vNext word comparison flags
+
+[ADR-0028](adr/0028-core-vnext-word-comparison-flags.md) derives word-valued
+equality and unsigned greater-than flags from the existing boolean comparisons
+and `boolToWord`. They return canonical word one or zero while preserving
+left-to-right exactly-once evaluation, store threading, and fault order. The
+existing boolean operations remain unchanged; no new tag or published API is
+introduced. Wire v1 rejects and wire v2 projects each exact expansion.
 
 ## Meaning of completion
 

@@ -42,6 +42,10 @@ Its named expansion, typing, inference, store-preserving evaluations, weakening,
 effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
 Additional conversions and primitives remain planned.
+The active tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
+derives canonical word-valued equality and unsigned greater-than flags from
+the existing boolean comparisons. It preserves left-to-right evaluation and
+adds no tag or source, standard-library, ABI, opcode, or gas commitment.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -84,6 +88,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0025 defines the derived word-valued zero test.
 - ADR-0026 defines derived short-circuit boolean conjunction and disjunction.
 - ADR-0027 defines the derived word-valued nonzero test.
+- ADR-0028 defines derived word-valued equality and unsigned-greater flags.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
