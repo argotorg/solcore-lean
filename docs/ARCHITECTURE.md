@@ -208,6 +208,15 @@ finding. No alias, tag, duplicate generic proof, schema, or Oracle behavior
 changed. Arithmetic shift, source spelling, opcode lowering, and gas remain
 outside the slice; the next feature is selected by a separate ADR.
 
+The active ADR-0036 slice completes focused interfaces for raw `wordAdd`,
+`wordSub`, and `wordMul`. Results wrap modulo `2^256`; Core evaluates left then
+right exactly once and retains the right operand's final store. Subtraction
+therefore means left minus right in both value and effect order; commutative
+values do not authorize swapping expressions. Exactly fourteen Word-identity,
+boundary, application, and evaluation theorems are required without an alias,
+new tag, or duplicate generic proof. Checked and signed arithmetic,
+source overloads, opcode lowering, and gas remain separate decisions.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

@@ -51,6 +51,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Direct unary primitive interface | ADR-0033 Accepted | Complete | named raw boolNot/wordNot APIs, zero/maximum/involution facts, exact fuel, fault/effect/store tests, v1 rejection, and exact v2 projection/round trips complete | None |
 | Totalized unsigned division and modulo interface | ADR-0034 Accepted | Complete | four Word, two apply, and six evaluation theorems; ordered zero-divisor effects/faults, exact fuel, and v1/v2 regressions complete | None |
 | Bounded logical shift interface | ADR-0035 Accepted | Complete | six Word, two apply, and six evaluation theorems; value-left/shift-right boundaries, effects, exact fuel, and v1/v2 plus JSON round trips complete | None |
+| Modular word arithmetic interface | ADR-0036 Accepted | Active | exactly fourteen Word/apply/evaluation theorems; identities, wraparound, strict operand order, effects/fuel, and v1/v2 plus JSON regressions in progress | None |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 

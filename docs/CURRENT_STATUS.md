@@ -42,6 +42,8 @@ the focused interface for the existing direct unary primitives.
 focused interface for totalized unsigned division and modulo.
 [ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md) completes the focused
 interface for the existing bounded logical shifts.
+[ADR-0036](adr/0036-core-vnext-modular-word-arithmetic.md) makes the focused
+interface for modular addition, subtraction, and multiplication the active slice.
 
 ## Implementation status
 
@@ -67,6 +69,7 @@ interface for the existing bounded logical shifts.
 | Internal direct unary primitive interface | Complete | Complete | Not published |
 | Internal totalized unsigned division and modulo interface | Complete | Complete | Not published |
 | Internal bounded logical shift interface | Complete | Complete | Not published |
+| Internal modular word arithmetic interface | In progress | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -398,6 +401,18 @@ fault and effect order, final stores, exact 4/5 and 28/29 fuel, Wire v1
 rejection, and exact Wire v2 and JSON round trips. The P0-P3 audit found no
 issue. No alias, tag, schema, Oracle, source, signed, or gas behavior changed.
 The next feature is selected by a separate ADR.
+
+## Active Core vNext modular word arithmetic slice
+
+[ADR-0036](adr/0036-core-vnext-modular-word-arithmetic.md) retains raw
+`wordAdd`, `wordSub`, and `wordMul` with modulo-`2^256` results and strict
+left-to-right evaluation. It targets eight reusable Word identity and boundary
+facts, three application equations, and three store-threaded evaluations.
+Commutative results never justify swapping effectful expressions. Required tests
+cover normal and wrapped values, zero/one/maximum, types, raw and ordered faults,
+effects and final stores, exact 4/5 and 28/29 fuel, Wire v1 rejection, and exact
+Wire v2 plus JSON round trips. Implementation is in progress; further
+primitives remain planned.
 
 ## Meaning of completion
 

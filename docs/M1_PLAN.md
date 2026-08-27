@@ -41,11 +41,12 @@ These results remain regression obligations for every extension.
 | 15 | Direct unary primitive interface | Complete | Completes focused APIs and regressions for existing boolNot and wordNot |
 | 16 | Totalized unsigned division and modulo | Complete | Completes focused APIs and strict zero-divisor regressions |
 | 17 | Bounded logical shifts | Complete | Completes focused APIs for existing wordShl and wordShr without new syntax |
-| 18 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
-| 19 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 20 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 21 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 22 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 18 | Modular word arithmetic | Active | Completes focused APIs for existing wordAdd, wordSub, and wordMul |
+| 19 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
+| 20 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 21 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 22 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 23 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -322,6 +323,19 @@ and six evaluation theorems are complete. Tests cover 0/1/maximum values,
 audit found no P0-P3 issue. No alias, tag, generic proof duplicate, source rule,
 arithmetic shift, opcode, or gas meaning was added. The next feature is selected
 by a separate ADR.
+
+## Active Core vNext slice: modular word arithmetic
+
+[ADR-0036](adr/0036-core-vnext-modular-word-arithmetic.md) retains raw
+`wordAdd`, `wordSub`, and `wordMul` and their modulo-`2^256` results. Eight Word
+identity and boundary facts, three application equations, and three
+store-threaded evaluations form the exact fourteen-theorem interface. Core
+evaluates left then right exactly once; commutative values never justify
+swapping effectful expressions, and subtraction remains left minus right.
+Normal/wrapped values, 0/1/maximum, types, faults, effects, final stores, exact
+4/5 and 28/29 fuel, and v1/v2 plus JSON boundaries are required. No alias, tag,
+generic proof duplicate, checked/signed/source/opcode/gas rule is added.
+Implementation is in progress.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
