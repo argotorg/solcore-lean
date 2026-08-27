@@ -208,14 +208,14 @@ finding. No alias, tag, duplicate generic proof, schema, or Oracle behavior
 changed. Arithmetic shift, source spelling, opcode lowering, and gas remain
 outside the slice; the next feature is selected by a separate ADR.
 
-The active ADR-0036 slice completes focused interfaces for raw `wordAdd`,
-`wordSub`, and `wordMul`. Results wrap modulo `2^256`; Core evaluates left then
-right exactly once and retains the right operand's final store. Subtraction
-therefore means left minus right in both value and effect order; commutative
-values do not authorize swapping expressions. Exactly fourteen Word-identity,
-boundary, application, and evaluation theorems are required without an alias,
-new tag, or duplicate generic proof. Checked and signed arithmetic,
-source overloads, opcode lowering, and gas remain separate decisions.
+The completed ADR-0036 slice gives raw `wordAdd`, `wordSub`, and `wordMul` eight
+Word, three application, and three store-threaded evaluation theorems. Results
+wrap modulo `2^256`; Core evaluates left then right exactly once and retains the
+right operand's final store. Subtraction is left minus right, and commutative
+values do not authorize swapping expressions. Normal and wrapped values, types,
+faults, effects, exact fuel, and Wire/Core/JSON round trips pass with no P0-P3
+finding. No alias, generic proof duplicate, tag, schema, or Oracle behavior
+changed. The next feature is selected by a separate ADR.
 
 ### Contract runtime
 

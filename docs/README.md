@@ -49,13 +49,14 @@ operators. Its fourteen theorems and boundary, order, effect, fuel, Wire, and
 JSON tests pass. Core keeps value before shift, uses zero for amounts of 256 or
 more, and adds no alias, tag, source rule, or Wire change. The next feature is
 selected by a separate ADR.
-The active eighteenth slice,
+The completed eighteenth slice,
 [ADR-0036](adr/0036-core-vnext-modular-word-arithmetic.md), completes fourteen
 focused Word, application, and evaluation results for existing raw addition,
-subtraction, and multiplication. Results wrap modulo `2^256`; expressions still
-evaluate left to right exactly once. It adds no alias, tag, checked or signed
-arithmetic, source rule, opcode rule, gas rule, or Wire change. Implementation
-is in progress; further primitives remain planned.
+subtraction, and multiplication. Normal and wrapped values, strict order,
+effects, exact fuel, and Wire/Core/JSON round trips pass. Results remain modulo
+`2^256` and expressions evaluate left to right exactly once. No alias, generic
+proof duplicate, tag, schema, or Oracle behavior changed. The next feature is
+selected by a separate ADR.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: eighteenth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -88,3 +88,20 @@ Oracle behavior, profile, capability, or golden stream.
 Callers can use concise named results for modular arithmetic while the raw Core
 operators and every published boundary remain unchanged. Further conversions
 and primitives are selected by separate ADRs.
+
+## Implementation result
+
+All fourteen theorems are complete: eight reusable Word identities and
+boundaries, three exact primitive-application equations, and three
+store-threaded evaluations. Tests cover ordinary arithmetic plus addition
+overflow, subtraction underflow, and multiplication wraparound; zero, one, and
+maximum; and the left-minus-right order of subtraction.
+
+Type rejection, raw and ordered faults, two exactly-once effectful operands, and
+the final store are checked for all three operations. Literal execution has the
+exact 4/5 fuel boundary and effectful execution the exact 28/29 boundary. Wire
+v1 rejects every raw expression; Wire v2 has exact operator and operand-order
+projection, Core round trips, and JSON round trips. The final independent audit
+found no P0-P3 issue. No alias, generic proof duplicate, tag, schema, Oracle
+behavior, or other published boundary changed. The next feature is selected by
+a separate ADR.
