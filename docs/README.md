@@ -55,13 +55,16 @@ syntax renaming, typing preservation, structural value/environment/store
 relations, simulation for every evaluation form, ground-value and typed-store
 exactness, and an exact word-result head-insertion theorem. Static and dynamic
 tests cover the foundation. It changes no execution, source, or wire meaning.
-The active twelfth slice,
+The completed twelfth slice,
 [ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md), completes the proof
 interfaces for the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe`
-builders. Their expansions remain unchanged; the nested-let comparisons keep
+builders. All four have expansion, typing, inference, renaming, weakening,
+store-threaded evaluation, and two truth-case results. Value, type, fuel, fault,
+effect, Wire v1 rejection, and exact Wire v2 projection and round-trip tests
+pass. Their expansions remain unchanged; the nested-let comparisons keep
 left-to-right exactly-once evaluation for arbitrary effectful expressions. No
-new syntax, tag, or public behavior is added. Additional primitives remain
-planned.
+new syntax, tag, or public behavior is added. The next additional primitive or
+conversion will be selected by its own ADR.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the

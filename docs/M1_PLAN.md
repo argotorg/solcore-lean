@@ -35,7 +35,7 @@ These results remain regression obligations for every extension.
 | 9 | Word nonzero test | Complete | Composes total truthiness and canonical word conversion without a new tag |
 | 10 | Word comparison flags | Complete | Derives canonical word equality and unsigned-greater results without new tags |
 | 11 | Renaming and environment insertion | Complete | Establishes static and dynamic weakening without changing semantics |
-| 12 | Derived boolean word comparisons | Active | Completes proof interfaces for the existing comparison builders |
+| 12 | Derived boolean word comparisons | Complete | Completes proof interfaces for the existing comparison builders |
 | 13 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
 | 14 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 15 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -252,19 +252,21 @@ structural relations for values, environments, and stores. `Evaluates.rename`
 covers every evaluation form. `CellPayload` exactness and
 `Evaluates.weakenAt_zero_word` preserve the identical ground result and final
 store after head insertion. Static and dynamic tests cover the full foundation.
-The next work completes arbitrary-expression proof interfaces for the existing
-`wordLt` and `wordGe` builders without changing their semantics.
 
-## Active Core vNext slice: derived word comparisons
+## Completed Core vNext slice: derived word comparisons
 
 [ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md) completes the proof
 interfaces for the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe`
-builders. Their ADR-0011 expansions do not change. `wordLt` and `wordGe` retain
+builders. Their ADR-0011 expansions do not change. All four provide expansion,
+typing, inference, renaming, and weakening results. `wordNe` and `wordLe`
+provide general untyped evaluation results; `wordLt` and `wordGe` provide typed,
+store-threaded evaluation results. Their eight truth cases are proved.
+`wordLt` and `wordGe` retain
 nested lets and right-operand weakening, which preserves left-to-right,
-exactly-once evaluation for effectful and faulting expressions. The work adds
-named expansion, typing, inference, renaming, weakening, general evaluation,
-truth-case theorems, and focused fuel/fault/effect/wire tests without a new tag
-or public behavior.
+exactly-once evaluation for effectful and faulting expressions. Value, type,
+fuel, fault, effect, Wire v1 rejection, and exact Wire v2 projection and
+round-trip tests pass without a new tag or public behavior. The next additional
+primitive or conversion is selected by a separate ADR.
 
 ## State and contracts
 

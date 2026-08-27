@@ -3,14 +3,14 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twelfth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
 ADR-0011 already defines four boolean-valued word comparisons as derived Core
 expressions: `wordNe`, `wordLt`, `wordLe`, and `wordGe`. Their runtime meaning is
 therefore fixed by existing unary, binary, let, variable, and weakening rules.
-What remains is a uniform public proof interface for arbitrary operand
+This slice supplies a uniform public proof interface for arbitrary operand
 expressions, including expressions that change the local store or fault.
 
 This slice completes that proof surface. It introduces no expression form,
@@ -40,9 +40,9 @@ Replacing this expansion by a syntax-level operand swap is forbidden. A swap
 would evaluate the right expression first and would change fault order, store
 effects, and exact fuel for arbitrary expressions.
 
-## Proof interface
+## Implemented proof interface
 
-Each builder receives:
+Each builder provides:
 
 - a named expansion theorem;
 - declarative `HasType` and executable `infer?` theorems;
@@ -51,10 +51,14 @@ Each builder receives:
 - truth-case corollaries for equal/unequal or ordered/not-ordered word values,
   as appropriate.
 
-The `wordLt` and `wordGe` proofs reuse ADR-0029's head-insertion theorem to
-justify evaluation of the weakened right operand without assuming that it is
-closed. The general theorems must expose the intermediate stores so callers can
-see left-to-right effect and fault order.
+The `wordNe` and `wordLe` evaluations need no typing assumptions. The typed,
+store-threaded `wordLt` and `wordGe` proofs reuse ADR-0029's head-insertion
+theorem to justify evaluation of the weakened right operand without assuming
+that it is closed. The general theorems expose the intermediate stores so
+callers can see left-to-right effect and fault order.
+
+Together the four builders expose eight truth-case corollaries: equal and
+unequal, greater and not greater, or less and not less, as appropriate.
 
 ## Tests
 
@@ -66,7 +70,8 @@ Focused tests cover:
 - wrong operand types and raw fault order;
 - exact insufficient and sufficient fuel boundaries;
 - Wire v1 rejection of the required primitive forms; and
-- exact Wire v2 projection against each handwritten normative expansion.
+- exact Wire v2 projection and round trips against each handwritten normative
+  expansion.
 
 Tests exercise both the executable behavior and the named proof interface.
 
@@ -82,3 +87,6 @@ does not define signed comparison, ABI decoding, opcode mapping, or gas cost.
 The four comparisons gain a consistent arbitrary-expression proof API while
 preserving their established meaning, evaluation order, faults, stores, and
 fuel behavior.
+
+Additional primitives and conversions are selected separately, one scoped ADR
+at a time; this decision does not choose the next feature.
