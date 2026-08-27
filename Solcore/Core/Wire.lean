@@ -135,6 +135,7 @@ def ofCore? : Solcore.Core.Expr → Option Expr
       some (.ifE condition thenBranch elseBranch)
   | .unary _ _ => none
   | .binary _ _ _ => none
+  | .ternary _ _ _ _ => none
   | .pair _ _ => none
   | .first _ => none
   | .second _ => none

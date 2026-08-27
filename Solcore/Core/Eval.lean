@@ -149,6 +149,17 @@ inductive Evaluates : Environment → Store → Expr → Value → Store → Pro
       Evaluates environment rightStore right rightValue finalStore →
       op.apply leftValue rightValue = some result →
       Evaluates environment initialStore (.binary op left right) result finalStore
+  | ternary
+      {environment : Environment}
+      {initialStore secondStore thirdStore finalStore : Store}
+      {op : TernaryOp} {first second third : Expr}
+      {firstValue secondValue thirdValue result : Value} :
+      Evaluates environment initialStore first firstValue secondStore →
+      Evaluates environment secondStore second secondValue thirdStore →
+      Evaluates environment thirdStore third thirdValue finalStore →
+      op.apply firstValue secondValue thirdValue = some result →
+      Evaluates environment initialStore (.ternary op first second third)
+        result finalStore
   | letE
       {environment : Environment}
       {initialStore bodyStore finalStore : Store}
@@ -306,6 +317,15 @@ theorem evaluation_deterministic
           rw [leftApplied] at rightApplied
           cases rightApplied
           exact ⟨rfl, storeEquality⟩
+  | ternary _ _ _ leftApplied firstIH secondIH thirdIH =>
+      cases rightEvaluation with
+      | ternary otherFirst otherSecond otherThird rightApplied =>
+          obtain ⟨rfl, rfl⟩ := firstIH otherFirst
+          obtain ⟨rfl, rfl⟩ := secondIH otherSecond
+          obtain ⟨rfl, storeEquality⟩ := thirdIH otherThird
+          rw [leftApplied] at rightApplied
+          cases rightApplied
+          exact ⟨rfl, storeEquality⟩
   | letE _ _ boundIH bodyIH =>
       cases rightEvaluation with
       | letE rightBound rightBody =>
@@ -368,6 +388,8 @@ theorem evaluation_store_length_monotone
         _ = _ := (Store.write?_preserves_length written).symm
   | binary _ _ _ leftIH rightIH =>
       exact Nat.le_trans leftIH rightIH
+  | ternary _ _ _ _ firstIH secondIH thirdIH =>
+      exact Nat.le_trans (Nat.le_trans firstIH secondIH) thirdIH
 
 /-! ## Cell-free compatibility -/
 
@@ -413,6 +435,9 @@ inductive CellFree : Expr → Prop where
       CellFree operand → CellFree (.unary op operand)
   | binary {op : BinaryOp} {left right : Expr} :
       CellFree left → CellFree right → CellFree (.binary op left right)
+  | ternary {op : TernaryOp} {first second third : Expr} :
+      CellFree first → CellFree second → CellFree third →
+      CellFree (.ternary op first second third)
   | letE {value body : Expr} :
       CellFree value → CellFree body → CellFree (.letE value body)
   | ifE {condition thenBranch elseBranch : Expr} :
@@ -506,6 +531,16 @@ private theorem binaryResult_storePassive
   clear applied left right
   cases op <;> cases result <;>
     simp [Value.type, BinaryOp.resultType] at resultType
+  all_goals constructor
+
+private theorem ternaryResult_storePassive
+    {op : TernaryOp} {first second third result : Value}
+    (applied : op.apply first second third = some result) :
+    StorePassiveValue result := by
+  have resultType := TernaryOp.apply_result_type applied
+  clear applied first second third
+  cases op <;> cases result <;>
+    simp [Value.type, TernaryOp.resultType] at resultType
   all_goals constructor
 
 /--
@@ -623,6 +658,13 @@ theorem evaluation_preserves_store_of_cellFree
           obtain ⟨rfl, _⟩ := leftIH leftFree environmentPassive
           obtain ⟨storeEq, _⟩ := rightIH rightFree environmentPassive
           exact ⟨storeEq, binaryResult_storePassive applied⟩
+  | ternary _ _ _ applied firstIH secondIH thirdIH =>
+      cases exprFree with
+      | ternary firstFree secondFree thirdFree =>
+          obtain ⟨rfl, _⟩ := firstIH firstFree environmentPassive
+          obtain ⟨rfl, _⟩ := secondIH secondFree environmentPassive
+          obtain ⟨storeEq, _⟩ := thirdIH thirdFree environmentPassive
+          exact ⟨storeEq, ternaryResult_storePassive applied⟩
   | letE _ _ valueIH bodyIH =>
       cases exprFree with
       | letE valueFree bodyFree =>

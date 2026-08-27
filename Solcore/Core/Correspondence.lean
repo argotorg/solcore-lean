@@ -344,6 +344,52 @@ theorem Evaluates.toStepsWithContinuation
           (leftPath.trans
             (rightEntryPath.trans
               (rightPath.trans applyPath)))⟩
+  | @ternary environment initialStore secondStore thirdStore finalStore op
+      firstExpr secondExpr thirdExpr firstValue secondValue thirdValue result
+      firstEvaluation secondEvaluation thirdEvaluation applied firstIH secondIH
+      thirdIH =>
+      obtain ⟨firstSteps, firstPath⟩ :=
+        firstIH
+          (.ternarySecond op secondExpr thirdExpr environment :: continuation)
+      obtain ⟨secondSteps, secondPath⟩ :=
+        secondIH
+          (.ternaryThird op firstValue thirdExpr environment :: continuation)
+      obtain ⟨thirdSteps, thirdPath⟩ :=
+        thirdIH (.ternaryApply op firstValue secondValue :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.ternary op firstExpr secondExpr thirdExpr) environment,
+            continuation, initialStore⟩
+          ⟨.eval firstExpr environment,
+            .ternarySecond op secondExpr thirdExpr environment :: continuation,
+            initialStore⟩ :=
+        .cons .enterTernary .refl
+      let secondEntryPath : Steps 1
+          ⟨.ret firstValue,
+            .ternarySecond op secondExpr thirdExpr environment :: continuation,
+            secondStore⟩
+          ⟨.eval secondExpr environment,
+            .ternaryThird op firstValue thirdExpr environment :: continuation,
+            secondStore⟩ :=
+        .cons .enterTernarySecond .refl
+      let thirdEntryPath : Steps 1
+          ⟨.ret secondValue,
+            .ternaryThird op firstValue thirdExpr environment :: continuation,
+            thirdStore⟩
+          ⟨.eval thirdExpr environment,
+            .ternaryApply op firstValue secondValue :: continuation, thirdStore⟩ :=
+        .cons .enterTernaryThird .refl
+      let applyPath : Steps 1
+          ⟨.ret thirdValue,
+            .ternaryApply op firstValue secondValue :: continuation, finalStore⟩
+          ⟨.ret result, continuation, finalStore⟩ :=
+        .cons (.applyTernary applied) .refl
+      exact ⟨_,
+        enterPath.trans
+          (firstPath.trans
+            (secondEntryPath.trans
+              (secondPath.trans
+                (thirdEntryPath.trans
+                  (thirdPath.trans applyPath)))))⟩
   | @letE environment initialStore bodyStore finalStore valueExpr body boundValue
       result valueEvaluation bodyEvaluation valueIH bodyIH =>
       obtain ⟨valueSteps, valuePath⟩ :=
@@ -875,6 +921,15 @@ theorem transition_reflects_denotation
       cases denotes with
       | ret continuation =>
           exact .ret (.binaryApply applied continuation)
+  | enterTernary =>
+      cases denotes with
+      | eval firstEvaluation continuation =>
+          cases continuation with
+          | ternarySecond secondEvaluation thirdEvaluation applied rest =>
+              exact .eval
+                (.ternary firstEvaluation secondEvaluation thirdEvaluation
+                  applied)
+                rest
   | enterTernarySecond =>
       cases denotes with
       | eval secondEvaluation continuation =>

@@ -81,6 +81,9 @@ mutual
     | .unary op operand => .unary op (operand.rename mapping)
     | .binary op left right =>
         .binary op (left.rename mapping) (right.rename mapping)
+    | .ternary op firstExpr secondExpr thirdExpr =>
+        .ternary op (firstExpr.rename mapping) (secondExpr.rename mapping)
+          (thirdExpr.rename mapping)
     | .letE value body =>
         .letE (value.rename mapping) (body.rename mapping.lift)
     | .ifE condition thenBranch elseBranch =>
@@ -119,6 +122,9 @@ mutual
     | .ifE scrutinee leftBranch rightBranch => by
         simp [Expr.rename, Expr.rename_id scrutinee, Expr.rename_id leftBranch,
           Expr.rename_id rightBranch]
+    | .ternary _ firstExpr secondExpr thirdExpr => by
+        simp [Expr.rename, Expr.rename_id firstExpr, Expr.rename_id secondExpr,
+          Expr.rename_id thirdExpr]
     | .matchData _ _ scrutinee branches => by
         simp [Expr.rename, Expr.rename_id scrutinee, Expr.renameList_id branches]
 
@@ -157,6 +163,9 @@ mutual
     | .ifE scrutinee leftBranch rightBranch, outer, inner => by
         simp [Expr.rename, Expr.rename_comp scrutinee,
           Expr.rename_comp leftBranch, Expr.rename_comp rightBranch]
+    | .ternary _ firstExpr secondExpr thirdExpr, outer, inner => by
+        simp [Expr.rename, Expr.rename_comp firstExpr, Expr.rename_comp secondExpr,
+          Expr.rename_comp thirdExpr]
     | .matchData _ _ scrutinee branches, outer, inner => by
         simp [Expr.rename, Expr.rename_comp scrutinee,
           Expr.renameList_comp branches]
@@ -206,6 +215,9 @@ mutual
     | .ifE scrutinee leftBranch rightBranch, cutoff => by
         simp [Expr.rename, Expr.weakenAt, Expr.rename_insertion scrutinee,
           Expr.rename_insertion leftBranch, Expr.rename_insertion rightBranch]
+    | .ternary _ firstExpr secondExpr thirdExpr, cutoff => by
+        simp [Expr.rename, Expr.weakenAt, Expr.rename_insertion firstExpr,
+          Expr.rename_insertion secondExpr, Expr.rename_insertion thirdExpr]
     | .matchData _ _ scrutinee branches, cutoff => by
         simp [Expr.rename, Expr.weakenAt, Expr.rename_insertion scrutinee,
           Expr.renameList_insertion branches]

@@ -303,6 +303,9 @@ def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
   | .unary op operand => .unary op (operand.weakenAt cutoff)
   | .binary op left right =>
       .binary op (left.weakenAt cutoff) (right.weakenAt cutoff)
+  | .ternary op firstExpr secondExpr thirdExpr =>
+      .ternary op (firstExpr.weakenAt cutoff) (secondExpr.weakenAt cutoff)
+        (thirdExpr.weakenAt cutoff)
   | .letE value body =>
       .letE (value.weakenAt cutoff) (body.weakenAt (cutoff + 1))
   | .ifE condition thenBranch elseBranch =>

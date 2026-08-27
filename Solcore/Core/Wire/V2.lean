@@ -219,6 +219,7 @@ def ofCore? : Solcore.Core.Expr → Option Expr
       let left ← ofCore? left
       let right ← ofCore? right
       some (.binary op left right)
+  | .ternary _ _ _ _ => none
   | .letE initializer body => do
       let initializer ← ofCore? initializer
       let body ← ofCore? body

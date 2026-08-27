@@ -91,6 +91,10 @@ theorem advance_next_iff {state next : State} :
             simp [advance] at advanced
             cases advanced
             exact .enterBinary
+        | ternary op firstExpr secondExpr thirdExpr =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterTernary
         | letE value body =>
             simp [advance] at advanced
             cases advanced
@@ -282,7 +286,7 @@ theorem advance_done_iff {state : State} {value : Value} :
         cases expr with
         | unit | bool | word | pair | first | second | inLeft | inRight | caseE |
             newCell | loadCell | storeCell | construct | matchData | lambda |
-            apply | unary | binary | letE | ifE =>
+            apply | unary | binary | ternary | letE | ifE =>
             simp [advance] at advanced
         | var index =>
             cases lookup : environment[index]? <;> simp [advance, lookup] at advanced

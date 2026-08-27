@@ -433,6 +433,7 @@ mutual
                 else
                   { path := leftPath,
                     data := .primitiveOperandTypeMismatch op.leftType leftType }
+        | .ternary _ _ _ _ => { path, data := .inferenceFailure }
         | .letE value body =>
             let valuePath := path.child .letValue
             match infer? context value definitions with
@@ -516,6 +517,9 @@ mutual
         diagnosticFuelExpr scrutinee + diagnosticFuelList branches + 1
     | .binary _ left right =>
         diagnosticFuelExpr left + diagnosticFuelExpr right + 1
+    | .ternary _ firstExpr secondExpr thirdExpr =>
+        diagnosticFuelExpr firstExpr + diagnosticFuelExpr secondExpr +
+          diagnosticFuelExpr thirdExpr + 1
 
   private def diagnosticFuelList : List Expr → Nat
     | [] => 1

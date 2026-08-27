@@ -329,6 +329,13 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.ret rightValue, .binaryApply op leftValue :: continuation, store⟩
         ⟨.ret result, continuation, store⟩
+  | enterTernary
+      {environment : Environment} {op : TernaryOp} {first second third : Expr}
+      {continuation : List Frame} {store : Store} :
+      Transition
+        ⟨.eval (.ternary op first second third) environment, continuation, store⟩
+        ⟨.eval first environment,
+          .ternarySecond op second third environment :: continuation, store⟩
   | enterTernarySecond
       {environment : Environment} {op : TernaryOp} {second third : Expr}
       {firstValue : Value} {continuation : List Frame} {store : Store} :
@@ -471,6 +478,10 @@ def advance (state : State) : AdvanceResult :=
       | .binary op left right =>
           .next ⟨.eval left environment,
             .binaryRight op right environment :: state.continuation, state.store⟩
+      | .ternary op firstExpr secondExpr thirdExpr =>
+          .next ⟨.eval firstExpr environment,
+            .ternarySecond op secondExpr thirdExpr environment :: state.continuation,
+            state.store⟩
       | .letE value body =>
           .next ⟨.eval value environment,
             .letBody body environment :: state.continuation, state.store⟩

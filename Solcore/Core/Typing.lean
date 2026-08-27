@@ -280,6 +280,7 @@ mutual
             none
         else
           none
+    | .ternary _ _ _ _ => none
     | .letE value body =>
         match inferWithDefinitions? definitions context value with
         | some valueType =>
@@ -721,6 +722,7 @@ theorem infer_sound
           exact .binary (leftIH leftInferred) (rightIH rightInferred)
         · simp [inferWithDefinitions?, leftInferred, rightInferred] at inferred
       · simp [inferWithDefinitions?, leftInferred] at inferred
+  | ternary => simp [inferWithDefinitions?] at inferred
   | letE value body valueIH bodyIH =>
       cases valueInferred : inferWithDefinitions? definitions context value with
       | none => simp [inferWithDefinitions?, valueInferred] at inferred

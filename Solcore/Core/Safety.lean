@@ -934,6 +934,7 @@ theorem evaluation_preserves_type
             resultStoreTyping,
             binary_apply_result_has_runtime_type applied
               (definitions := definitions)⟩
+  | ternary => cases typing
   | letE _ _ boundIH bodyIH =>
       cases typing with
       | letE boundTyping bodyTyping =>
@@ -2490,6 +2491,9 @@ theorem transition_preserves_state_type
                   exact .ret storeTyping
                     (binary_apply_result_has_runtime_type
                       (definitions := definitions) applied) restTyping
+  | enterTernary =>
+      cases stateTyping with
+      | eval _ _ exprTyping _ => cases exprTyping
   | enterTernarySecond =>
       cases stateTyping with
       | ret storeTyping firstTyping continuationTyping =>

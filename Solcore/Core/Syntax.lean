@@ -223,6 +223,7 @@ inductive Expr where
       (branches : List Expr)
   | unary (op : UnaryOp) (operand : Expr)
   | binary (op : BinaryOp) (left : Expr) (right : Expr)
+  | ternary (op : TernaryOp) (first second third : Expr)
   | letE (value : Expr) (body : Expr)
   | ifE (condition : Expr) (thenBranch : Expr) (elseBranch : Expr)
   deriving Repr
@@ -274,6 +275,12 @@ mutual
         decide (leftOp = rightOp) &&
           leftLeft.equal rightLeft &&
           leftRight.equal rightRight
+    | .ternary leftOp leftFirst leftSecond leftThird,
+        .ternary rightOp rightFirst rightSecond rightThird =>
+        decide (leftOp = rightOp) &&
+          leftFirst.equal rightFirst &&
+          leftSecond.equal rightSecond &&
+          leftThird.equal rightThird
     | _, _ => false
 
   def Expr.listEqual : List Expr → List Expr → Bool

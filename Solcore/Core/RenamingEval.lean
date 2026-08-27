@@ -25,6 +25,22 @@ private theorem BinaryOp.apply_related
     simp [BinaryOp.apply] at applied ⊢ <;>
     cases applied <;> first | exact .bool _ | exact .word _
 
+private theorem TernaryOp.apply_related
+    {op : TernaryOp}
+    {firstValue firstValue' secondValue secondValue' thirdValue thirdValue'
+      result : Value}
+    (firstValues : ValuesRelated firstValue firstValue')
+    (secondValues : ValuesRelated secondValue secondValue')
+    (thirdValues : ValuesRelated thirdValue thirdValue')
+    (applied : op.apply firstValue secondValue thirdValue = some result) :
+    ∃ result',
+      op.apply firstValue' secondValue' thirdValue' = some result' ∧
+      ValuesRelated result result' := by
+  cases op <;> cases firstValues <;> cases secondValues <;>
+    cases thirdValues <;>
+    simp [TernaryOp.apply] at applied ⊢ <;>
+    cases applied <;> exact .word _
+
 private theorem Expr.renameList_lookup
     {branches : List Expr} {index : Nat} {branch : Expr}
     (found : branches[index]? = some branch)
@@ -196,6 +212,18 @@ theorem Evaluates.rename
         BinaryOp.apply_related leftRelated rightRelated applied
       exact ⟨result', finalStore',
         .binary leftEvaluation rightEvaluation applied',
+        resultRelated, finalRelated⟩
+  | ternary _ _ _ applied firstIH secondIH thirdIH =>
+      obtain ⟨first', secondStore', firstEvaluation, firstRelated,
+        secondStores⟩ := firstIH environments stores
+      obtain ⟨second', thirdStore', secondEvaluation, secondRelated,
+        thirdStores⟩ := secondIH environments secondStores
+      obtain ⟨third', finalStore', thirdEvaluation, thirdRelated,
+        finalRelated⟩ := thirdIH environments thirdStores
+      obtain ⟨result', applied', resultRelated⟩ :=
+        TernaryOp.apply_related firstRelated secondRelated thirdRelated applied
+      exact ⟨result', finalStore',
+        .ternary firstEvaluation secondEvaluation thirdEvaluation applied',
         resultRelated, finalRelated⟩
   | letE _ _ valueIH bodyIH =>
       obtain ⟨value', bodyStore', valueEvaluation, valueRelated,
