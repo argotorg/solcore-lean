@@ -8,6 +8,7 @@ import Solcore.Core.RenamingRuntime
 import Solcore.Core.RenamingEval
 import Solcore.Core.RenamingSafety
 import Solcore.Core.RenamingInsertion
+import Solcore.Core.DerivedComparisons
 import Solcore.Core.Conversions
 import Solcore.Core.ComparisonFlags
 import Solcore.Core.ShortCircuit

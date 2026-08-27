@@ -38,6 +38,11 @@ def insertion (cutoff : Nat) : Renaming :=
       by_cases shifted : cutoff ≤ index <;>
         simp [lift, insertion, Nat.succ_le_succ_iff, shifted]
 
+@[simp] theorem lift_comp_insertion_zero (mapping : Renaming) :
+    comp mapping.lift (insertion 0) = comp (insertion 0) mapping := by
+  funext index
+  simp [comp, lift, insertion]
+
 end Renaming
 
 mutual
