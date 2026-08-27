@@ -16,6 +16,7 @@ import Solcore.Test.CoreConversions
 import Solcore.Test.CoreFunctions
 import Solcore.Test.CoreNamedData
 import Solcore.Test.CoreRenaming
+import Solcore.Test.CoreRenamingRuntime
 import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSums
 import Solcore.Test.SurfaceMultiCertifiedFrontend
@@ -4799,6 +4800,7 @@ def run : IO Unit := do
   testCoreConversions
   testCoreNamedData
   testCoreRenaming
+  testCoreRenamingRuntime
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile
