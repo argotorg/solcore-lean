@@ -40,6 +40,8 @@ arbitrary renaming-law backfill for eight older derived builders.
 the focused interface for the existing direct unary primitives.
 [ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md) completes the
 focused interface for totalized unsigned division and modulo.
+[ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md) completes the focused
+interface for the existing bounded logical shifts.
 
 ## Implementation status
 
@@ -64,6 +66,7 @@ focused interface for totalized unsigned division and modulo.
 | Internal derived-builder arbitrary renaming laws | Complete | Complete | Not published |
 | Internal direct unary primitive interface | Complete | Complete | Not published |
 | Internal totalized unsigned division and modulo interface | Complete | Complete | Not published |
+| Internal bounded logical shift interface | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -385,15 +388,16 @@ operand effects and final store, exact 4/5 and 28/29 fuel, Wire v1 rejection,
 and exact Wire v2 projection and round trips. No alias, generic API duplicate,
 tag, meaning, or byte changes. The next feature is selected by a separate ADR.
 
-## Active Core vNext bounded logical shift slice
+## Completed Core vNext bounded logical shift slice
 
 [ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md) keeps raw `wordShl`
-and `wordShr`, with value on the left and shift amount on the right. It targets
-fourteen named Word, application, and store-threaded evaluation theorems for
-zero, below-256, and at-least-256 shifts. Required regressions fix operand order,
-faults, effects, final stores, exact fuel, Wire v1 rejection, and exact Wire v2
-projection. No alias, tag, schema, Oracle, source, signed, or gas behavior is
-added. Implementation is in progress; additional primitives remain planned.
+and `wordShr`, with value on the left and shift amount on the right. Six Word,
+two application, and six evaluation theorems cover zero, below-256, and
+at-least-256 shifts. Tests cover values 0/1/maximum, amounts 0/1/255/256/maximum,
+fault and effect order, final stores, exact 4/5 and 28/29 fuel, Wire v1
+rejection, and exact Wire v2 and JSON round trips. The P0-P3 audit found no
+issue. No alias, tag, schema, Oracle, source, signed, or gas behavior changed.
+The next feature is selected by a separate ADR.
 
 ## Meaning of completion
 

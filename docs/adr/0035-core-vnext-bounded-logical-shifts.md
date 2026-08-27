@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: seventeenth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -90,3 +90,19 @@ Oracle versions retain their exact meanings.
 Callers can reason directly about ordinary, zero, and oversized logical shifts
 without unpacking the generic binary rule. Additional conversions and
 primitives remain planned as separate closed decisions.
+
+## Implementation result
+
+The implementation provides all fourteen required theorems: six Word boundary
+and unfolding results, two exact primitive-application results, and six
+store-threaded evaluation results. Tests cover values zero, one, and maximum;
+shift amounts zero, one, 255, 256, and maximum; and the fixed value-left,
+shift-right operand order.
+
+Raw faults, left-to-right effects, and the final store are checked directly.
+Literal expressions finish exactly at fuel 5 after failing at 4; two effectful
+operands finish at 29 after failing at 28. Both operators are rejected by Wire
+v1 and have exact Wire v2 projection, Core round trips, and JSON round trips.
+The final independent audit found no P0-P3 issue. No alias, tag, generic proof,
+schema, Oracle behavior, or other boundary changed. The next feature is chosen
+by a separate ADR.

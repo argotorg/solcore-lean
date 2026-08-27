@@ -42,12 +42,13 @@ Its named expansion, typing, inference, store-preserving evaluations, weakening,
 effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
 Additional conversions and primitives remain planned.
-The active seventeenth slice,
+The completed seventeenth slice,
 [ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md), completes focused
 proof and regression interfaces for the existing raw `wordShl` and `wordShr`
-operators. Core keeps value before shift, uses zero for amounts of 256 or more,
-and adds no alias, tag, source rule, or Wire change. Implementation is in
-progress; further primitives remain planned.
+operators. Its fourteen theorems and boundary, order, effect, fuel, Wire, and
+JSON tests pass. Core keeps value before shift, uses zero for amounts of 256 or
+more, and adds no alias, tag, source rule, or Wire change. The next feature is
+selected by a separate ADR.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
