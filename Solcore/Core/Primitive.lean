@@ -331,6 +331,12 @@ def wordLtFlag (left right : Expr) : Expr :=
 def wordSltFlag (left right : Expr) : Expr :=
   boolToWord (wordSlt left right)
 
+def wordSleFlag (left right : Expr) : Expr :=
+  boolToWord (wordSle left right)
+
+def wordSgeFlag (left right : Expr) : Expr :=
+  boolToWord (wordSge left right)
+
 def wordLeFlag (left right : Expr) : Expr :=
   boolToWord (wordLe left right)
 
