@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-sixth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -34,9 +34,10 @@ The result retains the right operand's final store.
 Implementing `wordSlt` by syntactically swapping `left` and `right` is
 forbidden. It would change observable fault order, effects, stores, and fuel.
 
-## Required proof interface
+## Implemented proof interface
 
-Publish exactly ten focused theorems:
+The implementation publishes exactly ten focused theorems: five static laws
+and five evaluation laws.
 
 - `Expr.wordSlt_expansion`;
 - `HasType.wordSlt`;
@@ -52,7 +53,7 @@ the weakened right expression. It exposes the source intermediate and final
 stores. Do not add `Word.signedLt`, a new operation tag, a primitive application
 theorem, or duplicate generic typing and Safety APIs.
 
-## Required tests
+## Implemented tests
 
 Focused regressions cover:
 
@@ -79,3 +80,12 @@ Word-valued signed flags remain a separate future decision.
 
 Internal Core gains signed less-than for arbitrary effectful expressions while
 preserving source order. The signed comparison basis stays minimal.
+
+The nested bindings leave variable zero naming the computed right value and
+variable one naming the computed left value. Value and type boundaries,
+underlying invalid-operand faults, ordered faults, effects, final stores, and
+exact literal 10/11 and effectful 34/35 fuel boundaries are executable
+regressions. Frozen Wire v1/v2 reject the builder and its handwritten
+expansion, while Wire v2 also rejects the underlying `wordSgt` operation.
+Public formats and bytes are unchanged. The independent audit found no P0-P3
+issue.

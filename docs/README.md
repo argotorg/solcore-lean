@@ -113,11 +113,13 @@ separate, and frozen public Wire formats reject the new internal operation.
 All eleven focused theorems and value, type, ordered-fault, effect, store,
 exact-fuel, and Wire-rejection tests are complete. Public formats are unchanged;
 the independent audit found no P0-P3 issue.
-The active twenty-sixth slice,
+The completed twenty-sixth slice,
 [ADR-0044](adr/0044-core-vnext-derived-signed-word-less-than.md), derives
 boolean signed less-than through two bindings. Source left remains before source
 right; only their bound values are reordered for signed greater-than. The exact
-ten-theorem and regression scope adds no primitive or public Wire tag.
+five static and five evaluation theorems and the value/type, fault-order,
+effect/store, fuel, and frozen-Wire regressions add no primitive or public Wire
+tag. Public behavior is unchanged; the independent audit found no P0-P3 issue.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -236,7 +238,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0041 completes internal 256-bit arithmetic right shift.
 - ADR-0042 completes internal modular word exponentiation.
 - ADR-0043 completes internal boolean signed word greater-than.
-- ADR-0044 accepts effect-safe derived signed word less-than.
+- ADR-0044 completes effect-safe derived signed word less-than.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
