@@ -205,6 +205,18 @@ def wordLe (left right : Expr) : Expr :=
 def wordGe (left right : Expr) : Expr :=
   .unary .boolNot (wordGtWithSwappedValues left right)
 
+def wordNeFlag (left right : Expr) : Expr :=
+  boolToWord (wordNe left right)
+
+def wordLtFlag (left right : Expr) : Expr :=
+  boolToWord (wordLt left right)
+
+def wordLeFlag (left right : Expr) : Expr :=
+  boolToWord (wordLe left right)
+
+def wordGeFlag (left right : Expr) : Expr :=
+  boolToWord (wordGe left right)
+
 end Expr
 
 end Solcore.Core
