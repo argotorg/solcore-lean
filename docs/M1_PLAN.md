@@ -30,11 +30,12 @@ These results remain regression obligations for every extension.
 | 4 | First-order local cells | Complete | Introduces explicit local state after pure values are stable; source assignment elaborates later |
 | 5 | Named algebraic data and direct matching | Complete | Adds program-local constructor identity without source pattern syntax |
 | 6 | Boolean and word conversions | Complete | Derives total conversions without a new Core tag |
-| 7 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 8 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 9 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 10 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 11 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 7 | Word zero test | Active | Derives a canonical word result from existing expressions |
+| 8 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 9 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 10 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 11 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 12 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -185,6 +186,15 @@ This slice is independent of ABI decoding. Total nonzero truthiness does not
 validate a canonical ABI boolean: strict zero-or-one admissibility, byte layout,
 and rejection behavior remain a later ABI decision. No wire schema, Oracle
 operation, profile, capability, or source spelling changes here.
+
+## Active Core vNext slice: word zero test
+
+[ADR-0025](adr/0025-core-vnext-word-is-zero.md) fixes `wordIsZero : word -> word`.
+It maps zero to word one and every nonzero word to word zero by expanding to
+`boolToWord(wordEq(value, word(0)))`. The operand appears once, and no new Core,
+CEK, wire, or Oracle tag is introduced. Wire v1 rejects the required primitive
+form and wire v2 projects the existing expansion. This operation remains
+distinct from `wordToBool` truthiness and from ABI boolean decoding.
 
 ## State and contracts
 

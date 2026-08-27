@@ -26,7 +26,9 @@ ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
 complete internal slices. The derived boolean and word conversions from
 [ADR-0024](adr/0024-core-vnext-bool-word-conversions.md) are complete as ordinary
-existing Core expressions. These slices add no source spelling for mutable
+existing Core expressions. [ADR-0025](adr/0025-core-vnext-word-is-zero.md) is
+the active slice: it derives a word-valued zero test from those expressions.
+These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
 roadmap through separate semantic decisions.
@@ -65,6 +67,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0022 defines first-order local cells and their explicit local store.
 - ADR-0023 defines named algebraic data and direct normalized matching.
 - ADR-0024 defines derived boolean and word conversions.
+- ADR-0025 defines the derived word-valued zero test.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

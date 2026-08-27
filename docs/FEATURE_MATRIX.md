@@ -40,6 +40,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Named algebraic data | ADR-0023 Accepted | Complete | whole-table validity, nominal constructor typing, recursive and mutually recursive finite-value safety, totality, sufficient fuel, diagnostics, and old-wire rejection complete | None |
 | Direct normalized matching | ADR-0023 Accepted | Complete | constructor-order exhaustiveness, payload binding, selected-branch store threading, CEK/big-step correspondence, safety, exact fuel, and diagnostics complete | None |
 | Boolean/word conversions | ADR-0024 Accepted | Complete | derived-expression typing and inference, exact values, exactly-once store-threaded evaluation, weakening, and version-boundary tests complete | None |
+| Word zero test | ADR-0025 Accepted | Active | derived word-to-word expansion, typing, evaluation, effects, fuel, and version-boundary coverage in progress | None |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 
@@ -97,4 +98,5 @@ This includes the cell forms accepted by ADR-0022 and every named-data form or
 nonempty definition table accepted by ADR-0023. ADR-0024 adds no constructor:
 its conversions expand into existing expressions, so each projection treats
 them exactly like the corresponding handwritten expansion. Publication of any
-new tag still requires a new additive version.
+new tag still requires a new additive version. ADR-0025 likewise adds no tag:
+wire v1 rejects its primitive expansion and wire v2 projects existing forms.

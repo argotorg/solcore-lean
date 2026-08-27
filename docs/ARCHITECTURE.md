@@ -90,6 +90,13 @@ This conversion layer is not an ABI layer. Total nonzero truthiness and strict
 ABI zero-or-one admissibility are separate rules. ABI byte layout, validation,
 decoding, and rejection remain in the future contract boundary.
 
+The active `wordIsZero` slice follows the same derived-expression boundary. It
+has type `word -> word`, returning word one for zero and word zero for every
+nonzero input, and expands to existing equality and `boolToWord` expressions.
+It is distinct from `wordToBool` truthiness and from ABI decoding. No new Core,
+CEK, wire, or Oracle tag is added: wire v1 rejects the required primitive form,
+while wire v2 projects the ordinary existing expansion.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

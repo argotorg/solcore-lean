@@ -23,7 +23,8 @@ program-local named algebraic data and normalized constructor matching accepted
 by ADR-0023 are complete internal slices. Core vNext as a whole remains the
 active development program. The derived `boolToWord` and `wordToBool`
 conversions accepted by ADR-0024 are also complete without adding a new Core
-expression form.
+expression form. ADR-0025 is the active slice and derives `wordIsZero` without
+adding one either.
 
 ## Implementation status
 
@@ -38,6 +39,7 @@ expression form.
 | Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
+| Internal word zero test | In progress | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -77,7 +79,7 @@ language. The following remain:
 - source-level mutable declarations, assignment syntax, and their elaboration;
 - source-level data declarations, pattern syntax, and elaboration into the
   completed internal named-data Core;
-- additional conversions and primitives beyond the completed boolean/word pair;
+- additional conversions and primitives beyond the active word-zero slice;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
 - contract entry and call semantics;
@@ -227,6 +229,16 @@ behavior, store threading, and weakening through the expansions. Focused tests
 cover effects, exact fuel, type errors, word boundaries, and unchanged wire
 projection. The full test, warning, kernel-trust, axiom, and whitespace audits
 pass. Neither frozen wire schema nor any Oracle profile or capability changes.
+
+## Active Core vNext word zero-test slice
+
+[ADR-0025](adr/0025-core-vnext-word-is-zero.md) fixes `wordIsZero : word -> word`:
+zero maps to word one and every nonzero word maps to word zero. The builder
+expands into existing `wordEq` and `boolToWord` expressions, so it adds no Core
+tag and evaluates its operand exactly once. Wire v1 continues to reject the
+needed primitive expansion, while wire v2 projects it through existing forms.
+This word-valued predicate is separate from `wordToBool` truthiness and from
+future strict ABI boolean decoding. Implementation and proof are in progress.
 
 ## Meaning of completion
 
