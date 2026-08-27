@@ -49,6 +49,7 @@ import Solcore.Test.CoreSignedComparison
 import Solcore.Test.CoreSignedComparisonFlags
 import Solcore.Test.CoreSignedComparisonFlagWire
 import Solcore.Test.CoreSignedComparisonWire
+import Solcore.Test.CoreSignedDivision
 import Solcore.Test.CoreSignedDivisionWire
 import Solcore.Test.CoreSums
 import Solcore.Test.CoreUnaryPrimitiveWire
@@ -4868,6 +4869,7 @@ def run : IO Unit := do
   testCoreSignedComparisonFlags
   testCoreSignedComparisonFlagWire
   testCoreSignedComparisonWire
+  testCoreSignedDivision
   testCoreSignedDivisionWire
   testCoreUnaryPrimitiveWire
   testCoreUnaryPrimitives
