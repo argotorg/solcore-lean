@@ -57,8 +57,9 @@ feature is selected separately.
 [ADR-0040](adr/0040-core-vnext-word-byte-selection.md) completes internal
 big-endian 256-bit word byte selection. Core vNext remains active; the next
 feature is selected separately.
-[ADR-0041](adr/0041-core-vnext-arithmetic-right-shift.md) makes internal
-256-bit arithmetic right shift the active Core vNext slice.
+[ADR-0041](adr/0041-core-vnext-arithmetic-right-shift.md) completes internal
+256-bit arithmetic right shift. Core vNext remains active; the next feature is
+selected separately.
 
 ## Implementation status
 
@@ -89,7 +90,7 @@ feature is selected separately.
 | Internal direct word comparison interface | Complete | Complete | Not published |
 | Internal word leading-zero count | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal word byte selection | Complete | Complete | Explicitly excluded from Wire v1/v2 |
-| Internal arithmetic right shift | In progress | In progress | Explicitly excluded from Wire v1/v2 |
+| Internal arithmetic right shift | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -484,18 +485,19 @@ and ordered faults, both effects and final store, exact 4/5 and 28/29 fuel, and
 frozen Wire v1/v2 plus v2-operation rejection. Public Oracle, schema, and JSON
 formats remain unchanged. The independent audit found no P0-P3 issue.
 
-## Active Core vNext arithmetic-right-shift slice
+## Completed Core vNext arithmetic-right-shift slice
 
 [ADR-0041](adr/0041-core-vnext-arithmetic-right-shift.md) adds internal
 `BinaryOp.wordSar` and `Word.shiftArithmeticRight(value, shift)`. Core evaluates
-value then shift exactly once. The exact eleven-theorem interface is five Word
-laws, one application equation, and five store-threaded evaluations. Tests cover
+value then shift exactly once. The exact eleven-theorem interface—five Word
+laws, one application equation, and five store-threaded evaluations—is complete.
+Tests cover
 positive, high-bit, maximum, negative, and oversized shifts; types; raw and
 ordered faults; both effects and final store; exact 4/5 and 28/29 fuel; and
 frozen Wire v1/v2 plus v2-operation rejection. Future source `(shift, value)`
 elaboration must bind source-order evaluation before reordering bound values.
-Public Oracle, schema, and JSON formats remain unchanged. Implementation is in
-progress.
+Public Oracle, schema, and JSON formats remain unchanged. The independent audit
+found no P0-P3 issue.
 
 ## Meaning of completion
 

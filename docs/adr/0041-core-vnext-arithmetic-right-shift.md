@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-third internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -92,3 +92,28 @@ and publication boundaries remain unchanged.
 
 Internal Core gains total arithmetic right shift with explicit sign, range,
 operand-order, and effect semantics. Further primitives require separate ADRs.
+
+## Implementation result
+
+Internal Core now has `BinaryOp.wordSar` and total
+`Word.shiftArithmeticRight(value, shift)`. All eleven focused theorems are
+implemented: five Word laws, one exact application equation, and five
+store-threaded general/branch evaluations covering both signs and both shift
+ranges.
+
+Compile-time and runtime tests cover positive `4 >> 1`, high-bit shifts at
+0/1/255/256, maximum with small and maximum shifts, two's-complement `-2` and
+`-3`, and oversized positive shifts. They also cover Word result typing and
+wrong result/value/shift types, raw invalid operands on both sides, ordered
+value/shift faults, and two allocating, writing operands evaluated exactly once
+with the final store. Literal evaluation has the exact 4/5 fuel boundary and
+effectful evaluation the exact 28/29 boundary.
+
+Frozen Wire v1/v2 expression projection and the Wire v2 `BinaryOp` conversion
+reject `wordSar`; no Core or JSON round trip is introduced. Raw Core remains
+value-left/shift-right. The future source `(shift, value)` boundary remains a
+binding-before-reordering requirement. The implementation and focused
+semantic/Wire validation are complete. The independent audit found no P0-P3
+issue, no source trust escape hatch, and only the repository-approved Lean
+foundational dependencies. Public Wire, Oracle, schemas, metadata, versions,
+encodings, and golden streams remain unchanged.

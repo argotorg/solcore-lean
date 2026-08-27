@@ -46,7 +46,7 @@ These results remain regression obligations for every extension.
 | 20 | Direct word comparisons | Complete | Completes focused APIs for existing wordEq and wordGt |
 | 21 | Word leading-zero count | Complete | Adds an internal-only total unary wordClz primitive |
 | 22 | Word byte selection | Complete | Adds internal big-endian byte selection with index-left/value-right order |
-| 23 | Arithmetic right shift | Active | Adds internal two's-complement wordSar with value-left/shift-right order |
+| 23 | Arithmetic right shift | Complete | Adds internal two's-complement wordSar with value-left/shift-right order |
 | 24 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
 | 25 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 26 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -393,16 +393,18 @@ operation conversion pass. No public Oracle, schema, JSON, source, ABI, opcode,
 or gas rule changed. The independent audit found no P0-P3 issue; the next
 feature is selected by a separate ADR.
 
-## Active Core vNext slice: arithmetic right shift
+## Completed Core vNext slice: arithmetic right shift
 
 [ADR-0041](adr/0041-core-vnext-arithmetic-right-shift.md) adds internal
 `BinaryOp.wordSar` and `Word.shiftArithmeticRight(value, shift)`. Core evaluates
 value then shift exactly once and preserves the final store. Five Word laws,
-one application equation, and five store-threaded evaluations form the exact
+one application equation, and five store-threaded evaluations complete the exact
 eleven-theorem interface. Positive/negative and bounded/oversized results,
-types, ordered faults, both effects, exact fuel, and frozen Wire rejection are
-required. A future source `(shift, value)` elaborator must bind effects in source
-order before reordering bound values. Public formats remain unchanged.
+types, raw and ordered faults, both effects, exact fuel, and frozen Wire plus
+v2-operation rejection pass. A future source `(shift, value)` elaborator must
+bind effects in source order before reordering bound values. Public formats
+remain unchanged. The independent audit found no P0-P3 issue; the next feature
+is a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
