@@ -90,6 +90,10 @@ private def testValuesTypesAndLiteralFuel : IO Unit := do
       (.binary .wordDiv (.word zero) (.word zero)), .word zero),
     ("zero mod zero", wordProgram
       (.binary .wordMod (.word zero) (.word zero)), .word zero),
+    ("one div maximum", wordProgram
+      (.binary .wordDiv (.word one) (.word maximum)), .word zero),
+    ("one mod maximum", wordProgram
+      (.binary .wordMod (.word one) (.word maximum)), .word one),
     ("maximum div one", wordProgram
       (.binary .wordDiv (.word maximum) (.word one)), .word maximum),
     ("maximum mod one", wordProgram
