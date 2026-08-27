@@ -375,8 +375,9 @@ no ABI padding, source conversion, state, or published observation.
 
 ADR-0055 connects the two completed Address representations without adding a
 new codec. Canonical 40-digit text equals the text of exact 20-byte encoding,
-and both decoder paths agree for arbitrary input text. This active proof-only
-slice changes no ABI, state, or publication boundary.
+and both decoder paths agree for arbitrary input text. This proof-only
+layer is complete without a public executable API and changes no ABI, state, or
+publication boundary. Its independent audit found no P0-P3 issue.
 
 ### Observation
 

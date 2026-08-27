@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: fifth internal contract-runtime foundation slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -91,6 +91,24 @@ Keep every commit below 300 changed lines and leave the tree green:
 
 The helper stage adds no public executable API or focused law. It isolates the
 radix-regrouping proof needed to connect the independently implemented codecs.
+
+## Completion evidence
+
+The completed proof-only layer adds no public executable API. Fifteen private
+helper theorems establish the radix regrouping and canonicality boundary, while
+exactly four public theorems expose the representation-coherence contract.
+Exactly eight runtime assertions cover the required canonical address values,
+independent 19-, 20-, and 21-byte inputs, and canonical, malformed, uppercase,
+odd-width, and wrong-width text.
+
+The staged implementation is recorded by commits `fe06803` (decision),
+`59b44cf` (private coherence kernel), `e519ac8` (public laws), and `e6e43ba`
+(runtime assertions). Every commit remains below 300 changed lines.
+
+All four public laws report exactly `propext`, `Classical.choice`, and
+`Quot.sound`. There are no custom axioms or unchecked declarations. Focused and
+full builds and tests, trust-zero, semantic-kernel, and metadata checks pass.
+The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions
 

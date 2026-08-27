@@ -106,9 +106,10 @@ slice. Two definitions, exactly six laws, and 10 runtime assertions cover an
 exact 20-byte big-endian representation and rejection of every other width,
 with no ABI, state, or publication commitment. Its independent audit found no
 P0-P3 issue.
-[ADR-0055](adr/0055-address-representation-coherence.md) accepts the active
-proof-only Address coherence slice. It adds no executable API and will prove
-that canonical text and exact 20-byte decoding agree for arbitrary input.
+[ADR-0055](adr/0055-address-representation-coherence.md) completes the
+proof-only Address coherence slice. It adds no public executable API; 15
+private helpers and exactly four public laws prove that canonical text and
+exact 20-byte decoding agree for arbitrary input.
 
 ## Implementation status
 
@@ -150,7 +151,7 @@ that canonical text and exact 20-byte decoding agree for arbitrary input.
 | Internal contract frame outcomes | Complete | Complete | Not published |
 | Strict address and word bridge | Complete | Complete | Not published |
 | Strict 20-byte address representation | Complete | Complete | Not published |
-| Address text and byte coherence | Active | In progress | Not published |
+| Address text and byte coherence | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -745,18 +746,21 @@ and full builds and tests, trust-zero, semantic-kernel, metadata,
 document-link, and diff checks pass. The independent audit found no P0-P3
 issue.
 
-## Active Address representation coherence slice
+## Completed Address representation coherence slice
 
 [ADR-0055](adr/0055-address-representation-coherence.md) connects the completed
 Address text and exact 20-byte codecs without adding an executable API. The
-planned exact four laws cover canonical encoding equality, both encoded-input
+exact four laws cover canonical encoding equality, both encoded-input
 decoder boundaries, and complete arbitrary-text decoder-bind coherence.
 Exactly eight runtime assertions cover zero, one, middle, maximum, 19/20/21
 bytes, and malformed or noncanonical text.
 
-The implementation adds no custom axiom or unchecked declaration; standard
-Lean dependencies will be audited and recorded. ABI behavior, source casts,
-contract state, EVM rules, and every public format remain unchanged.
+Fifteen private helper theorems support the public boundary. All four public
+laws report `propext`, `Classical.choice`, and `Quot.sound`; there is no custom
+axiom or unchecked declaration. Trust-zero, focused and full builds and tests,
+semantic-kernel, and metadata checks pass. ABI behavior, source casts, contract
+state, EVM rules, and every public format remain unchanged. The independent
+audit found no P0-P3 issue.
 
 ## Meaning of completion
 
