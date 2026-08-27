@@ -18,6 +18,7 @@ import Solcore.Core.UnaryPrimitives
 import Solcore.Core.CountLeadingZeros
 import Solcore.Core.ByteSelection
 import Solcore.Core.ArithmeticShift
+import Solcore.Core.ModularExponentiation
 import Solcore.Core.UnsignedDivision
 import Solcore.Core.LogicalShifts
 import Solcore.Core.ModularArithmetic
