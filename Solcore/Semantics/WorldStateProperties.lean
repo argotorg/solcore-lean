@@ -1,5 +1,4 @@
 import Solcore.Semantics.WorldState
-import Std.Data.ExtTreeMap.Lemmas
 
 set_option autoImplicit false
 
@@ -7,7 +6,7 @@ namespace Solcore.Semantics
 
 theorem WorldState.account?_empty (address : Address) :
     WorldState.empty.account? address = none := by
-  simp [WorldState.empty, WorldState.account?]
+  rfl
 
 theorem WorldState.account?_putAccount_same
     (state : WorldState)
@@ -23,19 +22,15 @@ theorem WorldState.account?_putAccount_other
     (different : other ≠ address) :
     (state.putAccount address account).account? other =
       state.account? other := by
-  have address_ne_other : address ≠ other :=
-    fun equal => different equal.symm
-  simp [WorldState.putAccount, WorldState.account?,
-    Std.ExtTreeMap.get?_eq_getElem?, Std.ExtTreeMap.getElem?_insert,
-    address_ne_other]
+  simp [WorldState.putAccount, WorldState.account?, different]
 
 theorem Account.storageValue?_empty (slot : Core.Word) :
     Account.empty.storageValue? slot = none := by
-  simp [Account.empty, Account.storageValue?]
+  rfl
 
 theorem Account.storageRead_empty (slot : Core.Word) :
     Account.empty.storageRead slot = Core.Word.zero := by
-  simp [Account.empty, Account.storageRead, Account.storageValue?]
+  rfl
 
 theorem Account.storageRead_storageWrite_same
     (account : Account)
@@ -66,15 +61,11 @@ theorem Account.storageRead_storageWrite_other
     (different : other ≠ slot) :
     (account.storageWrite slot value).storageRead other =
       account.storageRead other := by
-  have slot_ne_other : slot ≠ other :=
-    fun equal => different equal.symm
   by_cases zero : value = Core.Word.zero
   · simp [Account.storageWrite, Account.storageRead,
-      Account.storageValue?, zero, Std.ExtTreeMap.get?_eq_getElem?,
-      Std.ExtTreeMap.getElem?_erase, slot_ne_other]
+      Account.storageValue?, zero, different]
   · simp [Account.storageWrite, Account.storageRead,
-      Account.storageValue?, zero, Std.ExtTreeMap.get?_eq_getElem?,
-      Std.ExtTreeMap.getElem?_insert, slot_ne_other]
+      Account.storageValue?, zero, different]
 
 theorem WorldState.writeStorage?_of_absent
     (state : WorldState)

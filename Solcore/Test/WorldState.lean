@@ -28,17 +28,20 @@ private def stateWithB : WorldState :=
   WorldState.empty.putAccount addressB accountB
 
 def testWorldState : IO Unit := do
-  assertTrue (WorldState.empty.account? addressA == none)
+  assertTrue (WorldState.empty.account? addressA).isNone
     "an empty world must report every address as absent"
   assertTrue
-    ((WorldState.empty.putAccount addressA Account.empty).account? addressA ==
-      some Account.empty)
+    (match (WorldState.empty.putAccount addressA Account.empty).account? addressA with
+      | some account => account.storageValue? keyA == none
+      | none => false)
     "putting an empty account must make its address explicitly present"
   assertTrue
-    ((stateWithB.putAccount addressA Account.empty).account? addressB == some accountB)
+    (match (stateWithB.putAccount addressA Account.empty).account? addressB with
+      | some account => account.storageValue? keyB == some valueB
+      | none => false)
     "putting one address must preserve the account at another address"
   assertTrue (Account.empty.storageValue? keyA == none)
-    "an empty account must contain no physical storage entry"
+    "an empty account must contain no semantic storage value"
   assertTrue (Account.empty.storageRead keyA == Core.Word.zero)
     "reading missing storage in an empty account must return zero"
   assertTrue
@@ -47,27 +50,31 @@ def testWorldState : IO Unit := do
   let deleted :=
     (Account.empty.storageWrite keyA valueA).storageWrite keyA Core.Word.zero
   assertTrue (deleted.storageValue? keyA == none)
-    "writing zero must physically delete the selected storage entry"
+    "writing zero must remove the selected semantic storage value"
   assertTrue
     ((Account.empty.storageWrite keyA valueA).storageValue? keyA == some valueA)
-    "writing a nonzero value must create a physical storage entry"
+    "writing a nonzero value must create a semantic storage value"
   assertTrue
     ((accountB.storageWrite keyA valueA).storageRead keyB == valueB)
     "writing one storage key must preserve the value at another key"
-  assertTrue
-    (WorldState.empty.writeStorage? addressA keyA valueA == none)
+  assertTrue (WorldState.empty.writeStorage? addressA keyA valueA).isNone
     "writing storage at an absent address must fail without creating an account"
   assertTrue
     (match (WorldState.empty.putAccount addressA Account.empty).writeStorage?
         addressA keyA valueA with
       | some updated =>
-          updated.account? addressA == some (Account.empty.storageWrite keyA valueA)
+          match updated.account? addressA with
+          | some account => account.storageValue? keyA == some valueA
+          | none => false
       | none => false)
     "writing storage at a present address must update and preserve that account"
   assertTrue
     (match (stateWithB.putAccount addressA Account.empty).writeStorage?
         addressA keyA valueA with
-      | some updated => updated.account? addressB == some accountB
+      | some updated =>
+          match updated.account? addressB with
+          | some account => account.storageValue? keyB == some valueB
+          | none => false
       | none => false)
     "writing storage at one address must preserve an account at another address"
 
