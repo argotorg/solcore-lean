@@ -12,6 +12,7 @@ import Solcore.Surface.Multi.Token
 import Solcore.Test.CoreBooleanConnectives
 import Solcore.Test.CoreBitwiseLogic
 import Solcore.Test.CoreBitwiseLogicWire
+import Solcore.Test.CoreByteSelection
 import Solcore.Test.CoreByteSelectionWire
 import Solcore.Test.CoreCells
 import Solcore.Test.CoreComparisonFlags
@@ -4818,6 +4819,7 @@ def run : IO Unit := do
   testCoreBooleanConnectives
   testCoreBitwiseLogic
   testCoreBitwiseLogicWire
+  testCoreByteSelection
   testCoreByteSelectionWire
   testCoreComparisonFlags
   testCoreConversions
