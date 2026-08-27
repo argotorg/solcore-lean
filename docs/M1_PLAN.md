@@ -39,11 +39,12 @@ These results remain regression obligations for every extension.
 | 13 | Derived word comparison flags | Complete | Wraps existing boolean comparisons with canonical word conversion |
 | 14 | Derived-builder arbitrary renaming laws | Complete | Backfills the general renaming API for eight existing builders |
 | 15 | Direct unary primitive interface | Complete | Completes focused APIs and regressions for existing boolNot and wordNot |
-| 16 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 17 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 18 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 19 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 20 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 16 | Totalized unsigned division and modulo | Active | Completes focused APIs and strict zero-divisor regressions |
+| 17 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
+| 18 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 19 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 20 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 21 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -295,6 +296,15 @@ Focused tests cover values, types, raw faults, an exactly-once effectful operand
 and final store, exact 2/3 and 14/15 fuel, Wire v1 rejection, and exact Wire v2
 projection and round trips. No alias, tag, runtime meaning, or byte encoding
 changes. The next feature is selected by a separate ADR.
+
+## Active Core vNext slice: totalized unsigned division
+
+[ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md) keeps `wordDiv`
+and `wordMod` as raw binary operators. Named zero and nonzero value, exact
+primitive-application, and store-threaded evaluation results expose their
+existing behavior. A zero divisor does not skip either operand: numerator and
+divisor retain left-to-right effects, faults, final stores, and fuel. No alias,
+tag, Safety rule, or Wire encoding changes.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

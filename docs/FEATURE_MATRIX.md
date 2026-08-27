@@ -49,6 +49,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Derived word comparison flags | ADR-0031 Accepted | Complete | four builders and expansion/type/infer/rename/weaken APIs, four general and eight case evaluations, value/type/fuel/fault/effect tests, v1 rejection, and exact v2 projection/round trips complete | None |
 | Derived-builder arbitrary renaming laws | ADR-0032 Accepted | Complete | exactly eight laws in their owning modules, rename_boolToWord relocation, swap01 free-variable goldens, and three-family runtime-environment regressions complete | None |
 | Direct unary primitive interface | ADR-0033 Accepted | Complete | named raw boolNot/wordNot APIs, zero/maximum/involution facts, exact fuel, fault/effect/store tests, v1 rejection, and exact v2 projection/round trips complete | None |
+| Totalized unsigned division and modulo interface | ADR-0034 Accepted | Active | zero/nonzero value, apply, and store-threaded evaluation APIs plus strict effect/fault/fuel/wire regressions in progress | None |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 

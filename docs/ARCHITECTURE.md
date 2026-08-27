@@ -188,6 +188,13 @@ and exact Wire v2 projection and round trips. Generic Safety and machine
 correspondence remain unchanged, as do semantics, tags, and bytes. The next
 feature is selected by a separate ADR.
 
+The active ADR-0034 slice adds focused reasoning interfaces for direct unsigned
+word division and modulo. The raw binary form keeps numerator on the left and
+divisor on the right. A zero divisor produces zero only after both operands
+evaluate exactly once in order, so effects, faults, and final stores remain
+visible. Generic typing, renaming, weakening, Safety, machine correspondence,
+tags, and bytes do not change.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

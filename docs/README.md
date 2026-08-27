@@ -92,6 +92,13 @@ universal word-complement facts. Tests cover exact 2/3 and 14/15 fuel, raw
 faults, effects and final store, Wire v1 rejection, and exact Wire v2 projection
 and round trips. It adds no Expr alias, operation tag, meaning, bytes, or public
 behavior. The next feature is selected by a separate ADR.
+The active sixteenth slice,
+[ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md), completes focused
+proofs and regressions for the existing raw `wordDiv` and `wordMod` operators.
+The numerator remains left and the divisor right. A zero divisor returns zero
+after both operands evaluate left to right exactly once, retaining effects,
+fault order, final store, and fuel. It adds no alias, tag, schema, Oracle
+behavior, or byte change.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -140,6 +147,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0031 derives word-valued flags for the remaining word comparisons.
 - ADR-0032 backfills arbitrary renaming laws for eight older derived builders.
 - ADR-0033 completes the focused interface for direct unary primitives.
+- ADR-0034 completes focused interfaces for totalized unsigned division and modulo.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
