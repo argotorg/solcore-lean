@@ -57,7 +57,7 @@ These results remain regression obligations for every extension.
 | 31 | Signed non-strict comparison flags | Complete | Converts the completed boolean comparisons to canonical words |
 | 32 | Ternary modular arithmetic | Complete | Reduces full-precision sums and products after three ordered operands |
 | 33 | Canonical runtime scalar observations | Complete | Fixes byte, address, and word representation before contract state |
-| 34 | Contract frame halt outcomes | Active | Separates return data, revert data, and parametric trap reasons before state |
+| 34 | Contract frame halt outcomes | Complete | Separates return data, revert data, and parametric trap reasons before state |
 | 35 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
 | 36 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 37 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -553,7 +553,7 @@ remain unchanged. The layer is available through the internal semantics
 umbrella but adds no profile, Oracle behavior, contract state, ABI, hashing,
 storage, or source rule. The independent audit found no P0-P3 issue.
 
-## Active runtime-foundation slice: contract frame outcomes
+## Completed runtime-foundation slice: contract frame outcomes
 
 [ADR-0052](adr/0052-contract-frame-outcomes.md) defines an internal halt kind
 and a `FrameOutcome TrapReason`. Return and revert carry canonical `Bytes`;
@@ -561,10 +561,14 @@ trap carries a reason whose type is deliberately left to later semantics.
 Projections expose only the payload belonging to the selected kind, so empty
 bytes remain different from an absent projection.
 
-Implementation is limited to the carrier, four total observations, exactly six
-focused laws, and executable projection tests. State, rollback, calls, entry and
-ABI rules, evaluator limits, EVM revision, and every public format remain later
-decisions.
+The completed implementation contains the carrier, four total observations,
+exactly six focused laws, and 10 executable runtime assertions. Tests cover
+empty and zero-padded return and revert data, all kinds, matching and
+nonmatching projections, two distinct trap reasons, and constructor
+distinction. Focused and full builds and tests, trust-zero, semantic-kernel,
+metadata, axiom, document-link, and diff checks pass; the independent audit
+found no P0-P3 issue. State, rollback, calls, entry and ABI rules, evaluator
+limits, EVM revision, and every public format remain later decisions.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -355,7 +355,8 @@ may obtain meaning from compiler output or hidden host state.
 ADR-0052 fixes the first contract-frame halt carrier before that state exists.
 A frame returns bytes, reverts with bytes, or traps with a reason whose type is
 supplied by later semantics. Kind and payload projections keep empty data
-distinct from an absent payload. This active slice does not yet define an
+distinct from an absent payload. Exactly six laws characterize the kind and
+successful payload projections. This completed carrier does not define an
 evaluator, state transition, checkpoint, rollback policy, trap taxonomy, or
 resource-limit result.
 

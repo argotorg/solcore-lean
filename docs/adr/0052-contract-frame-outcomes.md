@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: second internal contract-runtime foundation slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -111,6 +111,24 @@ Keep every commit below 300 changed lines and leave the tree green:
 3. add the exact six focused laws;
 4. add executable boundary and projection tests; and
 5. independently audit the slice and update completion documentation.
+
+## Completion evidence
+
+The completed internal layer provides the three-case `FrameHaltKind`, the
+parametric `FrameOutcome TrapReason`, and four total kind and payload
+observations. Exactly six focused laws prove the three kind-constructor
+equations and characterize successful return-data, revert-data, and
+trap-reason projections in both directions.
+
+Ten executable runtime assertions cover empty and zero-padded return and
+revert data, all three kind results, matching and
+nonmatching projections, two distinct trap reasons, and constructor
+distinction. In particular, the tests verify that `some` empty bytes remain
+different from an absent projection.
+
+Focused and full builds and tests, trust-zero checking, semantic-kernel and
+metadata checks, the axiom audit, document-link validation, and diff checking
+pass. The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions
 

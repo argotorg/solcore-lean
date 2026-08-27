@@ -186,13 +186,14 @@ agreement, and accepted-input canonicalization. The frozen Wire codecs were not
 refactored; representative Word text is checked for output compatibility. The
 independent audit found no P0-P3 issue.
 
-The active contract-outcome slice,
+The completed contract-outcome slice,
 [ADR-0052](adr/0052-contract-frame-outcomes.md), adds only the internal halt
 vocabulary needed before contract state: return data, revert data, or a trap
 reason supplied by later semantics. Empty bytes remain a present payload rather
-than an absent one. The planned carrier, projections, exact six laws, and tests
-do not add rollback, an evaluator, ABI behavior, resource-limit meaning, or a
-published Wire or Oracle format.
+than an absent one. The carrier, four total observations, exactly six laws, and
+10 executable runtime assertions are complete. They add no rollback, evaluator,
+ABI behavior, resource-limit meaning, or published Wire or Oracle format. The
+independent audit found no P0-P3 issue.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -326,7 +327,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   independent audit found no P0-P3 issue.
 - ADR-0051 completes canonical internal runtime scalar representations; its
   independent audit found no P0-P3 issue.
-- ADR-0052 accepts parametric internal contract-frame halt outcomes.
+- ADR-0052 completes parametric internal contract-frame halt outcomes; its
+  independent audit found no P0-P3 issue.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

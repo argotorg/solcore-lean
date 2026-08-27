@@ -86,7 +86,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Feature | Status | Missing decision or implementation | Syntax coupling |
 | --- | --- | --- | --- |
 | Canonical runtime scalar observations | Complete | Strict Bytes/Address/Word text and Word big-endian bytes; exact sixteen theorems; boundary, rejection, canonicality, `Word.byteAt`, and frozen-Wire output compatibility tests complete; Wire codecs unchanged; audit clean | None |
-| Contract frame halt outcomes | Active | ADR-0052 accepted; parametric return/revert/trap carrier, payload projections, exact six laws, and executable boundary tests in progress; no state or publication | None |
+| Contract frame halt outcomes | Complete | Parametric return/revert/trap carrier and four observations; exactly six laws and 10 executable runtime assertions cover empty versus absent payloads, zero-octet preservation, distinct trap reasons, and constructor boundaries; no state or publication; audit clean | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
 | Revert and rollback | Planned | nested rollback and surviving observation policy | None |
