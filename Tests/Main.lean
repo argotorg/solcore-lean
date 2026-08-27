@@ -28,6 +28,7 @@ import Solcore.Test.CoreDerivedComparisons
 import Solcore.Test.CoreDerivedRenamingLaws
 import Solcore.Test.CoreDerivedSignedComparison
 import Solcore.Test.CoreDerivedSignedComparisonWire
+import Solcore.Test.CoreDerivedSignedNonStrictComparisonWire
 import Solcore.Test.CoreDirectWordComparisonWire
 import Solcore.Test.CoreDirectWordComparisons
 import Solcore.Test.CoreFunctions
@@ -4844,6 +4845,7 @@ def run : IO Unit := do
   testCoreDerivedRenamingLaws
   testCoreDerivedSignedComparison
   testCoreDerivedSignedComparisonWire
+  testCoreDerivedSignedNonStrictComparisonWire
   testCoreDirectWordComparisonWire
   testCoreDirectWordComparisons
   testCoreLogicalShiftWire
