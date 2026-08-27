@@ -32,9 +32,8 @@ ADR-0029 completes the renaming and environment-insertion proof foundation.
 [ADR-0030](adr/0030-core-vnext-derived-word-comparisons.md) completes the proof
 interfaces for the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe`
 builders. Core vNext remains active.
-[ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md) selects
-word-valued flags for the four existing derived comparisons as the active
-slice.
+[ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md) completes
+word-valued flags for the four existing derived comparisons.
 
 ## Implementation status
 
@@ -55,7 +54,7 @@ slice.
 | Internal word comparison flags | Complete | Complete | Not published |
 | Internal renaming and environment simulation | Complete | Complete | Not published |
 | Internal derived boolean word comparisons | Complete | Complete | Not published |
-| Internal derived word comparison flags | In progress | In progress | Not published |
+| Internal derived word comparison flags | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -325,14 +324,19 @@ pass. The nested-let forms preserve left-to-right exactly-once behavior. No new
 syntax, semantic rule, tag, or public behavior is introduced. The next
 primitive or conversion is chosen by its own ADR.
 
-## Active Core vNext derived word comparison flags
+## Completed Core vNext derived word comparison flags
 
 [ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md) wraps the
 existing boolean `wordNe`, `wordLt`, `wordLe`, and `wordGe` builders with
 `boolToWord`. The four resulting flags return canonical word zero or one while
 retaining left-to-right exactly-once operand evaluation, faults, effects,
-stores, and fuel. This work adds no Core or wire tag and changes no published
-behavior.
+stores, and fuel. Each has a builder, expansion, typing, inference, renaming,
+weakening, general evaluation, and two value-case theorems. Tests cover values,
+types, exact fuel, faults, effects, Wire v1 rejection, and exact Wire v2
+projection and round trips. For `wordLtFlag` and `wordGeFlag`, a faulting right
+variable is correctly lifted across the internal binding and observes the
+completed left store. This work adds no Core or wire tag and changes no
+published behavior. The next feature is selected by a separate ADR.
 
 ## Meaning of completion
 

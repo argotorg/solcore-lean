@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: thirteenth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -47,7 +47,7 @@ The `boolToWord` wrapper evaluates the comparison once and selects only its
 canonical result branch. It must preserve the comparison's fault order,
 intermediate effects, final store, and existing CEK fuel accounting.
 
-## Required implementation
+## Implemented interface
 
 Each builder provides:
 
@@ -61,7 +61,12 @@ The typed assumptions required by the existing `wordLt` and `wordGe`
 evaluation theorems remain explicit in their flag counterparts. The other two
 builders do not gain unnecessary typing assumptions.
 
-## Required tests
+The implementation provides four builders, four named expansions, four
+`HasType` results, four `infer?` results, and renaming and weakening laws for
+each builder. Four general store-threaded evaluations and eight true/false case
+corollaries return canonical word one or zero.
+
+## Implemented tests
 
 Focused regressions cover:
 
@@ -76,6 +81,12 @@ Focused regressions cover:
 Compile-time examples exercise the public typing, inference, and evaluation
 theorems.
 
+The fault regressions also cover the binder boundary in `wordLtFlag` and
+`wordGeFlag`: weakening the right expression lifts an unbound variable index
+under the internal left-value binding. The reported index is therefore shifted,
+while the fault still occurs after the completed left store and before any
+right-side effect.
+
 ## Boundaries
 
 This is an internal Core vNext proof-and-builder slice. It adds no source
@@ -88,3 +99,6 @@ conversions remain separate decisions.
 All existing unsigned word comparisons have both boolean-valued and canonical
 word-valued derived interfaces. Their underlying meaning, evaluation order,
 faults, effects, stores, and wire encoding remain unchanged.
+
+Further primitives and conversions are selected by separate ADRs; this slice
+does not choose the next feature.

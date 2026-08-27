@@ -36,7 +36,7 @@ These results remain regression obligations for every extension.
 | 10 | Word comparison flags | Complete | Derives canonical word equality and unsigned-greater results without new tags |
 | 11 | Renaming and environment insertion | Complete | Establishes static and dynamic weakening without changing semantics |
 | 12 | Derived boolean word comparisons | Complete | Completes proof interfaces for the existing comparison builders |
-| 13 | Derived word comparison flags | Active | Wraps existing boolean comparisons with canonical word conversion |
+| 13 | Derived word comparison flags | Complete | Wraps existing boolean comparisons with canonical word conversion |
 | 14 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
 | 15 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 16 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -270,14 +270,18 @@ round-trip tests pass without a new tag or public behavior. The next additional
 primitive or conversion is selected by a separate ADR; ADR-0031 is that next
 decision.
 
-## Active Core vNext slice: derived word comparison flags
+## Completed Core vNext slice: derived word comparison flags
 
 [ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md) derives
 `wordNeFlag`, `wordLtFlag`, `wordLeFlag`, and `wordGeFlag` by applying
-`boolToWord` to the existing boolean comparisons. The slice adds named proof
-interfaces and value, type, fuel, fault, effect, and wire regressions. It keeps
-the existing left-to-right exactly-once evaluation and adds no Core or wire
-tag.
+`boolToWord` to the existing boolean comparisons. All four have expansion,
+typing, inference, renaming, weakening, general evaluation, and two case
+theorems. Value, type, exact-fuel, fault, effect, Wire v1 rejection, and exact
+Wire v2 projection and round-trip tests pass. Right-side faults in `wordLtFlag`
+and `wordGeFlag` retain the completed left store while weakening lifts their
+variable index across the internal binding. The slice keeps left-to-right
+exactly-once evaluation and adds no Core or wire tag. The next feature is
+selected by a separate ADR.
 
 ## State and contracts
 

@@ -155,12 +155,18 @@ tests only; it does not add a Core form or change a wire or Oracle contract.
 Tests cover values, types, exact fuel, faults, effects, Wire v1 rejection, and
 exact Wire v2 projection and round trips.
 
-The active ADR-0031 slice applies `boolToWord` to the existing boolean
+The completed ADR-0031 slice applies `boolToWord` to the existing boolean
 `wordNe`, `wordLt`, `wordLe`, and `wordGe` builders. These derived flags return
 canonical word zero or one. They inherit left-to-right exactly-once evaluation,
 fault order, effects, final stores, and fuel from the established expansions;
 in particular, the nested-let less-than forms are not replaced by operand
-swaps. No Core form, wire tag, or published behavior changes.
+swaps. Four general and eight case evaluations accompany expansion, typing,
+inference, renaming, and weakening results. Tests cover values, types, exact
+fuel, faults, effects, Wire v1 rejection, and exact Wire v2 projection and
+round trips. A faulting right expression in the less-than forms is weakened
+under the internal binding, so its variable index is lifted while the completed
+left store is retained. No Core form, wire tag, or published behavior changes.
+The next feature is selected by a separate ADR.
 
 ### Contract runtime
 

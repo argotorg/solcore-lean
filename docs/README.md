@@ -64,12 +64,16 @@ effect, Wire v1 rejection, and exact Wire v2 projection and round-trip tests
 pass. Their expansions remain unchanged; the nested-let comparisons keep
 left-to-right exactly-once evaluation for arbitrary effectful expressions. No
 new syntax, tag, or public behavior is added.
-The active thirteenth slice,
+The completed thirteenth slice,
 [ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md), derives
 canonical word-zero-or-one flags for the existing boolean `wordNe`, `wordLt`,
-`wordLe`, and `wordGe` builders. It preserves their evaluation order, faults,
-effects, stores, and fuel through ordinary `boolToWord` composition and adds no
-Core form, wire tag, or public behavior.
+`wordLe`, and `wordGe` builders. Their expansion, typing, inference, renaming,
+weakening, four general evaluations, eight value cases, and value, type, fuel,
+fault, effect, and wire tests are complete. Right-side fault tests include the
+weakening boundary under the less-than binders. The builders preserve evaluation
+order, stores, and fuel through ordinary `boolToWord` composition and add no
+Core form, wire tag, or public behavior. The next feature is selected by a
+separate ADR.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
