@@ -43,6 +43,7 @@ import Solcore.Test.CoreNamedData
 import Solcore.Test.CoreRenaming
 import Solcore.Test.CoreRenamingRuntime
 import Solcore.Test.CoreProducts
+import Solcore.Test.CoreSignExtension
 import Solcore.Test.CoreSignExtensionWire
 import Solcore.Test.CoreSignedComparison
 import Solcore.Test.CoreSignedComparisonFlags
@@ -4860,6 +4861,7 @@ def run : IO Unit := do
   testCoreNamedData
   testCoreRenaming
   testCoreRenamingRuntime
+  testCoreSignExtension
   testCoreSignExtensionWire
   testCoreSignedComparison
   testCoreSignedComparisonFlags
