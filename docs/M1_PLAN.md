@@ -32,11 +32,12 @@ These results remain regression obligations for every extension.
 | 6 | Boolean and word conversions | Complete | Derives total conversions without a new Core tag |
 | 7 | Word zero test | Complete | Derives a canonical word result from existing expressions |
 | 8 | Short-circuit boolean operators | Complete | Fixes selected-branch-only effects without a new Core tag |
-| 9 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 10 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 11 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 12 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 13 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 9 | Word nonzero test | Active | Composes total truthiness and canonical word conversion without a new tag |
+| 10 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 11 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 12 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 13 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 14 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -214,6 +215,14 @@ Named expansion, typing, inference, and all four store-threaded branch theorems
 are complete. Tests cover truth, left and right operand types, skipped and
 selected faults, allocation and writes, left-to-right store threading into the
 right operand, exact fuel, weakening, and exact v1/v2 wire projection.
+
+## Active Core vNext slice: word nonzero test
+
+[ADR-0027](adr/0027-core-vnext-word-is-nonzero.md) fixes
+`wordIsNonzero : word -> word` as `boolToWord(wordToBool(x))`. Zero maps to word
+zero and every nonzero word to word one. The operand runs exactly once and its
+final store is preserved. The derived form adds no tag; wire v1 rejects it and
+wire v2 projects the exact expansion. Additional primitives remain planned.
 
 ## State and contracts
 

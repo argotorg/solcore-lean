@@ -112,6 +112,12 @@ are complete. Tests cover truth, operand types, skipped and selected faults,
 allocation and writes, left-to-right store threading, exact fuel, weakening,
 and exact wire v1 and v2 projection.
 
+The active `wordIsNonzero` slice composes the existing conversions as
+`boolToWord(wordToBool(x))`. It maps zero to word zero and every nonzero word to
+word one, evaluates `x` exactly once, and preserves its final store. It is a
+word-valued predicate rather than boolean truthiness or strict ABI decoding,
+and introduces no new semantic or wire tag.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

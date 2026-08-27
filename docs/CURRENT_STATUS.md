@@ -24,7 +24,8 @@ by ADR-0023 are complete internal slices. The derived `boolToWord` and `wordToBo
 conversions accepted by ADR-0024 are also complete without adding a new Core
 expression form. The `wordIsZero` slice accepted by ADR-0025 is complete and
 likewise adds no new Core expression form. The derived short-circuit `boolAnd`
-and `boolOr` slice accepted by ADR-0026 is complete. Core vNext as a whole
+and `boolOr` slice accepted by ADR-0026 is complete. ADR-0027 makes the derived
+word-valued nonzero predicate the active ninth slice. Core vNext as a whole
 remains active, with additional conversions and primitives planned.
 
 ## Implementation status
@@ -42,6 +43,7 @@ remains active, with additional conversions and primitives planned.
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
 | Internal short-circuit boolean operators | Complete | Complete | Not published |
+| Internal word nonzero test | In progress | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -259,6 +261,15 @@ four store-threaded branch cases. Tests cover truth tables, left and right
 types, skipped and selected faults, allocation and writes, left-to-right store
 threading into the right operand, exact fuel, weakening, and exact v1/v2 wire
 projection.
+
+## Active Core vNext word nonzero-test slice
+
+[ADR-0027](adr/0027-core-vnext-word-is-nonzero.md) fixes
+`wordIsNonzero(x) = boolToWord(wordToBool(x))`. It maps zero to word zero and
+every nonzero word to word one, evaluates `x` exactly once, and preserves its
+final store. It adds no tag and remains distinct from boolean truthiness,
+inverted `wordIsZero`, and strict ABI decoding. Wire v1 rejects the expansion;
+wire v2 projects it exactly.
 
 ## Meaning of completion
 

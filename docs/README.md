@@ -33,7 +33,12 @@ selected-branch-only boolean conjunction and disjunction using existing
 conditionals without adding a Core tag. Its expansion, typing, inference, four
 store-threaded branches, effects, faults, exact fuel, weakening, and exact wire
 v1/v2 projection are proved and tested. Core vNext remains active, with
-additional conversions and primitives planned.
+`wordIsNonzero` from
+[ADR-0027](adr/0027-core-vnext-word-is-nonzero.md) as its active ninth slice.
+It composes `boolToWord(wordToBool(x))`, maps zero to word zero and nonzero words
+to word one, evaluates its operand exactly once, and preserves its final store.
+It adds no tag and is separate from boolean truthiness and ABI decoding.
+Additional conversions and primitives remain planned.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -75,6 +80,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0024 defines derived boolean and word conversions.
 - ADR-0025 defines the derived word-valued zero test.
 - ADR-0026 defines derived short-circuit boolean conjunction and disjunction.
+- ADR-0027 defines the derived word-valued nonzero test.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
