@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: first internal contract-runtime observation foundation slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -103,6 +103,23 @@ green:
 The frozen Wire implementations may later delegate to the shared foundation,
 but such refactoring is not required for this slice and must preserve their
 error ordering, JSON bytes, schemas, profiles, and golden data exactly.
+
+## Completion evidence
+
+The completed internal layer includes a reusable fixed-radix kernel, strict
+canonical hexadecimal codecs, and the `Bytes`, `Address`, and existing-Word
+APIs exposed through `Solcore.Semantics`. Exactly sixteen focused theorems prove
+text lengths, decoder-after-encoder round trips, successful-decoder
+canonicality, text injectivity, exact 32-byte Word width, and agreement with
+`Word.byteAt`.
+
+Executable regressions cover the required boundaries and rejection cases, a
+complete 32-byte big-endian fixture, accepted-input canonicalization, and Word
+text compatibility with frozen Core Wire v1 and v2. The frozen Wire codecs were
+not refactored; the tests compare their existing output with the new internal
+encoder. Focused and full builds and tests, trust-zero checking, the semantic
+kernel and metadata checks, and the axiom audit pass. The independent audit
+found no P0-P3 issue.
 
 ## Publication and exclusions
 

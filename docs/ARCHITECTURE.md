@@ -359,11 +359,14 @@ will record normative state effects rather than bytecode layout, optimizer
 traces, generated names, or wall-clock behavior. Gas belongs to a separate
 fork-pinned profile.
 
-ADR-0051 starts the internal observation foundation without publishing a
-profile. `Bytes`, 160-bit addresses, and existing 256-bit words receive strict
-lowercase `0x` text; words also receive an exact 32-byte big-endian view that
-agrees with Core byte selection. This layer defines representation only, not
-contract state, ABI conversion, hashing, rollback, or EVM behavior.
+ADR-0051 provides the completed initial internal observation foundation without
+publishing a profile. `Bytes`, 160-bit addresses, and existing 256-bit words
+receive strict lowercase `0x` text; words also receive an exact 32-byte
+big-endian view that agrees with Core byte selection. Exactly sixteen focused
+theorems and executable boundary, rejection, canonicality, and compatibility
+tests fix this representation behavior. The frozen Wire codecs remain separate
+and unchanged. This layer defines representation only, not contract state, ABI
+conversion, hashing, rollback, or EVM behavior.
 
 ## Proof pattern
 
@@ -418,7 +421,7 @@ stabilized.
 | Location | Responsibility |
 | --- | --- |
 | Solcore/Core | Semantic Core, its local value store, and current Core proofs |
-| Solcore/Semantics | Future cross-feature and runtime semantics |
+| Solcore/Semantics | Cross-feature and internal runtime semantics |
 | Solcore/Surface | Published Surface v1 |
 | Solcore/Surface/Multi | Frozen internal Multi frontend |
 | Solcore/Workspace | Pure workspace identity and validation |

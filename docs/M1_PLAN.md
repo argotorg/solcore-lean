@@ -56,7 +56,7 @@ These results remain regression obligations for every extension.
 | 30 | Signed division and remainder | Complete | Fixes zero, rounding, sign, and minimum-value behavior |
 | 31 | Signed non-strict comparison flags | Complete | Converts the completed boolean comparisons to canonical words |
 | 32 | Ternary modular arithmetic | Complete | Reduces full-precision sums and products after three ordered operands |
-| 33 | Canonical runtime scalar observations | Active | Fixes byte, address, and word representation before contract state |
+| 33 | Canonical runtime scalar observations | Complete | Fixes byte, address, and word representation before contract state |
 | 34 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
 | 35 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 36 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -534,6 +534,23 @@ dedicated `invalidTernaryOperands`, ordered faults and effects/final store,
 exact 6/7 and 42/43 fuel, no-prewrap values, and frozen v1/v2 rejection are
 complete. Public formats and source, ABI, opcode, and gas rules remain
 unchanged; the independent audit found no P0-P3 issue.
+
+## Completed runtime-foundation slice: canonical scalar observations
+
+[ADR-0051](adr/0051-canonical-runtime-scalars.md) adds internal `Bytes`,
+160-bit `Address`, and existing-Word representations independently of source
+syntax and contract state. Their strict lowercase `0x` text preserves exact
+widths and byte order; Word also has an exact 32-byte big-endian form. Exactly
+sixteen focused theorems establish lengths, round trips, canonicality,
+injectivity, and agreement with `Word.byteAt`.
+
+Executable tests cover empty and boundary values, leading and trailing zero
+bytes, strict decoder rejection, accepted-input canonicalization, a complete
+32-byte big-endian fixture and `Word.byteAt` checks, and
+representative equality with frozen Wire v1/v2 Word text. Those Wire codecs
+remain unchanged. The layer is available through the internal semantics
+umbrella but adds no profile, Oracle behavior, contract state, ABI, hashing,
+storage, or source rule. The independent audit found no P0-P3 issue.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
