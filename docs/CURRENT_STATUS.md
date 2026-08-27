@@ -72,9 +72,9 @@ Its independent audit found no P0-P3 issue.
 [ADR-0045](adr/0045-core-vnext-signed-word-comparison-flags.md) completes
 canonical word-valued signed strict comparison flags with no new tag or public
 representation. Its independent audit found no P0-P3 issue.
-[ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md) accepts
-the active internal slice: effect-safe boolean signed ≤ and ≥ builders with no
-new tag or public representation.
+[ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md) completes
+effect-safe boolean signed ≤ and ≥ builders with no new tag or public
+representation. Its independent audit found no P0-P3 issue.
 
 ## Implementation status
 
@@ -566,14 +566,17 @@ and 37/38 `wordSltFlag` fuel, and frozen v1/v2 builder, handwritten expansion,
 and `wordSgt` rejection are complete. Public behavior remains unchanged;
 the independent audit found no P0-P3 issue.
 
-## Active Core vNext signed non-strict comparison slice
+## Completed Core vNext signed non-strict comparison slice
 
 [ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md) derives
 boolean `wordSle` by negating signed greater-than and `wordSge` by negating the
 effect-safe signed less-than builder. Source left remains before source right;
 only `wordSge` reverses the computed bound values. The exact twenty-theorem and
-sign/equality, type, fault-order, effect/store, fuel, and frozen-Wire regression
-scope is active. Public behavior remains unchanged.
+sign/equality, type, underlying invalid and ordered-fault, effect/store, exact
+6/7, 30/31, 12/13, and 36/37 fuel, and frozen-Wire regressions are complete.
+Focused and full builds, the full test runner, kernel policy, and metadata
+verification pass. Public behavior remains unchanged; the independent audit
+found no P0-P3 issue.
 
 ## Meaning of completion
 

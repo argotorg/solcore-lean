@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-eighth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete; independent audit found no P0-P3 issue
 
 ## Context
 
@@ -46,7 +46,7 @@ nonnegative/negative, and negative/nonnegative.
 Do not add a Word operation, primitive application theorem, Core tag, or
 duplicate generic typing and Safety APIs.
 
-## Required tests
+## Implemented tests
 
 Focused regressions cover:
 
@@ -78,3 +78,18 @@ unchanged.
 Internal Core gains boolean signed non-strict comparisons while retaining the
 signed strict basis, source evaluation order, faults, effects, stores, and
 publication boundary.
+
+## Implementation result
+
+All twenty focused theorems are implemented: five static and five evaluation
+laws for each builder. Same-sign cases negate the corresponding unsigned
+strict-order decision; cross-sign cases reduce to the constants described
+above, and equality returns true. The executable regressions cover both sign
+boundaries, types, underlying invalid operands, ordered faults, exactly-once
+effects, final stores, and the exact 6/7, 30/31, 12/13, and 36/37 fuel
+boundaries. Frozen Wire v1/v2 reject both builders and their handwritten
+expansions, and Wire v2 continues to reject `wordSgt`.
+
+Focused and full warning-free builds, the full test runner, kernel policy, and
+metadata verification pass. Public formats and bytes are unchanged. The
+independent audit found no P0-P3 issue.

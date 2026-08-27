@@ -458,14 +458,17 @@ effects/final store, exact 7/8, 31/32, 13/14, and 37/38 fuel, and frozen v1/v2
 builder, handwritten, and `wordSgt` rejection are complete. It adds no operation
 tag or public behavior; the independent audit found no P0-P3 issue.
 
-## Active Core vNext slice: signed non-strict word comparisons
+## Completed Core vNext slice: signed non-strict word comparisons
 
 [ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md) derives
 boolean signed ≤ and ≥ by negating the existing strict comparisons. Source
 left-to-right evaluation and the final store remain intact; only `wordSge`'s
-computed bound values are reversed. The exact twenty-theorem and focused
-value/type/fault/effect/store/fuel/Wire scope is active, with no new operation
-tag or public behavior.
+computed bound values are reversed. Ten static and ten evaluation theorems,
+value/type, invalid and ordered-fault, effect/final-store, exact 6/7, 30/31,
+12/13, and 36/37 fuel, and frozen v1/v2 rejection regressions are complete.
+Focused/full builds, tests, kernel policy, and metadata verification pass. No
+new operation tag or public behavior is added; the independent audit found no
+P0-P3 issue. The next feature is selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
