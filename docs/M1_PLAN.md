@@ -516,6 +516,22 @@ and metadata verification pass. Public formats and source, ABI, opcode, and gas
 rules remain unchanged; the independent audit found no P0-P3 issue. The next
 feature is selected by a separate ADR.
 
+## Active Core vNext slice: ternary modular arithmetic
+
+[ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) adds dedicated
+`TernaryOp.wordAddMod`, `TernaryOp.wordMulMod`, and `Expr.ternary`. Operands
+evaluate first, second, then modulus, each exactly once. A zero modulus returns
+zero after all three evaluations; a nonzero modulus reduces the full-precision
+natural sum or product without pre-wrapping at 256 bits. Six Word laws, two
+application equations, and six evaluations form the planned exact fourteen
+focused theorems. Generic typing, checking, Safety, correspondence, and
+renaming support, dedicated `invalidTernaryOperands`, ordered faults and
+effects/final store, exact 6/7 and 42/43 fuel, no-prewrap values, and frozen
+v1/v2 rejection are required. Implementation is staged as separately green,
+sub-300-line commits for values, dormant CEK support, semantic activation,
+static/safety activation, focused proofs, semantic tests, Wire tests, and docs.
+Public formats and source, ABI, opcode, and gas rules remain unchanged.
+
 ## Completed Core vNext slice: derived-builder renaming laws
 
 [ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) backfills

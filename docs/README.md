@@ -165,6 +165,13 @@ ordered fault, effect/final-store, exact-fuel, and frozen builder,
 handwritten-expansion, and v2-`wordSgt` rejection regressions are complete.
 Focused/full builds and tests, kernel policy, and metadata verification pass.
 It adds no tag or public behavior; the independent audit found no P0-P3 issue.
+The active thirty-second slice,
+[ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md), adds dedicated
+three-operand modular addition and multiplication. It evaluates both values
+and then the modulus, uses the full-precision sum or product before reduction,
+and returns zero for modulus zero only after every operand evaluates. The new
+form, its dedicated raw fault, generic static/safety support, exact fourteen
+focused theorems, and value/order/effect/fuel/Wire regressions remain internal.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -293,6 +300,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   remainder; its independent audit found no P0-P3 issue.
 - ADR-0049 completes canonical word-valued signed non-strict comparison flags;
   its independent audit found no P0-P3 issue.
+- ADR-0050 accepts dedicated internal ternary modular arithmetic.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -84,6 +84,9 @@ no public Wire representation. Its independent audit found no P0-P3 issue.
 [ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md)
 completes internal word-valued signed ≤ and ≥ flags with no new Core tag or
 public Wire representation. Its independent audit found no P0-P3 issue.
+[ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) accepts the
+active internal three-operand modular arithmetic slice with no public Wire
+representation.
 
 ## Implementation status
 
@@ -624,6 +627,18 @@ builder/handwritten-expansion/v2-`wordSgt` rejection regressions are complete.
 Focused/full builds and tests, kernel policy, and metadata verification pass.
 There is no public format or source commitment; the independent audit found no
 P0-P3 issue.
+
+## Active Core vNext ternary modular arithmetic slice
+
+[ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) adds
+`TernaryOp.wordAddMod`, `wordMulMod`, and `Expr.ternary`. First value, second
+value, and modulus evaluate in source order. Nonzero moduli reduce a
+full-precision natural sum or product; a zero modulus returns zero only after
+all operands evaluate. The planned exact fourteen focused theorems sit on
+generic typing, checking, Safety, correspondence, and renaming support.
+Focused result/type, dedicated raw fault, ordered fault/effect/store, exact 6/7
+and 42/43 fuel, no-prewrap, and frozen v1/v2 rejection regressions add no public
+format or source commitment.
 
 ## Meaning of completion
 
