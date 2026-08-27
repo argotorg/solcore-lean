@@ -242,6 +242,14 @@ final-store, and exact-fuel tests pass. Frozen Wire v1 and v2 both reject the
 tag; public Oracle and schema formats remain unchanged. The independent audit
 found no P0-P3 issue.
 
+The active ADR-0040 slice adds internal `BinaryOp.wordByte` and
+`Word.byteAt(index, value)`. Left is the byte index and right is the 256-bit
+value; Core evaluates them in that order exactly once. Index zero is the most
+significant byte, index 31 the least significant, and indices at least 32 return
+zero. The focused surface has five Word laws, one application equation, and
+three evaluations. Frozen Wire v1/v2 reject the tag and public Oracle/schema
+formats remain unchanged.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,
