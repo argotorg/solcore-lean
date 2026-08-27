@@ -232,6 +232,11 @@ private def wordGtWithSwappedValues (left right : Expr) : Expr :=
     (.letE (right.weakenAt 0)
       (.binary .wordGt (.var 0) (.var 1)))
 
+private def wordSgtWithSwappedValues (left right : Expr) : Expr :=
+  .letE left
+    (.letE (right.weakenAt 0)
+      (.binary .wordSgt (.var 0) (.var 1)))
+
 def wordNe (left right : Expr) : Expr :=
   .unary .boolNot (.binary .wordEq left right)
 
@@ -255,6 +260,9 @@ def wordGtFlag (left right : Expr) : Expr :=
 
 def wordLt (left right : Expr) : Expr :=
   wordGtWithSwappedValues left right
+
+def wordSlt (left right : Expr) : Expr :=
+  wordSgtWithSwappedValues left right
 
 def wordLe (left right : Expr) : Expr :=
   .unary .boolNot (.binary .wordGt left right)
