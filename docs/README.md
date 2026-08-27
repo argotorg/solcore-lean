@@ -57,6 +57,13 @@ effects, exact fuel, and Wire/Core/JSON round trips pass. Results remain modulo
 `2^256` and expressions evaluate left to right exactly once. No alias, generic
 proof duplicate, tag, schema, or Oracle behavior changed. The next feature is
 selected by a separate ADR.
+The active nineteenth slice,
+[ADR-0037](adr/0037-core-vnext-binary-bitwise-logic.md), completes fifteen
+focused Word, application, and evaluation results for existing raw word and,
+or, and xor. Expressions remain left-to-right and exactly once even though the
+value operations commute. It adds no alias, generic proof duplicate, tag,
+source or standard-library API, opcode rule, gas rule, or Wire change.
+Implementation is in progress; further primitives remain planned.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -168,6 +175,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0034 completes focused interfaces for totalized unsigned division and modulo.
 - ADR-0035 completes focused interfaces for bounded logical shifts.
 - ADR-0036 completes focused interfaces for modular word arithmetic.
+- ADR-0037 completes focused interfaces for binary bitwise logic.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
