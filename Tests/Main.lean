@@ -9,6 +9,7 @@ import Solcore.Standard.CanonicalData
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
+import Solcore.Test.CoreCells
 import Solcore.Test.CoreFunctions
 import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSums
@@ -4787,6 +4788,7 @@ def run : IO Unit := do
   testCoreProducts
   testCoreFunctions
   testCoreSums
+  testCoreCells
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile

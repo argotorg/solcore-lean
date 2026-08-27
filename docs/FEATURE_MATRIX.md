@@ -28,19 +28,19 @@ The M1c primitive subset contains boolean and word negation, modular word
 addition/subtraction/multiplication, total unsigned division/modulo, word
 equality and greater-than, bitwise operations, and bounded logical shifts.
 
-## Active Semantic Core work
+## Internal Semantic Core roadmap
 
 | Feature | Decision | Lean status | Required proof boundary | Syntax coupling |
 | --- | --- | --- | --- | --- |
 | Binary products and projections | ADR-0019 Accepted | Complete | typing/checker equivalence, CEK/big-step correspondence, safety, sufficient fuel, and old-wire rejection complete | None |
 | Functions and application | ADR-0020 Accepted | Complete | typing/checker equivalence, ordered application, correspondence, logical-relations totality, safety, and old-wire rejection complete | None |
 | Lexical closures | ADR-0020 Accepted | Complete | capture typing, environment correspondence, invocation, and fault exclusion complete | None |
-| Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
-| Mutable locals and assignment | Direction accepted | Active design | cell identity, evaluation order, state typing, preservation | None |
 | Sum values | ADR-0021 Accepted | Complete | injections, exhaustive elimination, checker equivalence, CEK correspondence, logical-relations totality, safety, and old-wire rejection complete | None |
+| First-order local cells | ADR-0022 Accepted | Complete | explicit store threading, checker correspondence, CEK/big-step correspondence, store-indexed safety, sufficient fuel, and old-wire rejection complete | None |
 | User algebraic data | Direction accepted | Planned | constructor identity and value algebra | Low |
 | Direct pattern matching | Direction accepted | Planned | matching order, exhaustiveness, failure policy | Low |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | total application and typed results | None |
+| Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 
 ## Static semantics after Core
 
@@ -59,7 +59,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Feature | Status | Missing decision or implementation | Syntax coupling |
 | --- | --- | --- | --- |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
-| Explicit runtime state | Planned | accounts, frames, transactions, balances | None |
+| Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
 | Revert and rollback | Planned | nested rollback and surviving observation policy | None |
 | Storage | Blocked | storage-layout ADR | Low |
 | External calls and creation | Planned | host transition and call-depth rules | None |
@@ -92,4 +92,5 @@ next Surface version.
 
 Semantic Core v1, Semantic Core v2, and Surface v1 are closed algebras.
 Internal Core vNext values and expressions must fail their old wire projection.
-Publication occurs only through a new additive version.
+This includes the cell types, references, allocation, load, and store accepted
+by ADR-0022. Publication occurs only through a new additive version.

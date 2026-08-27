@@ -18,7 +18,8 @@ now frozen because the concrete Solcore syntax may change.
 Active development has moved to Semantic Core vNext. The goal is to define
 types, evaluation, state, and observations independently of concrete source
 spelling, then connect a stabilized future Surface language through a separate
-adapter.
+adapter. The explicit local-cell store accepted by ADR-0022 is complete; the
+next Core work is named algebraic data and direct matching.
 
 ## Stable implementation
 
@@ -30,6 +31,7 @@ adapter.
 | Internal Core binary products | Complete | Complete | Not published |
 | Internal non-recursive functions | Complete | Complete, including totality | Not published |
 | Internal binary sums | Complete | Complete, including totality | Not published |
+| Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -37,8 +39,8 @@ adapter.
 | Source locations and retained tokens | Complete for the frozen AST and grammar | Parser-wide correspondence | Internal only |
 | Certified one-file Multi frontend | Complete for the frozen grammar | Lexical, parse, structural, location, and token evidence | Internal only |
 
-The committed parser baseline through commit 0209a37 passed the full test,
-warning, metadata, kernel-policy, and axiom audits used during development.
+The frozen parser baseline passed the full test, warning, metadata,
+kernel-policy, and axiom audits used during development.
 
 ## What the published Semantic Core contains
 
@@ -66,7 +68,7 @@ The public Core fragment is complete, but it is not the complete Solcore
 language. The following remain:
 
 - explicit return, recursion, and divergence;
-- mutable locals and assignment;
+- source-level mutable declarations, assignment syntax, and their elaboration;
 - user-defined algebraic data and direct pattern matching;
 - conversions and additional primitives;
 - resolved-name and typed intermediate representations;
@@ -139,8 +141,30 @@ The third vertical slice adds:
 Named algebraic data and source-level pattern syntax remain later decisions.
 See [ADR-0021](adr/0021-core-vnext-binary-sums.md).
 
-The next active step is explicit mutable locals and assignment, with state
-identity and evaluation order fixed independently of contract storage.
+## Completed Core vNext local-cell result
+
+[ADR-0022](adr/0022-core-vnext-first-order-local-cells.md) defines first-order
+local cells. Its Lean implementation and proof boundary are complete.
+
+The accepted design adds typed cell references plus explicit allocation, load,
+and store operations. Allocation occurs after its initializer; store resolves
+its reference before evaluating the right-hand side; every operand is
+evaluated exactly once; and store returns `unit`. Closures capture references
+but never copy the local store, so two closures containing the same reference
+share writes.
+
+The local store is explicit, append-only for allocation, and separate from
+future contract storage. Cell contents are restricted recursively to unit,
+boolean, word, product, and sum data. Functions and cells are excluded as cell
+contents so that mutation cannot encode recursion before the separate
+recursion-and-divergence decision.
+
+All Core layers now cover cells: syntax and values, declarative and executable
+typing, store-threaded big-step evaluation, CEK execution, correspondence,
+store-indexed safety, logical reducibility, sufficient fuel, diagnostics,
+focused tests, and old-wire rejection. The internal stateful runner returns
+the final local store; the existing `Program.run` and Oracle path erase it for
+compatibility. No public schema or Oracle version was added.
 
 ## Meaning of completion
 

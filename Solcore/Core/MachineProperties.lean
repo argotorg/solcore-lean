@@ -8,7 +8,7 @@ theorem advance_next_iff {state next : State} :
     advance state = .next next ↔ Transition state next := by
   constructor
   · intro advanced
-    rcases state with ⟨control, continuation⟩
+    rcases state with ⟨control, continuation, store⟩
     cases control with
     | eval expr environment =>
         cases expr with
@@ -48,6 +48,18 @@ theorem advance_next_iff {state next : State} :
             simp [advance] at advanced
             cases advanced
             exact .enterCase
+        | newCell elementType initializer =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterNewCell
+        | loadCell reference =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterLoadCell
+        | storeCell reference valueExpr =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterStoreCell
         | lambda parameterType resultType body =>
             simp [advance] at advanced
             cases advanced
@@ -112,7 +124,7 @@ theorem advance_next_iff {state next : State} :
                 exact .applyPair
             | firstApply =>
                 cases value with
-                | unit | bool | word | inLeft | inRight | closure =>
+                | unit | bool | word | inLeft | inRight | closure | cellRef =>
                     simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
@@ -120,7 +132,7 @@ theorem advance_next_iff {state next : State} :
                     exact .applyFirst
             | secondApply =>
                 cases value with
-                | unit | bool | word | inLeft | inRight | closure =>
+                | unit | bool | word | inLeft | inRight | closure | cellRef =>
                     simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
@@ -136,7 +148,8 @@ theorem advance_next_iff {state next : State} :
                 exact .applyInRight
             | caseBranches leftBranch rightBranch environment =>
                 cases value with
-                | unit | bool | word | pair | closure => simp [advance] at advanced
+                | unit | bool | word | pair | closure | cellRef =>
+                    simp [advance] at advanced
                 | inLeft rightType payload =>
                     simp [advance] at advanced
                     cases advanced
@@ -145,9 +158,42 @@ theorem advance_next_iff {state next : State} :
                     simp [advance] at advanced
                     cases advanced
                     exact .chooseRight
+            | newCellApply elementType =>
+                simp [advance] at advanced
+                cases advanced
+                exact .applyNewCell
+            | loadCellApply =>
+                cases value with
+                | unit | bool | word | pair | closure | inLeft | inRight =>
+                    simp [advance] at advanced
+                | cellRef elementType location =>
+                    cases lookup : store.read? location with
+                    | none => simp [advance, lookup] at advanced
+                    | some loaded =>
+                        simp [advance, lookup] at advanced
+                        cases advanced
+                        exact .applyLoadCell lookup
+            | storeCellValue valueExpr environment =>
+                cases value with
+                | unit | bool | word | pair | closure | inLeft | inRight =>
+                    simp [advance] at advanced
+                | cellRef elementType location =>
+                    cases lookup : store.read? location with
+                    | none => simp [advance, lookup] at advanced
+                    | some oldValue =>
+                        simp [advance, lookup] at advanced
+                        cases advanced
+                        exact .beginStoreCellValue lookup
+            | storeCellApply elementType location =>
+                cases written : store.write? location value with
+                | none => simp [advance, written] at advanced
+                | some updatedStore =>
+                    simp [advance, written] at advanced
+                    cases advanced
+                    exact .applyStoreCell written
             | applyArgument argument callerEnvironment =>
                 cases value with
-                | unit | bool | word | pair | inLeft | inRight =>
+                | unit | bool | word | pair | inLeft | inRight | cellRef =>
                     simp [advance] at advanced
                 | closure parameterType resultType body capturedEnvironment =>
                     simp [advance] at advanced
@@ -163,7 +209,7 @@ theorem advance_next_iff {state next : State} :
                 exact .bindLet
             | ifBranches thenBranch elseBranch environment =>
                 cases value with
-                | unit | word | pair | inLeft | inRight | closure =>
+                | unit | word | pair | inLeft | inRight | closure | cellRef =>
                     simp [advance] at advanced
                 | bool decision =>
                     cases decision with
@@ -179,15 +225,17 @@ theorem advance_next_iff {state next : State} :
     cases transition <;> simp [advance, *]
 
 theorem advance_done_iff {state : State} {value : Value} :
-    advance state = .done value ↔ state = State.final value := by
+    advance state = .done value ↔
+      ∃ store, state = State.final value store := by
   constructor
   · intro advanced
-    rcases state with ⟨control, continuation⟩
+    rcases state with ⟨control, continuation, store⟩
     cases control with
     | eval expr environment =>
         cases expr with
         | unit | bool | word | pair | first | second | inLeft | inRight | caseE |
-            lambda | apply | unary | binary | letE | ifE =>
+            newCell | loadCell | storeCell | lambda | apply | unary | binary |
+            letE | ifE =>
             simp [advance] at advanced
         | var index =>
             cases lookup : environment[index]? <;> simp [advance, lookup] at advanced
@@ -196,7 +244,7 @@ theorem advance_done_iff {state : State} {value : Value} :
         | nil =>
             simp [advance] at advanced
             cases advanced
-            rfl
+            exact ⟨store, rfl⟩
         | cons frame continuation =>
             cases frame with
             | unaryApply op =>
@@ -217,6 +265,24 @@ theorem advance_done_iff {state : State} {value : Value} :
             | inRightApply leftType => simp [advance] at advanced
             | caseBranches leftBranch rightBranch environment =>
                 cases returned <;> simp [advance] at advanced
+            | newCellApply elementType => simp [advance] at advanced
+            | loadCellApply =>
+                cases returned with
+                | unit | bool | word | pair | closure | inLeft | inRight =>
+                    simp [advance] at advanced
+                | cellRef elementType location =>
+                    cases lookup : store.read? location <;>
+                      simp [advance, lookup] at advanced
+            | storeCellValue valueExpr environment =>
+                cases returned with
+                | unit | bool | word | pair | closure | inLeft | inRight =>
+                    simp [advance] at advanced
+                | cellRef elementType location =>
+                    cases lookup : store.read? location <;>
+                      simp [advance, lookup] at advanced
+            | storeCellApply elementType location =>
+                cases written : store.write? location returned <;>
+                  simp [advance, written] at advanced
             | applyArgument argument callerEnvironment =>
                 cases returned <;> simp [advance] at advanced
             | applyClosure parameterType resultType body capturedEnvironment =>
@@ -224,12 +290,11 @@ theorem advance_done_iff {state : State} {value : Value} :
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with
-                | unit | word | pair | inLeft | inRight | closure =>
+                | unit | word | pair | inLeft | inRight | closure | cellRef =>
                     simp [advance] at advanced
                 | bool decision =>
                     cases decision <;> simp [advance] at advanced
-  · intro final
-    subst state
+  · rintro ⟨store, rfl⟩
     simp [advance, State.final]
 
 theorem transition_deterministic
@@ -242,43 +307,188 @@ theorem transition_deterministic
   cases rightStep
   rfl
 
-theorem run_sound
-    {fuel : Nat} {state : State} {value : Value}
-    (result : run fuel state = .done value) :
-    ∃ steps, steps ≤ fuel ∧ Steps steps state (State.final value) := by
+theorem runStateful_sound
+    {fuel : Nat} {state : State} {value : Value} {finalStore : Store}
+    (result : runStateful fuel state = .done value finalStore) :
+    ∃ steps,
+      steps ≤ fuel ∧
+      Steps steps state (State.final value finalStore) := by
   induction fuel generalizing state value with
   | zero =>
       cases advanced : advance state with
       | next next =>
-          rw [run, advanced] at result
+          rw [runStateful, advanced] at result
           contradiction
       | fault error =>
-          rw [run, advanced] at result
+          rw [runStateful, advanced] at result
           contradiction
       | done returned =>
-          have finalState := advance_done_iff.mp advanced
-          rw [run, advanced] at result
+          obtain ⟨store, rfl⟩ := advance_done_iff.mp advanced
+          rw [runStateful, advanced] at result
           cases result
-          subst state
           exact ⟨0, Nat.zero_le 0, .refl⟩
   | succ fuel fuelIH =>
       cases advanced : advance state with
       | fault error =>
-          rw [run, advanced] at result
+          rw [runStateful, advanced] at result
           contradiction
       | done returned =>
-          have finalState := advance_done_iff.mp advanced
-          rw [run, advanced] at result
+          obtain ⟨store, rfl⟩ := advance_done_iff.mp advanced
+          rw [runStateful, advanced] at result
           cases result
-          subst state
           exact ⟨0, Nat.zero_le _, .refl⟩
       | next next =>
-          have tailResult : run fuel next = .done value := by
-            rw [run, advanced] at result
+          have tailResult :
+              runStateful fuel next = .done value finalStore := by
+            rw [runStateful, advanced] at result
             exact result
           obtain ⟨steps, bounded, path⟩ := fuelIH tailResult
           exact ⟨steps + 1, Nat.succ_le_succ bounded,
             .cons (advance_next_iff.mp advanced) path⟩
+
+theorem runStateful_fault_sound
+    {fuel : Nat} {state faultState : State} {error : MachineFault}
+    (result : runStateful fuel state = .fault error faultState) :
+    ∃ steps,
+      steps ≤ fuel ∧
+      Steps steps state faultState ∧
+      advance faultState = .fault error := by
+  induction fuel generalizing state error faultState with
+  | zero =>
+      cases advanced : advance state with
+      | next next =>
+          rw [runStateful, advanced] at result
+          contradiction
+      | done value =>
+          rw [runStateful, advanced] at result
+          contradiction
+      | fault actualError =>
+          rw [runStateful, advanced] at result
+          cases result
+          exact ⟨0, Nat.zero_le 0, .refl, advanced⟩
+  | succ fuel fuelIH =>
+      cases advanced : advance state with
+      | done value =>
+          rw [runStateful, advanced] at result
+          contradiction
+      | fault actualError =>
+          rw [runStateful, advanced] at result
+          cases result
+          exact ⟨0, Nat.zero_le _, .refl, advanced⟩
+      | next next =>
+          have tailResult :
+              runStateful fuel next = .fault error faultState := by
+            rw [runStateful, advanced] at result
+            exact result
+          obtain ⟨steps, bounded, path, terminal⟩ := fuelIH tailResult
+          exact ⟨steps + 1, Nat.succ_le_succ bounded,
+            .cons (advance_next_iff.mp advanced) path, terminal⟩
+
+theorem runStateful_outOfFuel_sound
+    {fuel : Nat} {state suspendedState : State}
+    (result : runStateful fuel state = .outOfFuel suspendedState) :
+    Steps fuel state suspendedState ∧
+      ∃ next, advance suspendedState = .next next := by
+  induction fuel generalizing state suspendedState with
+  | zero =>
+      cases advanced : advance state with
+      | done value =>
+          rw [runStateful, advanced] at result
+          contradiction
+      | fault error =>
+          rw [runStateful, advanced] at result
+          contradiction
+      | next next =>
+          rw [runStateful, advanced] at result
+          cases result
+          exact ⟨.refl, next, advanced⟩
+  | succ fuel fuelIH =>
+      cases advanced : advance state with
+      | done value =>
+          rw [runStateful, advanced] at result
+          contradiction
+      | fault error =>
+          rw [runStateful, advanced] at result
+          contradiction
+      | next next =>
+          have tailResult :
+              runStateful fuel next = .outOfFuel suspendedState := by
+            rw [runStateful, advanced] at result
+            exact result
+          obtain ⟨path, finalNext, pending⟩ := fuelIH tailResult
+          exact ⟨.cons (advance_next_iff.mp advanced) path,
+            finalNext, pending⟩
+
+theorem runStateful_complete_of_steps
+    {steps fuel : Nat} {state finish : State} {value : Value}
+    (path : Steps steps state finish)
+    (terminal : advance finish = .done value)
+    (enough : steps ≤ fuel) :
+    runStateful fuel state = .done value finish.store := by
+  induction path generalizing fuel value with
+  | refl =>
+      rw [runStateful, terminal]
+  | cons transition tail tailIH =>
+      cases fuel with
+      | zero => simp at enough
+      | succ fuel =>
+          have advanced := advance_next_iff.mpr transition
+          rw [runStateful, advanced]
+          exact tailIH terminal (Nat.le_of_succ_le_succ enough)
+
+theorem runStateful_complete_with_fuel
+    {steps fuel : Nat} {state : State} {value : Value} {finalStore : Store}
+    (path : Steps steps state (State.final value finalStore))
+    (enough : steps ≤ fuel) :
+    runStateful fuel state = .done value finalStore :=
+  runStateful_complete_of_steps path (by simp [advance, State.final]) enough
+
+theorem runStateful_fault_complete_of_steps
+    {steps fuel : Nat} {state faultState : State} {error : MachineFault}
+    (path : Steps steps state faultState)
+    (terminal : advance faultState = .fault error)
+    (enough : steps ≤ fuel) :
+    runStateful fuel state = .fault error faultState := by
+  induction path generalizing fuel error with
+  | refl =>
+      rw [runStateful, terminal]
+  | cons transition tail tailIH =>
+      cases fuel with
+      | zero => simp at enough
+      | succ fuel =>
+          have advanced := advance_next_iff.mpr transition
+          rw [runStateful, advanced]
+          exact tailIH terminal (Nat.le_of_succ_le_succ enough)
+
+theorem runStateful_outOfFuel_complete
+    {fuel : Nat} {state suspendedState next : State}
+    (path : Steps fuel state suspendedState)
+    (pending : advance suspendedState = .next next) :
+    runStateful fuel state = .outOfFuel suspendedState := by
+  induction path with
+  | refl =>
+      rw [runStateful, pending]
+  | cons transition tail tailIH =>
+      have advanced := advance_next_iff.mpr transition
+      rw [runStateful, advanced]
+      exact tailIH pending
+
+theorem run_sound
+    {fuel : Nat} {state : State} {value : Value}
+    (result : run fuel state = .done value) :
+    ∃ finalStore steps,
+      steps ≤ fuel ∧
+      Steps steps state (State.final value finalStore) := by
+  cases stateful : runStateful fuel state with
+  | done returned finalStore =>
+      rw [run, stateful] at result
+      cases result
+      obtain ⟨steps, bounded, path⟩ := runStateful_sound stateful
+      exact ⟨finalStore, steps, bounded, path⟩
+  | outOfFuel suspendedState =>
+      simp [run, stateful, StatefulRunResult.erase] at result
+  | fault error faultState =>
+      simp [run, stateful, StatefulRunResult.erase] at result
 
 theorem run_complete_of_steps
     {steps fuel : Nat} {state finish : State} {value : Value}
@@ -286,20 +496,12 @@ theorem run_complete_of_steps
     (terminal : advance finish = .done value)
     (enough : steps ≤ fuel) :
     run fuel state = .done value := by
-  induction path generalizing fuel value with
-  | refl =>
-      rw [run, terminal]
-  | cons transition tail tailIH =>
-      cases fuel with
-      | zero => simp at enough
-      | succ fuel =>
-          have advanced := advance_next_iff.mpr transition
-          rw [run, advanced]
-          exact tailIH terminal (Nat.le_of_succ_le_succ enough)
+  simp [run, runStateful_complete_of_steps path terminal enough,
+    StatefulRunResult.erase]
 
 theorem run_complete_with_fuel
-    {steps fuel : Nat} {state : State} {value : Value}
-    (path : Steps steps state (State.final value))
+    {steps fuel : Nat} {state : State} {value : Value} {finalStore : Store}
+    (path : Steps steps state (State.final value finalStore))
     (enough : steps ≤ fuel) :
     run fuel state = .done value :=
   run_complete_of_steps path (by simp [advance, State.final]) enough

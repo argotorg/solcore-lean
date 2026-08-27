@@ -146,6 +146,11 @@ def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
         (scrutinee.weakenAt cutoff)
         (leftBranch.weakenAt (cutoff + 1))
         (rightBranch.weakenAt (cutoff + 1))
+  | .newCell elementType initializer =>
+      .newCell elementType (initializer.weakenAt cutoff)
+  | .loadCell reference => .loadCell (reference.weakenAt cutoff)
+  | .storeCell reference value =>
+      .storeCell (reference.weakenAt cutoff) (value.weakenAt cutoff)
   | .unary op operand => .unary op (operand.weakenAt cutoff)
   | .binary op left right =>
       .binary op (left.weakenAt cutoff) (right.weakenAt cutoff)

@@ -51,6 +51,22 @@ inductive HasType : Context → Expr → Ty → Prop where
       HasType (leftType :: context) leftBranch resultType →
       HasType (rightType :: context) rightBranch resultType →
       HasType context (.caseE scrutinee leftBranch rightBranch) resultType
+  | newCell
+      {context : Context} {elementType : Ty} {initializer : Expr} :
+      HasType context initializer elementType →
+      CellPayload elementType →
+      HasType context (.newCell elementType initializer) (.cell elementType)
+  | loadCell
+      {context : Context} {elementType : Ty} {reference : Expr} :
+      HasType context reference (.cell elementType) →
+      CellPayload elementType →
+      HasType context (.loadCell reference) elementType
+  | storeCell
+      {context : Context} {elementType : Ty} {reference value : Expr} :
+      HasType context reference (.cell elementType) →
+      HasType context value elementType →
+      CellPayload elementType →
+      HasType context (.storeCell reference value) .unit
   | unary
       {context : Context} {op : UnaryOp} {operand : Expr} :
       HasType context operand op.operandType →
@@ -123,6 +139,27 @@ def infer? (context : Context) : Expr → Option Ty
                 none
           | _, _ => none
       | _ => none
+  | .newCell elementType initializer =>
+      if infer? context initializer = some elementType then
+        if elementType.isCellPayload then
+          some (.cell elementType)
+        else
+          none
+      else
+        none
+  | .loadCell reference =>
+      match infer? context reference with
+      | some (.cell elementType) =>
+          if elementType.isCellPayload then some elementType else none
+      | _ => none
+  | .storeCell reference value =>
+      match infer? context reference with
+      | some (.cell elementType) =>
+          if elementType.isCellPayload then
+            if infer? context value = some elementType then some .unit else none
+          else
+            none
+      | _ => none
   | .unary op operand =>
       if infer? context operand = some op.operandType then
         some op.resultType
@@ -161,6 +198,12 @@ theorem infer_complete
   | inRight _ payloadIH => simp [infer?, payloadIH]
   | caseE _ _ _ scrutineeIH leftIH rightIH =>
       simp [infer?, scrutineeIH, leftIH, rightIH]
+  | newCell _ payload initializerIH =>
+      simp [infer?, initializerIH, Ty.isCellPayload_complete payload]
+  | loadCell _ payload referenceIH =>
+      simp [infer?, referenceIH, Ty.isCellPayload_complete payload]
+  | storeCell _ _ payload referenceIH valueIH =>
+      simp [infer?, referenceIH, valueIH, Ty.isCellPayload_complete payload]
   | unary _ operandIH => simp [infer?, operandIH]
   | binary _ _ leftIH rightIH => simp [infer?, leftIH, rightIH]
   | letE _ _ valueIH bodyIH => simp_all [infer?]
@@ -217,6 +260,8 @@ theorem infer_sound
               simp [infer?, operandInferred] at inferred
           | sum leftType rightType =>
               simp [infer?, operandInferred] at inferred
+          | cell elementType =>
+              simp [infer?, operandInferred] at inferred
   | second operand operandIH =>
       cases operandInferred : infer? context operand with
       | none => simp [infer?, operandInferred] at inferred
@@ -234,6 +279,8 @@ theorem infer_sound
           | function parameterType resultType =>
               simp [infer?, operandInferred] at inferred
           | sum leftType rightType =>
+              simp [infer?, operandInferred] at inferred
+          | cell elementType =>
               simp [infer?, operandInferred] at inferred
   | lambda parameterType resultType body bodyIH =>
       by_cases bodyInferred :
@@ -266,6 +313,8 @@ theorem infer_sound
                   (argumentIH argumentInferred)
               · simp [infer?, functionInferred, argumentInferred] at inferred
           | sum leftType rightType =>
+              simp [infer?, functionInferred] at inferred
+          | cell elementType =>
               simp [infer?, functionInferred] at inferred
   | inLeft rightType payload payloadIH =>
       cases payloadInferred : infer? context payload with
@@ -324,6 +373,59 @@ theorem infer_sound
                           rightInferred,
                           equalTypes
                         ] at inferred
+          | cell elementType =>
+              simp [infer?, scrutineeInferred] at inferred
+  | newCell elementType initializer initializerIH =>
+      by_cases initializerInferred :
+          infer? context initializer = some elementType
+      · by_cases payloadAccepted : elementType.isCellPayload = true
+        · have resultType : Ty.cell elementType = type := by
+            exact Option.some.inj (by
+              simpa [infer?, initializerInferred, payloadAccepted] using inferred)
+          subst type
+          exact .newCell
+            (initializerIH initializerInferred)
+            (Ty.isCellPayload_sound payloadAccepted)
+        · simp [infer?, initializerInferred, payloadAccepted] at inferred
+      · simp [infer?, initializerInferred] at inferred
+  | loadCell reference referenceIH =>
+      cases referenceInferred : infer? context reference with
+      | none => simp [infer?, referenceInferred] at inferred
+      | some referenceType =>
+          cases referenceType with
+          | unit | bool | word | product | function | sum =>
+              simp [infer?, referenceInferred] at inferred
+          | cell elementType =>
+              by_cases payloadAccepted : elementType.isCellPayload = true
+              · have resultType : elementType = type := by
+                  exact Option.some.inj (by
+                    simpa [infer?, referenceInferred, payloadAccepted] using inferred)
+                subst type
+                exact .loadCell
+                  (referenceIH referenceInferred)
+                  (Ty.isCellPayload_sound payloadAccepted)
+              · simp [infer?, referenceInferred, payloadAccepted] at inferred
+  | storeCell reference value referenceIH valueIH =>
+      cases referenceInferred : infer? context reference with
+      | none => simp [infer?, referenceInferred] at inferred
+      | some referenceType =>
+          cases referenceType with
+          | unit | bool | word | product | function | sum =>
+              simp [infer?, referenceInferred] at inferred
+          | cell elementType =>
+              by_cases payloadAccepted : elementType.isCellPayload = true
+              · by_cases valueInferred : infer? context value = some elementType
+                · have resultType : Ty.unit = type := by
+                    exact Option.some.inj (by
+                      simpa [infer?, referenceInferred, payloadAccepted, valueInferred]
+                        using inferred)
+                  subst type
+                  exact .storeCell
+                    (referenceIH referenceInferred)
+                    (valueIH valueInferred)
+                    (Ty.isCellPayload_sound payloadAccepted)
+                · simp [infer?, referenceInferred, payloadAccepted, valueInferred] at inferred
+              · simp [infer?, referenceInferred, payloadAccepted] at inferred
   | unary op operand operandIH =>
       by_cases operandInferred :
           infer? context operand = some op.operandType
@@ -366,6 +468,8 @@ theorem infer_sound
           | function parameterType resultType =>
               simp [infer?, conditionInferred] at inferred
           | sum leftType rightType =>
+              simp [infer?, conditionInferred] at inferred
+          | cell elementType =>
               simp [infer?, conditionInferred] at inferred
           | bool =>
               cases thenInferred : infer? context thenBranch with

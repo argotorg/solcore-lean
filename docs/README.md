@@ -21,7 +21,9 @@ explain what the implementation means, what is proved, and what remains.
 Concrete Solcore syntax may change substantially. The published parsers remain
 available as versioned reference implementations, but new grammar-dependent
 proof work is paused. Active work is directed toward a syntax-independent
-Semantic Core and explicit runtime semantics.
+Semantic Core and explicit runtime semantics. First-order local cells from
+ADR-0022 are complete; they deliberately do not choose a source spelling for
+mutable declarations or assignment.
 
 This policy is recorded by
 [ADR-0018](adr/0018-semantics-first-development-order.md). It changes
@@ -54,6 +56,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0019 defines the first internal Core vNext feature.
 - ADR-0020 defines non-recursive functions and lexical closures.
 - ADR-0021 defines binary sums and exhaustive elimination.
+- ADR-0022 defines first-order local cells and their explicit local store.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -25,7 +25,70 @@ inductive Ty where
   | product (left : Ty) (right : Ty)
   | function (parameter : Ty) (result : Ty)
   | sum (left : Ty) (right : Ty)
+  | cell (elementType : Ty)
   deriving Repr, BEq, DecidableEq
+
+inductive CellPayload : Ty → Prop where
+  | unit : CellPayload .unit
+  | bool : CellPayload .bool
+  | word : CellPayload .word
+  | product {left right : Ty} :
+      CellPayload left →
+      CellPayload right →
+      CellPayload (.product left right)
+  | sum {left right : Ty} :
+      CellPayload left →
+      CellPayload right →
+      CellPayload (.sum left right)
+
+namespace Ty
+
+def isCellPayload : Ty → Bool
+  | .unit
+  | .bool
+  | .word => true
+  | .product left right
+  | .sum left right => left.isCellPayload && right.isCellPayload
+  | .function _ _
+  | .cell _ => false
+
+theorem isCellPayload_sound
+    {type : Ty}
+    (accepted : type.isCellPayload = true) :
+    CellPayload type := by
+  induction type with
+  | unit => exact .unit
+  | bool => exact .bool
+  | word => exact .word
+  | product left right leftIH rightIH =>
+      simp [isCellPayload] at accepted
+      exact .product (leftIH accepted.1) (rightIH accepted.2)
+  | function parameter result parameterIH resultIH =>
+      simp [isCellPayload] at accepted
+  | sum left right leftIH rightIH =>
+      simp [isCellPayload] at accepted
+      exact .sum (leftIH accepted.1) (rightIH accepted.2)
+  | cell elementType elementIH =>
+      simp [isCellPayload] at accepted
+
+theorem isCellPayload_complete
+    {type : Ty}
+    (payload : CellPayload type) :
+    type.isCellPayload = true := by
+  induction payload with
+  | unit
+  | bool
+  | word => rfl
+  | product leftPayload rightPayload leftIH rightIH
+  | sum leftPayload rightPayload leftIH rightIH =>
+      simp [isCellPayload, leftIH, rightIH]
+
+theorem isCellPayload_iff
+    {type : Ty} :
+    type.isCellPayload = true ↔ CellPayload type :=
+  ⟨isCellPayload_sound, isCellPayload_complete⟩
+
+end Ty
 
 inductive UnaryOp where
   | boolNot
@@ -81,6 +144,8 @@ def resultType : BinaryOp → Ty
 
 end BinaryOp
 
+abbrev Location := Nat
+
 inductive Expr where
   | unit
   | bool (value : Bool)
@@ -94,6 +159,9 @@ inductive Expr where
   | inLeft (rightType : Ty) (payload : Expr)
   | inRight (leftType : Ty) (payload : Expr)
   | caseE (scrutinee leftBranch rightBranch : Expr)
+  | newCell (elementType : Ty) (initializer : Expr)
+  | loadCell (reference : Expr)
+  | storeCell (reference value : Expr)
   | unary (op : UnaryOp) (operand : Expr)
   | binary (op : BinaryOp) (left : Expr) (right : Expr)
   | letE (value : Expr) (body : Expr)
@@ -111,6 +179,7 @@ inductive Value where
       (environment : List Value)
   | inLeft (rightType : Ty) (payload : Value)
   | inRight (leftType : Ty) (payload : Value)
+  | cellRef (elementType : Ty) (location : Location)
   deriving Repr
 
 mutual
@@ -215,48 +284,80 @@ mutual
             intro injectionEquality
             cases injectionEquality
             exact typeEquality rfl)
+    | .cellRef leftElementType leftLocation,
+        .cellRef rightElementType rightLocation =>
+        if typeEquality : leftElementType = rightElementType then
+          if locationEquality : leftLocation = rightLocation then
+            isTrue (by
+              cases typeEquality
+              cases locationEquality
+              rfl)
+          else
+            isFalse (by
+              intro referenceEquality
+              cases referenceEquality
+              exact locationEquality rfl)
+        else
+          isFalse (by
+            intro referenceEquality
+            cases referenceEquality
+            exact typeEquality rfl)
     | .unit, .bool _
     | .unit, .word _
     | .unit, .pair _ _
     | .unit, .closure _ _ _ _
     | .unit, .inLeft _ _
     | .unit, .inRight _ _
+    | .unit, .cellRef _ _
     | .bool _, .unit
     | .bool _, .word _
     | .bool _, .pair _ _
     | .bool _, .closure _ _ _ _
     | .bool _, .inLeft _ _
     | .bool _, .inRight _ _
+    | .bool _, .cellRef _ _
     | .word _, .unit
     | .word _, .bool _
     | .word _, .pair _ _
     | .word _, .closure _ _ _ _
     | .word _, .inLeft _ _
     | .word _, .inRight _ _
+    | .word _, .cellRef _ _
     | .pair _ _, .unit
     | .pair _ _, .bool _
     | .pair _ _, .word _
     | .pair _ _, .closure _ _ _ _
     | .pair _ _, .inLeft _ _
     | .pair _ _, .inRight _ _
+    | .pair _ _, .cellRef _ _
     | .closure _ _ _ _, .unit
     | .closure _ _ _ _, .bool _
     | .closure _ _ _ _, .word _
     | .closure _ _ _ _, .pair _ _
     | .closure _ _ _ _, .inLeft _ _
     | .closure _ _ _ _, .inRight _ _
+    | .closure _ _ _ _, .cellRef _ _
     | .inLeft _ _, .unit
     | .inLeft _ _, .bool _
     | .inLeft _ _, .word _
     | .inLeft _ _, .pair _ _
     | .inLeft _ _, .closure _ _ _ _
     | .inLeft _ _, .inRight _ _
+    | .inLeft _ _, .cellRef _ _
     | .inRight _ _, .unit
     | .inRight _ _, .bool _
     | .inRight _ _, .word _
     | .inRight _ _, .pair _ _
     | .inRight _ _, .closure _ _ _ _
-    | .inRight _ _, .inLeft _ _ =>
+    | .inRight _ _, .inLeft _ _
+    | .inRight _ _, .cellRef _ _
+    | .cellRef _ _, .unit
+    | .cellRef _ _, .bool _
+    | .cellRef _ _, .word _
+    | .cellRef _ _, .pair _ _
+    | .cellRef _ _, .closure _ _ _ _
+    | .cellRef _ _, .inLeft _ _
+    | .cellRef _ _, .inRight _ _ =>
         isFalse (by intro equality; cases equality)
   termination_by sizeOf left + sizeOf right
   decreasing_by all_goals simp_wf <;> omega
@@ -312,10 +413,15 @@ def Value.type : Value → Ty
       .function parameterType resultType
   | .inLeft rightType payload => .sum payload.type rightType
   | .inRight leftType payload => .sum leftType payload.type
+  | .cellRef elementType _ => .cell elementType
 
 abbrev Context := List Ty
 
 abbrev Environment := List Value
+
+abbrev Store := List Value
+
+abbrev StoreTyping := List Ty
 
 structure Program where
   resultType : Ty

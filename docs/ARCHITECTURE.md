@@ -52,11 +52,25 @@ The existing Core v2 fragment is closed and published. New features extend the
 internal Core additively. Old wire languages remain projections and must
 reject new constructors.
 
+Core vNext includes local mutation through explicit typed cells. Cell
+references are ordinary internal values, while the local store is a separate
+component of evaluation and machine state. Closures capture references in
+their lexical environments; they do not copy the store. This makes sharing
+explicit and keeps the semantics independent of host-language mutation.
+
+The completed initial cell slice stores only first-order data: unit, boolean,
+word, and products or sums made recursively from those types. Function-valued
+and cell-valued contents wait for the recursion-and-divergence decision because
+higher-order cells can encode nontermination.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,
 call frames, transaction inputs, logs, created contracts, and rollback state.
-It must not obtain meaning from compiler output or hidden host state.
+That world state is distinct from the Core-local cell store. The local store
+uses transient locations for one Core execution; it does not define contract
+storage keys, persistence, transaction boundaries, or rollback. Neither layer
+may obtain meaning from compiler output or hidden host state.
 
 ### Observation
 
@@ -72,10 +86,11 @@ Each semantic feature follows the same vertical structure:
 | Concern | Required artifact |
 | --- | --- |
 | Intended meaning | Independent typing and evaluation judgments |
-| Execution | Pure total checker and evaluator |
+| Execution | Total checker and explicitly state-threaded evaluator |
 | Static correspondence | Checker soundness and completeness |
 | Dynamic correspondence | Machine and big-step agreement |
 | Safety | Progress, preservation, and typed result properties |
+| Local state | Explicit store threading, typed allocation/update, and final-store agreement |
 | Resource behavior | Explicit fuel or a proved finite bound |
 | Compatibility | Old wires reject new syntax unless a new version publishes it |
 | Regression protection | Positive, negative, order, boundary, and version tests |
@@ -114,7 +129,7 @@ stabilized.
 
 | Location | Responsibility |
 | --- | --- |
-| Solcore/Core | Semantic Core and current Core proofs |
+| Solcore/Core | Semantic Core, its local value store, and current Core proofs |
 | Solcore/Semantics | Future cross-feature and runtime semantics |
 | Solcore/Surface | Published Surface v1 |
 | Solcore/Surface/Multi | Frozen internal Multi frontend |

@@ -38,7 +38,7 @@ Build and inspect the command-line interface:
 
     lake exe solcoreOracle --help
 
-The two current public interfaces are:
+The latest capability-report commands are:
 
 | Command | Purpose |
 | --- | --- |
@@ -48,12 +48,12 @@ The two current public interfaces are:
 The Oracle reads newline-delimited JSON from standard input when no command is
 given. Each request produces exactly one response in the same order.
 
-    lake exe solcoreOracle < request.ndjson
+    lake exe solcoreOracle < Tests/golden/m1c-eval-operations-request.ndjson
 
 Requests must contain one compact JSON object per line. Malformed envelopes,
 unknown schemas, and invalid field shapes produce protocol errors rather than
 language results. Checked-in request and response examples are available in
-the Tests/golden directory.
+the [golden test directory](Tests/golden).
 
 ## Use as a Lean library
 
@@ -69,8 +69,11 @@ Or import an individual layer:
 
 ## Public schemas
 
+- [Oracle v1](schema/oracle-v1.schema.json)
+- [Oracle v2](schema/oracle-v2.schema.json)
 - [Oracle v3](schema/oracle-v3.schema.json)
 - [Oracle v4](schema/oracle-v4.schema.json)
+- [Semantic Core v1](schema/semantic-core-v1.schema.json)
 - [Semantic Core v2](schema/semantic-core-v2.schema.json)
 - [Surface v1](schema/surface-v1.schema.json)
 - [Parse result v1](schema/parse-result-v1.schema.json)

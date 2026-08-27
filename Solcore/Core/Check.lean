@@ -17,6 +17,10 @@ inductive CheckPathStep where
   | caseScrutinee
   | caseLeftBranch
   | caseRightBranch
+  | newCellInitializer
+  | loadCellReference
+  | storeCellReference
+  | storeCellValue
   | unaryOperand
   | binaryLeft
   | binaryRight
@@ -41,6 +45,10 @@ inductive CheckErrorCode where
   | lambdaResultTypeMismatch
   | expectedSum
   | caseBranchTypeMismatch
+  | invalidCellPayload
+  | cellInitializerTypeMismatch
+  | expectedCell
+  | cellValueTypeMismatch
   | primitiveOperandTypeMismatch
   | branchTypeMismatch
   | declaredResultTypeMismatch
@@ -56,6 +64,11 @@ def CheckErrorCode.name : CheckErrorCode → String
   | .lambdaResultTypeMismatch => "core.check.lambda-result-type-mismatch"
   | .expectedSum => "core.check.expected-sum"
   | .caseBranchTypeMismatch => "core.check.case-branch-type-mismatch"
+  | .invalidCellPayload => "core.check.invalid-cell-payload"
+  | .cellInitializerTypeMismatch =>
+      "core.check.cell-initializer-type-mismatch"
+  | .expectedCell => "core.check.expected-cell"
+  | .cellValueTypeMismatch => "core.check.cell-value-type-mismatch"
   | .primitiveOperandTypeMismatch =>
       "core.check.primitive-operand-type-mismatch"
   | .branchTypeMismatch => "core.check.branch-type-mismatch"
@@ -70,6 +83,10 @@ inductive CheckErrorData where
   | lambdaResultTypeMismatch (declared actual : Ty)
   | expectedSum (actual : Ty)
   | caseBranchTypeMismatch (leftType rightType : Ty)
+  | invalidCellPayload (actual : Ty)
+  | cellInitializerTypeMismatch (expected actual : Ty)
+  | expectedCell (actual : Ty)
+  | cellValueTypeMismatch (expected actual : Ty)
   | primitiveOperandTypeMismatch (expected actual : Ty)
   | branchTypeMismatch (thenType elseType : Ty)
   | declaredResultTypeMismatch (declaredType inferredType : Ty)
@@ -84,6 +101,10 @@ def CheckErrorData.code : CheckErrorData → CheckErrorCode
   | .lambdaResultTypeMismatch .. => .lambdaResultTypeMismatch
   | .expectedSum .. => .expectedSum
   | .caseBranchTypeMismatch .. => .caseBranchTypeMismatch
+  | .invalidCellPayload .. => .invalidCellPayload
+  | .cellInitializerTypeMismatch .. => .cellInitializerTypeMismatch
+  | .expectedCell .. => .expectedCell
+  | .cellValueTypeMismatch .. => .cellValueTypeMismatch
   | .primitiveOperandTypeMismatch .. => .primitiveOperandTypeMismatch
   | .branchTypeMismatch .. => .branchTypeMismatch
   | .declaredResultTypeMismatch .. => .declaredResultTypeMismatch
@@ -211,6 +232,68 @@ def inferDetailed (context : Context) (path : CheckPath := []) : Expr → Except
           .error {
             path := scrutineePath
             data := .expectedSum actualType
+          }
+  | .newCell elementType initializer =>
+      let initializerPath := path.child .newCellInitializer
+      match inferDetailed context initializerPath initializer with
+      | .error error => .error error
+      | .ok actualType =>
+          if actualType = elementType then
+            if elementType.isCellPayload then
+              .ok (.cell elementType)
+            else
+              .error {
+                path
+                data := .invalidCellPayload elementType
+              }
+          else
+            .error {
+              path := initializerPath
+              data := .cellInitializerTypeMismatch elementType actualType
+            }
+  | .loadCell reference =>
+      let referencePath := path.child .loadCellReference
+      match inferDetailed context referencePath reference with
+      | .error error => .error error
+      | .ok (.cell elementType) =>
+          if elementType.isCellPayload then
+            .ok elementType
+          else
+            .error {
+              path := referencePath
+              data := .invalidCellPayload elementType
+            }
+      | .ok actualType =>
+          .error {
+            path := referencePath
+            data := .expectedCell actualType
+          }
+  | .storeCell reference value =>
+      let referencePath := path.child .storeCellReference
+      match inferDetailed context referencePath reference with
+      | .error error => .error error
+      | .ok (.cell elementType) =>
+          if elementType.isCellPayload then
+            let valuePath := path.child .storeCellValue
+            match inferDetailed context valuePath value with
+            | .error error => .error error
+            | .ok actualType =>
+                if actualType = elementType then
+                  .ok .unit
+                else
+                  .error {
+                    path := valuePath
+                    data := .cellValueTypeMismatch elementType actualType
+                  }
+          else
+            .error {
+              path := referencePath
+              data := .invalidCellPayload elementType
+            }
+      | .ok actualType =>
+          .error {
+            path := referencePath
+            data := .expectedCell actualType
           }
   | .unary op operand =>
       let operandPath := path.child .unaryOperand
@@ -522,6 +605,14 @@ theorem inferDetailed_toOption
                 functionDetailed,
                 functionInferred
               ]
+          | cell elementType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                functionDetailed,
+                functionInferred
+              ]
   | inLeft rightType payload payloadIH =>
       cases payloadDetailed :
           inferDetailed context (path.child .inLeftPayload) payload with
@@ -718,6 +809,185 @@ theorem inferDetailed_toOption
                           rightInferred,
                           equalTypes
                         ]
+          | cell elementType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                scrutineeDetailed,
+                scrutineeInferred
+              ]
+  | newCell elementType initializer initializerIH =>
+      cases initializerDetailed :
+          inferDetailed context (path.child .newCellInitializer) initializer with
+      | error error =>
+          have initializerNotInferred : infer? context initializer = none := by
+            simpa [initializerDetailed, Except.toOption] using
+              (initializerIH context (path.child .newCellInitializer)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            initializerDetailed,
+            initializerNotInferred
+          ]
+      | ok initializerType =>
+          have initializerInferred :
+              infer? context initializer = some initializerType := by
+            simpa [initializerDetailed, Except.toOption] using
+              (initializerIH context (path.child .newCellInitializer)).symm
+          by_cases matchingType : initializerType = elementType
+          · subst initializerType
+            by_cases payloadAccepted : elementType.isCellPayload = true
+            · simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                initializerDetailed,
+                initializerInferred,
+                payloadAccepted
+              ]
+            · simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                initializerDetailed,
+                initializerInferred,
+                payloadAccepted
+              ]
+          · simp [
+              inferDetailed,
+              infer?,
+              Except.toOption,
+              initializerDetailed,
+              initializerInferred,
+              matchingType
+            ]
+  | loadCell reference referenceIH =>
+      cases referenceDetailed :
+          inferDetailed context (path.child .loadCellReference) reference with
+      | error error =>
+          have referenceNotInferred : infer? context reference = none := by
+            simpa [referenceDetailed, Except.toOption] using
+              (referenceIH context (path.child .loadCellReference)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            referenceDetailed,
+            referenceNotInferred
+          ]
+      | ok referenceType =>
+          have referenceInferred : infer? context reference = some referenceType := by
+            simpa [referenceDetailed, Except.toOption] using
+              (referenceIH context (path.child .loadCellReference)).symm
+          cases referenceType with
+          | unit | bool | word | product | function | sum =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                referenceDetailed,
+                referenceInferred
+              ]
+          | cell elementType =>
+              by_cases payloadAccepted : elementType.isCellPayload = true
+              · simp [
+                  inferDetailed,
+                  infer?,
+                  Except.toOption,
+                  referenceDetailed,
+                  referenceInferred,
+                  payloadAccepted
+                ]
+              · simp [
+                  inferDetailed,
+                  infer?,
+                  Except.toOption,
+                  referenceDetailed,
+                  referenceInferred,
+                  payloadAccepted
+                ]
+  | storeCell reference value referenceIH valueIH =>
+      cases referenceDetailed :
+          inferDetailed context (path.child .storeCellReference) reference with
+      | error error =>
+          have referenceNotInferred : infer? context reference = none := by
+            simpa [referenceDetailed, Except.toOption] using
+              (referenceIH context (path.child .storeCellReference)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            referenceDetailed,
+            referenceNotInferred
+          ]
+      | ok referenceType =>
+          have referenceInferred : infer? context reference = some referenceType := by
+            simpa [referenceDetailed, Except.toOption] using
+              (referenceIH context (path.child .storeCellReference)).symm
+          cases referenceType with
+          | unit | bool | word | product | function | sum =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                referenceDetailed,
+                referenceInferred
+              ]
+          | cell elementType =>
+              by_cases payloadAccepted : elementType.isCellPayload = true
+              · cases valueDetailed :
+                    inferDetailed context (path.child .storeCellValue) value with
+                | error error =>
+                    have valueNotInferred : infer? context value = none := by
+                      simpa [valueDetailed, Except.toOption] using
+                        (valueIH context (path.child .storeCellValue)).symm
+                    simp [
+                      inferDetailed,
+                      infer?,
+                      Except.toOption,
+                      referenceDetailed,
+                      referenceInferred,
+                      payloadAccepted,
+                      valueDetailed,
+                      valueNotInferred
+                    ]
+                | ok valueType =>
+                    have valueInferred : infer? context value = some valueType := by
+                      simpa [valueDetailed, Except.toOption] using
+                        (valueIH context (path.child .storeCellValue)).symm
+                    by_cases matchingType : valueType = elementType
+                    · subst valueType
+                      simp [
+                        inferDetailed,
+                        infer?,
+                        Except.toOption,
+                        referenceDetailed,
+                        referenceInferred,
+                        payloadAccepted,
+                        valueDetailed,
+                        valueInferred
+                      ]
+                    · simp [
+                        inferDetailed,
+                        infer?,
+                        Except.toOption,
+                        referenceDetailed,
+                        referenceInferred,
+                        payloadAccepted,
+                        valueDetailed,
+                        valueInferred,
+                        matchingType
+                      ]
+              · simp [
+                  inferDetailed,
+                  infer?,
+                  Except.toOption,
+                  referenceDetailed,
+                  referenceInferred,
+                  payloadAccepted
+                ]
   | unary op operand operandIH =>
       cases operandDetailed :
           inferDetailed context (path.child .unaryOperand) operand with
@@ -893,6 +1163,14 @@ theorem inferDetailed_toOption
                 conditionInferred
               ]
           | sum leftType rightType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                conditionDetailed,
+                conditionInferred
+              ]
+          | cell elementType =>
               simp [
                 inferDetailed,
                 infer?,

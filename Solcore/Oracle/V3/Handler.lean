@@ -37,6 +37,10 @@ private def checkPathStepName : Core.CheckPathStep → String
   | .caseScrutinee => "caseScrutinee"
   | .caseLeftBranch => "caseLeftBranch"
   | .caseRightBranch => "caseRightBranch"
+  | .newCellInitializer => "newCellInitializer"
+  | .loadCellReference => "loadCellReference"
+  | .storeCellReference => "storeCellReference"
+  | .storeCellValue => "storeCellValue"
   | .unaryOperand => "unaryOperand"
   | .binaryLeft => "binaryLeft"
   | .binaryRight => "binaryRight"
@@ -87,6 +91,26 @@ private def checkErrorArguments : Core.CheckErrorData → Option Lean.Json
       pure (.mkObj [
         ("leftType", leftType),
         ("rightType", rightType)
+      ])
+  | .invalidCellPayload actual => do
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [("actual", actual)])
+  | .cellInitializerTypeMismatch expected actual => do
+      let expected ← encodeCoreType? expected
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [
+        ("expected", expected),
+        ("actual", actual)
+      ])
+  | .expectedCell actual => do
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [("actual", actual)])
+  | .cellValueTypeMismatch expected actual => do
+      let expected ← encodeCoreType? expected
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [
+        ("expected", expected),
+        ("actual", actual)
       ])
   | .primitiveOperandTypeMismatch expected actual => do
       let expected ← encodeCoreType? expected

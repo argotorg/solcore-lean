@@ -22,17 +22,18 @@ These results remain regression obligations for every extension.
 
 ## Implementation order
 
-| Order | Feature family | Why it is here |
-| ---: | --- | --- |
-| 1 | Binary products and projections | Exercises every Core layer without introducing divergence |
-| 2 | Functions, application, and lexical closures | Establishes callable values and reusable computation |
-| 3 | Sum values, algebraic data, and pattern matching | Adds structured branching and user data |
-| 4 | Mutable locals and assignment | Introduces explicit local state after pure values are stable |
-| 5 | Additional primitives and conversions | Added one closed, typed family at a time |
-| 6 | Recursion and divergence | Requires a deliberate change to termination and resource claims |
-| 7 | Contract runtime state and observations | Adds external effects independently of source syntax |
-| 8 | ABI and storage | Follows accepted layout and admissibility decisions |
-| 9 | Resolved static semantics and elaboration adapters | Connects stabilized source syntax last |
+| Order | Feature family | Status | Why it is here |
+| ---: | --- | --- | --- |
+| 1 | Binary products and projections | Complete | Exercises every Core layer without introducing divergence |
+| 2 | Functions, application, and lexical closures | Complete | Establishes callable values and reusable computation |
+| 3 | Binary sums and elimination | Complete | Adds structured branching without choosing source pattern syntax |
+| 4 | First-order local cells | Complete | Introduces explicit local state after pure values are stable; source assignment elaborates later |
+| 5 | Named algebraic data and direct matching | Next | Builds on sums after constructor identity is accepted |
+| 6 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 7 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 8 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 9 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 10 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -105,25 +106,42 @@ branch evaluation, detailed diagnostics, weakening, CEK/big-step
 correspondence, safety, logical-relations totality, exact fuel, interactions
 with products and closures, and old-wire rejection.
 
-## Next active design: mutable locals
+## Completed Core vNext slice: first-order local cells
 
-The next decision must fix:
+[ADR-0022](adr/0022-core-vnext-first-order-local-cells.md) fixes:
 
-- whether bindings denote values or stable cell identities;
-- allocation order and lifetime;
-- assignment result and evaluation order;
-- how closures share captured mutable cells;
-- explicit store typing and preservation; and
-- the boundary between local cells and future contract storage.
+- first-class `cell` types and typed cell-reference values;
+- explicit `newCell`, `loadCell`, and `storeCell` Core operations;
+- an append-only local store with stable natural-number locations;
+- initializer-before-allocation and reference-before-right-hand-side order;
+- `unit` as the result of a successful store;
+- closure sharing through captured references rather than copied stores;
+- a stateful internal runner that returns the final local store; and
+- rejection of every cell form by the frozen Core wire projections.
 
-This slice must keep local state explicit in the semantics and must not depend
-on host-language mutation.
+Cell contents are limited recursively to unit, boolean, word, product, and sum
+data. Functions and cells cannot be stored in cells during this slice. This is
+not merely an implementation convenience: function-valued cells can encode
+recursion and divergence, which belong to a later roadmap decision that will
+replace the current totality and sufficient-fuel claims.
+
+The existing `Program.run` behavior remains available as a compatibility
+wrapper that discards the final local store. Oracle v2 and v3 inputs cannot
+construct cells, so their store stays empty and their published behavior does
+not change.
+
+The implementation covers declarative and executable typing, store-threaded
+evaluation, CEK execution, correspondence, store-indexed safety, logical
+reducibility, sufficient fuel, detailed diagnostics, composite-payload and
+aliasing tests, and old-wire rejection. Existing public Core and Oracle
+behavior remains unchanged.
 
 ## State and contracts
 
-Local mutation should use explicit typed cells rather than hidden host
-mutation. Contract execution should then add an explicit world state, call
-frames, transaction inputs, and rollback checkpoints.
+Local mutation uses the explicit typed-cell store fixed by ADR-0022, never
+hidden host mutation. This store contains local runtime values and is scoped to
+one Core execution. Contract execution will later add a separate explicit
+world state, call frames, transaction inputs, and rollback checkpoints.
 
 Runtime observations are defined over semantic effects. They do not require
 executing compiler-generated EVM bytecode.
@@ -136,7 +154,7 @@ For each feature:
 2. Extend syntax, types, values, and declarative rules.
 3. Extend executable checking and evaluation.
 4. Extend the CEK machine.
-5. re-establish correspondence and safety.
+5. Re-establish correspondence and safety.
 6. Add compatibility rejection for old wires.
 7. Add focused tests and run the full repository audit.
 8. Keep the feature internal until a separate publication decision.
