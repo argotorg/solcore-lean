@@ -10,6 +10,7 @@ import Solcore.Core.RenamingSafety
 import Solcore.Core.RenamingInsertion
 import Solcore.Core.DerivedComparisons
 import Solcore.Core.DerivedSignedComparisons
+import Solcore.Core.DerivedSignedNonStrictComparisons
 import Solcore.Core.DerivedSignedComparisonEval
 import Solcore.Core.DerivedComparisonEval
 import Solcore.Core.DerivedComparisonFlags

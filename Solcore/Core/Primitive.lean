@@ -267,6 +267,12 @@ def wordLt (left right : Expr) : Expr :=
 def wordSlt (left right : Expr) : Expr :=
   wordSgtWithSwappedValues left right
 
+def wordSle (left right : Expr) : Expr :=
+  .unary .boolNot (.binary .wordSgt left right)
+
+def wordSge (left right : Expr) : Expr :=
+  .unary .boolNot (wordSlt left right)
+
 def wordLe (left right : Expr) : Expr :=
   .unary .boolNot (.binary .wordGt left right)
 
