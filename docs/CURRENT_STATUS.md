@@ -84,9 +84,9 @@ no public Wire representation. Its independent audit found no P0-P3 issue.
 [ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md)
 completes internal word-valued signed ≤ and ≥ flags with no new Core tag or
 public Wire representation. Its independent audit found no P0-P3 issue.
-[ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) accepts the
-active internal three-operand modular arithmetic slice with no public Wire
-representation.
+[ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) completes the
+internal three-operand modular arithmetic slice with no public Wire
+representation. Its independent audit found no P0-P3 issue.
 
 ## Implementation status
 
@@ -119,6 +119,11 @@ representation.
 | Internal word byte selection | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal arithmetic right shift | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal modular exponentiation | Complete | Complete | Explicitly excluded from Wire v1/v2 |
+| Internal signed word comparisons | Complete | Complete | Explicitly excluded from Wire v1/v2 |
+| Internal signed comparison flags | Complete | Complete | Explicitly excluded from Wire v1/v2 |
+| Internal word sign extension | Complete | Complete | Explicitly excluded from Wire v1/v2 |
+| Internal signed division and remainder | Complete | Complete | Explicitly excluded from Wire v1/v2 |
+| Internal ternary modular arithmetic | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -608,7 +613,7 @@ commitment; the independent audit found no P0-P3 issue.
 `BinaryOp.wordSdiv` and `BinaryOp.wordSmod`. Both evaluate dividend then
 divisor. Division rounds toward zero; remainder follows the dividend's sign;
 zero divisors return zero after both operands evaluate; and minimum divided by
-negative one wraps. The planned exact fourteen theorems and focused sign,
+negative one wraps. The exact fourteen theorems and focused sign,
 zero, minimum, type, raw and ordered fault, effect/final-store, exact 4/5 and
 28/29 fuel, and frozen v1/v2 rejection regressions are complete. Focused/full
 builds and tests, kernel policy, and metadata verification pass. They add no
@@ -628,17 +633,19 @@ Focused/full builds and tests, kernel policy, and metadata verification pass.
 There is no public format or source commitment; the independent audit found no
 P0-P3 issue.
 
-## Active Core vNext ternary modular arithmetic slice
+## Completed Core vNext ternary modular arithmetic slice
 
 [ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) adds
 `TernaryOp.wordAddMod`, `wordMulMod`, and `Expr.ternary`. First value, second
 value, and modulus evaluate in source order. Nonzero moduli reduce a
 full-precision natural sum or product; a zero modulus returns zero only after
-all operands evaluate. The planned exact fourteen focused theorems sit on
+all operands evaluate. The exact fourteen focused theorems sit on
 generic typing, checking, Safety, correspondence, and renaming support.
 Focused result/type, dedicated raw fault, ordered fault/effect/store, exact 6/7
-and 42/43 fuel, no-prewrap, and frozen v1/v2 rejection regressions add no public
-format or source commitment.
+and 42/43 fuel, no-prewrap, and frozen v1/v2 rejection regressions are complete.
+Focused/full builds and tests, kernel policy, metadata, trust-zero, and axiom
+checks pass. There is no public format or source commitment; the independent
+audit found no P0-P3 issue.
 
 ## Meaning of completion
 

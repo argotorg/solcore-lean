@@ -335,11 +335,13 @@ Its exact twenty theorems and truth, type, fault, effect/store, and fuel
 regressions pass. Frozen public Wire formats reject both builders and their
 expansions; the independent audit found no P0-P3 issue.
 
-The active ADR-0050 slice introduces dedicated ternary modular arithmetic.
+The completed ADR-0050 slice introduces dedicated ternary modular arithmetic.
 `wordAddMod` and `wordMulMod` evaluate first value, second value, then modulus,
 and reduce the full-precision natural sum or product without an earlier
 256-bit wrap. A zero modulus still evaluates all three operands before
-returning zero. Frozen public Wire formats reject the ternary form.
+returning zero. Typing, checking, correspondence, Safety, renaming, exact fuel,
+and frozen-Wire rejection are complete; the independent audit found no P0-P3
+issue.
 
 ### Contract runtime
 

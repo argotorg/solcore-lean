@@ -51,12 +51,16 @@ These results remain regression obligations for every extension.
 | 25 | Signed word greater-than | Complete | Adds an internal boolean two's-complement comparison basis |
 | 26 | Derived signed word less-than | Complete | Preserves source order while reusing signed greater-than |
 | 27 | Signed word comparison flags | Complete | Derives canonical word results from signed boolean comparisons |
-| 28 | Signed non-strict word comparisons | Active | Derives boolean ≤ and ≥ while preserving source order |
-| 29 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
-| 30 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 31 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 32 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 33 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 28 | Signed non-strict word comparisons | Complete | Derives boolean ≤ and ≥ while preserving source order |
+| 29 | Word sign extension | Complete | Adds byte-indexed two's-complement extension with explicit operand order |
+| 30 | Signed division and remainder | Complete | Fixes zero, rounding, sign, and minimum-value behavior |
+| 31 | Signed non-strict comparison flags | Complete | Converts the completed boolean comparisons to canonical words |
+| 32 | Ternary modular arithmetic | Complete | Reduces full-precision sums and products after three ordered operands |
+| 33 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
+| 34 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 35 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 36 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 37 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -516,21 +520,19 @@ and metadata verification pass. Public formats and source, ABI, opcode, and gas
 rules remain unchanged; the independent audit found no P0-P3 issue. The next
 feature is selected by a separate ADR.
 
-## Active Core vNext slice: ternary modular arithmetic
+## Completed Core vNext slice: ternary modular arithmetic
 
 [ADR-0050](adr/0050-core-vnext-ternary-modular-arithmetic.md) adds dedicated
 `TernaryOp.wordAddMod`, `TernaryOp.wordMulMod`, and `Expr.ternary`. Operands
 evaluate first, second, then modulus, each exactly once. A zero modulus returns
 zero after all three evaluations; a nonzero modulus reduces the full-precision
 natural sum or product without pre-wrapping at 256 bits. Six Word laws, two
-application equations, and six evaluations form the planned exact fourteen
-focused theorems. Generic typing, checking, Safety, correspondence, and
-renaming support, dedicated `invalidTernaryOperands`, ordered faults and
-effects/final store, exact 6/7 and 42/43 fuel, no-prewrap values, and frozen
-v1/v2 rejection are required. Implementation is staged as separately green,
-sub-300-line commits for values, dormant CEK support, semantic activation,
-static/safety activation, focused proofs, semantic tests, Wire tests, and docs.
-Public formats and source, ABI, opcode, and gas rules remain unchanged.
+application equations, and six evaluations form the exact fourteen focused
+theorems. Generic typing, checking, Safety, correspondence, renaming,
+dedicated `invalidTernaryOperands`, ordered faults and effects/final store,
+exact 6/7 and 42/43 fuel, no-prewrap values, and frozen v1/v2 rejection are
+complete. Public formats and source, ABI, opcode, and gas rules remain
+unchanged; the independent audit found no P0-P3 issue.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
