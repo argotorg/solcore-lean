@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twentieth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -69,3 +69,24 @@ golden stream. Derived comparison builders and flags retain their meaning.
 The existing boolean word comparisons gain concise reusable application and
 store-threaded evaluation results without expanding Core. Further conversions
 and primitives remain separate ADR decisions.
+
+## Implementation result
+
+All eight named theorems are implemented: two exact `BinaryOp.apply` equations
+and six store-threaded general/case evaluation theorems. `ComparisonFlags` and
+`DerivedComparisonEval` now reuse the direct evaluation helpers without
+changing their expressions or semantics.
+
+Tests cover zero, one, maximum, equality, inequality, strict greater-than, and
+not-greater-than results; boolean result typing and invalid result/operand
+types; raw invalid operands and ordered left/right faults; and two allocating,
+writing operands with the exact final store. Literal evaluation has the exact
+4/5 fuel boundary and effectful evaluation the exact 28/29 boundary. Wire v1
+rejects both operations, while Wire v2 preserves exact operator and operand
+projection through Core and JSON round trips.
+
+The implementation, focused Wire suite, semantic suite, and independent audit
+are complete. The audit found no P0-P3 issue, no source trust escape hatch, and
+only the repository-approved Lean foundational dependencies. No alias,
+duplicate Word or generic theorem, tag, schema, or Oracle behavior changed. The
+next feature requires a separate ADR.

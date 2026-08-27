@@ -48,8 +48,9 @@ remains active; the next feature is selected separately.
 [ADR-0037](adr/0037-core-vnext-binary-bitwise-logic.md) completes the focused
 interface for binary word and, or, and xor. Core vNext remains active; the next
 feature is selected separately.
-[ADR-0038](adr/0038-core-vnext-direct-word-comparisons.md) makes the focused
-interface for direct boolean word equality and unsigned greater-than active.
+[ADR-0038](adr/0038-core-vnext-direct-word-comparisons.md) completes the focused
+interface for direct boolean word equality and unsigned greater-than. Core
+vNext remains active; the next feature is selected separately.
 
 ## Implementation status
 
@@ -77,7 +78,7 @@ interface for direct boolean word equality and unsigned greater-than active.
 | Internal bounded logical shift interface | Complete | Complete | Not published |
 | Internal modular word arithmetic interface | Complete | Complete | Not published |
 | Internal binary bitwise logic interface | Complete | Complete | Not published |
-| Internal direct word comparison interface | In progress | In progress | Not published |
+| Internal direct word comparison interface | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -434,17 +435,18 @@ only to Word values; expressions are not swapped. The audit found no P0-P3
 issue. No alias, generic proof, tag, schema, or Oracle behavior changed. The
 next feature is selected by a separate ADR.
 
-## Active Core vNext direct word comparison slice
+## Completed Core vNext direct word comparison slice
 
 [ADR-0038](adr/0038-core-vnext-direct-word-comparisons.md) retains raw
 `wordEq` and `wordGt`, their boolean results, and strict unsigned greater-than.
-The exact eight-theorem interface is two application equations plus three
-general/case evaluations per operation. Tests cover zero/one/maximum,
+The exact eight-theorem interface—two application equations plus three
+general/case evaluations per operation—is complete. Tests cover zero/one/maximum,
 equal/unequal and greater/not-greater values, result and operand types, raw and
 ordered faults, exactly-once effects and final stores, exact 4/5 and 28/29 fuel,
-Wire v1 rejection, and exact Wire v2 Core and JSON round trips. No expression
-alias, Word or generic proof duplicate, tag, schema, or Oracle behavior is
-added. Implementation is in progress.
+Wire v1 rejection, and exact Wire v2 Core and JSON round trips. Existing derived
+helpers reuse the evaluations without semantic change. No expression alias,
+Word or generic proof duplicate, tag, schema, or Oracle behavior changed. The
+independent audit found no P0-P3 issue.
 
 ## Meaning of completion
 

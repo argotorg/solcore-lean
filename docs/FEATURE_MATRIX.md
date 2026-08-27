@@ -53,7 +53,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Bounded logical shift interface | ADR-0035 Accepted | Complete | six Word, two apply, and six evaluation theorems; value-left/shift-right boundaries, effects, exact fuel, and v1/v2 plus JSON round trips complete | None |
 | Modular word arithmetic interface | ADR-0036 Accepted | Complete | eight Word, three apply, and three evaluation theorems; normal/wrapped values, strict order, effects/fuel, and v1/v2 Core plus JSON round trips complete | None |
 | Binary bitwise logic interface | ADR-0037 Accepted | Complete | nine Word, three apply, and three evaluation theorems; masks, strict order, effects/fuel, and v1/v2 Core plus JSON round trips complete | None |
-| Direct word comparison interface | ADR-0038 Accepted | Active | two apply and six evaluation theorems; boolean equality and strict unsigned greater-than with ordered effects/fuel and v1/v2 regressions | None |
+| Direct word comparison interface | ADR-0038 Accepted | Complete | two apply and six evaluation theorems; boolean equality and strict unsigned greater-than with values, types, ordered faults/effects, exact fuel, and v1/v2 Core/JSON regressions complete | None |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | slice 21 onward; separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 
