@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: thirtieth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete; independent audit found no P0-P3 issue
 
 ## Context
 
@@ -61,7 +61,7 @@ dividend and the final store after the divisor. Generic typing, inference,
 machine, Safety, and renaming theorems should absorb the new binary cases;
 focused duplicates are excluded.
 
-## Required tests
+## Implemented tests
 
 Focused regressions cover:
 
@@ -93,3 +93,19 @@ opcode lowering, gas rule, or exceptional division behavior.
 Core gains total, deterministic signed division and remainder whose sign,
 rounding, zero-divisor, overflow-wrap, operand-order, and store behavior are
 explicit. Existing public formats and behavior remain unchanged.
+
+## Implementation result
+
+The exact fourteen-theorem interface is complete: six Word laws, two binary
+application equations, and six store-threaded evaluation theorems. Focused
+regressions cover all four sign combinations of 7 and 3, zero operands and
+zero divisors, and minimum signed word divided by negative one with remainder
+zero. They also cover result and operand types, raw invalid operands, ordered
+faults, left-to-right effects evaluated exactly once with the final store
+retained, and exact literal 4/5 and effectful 28/29 fuel boundaries.
+
+Frozen Wire v1/v2 expression projection and the Wire v2 binary-operation
+conversion reject both internal operations, so public schemas and bytes remain
+unchanged. Focused and full warning-free builds, the full test runner, kernel
+policy, and metadata verification pass. The independent audit found no P0-P3
+issue.

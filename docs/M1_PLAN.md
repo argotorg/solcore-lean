@@ -484,7 +484,7 @@ pass. Public formats, source syntax, ABI, opcode, and gas rules remain
 unchanged; the independent audit found no P0-P3 issue. The next feature is
 selected by a separate ADR.
 
-## Active Core vNext slice: signed division and remainder
+## Completed Core vNext slice: signed division and remainder
 
 [ADR-0048](adr/0048-core-vnext-signed-word-division.md) adds internal
 `BinaryOp.wordSdiv(dividend, divisor)` and `BinaryOp.wordSmod(dividend,
@@ -492,11 +492,13 @@ divisor)`. Both operands evaluate left to right exactly once. Division uses
 magnitudes and rounds toward zero; remainder takes the dividend's sign. Zero
 divisors return zero after evaluation, while minimum divided by negative one
 wraps to minimum with remainder zero. Six Word laws, two application equations,
-and six evaluations form the planned exact fourteen-theorem interface. Four
-sign combinations of 7 and 3, zero and minimum boundaries, types, faults,
-effects/final store, exact 4/5 and 28/29 fuel, and frozen v1/v2 rejection are
-required. Public formats, source syntax, ABI, opcode, and gas rules remain
-unchanged.
+and six evaluations form the completed exact fourteen-theorem interface. Four
+sign combinations of 7 and 3, zero and minimum/negative-one boundaries, types,
+raw and ordered faults, effects/final store, exact 4/5 and 28/29 fuel, and
+frozen v1/v2 rejection are covered. Focused/full builds and tests, kernel
+policy, and metadata verification pass. Public formats, source syntax, ABI,
+opcode, and gas rules remain unchanged; the independent audit found no P0-P3
+issue. The next feature is selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -145,14 +145,16 @@ final stores, exact fuel, and frozen-Wire rejection. Focused/full builds, tests,
 kernel policy, and metadata verification pass. The slice is internal and does
 not change frozen Wire formats or public behavior; the independent audit found
 no P0-P3 issue.
-The active thirtieth slice,
+The completed thirtieth slice,
 [ADR-0048](adr/0048-core-vnext-signed-word-division.md), adds internal signed
 division and remainder. The left operand is the dividend and the right is the
 divisor. Division rounds toward zero, remainder follows the dividend's sign,
 zero divisors return zero after both operands evaluate, and the minimum-value
-overflow case wraps. Its planned exact fourteen theorems and focused boundary,
-fault, effect/store, fuel, and frozen-Wire regressions do not change public
-formats or behavior.
+overflow case wraps. Its exact fourteen theorems and focused sign, zero,
+minimum/negative-one, type, raw and ordered fault, effect/final-store, exact
+fuel, and frozen-Wire regressions are complete. Focused/full builds and tests,
+kernel policy, and metadata verification pass. Public formats and behavior are
+unchanged; the independent audit found no P0-P3 issue.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -277,8 +279,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   independent audit found no P0-P3 issue.
 - ADR-0047 completes internal index-left/value-right word sign extension; its
   independent audit found no P0-P3 issue.
-- ADR-0048 accepts internal dividend-left/divisor-right signed division and
-  remainder.
+- ADR-0048 completes internal dividend-left/divisor-right signed division and
+  remainder; its independent audit found no P0-P3 issue.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
