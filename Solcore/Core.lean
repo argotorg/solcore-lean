@@ -32,6 +32,7 @@ import Solcore.Core.UnsignedDivision
 import Solcore.Core.SignedDivision
 import Solcore.Core.LogicalShifts
 import Solcore.Core.ModularArithmetic
+import Solcore.Core.TernaryModularArithmetic
 import Solcore.Core.BitwiseLogic
 import Solcore.Core.DirectWordComparisons
 import Solcore.Core.SignedComparison
