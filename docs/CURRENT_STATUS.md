@@ -101,6 +101,9 @@ bridge between addresses and words. Widening preserves the numeric value;
 narrowing rejects values at or above `2^160` rather than truncating them. Its
 two definitions, exactly six axiom-free laws, and 10 runtime assertions are
 complete and are not published. The independent audit found no P0-P3 issue.
+[ADR-0054](adr/0054-strict-address-bytes.md) accepts the active strict address
+byte slice. It fixes an exact 20-byte big-endian representation and rejection
+of every other width, with no ABI, state, or publication commitment.
 
 ## Implementation status
 
@@ -141,6 +144,7 @@ complete and are not published. The independent audit found no P0-P3 issue.
 | Canonical runtime scalar observations | Complete | Complete | Not published |
 | Internal contract frame outcomes | Complete | Complete | Not published |
 | Strict address and word bridge | Complete | Complete | Not published |
+| Strict 20-byte address representation | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -715,6 +719,18 @@ semantic-kernel, metadata, axiom, document-link, and diff checks pass. The
 independent audit found no P0-P3 issue. The slice changes no scalar text, Core
 operation, source or ABI rule, contract state, rollback behavior, or published
 interface.
+
+## Active strict address byte slice
+
+[ADR-0054](adr/0054-strict-address-bytes.md) specifies two conversions between
+the existing 160-bit Address and exactly 20 most-significant-byte-first octets.
+The planned exact six laws cover width, both round-trip directions, the decoder
+success domain, injectivity, and agreement with widened Word byte indices 12
+through 31. Exactly 10 runtime assertions cover zero, one, maximum, a nontrivial
+round trip, 19- and 21-byte rejection, and all 20 aligned bytes.
+
+The slice changes no address text, numeric bridge, source or ABI rule, contract
+state, EVM behavior, or published format.
 
 ## Meaning of completion
 

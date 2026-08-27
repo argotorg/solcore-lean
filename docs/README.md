@@ -42,7 +42,8 @@ Its named expansion, typing, inference, store-preserving evaluations, weakening,
 effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
 The strict address-and-word bridge is complete; further Core conversions and
-primitives remain planned.
+primitives remain planned. Strict 20-byte address encoding is the active
+syntax-independent runtime slice.
 The completed seventeenth slice,
 [ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md), completes focused
 proof and regression interfaces for the existing raw `wordShl` and `wordShr`
@@ -204,6 +205,13 @@ two definitions, exactly six axiom-free laws, and 10 runtime assertions are
 complete. They add no source cast, ABI behavior, contract state, or public
 format. The independent audit found no P0-P3 issue.
 
+The active strict address-byte slice,
+[ADR-0054](adr/0054-strict-address-bytes.md), fixes an exact 20-byte
+most-significant-byte-first representation. Its planned two conversions,
+exactly six laws, and 10 runtime assertions cover strict width, round trips,
+injectivity, and agreement with bytes 12 through 31 of a widened Word. It adds
+no ABI rule, source cast, contract state, or public format.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -340,6 +348,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   independent audit found no P0-P3 issue.
 - ADR-0053 completes the strict internal address-to-word bridge and its
   non-truncating partial inverse; its independent audit found no P0-P3 issue.
+- ADR-0054 accepts an exact 20-byte big-endian internal address representation.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

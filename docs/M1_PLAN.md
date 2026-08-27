@@ -59,10 +59,11 @@ These results remain regression obligations for every extension.
 | 33 | Canonical runtime scalar observations | Complete | Fixes byte, address, and word representation before contract state |
 | 34 | Contract frame halt outcomes | Complete | Separates return data, revert data, and parametric trap reasons before state |
 | 35 | Strict Address↔Word bridge | Complete | Adds lossless widening and a strict partial inverse before contract state |
-| 36 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 37 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 38 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 39 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 36 | Strict 20-byte Address representation | Active | Fixes exact big-endian bytes and strict width before contract state |
+| 37 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 38 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 39 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 40 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -586,6 +587,18 @@ trust-zero, semantic-kernel, metadata, axiom, document-link, and diff checks
 pass; the independent audit found no P0-P3 issue. Source casts, ABI behavior,
 Core operations, contract state, rollback, and every public format remain
 separate work.
+
+## Active strict address byte slice
+
+[ADR-0054](adr/0054-strict-address-bytes.md) fixes exactly 20
+most-significant-byte-first octets for Address. Decoding rejects every other
+width rather than padding or truncating. The planned two conversions, exactly
+six laws, and exactly 10 runtime assertions cover both round-trip directions,
+strict success, injectivity, boundaries, and agreement with widened Word byte
+indices 12 through 31.
+
+Address text, the numeric Address↔Word bridge, source casts, ABI behavior,
+contract state, EVM rules, and every public format remain unchanged.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

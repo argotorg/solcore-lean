@@ -367,6 +367,12 @@ explicit failure, never truncation or modulo reduction. This completed internal
 bridge has two executable definitions and six axiom-free laws. It does not
 define a source cast, ABI decoding, a Core operation, or a public observation.
 
+ADR-0054 specifies the corresponding strict byte view. An address has exactly
+20 most-significant-byte-first octets, and decoding rejects every other width.
+Its bytes agree with indices 12 through 31 of the completed widened Word view.
+This active internal slice adds no ABI padding, source conversion, state, or
+published observation.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
