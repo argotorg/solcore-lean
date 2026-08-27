@@ -250,6 +250,14 @@ fault, effect, final-store, and exact-fuel tests pass. Frozen Wire v1/v2 and the
 v2 operation conversion reject the tag; public Oracle/schema/JSON formats are
 unchanged. The independent audit found no P0-P3 issue.
 
+The active ADR-0041 slice adds internal `BinaryOp.wordSar` and
+`Word.shiftArithmeticRight(value, shift)`. Raw Core evaluates value then shift
+exactly once. Results use 256-bit two's-complement sign extension and saturate
+oversized shifts to zero or maximum by sign. Future source `(shift, value)`
+elaboration must bind source-order effects before reordering bound values. The
+focused surface has five Word laws, one application equation, and five
+evaluations. Frozen Wire v1/v2 reject the tag; public formats remain unchanged.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,
