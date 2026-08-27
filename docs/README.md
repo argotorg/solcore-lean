@@ -105,11 +105,14 @@ ordered-fault, effect, store, exact-fuel, and frozen Wire plus v2-operation
 rejection tests pass. Public Oracle, schema, and JSON formats remain unchanged.
 The independent audit found no remaining P0-P3 issue; further primitives use
 separate ADRs.
-The active twenty-fifth slice,
+The completed twenty-fifth slice,
 [ADR-0043](adr/0043-core-vnext-signed-word-greater-than.md), fixes an internal
 boolean signed-greater basis over 256-bit two's-complement words. Core evaluates
 left then right exactly once. Signed less-than and word-valued flags remain
 separate, and frozen public Wire formats reject the new internal operation.
+All eleven focused theorems and value, type, ordered-fault, effect, store,
+exact-fuel, and Wire-rejection tests are complete. Public formats are unchanged;
+the independent audit found no P0-P3 issue.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -227,7 +230,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0040 completes internal big-endian word byte selection.
 - ADR-0041 completes internal 256-bit arithmetic right shift.
 - ADR-0042 completes internal modular word exponentiation.
-- ADR-0043 accepts internal boolean signed word greater-than.
+- ADR-0043 completes internal boolean signed word greater-than.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

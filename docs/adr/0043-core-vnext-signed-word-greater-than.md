@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-fifth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -78,3 +78,20 @@ Existing public behavior and bytes remain unchanged.
 
 Internal Core gains one total boolean basis for signed comparison. Derived
 signed less-than and word-valued flags remain explicit future decisions.
+
+## Implementation result
+
+Internal Core now includes `BinaryOp.wordSgt` and total `Word.signedGt`. The
+exact eleven-theorem interface is complete: five Word laws, one primitive
+application equation, and the general plus four sign-case store-threaded
+evaluations.
+
+Focused tests cover zero, one, both sign boundaries, maximum, same-sign and
+cross-sign order, equality, boolean and operand types, raw invalid operands,
+and ordered faults. Two allocating and writing operands run left then right
+exactly once and retain their final store. Literal expressions stop at fuel 4
+and complete at 5; effectful expressions stop at 28 and complete at 29.
+
+Frozen Wire v1/v2 expression projections and the Wire v2 `BinaryOp` conversion
+reject `wordSgt`. No public enum, schema, JSON value, Oracle behavior, profile,
+version, or byte sequence changed. The independent audit found no P0-P3 issue.

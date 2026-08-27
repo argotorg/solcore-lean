@@ -268,11 +268,14 @@ type, ordered-fault, effect, store, exact-fuel, and frozen-Wire rejection tests
 pass. Public formats remain unchanged; the independent audit found no remaining
 P0-P3 issue.
 
-The active ADR-0043 slice adds internal boolean `BinaryOp.wordSgt`. The sign bit
-is bit 255. Same-sign operands retain unsigned order; nonnegative values compare
-above negative values. Raw Core evaluates left then right exactly once. Derived
-signed less-than and word flags are separate, and frozen public Wire formats
-continue to reject the internal operation.
+The completed ADR-0043 slice adds internal boolean `BinaryOp.wordSgt`. The sign
+bit is bit 255. Same-sign operands retain unsigned order; nonnegative values
+compare above negative values. Raw Core evaluates left then right exactly once.
+Derived signed less-than and word flags are separate, and frozen public Wire
+formats continue to reject the internal operation.
+Its exact eleven-theorem interface and value, type, ordered-fault, effect,
+store, and exact-fuel regressions are complete. Public formats are unchanged;
+the independent audit found no P0-P3 issue.
 
 ### Contract runtime
 

@@ -63,9 +63,9 @@ selected separately.
 [ADR-0042](adr/0042-core-vnext-modular-exponentiation.md) completes internal
 modular word exponentiation. Core vNext remains active; the next feature is
 selected by a separate ADR.
-[ADR-0043](adr/0043-core-vnext-signed-word-greater-than.md) accepts the next
-internal slice: boolean signed word greater-than with strict left-to-right
-evaluation and no public Wire representation.
+[ADR-0043](adr/0043-core-vnext-signed-word-greater-than.md) completes internal
+boolean signed word greater-than with strict left-to-right evaluation and no
+public Wire representation. Its independent audit found no P0-P3 issue.
 
 ## Implementation status
 
@@ -520,15 +520,16 @@ v2-op rejection. Public formats remain unchanged. The independent audit found
 no remaining P0-P3 issue; the next primitive or conversion is selected by a
 separate ADR.
 
-## Active Core vNext signed-greater-than slice
+## Completed Core vNext signed-greater-than slice
 
 [ADR-0043](adr/0043-core-vnext-signed-word-greater-than.md) fixes a boolean
 two's-complement comparison basis. Values below `2^255` are nonnegative and
 values at or above it are negative. Same-sign operands use unsigned order;
 cross-sign order places every nonnegative value above every negative value.
-Core evaluates left then right exactly once. The exact eleven-theorem and
-value/type/fault/effect/fuel/Wire-rejection scope is fixed; implementation is in
-progress.
+Core evaluates left then right exactly once. The exact eleven theorems and
+value, type, raw and ordered-fault, effect, final-store, exact 4/5 and 28/29
+fuel, and frozen-Wire rejection tests are complete. Public formats are
+unchanged; the independent audit found no P0-P3 issue.
 
 ## Meaning of completion
 
