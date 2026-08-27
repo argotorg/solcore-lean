@@ -178,6 +178,12 @@ private def wordGtWithSwappedValues (left right : Expr) : Expr :=
 def wordNe (left right : Expr) : Expr :=
   .unary .boolNot (.binary .wordEq left right)
 
+def boolToWord (value : Expr) : Expr :=
+  .ifE value (.word (Word.ofNatModulo 1)) (.word Word.zero)
+
+def wordToBool (value : Expr) : Expr :=
+  wordNe value (.word Word.zero)
+
 def wordLt (left right : Expr) : Expr :=
   wordGtWithSwappedValues left right
 
