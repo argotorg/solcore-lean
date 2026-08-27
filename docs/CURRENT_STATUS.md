@@ -91,6 +91,10 @@ representation. Its independent audit found no P0-P3 issue.
 canonical runtime scalar foundation. Strict byte, address, and word
 representations are executable and proved without publishing a contract
 observation format.
+[ADR-0052](adr/0052-contract-frame-outcomes.md) accepts the active internal
+contract-frame outcome slice. It separates return data, revert data, and a
+parametric trap reason without defining state, rollback, or an execution
+profile.
 
 ## Implementation status
 
@@ -129,6 +133,7 @@ observation format.
 | Internal signed division and remainder | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Internal ternary modular arithmetic | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Canonical runtime scalar observations | Complete | Complete | Not published |
+| Internal contract frame outcomes | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -667,6 +672,19 @@ with `Word.byteAt`. The frozen Wire v1 and v2 codecs remain unchanged;
 compatibility tests confirm that their representative Word output matches the
 new encoder. Focused and full checks pass, and the independent audit found no
 P0-P3 issue.
+
+## Active contract frame outcome slice
+
+[ADR-0052](adr/0052-contract-frame-outcomes.md) fixes the next internal carrier:
+return with return data, revert with revert data, or trap with a reason supplied
+by later semantics. The trap-reason type remains a parameter. Total projections
+distinguish a present empty byte string from a payload that does not belong to
+the selected halt kind. The planned exact six laws characterize all three kinds
+and all three successful projections.
+
+This slice is only a syntax-independent halt vocabulary. It does not connect
+Core results to contract entry, add state or rollback, choose trap reasons or
+an EVM revision, or publish a Wire, Oracle, verdict, or observation format.
 
 ## Meaning of completion
 
