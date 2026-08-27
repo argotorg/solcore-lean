@@ -15,6 +15,7 @@ import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
 import Solcore.Test.CoreFunctions
 import Solcore.Test.CoreNamedData
+import Solcore.Test.CoreRenaming
 import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSums
 import Solcore.Test.SurfaceMultiCertifiedFrontend
@@ -4797,6 +4798,7 @@ def run : IO Unit := do
   testCoreComparisonFlags
   testCoreConversions
   testCoreNamedData
+  testCoreRenaming
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile
