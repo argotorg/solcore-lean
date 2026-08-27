@@ -147,6 +147,8 @@ inductive BinaryOp where
   | wordSar
   | wordPow
   | wordSignExtend
+  | wordSdiv
+  | wordSmod
   deriving Repr, BEq, DecidableEq
 
 namespace BinaryOp
@@ -172,7 +174,9 @@ def resultType : BinaryOp → Ty
   | .wordByte
   | .wordSar
   | .wordPow
-  | .wordSignExtend => .word
+  | .wordSignExtend
+  | .wordSdiv
+  | .wordSmod => .word
 
 end BinaryOp
 

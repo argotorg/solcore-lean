@@ -108,6 +108,31 @@ def signExtend (index value : Word) : Word :=
   else
     value
 
+def signedNegative (value : Word) : Bool :=
+  decide (2 ^ 255 ≤ value.val)
+
+def signedMagnitude (value : Word) : Nat :=
+  if value.signedNegative then wordModulus - value.val else value.val
+
+def ofSignedMagnitude (negative : Bool) (magnitude : Nat) : Word :=
+  if negative then ofNatModulo (wordModulus - magnitude)
+  else ofNatModulo magnitude
+
+def sdiv (dividend divisor : Word) : Word :=
+  if divisor.val = 0 then
+    zero
+  else
+    ofSignedMagnitude
+      (dividend.signedNegative != divisor.signedNegative)
+      (dividend.signedMagnitude / divisor.signedMagnitude)
+
+def smod (dividend divisor : Word) : Word :=
+  if divisor.val = 0 then
+    zero
+  else
+    ofSignedMagnitude dividend.signedNegative
+      (dividend.signedMagnitude % divisor.signedMagnitude)
+
 end Word
 
 namespace UnaryOp
@@ -161,6 +186,10 @@ def apply : BinaryOp → Value → Value → Option Value
   | .wordPow, .word base, .word exponent => some (.word (base.pow exponent))
   | .wordSignExtend, .word index, .word value =>
       some (.word (index.signExtend value))
+  | .wordSdiv, .word dividend, .word divisor =>
+      some (.word (dividend.sdiv divisor))
+  | .wordSmod, .word dividend, .word divisor =>
+      some (.word (dividend.smod divisor))
   | _, _, _ => none
 
 theorem apply_total_of_types
