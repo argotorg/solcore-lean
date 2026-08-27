@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: third internal contract-runtime foundation slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -99,6 +99,22 @@ Keep every commit below 300 changed lines and leave the tree green:
 3. add the exact six focused laws;
 4. add the exact ten executable runtime assertions; and
 5. independently audit the slice and update completion documentation.
+
+## Completion evidence
+
+The completed internal bridge contains exactly two executable definitions:
+lossless address widening and strict, partial word narrowing. Exactly six
+focused, axiom-free laws characterize successful results, the accepted and
+rejected ranges, both partial-inverse directions, and injectivity.
+
+Exactly ten runtime assertions cover zero, one, a nontrivial middle value, and
+the maximum address. They also reject the first overflowing word, `2^160`, and
+the maximum 256-bit word, demonstrating that narrowing never truncates or
+reduces modulo the address width.
+
+Focused and full builds and tests, trust-zero checking, semantic-kernel and
+metadata checks, the axiom audit, document-link validation, and diff checking
+pass. The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions
 

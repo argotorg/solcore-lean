@@ -96,10 +96,11 @@ contract-frame outcome slice. Exactly six laws and 10 executable runtime
 assertions cover return data, revert data, and a parametric trap reason without
 defining state, rollback, or an execution profile. Its independent audit found
 no P0-P3 issue.
-[ADR-0053](adr/0053-strict-address-word-bridge.md) activates a strict internal
+[ADR-0053](adr/0053-strict-address-word-bridge.md) completes a strict internal
 bridge between addresses and words. Widening preserves the numeric value;
 narrowing rejects values at or above `2^160` rather than truncating them. Its
-implementation and proofs are in progress and are not published.
+two definitions, exactly six axiom-free laws, and 10 runtime assertions are
+complete and are not published. The independent audit found no P0-P3 issue.
 
 ## Implementation status
 
@@ -139,7 +140,7 @@ implementation and proofs are in progress and are not published.
 | Internal ternary modular arithmetic | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Canonical runtime scalar observations | Complete | Complete | Not published |
 | Internal contract frame outcomes | Complete | Complete | Not published |
-| Strict address and word bridge | Active | In progress | Not published |
+| Strict address and word bridge | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -179,8 +180,8 @@ language. The following remain:
 - source-level mutable declarations, assignment syntax, and their elaboration;
 - source-level data declarations, pattern syntax, and elaboration into the
   completed internal named-data Core;
-- the active strict address-and-word bridge and further closed Core conversions
-  or primitives;
+- further closed Core conversions or primitives after the completed strict
+  address-and-word bridge;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
 - contract entry and call semantics;
@@ -699,17 +700,21 @@ Focused and full builds and tests, trust-zero, semantic-kernel, metadata,
 axiom, document-link, and diff checks pass. The independent audit found no
 P0-P3 issue.
 
-## Active strict address and word bridge slice
+## Completed strict address and word bridge slice
 
 [ADR-0053](adr/0053-strict-address-word-bridge.md) specifies a lossless
 conversion from the existing 160-bit `Address` to `Core.Word` and a strict
 partial inverse. Narrowing succeeds only below `2^160` and preserves the same
 natural-number value; overflow returns `none` instead of truncating high bits.
 
-The planned implementation contains two conversions, exactly six focused
-laws, and exactly ten direct runtime assertions. It changes no scalar text,
-Core operation, source or ABI rule, contract state, rollback behavior, or
-published interface.
+The implementation contains two conversions, exactly six focused axiom-free
+laws, and exactly 10 direct runtime assertions. Tests cover zero, one, a
+nontrivial middle value, the maximum address, and rejection of both `2^160` and
+the maximum Word. Focused and full builds and tests, trust-zero,
+semantic-kernel, metadata, axiom, document-link, and diff checks pass. The
+independent audit found no P0-P3 issue. The slice changes no scalar text, Core
+operation, source or ABI rule, contract state, rollback behavior, or published
+interface.
 
 ## Meaning of completion
 
