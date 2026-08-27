@@ -50,6 +50,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Derived-builder arbitrary renaming laws | ADR-0032 Accepted | Complete | exactly eight laws in their owning modules, rename_boolToWord relocation, swap01 free-variable goldens, and three-family runtime-environment regressions complete | None |
 | Direct unary primitive interface | ADR-0033 Accepted | Complete | named raw boolNot/wordNot APIs, zero/maximum/involution facts, exact fuel, fault/effect/store tests, v1 rejection, and exact v2 projection/round trips complete | None |
 | Totalized unsigned division and modulo interface | ADR-0034 Accepted | Complete | four Word, two apply, and six evaluation theorems; ordered zero-divisor effects/faults, exact fuel, and v1/v2 regressions complete | None |
+| Bounded logical shift interface | ADR-0035 Accepted | Active | fourteen focused Word/apply/evaluation theorems, operand-order and 0/255/256/maximum boundaries, effects/fuel, and v1/v2 regressions in progress | None |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 

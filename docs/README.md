@@ -42,6 +42,12 @@ Its named expansion, typing, inference, store-preserving evaluations, weakening,
 effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
 Additional conversions and primitives remain planned.
+The active seventeenth slice,
+[ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md), completes focused
+proof and regression interfaces for the existing raw `wordShl` and `wordShr`
+operators. Core keeps value before shift, uses zero for amounts of 256 or more,
+and adds no alias, tag, source rule, or Wire change. Implementation is in
+progress; further primitives remain planned.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -151,6 +157,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0032 backfills arbitrary renaming laws for eight older derived builders.
 - ADR-0033 completes the focused interface for direct unary primitives.
 - ADR-0034 completes focused interfaces for totalized unsigned division and modulo.
+- ADR-0035 completes focused interfaces for bounded logical shifts.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

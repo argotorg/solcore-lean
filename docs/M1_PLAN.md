@@ -40,11 +40,12 @@ These results remain regression obligations for every extension.
 | 14 | Derived-builder arbitrary renaming laws | Complete | Backfills the general renaming API for eight existing builders |
 | 15 | Direct unary primitive interface | Complete | Completes focused APIs and regressions for existing boolNot and wordNot |
 | 16 | Totalized unsigned division and modulo | Complete | Completes focused APIs and strict zero-divisor regressions |
-| 17 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
-| 18 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 19 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 20 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 21 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 17 | Bounded logical shifts | Active | Completes focused APIs for existing wordShl and wordShr without new syntax |
+| 18 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
+| 19 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 20 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 21 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 22 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -309,6 +310,16 @@ maximum boundaries, `0 / 0` and `0 % 0`, types and raw faults, both operand
 effects, exact 4/5 and 28/29 fuel, Wire v1 rejection, and exact Wire v2
 projection and round trips. No alias, generic API duplicate, tag, Safety rule,
 or Wire encoding changes. The next feature is selected by a separate ADR.
+
+## Active Core vNext slice: bounded logical shifts
+
+[ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md) retains raw
+`wordShl(value, shift)` and `wordShr(value, shift)`. Core evaluates value then
+shift exactly once; amounts at least 256 return zero. The slice requires exactly
+fourteen named value, primitive-application, and store-threaded evaluation
+theorems plus 0/1/255/256/maximum, type, fault, effect, exact-fuel, and v1/v2
+regressions. It adds no alias, tag, generic proof duplicate, source rule,
+arithmetic shift, opcode, or gas meaning. Implementation is in progress.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

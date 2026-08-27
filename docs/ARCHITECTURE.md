@@ -199,6 +199,14 @@ projection and round trips. Generic typing, renaming, weakening, Safety, machine
 correspondence, tags, and bytes do not change. The next feature is selected by
 a separate ADR.
 
+The active ADR-0035 slice completes focused interfaces for the existing raw
+logical shifts. Core keeps the value on the left and the shift amount on the
+right, evaluates both exactly once in that order, and returns zero for amounts
+of 256 or more. Fourteen named value, application, and store-threaded evaluation
+theorems are required without aliases, new tags, or duplicate generic proofs.
+Arithmetic shift, source spelling, opcode lowering, and gas remain outside the
+slice. Parser-specific proof work remains paused under the semantics-first plan.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

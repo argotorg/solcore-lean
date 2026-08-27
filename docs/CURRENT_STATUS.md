@@ -385,6 +385,16 @@ operand effects and final store, exact 4/5 and 28/29 fuel, Wire v1 rejection,
 and exact Wire v2 projection and round trips. No alias, generic API duplicate,
 tag, meaning, or byte changes. The next feature is selected by a separate ADR.
 
+## Active Core vNext bounded logical shift slice
+
+[ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md) keeps raw `wordShl`
+and `wordShr`, with value on the left and shift amount on the right. It targets
+fourteen named Word, application, and store-threaded evaluation theorems for
+zero, below-256, and at-least-256 shifts. Required regressions fix operand order,
+faults, effects, final stores, exact fuel, Wire v1 rejection, and exact Wire v2
+projection. No alias, tag, schema, Oracle, source, signed, or gas behavior is
+added. Implementation is in progress; additional primitives remain planned.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable
