@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-fourth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -21,8 +21,8 @@ each exactly once, retaining the exponent operand's final store.
 Implement `Word.pow` with
 `Word.modularPowLoop(base, accumulator, exponent)`. Each iteration uses the low
 exponent bit, squares the base modulo `2^256`, and halves the exponent. The
-recursive measure is `exponent.val`; halving bounds the loop to at most 256
-iterations.
+natural-number helper terminates by the `exponent` argument. `Word.pow` seeds it
+with `exponent.val < 2^256`, so that call takes at most 256 iterations.
 
 The result is exactly:
 
@@ -88,3 +88,26 @@ and publication boundaries remain unchanged.
 Internal Core gains total, proved modular exponentiation with bounded host
 computation and unchanged observable evaluation structure. Further primitives
 require separate ADRs.
+
+## Implementation result
+
+Internal Core now has `BinaryOp.wordPow`, `Word.pow`, and the terminating
+square-and-multiply helper `Word.modularPowLoop`. The loop-correctness theorem
+connects the executable helper to natural-number exponentiation modulo `2^256`.
+All fourteen focused theorems are complete: eight Word results, one exact
+application equation, and five store-threaded evaluations.
+
+Runtime tests cover zero, one, ordinary, boundary, high-bit, maximum, and
+maximum-exponent cases without constructing giant expected natural powers.
+They also cover result and operand types, raw invalid operands, ordered faults,
+and two allocating, writing operands evaluated base then exponent exactly once
+with the final store. Literal expressions stop at fuel 4 and complete at 5;
+effectful expressions stop at 28 and complete at 29. Maximum exponents still
+complete at fuel 5 because the internal loop remains one CEK primitive step.
+
+Frozen Wire v1/v2 expression projection and the Wire v2 `BinaryOp` conversion
+reject `wordPow`; no public Core or JSON representation was added. Public
+Oracle behavior, schemas, metadata, versions, and encodings remain unchanged.
+The implementation and focused proof/semantic/Wire validation are complete.
+After correcting the helper-bound wording above, the independent audit found no
+remaining P0-P3 issue. The next primitive or conversion requires its own ADR.

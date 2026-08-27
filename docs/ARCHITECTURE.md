@@ -259,12 +259,14 @@ faults, effects, final stores, and exact fuel pass. Future source
 bound values. Frozen Wire v1/v2 and the v2 operation conversion reject the tag;
 public formats remain unchanged. The independent audit found no P0-P3 issue.
 
-The active ADR-0042 slice adds internal `BinaryOp.wordPow` and
-`Word.pow(base, exponent)`. Core evaluates base then exponent exactly once.
-An internal square-and-multiply loop halves the exponent and finishes within
-256 iterations, while remaining one CEK primitive step. Eight Word laws, one
-application equation, and five evaluations form the focused surface. Frozen
-Wire v1/v2 reject the tag; public formats remain unchanged.
+The completed ADR-0042 slice adds internal `BinaryOp.wordPow`, `Word.pow`, and
+the proved square-and-multiply helper. Core evaluates base then exponent exactly
+once. `Word.pow` supplies a 256-bit exponent, so repeated halving takes at most
+256 iterations. The helper is proved equal to exponentiation modulo `2^256`,
+while remaining one CEK primitive step. All fourteen focused theorems and value,
+type, ordered-fault, effect, store, exact-fuel, and frozen-Wire rejection tests
+pass. Public formats remain unchanged; the independent audit found no remaining
+P0-P3 issue.
 
 ### Contract runtime
 

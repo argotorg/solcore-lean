@@ -47,7 +47,7 @@ These results remain regression obligations for every extension.
 | 21 | Word leading-zero count | Complete | Adds an internal-only total unary wordClz primitive |
 | 22 | Word byte selection | Complete | Adds internal big-endian byte selection with index-left/value-right order |
 | 23 | Arithmetic right shift | Complete | Adds internal two's-complement wordSar with value-left/shift-right order |
-| 24 | Modular exponentiation | Active | Adds internal bounded square-and-multiply wordPow |
+| 24 | Modular exponentiation | Complete | Adds internal bounded square-and-multiply wordPow |
 | 25 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
 | 26 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 27 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -407,16 +407,18 @@ bind effects in source order before reordering bound values. Public formats
 remain unchanged. The independent audit found no P0-P3 issue; the next feature
 is a separate ADR.
 
-## Active Core vNext slice: modular exponentiation
+## Completed Core vNext slice: modular exponentiation
 
 [ADR-0042](adr/0042-core-vnext-modular-exponentiation.md) adds internal
 `BinaryOp.wordPow` and `Word.pow(base, exponent)`, with base evaluated before
 exponent exactly once. The bounded square-and-multiply helper halves exponent
 at each recursion and is proved correct modulo `2^256`. Its work remains one
 CEK primitive step. Eight Word laws, one application equation, and five
-evaluations form the exact fourteen-theorem interface. Value, type, fault,
-effect, store, exact-fuel, and frozen Wire rejection tests are required. Public
-Oracle, schema, JSON, source, ABI, opcode, and gas rules remain unchanged.
+evaluations complete the exact fourteen-theorem interface. Value, type, raw and
+ordered-fault, effect, store, exact-fuel, and frozen Wire plus v2-operation
+rejection tests pass. Public Oracle, schema, JSON, source, ABI, opcode, and gas
+rules remain unchanged. The independent audit found no remaining P0-P3 issue;
+further primitives are planned one closed ADR at a time.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

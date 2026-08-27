@@ -96,13 +96,15 @@ range, type, raw and ordered-fault, effect, store, exact-fuel, and frozen Wire
 plus v2-operation rejection tests pass. Future source argument reordering must
 preserve source evaluation through prior bindings. Public Oracle, schema, and
 JSON formats remain unchanged. The independent audit found no P0-P3 issue.
-The active twenty-fourth slice,
+The completed twenty-fourth slice,
 [ADR-0042](adr/0042-core-vnext-modular-exponentiation.md), adds internal modular
 word exponentiation. Core evaluates base then exponent exactly once. A bounded
 square-and-multiply helper computes modulo `2^256`, with its loop contained in
-one CEK primitive step. Fourteen focused theorems and value, type, ordered-fault,
-effect, store, exact-fuel, and frozen Wire rejection tests are required. Public
-Oracle, schema, and JSON formats remain unchanged.
+one CEK primitive step. All fourteen focused theorems and value, type, raw and
+ordered-fault, effect, store, exact-fuel, and frozen Wire plus v2-operation
+rejection tests pass. Public Oracle, schema, and JSON formats remain unchanged.
+The independent audit found no remaining P0-P3 issue; further primitives use
+separate ADRs.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -219,7 +221,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0039 completes an internal 256-bit word leading-zero count.
 - ADR-0040 completes internal big-endian word byte selection.
 - ADR-0041 completes internal 256-bit arithmetic right shift.
-- ADR-0042 specifies internal modular word exponentiation.
+- ADR-0042 completes internal modular word exponentiation.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
