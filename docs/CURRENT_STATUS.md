@@ -38,8 +38,8 @@ word-valued flags for the four existing derived comparisons.
 arbitrary renaming-law backfill for eight older derived builders.
 [ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md) completes
 the focused interface for the existing direct unary primitives.
-[ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md) makes the focused
-interface for totalized unsigned division and modulo the active slice.
+[ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md) completes the
+focused interface for totalized unsigned division and modulo.
 
 ## Implementation status
 
@@ -63,7 +63,7 @@ interface for totalized unsigned division and modulo the active slice.
 | Internal derived word comparison flags | Complete | Complete | Not published |
 | Internal derived-builder arbitrary renaming laws | Complete | Complete | Not published |
 | Internal direct unary primitive interface | Complete | Complete | Not published |
-| Internal totalized unsigned division and modulo interface | In progress | In progress | Not published |
+| Internal totalized unsigned division and modulo interface | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -373,13 +373,17 @@ and exact Wire v2 projection and round trips. Generic Safety is reused. No
 alias, tag, meaning, or byte changes. The next feature is selected by a separate
 ADR.
 
-## Active Core vNext totalized unsigned division
+## Completed Core vNext totalized unsigned division
 
 [ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md) completes focused
 value, primitive-application, and store-threaded evaluation interfaces for the
 existing raw `wordDiv` and `wordMod` operators. Zero divisors still return zero
-only after numerator and divisor evaluate left to right exactly once. Generic
-typing, renaming, weakening, Safety, and existing Wire tags remain unchanged.
+only after numerator and divisor evaluate left to right exactly once. Four Word,
+two apply, and six evaluation theorems are complete. Tests cover values including
+`0 / 0` and `0 % 0`, result and operand types, raw and ordered faults, both
+operand effects and final store, exact 4/5 and 28/29 fuel, Wire v1 rejection,
+and exact Wire v2 projection and round trips. No alias, generic API duplicate,
+tag, meaning, or byte changes. The next feature is selected by a separate ADR.
 
 ## Meaning of completion
 

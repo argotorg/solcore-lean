@@ -92,13 +92,16 @@ universal word-complement facts. Tests cover exact 2/3 and 14/15 fuel, raw
 faults, effects and final store, Wire v1 rejection, and exact Wire v2 projection
 and round trips. It adds no Expr alias, operation tag, meaning, bytes, or public
 behavior. The next feature is selected by a separate ADR.
-The active sixteenth slice,
+The completed sixteenth slice,
 [ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md), completes focused
 proofs and regressions for the existing raw `wordDiv` and `wordMod` operators.
 The numerator remains left and the divisor right. A zero divisor returns zero
 after both operands evaluate left to right exactly once, retaining effects,
-fault order, final store, and fuel. It adds no alias, tag, schema, Oracle
-behavior, or byte change.
+fault order, final store, and fuel. Four Word, two apply, and six evaluation
+theorems accompany values including `0 / 0`, type/fault/effect tests, exact 4/5
+and 28/29 fuel, Wire v1 rejection, and exact Wire v2 projection and round trips.
+It adds no alias, generic API duplicate, tag, schema, Oracle behavior, or byte
+change. The next feature is selected by a separate ADR.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the

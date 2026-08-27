@@ -39,7 +39,7 @@ These results remain regression obligations for every extension.
 | 13 | Derived word comparison flags | Complete | Wraps existing boolean comparisons with canonical word conversion |
 | 14 | Derived-builder arbitrary renaming laws | Complete | Backfills the general renaming API for eight existing builders |
 | 15 | Direct unary primitive interface | Complete | Completes focused APIs and regressions for existing boolNot and wordNot |
-| 16 | Totalized unsigned division and modulo | Active | Completes focused APIs and strict zero-divisor regressions |
+| 16 | Totalized unsigned division and modulo | Complete | Completes focused APIs and strict zero-divisor regressions |
 | 17 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
 | 18 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 19 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -297,14 +297,18 @@ and final store, exact 2/3 and 14/15 fuel, Wire v1 rejection, and exact Wire v2
 projection and round trips. No alias, tag, runtime meaning, or byte encoding
 changes. The next feature is selected by a separate ADR.
 
-## Active Core vNext slice: totalized unsigned division
+## Completed Core vNext slice: totalized unsigned division
 
 [ADR-0034](adr/0034-core-vnext-totalized-unsigned-division.md) keeps `wordDiv`
 and `wordMod` as raw binary operators. Named zero and nonzero value, exact
 primitive-application, and store-threaded evaluation results expose their
 existing behavior. A zero divisor does not skip either operand: numerator and
-divisor retain left-to-right effects, faults, final stores, and fuel. No alias,
-tag, Safety rule, or Wire encoding changes.
+divisor retain left-to-right effects, faults, final stores, and fuel. Four Word,
+two apply, and six evaluation theorems are complete. Tests cover zero, one, and
+maximum boundaries, `0 / 0` and `0 % 0`, types and raw faults, both operand
+effects, exact 4/5 and 28/29 fuel, Wire v1 rejection, and exact Wire v2
+projection and round trips. No alias, generic API duplicate, tag, Safety rule,
+or Wire encoding changes. The next feature is selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

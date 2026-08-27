@@ -188,12 +188,16 @@ and exact Wire v2 projection and round trips. Generic Safety and machine
 correspondence remain unchanged, as do semantics, tags, and bytes. The next
 feature is selected by a separate ADR.
 
-The active ADR-0034 slice adds focused reasoning interfaces for direct unsigned
+The completed ADR-0034 slice adds focused reasoning interfaces for direct unsigned
 word division and modulo. The raw binary form keeps numerator on the left and
 divisor on the right. A zero divisor produces zero only after both operands
 evaluate exactly once in order, so effects, faults, and final stores remain
-visible. Generic typing, renaming, weakening, Safety, machine correspondence,
-tags, and bytes do not change.
+visible. Four Word, two apply, and six evaluation theorems cover normal and zero
+divisors. Tests include `0 / 0`, types, raw and ordered faults, two effectful
+operands, exact 4/5 and 28/29 fuel, Wire v1 rejection, and exact Wire v2
+projection and round trips. Generic typing, renaming, weakening, Safety, machine
+correspondence, tags, and bytes do not change. The next feature is selected by
+a separate ADR.
 
 ### Contract runtime
 

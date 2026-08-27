@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: sixteenth internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -30,7 +30,7 @@ without loss of information.
 The left operand is always the numerator and the right operand is always the
 divisor. This order is part of the semantic interface.
 
-## Required proof interface
+## Implemented proof interface
 
 Add named value lemmas for both `Word.udiv` and `Word.umod`:
 
@@ -61,7 +61,10 @@ The unchecked machine still faults for non-word operand values. Well-typed
 programs reuse the existing generic Safety proof that makes those operand faults
 unreachable.
 
-## Required tests
+The focused interface contains four `Word` lemmas, two exact `BinaryOp.apply`
+lemmas, and six general, zero-divisor, and nonzero-divisor `Evaluates` theorems.
+
+## Implemented tests
 
 Focused semantic regressions cover:
 
@@ -78,8 +81,15 @@ Focused semantic regressions cover:
 - exact Wire v2 projection and round trips through the existing `wordDiv` and
   `wordMod` tags.
 
-Compile-time examples exercise every new named theorem. Effectful tests assert
-the final store, not merely the returned zero.
+Compile-time examples exercise all twelve named theorems. Value tests include
+`0 / 0` and `0 % 0`, and type tests reject wrong declared results and wrong
+left or right operands. Raw invalid operands and left/right faults retain the
+specified order. With two allocating and writing operands, a zero divisor
+returns zero and the final store contains both writes in order.
+
+Literal programs stop at fuel four and complete at five. The effectful programs
+stop at twenty-eight and complete at twenty-nine. Wire v1 rejects the forms;
+Wire v2 projects and round-trips the exact existing tags.
 
 ## Existing generic proofs
 
