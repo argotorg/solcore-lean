@@ -769,10 +769,11 @@ audit found no P0-P3 issue.
 ## Active minimal WorldState slice
 
 [ADR-0056](adr/0056-minimal-world-state.md) introduces exactly two carriers and
-eight public operations over private finite extensional maps. An absent Account
-stays distinct from a present empty Account. Missing storage reads as Word zero;
-zero writes canonically erase the entry; and storage writes never create a
-missing Account.
+eight public operations over private semantic lookup functions. The finite Word
+and Address domains keep these partial maps finite without exposing a tree,
+hash, iteration, or insertion order. An absent Account stays distinct from a
+present empty Account. Missing storage reads as Word zero; zero writes
+canonically erase the entry; and storage writes never create a missing Account.
 
 The planned exact twelve laws and twelve runtime assertions cover Account
 lookup, explicit insertion, storage presence and reads, zero deletion,

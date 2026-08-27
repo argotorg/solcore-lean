@@ -27,11 +27,18 @@ Account
 WorldState
 ```
 
-Their representation is private. Both use finite extensional maps backed by
-`Std.ExtTreeMap`, so observable equality is independent of insertion order.
-Account storage maps `Core.Word` keys to a private nonzero-Word subtype. A zero
-storage entry is therefore unrepresentable. WorldState maps `Address` to
-Account and preserves absence explicitly as `none`.
+Their representation is semantic and extensional. Account privately carries a
+lookup function `Core.Word → Option Core.Word` plus a proof that every stored
+value is nonzero. WorldState privately carries a lookup function
+`Address → Option Account`. Because Word and Address are finite domains, these
+functions still denote finite partial maps without choosing a tree, hash,
+iteration, or insertion-order representation.
+
+A public recursor can reveal only those semantic lookup functions, which carry
+exactly the same information as `storageValue?` and `account?`. There is no
+`Std.ExtTreeMap`, stored-value subtype, carrier abbreviation, `BEq`,
+`DecidableEq`, or `Repr` instance to expose an additional representation. The
+zero-free proof makes a stored zero entry unrepresentable.
 
 An empty Account is different from an absent Account. Writing zero deletes only
 the selected storage entry and leaves the Account present. Writing storage at
@@ -85,7 +92,7 @@ Publish exactly twelve focused laws:
 12. `WorldState.account?_writeStorage?_other` proves that a successful write
     preserves every different address.
 
-Private map and nonzero-subtype helpers do not add to the twelve-law public
+Private lookup and zero-free-proof helpers do not add to the twelve-law public
 interface. The implementation uses no custom axioms or unchecked declarations;
 standard Lean dependencies are audited and recorded.
 
@@ -109,7 +116,7 @@ twelve public laws:
 12. storage write at one address preserves another Account.
 
 Fixtures use distinct addresses and storage keys. Tests query the public
-operations directly and do not depend on private map iteration or ordering.
+operations directly and do not depend on a concrete map representation.
 
 ## Staged implementation plan
 

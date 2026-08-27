@@ -224,9 +224,10 @@ issue.
 
 The active minimal world-state slice,
 [ADR-0056](adr/0056-minimal-world-state.md), adds finite Account and WorldState
-carriers. Missing storage reads as zero, zero writes delete the entry, and an
-absent Account is never created by a storage write. Rollback, balances, code,
-calls, ABI behavior, ordering, and publication remain outside this slice.
+carriers whose private data is limited to semantic lookup functions and
+zero-free evidence. Missing storage reads as zero, zero writes delete the entry,
+and an absent Account is never created by a storage write. Rollback, balances,
+code, calls, ABI behavior, ordering, and publication remain outside this slice.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
