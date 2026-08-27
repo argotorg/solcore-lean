@@ -100,6 +100,14 @@ Dedicated typing, inference, evaluation, store-threading, expansion, and
 weakening theorems, plus effect, exact-fuel, type-error, boundary, and wire
 regressions, complete this proof boundary.
 
+The active short-circuit boolean slice is another derived-expression boundary.
+`boolAnd(x, y)` expands to `ifE x y false`, while `boolOr(x, y)` expands to
+`ifE x true y`. The left operand runs once and first; the right operand runs
+only in the selected branch. This store, fault, and fuel behavior follows the
+existing conditional semantics and adds no Core, CEK, wire, or Oracle tag.
+Eager ordinary reference calls are comparison evidence, not authority over the
+selected-branch-only decision fixed by ADR-0011 and ADR-0026.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

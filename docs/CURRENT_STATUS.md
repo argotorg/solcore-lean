@@ -23,7 +23,8 @@ program-local named algebraic data and normalized constructor matching accepted
 by ADR-0023 are complete internal slices. The derived `boolToWord` and `wordToBool`
 conversions accepted by ADR-0024 are also complete without adding a new Core
 expression form. The `wordIsZero` slice accepted by ADR-0025 is complete and
-likewise adds no new Core expression form. Core vNext as a whole remains active.
+likewise adds no new Core expression form. ADR-0026 makes derived short-circuit
+`boolAnd` and `boolOr` the active slice. Core vNext as a whole remains active.
 
 ## Implementation status
 
@@ -39,6 +40,7 @@ likewise adds no new Core expression form. Core vNext as a whole remains active.
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
+| Internal short-circuit boolean operators | In progress | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -78,7 +80,8 @@ language. The following remain:
 - source-level mutable declarations, assignment syntax, and their elaboration;
 - source-level data declarations, pattern syntax, and elaboration into the
   completed internal named-data Core;
-- additional conversions and primitives beyond the completed word-zero slice;
+- short-circuit boolean builders and their focused proof boundary;
+- additional conversions and primitives beyond that active slice;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
 - contract entry and call semantics;
@@ -242,6 +245,15 @@ Dedicated theorems cover expansion, typing, inference, general and zero/nonzero
 evaluation, store threading, and weakening. Tests cover word boundaries,
 type errors, effects, exact fuel, the distinction from `wordToBool`, and frozen
 wire behavior. The warning, kernel-trust, axiom, and whitespace audits pass.
+
+## Active Core vNext short-circuit boolean slice
+
+[ADR-0026](adr/0026-core-vnext-short-circuit-booleans.md) fixes
+`boolAnd(x, y) = ifE x y false` and `boolOr(x, y) = ifE x true y`. Both have
+type `bool × bool -> bool`. The left operand is evaluated once and first; the
+right operand is evaluated only when selected. Existing conditional semantics
+therefore determine store threading, faults, and fuel without a new tag or
+machine rule. Both frozen wires project the exact handwritten expansions.
 
 ## Meaning of completion
 

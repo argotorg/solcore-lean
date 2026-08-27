@@ -31,11 +31,12 @@ These results remain regression obligations for every extension.
 | 5 | Named algebraic data and direct matching | Complete | Adds program-local constructor identity without source pattern syntax |
 | 6 | Boolean and word conversions | Complete | Derives total conversions without a new Core tag |
 | 7 | Word zero test | Complete | Derives a canonical word result from existing expressions |
-| 8 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 9 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 10 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 11 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 12 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 8 | Short-circuit boolean operators | Active | Fixes selected-branch-only effects without a new Core tag |
+| 9 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 10 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 11 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 12 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 13 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -199,6 +200,15 @@ distinct from `wordToBool` truthiness and from ABI boolean decoding.
 The implementation includes named expansion, typing, inference, general and
 zero/nonzero evaluation, store-threading, and weakening theorems. Boundary,
 type-error, effectful exactly-once, exact-fuel, and frozen-wire tests pass.
+
+## Active Core vNext slice: short-circuit booleans
+
+[ADR-0026](adr/0026-core-vnext-short-circuit-booleans.md) fixes boolean
+conjunction and disjunction as conditional expansions. Each left operand runs
+once and first. The right operand runs only when selected, so its effects,
+faults, store changes, and fuel cost are skipped with the branch. No new Core,
+CEK, wire, or Oracle tag is introduced, and both frozen wires project the exact
+ordinary conditional expansion.
 
 ## State and contracts
 
