@@ -129,6 +129,20 @@ theorem wordGtFlag_not_gt
 
 end Evaluates
 
+@[simp] theorem Expr.rename_wordEqFlag
+    (left right : Expr) (mapping : Renaming) :
+    (left.wordEqFlag right).rename mapping =
+      (left.rename mapping).wordEqFlag (right.rename mapping) := by
+  rw [Expr.wordEqFlag_expansion, Expr.rename_boolToWord]
+  simp [Expr.rename, Expr.wordEqFlag_expansion]
+
+@[simp] theorem Expr.rename_wordGtFlag
+    (left right : Expr) (mapping : Renaming) :
+    (left.wordGtFlag right).rename mapping =
+      (left.rename mapping).wordGtFlag (right.rename mapping) := by
+  rw [Expr.wordGtFlag_expansion, Expr.rename_boolToWord]
+  simp [Expr.rename, Expr.wordGtFlag_expansion]
+
 @[simp] theorem Expr.weakenAt_wordEqFlag
     (left right : Expr) (cutoff : Nat) :
     (left.wordEqFlag right).weakenAt cutoff =

@@ -1,4 +1,5 @@
 import Solcore.Core.Eval
+import Solcore.Core.RenamingSyntax
 
 set_option autoImplicit false
 
@@ -99,6 +100,18 @@ theorem boolOr_false
   .ifFalse leftEvaluation rightEvaluation
 
 end Evaluates
+
+@[simp] theorem Expr.rename_boolAnd
+    (left right : Expr) (mapping : Renaming) :
+    (left.boolAnd right).rename mapping =
+      (left.rename mapping).boolAnd (right.rename mapping) := by
+  simp [Expr.boolAnd, Expr.rename]
+
+@[simp] theorem Expr.rename_boolOr
+    (left right : Expr) (mapping : Renaming) :
+    (left.boolOr right).rename mapping =
+      (left.rename mapping).boolOr (right.rename mapping) := by
+  simp [Expr.boolOr, Expr.rename]
 
 @[simp] theorem Expr.weakenAt_boolAnd
     (left right : Expr) (cutoff : Nat) :
