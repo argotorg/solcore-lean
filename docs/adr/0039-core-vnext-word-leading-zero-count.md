@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: twenty-first internal Semantic Core vNext slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -76,3 +76,23 @@ faults, effects, fuel, and Wire meaning remain unchanged.
 
 Internal Core gains one precise, total bit-analysis primitive while its public
 formats remain frozen. Further primitives require separate ADRs.
+
+## Implementation result
+
+Internal Core now has `UnaryOp.wordClz` and the total `Word.clz` operation with
+the specified zero and nonzero definitions. All eleven focused theorems are
+implemented: five Word laws, one exact application equation, and five
+store-threaded general/boundary evaluations.
+
+Compile-time and runtime tests cover 0, 1, 2, `2^255`, and maximum; Word result
+typing and wrong result/operand types; the raw invalid-unary-operand fault; and
+an allocating, writing operand evaluated exactly once with its final store.
+Literal evaluation has the exact 2/3 fuel boundary and effectful evaluation the
+exact 14/15 boundary. Frozen Wire v1 and v2 both reject `wordClz`, so no Core or
+JSON projection is introduced.
+
+The implementation, focused semantic/Wire validation, and independent audit
+are complete. The audit found no P0-P3 issue, no source trust escape hatch, and
+only the repository-approved Lean foundational dependencies. The public Wire,
+Oracle, metadata, schemas, versions, encodings, and golden streams remain
+unchanged.

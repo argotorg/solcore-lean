@@ -72,13 +72,14 @@ exactly once. Value, type, ordered-fault, effect, exact-fuel, and Wire/Core/JSON
 regressions pass, and older derived comparisons reuse the helpers. No expression
 alias, Word or generic proof duplicate, tag, schema, or Oracle behavior changed.
 The independent audit found no P0-P3 issue; further primitives remain planned.
-The active twenty-first slice,
-[ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md), adds an internal
-unary leading-zero count for 256-bit words. It maps zero to 256 and nonzero
-values to `255 - Nat.log2 value.val`, evaluates its operand exactly once, and
-retains the final store. Eleven focused laws and evaluation results plus value,
-type, fault, effect, fuel, and frozen Wire v1/v2 rejection tests are required.
-The public Oracle and schemas remain unchanged.
+The completed twenty-first slice,
+[ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md), adds internal
+`UnaryOp.wordClz` and total `Word.clz` for 256-bit words. It maps zero to 256
+and nonzero values to `255 - Nat.log2 value.val`, evaluates its operand exactly
+once, and retains the final store. All eleven focused theorems and value, type,
+raw-fault, effect, exact-fuel, and frozen Wire v1/v2 rejection tests pass. The
+public Oracle and schemas remain unchanged. The independent audit found no
+P0-P3 issue.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -192,7 +193,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0036 completes focused interfaces for modular word arithmetic.
 - ADR-0037 completes focused interfaces for binary bitwise logic.
 - ADR-0038 completes focused interfaces for direct word comparisons.
-- ADR-0039 specifies an internal 256-bit word leading-zero count.
+- ADR-0039 completes an internal 256-bit word leading-zero count.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

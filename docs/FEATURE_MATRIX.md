@@ -54,7 +54,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Modular word arithmetic interface | ADR-0036 Accepted | Complete | eight Word, three apply, and three evaluation theorems; normal/wrapped values, strict order, effects/fuel, and v1/v2 Core plus JSON round trips complete | None |
 | Binary bitwise logic interface | ADR-0037 Accepted | Complete | nine Word, three apply, and three evaluation theorems; masks, strict order, effects/fuel, and v1/v2 Core plus JSON round trips complete | None |
 | Direct word comparison interface | ADR-0038 Accepted | Complete | two apply and six evaluation theorems; boolean equality and strict unsigned greater-than with values, types, ordered faults/effects, exact fuel, and v1/v2 Core/JSON regressions complete | None |
-| Word leading-zero count | ADR-0039 Accepted | Active | internal 256-bit wordClz; five Word, one apply, and five evaluation theorems; frozen v1/v2 rejection | None |
+| Word leading-zero count | ADR-0039 Accepted | Complete | internal UnaryOp.wordClz and Word.clz; five Word, one apply, and five evaluation theorems; value/type/fault/effect/fuel tests and frozen v1/v2 rejection complete | None |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | slice 22 onward; separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 

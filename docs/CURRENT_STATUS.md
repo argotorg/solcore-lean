@@ -51,8 +51,9 @@ feature is selected separately.
 [ADR-0038](adr/0038-core-vnext-direct-word-comparisons.md) completes the focused
 interface for direct boolean word equality and unsigned greater-than. Core
 vNext remains active; the next feature is selected separately.
-[ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md) makes the internal
-256-bit word leading-zero count the active Core vNext slice.
+[ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md) completes the
+internal 256-bit word leading-zero count. Core vNext remains active; the next
+feature is selected separately.
 
 ## Implementation status
 
@@ -81,7 +82,7 @@ vNext remains active; the next feature is selected separately.
 | Internal modular word arithmetic interface | Complete | Complete | Not published |
 | Internal binary bitwise logic interface | Complete | Complete | Not published |
 | Internal direct word comparison interface | Complete | Complete | Not published |
-| Internal word leading-zero count | In progress | In progress | Explicitly excluded from Wire v1/v2 |
+| Internal word leading-zero count | Complete | Complete | Explicitly excluded from Wire v1/v2 |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -451,16 +452,17 @@ helpers reuse the evaluations without semantic change. No expression alias,
 Word or generic proof duplicate, tag, schema, or Oracle behavior changed. The
 independent audit found no P0-P3 issue.
 
-## Active Core vNext word leading-zero-count slice
+## Completed Core vNext word leading-zero-count slice
 
 [ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md) adds internal unary
-`wordClz : word -> word`. It returns 256 for zero and
+`UnaryOp.wordClz` and `Word.clz`. The operation returns 256 for zero and
 `255 - Nat.log2 value.val` otherwise. The exact eleven-theorem interface is five
-Word laws, one application equation, and five store-threaded evaluations.
+Word laws, one application equation, and five store-threaded evaluations; all
+are complete.
 Tests cover 0, 1, 2, `2^255`, maximum, types, the raw fault, exactly-once effects
 and final store, exact 2/3 and 14/15 fuel, and rejection by both frozen Wire
-versions. The public Oracle and schemas remain unchanged. Implementation is in
-progress.
+versions. The public Oracle and schemas remain unchanged. The independent audit
+found no P0-P3 issue.
 
 ## Meaning of completion
 

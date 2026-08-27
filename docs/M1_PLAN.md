@@ -44,7 +44,7 @@ These results remain regression obligations for every extension.
 | 18 | Modular word arithmetic | Complete | Completes focused APIs for existing wordAdd, wordSub, and wordMul |
 | 19 | Binary bitwise logic | Complete | Completes focused APIs for existing wordAnd, wordOr, and wordXor |
 | 20 | Direct word comparisons | Complete | Completes focused APIs for existing wordEq and wordGt |
-| 21 | Word leading-zero count | Active | Adds an internal-only total unary wordClz primitive |
+| 21 | Word leading-zero count | Complete | Adds an internal-only total unary wordClz primitive |
 | 22 | Additional conversions and primitives | Planned | Added one closed, typed family at a time |
 | 23 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 24 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -367,15 +367,16 @@ typing/inference/renaming/weakening/Safety proof, tag, signed/source API,
 opcode, or gas rule changed. The independent audit found no P0-P3 issue; the
 next feature is selected by a separate ADR.
 
-## Active Core vNext slice: word leading-zero count
+## Completed Core vNext slice: word leading-zero count
 
-[ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md) adds internal unary
-`wordClz : word -> word` with fixed 256-bit meaning. Zero returns 256; nonzero
-values return `255 - Nat.log2 value.val`. Five Word laws, one application
-equation, and five store-threaded evaluations form the exact eleven-theorem
-interface. Tests require the 0/1/2/high-bit/maximum boundaries, typing and raw
-fault, exactly-once effects and final store, exact 2/3 and 14/15 fuel, and
-frozen Wire v1/v2 rejection. No public Oracle or schema changes.
+[ADR-0039](adr/0039-core-vnext-word-leading-zero-count.md) adds internal
+`UnaryOp.wordClz` and total `Word.clz` with fixed 256-bit meaning. Zero returns
+256; nonzero values return `255 - Nat.log2 value.val`. Five Word laws, one
+application equation, and five store-threaded evaluations complete the exact
+eleven-theorem interface. The 0/1/2/high-bit/maximum, typing, raw-fault,
+exactly-once effect, final-store, exact 2/3 and 14/15 fuel, and frozen Wire v1/v2
+rejection tests pass. No public Oracle or schema changed. The independent audit
+found no P0-P3 issue; the next feature is selected by a separate ADR.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

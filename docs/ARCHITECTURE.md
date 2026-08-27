@@ -234,12 +234,13 @@ comparison proofs reuse the helpers without semantic change. No expression
 alias, Word or generic proof duplicate, tag, schema, or Oracle behavior changed.
 The independent audit found no P0-P3 issue.
 
-The active ADR-0039 slice adds internal unary `wordClz`, the 256-bit leading
-zero count. Zero returns 256; nonzero values return `255 - Nat.log2 value.val`.
-Its operand evaluates exactly once and retains its final store. The focused
-surface is five Word laws, one application equation, and five evaluations.
-Frozen Wire v1 and v2 both reject the new internal tag; public Oracle and schema
-formats remain unchanged.
+The completed ADR-0039 slice adds internal `UnaryOp.wordClz` and total
+`Word.clz` for the 256-bit leading-zero count. Zero returns 256; nonzero values
+return `255 - Nat.log2 value.val`. Five Word laws, one application equation,
+and five evaluations are complete. Value, type, raw-fault, exactly-once effect,
+final-store, and exact-fuel tests pass. Frozen Wire v1 and v2 both reject the
+tag; public Oracle and schema formats remain unchanged. The independent audit
+found no P0-P3 issue.
 
 ### Contract runtime
 
