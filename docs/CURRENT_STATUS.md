@@ -28,6 +28,7 @@ adapter.
 | Small Semantic Core machine | Complete | Complete for the closed fragment | Oracle v2 and v3 |
 | Semantic Core primitive subset | Complete | Complete | Oracle v3 / Core v2 |
 | Internal Core binary products | Complete | Complete | Not published |
+| Internal non-recursive functions | Complete | Complete, including totality | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -64,7 +65,7 @@ The public Core fragment is complete, but it is not the complete Solcore
 language. The following remain:
 
 - sum values;
-- functions, application, return, closures, recursion, and divergence;
+- explicit return, recursion, and divergence;
 - mutable locals and assignment;
 - user-defined algebraic data and direct pattern matching;
 - conversions and additional primitives;
@@ -90,9 +91,9 @@ following is paused:
 - source checking and Surface-to-Core elaboration; and
 - publication of the Multi frontend.
 
-## First Core vNext result
+## Completed Core vNext results
 
-The first Core vNext vertical slice is implemented:
+The first Core vNext vertical slice adds:
 
 - a binary product type;
 - pair construction;
@@ -110,8 +111,23 @@ wire projections reject product types, values, expressions, and programs.
 See the [Semantic Core roadmap](M1_PLAN.md) and
 [ADR-0019](adr/0019-core-vnext-products.md).
 
-The next active step is to fix the function, application, closure, return, and
-divergence boundary before extending the Core again.
+The second vertical slice adds:
+
+- explicitly typed unary functions;
+- callee-before-argument application;
+- immutable lexical closures;
+- de Bruijn parameters and captured bindings;
+- detailed function-checking diagnostics;
+- CEK execution and big-step correspondence; and
+- a logical-relations proof retaining total evaluation and sufficient fuel for
+  non-recursive, well-typed programs.
+
+Frozen wire projections reject function types, lambdas, applications,
+closures, and programs containing them. See
+[ADR-0020](adr/0020-core-vnext-non-recursive-functions.md).
+
+The next active step is sum values and elimination. User algebraic data and
+source-level pattern syntax remain later decisions.
 
 ## Meaning of completion
 

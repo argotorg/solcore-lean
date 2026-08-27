@@ -27,6 +27,21 @@ inductive Evaluates : Environment → Expr → Value → Prop where
       {leftValue rightValue : Value} :
       Evaluates environment operand (.pair leftValue rightValue) →
       Evaluates environment (.second operand) rightValue
+  | lambda
+      {environment : Environment} {parameterType resultType : Ty}
+      {body : Expr} :
+      Evaluates environment (.lambda parameterType resultType body)
+        (.closure parameterType resultType body environment)
+  | apply
+      {environment capturedEnvironment : Environment}
+      {function argument body : Expr}
+      {parameterType resultType : Ty}
+      {argumentValue result : Value} :
+      Evaluates environment function
+        (.closure parameterType resultType body capturedEnvironment) →
+      Evaluates environment argument argumentValue →
+      Evaluates (argumentValue :: capturedEnvironment) body result →
+      Evaluates environment (.apply function argument) result
   | var {environment : Environment} {index : Nat} {value : Value} :
       environment[index]? = some value →
       Evaluates environment (.var index) value
@@ -95,6 +110,17 @@ theorem evaluation_deterministic
           have pairEquality := operandIH otherOperand
           cases pairEquality
           rfl
+  | lambda =>
+      cases rightEvaluation
+      rfl
+  | apply _ _ _ functionIH argumentIH bodyIH =>
+      cases rightEvaluation with
+      | apply otherFunction otherArgument otherBody =>
+          have functionEquality := functionIH otherFunction
+          cases functionEquality
+          have argumentEquality := argumentIH otherArgument
+          cases argumentEquality
+          exact bodyIH otherBody
   | var leftLookup =>
       cases rightEvaluation with
       | var rightLookup =>
@@ -128,12 +154,12 @@ theorem evaluation_deterministic
           exact branchIH rightBranch
       | ifFalse rightCondition _ =>
           have impossible := conditionIH rightCondition
-          contradiction
+          cases impossible
   | ifFalse _ _ conditionIH branchIH =>
       cases rightEvaluation with
       | ifTrue rightCondition _ =>
           have impossible := conditionIH rightCondition
-          contradiction
+          cases impossible
       | ifFalse rightCondition rightBranch =>
           exact branchIH rightBranch
 

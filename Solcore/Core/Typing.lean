@@ -24,6 +24,18 @@ inductive HasType : Context → Expr → Ty → Prop where
       {context : Context} {operand : Expr} {leftType rightType : Ty} :
       HasType context operand (.product leftType rightType) →
       HasType context (.second operand) rightType
+  | lambda
+      {context : Context} {parameterType resultType : Ty} {body : Expr} :
+      HasType (parameterType :: context) body resultType →
+      HasType context
+        (.lambda parameterType resultType body)
+        (.function parameterType resultType)
+  | apply
+      {context : Context} {function argument : Expr}
+      {parameterType resultType : Ty} :
+      HasType context function (.function parameterType resultType) →
+      HasType context argument parameterType →
+      HasType context (.apply function argument) resultType
   | unary
       {context : Context} {op : UnaryOp} {operand : Expr} :
       HasType context operand op.operandType →
@@ -62,6 +74,19 @@ def infer? (context : Context) : Expr → Option Ty
       match infer? context operand with
       | some (.product _ rightType) => some rightType
       | _ => none
+  | .lambda parameterType resultType body =>
+      if infer? (parameterType :: context) body = some resultType then
+        some (.function parameterType resultType)
+      else
+        none
+  | .apply function argument =>
+      match infer? context function with
+      | some (.function parameterType resultType) =>
+          if infer? context argument = some parameterType then
+            some resultType
+          else
+            none
+      | _ => none
   | .unary op operand =>
       if infer? context operand = some op.operandType then
         some op.resultType
@@ -94,6 +119,8 @@ theorem infer_complete
   | pair _ _ leftIH rightIH => simp [infer?, leftIH, rightIH]
   | first _ operandIH => simp [infer?, operandIH]
   | second _ operandIH => simp [infer?, operandIH]
+  | lambda bodyTyping bodyIH => simp [infer?, bodyIH]
+  | apply _ _ functionIH argumentIH => simp [infer?, functionIH, argumentIH]
   | unary _ operandIH => simp [infer?, operandIH]
   | binary _ _ leftIH rightIH => simp [infer?, leftIH, rightIH]
   | letE _ _ valueIH bodyIH => simp_all [infer?]
@@ -146,6 +173,8 @@ theorem infer_sound
                   simpa [infer?, operandInferred] using inferred)
               subst type
               exact .first (operandIH operandInferred)
+          | function parameterType resultType =>
+              simp [infer?, operandInferred] at inferred
   | second operand operandIH =>
       cases operandInferred : infer? context operand with
       | none => simp [infer?, operandInferred] at inferred
@@ -160,6 +189,38 @@ theorem infer_sound
                   simpa [infer?, operandInferred] using inferred)
               subst type
               exact .second (operandIH operandInferred)
+          | function parameterType resultType =>
+              simp [infer?, operandInferred] at inferred
+  | lambda parameterType resultType body bodyIH =>
+      by_cases bodyInferred :
+          infer? (parameterType :: context) body = some resultType
+      · have functionType : Ty.function parameterType resultType = type := by
+          exact Option.some.inj (by
+            simpa [infer?, bodyInferred] using inferred)
+        subst type
+        exact .lambda (bodyIH bodyInferred)
+      · simp [infer?, bodyInferred] at inferred
+  | apply function argument functionIH argumentIH =>
+      cases functionInferred : infer? context function with
+      | none => simp [infer?, functionInferred] at inferred
+      | some functionType =>
+          cases functionType with
+          | unit => simp [infer?, functionInferred] at inferred
+          | bool => simp [infer?, functionInferred] at inferred
+          | word => simp [infer?, functionInferred] at inferred
+          | product leftType rightType =>
+              simp [infer?, functionInferred] at inferred
+          | function parameterType resultType =>
+              by_cases argumentInferred :
+                  infer? context argument = some parameterType
+              · have inferredResult : resultType = type := by
+                  exact Option.some.inj (by
+                    simpa [infer?, functionInferred, argumentInferred] using inferred)
+                subst type
+                exact .apply
+                  (functionIH functionInferred)
+                  (argumentIH argumentInferred)
+              · simp [infer?, functionInferred, argumentInferred] at inferred
   | unary op operand operandIH =>
       by_cases operandInferred :
           infer? context operand = some op.operandType
@@ -198,6 +259,8 @@ theorem infer_sound
           | unit => simp [infer?, conditionInferred] at inferred
           | word => simp [infer?, conditionInferred] at inferred
           | product leftType rightType =>
+              simp [infer?, conditionInferred] at inferred
+          | function parameterType resultType =>
               simp [infer?, conditionInferred] at inferred
           | bool =>
               cases thenInferred : infer? context thenBranch with

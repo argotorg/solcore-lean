@@ -17,6 +17,11 @@ inductive Frame where
   | pairApply (leftValue : Value)
   | firstApply
   | secondApply
+  | applyArgument (argument : Expr) (environment : Environment)
+  | applyClosure
+      (parameterType resultType : Ty)
+      (body : Expr)
+      (environment : Environment)
   | letBody (body : Expr) (environment : Environment)
   | ifBranches (thenBranch : Expr) (elseBranch : Expr) (environment : Environment)
   deriving Repr, BEq, DecidableEq
@@ -90,6 +95,36 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.ret (.pair leftValue rightValue), .secondApply :: continuation⟩
         ⟨.ret rightValue, continuation⟩
+  | lambda
+      {environment : Environment} {parameterType resultType : Ty}
+      {body : Expr} {continuation : List Frame} :
+      Transition
+        ⟨.eval (.lambda parameterType resultType body) environment, continuation⟩
+        ⟨.ret (.closure parameterType resultType body environment), continuation⟩
+  | enterApply
+      {environment : Environment} {function argument : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.apply function argument) environment, continuation⟩
+        ⟨.eval function environment,
+          .applyArgument argument environment :: continuation⟩
+  | beginArgument
+      {callerEnvironment capturedEnvironment : Environment}
+      {parameterType resultType : Ty} {body argument : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.ret (.closure parameterType resultType body capturedEnvironment),
+          .applyArgument argument callerEnvironment :: continuation⟩
+        ⟨.eval argument callerEnvironment,
+          .applyClosure parameterType resultType body capturedEnvironment :: continuation⟩
+  | invokeClosure
+      {capturedEnvironment : Environment}
+      {parameterType resultType : Ty} {body : Expr}
+      {argumentValue : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret argumentValue,
+          .applyClosure parameterType resultType body capturedEnvironment :: continuation⟩
+        ⟨.eval body (argumentValue :: capturedEnvironment), continuation⟩
   | var
       {environment : Environment} {index : Nat} {value : Value}
       {continuation : List Frame} :
@@ -166,6 +201,7 @@ inductive MachineFault where
   | unboundVariable (index : Nat)
   | expectedBool (actual : Value)
   | expectedProduct (actual : Value)
+  | expectedFunction (actual : Value)
   | invalidUnaryOperand (op : UnaryOp) (actual : Value)
   | invalidBinaryOperands (op : BinaryOp) (left right : Value)
   deriving Repr, BEq, DecidableEq
@@ -190,6 +226,12 @@ def advance (state : State) : AdvanceResult :=
           .next ⟨.eval operand environment, .firstApply :: state.continuation⟩
       | .second operand =>
           .next ⟨.eval operand environment, .secondApply :: state.continuation⟩
+      | .lambda parameterType resultType body =>
+          .next ⟨.ret (.closure parameterType resultType body environment),
+            state.continuation⟩
+      | .apply function argument =>
+          .next ⟨.eval function environment,
+            .applyArgument argument environment :: state.continuation⟩
       | .var index =>
           match environment[index]? with
           | some value => .next ⟨.ret value, state.continuation⟩
@@ -230,6 +272,15 @@ def advance (state : State) : AdvanceResult :=
           match value with
           | .pair _ rightValue => .next ⟨.ret rightValue, continuation⟩
           | actual => .fault (.expectedProduct actual)
+      | .applyArgument argument callerEnvironment :: continuation =>
+          match value with
+          | .closure parameterType resultType body capturedEnvironment =>
+              .next ⟨.eval argument callerEnvironment,
+                .applyClosure parameterType resultType body capturedEnvironment ::
+                  continuation⟩
+          | actual => .fault (.expectedFunction actual)
+      | .applyClosure _ _ body capturedEnvironment :: continuation =>
+          .next ⟨.eval body (value :: capturedEnvironment), continuation⟩
       | .letBody body environment :: continuation =>
           .next ⟨.eval body (value :: environment), continuation⟩
       | .ifBranches thenBranch elseBranch environment :: continuation =>

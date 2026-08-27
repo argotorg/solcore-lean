@@ -33,11 +33,11 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Feature | Decision | Lean status | Required proof boundary | Syntax coupling |
 | --- | --- | --- | --- | --- |
 | Binary products and projections | ADR-0019 Accepted | Complete | typing/checker equivalence, CEK/big-step correspondence, safety, sufficient fuel, and old-wire rejection complete | None |
-| Functions and application | Direction accepted | Planned | typing, closure evaluation, application order, machine and safety | None |
-| Lexical closures | Direction accepted | Planned with functions | capture typing, environment correspondence, invocation | None |
+| Functions and application | ADR-0020 Accepted | Complete | typing/checker equivalence, ordered application, correspondence, logical-relations totality, safety, and old-wire rejection complete | None |
+| Lexical closures | ADR-0020 Accepted | Complete | capture typing, environment correspondence, invocation, and fault exclusion complete | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 | Mutable locals and assignment | Direction accepted | Planned | cell identity, evaluation order, state typing, preservation | None |
-| Sum values | Direction accepted | Planned | injections, elimination, value typing, safety | None |
+| Sum values | Direction accepted | Active design | injections, elimination, value typing, safety | None |
 | User algebraic data | Direction accepted | Planned | constructor identity and value algebra | Low |
 | Direct pattern matching | Direction accepted | Planned | matching order, exhaustiveness, failure policy | Low |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | total application and typed results | None |

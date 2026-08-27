@@ -36,6 +36,14 @@ theorem advance_next_iff {state next : State} :
             simp [advance] at advanced
             cases advanced
             exact .enterSecond
+        | lambda parameterType resultType body =>
+            simp [advance] at advanced
+            cases advanced
+            exact .lambda
+        | apply function argument =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterApply
         | var index =>
             cases lookup : environment[index]? with
             | none => simp [advance, lookup] at advanced
@@ -92,25 +100,36 @@ theorem advance_next_iff {state next : State} :
                 exact .applyPair
             | firstApply =>
                 cases value with
-                | unit | bool | word => simp [advance] at advanced
+                | unit | bool | word | closure => simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
                     cases advanced
                     exact .applyFirst
             | secondApply =>
                 cases value with
-                | unit | bool | word => simp [advance] at advanced
+                | unit | bool | word | closure => simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
                     cases advanced
                     exact .applySecond
+            | applyArgument argument callerEnvironment =>
+                cases value with
+                | unit | bool | word | pair => simp [advance] at advanced
+                | closure parameterType resultType body capturedEnvironment =>
+                    simp [advance] at advanced
+                    cases advanced
+                    exact .beginArgument
+            | applyClosure parameterType resultType body capturedEnvironment =>
+                simp [advance] at advanced
+                cases advanced
+                exact .invokeClosure
             | letBody body environment =>
                 simp [advance] at advanced
                 cases advanced
                 exact .bindLet
             | ifBranches thenBranch elseBranch environment =>
                 cases value with
-                | unit | word | pair => simp [advance] at advanced
+                | unit | word | pair | closure => simp [advance] at advanced
                 | bool decision =>
                     cases decision with
                     | false =>
@@ -132,7 +151,8 @@ theorem advance_done_iff {state : State} {value : Value} :
     cases control with
     | eval expr environment =>
         cases expr with
-        | unit | bool | word | pair | first | second | unary | binary | letE | ifE =>
+        | unit | bool | word | pair | first | second | lambda | apply | unary | binary |
+            letE | ifE =>
             simp [advance] at advanced
         | var index =>
             cases lookup : environment[index]? <;> simp [advance, lookup] at advanced
@@ -158,10 +178,14 @@ theorem advance_done_iff {state : State} {value : Value} :
                 cases returned <;> simp [advance] at advanced
             | secondApply =>
                 cases returned <;> simp [advance] at advanced
+            | applyArgument argument callerEnvironment =>
+                cases returned <;> simp [advance] at advanced
+            | applyClosure parameterType resultType body capturedEnvironment =>
+                simp [advance] at advanced
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with
-                | unit | word | pair => simp [advance] at advanced
+                | unit | word | pair | closure => simp [advance] at advanced
                 | bool decision =>
                     cases decision <;> simp [advance] at advanced
   · intro final

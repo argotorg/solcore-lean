@@ -29,6 +29,9 @@ private def checkPathStepName : Core.CheckPathStep → String
   | .pairRight => "pairRight"
   | .firstOperand => "firstOperand"
   | .secondOperand => "secondOperand"
+  | .lambdaBody => "lambdaBody"
+  | .applyFunction => "applyFunction"
+  | .applyArgument => "applyArgument"
   | .unaryOperand => "unaryOperand"
   | .binaryLeft => "binaryLeft"
   | .binaryRight => "binaryRight"
@@ -53,6 +56,23 @@ private def checkErrorArguments : Core.CheckErrorData → Option Lean.Json
   | .expectedProduct actual => do
       let actual ← encodeCoreType? actual
       pure (.mkObj [("actual", actual)])
+  | .expectedFunction actual => do
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [("actual", actual)])
+  | .functionArgumentTypeMismatch expected actual => do
+      let expected ← encodeCoreType? expected
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [
+        ("expected", expected),
+        ("actual", actual)
+      ])
+  | .lambdaResultTypeMismatch declared actual => do
+      let declared ← encodeCoreType? declared
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [
+        ("declared", declared),
+        ("actual", actual)
+      ])
   | .primitiveOperandTypeMismatch expected actual => do
       let expected ← encodeCoreType? expected
       let actual ← encodeCoreType? actual

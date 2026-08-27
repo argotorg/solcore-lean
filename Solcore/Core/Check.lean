@@ -9,6 +9,9 @@ inductive CheckPathStep where
   | pairRight
   | firstOperand
   | secondOperand
+  | lambdaBody
+  | applyFunction
+  | applyArgument
   | unaryOperand
   | binaryLeft
   | binaryRight
@@ -28,6 +31,9 @@ inductive CheckErrorCode where
   | unboundVariable
   | expectedBool
   | expectedProduct
+  | expectedFunction
+  | functionArgumentTypeMismatch
+  | lambdaResultTypeMismatch
   | primitiveOperandTypeMismatch
   | branchTypeMismatch
   | declaredResultTypeMismatch
@@ -37,6 +43,10 @@ def CheckErrorCode.name : CheckErrorCode → String
   | .unboundVariable => "core.check.unbound-variable"
   | .expectedBool => "core.check.expected-bool"
   | .expectedProduct => "core.check.expected-product"
+  | .expectedFunction => "core.check.expected-function"
+  | .functionArgumentTypeMismatch =>
+      "core.check.function-argument-type-mismatch"
+  | .lambdaResultTypeMismatch => "core.check.lambda-result-type-mismatch"
   | .primitiveOperandTypeMismatch =>
       "core.check.primitive-operand-type-mismatch"
   | .branchTypeMismatch => "core.check.branch-type-mismatch"
@@ -46,6 +56,9 @@ inductive CheckErrorData where
   | unboundVariable (index contextSize : Nat)
   | expectedBool (actual : Ty)
   | expectedProduct (actual : Ty)
+  | expectedFunction (actual : Ty)
+  | functionArgumentTypeMismatch (expected actual : Ty)
+  | lambdaResultTypeMismatch (declared actual : Ty)
   | primitiveOperandTypeMismatch (expected actual : Ty)
   | branchTypeMismatch (thenType elseType : Ty)
   | declaredResultTypeMismatch (declaredType inferredType : Ty)
@@ -55,6 +68,9 @@ def CheckErrorData.code : CheckErrorData → CheckErrorCode
   | .unboundVariable .. => .unboundVariable
   | .expectedBool .. => .expectedBool
   | .expectedProduct .. => .expectedProduct
+  | .expectedFunction .. => .expectedFunction
+  | .functionArgumentTypeMismatch .. => .functionArgumentTypeMismatch
+  | .lambdaResultTypeMismatch .. => .lambdaResultTypeMismatch
   | .primitiveOperandTypeMismatch .. => .primitiveOperandTypeMismatch
   | .branchTypeMismatch .. => .branchTypeMismatch
   | .declaredResultTypeMismatch .. => .declaredResultTypeMismatch
@@ -108,6 +124,39 @@ def inferDetailed (context : Context) (path : CheckPath := []) : Expr → Except
           .error {
             path := operandPath
             data := .expectedProduct actualType
+          }
+  | .lambda parameterType resultType body =>
+      let bodyPath := path.child .lambdaBody
+      match inferDetailed (parameterType :: context) bodyPath body with
+      | .error error => .error error
+      | .ok actualType =>
+          if actualType = resultType then
+            .ok (.function parameterType resultType)
+          else
+            .error {
+              path := bodyPath
+              data := .lambdaResultTypeMismatch resultType actualType
+            }
+  | .apply function argument =>
+      let functionPath := path.child .applyFunction
+      match inferDetailed context functionPath function with
+      | .error error => .error error
+      | .ok (.function parameterType resultType) =>
+          let argumentPath := path.child .applyArgument
+          match inferDetailed context argumentPath argument with
+          | .error error => .error error
+          | .ok actualType =>
+              if actualType = parameterType then
+                .ok resultType
+              else
+                .error {
+                  path := argumentPath
+                  data := .functionArgumentTypeMismatch parameterType actualType
+                }
+      | .ok actualType =>
+          .error {
+            path := functionPath
+            data := .expectedFunction actualType
           }
   | .unary op operand =>
       let operandPath := path.child .unaryOperand
@@ -278,6 +327,139 @@ theorem inferDetailed_toOption
               operandDetailed,
               operandInferred
             ]
+  | lambda parameterType resultType body bodyIH =>
+      cases bodyDetailed :
+          inferDetailed
+            (parameterType :: context)
+            (path.child .lambdaBody)
+            body with
+      | error error =>
+          have bodyNotInferred :
+              infer? (parameterType :: context) body = none := by
+            simpa [bodyDetailed, Except.toOption] using
+              (bodyIH (parameterType :: context) (path.child .lambdaBody)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            bodyDetailed,
+            bodyNotInferred
+          ]
+      | ok bodyType =>
+          have bodyInferred :
+              infer? (parameterType :: context) body = some bodyType := by
+            simpa [bodyDetailed, Except.toOption] using
+              (bodyIH (parameterType :: context) (path.child .lambdaBody)).symm
+          by_cases matchingResult : bodyType = resultType
+          · subst bodyType
+            simp [
+              inferDetailed,
+              infer?,
+              Except.toOption,
+              bodyDetailed,
+              bodyInferred
+            ]
+          · simp [
+              inferDetailed,
+              infer?,
+              Except.toOption,
+              bodyDetailed,
+              bodyInferred,
+              matchingResult
+            ]
+  | apply function argument functionIH argumentIH =>
+      cases functionDetailed :
+          inferDetailed context (path.child .applyFunction) function with
+      | error error =>
+          have functionNotInferred : infer? context function = none := by
+            simpa [functionDetailed, Except.toOption] using
+              (functionIH context (path.child .applyFunction)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            functionDetailed,
+            functionNotInferred
+          ]
+      | ok functionType =>
+          have functionInferred : infer? context function = some functionType := by
+            simpa [functionDetailed, Except.toOption] using
+              (functionIH context (path.child .applyFunction)).symm
+          cases functionType with
+          | unit =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                functionDetailed,
+                functionInferred
+              ]
+          | bool =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                functionDetailed,
+                functionInferred
+              ]
+          | word =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                functionDetailed,
+                functionInferred
+              ]
+          | product leftType rightType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                functionDetailed,
+                functionInferred
+              ]
+          | function parameterType resultType =>
+              cases argumentDetailed :
+                  inferDetailed context (path.child .applyArgument) argument with
+              | error error =>
+                  have argumentNotInferred : infer? context argument = none := by
+                    simpa [argumentDetailed, Except.toOption] using
+                      (argumentIH context (path.child .applyArgument)).symm
+                  simp [
+                    inferDetailed,
+                    infer?,
+                    Except.toOption,
+                    functionDetailed,
+                    functionInferred,
+                    argumentDetailed,
+                    argumentNotInferred
+                  ]
+              | ok argumentType =>
+                  have argumentInferred :
+                      infer? context argument = some argumentType := by
+                    simpa [argumentDetailed, Except.toOption] using
+                      (argumentIH context (path.child .applyArgument)).symm
+                  by_cases matchingArgument : argumentType = parameterType
+                  · subst argumentType
+                    simp [
+                      inferDetailed,
+                      infer?,
+                      Except.toOption,
+                      functionDetailed,
+                      functionInferred,
+                      argumentDetailed,
+                      argumentInferred
+                    ]
+                  · simp [
+                      inferDetailed,
+                      infer?,
+                      Except.toOption,
+                      functionDetailed,
+                      functionInferred,
+                      argumentDetailed,
+                      argumentInferred,
+                      matchingArgument
+                    ]
   | unary op operand operandIH =>
       cases operandDetailed :
           inferDetailed context (path.child .unaryOperand) operand with
@@ -437,6 +619,14 @@ theorem inferDetailed_toOption
                 conditionInferred
               ]
           | product leftType rightType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                conditionDetailed,
+                conditionInferred
+              ]
+          | function parameterType resultType =>
               simp [
                 inferDetailed,
                 infer?,

@@ -65,20 +65,40 @@ The current implementation satisfies all of the following:
 
 The feature remains internal and therefore does not change Oracle v2 or v3.
 
-## Next active design: functions and closures
+## Completed Core vNext slice: functions and closures
+
+ADR-0020 fixes:
+
+- unary functions with explicit parameter and result annotations;
+- a de Bruijn parameter at index zero;
+- callee-before-argument evaluation;
+- lexical capture of immutable environments;
+- direct, non-recursive binding; and
+- continuation-based return from a function body.
+
+Recursion, divergence, named functions, explicit return, and Surface syntax
+remain separate. This keeps the current totality and sufficient-fuel theorems
+meaningful while the call mechanism is established.
+
+The implementation now covers declarative and executable typing, detailed
+diagnostics, lexical capture, callee-before-argument CEK execution, evaluator
+correspondence, state safety, old-wire rejection, and focused regressions. A
+logical-relations argument preserves total evaluation and sufficient fuel for
+the extended non-recursive language.
+
+## Next active design: sums and elimination
 
 The next decision must fix:
 
-- parameter and argument representation;
-- left-to-right argument evaluation;
-- closure environments and their typing;
-- direct versus recursive binding;
-- return and control transfer;
-- recursion support; and
-- the relation between divergence and explicit fuel.
+- left and right injection representation;
+- how both alternative payload types remain available at runtime;
+- branch binders and de Bruijn scope;
+- scrutinee-before-selected-branch evaluation;
+- detailed checking paths and mismatch diagnostics; and
+- the boundary between binary sums and later named algebraic data.
 
-Non-recursive functions can be delivered separately if doing so preserves a
-clear later path to recursion.
+Exhaustive binary elimination can be completed without choosing Surface
+pattern syntax or constructor identity.
 
 ## State and contracts
 

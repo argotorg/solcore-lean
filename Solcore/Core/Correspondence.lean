@@ -95,6 +95,52 @@ theorem Evaluates.toStepsWithContinuation
           (@Transition.applySecond leftValue rightValue continuation)
           .refl
       exact ⟨_, enterPath.trans (operandPath.trans applyPath)⟩
+  | @lambda environment parameterType resultType body =>
+      exact ⟨1, .cons .lambda .refl⟩
+  | @apply environment capturedEnvironment function argument body
+      parameterType resultType argumentValue result
+      functionEvaluation argumentEvaluation bodyEvaluation
+      functionIH argumentIH bodyIH =>
+      obtain ⟨functionSteps, functionPath⟩ :=
+        functionIH (.applyArgument argument environment :: continuation)
+      obtain ⟨argumentSteps, argumentPath⟩ :=
+        argumentIH
+          (.applyClosure parameterType resultType body capturedEnvironment ::
+            continuation)
+      obtain ⟨bodySteps, bodyPath⟩ := bodyIH continuation
+      let enterPath : Steps 1
+          ⟨.eval (.apply function argument) environment, continuation⟩
+          ⟨.eval function environment,
+            .applyArgument argument environment :: continuation⟩ :=
+        .cons
+          (@Transition.enterApply environment function argument continuation)
+          .refl
+      let argumentEntryPath : Steps 1
+          ⟨.ret (.closure parameterType resultType body capturedEnvironment),
+            .applyArgument argument environment :: continuation⟩
+          ⟨.eval argument environment,
+            .applyClosure parameterType resultType body capturedEnvironment ::
+              continuation⟩ :=
+        .cons
+          (@Transition.beginArgument
+            environment capturedEnvironment parameterType resultType body argument
+            continuation)
+          .refl
+      let invocationPath : Steps 1
+          ⟨.ret argumentValue,
+            .applyClosure parameterType resultType body capturedEnvironment ::
+              continuation⟩
+          ⟨.eval body (argumentValue :: capturedEnvironment), continuation⟩ :=
+        .cons
+          (@Transition.invokeClosure capturedEnvironment parameterType resultType
+            body argumentValue continuation)
+          .refl
+      exact ⟨_,
+        enterPath.trans
+          (functionPath.trans
+            (argumentEntryPath.trans
+              (argumentPath.trans
+                (invocationPath.trans bodyPath))))⟩
   | var lookup =>
       exact ⟨1, .cons (.var lookup) .refl⟩
   | @unary environment op operand operandValue result
@@ -272,6 +318,29 @@ inductive Continues : List Frame → Value → Value → Prop where
         (.secondApply :: continuation)
         (.pair leftValue rightValue)
         finalValue
+  | applyArgument
+      {argument : Expr} {callerEnvironment capturedEnvironment : Environment}
+      {parameterType resultType : Ty} {body : Expr}
+      {continuation : List Frame}
+      {argumentValue result finalValue : Value} :
+      Evaluates callerEnvironment argument argumentValue →
+      Evaluates (argumentValue :: capturedEnvironment) body result →
+      Continues continuation result finalValue →
+      Continues
+        (.applyArgument argument callerEnvironment :: continuation)
+        (.closure parameterType resultType body capturedEnvironment)
+        finalValue
+  | applyClosure
+      {capturedEnvironment : Environment} {parameterType resultType : Ty}
+      {body : Expr} {continuation : List Frame}
+      {argumentValue result finalValue : Value} :
+      Evaluates (argumentValue :: capturedEnvironment) body result →
+      Continues continuation result finalValue →
+      Continues
+        (.applyClosure parameterType resultType body capturedEnvironment ::
+          continuation)
+        argumentValue
+        finalValue
   | letBody
       {body : Expr} {environment : Environment} {continuation : List Frame}
       {boundValue result finalValue : Value} :
@@ -360,6 +429,28 @@ theorem transition_reflects_denotation
       cases denotes with
       | ret continuation =>
           exact .ret (.secondApply continuation)
+  | lambda =>
+      cases denotes with
+      | ret continuation => exact .eval .lambda continuation
+  | enterApply =>
+      cases denotes with
+      | eval functionEvaluation continuation =>
+          cases continuation with
+          | applyArgument argumentEvaluation bodyEvaluation rest =>
+              exact .eval
+                (.apply functionEvaluation argumentEvaluation bodyEvaluation)
+                rest
+  | beginArgument =>
+      cases denotes with
+      | eval argumentEvaluation continuation =>
+          cases continuation with
+          | applyClosure bodyEvaluation rest =>
+              exact .ret
+                (.applyArgument argumentEvaluation bodyEvaluation rest)
+  | invokeClosure =>
+      cases denotes with
+      | eval bodyEvaluation continuation =>
+          exact .ret (.applyClosure bodyEvaluation continuation)
   | var lookup =>
       cases denotes with
       | ret continuation => exact .eval (.var lookup) continuation

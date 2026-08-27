@@ -23,6 +23,7 @@ inductive Ty where
   | bool
   | word
   | product (left : Ty) (right : Ty)
+  | function (parameter : Ty) (result : Ty)
   deriving Repr, BEq, DecidableEq
 
 inductive UnaryOp where
@@ -87,6 +88,8 @@ inductive Expr where
   | pair (left : Expr) (right : Expr)
   | first (operand : Expr)
   | second (operand : Expr)
+  | lambda (parameterType resultType : Ty) (body : Expr)
+  | apply (function : Expr) (argument : Expr)
   | unary (op : UnaryOp) (operand : Expr)
   | binary (op : BinaryOp) (left : Expr) (right : Expr)
   | letE (value : Expr) (body : Expr)
@@ -98,13 +101,155 @@ inductive Value where
   | bool (value : Bool)
   | word (value : Word)
   | pair (left : Value) (right : Value)
-  deriving Repr, BEq, DecidableEq
+  | closure
+      (parameterType resultType : Ty)
+      (body : Expr)
+      (environment : List Value)
+  deriving Repr
+
+mutual
+
+  def Value.decEq (left right : Value) : Decidable (left = right) :=
+    match left, right with
+    | .unit, .unit => isTrue rfl
+    | .bool leftValue, .bool rightValue =>
+        if equality : leftValue = rightValue then
+          isTrue (by cases equality; rfl)
+        else
+          isFalse (by
+            intro valueEquality
+            cases valueEquality
+            exact equality rfl)
+    | .word leftValue, .word rightValue =>
+        if equality : leftValue = rightValue then
+          isTrue (by cases equality; rfl)
+        else
+          isFalse (by
+            intro valueEquality
+            cases valueEquality
+            exact equality rfl)
+    | .pair leftFirst leftSecond, .pair rightFirst rightSecond =>
+        match Value.decEq leftFirst rightFirst with
+        | isFalse notEqual =>
+            isFalse (by
+              intro pairEquality
+              cases pairEquality
+              exact notEqual rfl)
+        | isTrue firstEquality =>
+            match Value.decEq leftSecond rightSecond with
+            | isFalse notEqual =>
+                isFalse (by
+                  intro pairEquality
+                  cases pairEquality
+                  exact notEqual rfl)
+            | isTrue secondEquality =>
+                isTrue (by cases firstEquality; cases secondEquality; rfl)
+    | .closure leftParameter leftResult leftBody leftEnvironment,
+        .closure rightParameter rightResult rightBody rightEnvironment =>
+        if parameterEquality : leftParameter = rightParameter then
+          if resultEquality : leftResult = rightResult then
+            if bodyEquality : leftBody = rightBody then
+              match Value.listDecEq leftEnvironment rightEnvironment with
+              | isFalse notEqual =>
+                  isFalse (by
+                    intro closureEquality
+                    cases closureEquality
+                    exact notEqual rfl)
+              | isTrue environmentEquality =>
+                  isTrue (by
+                    cases parameterEquality
+                    cases resultEquality
+                    cases bodyEquality
+                    cases environmentEquality
+                    rfl)
+            else
+              isFalse (by
+                intro closureEquality
+                cases closureEquality
+                exact bodyEquality rfl)
+          else
+            isFalse (by
+              intro closureEquality
+              cases closureEquality
+              exact resultEquality rfl)
+        else
+          isFalse (by
+            intro closureEquality
+            cases closureEquality
+            exact parameterEquality rfl)
+    | .unit, .bool _
+    | .unit, .word _
+    | .unit, .pair _ _
+    | .unit, .closure _ _ _ _
+    | .bool _, .unit
+    | .bool _, .word _
+    | .bool _, .pair _ _
+    | .bool _, .closure _ _ _ _
+    | .word _, .unit
+    | .word _, .bool _
+    | .word _, .pair _ _
+    | .word _, .closure _ _ _ _
+    | .pair _ _, .unit
+    | .pair _ _, .bool _
+    | .pair _ _, .word _
+    | .pair _ _, .closure _ _ _ _
+    | .closure _ _ _ _, .unit
+    | .closure _ _ _ _, .bool _
+    | .closure _ _ _ _, .word _
+    | .closure _ _ _ _, .pair _ _ =>
+        isFalse (by intro equality; cases equality)
+  termination_by sizeOf left + sizeOf right
+  decreasing_by all_goals simp_wf <;> omega
+
+  def Value.listDecEq
+      (left right : List Value) : Decidable (left = right) :=
+    match left, right with
+    | [], [] => isTrue rfl
+    | leftHead :: leftTail, rightHead :: rightTail =>
+        match Value.decEq leftHead rightHead with
+        | isFalse notEqual =>
+            isFalse (by
+              intro listEquality
+              cases listEquality
+              exact notEqual rfl)
+        | isTrue headEquality =>
+            match Value.listDecEq leftTail rightTail with
+            | isFalse notEqual =>
+                isFalse (by
+                  intro listEquality
+                  cases listEquality
+                  exact notEqual rfl)
+            | isTrue tailEquality =>
+                isTrue (by cases headEquality; cases tailEquality; rfl)
+    | [], _ :: _
+    | _ :: _, [] => isFalse (by intro equality; cases equality)
+  termination_by sizeOf left + sizeOf right
+  decreasing_by all_goals simp_wf <;> omega
+
+end
+
+instance : DecidableEq Value := Value.decEq
+
+instance : BEq Value :=
+  ⟨fun left right => decide (left = right)⟩
+
+instance : LawfulBEq Value where
+  rfl := by
+    intro value
+    change decide (value = value) = true
+    exact of_decide_eq_self_eq_true value
+  eq_of_beq := by
+    intro left right equal
+    change decide (left = right) = true at equal
+    exact of_decide_eq_true equal
 
 def Value.type : Value → Ty
   | .unit => .unit
   | .bool _ => .bool
   | .word _ => .word
   | .pair left right => .product left.type right.type
+  | .closure parameterType resultType _ _ =>
+      .function parameterType resultType
 
 abbrev Context := List Ty
 

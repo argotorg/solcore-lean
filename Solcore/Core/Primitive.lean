@@ -133,6 +133,10 @@ def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
       .pair (left.weakenAt cutoff) (right.weakenAt cutoff)
   | .first operand => .first (operand.weakenAt cutoff)
   | .second operand => .second (operand.weakenAt cutoff)
+  | .lambda parameterType resultType body =>
+      .lambda parameterType resultType (body.weakenAt (cutoff + 1))
+  | .apply function argument =>
+      .apply (function.weakenAt cutoff) (argument.weakenAt cutoff)
   | .unary op operand => .unary op (operand.weakenAt cutoff)
   | .binary op left right =>
       .binary op (left.weakenAt cutoff) (right.weakenAt cutoff)

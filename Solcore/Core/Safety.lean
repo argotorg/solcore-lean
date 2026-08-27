@@ -4,23 +4,36 @@ set_option autoImplicit false
 
 namespace Solcore.Core
 
-inductive ValueHasType : Value → Ty → Prop where
-  | unit : ValueHasType .unit .unit
-  | bool {value : Bool} : ValueHasType (.bool value) .bool
-  | word {value : Word} : ValueHasType (.word value) .word
-  | pair
-      {left right : Value} {leftType rightType : Ty} :
-      ValueHasType left leftType →
-      ValueHasType right rightType →
-      ValueHasType (.pair left right) (.product leftType rightType)
+mutual
 
-inductive EnvironmentHasTypes : Environment → Context → Prop where
-  | nil : EnvironmentHasTypes [] []
-  | cons
-      {value : Value} {type : Ty} {environment : Environment} {context : Context} :
-      ValueHasType value type →
-      EnvironmentHasTypes environment context →
-      EnvironmentHasTypes (value :: environment) (type :: context)
+  inductive ValueHasType : Value → Ty → Prop where
+    | unit : ValueHasType .unit .unit
+    | bool {value : Bool} : ValueHasType (.bool value) .bool
+    | word {value : Word} : ValueHasType (.word value) .word
+    | pair
+        {left right : Value} {leftType rightType : Ty} :
+        ValueHasType left leftType →
+        ValueHasType right rightType →
+        ValueHasType (.pair left right) (.product leftType rightType)
+    | closure
+        {parameterType resultType : Ty} {body : Expr}
+        {environment : Environment} {context : Context} :
+        EnvironmentHasTypes environment context →
+        HasType (parameterType :: context) body resultType →
+        ValueHasType
+          (.closure parameterType resultType body environment)
+          (.function parameterType resultType)
+
+  inductive EnvironmentHasTypes : Environment → Context → Prop where
+    | nil : EnvironmentHasTypes [] []
+    | cons
+        {value : Value} {type : Ty}
+        {environment : Environment} {context : Context} :
+        ValueHasType value type →
+        EnvironmentHasTypes environment context →
+        EnvironmentHasTypes (value :: environment) (type :: context)
+
+end
 
 theorem EnvironmentHasTypes.lookup
     {environment : Environment} {context : Context}
@@ -28,10 +41,12 @@ theorem EnvironmentHasTypes.lookup
     {index : Nat} {type : Ty}
     (typeLookup : context[index]? = some type) :
     ∃ value, environment[index]? = some value ∧ ValueHasType value type := by
-  induction hasTypes generalizing index with
+  induction hasTypes using EnvironmentHasTypes.rec
+      (motive_1 := fun _ _ _ => True) generalizing index with
+  | unit | bool | word | pair | closure => exact True.intro
   | nil =>
       simp at typeLookup
-  | cons valueTyping tailTyping tailIH =>
+  | cons valueTyping tailTyping _ tailIH =>
       cases index with
       | zero =>
           simp at typeLookup
@@ -53,32 +68,28 @@ theorem ValueHasType.type_eq
     {value : Value} {type : Ty}
     (typing : ValueHasType value type) :
     value.type = type := by
-  induction typing with
-  | unit | bool | word => rfl
+  induction typing using ValueHasType.rec
+      (motive_2 := fun _ _ _ => True) with
+  | unit | bool | word | closure => rfl
   | pair leftTyping rightTyping leftIH rightIH =>
       simp [Value.type, leftIH, rightIH]
+  | nil | cons => exact True.intro
 
-theorem ValueHasType.of_type_eq
-    {value : Value} {type : Ty}
-    (typeEquality : value.type = type) :
-    ValueHasType value type := by
-  induction value generalizing type with
-  | unit =>
-      simp [Value.type] at typeEquality
-      subst type
-      exact .unit
-  | bool =>
-      simp [Value.type] at typeEquality
-      subst type
-      exact .bool
-  | word =>
-      simp [Value.type] at typeEquality
-      subst type
-      exact .word
-  | pair left right leftIH rightIH =>
-      simp [Value.type] at typeEquality
-      subst type
-      exact .pair (leftIH rfl) (rightIH rfl)
+theorem unary_apply_result_has_type
+    {op : UnaryOp} {operand result : Value}
+    (applied : op.apply operand = some result) :
+    ValueHasType result op.resultType := by
+  cases op <;> cases operand <;>
+    simp [UnaryOp.apply] at applied <;>
+    cases applied <;> constructor
+
+theorem binary_apply_result_has_type
+    {op : BinaryOp} {left right result : Value}
+    (applied : op.apply left right = some result) :
+    ValueHasType result op.resultType := by
+  cases op <;> cases left <;> cases right <;>
+    simp [BinaryOp.apply] at applied <;>
+    cases applied <;> constructor
 
 theorem evaluation_preserves_type
     {environment : Environment} {context : Context}
@@ -117,6 +128,22 @@ theorem evaluation_preserves_type
             operandIH operandTyping environmentTyping
           cases operandValueTyping with
           | pair leftTyping rightTyping => exact rightTyping
+  | lambda =>
+      cases typing with
+      | lambda bodyTyping => exact .closure environmentTyping bodyTyping
+  | apply functionEvaluation argumentEvaluation bodyEvaluation
+      functionIH argumentIH bodyIH =>
+      cases typing with
+      | apply functionTyping argumentTyping =>
+          have functionValueTyping :=
+            functionIH functionTyping environmentTyping
+          cases functionValueTyping with
+          | closure capturedEnvironmentTyping bodyTyping =>
+              have argumentValueTyping :=
+                argumentIH argumentTyping environmentTyping
+              exact bodyIH
+                bodyTyping
+                (.cons argumentValueTyping capturedEnvironmentTyping)
   | var valueLookup =>
       cases typing with
       | var typeLookup =>
@@ -128,13 +155,11 @@ theorem evaluation_preserves_type
   | unary operandEvaluation applied operandIH =>
       cases typing with
       | unary operandTyping =>
-          exact ValueHasType.of_type_eq
-            (UnaryOp.apply_result_type applied)
+          exact unary_apply_result_has_type applied
   | binary leftEvaluation rightEvaluation applied leftIH rightIH =>
       cases typing with
       | binary leftTyping rightTyping =>
-          exact ValueHasType.of_type_eq
-            (BinaryOp.apply_result_type applied)
+          exact binary_apply_result_has_type applied
   | letE boundEvaluation bodyEvaluation boundIH bodyIH =>
       cases typing with
       | letE boundTyping bodyTyping =>
@@ -150,104 +175,298 @@ theorem evaluation_preserves_type
       | ifE conditionTyping thenTyping elseTyping =>
           exact branchIH elseTyping environmentTyping
 
+def ReducibleValue : (type : Ty) → Value → Prop
+  | .unit, value => value = .unit
+  | .bool, value => ∃ decision, value = .bool decision
+  | .word, value => ∃ word, value = .word word
+  | .product leftType rightType, value =>
+      ∃ left right,
+        value = .pair left right ∧
+        ReducibleValue leftType left ∧
+        ReducibleValue rightType right
+  | .function parameterType resultType, value =>
+      ∃ body environment context,
+        value = .closure parameterType resultType body environment ∧
+        EnvironmentHasTypes environment context ∧
+        HasType (parameterType :: context) body resultType ∧
+        ∀ argument,
+          ReducibleValue parameterType argument →
+          ∃ result,
+            Evaluates (argument :: environment) body result ∧
+            ReducibleValue resultType result
+termination_by type _ => type
+
+inductive ReducibleEnvironment : Environment → Context → Prop where
+  | nil : ReducibleEnvironment [] []
+  | cons
+      {value : Value} {type : Ty}
+      {environment : Environment} {context : Context} :
+      ReducibleValue type value →
+      ReducibleEnvironment environment context →
+      ReducibleEnvironment (value :: environment) (type :: context)
+
+theorem ReducibleEnvironment.lookup
+    {environment : Environment} {context : Context}
+    (reducible : ReducibleEnvironment environment context)
+    {index : Nat} {type : Ty}
+    (typeLookup : context[index]? = some type) :
+    ∃ value,
+      environment[index]? = some value ∧ ReducibleValue type value := by
+  induction reducible generalizing index with
+  | nil => simp at typeLookup
+  | cons headReducible tailReducible tailIH =>
+      cases index with
+      | zero =>
+          simp at typeLookup
+          cases typeLookup
+          exact ⟨_, rfl, headReducible⟩
+      | succ index =>
+          simp at typeLookup
+          obtain ⟨value, valueLookup, valueReducible⟩ := tailIH typeLookup
+          exact ⟨value, by simpa using valueLookup, valueReducible⟩
+
+theorem ReducibleValue.hasType
+    {type : Ty} {value : Value}
+    (reducible : ReducibleValue type value) :
+    ValueHasType value type := by
+  induction type generalizing value with
+  | unit =>
+      simp only [ReducibleValue] at reducible
+      subst value
+      exact .unit
+  | bool =>
+      simp only [ReducibleValue] at reducible
+      obtain ⟨decision, rfl⟩ := reducible
+      exact .bool
+  | word =>
+      simp only [ReducibleValue] at reducible
+      obtain ⟨word, rfl⟩ := reducible
+      exact .word
+  | product leftType rightType leftIH rightIH =>
+      simp only [ReducibleValue] at reducible
+      obtain ⟨left, right, rfl, leftReducible, rightReducible⟩ := reducible
+      exact .pair (leftIH leftReducible) (rightIH rightReducible)
+  | function parameterType resultType parameterIH resultIH =>
+      simp only [ReducibleValue] at reducible
+      obtain ⟨body, environment, context, rfl,
+        environmentTyping, bodyTyping, _⟩ := reducible
+      exact .closure environmentTyping bodyTyping
+
+theorem ReducibleEnvironment.hasTypes
+    {environment : Environment} {context : Context}
+    (reducible : ReducibleEnvironment environment context) :
+    EnvironmentHasTypes environment context := by
+  induction reducible with
+  | nil => exact .nil
+  | cons headReducible tailReducible tailIH =>
+      exact .cons headReducible.hasType tailIH
+
+theorem ValueHasType.bool_reducible
+    {value : Value}
+    (typing : ValueHasType value .bool) :
+    ReducibleValue .bool value := by
+  cases typing with
+  | bool =>
+      simp only [ReducibleValue]
+      exact ⟨_, rfl⟩
+
+theorem ValueHasType.word_reducible
+    {value : Value}
+    (typing : ValueHasType value .word) :
+    ReducibleValue .word value := by
+  cases typing with
+  | word =>
+      simp only [ReducibleValue]
+      exact ⟨_, rfl⟩
+
+theorem unary_apply_result_reducible
+    {op : UnaryOp} {operand result : Value}
+    (applied : op.apply operand = some result) :
+    ReducibleValue op.resultType result := by
+  cases op with
+  | boolNot =>
+      change ReducibleValue .bool result
+      exact (unary_apply_result_has_type applied).bool_reducible
+  | wordNot =>
+      change ReducibleValue .word result
+      exact (unary_apply_result_has_type applied).word_reducible
+
+theorem binary_apply_result_reducible
+    {op : BinaryOp} {left right result : Value}
+    (applied : op.apply left right = some result) :
+    ReducibleValue op.resultType result := by
+  cases op <;>
+    first
+    | exact (binary_apply_result_has_type applied).bool_reducible
+    | exact (binary_apply_result_has_type applied).word_reducible
+
+theorem reducibility_fundamental
+    {context : Context} {expr : Expr} {type : Ty}
+    (typing : HasType context expr type)
+    {environment : Environment}
+    (environmentReducible : ReducibleEnvironment environment context) :
+    ∃ value,
+      Evaluates environment expr value ∧ ReducibleValue type value := by
+  induction typing generalizing environment with
+  | unit =>
+      refine ⟨.unit, .unit, ?_⟩
+      simp only [ReducibleValue]
+  | bool =>
+      refine ⟨.bool _, .bool, ?_⟩
+      simp only [ReducibleValue]
+      exact ⟨_, rfl⟩
+  | word =>
+      refine ⟨.word _, .word, ?_⟩
+      simp only [ReducibleValue]
+      exact ⟨_, rfl⟩
+  | var typeLookup =>
+      obtain ⟨value, valueLookup, valueReducible⟩ :=
+        environmentReducible.lookup typeLookup
+      exact ⟨value, .var valueLookup, valueReducible⟩
+  | pair leftTyping rightTyping leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftReducible⟩ :=
+        leftIH environmentReducible
+      obtain ⟨rightValue, rightEvaluation, rightReducible⟩ :=
+        rightIH environmentReducible
+      refine ⟨.pair leftValue rightValue,
+        .pair leftEvaluation rightEvaluation, ?_⟩
+      simp only [ReducibleValue]
+      exact ⟨leftValue, rightValue, rfl, leftReducible, rightReducible⟩
+  | first operandTyping operandIH =>
+      obtain ⟨operandValue, operandEvaluation, operandReducible⟩ :=
+        operandIH environmentReducible
+      simp only [ReducibleValue] at operandReducible
+      obtain ⟨leftValue, rightValue, rfl,
+        leftReducible, rightReducible⟩ := operandReducible
+      exact ⟨leftValue, .first operandEvaluation, leftReducible⟩
+  | second operandTyping operandIH =>
+      obtain ⟨operandValue, operandEvaluation, operandReducible⟩ :=
+        operandIH environmentReducible
+      simp only [ReducibleValue] at operandReducible
+      obtain ⟨leftValue, rightValue, rfl,
+        leftReducible, rightReducible⟩ := operandReducible
+      exact ⟨rightValue, .second operandEvaluation, rightReducible⟩
+  | @lambda context parameterType resultType body bodyTyping bodyIH =>
+      refine ⟨.closure parameterType resultType body environment, .lambda, ?_⟩
+      simp only [ReducibleValue]
+      exact ⟨body, environment, context, rfl,
+        environmentReducible.hasTypes, bodyTyping,
+        fun argument argumentReducible =>
+          bodyIH (.cons argumentReducible environmentReducible)⟩
+  | @apply context function argument parameterType resultType
+      functionTyping argumentTyping functionIH argumentIH =>
+      obtain ⟨functionValue, functionEvaluation, functionReducible⟩ :=
+        functionIH environmentReducible
+      simp only [ReducibleValue] at functionReducible
+      obtain ⟨body, capturedEnvironment, capturedContext,
+        functionShape, capturedTyping, bodyTyping, callable⟩ := functionReducible
+      subst functionValue
+      obtain ⟨argumentValue, argumentEvaluation, argumentReducible⟩ :=
+        argumentIH environmentReducible
+      obtain ⟨result, bodyEvaluation, resultReducible⟩ :=
+        callable argumentValue argumentReducible
+      exact ⟨result,
+        .apply functionEvaluation argumentEvaluation bodyEvaluation,
+        resultReducible⟩
+  | unary operandTyping operandIH =>
+      obtain ⟨operandValue, operandEvaluation, operandReducible⟩ :=
+        operandIH environmentReducible
+      obtain ⟨result, applied, _⟩ :=
+        UnaryOp.apply_total_of_type
+          _ operandValue operandReducible.hasType.type_eq
+      exact ⟨result, .unary operandEvaluation applied,
+        unary_apply_result_reducible applied⟩
+  | binary leftTyping rightTyping leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftReducible⟩ :=
+        leftIH environmentReducible
+      obtain ⟨rightValue, rightEvaluation, rightReducible⟩ :=
+        rightIH environmentReducible
+      obtain ⟨result, applied, _⟩ :=
+        BinaryOp.apply_total_of_types
+          _ leftValue rightValue
+          leftReducible.hasType.type_eq rightReducible.hasType.type_eq
+      exact ⟨result, .binary leftEvaluation rightEvaluation applied,
+        binary_apply_result_reducible applied⟩
+  | letE boundTyping bodyTyping boundIH bodyIH =>
+      obtain ⟨boundValue, boundEvaluation, boundReducible⟩ :=
+        boundIH environmentReducible
+      obtain ⟨result, bodyEvaluation, resultReducible⟩ :=
+        bodyIH (.cons boundReducible environmentReducible)
+      exact ⟨result, .letE boundEvaluation bodyEvaluation, resultReducible⟩
+  | ifE conditionTyping thenTyping elseTyping conditionIH thenIH elseIH =>
+      obtain ⟨conditionValue, conditionEvaluation, conditionReducible⟩ :=
+        conditionIH environmentReducible
+      simp only [ReducibleValue] at conditionReducible
+      obtain ⟨decision, rfl⟩ := conditionReducible
+      cases decision with
+      | false =>
+          obtain ⟨result, branchEvaluation, resultReducible⟩ :=
+            elseIH environmentReducible
+          exact ⟨result, .ifFalse conditionEvaluation branchEvaluation,
+            resultReducible⟩
+      | true =>
+          obtain ⟨result, branchEvaluation, resultReducible⟩ :=
+            thenIH environmentReducible
+          exact ⟨result, .ifTrue conditionEvaluation branchEvaluation,
+            resultReducible⟩
+
+theorem ValueHasType.reducible
+    {value : Value} {type : Ty}
+    (typing : ValueHasType value type) :
+    ReducibleValue type value := by
+  induction typing using ValueHasType.rec
+      (motive_2 := fun environment context _ =>
+        ReducibleEnvironment environment context) with
+  | unit => simp only [ReducibleValue]
+  | bool =>
+      simp only [ReducibleValue]
+      exact ⟨_, rfl⟩
+  | word =>
+      simp only [ReducibleValue]
+      exact ⟨_, rfl⟩
+  | pair leftTyping rightTyping leftIH rightIH =>
+      simp only [ReducibleValue]
+      exact ⟨_, _, rfl, leftIH, rightIH⟩
+  | @closure parameterType resultType body environment context
+      environmentTyping bodyTyping environmentIH =>
+      simp only [ReducibleValue]
+      exact ⟨body, environment, context, rfl,
+        environmentTyping, bodyTyping,
+        fun argument argumentReducible =>
+          reducibility_fundamental
+            bodyTyping
+            (.cons argumentReducible environmentIH)⟩
+  | nil => exact .nil
+  | cons valueTyping environmentTyping valueIH environmentIH =>
+      exact .cons valueIH environmentIH
+
+theorem EnvironmentHasTypes.reducible
+    {environment : Environment} {context : Context}
+    (typing : EnvironmentHasTypes environment context) :
+    ReducibleEnvironment environment context := by
+  cases typing with
+  | nil => exact .nil
+  | cons valueTyping environmentTyping =>
+      exact .cons valueTyping.reducible environmentTyping.reducible
+termination_by environment
+
+theorem reducible_environment_evaluates
+    {context : Context} {expr : Expr} {type : Ty}
+    (typing : HasType context expr type)
+    {environment : Environment}
+    (environmentReducible : ReducibleEnvironment environment context) :
+    ∃ value, Evaluates environment expr value := by
+  obtain ⟨value, evaluation, _⟩ :=
+    reducibility_fundamental typing environmentReducible
+  exact ⟨value, evaluation⟩
+
 theorem well_typed_evaluates
     {context : Context} {expr : Expr} {type : Ty}
     (typing : HasType context expr type)
     {environment : Environment}
     (environmentTyping : EnvironmentHasTypes environment context) :
-    ∃ value, Evaluates environment expr value := by
-  induction typing generalizing environment with
-  | unit => exact ⟨.unit, .unit⟩
-  | bool => exact ⟨.bool _, .bool⟩
-  | word => exact ⟨.word _, .word⟩
-  | pair leftTyping rightTyping leftIH rightIH =>
-      obtain ⟨leftValue, leftEvaluation⟩ := leftIH environmentTyping
-      obtain ⟨rightValue, rightEvaluation⟩ := rightIH environmentTyping
-      exact ⟨.pair leftValue rightValue,
-        .pair leftEvaluation rightEvaluation⟩
-  | first operandTyping operandIH =>
-      obtain ⟨operandValue, operandEvaluation⟩ :=
-        operandIH environmentTyping
-      have operandValueTyping :=
-        evaluation_preserves_type
-          operandEvaluation
-          operandTyping
-          environmentTyping
-      cases operandValueTyping with
-      | pair leftTyping rightTyping =>
-          exact ⟨_, .first operandEvaluation⟩
-  | second operandTyping operandIH =>
-      obtain ⟨operandValue, operandEvaluation⟩ :=
-        operandIH environmentTyping
-      have operandValueTyping :=
-        evaluation_preserves_type
-          operandEvaluation
-          operandTyping
-          environmentTyping
-      cases operandValueTyping with
-      | pair leftTyping rightTyping =>
-          exact ⟨_, .second operandEvaluation⟩
-  | var typeLookup =>
-      obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
-      exact ⟨value, .var valueLookup⟩
-  | unary operandTyping operandIH =>
-      obtain ⟨operandValue, operandEvaluation⟩ :=
-        operandIH environmentTyping
-      have operandValueTyping :=
-        evaluation_preserves_type
-          operandEvaluation
-          operandTyping
-          environmentTyping
-      obtain ⟨result, applied, _⟩ :=
-        UnaryOp.apply_total_of_type
-          _
-          operandValue
-          operandValueTyping.type_eq
-      exact ⟨result, .unary operandEvaluation applied⟩
-  | binary leftTyping rightTyping leftIH rightIH =>
-      obtain ⟨leftValue, leftEvaluation⟩ :=
-        leftIH environmentTyping
-      obtain ⟨rightValue, rightEvaluation⟩ :=
-        rightIH environmentTyping
-      have leftValueTyping :=
-        evaluation_preserves_type
-          leftEvaluation
-          leftTyping
-          environmentTyping
-      have rightValueTyping :=
-        evaluation_preserves_type
-          rightEvaluation
-          rightTyping
-          environmentTyping
-      obtain ⟨result, applied, _⟩ :=
-        BinaryOp.apply_total_of_types
-          _
-          leftValue
-          rightValue
-          leftValueTyping.type_eq
-          rightValueTyping.type_eq
-      exact ⟨result, .binary leftEvaluation rightEvaluation applied⟩
-  | letE boundTyping bodyTyping boundIH bodyIH =>
-      obtain ⟨boundValue, boundEvaluation⟩ := boundIH environmentTyping
-      have boundValueTyping :=
-        evaluation_preserves_type boundEvaluation boundTyping environmentTyping
-      obtain ⟨result, bodyEvaluation⟩ :=
-        bodyIH (.cons boundValueTyping environmentTyping)
-      exact ⟨result, .letE boundEvaluation bodyEvaluation⟩
-  | ifE conditionTyping thenTyping elseTyping conditionIH thenIH elseIH =>
-      obtain ⟨conditionValue, conditionEvaluation⟩ :=
-        conditionIH environmentTyping
-      have conditionValueTyping :=
-        evaluation_preserves_type conditionEvaluation conditionTyping environmentTyping
-      obtain ⟨decision, conditionShape⟩ := conditionValueTyping.bool_shape
-      subst conditionValue
-      cases decision with
-      | false =>
-          obtain ⟨result, branchEvaluation⟩ := elseIH environmentTyping
-          exact ⟨result, .ifFalse conditionEvaluation branchEvaluation⟩
-      | true =>
-          obtain ⟨result, branchEvaluation⟩ := thenIH environmentTyping
-          exact ⟨result, .ifTrue conditionEvaluation branchEvaluation⟩
+    ∃ value, Evaluates environment expr value :=
+  reducible_environment_evaluates typing environmentTyping.reducible
 
 theorem closed_well_typed_evaluates
     {expr : Expr} {type : Ty}
@@ -321,6 +540,24 @@ inductive FrameHasType : Frame → Ty → Ty → Prop where
   | secondApply
       {leftType rightType : Ty} :
       FrameHasType .secondApply (.product leftType rightType) rightType
+  | applyArgument
+      {argument : Expr} {environment : Environment} {context : Context}
+      {parameterType resultType : Ty} :
+      EnvironmentHasTypes environment context →
+      HasType context argument parameterType →
+      FrameHasType
+        (.applyArgument argument environment)
+        (.function parameterType resultType)
+        resultType
+  | applyClosure
+      {parameterType resultType : Ty} {body : Expr}
+      {environment : Environment} {context : Context} :
+      EnvironmentHasTypes environment context →
+      HasType (parameterType :: context) body resultType →
+      FrameHasType
+        (.applyClosure parameterType resultType body environment)
+        parameterType
+        resultType
   | letBody
       {body : Expr} {environment : Environment} {context : Context}
       {inputType outputType : Ty} :
@@ -451,6 +688,51 @@ theorem transition_preserves_state_type
                   cases pairTyping with
                   | pair leftTyping rightTyping =>
                       exact .ret rightTyping restTyping
+  | lambda =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | lambda bodyTyping =>
+              exact .ret
+                (.closure environmentTyping bodyTyping)
+                continuationTyping
+  | enterApply =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | apply functionTyping argumentTyping =>
+              exact .eval
+                environmentTyping
+                functionTyping
+                (.cons
+                  (.applyArgument environmentTyping argumentTyping)
+                  continuationTyping)
+  | beginArgument =>
+      cases stateTyping with
+      | ret functionTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | applyArgument callerEnvironmentTyping argumentTyping =>
+                  cases functionTyping with
+                  | closure capturedEnvironmentTyping bodyTyping =>
+                      exact .eval
+                        callerEnvironmentTyping
+                        argumentTyping
+                        (.cons
+                          (.applyClosure capturedEnvironmentTyping bodyTyping)
+                          restTyping)
+  | invokeClosure =>
+      cases stateTyping with
+      | ret argumentTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | applyClosure capturedEnvironmentTyping bodyTyping =>
+                  exact .eval
+                    (.cons argumentTyping capturedEnvironmentTyping)
+                    bodyTyping
+                    restTyping
   | var valueLookup =>
       cases stateTyping with
       | eval environmentTyping exprTyping continuationTyping =>
@@ -478,8 +760,7 @@ theorem transition_preserves_state_type
               cases frameTyping with
               | unaryApply =>
                   exact .ret
-                    (ValueHasType.of_type_eq
-                      (UnaryOp.apply_result_type applied))
+                    (unary_apply_result_has_type applied)
                     restTyping
   | enterBinary =>
       cases stateTyping with
@@ -511,8 +792,7 @@ theorem transition_preserves_state_type
               cases frameTyping with
               | binaryApply leftTyping =>
                   exact .ret
-                    (ValueHasType.of_type_eq
-                      (BinaryOp.apply_result_type applied))
+                    (binary_apply_result_has_type applied)
                     restTyping
   | enterLet =>
       cases stateTyping with
@@ -576,6 +856,8 @@ theorem state_progress
       | pair => exact .inr ⟨_, .enterPair⟩
       | first => exact .inr ⟨_, .enterFirst⟩
       | second => exact .inr ⟨_, .enterSecond⟩
+      | lambda => exact .inr ⟨_, .lambda⟩
+      | apply => exact .inr ⟨_, .enterApply⟩
       | var typeLookup =>
           obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
           exact .inr ⟨_, .var valueLookup⟩
@@ -618,6 +900,11 @@ theorem state_progress
           | secondApply =>
               cases valueTyping with
               | pair => exact .inr ⟨_, .applySecond⟩
+          | applyArgument =>
+              cases valueTyping with
+              | closure => exact .inr ⟨_, .beginArgument⟩
+          | applyClosure =>
+              exact .inr ⟨_, .invokeClosure⟩
           | letBody =>
               exact .inr ⟨_, .bindLet⟩
           | ifBranches =>
