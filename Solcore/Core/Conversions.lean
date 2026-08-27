@@ -30,6 +30,12 @@ theorem wordToBool
     HasType context value.wordToBool .bool definitions :=
   .unary (.binary typing .word)
 
+theorem wordIsZero
+    {context : Context} {definitions : DataEnvironment} {value : Expr}
+    (typing : HasType context value .word definitions) :
+    HasType context value.wordIsZero .word definitions :=
+  HasType.boolToWord (HasType.binary typing .word)
+
 end HasType
 
 theorem infer_boolToWord
@@ -43,6 +49,12 @@ theorem infer_wordToBool
     (inferred : infer? context value definitions = some .word) :
     infer? context value.wordToBool definitions = some .bool :=
   infer_complete ((infer_sound inferred).wordToBool)
+
+theorem infer_wordIsZero
+    {context : Context} {definitions : DataEnvironment} {value : Expr}
+    (inferred : infer? context value definitions = some .word) :
+    infer? context value.wordIsZero definitions = some .word :=
+  infer_complete ((infer_sound inferred).wordIsZero)
 
 namespace Evaluates
 
@@ -105,7 +117,43 @@ theorem wordToBool_nonzero
     beq_eq_false_iff_ne.mpr valueNotZero
   simpa [valueBeqZero] using evaluation.wordToBool
 
+theorem wordIsZero
+    {environment : Environment} {initialStore finalStore : Store}
+    {operand : Expr} {value : Word}
+    (evaluation :
+      Evaluates environment initialStore operand (.word value) finalStore) :
+    Evaluates environment initialStore operand.wordIsZero
+      (.word (if value == Word.zero then Word.ofNatModulo 1 else Word.zero))
+      finalStore :=
+  (Evaluates.binary evaluation .word rfl).boolToWord
+
+theorem wordIsZero_zero
+    {environment : Environment} {initialStore finalStore : Store}
+    {operand : Expr}
+    (evaluation :
+      Evaluates environment initialStore operand (.word Word.zero) finalStore) :
+    Evaluates environment initialStore operand.wordIsZero
+      (.word (Word.ofNatModulo 1)) finalStore := by
+  simpa using evaluation.wordIsZero
+
+theorem wordIsZero_nonzero
+    {environment : Environment} {initialStore finalStore : Store}
+    {operand : Expr} {value : Word}
+    (valueNotZero : value ≠ Word.zero)
+    (evaluation :
+      Evaluates environment initialStore operand (.word value) finalStore) :
+    Evaluates environment initialStore operand.wordIsZero
+      (.word Word.zero) finalStore := by
+  have valueBeqZero : (value == Word.zero) = false :=
+    beq_eq_false_iff_ne.mpr valueNotZero
+  simpa [valueBeqZero] using evaluation.wordIsZero
+
 end Evaluates
+
+@[simp] theorem Expr.wordIsZero_expansion (value : Expr) :
+    value.wordIsZero =
+      (Expr.binary .wordEq value (.word Word.zero)).boolToWord :=
+  rfl
 
 @[simp] theorem Expr.weakenAt_boolToWord
     (value : Expr) (cutoff : Nat) :
@@ -116,5 +164,10 @@ end Evaluates
     (value : Expr) (cutoff : Nat) :
     value.wordToBool.weakenAt cutoff = (value.weakenAt cutoff).wordToBool :=
   by simp [Expr.wordToBool, Expr.wordNe, Expr.weakenAt]
+
+@[simp] theorem Expr.weakenAt_wordIsZero
+    (value : Expr) (cutoff : Nat) :
+    value.wordIsZero.weakenAt cutoff = (value.weakenAt cutoff).wordIsZero :=
+  by simp [Expr.wordIsZero, Expr.boolToWord, Expr.weakenAt]
 
 end Solcore.Core

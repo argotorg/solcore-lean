@@ -139,11 +139,101 @@ private def testFrozenWireProjection : IO Unit := do
   assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? wordConversion).isNone
     "v1 must continue rejecting the M1c primitives used by wordToBool"
 
-/-- Cover truth conversion, typing, raw faults, evaluation order, exact fuel,
-and the unchanged frozen-wire boundary. -/
+private def testWordIsZero : IO Unit := do
+  let one := Word.ofNatModulo 1
+  let two := Word.ofNatModulo 2
+  let zeroProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsZero (.word Word.zero)
+  }
+  let oneProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsZero (.word one)
+  }
+  let twoProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsZero (.word two)
+  }
+  let maximumProgram : Program := {
+    resultType := .word
+    body := Expr.wordIsZero (.word Word.maximum)
+  }
+
+  for program in [zeroProgram, oneProgram, twoProgram, maximumProgram] do
+    assertTrue program.check
+      s!"wordIsZero failed to type-check as word: {reprStr program.body}"
+
+  assertTrue (zeroProgram.run 8 == .done (.word one))
+    "wordIsZero must map zero to word one"
+  assertTrue (oneProgram.run 8 == .done (.word Word.zero))
+    "wordIsZero must map word one to word zero"
+  assertTrue (twoProgram.run 8 == .done (.word Word.zero))
+    "wordIsZero must map word two to word zero"
+  assertTrue (maximumProgram.run 8 == .done (.word Word.zero))
+    "wordIsZero must map the maximum word to word zero"
+
+  let wrongInput : Program := {
+    resultType := .word
+    body := Expr.wordIsZero .unit
+  }
+  assertTrue (!wrongInput.check)
+    "wordIsZero must reject a non-word operand"
+  assertTrue
+    (wrongInput.run 5 ==
+      .fault (.invalidBinaryOperands .wordEq .unit (.word Word.zero)))
+    "the unchecked wordIsZero expansion must expose its word-comparison fault"
+
+  assertTrue (zeroProgram.run 7 == .outOfFuel)
+    "seven transitions must be insufficient for wordIsZero"
+  assertTrue (zeroProgram.run 8 == .done (.word one))
+    "wordIsZero must finish at its eight-transition boundary"
+
+  let effectfulProgram : Program := {
+    resultType := .word
+    body :=
+      Expr.wordIsZero
+        (.letE (.newCell .unit .unit) (.word Word.zero))
+  }
+  assertTrue effectfulProgram.check
+    "wordIsZero must accept an effectful word operand"
+  assertTrue
+    (effectfulProgram.runStateful 13 == .done (.word one) [.unit])
+    "wordIsZero must evaluate its operand exactly once before comparing with zero"
+
+  let booleanTruthiness : Program := {
+    resultType := .bool
+    body := Expr.wordToBool (.word Word.zero)
+  }
+  assertTrue booleanTruthiness.check
+    "wordToBool must retain its boolean result type"
+  assertTrue (booleanTruthiness.run 7 == .done (.bool false))
+    "wordToBool zero must remain boolean false, distinct from wordIsZero's word one"
+  let wrongDeclaredType : Program := {
+    resultType := .bool
+    body := Expr.wordIsZero (.word Word.zero)
+  }
+  assertTrue (!wrongDeclaredType.check)
+    "wordIsZero must not be confused with the boolean-valued wordToBool helper"
+
+  let projection := Expr.wordIsZero (.word Word.zero)
+  let handwritten :=
+    Expr.boolToWord
+      (.binary .wordEq (.word Word.zero) (.word Word.zero))
+  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? projection).isNone
+    "v1 must reject the word equality used by wordIsZero"
+  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? projection).isSome
+    "wordIsZero must project through existing v2 conditional and primitive forms"
+  assertTrue
+    (Solcore.Core.Wire.V2.Expr.ofCore? projection ==
+      Solcore.Core.Wire.V2.Expr.ofCore? handwritten)
+    "wordIsZero must project exactly like its handwritten expansion"
+
+/-- Cover truth conversion and the word-valued zero predicate, including
+typing, raw faults, evaluation order, exact fuel, and frozen-wire boundaries. -/
 def testCoreConversions : IO Unit := do
   testConversionValuesAndTypes
   testExactFuelAndSingleEvaluation
   testFrozenWireProjection
+  testWordIsZero
 
 end Tests
