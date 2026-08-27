@@ -17,6 +17,7 @@ import Solcore.Core.ComparisonFlags
 import Solcore.Core.UnaryPrimitives
 import Solcore.Core.UnsignedDivision
 import Solcore.Core.LogicalShifts
+import Solcore.Core.ModularArithmetic
 import Solcore.Core.ShortCircuit
 
 /-!
