@@ -327,6 +327,12 @@ to the minimum word. Its exact fourteen theorems and sign, zero, type, fault,
 effect/store, and fuel regressions pass. Frozen public Wire formats reject both
 operations; the independent audit found no P0-P3 issue.
 
+The active ADR-0049 slice derives canonical word-valued signed non-strict
+comparison flags. `wordSleFlag` and `wordSgeFlag` convert the existing boolean
+builders to word one or zero. Source left still evaluates before source right;
+only `wordSgeFlag`'s already computed bound values are swapped internally.
+Frozen public Wire formats reject both builders and their expansions.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

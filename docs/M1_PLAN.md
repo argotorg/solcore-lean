@@ -500,6 +500,19 @@ policy, and metadata verification pass. Public formats, source syntax, ABI,
 opcode, and gas rules remain unchanged; the independent audit found no P0-P3
 issue. The next feature is selected by a separate ADR.
 
+## Active Core vNext slice: signed non-strict comparison flags
+
+[ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md)
+derives `wordSleFlag = boolToWord(wordSle)` and
+`wordSgeFlag = boolToWord(wordSge)`. Each produces canonical word one or zero.
+Source left remains before source right; only `wordSgeFlag`'s computed bound
+values are swapped. Ten static and ten evaluation theorems form the planned
+exact twenty-theorem interface. Same-sign, cross-sign, and equality values,
+types, raw and ordered faults, effects/final store, exact 9/10 and 33/34
+`wordSleFlag` fuel, exact 15/16 and 39/40 `wordSgeFlag` fuel, and frozen v1/v2
+builder and expansion rejection plus v2 `wordSgt` rejection are required.
+Public formats and source, ABI, opcode, and gas rules remain unchanged.
+
 ## Completed Core vNext slice: derived-builder renaming laws
 
 [ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) backfills

@@ -155,6 +155,13 @@ minimum/negative-one, type, raw and ordered fault, effect/final-store, exact
 fuel, and frozen-Wire regressions are complete. Focused/full builds and tests,
 kernel policy, and metadata verification pass. Public formats and behavior are
 unchanged; the independent audit found no P0-P3 issue.
+The active thirty-first slice,
+[ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md),
+derives canonical word-valued signed ≤ and ≥ flags from the existing boolean
+builders. Both keep source left-to-right evaluation and return word one or
+zero; only the ≥ builder swaps already computed bound values internally. The
+planned exact twenty theorems and focused truth, type, fault, effect/store,
+fuel, and frozen-Wire regressions add no tag or public behavior.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -281,6 +288,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   independent audit found no P0-P3 issue.
 - ADR-0048 completes internal dividend-left/divisor-right signed division and
   remainder; its independent audit found no P0-P3 issue.
+- ADR-0049 accepts canonical word-valued signed non-strict comparison flags.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

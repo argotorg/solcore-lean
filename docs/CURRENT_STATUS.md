@@ -81,6 +81,9 @@ representation. Its independent audit found no P0-P3 issue.
 [ADR-0048](adr/0048-core-vnext-signed-word-division.md) completes internal
 signed division and remainder with dividend-left/divisor-right evaluation and
 no public Wire representation. Its independent audit found no P0-P3 issue.
+[ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md)
+accepts the active internal word-valued signed ≤ and ≥ flag slice with no new
+Core tag or public Wire representation.
 
 ## Implementation status
 
@@ -607,6 +610,17 @@ zero, minimum, type, raw and ordered fault, effect/final-store, exact 4/5 and
 28/29 fuel, and frozen v1/v2 rejection regressions are complete. Focused/full
 builds and tests, kernel policy, and metadata verification pass. They add no
 public format or source commitment; the independent audit found no P0-P3 issue.
+
+## Active Core vNext signed non-strict comparison flag slice
+
+[ADR-0049](adr/0049-core-vnext-signed-word-nonstrict-comparison-flags.md)
+derives `wordSleFlag` and `wordSgeFlag` from the existing boolean comparisons.
+Both return canonical word one or zero and keep source left-to-right evaluation;
+only `wordSgeFlag` swaps already computed bound values. The planned exact ten
+static and ten evaluation theorems cover same-sign, cross-sign, and equality
+results. Focused type, raw and ordered fault, effect/final-store, exact 9/10,
+33/34, 15/16, and 39/40 fuel, and frozen builder/expansion/v2-operation
+rejection regressions add no public format or source commitment.
 
 ## Meaning of completion
 
