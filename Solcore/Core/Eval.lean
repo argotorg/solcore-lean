@@ -11,6 +11,22 @@ inductive Evaluates : Environment → Expr → Value → Prop where
       Evaluates environment (.bool value) (.bool value)
   | word {environment : Environment} {value : Word} :
       Evaluates environment (.word value) (.word value)
+  | pair
+      {environment : Environment} {left right : Expr}
+      {leftValue rightValue : Value} :
+      Evaluates environment left leftValue →
+      Evaluates environment right rightValue →
+      Evaluates environment (.pair left right) (.pair leftValue rightValue)
+  | first
+      {environment : Environment} {operand : Expr}
+      {leftValue rightValue : Value} :
+      Evaluates environment operand (.pair leftValue rightValue) →
+      Evaluates environment (.first operand) leftValue
+  | second
+      {environment : Environment} {operand : Expr}
+      {leftValue rightValue : Value} :
+      Evaluates environment operand (.pair leftValue rightValue) →
+      Evaluates environment (.second operand) rightValue
   | var {environment : Environment} {index : Nat} {value : Value} :
       environment[index]? = some value →
       Evaluates environment (.var index) value
@@ -61,6 +77,24 @@ theorem evaluation_deterministic
   | word =>
       cases rightEvaluation
       rfl
+  | pair _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | pair otherLeft otherRight =>
+          cases leftIH otherLeft
+          cases rightIH otherRight
+          rfl
+  | first _ operandIH =>
+      cases rightEvaluation with
+      | first otherOperand =>
+          have pairEquality := operandIH otherOperand
+          cases pairEquality
+          rfl
+  | second _ operandIH =>
+      cases rightEvaluation with
+      | second otherOperand =>
+          have pairEquality := operandIH otherOperand
+          cases pairEquality
+          rfl
   | var leftLookup =>
       cases rightEvaluation with
       | var rightLookup =>

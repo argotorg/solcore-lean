@@ -32,7 +32,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 
 | Feature | Decision | Lean status | Required proof boundary | Syntax coupling |
 | --- | --- | --- | --- | --- |
-| Binary products and projections | ADR-0019 Accepted | Active | typing/checker equivalence, CEK/big-step correspondence, safety, old-wire rejection | None |
+| Binary products and projections | ADR-0019 Accepted | Complete | typing/checker equivalence, CEK/big-step correspondence, safety, sufficient fuel, and old-wire rejection complete | None |
 | Functions and application | Direction accepted | Planned | typing, closure evaluation, application order, machine and safety | None |
 | Lexical closures | Direction accepted | Planned with functions | capture typing, environment correspondence, invocation | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |

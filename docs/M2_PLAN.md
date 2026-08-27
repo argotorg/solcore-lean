@@ -46,11 +46,10 @@ The following work is not active:
 ADR-0016 remains an Accepted design record. ADR-0017 remains Proposed. Their
 implementation priority is suspended by ADR-0018 rather than erased.
 
-## Working-tree experiment
+## Excluded experiment
 
-An uncommitted synthetic comma-separator scan was started after the stable
-parser commit 0209a37. It is incomplete and not part of the frozen guarantee.
-It must not be included in semantic commits accidentally.
+A synthetic comma-separator scan was explored after the stable parser commit
+0209a37. It was not merged and is not part of the frozen guarantee.
 
 ## Resume conditions
 

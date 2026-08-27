@@ -31,6 +31,70 @@ theorem Evaluates.toStepsWithContinuation
       exact ⟨1, .cons .bool .refl⟩
   | word =>
       exact ⟨1, .cons .word .refl⟩
+  | @pair environment left right leftValue rightValue
+      leftEvaluation rightEvaluation leftIH rightIH =>
+      obtain ⟨leftSteps, leftPath⟩ :=
+        leftIH (.pairRight right environment :: continuation)
+      obtain ⟨rightSteps, rightPath⟩ :=
+        rightIH (.pairApply leftValue :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.pair left right) environment, continuation⟩
+          ⟨.eval left environment,
+            .pairRight right environment :: continuation⟩ :=
+        .cons
+          (@Transition.enterPair environment left right continuation)
+          .refl
+      let rightEntryPath : Steps 1
+          ⟨.ret leftValue, .pairRight right environment :: continuation⟩
+          ⟨.eval right environment, .pairApply leftValue :: continuation⟩ :=
+        .cons
+          (@Transition.enterPairRight environment right leftValue continuation)
+          .refl
+      let applyPath : Steps 1
+          ⟨.ret rightValue, .pairApply leftValue :: continuation⟩
+          ⟨.ret (.pair leftValue rightValue), continuation⟩ :=
+        .cons
+          (@Transition.applyPair leftValue rightValue continuation)
+          .refl
+      exact ⟨_,
+        enterPath.trans
+          (leftPath.trans
+            (rightEntryPath.trans
+              (rightPath.trans applyPath)))⟩
+  | @first environment operand leftValue rightValue
+      operandEvaluation operandIH =>
+      obtain ⟨operandSteps, operandPath⟩ :=
+        operandIH (.firstApply :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.first operand) environment, continuation⟩
+          ⟨.eval operand environment, .firstApply :: continuation⟩ :=
+        .cons
+          (@Transition.enterFirst environment operand continuation)
+          .refl
+      let applyPath : Steps 1
+          ⟨.ret (.pair leftValue rightValue), .firstApply :: continuation⟩
+          ⟨.ret leftValue, continuation⟩ :=
+        .cons
+          (@Transition.applyFirst leftValue rightValue continuation)
+          .refl
+      exact ⟨_, enterPath.trans (operandPath.trans applyPath)⟩
+  | @second environment operand leftValue rightValue
+      operandEvaluation operandIH =>
+      obtain ⟨operandSteps, operandPath⟩ :=
+        operandIH (.secondApply :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.second operand) environment, continuation⟩
+          ⟨.eval operand environment, .secondApply :: continuation⟩ :=
+        .cons
+          (@Transition.enterSecond environment operand continuation)
+          .refl
+      let applyPath : Steps 1
+          ⟨.ret (.pair leftValue rightValue), .secondApply :: continuation⟩
+          ⟨.ret rightValue, continuation⟩ :=
+        .cons
+          (@Transition.applySecond leftValue rightValue continuation)
+          .refl
+      exact ⟨_, enterPath.trans (operandPath.trans applyPath)⟩
   | var lookup =>
       exact ⟨1, .cons (.var lookup) .refl⟩
   | @unary environment op operand operandValue result
@@ -174,6 +238,40 @@ inductive Continues : List Frame → Value → Value → Prop where
         (.binaryApply op leftValue :: continuation)
         rightValue
         finalValue
+  | pairRight
+      {right : Expr} {environment : Environment}
+      {continuation : List Frame}
+      {leftValue rightValue finalValue : Value} :
+      Evaluates environment right rightValue →
+      Continues continuation (.pair leftValue rightValue) finalValue →
+      Continues
+        (.pairRight right environment :: continuation)
+        leftValue
+        finalValue
+  | pairApply
+      {leftValue rightValue finalValue : Value}
+      {continuation : List Frame} :
+      Continues continuation (.pair leftValue rightValue) finalValue →
+      Continues
+        (.pairApply leftValue :: continuation)
+        rightValue
+        finalValue
+  | firstApply
+      {leftValue rightValue finalValue : Value}
+      {continuation : List Frame} :
+      Continues continuation leftValue finalValue →
+      Continues
+        (.firstApply :: continuation)
+        (.pair leftValue rightValue)
+        finalValue
+  | secondApply
+      {leftValue rightValue finalValue : Value}
+      {continuation : List Frame} :
+      Continues continuation rightValue finalValue →
+      Continues
+        (.secondApply :: continuation)
+        (.pair leftValue rightValue)
+        finalValue
   | letBody
       {body : Expr} {environment : Environment} {continuation : List Frame}
       {boundValue result finalValue : Value} :
@@ -226,6 +324,42 @@ theorem transition_reflects_denotation
   | word =>
       cases denotes with
       | ret continuation => exact .eval .word continuation
+  | enterPair =>
+      cases denotes with
+      | eval leftEvaluation continuation =>
+          cases continuation with
+          | pairRight rightEvaluation rest =>
+              exact .eval (.pair leftEvaluation rightEvaluation) rest
+  | enterPairRight =>
+      cases denotes with
+      | eval rightEvaluation continuation =>
+          cases continuation with
+          | pairApply rest =>
+              exact .ret (.pairRight rightEvaluation rest)
+  | applyPair =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.pairApply continuation)
+  | enterFirst =>
+      cases denotes with
+      | eval operandEvaluation continuation =>
+          cases continuation with
+          | firstApply rest =>
+              exact .eval (.first operandEvaluation) rest
+  | applyFirst =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.firstApply continuation)
+  | enterSecond =>
+      cases denotes with
+      | eval operandEvaluation continuation =>
+          cases continuation with
+          | secondApply rest =>
+              exact .eval (.second operandEvaluation) rest
+  | applySecond =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.secondApply continuation)
   | var lookup =>
       cases denotes with
       | ret continuation => exact .eval (.var lookup) continuation

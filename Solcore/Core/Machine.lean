@@ -13,6 +13,10 @@ inductive Frame where
   | unaryApply (op : UnaryOp)
   | binaryRight (op : BinaryOp) (right : Expr) (environment : Environment)
   | binaryApply (op : BinaryOp) (leftValue : Value)
+  | pairRight (right : Expr) (environment : Environment)
+  | pairApply (leftValue : Value)
+  | firstApply
+  | secondApply
   | letBody (body : Expr) (environment : Environment)
   | ifBranches (thenBranch : Expr) (elseBranch : Expr) (environment : Environment)
   deriving Repr, BEq, DecidableEq
@@ -47,6 +51,45 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.eval (.word value) environment, continuation⟩
         ⟨.ret (.word value), continuation⟩
+  | enterPair
+      {environment : Environment} {left right : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.pair left right) environment, continuation⟩
+        ⟨.eval left environment, .pairRight right environment :: continuation⟩
+  | enterPairRight
+      {environment : Environment} {right : Expr}
+      {leftValue : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret leftValue, .pairRight right environment :: continuation⟩
+        ⟨.eval right environment, .pairApply leftValue :: continuation⟩
+  | applyPair
+      {leftValue rightValue : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret rightValue, .pairApply leftValue :: continuation⟩
+        ⟨.ret (.pair leftValue rightValue), continuation⟩
+  | enterFirst
+      {environment : Environment} {operand : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.first operand) environment, continuation⟩
+        ⟨.eval operand environment, .firstApply :: continuation⟩
+  | applyFirst
+      {leftValue rightValue : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret (.pair leftValue rightValue), .firstApply :: continuation⟩
+        ⟨.ret leftValue, continuation⟩
+  | enterSecond
+      {environment : Environment} {operand : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.second operand) environment, continuation⟩
+        ⟨.eval operand environment, .secondApply :: continuation⟩
+  | applySecond
+      {leftValue rightValue : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret (.pair leftValue rightValue), .secondApply :: continuation⟩
+        ⟨.ret rightValue, continuation⟩
   | var
       {environment : Environment} {index : Nat} {value : Value}
       {continuation : List Frame} :
@@ -122,6 +165,7 @@ inductive Transition : State → State → Prop where
 inductive MachineFault where
   | unboundVariable (index : Nat)
   | expectedBool (actual : Value)
+  | expectedProduct (actual : Value)
   | invalidUnaryOperand (op : UnaryOp) (actual : Value)
   | invalidBinaryOperands (op : BinaryOp) (left right : Value)
   deriving Repr, BEq, DecidableEq
@@ -139,6 +183,13 @@ def advance (state : State) : AdvanceResult :=
       | .unit => .next ⟨.ret .unit, state.continuation⟩
       | .bool value => .next ⟨.ret (.bool value), state.continuation⟩
       | .word value => .next ⟨.ret (.word value), state.continuation⟩
+      | .pair left right =>
+          .next ⟨.eval left environment,
+            .pairRight right environment :: state.continuation⟩
+      | .first operand =>
+          .next ⟨.eval operand environment, .firstApply :: state.continuation⟩
+      | .second operand =>
+          .next ⟨.eval operand environment, .secondApply :: state.continuation⟩
       | .var index =>
           match environment[index]? with
           | some value => .next ⟨.ret value, state.continuation⟩
@@ -167,6 +218,18 @@ def advance (state : State) : AdvanceResult :=
           match op.apply leftValue value with
           | some result => .next ⟨.ret result, continuation⟩
           | none => .fault (.invalidBinaryOperands op leftValue value)
+      | .pairRight right environment :: continuation =>
+          .next ⟨.eval right environment, .pairApply value :: continuation⟩
+      | .pairApply leftValue :: continuation =>
+          .next ⟨.ret (.pair leftValue value), continuation⟩
+      | .firstApply :: continuation =>
+          match value with
+          | .pair leftValue _ => .next ⟨.ret leftValue, continuation⟩
+          | actual => .fault (.expectedProduct actual)
+      | .secondApply :: continuation =>
+          match value with
+          | .pair _ rightValue => .next ⟨.ret rightValue, continuation⟩
+          | actual => .fault (.expectedProduct actual)
       | .letBody body environment :: continuation =>
           .next ⟨.eval body (value :: environment), continuation⟩
       | .ifBranches thenBranch elseBranch environment :: continuation =>

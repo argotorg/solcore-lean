@@ -8,6 +8,11 @@ inductive ValueHasType : Value → Ty → Prop where
   | unit : ValueHasType .unit .unit
   | bool {value : Bool} : ValueHasType (.bool value) .bool
   | word {value : Word} : ValueHasType (.word value) .word
+  | pair
+      {left right : Value} {leftType rightType : Ty} :
+      ValueHasType left leftType →
+      ValueHasType right rightType →
+      ValueHasType (.pair left right) (.product leftType rightType)
 
 inductive EnvironmentHasTypes : Environment → Context → Prop where
   | nil : EnvironmentHasTypes [] []
@@ -48,17 +53,32 @@ theorem ValueHasType.type_eq
     {value : Value} {type : Ty}
     (typing : ValueHasType value type) :
     value.type = type := by
-  cases typing <;> rfl
+  induction typing with
+  | unit | bool | word => rfl
+  | pair leftTyping rightTyping leftIH rightIH =>
+      simp [Value.type, leftIH, rightIH]
 
 theorem ValueHasType.of_type_eq
     {value : Value} {type : Ty}
     (typeEquality : value.type = type) :
     ValueHasType value type := by
-  cases value <;> simp [Value.type] at typeEquality <;>
-    subst type
-  · exact .unit
-  · exact .bool
-  · exact .word
+  induction value generalizing type with
+  | unit =>
+      simp [Value.type] at typeEquality
+      subst type
+      exact .unit
+  | bool =>
+      simp [Value.type] at typeEquality
+      subst type
+      exact .bool
+  | word =>
+      simp [Value.type] at typeEquality
+      subst type
+      exact .word
+  | pair left right leftIH rightIH =>
+      simp [Value.type] at typeEquality
+      subst type
+      exact .pair (leftIH rfl) (rightIH rfl)
 
 theorem evaluation_preserves_type
     {environment : Environment} {context : Context}
@@ -77,6 +97,26 @@ theorem evaluation_preserves_type
   | word =>
       cases typing
       exact .word
+  | pair leftEvaluation rightEvaluation leftIH rightIH =>
+      cases typing with
+      | pair leftTyping rightTyping =>
+          exact .pair
+            (leftIH leftTyping environmentTyping)
+            (rightIH rightTyping environmentTyping)
+  | first operandEvaluation operandIH =>
+      cases typing with
+      | first operandTyping =>
+          have operandValueTyping :=
+            operandIH operandTyping environmentTyping
+          cases operandValueTyping with
+          | pair leftTyping rightTyping => exact leftTyping
+  | second operandEvaluation operandIH =>
+      cases typing with
+      | second operandTyping =>
+          have operandValueTyping :=
+            operandIH operandTyping environmentTyping
+          cases operandValueTyping with
+          | pair leftTyping rightTyping => exact rightTyping
   | var valueLookup =>
       cases typing with
       | var typeLookup =>
@@ -120,6 +160,33 @@ theorem well_typed_evaluates
   | unit => exact ⟨.unit, .unit⟩
   | bool => exact ⟨.bool _, .bool⟩
   | word => exact ⟨.word _, .word⟩
+  | pair leftTyping rightTyping leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation⟩ := leftIH environmentTyping
+      obtain ⟨rightValue, rightEvaluation⟩ := rightIH environmentTyping
+      exact ⟨.pair leftValue rightValue,
+        .pair leftEvaluation rightEvaluation⟩
+  | first operandTyping operandIH =>
+      obtain ⟨operandValue, operandEvaluation⟩ :=
+        operandIH environmentTyping
+      have operandValueTyping :=
+        evaluation_preserves_type
+          operandEvaluation
+          operandTyping
+          environmentTyping
+      cases operandValueTyping with
+      | pair leftTyping rightTyping =>
+          exact ⟨_, .first operandEvaluation⟩
+  | second operandTyping operandIH =>
+      obtain ⟨operandValue, operandEvaluation⟩ :=
+        operandIH environmentTyping
+      have operandValueTyping :=
+        evaluation_preserves_type
+          operandEvaluation
+          operandTyping
+          environmentTyping
+      cases operandValueTyping with
+      | pair leftTyping rightTyping =>
+          exact ⟨_, .second operandEvaluation⟩
   | var typeLookup =>
       obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
       exact ⟨value, .var valueLookup⟩
@@ -232,6 +299,28 @@ inductive FrameHasType : Frame → Ty → Ty → Prop where
         (.binaryApply op leftValue)
         op.rightType
         op.resultType
+  | pairRight
+      {right : Expr} {environment : Environment} {context : Context}
+      {leftType rightType : Ty} :
+      EnvironmentHasTypes environment context →
+      HasType context right rightType →
+      FrameHasType
+        (.pairRight right environment)
+        leftType
+        (.product leftType rightType)
+  | pairApply
+      {leftValue : Value} {leftType rightType : Ty} :
+      ValueHasType leftValue leftType →
+      FrameHasType
+        (.pairApply leftValue)
+        rightType
+        (.product leftType rightType)
+  | firstApply
+      {leftType rightType : Ty} :
+      FrameHasType .firstApply (.product leftType rightType) leftType
+  | secondApply
+      {leftType rightType : Ty} :
+      FrameHasType .secondApply (.product leftType rightType) rightType
   | letBody
       {body : Expr} {environment : Environment} {context : Context}
       {inputType outputType : Ty} :
@@ -294,6 +383,74 @@ theorem transition_preserves_state_type
       | eval environmentTyping exprTyping continuationTyping =>
           cases exprTyping
           exact .ret .word continuationTyping
+  | enterPair =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | pair leftTyping rightTyping =>
+              exact .eval
+                environmentTyping
+                leftTyping
+                (.cons
+                  (.pairRight environmentTyping rightTyping)
+                  continuationTyping)
+  | enterPairRight =>
+      cases stateTyping with
+      | ret leftTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | pairRight environmentTyping rightTyping =>
+                  exact .eval
+                    environmentTyping
+                    rightTyping
+                    (.cons (.pairApply leftTyping) restTyping)
+  | applyPair =>
+      cases stateTyping with
+      | ret rightTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | pairApply leftTyping =>
+                  exact .ret (.pair leftTyping rightTyping) restTyping
+  | enterFirst =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | first operandTyping =>
+              exact .eval
+                environmentTyping
+                operandTyping
+                (.cons .firstApply continuationTyping)
+  | applyFirst =>
+      cases stateTyping with
+      | ret pairTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | firstApply =>
+                  cases pairTyping with
+                  | pair leftTyping rightTyping =>
+                      exact .ret leftTyping restTyping
+  | enterSecond =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | second operandTyping =>
+              exact .eval
+                environmentTyping
+                operandTyping
+                (.cons .secondApply continuationTyping)
+  | applySecond =>
+      cases stateTyping with
+      | ret pairTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | secondApply =>
+                  cases pairTyping with
+                  | pair leftTyping rightTyping =>
+                      exact .ret rightTyping restTyping
   | var valueLookup =>
       cases stateTyping with
       | eval environmentTyping exprTyping continuationTyping =>
@@ -416,6 +573,9 @@ theorem state_progress
       | unit => exact .inr ⟨_, .unit⟩
       | bool => exact .inr ⟨_, .bool⟩
       | word => exact .inr ⟨_, .word⟩
+      | pair => exact .inr ⟨_, .enterPair⟩
+      | first => exact .inr ⟨_, .enterFirst⟩
+      | second => exact .inr ⟨_, .enterSecond⟩
       | var typeLookup =>
           obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
           exact .inr ⟨_, .var valueLookup⟩
@@ -448,6 +608,16 @@ theorem state_progress
                   leftTyping.type_eq
                   valueTyping.type_eq
               exact .inr ⟨_, .applyBinary applied⟩
+          | pairRight =>
+              exact .inr ⟨_, .enterPairRight⟩
+          | pairApply =>
+              exact .inr ⟨_, .applyPair⟩
+          | firstApply =>
+              cases valueTyping with
+              | pair => exact .inr ⟨_, .applyFirst⟩
+          | secondApply =>
+              cases valueTyping with
+              | pair => exact .inr ⟨_, .applySecond⟩
           | letBody =>
               exact .inr ⟨_, .bindLet⟩
           | ifBranches =>

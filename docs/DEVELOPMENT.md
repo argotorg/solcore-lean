@@ -118,9 +118,9 @@ semantics-first phase. A necessary maintenance fix must:
   reference;
 - run the relevant parser and full repository checks.
 
-The unfinished separator-scan working-tree files are outside the stable parser
-baseline. Stage semantic changes explicitly so they are not committed by
-accident.
+Any restored parser experiment remains outside the stable parser baseline.
+Stage semantic changes explicitly so unrelated frontend work is not committed
+by accident.
 
 ## Kernel policy
 

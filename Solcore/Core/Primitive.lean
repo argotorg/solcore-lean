@@ -129,6 +129,10 @@ def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
   | .word value => .word value
   | .var index =>
       if cutoff ≤ index then .var (index + 1) else .var index
+  | .pair left right =>
+      .pair (left.weakenAt cutoff) (right.weakenAt cutoff)
+  | .first operand => .first (operand.weakenAt cutoff)
+  | .second operand => .second (operand.weakenAt cutoff)
   | .unary op operand => .unary op (operand.weakenAt cutoff)
   | .binary op left right =>
       .binary op (left.weakenAt cutoff) (right.weakenAt cutoff)

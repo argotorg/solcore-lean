@@ -11,6 +11,19 @@ inductive HasType : Context → Expr → Ty → Prop where
   | var {context : Context} {index : Nat} {type : Ty} :
       context[index]? = some type →
       HasType context (.var index) type
+  | pair
+      {context : Context} {left right : Expr} {leftType rightType : Ty} :
+      HasType context left leftType →
+      HasType context right rightType →
+      HasType context (.pair left right) (.product leftType rightType)
+  | first
+      {context : Context} {operand : Expr} {leftType rightType : Ty} :
+      HasType context operand (.product leftType rightType) →
+      HasType context (.first operand) leftType
+  | second
+      {context : Context} {operand : Expr} {leftType rightType : Ty} :
+      HasType context operand (.product leftType rightType) →
+      HasType context (.second operand) rightType
   | unary
       {context : Context} {op : UnaryOp} {operand : Expr} :
       HasType context operand op.operandType →
@@ -37,6 +50,18 @@ def infer? (context : Context) : Expr → Option Ty
   | .bool _ => some .bool
   | .word _ => some .word
   | .var index => context[index]?
+  | .pair left right =>
+      match infer? context left, infer? context right with
+      | some leftType, some rightType => some (.product leftType rightType)
+      | _, _ => none
+  | .first operand =>
+      match infer? context operand with
+      | some (.product leftType _) => some leftType
+      | _ => none
+  | .second operand =>
+      match infer? context operand with
+      | some (.product _ rightType) => some rightType
+      | _ => none
   | .unary op operand =>
       if infer? context operand = some op.operandType then
         some op.resultType
@@ -66,6 +91,9 @@ theorem infer_complete
     infer? context expr = some type := by
   induction typing with
   | unit | bool | word | var => simp_all [infer?]
+  | pair _ _ leftIH rightIH => simp [infer?, leftIH, rightIH]
+  | first _ operandIH => simp [infer?, operandIH]
+  | second _ operandIH => simp [infer?, operandIH]
   | unary _ operandIH => simp [infer?, operandIH]
   | binary _ _ leftIH rightIH => simp [infer?, leftIH, rightIH]
   | letE _ _ valueIH bodyIH => simp_all [infer?]
@@ -90,6 +118,48 @@ theorem infer_sound
       exact .word
   | var index =>
       exact .var inferred
+  | pair left right leftIH rightIH =>
+      cases leftInferred : infer? context left with
+      | none => simp [infer?, leftInferred] at inferred
+      | some leftType =>
+          cases rightInferred : infer? context right with
+          | none => simp [infer?, leftInferred, rightInferred] at inferred
+          | some rightType =>
+              have resultType : Ty.product leftType rightType = type := by
+                exact Option.some.inj (by
+                  simpa [infer?, leftInferred, rightInferred] using inferred)
+              subst type
+              exact .pair
+                (leftIH leftInferred)
+                (rightIH rightInferred)
+  | first operand operandIH =>
+      cases operandInferred : infer? context operand with
+      | none => simp [infer?, operandInferred] at inferred
+      | some operandType =>
+          cases operandType with
+          | unit => simp [infer?, operandInferred] at inferred
+          | bool => simp [infer?, operandInferred] at inferred
+          | word => simp [infer?, operandInferred] at inferred
+          | product leftType rightType =>
+              have resultType : leftType = type := by
+                exact Option.some.inj (by
+                  simpa [infer?, operandInferred] using inferred)
+              subst type
+              exact .first (operandIH operandInferred)
+  | second operand operandIH =>
+      cases operandInferred : infer? context operand with
+      | none => simp [infer?, operandInferred] at inferred
+      | some operandType =>
+          cases operandType with
+          | unit => simp [infer?, operandInferred] at inferred
+          | bool => simp [infer?, operandInferred] at inferred
+          | word => simp [infer?, operandInferred] at inferred
+          | product leftType rightType =>
+              have resultType : rightType = type := by
+                exact Option.some.inj (by
+                  simpa [infer?, operandInferred] using inferred)
+              subst type
+              exact .second (operandIH operandInferred)
   | unary op operand operandIH =>
       by_cases operandInferred :
           infer? context operand = some op.operandType
@@ -127,6 +197,8 @@ theorem infer_sound
           cases conditionType with
           | unit => simp [infer?, conditionInferred] at inferred
           | word => simp [infer?, conditionInferred] at inferred
+          | product leftType rightType =>
+              simp [infer?, conditionInferred] at inferred
           | bool =>
               cases thenInferred : infer? context thenBranch with
               | none => simp [infer?, conditionInferred, thenInferred] at inferred

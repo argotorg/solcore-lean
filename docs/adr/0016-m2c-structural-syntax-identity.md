@@ -24,6 +24,9 @@
   “Virtual lexical scopes”, “Construction boundary and diagnostics”, and
   “Required proof boundary”. The long role tables are reference material.
 
+The remainder of this ADR is a technical reference. For the current
+development priority and pause condition, read the frontend freeze plan.
+
 ## Context
 
 ADR-0014 fixes source and module identity without interpreting source syntax.

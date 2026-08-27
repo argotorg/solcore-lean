@@ -36,6 +36,7 @@ def ofCore? : Solcore.Core.Ty → Option Ty
   | .unit => some .unit
   | .bool => some .bool
   | .word => some .word
+  | .product _ _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (type : Ty) :
@@ -71,6 +72,7 @@ def ofCore? : Solcore.Core.Value → Option Value
   | .unit => some .unit
   | .bool value => some (.bool value)
   | .word value => some (.word value)
+  | .pair _ _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (value : Value) :
@@ -217,6 +219,9 @@ def ofCore? : Solcore.Core.Expr → Option Expr
       let thenBranch ← ofCore? thenBranch
       let elseBranch ← ofCore? elseBranch
       some (.ifE condition thenBranch elseBranch)
+  | .pair _ _ => none
+  | .first _ => none
+  | .second _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (expr : Expr) :

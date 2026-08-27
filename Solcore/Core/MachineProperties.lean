@@ -24,6 +24,18 @@ theorem advance_next_iff {state next : State} :
             simp [advance] at advanced
             cases advanced
             exact .word
+        | pair left right =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterPair
+        | first operand =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterFirst
+        | second operand =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterSecond
         | var index =>
             cases lookup : environment[index]? with
             | none => simp [advance, lookup] at advanced
@@ -70,14 +82,35 @@ theorem advance_next_iff {state next : State} :
                     simp [advance, applied] at advanced
                     cases advanced
                     exact .applyBinary applied
+            | pairRight right environment =>
+                simp [advance] at advanced
+                cases advanced
+                exact .enterPairRight
+            | pairApply leftValue =>
+                simp [advance] at advanced
+                cases advanced
+                exact .applyPair
+            | firstApply =>
+                cases value with
+                | unit | bool | word => simp [advance] at advanced
+                | pair leftValue rightValue =>
+                    simp [advance] at advanced
+                    cases advanced
+                    exact .applyFirst
+            | secondApply =>
+                cases value with
+                | unit | bool | word => simp [advance] at advanced
+                | pair leftValue rightValue =>
+                    simp [advance] at advanced
+                    cases advanced
+                    exact .applySecond
             | letBody body environment =>
                 simp [advance] at advanced
                 cases advanced
                 exact .bindLet
             | ifBranches thenBranch elseBranch environment =>
                 cases value with
-                | unit => simp [advance] at advanced
-                | word value => simp [advance] at advanced
+                | unit | word | pair => simp [advance] at advanced
                 | bool decision =>
                     cases decision with
                     | false =>
@@ -99,7 +132,8 @@ theorem advance_done_iff {state : State} {value : Value} :
     cases control with
     | eval expr environment =>
         cases expr with
-        | unit | bool | word | unary | binary | letE | ifE => simp [advance] at advanced
+        | unit | bool | word | pair | first | second | unary | binary | letE | ifE =>
+            simp [advance] at advanced
         | var index =>
             cases lookup : environment[index]? <;> simp [advance, lookup] at advanced
     | ret returned =>
@@ -118,10 +152,16 @@ theorem advance_done_iff {state : State} {value : Value} :
             | binaryApply op leftValue =>
                 cases applied : op.apply leftValue returned <;>
                   simp [advance, applied] at advanced
+            | pairRight right environment => simp [advance] at advanced
+            | pairApply leftValue => simp [advance] at advanced
+            | firstApply =>
+                cases returned <;> simp [advance] at advanced
+            | secondApply =>
+                cases returned <;> simp [advance] at advanced
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with
-                | unit | word => simp [advance] at advanced
+                | unit | word | pair => simp [advance] at advanced
                 | bool decision =>
                     cases decision <;> simp [advance] at advanced
   · intro final

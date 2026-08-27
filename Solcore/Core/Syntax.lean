@@ -22,6 +22,7 @@ inductive Ty where
   | unit
   | bool
   | word
+  | product (left : Ty) (right : Ty)
   deriving Repr, BEq, DecidableEq
 
 inductive UnaryOp where
@@ -83,6 +84,9 @@ inductive Expr where
   | bool (value : Bool)
   | word (value : Word)
   | var (index : Nat)
+  | pair (left : Expr) (right : Expr)
+  | first (operand : Expr)
+  | second (operand : Expr)
   | unary (op : UnaryOp) (operand : Expr)
   | binary (op : BinaryOp) (left : Expr) (right : Expr)
   | letE (value : Expr) (body : Expr)
@@ -93,12 +97,14 @@ inductive Value where
   | unit
   | bool (value : Bool)
   | word (value : Word)
+  | pair (left : Value) (right : Value)
   deriving Repr, BEq, DecidableEq
 
 def Value.type : Value → Ty
   | .unit => .unit
   | .bool _ => .bool
   | .word _ => .word
+  | .pair left right => .product left.type right.type
 
 abbrev Context := List Ty
 

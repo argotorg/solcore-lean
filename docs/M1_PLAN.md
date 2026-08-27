@@ -37,7 +37,7 @@ These results remain regression obligations for every extension.
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
 
-## Active slice: products
+## Completed Core vNext slice: products
 
 ADR-0019 fixes:
 
@@ -49,7 +49,7 @@ ADR-0019 fixes:
 - no product equality, ABI mapping, source tuple nesting, or public wire tag;
 - rejection by Semantic Core v1 and v2 projections.
 
-The slice is complete when all of the following hold:
+The current implementation satisfies all of the following:
 
 1. Declarative typing covers pair construction and both projections.
 2. Executable inference is sound and complete.
@@ -63,7 +63,9 @@ The slice is complete when all of the following hold:
 9. Tests cover nesting, evaluation order, invalid projection, exact fuel, and
    old-wire rejection.
 
-## Functions and closures
+The feature remains internal and therefore does not change Oracle v2 or v3.
+
+## Next active design: functions and closures
 
 The next decision must fix:
 

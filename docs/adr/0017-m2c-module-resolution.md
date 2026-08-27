@@ -23,6 +23,9 @@
   “Exact executable resource metric” and both feasibility gates. Lookup tables
   and divergence ledgers are reference sections.
 
+The remainder of this Proposed ADR is a technical design reference. It is not
+the active implementation roadmap while ADR-0018 is in force.
+
 ## Context
 
 ADR-0014 fixes caller-workspace identity and canonical logical paths. Accepted

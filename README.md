@@ -48,19 +48,12 @@ The two current public interfaces are:
 The Oracle reads newline-delimited JSON from standard input when no command is
 given. Each request produces exactly one response in the same order.
 
-    lake exe solcoreOracle < Tests/golden/m1c-eval-operations-request.ndjson
-    lake exe solcoreOracle < Tests/golden/m2b-parse-outcomes-request.ndjson
-
-Useful example requests:
-
-- [Core checking](Tests/golden/m1c-check-rejected-request.ndjson)
-- [Core evaluation](Tests/golden/m1c-eval-operations-request.ndjson)
-- [Surface parsing](Tests/golden/m2b-parse-outcomes-request.ndjson)
-- [Mixed protocol versions](Tests/golden/mixed-v1-v2-v3-v4-request.ndjson)
+    lake exe solcoreOracle < request.ndjson
 
 Requests must contain one compact JSON object per line. Malformed envelopes,
 unknown schemas, and invalid field shapes produce protocol errors rather than
-language results.
+language results. Checked-in request and response examples are available in
+the Tests/golden directory.
 
 ## Use as a Lean library
 

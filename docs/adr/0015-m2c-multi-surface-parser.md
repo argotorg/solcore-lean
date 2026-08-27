@@ -6,51 +6,23 @@
 
 ## Reader summary / Current implementation
 
-- **Decision:** Define the closed, source-preserving
-  `solcore-multi-surface/m2c-v1` language, its independent lexer/parser
-  judgments and executors, structural acceptance, diagnostics, and the
-  `CertifiedParsedModule` boundary. This is an internal specification, not a
-  published Oracle feature.
-- **Current implementation:** Source, token, syntax, diagnostics, measures,
-  grammar tables, `ParserCore`, the lexical judgment and lexer, the parser
-  judgment, the finite contextual chart, parser-totality certificates, a total
-  file-only lexer/parser frontend, and their current soundness proofs are
-  present. The structural judgment and validator are also present, with
-  two-way diagnostic correspondence, sufficient traversal fuel, canonical
-  reports, and executable acceptance equivalence. Strict UTF-8 and
-  canonical-byte facts are present. Parser-wide source-location validity and
-  nesting are proved by `Parses.everyLocationValid`. `CertifiedParsedModule`,
-  its phase-composition core, executable resource-bound functions, and the
-  concrete AST-carrier cardinality theorem are also present. Exact-token
-  correspondence is closed for all 75 grammar rules by
-  `rootActionTokenPlanSound`, and the proof-argument-free
-  `Solcore.Surface.Multi.parseModule` returns phase diagnostics or a module
-  carrying all five frontend judgments. Four executable fixtures cover lexical,
-  parse, structural, and successful outcomes.
-  All six structural unit families now have executable traces and exact
-  projections, and a public ledger exposes their combined total. The two
-  canonical-list passes also have insertion-square comparison bounds, and the
-  complete ledger satisfies the ADR-fixed quadratic structural bound.
-  The quadratic fast-parser schedule is exposed as exact finite typed fixed,
-  boundary-slot, and memo-slot address spaces whose cardinality total is
-  exactly `parseBound`. Its duplicate-rejecting trace has component
-  `FitsWithin`, fresh-charge increment, and total-bound theorems.
-- **Not yet implemented:** The separate fast `Parser`, transitions that charge
-  the typed schedule addresses, their trace and operational correspondence,
-  and exact result equality with `Chart.G`,
-  the six complete canonical-standard parse certificates, and the public
-  `Solcore.Surface.Multi` umbrella are absent.
-  Consequently ADR-0015 is Accepted as a decision but is not yet a completed
-  implementation or publication boundary.
+- **Decision:** Define a closed, source-preserving internal frontend with
+  independent lexer/parser rules, deterministic executors, structural
+  validation, diagnostics, and proof-carrying successful results.
+- **Current implementation:** One file can be lexed, parsed, structurally
+  checked, and certified for the grammar fixed by this ADR. Successful results
+  carry source-location and retained-token guarantees. Structural checking has
+  a proved executable bound. A terminal-only fast-parser base charges its typed
+  schedule addresses with an exact ledger.
+- **Not yet implemented:** The complete fast parser, nonterminal prediction and
+  completion, contextual guards, root selection, exact equality with the chart
+  reference, canonical six-file certificates, and publication are absent.
 - **Development status:** ADR-0018 freezes this grammar as an internal
   reference and pauses the remaining fast parser, canonical-file gate,
   identity, and resolver work while Semantic Core vNext is developed.
-- **Suggested reading:** Read “Acceptance scope and frozen published
-  boundaries”, “Closed source-preserving AST”, and “Complete syntactic grammar”
-  for the language; then “Independent judgments and pure executors”,
-  “Termination and resource bounds”, and “Module boundaries and implementation
-  order” for the proof and delivery plan. Use the compatibility ledger as a
-  decision index rather than reading every grammar table first.
+- **Reader guidance:** Use the frontend freeze plan for current status. The
+  remainder of this ADR is the detailed technical reference for the frozen
+  grammar and proof boundary.
 
 ## Context
 

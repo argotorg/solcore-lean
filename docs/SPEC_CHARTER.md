@@ -1,6 +1,6 @@
 # Solcore Lean specification charter
 
-- Status: Draft
+- Status: Active
 - Adopted: 2026-07-23
 - Development policy amended: 2026-08-27
 

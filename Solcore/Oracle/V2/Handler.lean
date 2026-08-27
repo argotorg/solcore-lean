@@ -25,6 +25,10 @@ private def responseFor
 }
 
 private def checkPathStepName : Core.CheckPathStep → String
+  | .pairLeft => "pairLeft"
+  | .pairRight => "pairRight"
+  | .firstOperand => "firstOperand"
+  | .secondOperand => "secondOperand"
   | .unaryOperand => "unaryOperand"
   | .binaryLeft => "binaryLeft"
   | .binaryRight => "binaryRight"
@@ -44,6 +48,9 @@ private def checkErrorArguments : Core.CheckErrorData → Option Lean.Json
         ("contextSize", Lean.toJson contextSize)
       ])
   | .expectedBool actual => do
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [("actual", actual)])
+  | .expectedProduct actual => do
       let actual ← encodeCoreType? actual
       pure (.mkObj [("actual", actual)])
   | .primitiveOperandTypeMismatch expected actual => do

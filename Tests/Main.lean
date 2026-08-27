@@ -9,6 +9,7 @@ import Solcore.Standard.CanonicalData
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
+import Solcore.Test.CoreProducts
 import Solcore.Test.SurfaceMultiCertifiedFrontend
 import Solcore.Test.SurfaceMultiExactToken
 import Solcore.Test.SurfaceMultiFastParser
@@ -4781,6 +4782,7 @@ def run : IO Unit := do
   testSemanticCore
   testPrimitiveAlgebra
   testM1cKernel
+  testCoreProducts
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile

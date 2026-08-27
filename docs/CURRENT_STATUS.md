@@ -27,6 +27,7 @@ adapter.
 | Versioning, profiles, verdicts | Complete | Applicable invariants checked | Oracle v1 and later |
 | Small Semantic Core machine | Complete | Complete for the closed fragment | Oracle v2 and v3 |
 | Semantic Core primitive subset | Complete | Complete | Oracle v3 / Core v2 |
+| Internal Core binary products | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -62,7 +63,7 @@ unreachability for well-typed closed programs.
 The public Core fragment is complete, but it is not the complete Solcore
 language. The following remain:
 
-- product and sum values;
+- sum values;
 - functions, application, return, closures, recursion, and divergence;
 - mutable locals and assignment;
 - user-defined algebraic data and direct pattern matching;
@@ -89,13 +90,9 @@ following is paused:
 - source checking and Surface-to-Core elaboration; and
 - publication of the Multi frontend.
 
-The working tree also contains an uncommitted separator-scan experiment made
-after commit 0209a37. It is deliberately not part of the stable baseline and
-must be preserved or discarded separately from Semantic Core changes.
+## First Core vNext result
 
-## Active work
-
-The first Core vNext vertical slice is product values:
+The first Core vNext vertical slice is implemented:
 
 - a binary product type;
 - pair construction;
@@ -103,13 +100,18 @@ The first Core vNext vertical slice is product values:
 - left-to-right pair evaluation;
 - executable inference and detailed checking;
 - CEK execution and big-step semantics; and
-- the usual soundness, completeness, correspondence, and safety results.
+- soundness, completeness, correspondence, and safety results; and
+- regression tests for nesting, exact fuel, evaluation order, invalid
+  projection, and old-wire rejection.
 
 This internal extension will not reinterpret Semantic Core v1 or v2. Frozen
-wire projections must reject expressions and values outside their version.
+wire projections reject product types, values, expressions, and programs.
 
 See the [Semantic Core roadmap](M1_PLAN.md) and
 [ADR-0019](adr/0019-core-vnext-products.md).
+
+The next active step is to fix the function, application, closure, return, and
+divergence boundary before extending the Core again.
 
 ## Meaning of completion
 
