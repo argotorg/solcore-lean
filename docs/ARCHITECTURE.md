@@ -132,12 +132,16 @@ store-threaded evaluation, and weakening results are complete. Value, boundary,
 type, fault-order, two-operand effect, exact-fuel, boolean-preservation, and
 exact wire regressions pass with the repository audits.
 
-The active renaming-simulation slice adds proof infrastructure for general
-de Bruijn renaming and typed runtime environment insertion. Static typing is
-preserved under context-respecting renaming; dynamic results use a binary value
-relation because renamed closures are behaviorally related but not raw-equal.
-The word-result insertion corollary preserves the exact word and store. This
-changes no Core execution or wire behavior.
+The completed renaming foundation provides binder-aware `Expr.rename`,
+context-respecting preservation of expression and branch typing, structural
+relations for values, environments, and stores, and `Evaluates.rename` for all
+evaluation forms. Renamed closures retain related bodies and captured
+environments rather than requiring false raw equality. `CellPayload` exactness
+recovers equal ground values and typed stores, and the word head-insertion
+corollary preserves the exact word and final store. Static and dynamic tests
+cover binders, closures, application, cells, named data, and effects. This
+changes no Core execution or wire behavior. The next work completes the
+arbitrary-expression proof interfaces for existing `wordLt` and `wordGe`.
 
 ### Contract runtime
 

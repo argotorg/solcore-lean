@@ -49,11 +49,14 @@ adds no tag or source, standard-library, ABI, opcode, or gas commitment.
 Its named expansions, typing, inference, store-threaded cases, weakening,
 effects and fault order, exact fuel, boolean preservation, and exact v1/v2
 boundaries are proved and tested; the audits pass. Core vNext remains active.
-The active eleventh slice, [ADR-0029](adr/0029-core-vnext-renaming-simulation.md),
-builds binder-aware renaming and typed environment-insertion simulation as
-proof infrastructure. It changes no execution, source, or wire meaning and
-leaves later comparison-interface completion separate. Additional primitives
-remain planned.
+The completed eleventh slice,
+[ADR-0029](adr/0029-core-vnext-renaming-simulation.md), provides binder-aware
+syntax renaming, typing preservation, structural value/environment/store
+relations, simulation for every evaluation form, ground-value and typed-store
+exactness, and an exact word-result head-insertion theorem. Static and dynamic
+tests cover the foundation. It changes no execution, source, or wire meaning.
+The next work completes arbitrary-expression proof interfaces for the existing
+`wordLt` and `wordGe` builders. Additional primitives remain planned.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the

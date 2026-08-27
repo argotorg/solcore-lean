@@ -243,14 +243,16 @@ boundaries, types, raw fault order, two allocating/writing operands and final
 store, exact 7/8 and 31/32 fuel, boolean comparison preservation, and exact
 v1/v2 projections. Audits pass. Additional primitives remain planned.
 
-## Active Core vNext slice: renaming and environment insertion
+## Completed Core vNext slice: renaming and environment insertion
 
 [ADR-0029](adr/0029-core-vnext-renaming-simulation.md) establishes general
 de Bruijn renaming and lift, preservation of expression and branch typing, and
-a typed binary runtime simulation. Base results and stores remain equal while
-closures use a relation over renamed bodies and captured environments. Its exit
-theorem preserves the identical word and final store after head insertion,
-enabling later `wordLt` and `wordGe` proofs without changing their semantics.
+structural relations for values, environments, and stores. `Evaluates.rename`
+covers every evaluation form. `CellPayload` exactness and
+`Evaluates.weakenAt_zero_word` preserve the identical ground result and final
+store after head insertion. Static and dynamic tests cover the full foundation.
+The next work completes arbitrary-expression proof interfaces for the existing
+`wordLt` and `wordGe` builders without changing their semantics.
 
 ## State and contracts
 

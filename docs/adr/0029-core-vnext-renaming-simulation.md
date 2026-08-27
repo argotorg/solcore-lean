@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: eleventh internal Semantic Core vNext vertical slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -19,7 +19,7 @@ fault, fuel, source, profile, schema, wire, Oracle, or observation semantics.
 
 ## Decision
 
-The Core proof library will define:
+The Core proof library defines:
 
 - a general de Bruijn `Renaming`, its binder-aware lift, and `Expr.rename`;
 - insertion renaming and a theorem identifying existing `Expr.weakenAt` with
@@ -43,7 +43,8 @@ environments, with application preserving the relation; they are not required
 to be equal Lean values.
 
 The paired evaluation theorem relates an expression and its renaming under
-related typed environments. For environment insertion, both executions start
+related environments. Typed exactness is applied afterward. For environment
+insertion, both executions start
 with the same store and finish with the same store. This literal store equality
 is justified by the existing `CellPayload` boundary: stored payload types
 exclude closures and other values that would require syntax renaming, including
@@ -65,7 +66,7 @@ closure equality.
 
 The implementation must yield this usable insertion corollary: if a word-typed
 expression evaluates under a typed environment, weakening it at zero and
-inserting a typed runtime value at the environment head evaluates to the
+inserting any runtime value at the environment head evaluates to the
 identical word and identical final store from the same initial store.
 
 That corollary enables later arbitrary-expression typing, evaluation, and
@@ -73,18 +74,24 @@ weakening proofs for the existing `wordLt` and `wordGe` expansions. Completing
 those comparison interfaces is a separate slice; this ADR does not change their
 definitions or exact fuel.
 
-## Required proof and tests
+## Implemented proof and tests
 
-- prove renaming lift, lookup, insertion, identity, and composition laws;
-- prove `Expr.rename` binder behavior and its equivalence with `weakenAt`;
-- prove mutual `HasType` and `BranchesHaveType` renaming preservation;
-- define typed value and environment simulation for every current type/value;
-- prove evaluation simulation for every current expression form;
-- prove same-store insertion and base-type equality corollaries;
-- prove the word-typed head-insertion exit theorem;
-- test nested binders, free-variable insertion, closures, application, cells,
-  named data, store effects, and the `wordLt`/`wordGe` prerequisite shape; and
-- run warning, trust, axiom, full-test, and whitespace audits.
+- `Renaming`, lift, insertion, identity, composition, and lookup laws cover all
+  current binders and branch lists;
+- `Expr.rename` is defined for every expression and agrees with `weakenAt` for
+  insertion renamings;
+- `HasType` and `BranchesHaveType` are preserved by context-respecting
+  renamings;
+- `ValuesRelated`, `EnvironmentsRelated`, and `StoresRelated` describe renamed
+  closures, captured environments, and elementwise stores;
+- `Evaluates.rename` simulates every current evaluation rule;
+- `CellPayload` exactness recovers equal ground results and equal typed stores;
+- `Evaluates.weakenAt_zero_word` gives the same word and final store after head
+  insertion, and accepts any inserted runtime value because shifted variables
+  cannot observe it;
+- static and dynamic tests cover nested binders, closures, application, cells,
+  named data, store effects, and the comparison-helper prerequisite shape; and
+- warning, trust, full-test, and whitespace audits pass.
 
 ## Boundaries
 
@@ -96,3 +103,5 @@ ABI rule, opcode mapping, gas rule, or new comparison operation.
 
 Future binder-introducing derived expressions can reuse one sound static and
 dynamic renaming foundation instead of adding ad hoc weakening assumptions.
+The next implementation work completes the arbitrary-expression proof
+interfaces for the existing `wordLt` and `wordGe` builders.

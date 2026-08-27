@@ -28,8 +28,9 @@ and `boolOr` slice accepted by ADR-0026 is complete. The derived word-valued
 nonzero predicate accepted by ADR-0027 is also complete. Core vNext as a whole
 remains active. The word-valued equality and unsigned greater-than flags from
 ADR-0028 are complete, with additional conversions and primitives planned.
-ADR-0029 makes the renaming and environment-insertion proof foundation the
-active eleventh slice. Core vNext remains active.
+ADR-0029 completes the renaming and environment-insertion proof foundation.
+The next work completes the arbitrary-expression proof interfaces for the
+existing `wordLt` and `wordGe` builders. Core vNext remains active.
 
 ## Implementation status
 
@@ -48,7 +49,7 @@ active eleventh slice. Core vNext remains active.
 | Internal short-circuit boolean operators | Complete | Complete | Not published |
 | Internal word nonzero test | Complete | Complete | Not published |
 | Internal word comparison flags | Complete | Complete | Not published |
-| Internal renaming and environment simulation | In progress | In progress | Not published |
+| Internal renaming and environment simulation | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -293,15 +294,18 @@ and weakening are proved. Tests cover values, boundaries, types, raw fault
 order, two allocating/writing operands and final store, exact 7/8 and 31/32
 fuel, existing boolean comparisons, and exact v1/v2 boundaries. Audits pass.
 
-## Active Core vNext renaming foundation
+## Completed Core vNext renaming foundation
 
-[ADR-0029](adr/0029-core-vnext-renaming-simulation.md) fixes binder-aware
-renaming, static typing preservation, and typed binary simulation for runtime
-environment insertion. Closures are related through renamed bodies and
-captured environments rather than false raw equality. The exit condition gives
-an identical word and final store for a weakened word expression under head
-insertion. It changes no observable semantics or wire behavior; completing the
-existing `wordLt` and `wordGe` proof interfaces remains a later slice.
+[ADR-0029](adr/0029-core-vnext-renaming-simulation.md) implements binder-aware
+syntax renaming, context-respecting typing preservation, structural
+`ValuesRelated`, `EnvironmentsRelated`, and `StoresRelated` relations, and
+`Evaluates.rename` for every evaluation rule. `CellPayload` exactness recovers
+equal ground values and typed stores, while `Evaluates.weakenAt_zero_word`
+returns the same word and final store after arbitrary environment-head
+insertion. Static and dynamic tests cover binders, closures, application,
+cells, named data, and store effects. This proof infrastructure changes no
+observable semantics or wire behavior. The next work completes the
+arbitrary-expression proof interfaces for the existing `wordLt` and `wordGe`.
 
 ## Meaning of completion
 
