@@ -137,6 +137,7 @@ inductive BinaryOp where
   | wordMod
   | wordEq
   | wordGt
+  | wordSgt
   | wordAnd
   | wordOr
   | wordXor
@@ -155,7 +156,8 @@ def rightType (_ : BinaryOp) : Ty := .word
 
 def resultType : BinaryOp → Ty
   | .wordEq
-  | .wordGt => .bool
+  | .wordGt
+  | .wordSgt => .bool
   | .wordAdd
   | .wordSub
   | .wordMul

@@ -47,6 +47,14 @@ def udiv (left right : Word) : Word :=
 def umod (left right : Word) : Word :=
   if right.val = 0 then zero else left % right
 
+def signedGt (left right : Word) : Bool :=
+  if left.val < 2 ^ 255 then
+    if right.val < 2 ^ 255 then decide (left > right)
+    else true
+  else
+    if right.val < 2 ^ 255 then false
+    else decide (left > right)
+
 def bitAnd (left right : Word) : Word :=
   left &&& right
 
@@ -129,6 +137,7 @@ def apply : BinaryOp → Value → Value → Option Value
   | .wordMod, .word left, .word right => some (.word (left.umod right))
   | .wordEq, .word left, .word right => some (.bool (left == right))
   | .wordGt, .word left, .word right => some (.bool (decide (left > right)))
+  | .wordSgt, .word left, .word right => some (.bool (left.signedGt right))
   | .wordAnd, .word left, .word right => some (.word (left.bitAnd right))
   | .wordOr, .word left, .word right => some (.word (left.bitOr right))
   | .wordXor, .word left, .word right => some (.word (left.bitXor right))
