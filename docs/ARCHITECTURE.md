@@ -300,6 +300,12 @@ Value/type, both-side invalid payload, ordered-fault, effect/store, exact
 complete. Public behavior is unchanged; the independent audit found no P0-P3
 issue.
 
+The active ADR-0046 slice derives boolean signed non-strict comparisons.
+`wordSle` negates raw `wordSgt`; `wordSge` negates the nested, effect-safe
+`wordSlt`. Both retain source left-to-right evaluation and the final store,
+including equality as true. Only `wordSge` reverses already computed bound
+values. No Word operation, Core tag, generic rule, or public Wire form is added.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

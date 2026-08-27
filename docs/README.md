@@ -128,6 +128,12 @@ ten static and ten evaluation theorems cover canonical word-one/word-zero
 results, values/types, ordered faults, effects/store, exact fuel, and frozen
 Wire rejection. It adds no operation tag or public behavior; the independent
 audit found no P0-P3 issue.
+The active twenty-eighth slice,
+[ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md), derives
+boolean signed ≤ and ≥ by negating the existing strict comparisons. Both keep
+source left-to-right evaluation and equality returns true. The exact
+twenty-theorem and focused regression scope adds no operation tag or public
+Wire behavior.
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -248,6 +254,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0043 completes internal boolean signed word greater-than.
 - ADR-0044 completes effect-safe derived signed word less-than.
 - ADR-0045 completes canonical word-valued signed strict comparison flags.
+- ADR-0046 accepts effect-safe boolean signed non-strict comparisons.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

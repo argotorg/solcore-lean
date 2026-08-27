@@ -51,11 +51,12 @@ These results remain regression obligations for every extension.
 | 25 | Signed word greater-than | Complete | Adds an internal boolean two's-complement comparison basis |
 | 26 | Derived signed word less-than | Complete | Preserves source order while reusing signed greater-than |
 | 27 | Signed word comparison flags | Complete | Derives canonical word results from signed boolean comparisons |
-| 28 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
-| 29 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 30 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 31 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 32 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 28 | Signed non-strict word comparisons | Active | Derives boolean ≤ and ≥ while preserving source order |
+| 29 | Additional conversions and primitives | Planned | Adds one closed, typed family at a time |
+| 30 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 31 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 32 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 33 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -456,6 +457,15 @@ cross-sign results. Values/types, both-side invalid and ordered faults,
 effects/final store, exact 7/8, 31/32, 13/14, and 37/38 fuel, and frozen v1/v2
 builder, handwritten, and `wordSgt` rejection are complete. It adds no operation
 tag or public behavior; the independent audit found no P0-P3 issue.
+
+## Active Core vNext slice: signed non-strict word comparisons
+
+[ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md) derives
+boolean signed ≤ and ≥ by negating the existing strict comparisons. Source
+left-to-right evaluation and the final store remain intact; only `wordSge`'s
+computed bound values are reversed. The exact twenty-theorem and focused
+value/type/fault/effect/store/fuel/Wire scope is active, with no new operation
+tag or public behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

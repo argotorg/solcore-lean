@@ -61,7 +61,8 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Signed word greater-than | ADR-0043 Accepted | Complete | exact eleven-theorem boolean wordSgt basis; sign boundaries, types, ordered faults/effects, exact fuel, and frozen v1/v2 plus v2-op rejection complete; audit clean | None |
 | Derived signed word less-than | ADR-0044 Accepted | Complete | effect-safe nested-let wordSlt; five static and five evaluation theorems; values/types/fault order/effects/store/fuel and frozen v1/v2 rejection complete; audit clean | None |
 | Signed word comparison flags | ADR-0045 Accepted | Complete | two exact builders; ten static and ten evaluation laws; sign/value/type/fault/effect/store/fuel and frozen v1/v2 rejection complete; audit clean | None |
-| Additional conversions and primitives | Per-feature decisions needed | Planned | slice 28 onward; separate closed decisions, total application, and typed results | None |
+| Signed non-strict word comparisons | ADR-0046 Accepted | Active | derived boolean wordSle and wordSge; exact twenty-theorem static/evaluation scope | None |
+| Additional conversions and primitives | Per-feature decisions needed | Planned | slice 29 onward; separate closed decisions, total application, and typed results | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
 
 ## Static semantics after Core
