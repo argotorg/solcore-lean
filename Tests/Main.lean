@@ -10,6 +10,7 @@ import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
 import Solcore.Test.CoreBooleanConnectives
+import Solcore.Test.CoreBitwiseLogicWire
 import Solcore.Test.CoreCells
 import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
@@ -4809,6 +4810,7 @@ def run : IO Unit := do
   testCoreSums
   testCoreCells
   testCoreBooleanConnectives
+  testCoreBitwiseLogicWire
   testCoreComparisonFlags
   testCoreConversions
   testCoreDerivedComparisonFlags
