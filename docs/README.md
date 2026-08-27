@@ -28,9 +28,12 @@ complete internal slices. The derived boolean and word conversions from
 [ADR-0024](adr/0024-core-vnext-bool-word-conversions.md) are complete as ordinary
 existing Core expressions. The derived word-valued zero test from
 [ADR-0025](adr/0025-core-vnext-word-is-zero.md) is also complete.
-The active [ADR-0026](adr/0026-core-vnext-short-circuit-booleans.md) slice
-derives selected-branch-only boolean conjunction and disjunction from existing
-conditionals without adding a Core tag.
+The [ADR-0026](adr/0026-core-vnext-short-circuit-booleans.md) slice completes
+selected-branch-only boolean conjunction and disjunction using existing
+conditionals without adding a Core tag. Its expansion, typing, inference, four
+store-threaded branches, effects, faults, exact fuel, weakening, and exact wire
+v1/v2 projection are proved and tested. Core vNext remains active, with
+additional conversions and primitives planned.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the

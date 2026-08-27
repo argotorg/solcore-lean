@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: eighth internal Semantic Core vNext vertical slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context and authority
 
@@ -108,3 +108,9 @@ replacement, ABI decoding, or a new public Core or Oracle version.
 Short-circuit boolean behavior becomes an explicit reusable Core target while
 remaining ordinary conditional semantics. Future elaborators must select these
 builders, not eager ordinary calls, when implementing boolean operators.
+
+The implementation provides the named expansions, typing and inference
+theorems, and all four store-threaded branch evaluations. Tests cover truth
+tables, operand types, skipped and selected faults, allocation and writes,
+left-to-right store threading into the selected right operand, exact fuel,
+weakening, and exact wire v1 and v2 projection of the handwritten expansions.

@@ -31,7 +31,7 @@ These results remain regression obligations for every extension.
 | 5 | Named algebraic data and direct matching | Complete | Adds program-local constructor identity without source pattern syntax |
 | 6 | Boolean and word conversions | Complete | Derives total conversions without a new Core tag |
 | 7 | Word zero test | Complete | Derives a canonical word result from existing expressions |
-| 8 | Short-circuit boolean operators | Active | Fixes selected-branch-only effects without a new Core tag |
+| 8 | Short-circuit boolean operators | Complete | Fixes selected-branch-only effects without a new Core tag |
 | 9 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
 | 10 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 11 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
@@ -201,7 +201,7 @@ The implementation includes named expansion, typing, inference, general and
 zero/nonzero evaluation, store-threading, and weakening theorems. Boundary,
 type-error, effectful exactly-once, exact-fuel, and frozen-wire tests pass.
 
-## Active Core vNext slice: short-circuit booleans
+## Completed Core vNext slice: short-circuit booleans
 
 [ADR-0026](adr/0026-core-vnext-short-circuit-booleans.md) fixes boolean
 conjunction and disjunction as conditional expansions. Each left operand runs
@@ -209,6 +209,11 @@ once and first. The right operand runs only when selected, so its effects,
 faults, store changes, and fuel cost are skipped with the branch. No new Core,
 CEK, wire, or Oracle tag is introduced, and both frozen wires project the exact
 ordinary conditional expansion.
+
+Named expansion, typing, inference, and all four store-threaded branch theorems
+are complete. Tests cover truth, left and right operand types, skipped and
+selected faults, allocation and writes, left-to-right store threading into the
+right operand, exact fuel, weakening, and exact v1/v2 wire projection.
 
 ## State and contracts
 
