@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-27
 - Scope: sixth internal Semantic Core vNext vertical slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -121,6 +121,11 @@ closed schema.
 - test frozen-wire and Oracle boundaries, including that no new tag or
   capability appears and that projections behave exactly like the handwritten
   expansions.
+
+The completed implementation provides dedicated typing, inference, evaluation,
+zero/nonzero, store-threading, and weakening theorems. Focused tests cover
+effects, exact fuel, type errors, word boundaries, and unchanged wire behavior;
+the full test, warning, kernel-trust, axiom, and whitespace audits pass.
 
 ## Deferred
 

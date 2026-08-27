@@ -24,12 +24,12 @@ proof work is paused. Active work is directed toward a syntax-independent
 Semantic Core and explicit runtime semantics. First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
-complete internal slices. They deliberately do not choose source spellings for
-mutable declarations, assignment, data declarations, or patterns. The active
-slice, [ADR-0024](adr/0024-core-vnext-bool-word-conversions.md), defines boolean
-and word conversions as ordinary existing Core expressions. It adds no syntax
-tag and remains separate from future ABI decoding. Further Core work follows
-the roadmap through separate semantic decisions.
+complete internal slices. The derived boolean and word conversions from
+[ADR-0024](adr/0024-core-vnext-bool-word-conversions.md) are complete as ordinary
+existing Core expressions. These slices add no source spelling for mutable
+declarations, assignment, data declarations, patterns, or casts; the conversions
+also remain separate from future ABI decoding. Further Core work follows the
+roadmap through separate semantic decisions.
 
 This policy is recorded by
 [ADR-0018](adr/0018-semantics-first-development-order.md). It changes

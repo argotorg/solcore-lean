@@ -21,9 +21,9 @@ spelling, then connect a stabilized future Surface language through a separate
 adapter. The explicit local-cell store accepted by ADR-0022 and the
 program-local named algebraic data and normalized constructor matching accepted
 by ADR-0023 are complete internal slices. Core vNext as a whole remains the
-active development program. Its current slice is implementing the derived
-`boolToWord` and `wordToBool` conversions accepted by ADR-0024 without adding a
-new Core expression form.
+active development program. The derived `boolToWord` and `wordToBool`
+conversions accepted by ADR-0024 are also complete without adding a new Core
+expression form.
 
 ## Implementation status
 
@@ -37,7 +37,7 @@ new Core expression form.
 | Internal binary sums | Complete | Complete, including totality | Not published |
 | Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
-| Internal boolean/word conversions | In progress | In progress | Not published |
+| Internal boolean/word conversions | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -77,7 +77,7 @@ language. The following remain:
 - source-level mutable declarations, assignment syntax, and their elaboration;
 - source-level data declarations, pattern syntax, and elaboration into the
   completed internal named-data Core;
-- additional conversions and primitives beyond the active boolean/word pair;
+- additional conversions and primitives beyond the completed boolean/word pair;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
 - contract entry and call semantics;
@@ -204,10 +204,10 @@ diagnostic, raw-fault, and version-boundary cases are covered.
 Semantic Core v1 and v2 reject every named form and every nonempty definition
 table, so no published Oracle behavior changes.
 
-## Active Core vNext boolean/word conversion slice
+## Completed Core vNext boolean/word conversion slice
 
 [ADR-0024](adr/0024-core-vnext-bool-word-conversions.md) is Accepted and its
-implementation is in progress. It fixes two total conversions:
+implementation and proof boundary are complete. It fixes two total conversions:
 
 - `boolToWord` maps `false` to word zero and `true` to word one;
 - `wordToBool` maps word zero to `false` and every nonzero word to `true`.
@@ -222,10 +222,11 @@ must separately decide and enforce strict zero-or-one admissibility; in
 particular, it may reject word two even though `wordToBool` returns `true` for
 that value.
 
-The remaining work is the focused typing and evaluation theorem surface plus
-positive, negative, effect-order, word-boundary, and version-boundary tests.
-Because the builders expand to existing expressions, neither frozen wire schema
-nor any Oracle profile or capability changes.
+Dedicated theorems cover typing, inference, exact evaluation, zero/nonzero
+behavior, store threading, and weakening through the expansions. Focused tests
+cover effects, exact fuel, type errors, word boundaries, and unchanged wire
+projection. The full test, warning, kernel-trust, axiom, and whitespace audits
+pass. Neither frozen wire schema nor any Oracle profile or capability changes.
 
 ## Meaning of completion
 

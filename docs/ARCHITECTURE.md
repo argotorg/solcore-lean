@@ -76,13 +76,15 @@ supports elimination of an empty data type. Source wildcards, nested patterns,
 guards, arm ordering, names, and field shapes belong to a later resolved
 adapter, not this execution layer.
 
-The active boolean/word conversion slice is deliberately smaller than an
+The completed boolean/word conversion slice is deliberately smaller than an
 algebra extension. `boolToWord` expands to a conditional selecting word zero or
 one, and `wordToBool` expands to a nonzero test built from existing primitives.
 The operand occurs once in either expansion. Because there is no new expression
 tag, the existing evaluator, CEK machine, safety results, and wire projections
 remain the architectural boundary; the slice adds named builders, focused
-theorems, and tests rather than parallel semantics.
+theorems, and tests rather than parallel semantics. Dedicated typing, inference,
+evaluation, store-threading, and weakening results, plus effect, exact-fuel, and
+wire regressions, are complete.
 
 This conversion layer is not an ABI layer. Total nonzero truthiness and strict
 ABI zero-or-one admissibility are separate rules. ABI byte layout, validation,
