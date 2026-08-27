@@ -107,6 +107,28 @@ private def testValuesTypesAndFuel : IO Unit := do
 private def testLeftFirstFaults : IO Unit := do
   let one := Word.ofNatModulo 1
   let rightWithEffect := allocatingWritingWord Word.zero one Word.zero
+  let neFault : Program := {
+    resultType := .bool
+    body := Expr.wordNe (.var 99) rightWithEffect
+  }
+  match neFault.runStateful 2 with
+  | .fault (.unboundVariable 99) state =>
+      assertTrue state.store.isEmpty
+        "wordNe evaluated its right operand after a left fault"
+  | result =>
+      throw (IO.userError s!"wordNe exposed the wrong fault: {reprStr result}")
+
+  let leFault : Program := {
+    resultType := .bool
+    body := Expr.wordLe (.var 99) rightWithEffect
+  }
+  match leFault.runStateful 2 with
+  | .fault (.unboundVariable 99) state =>
+      assertTrue state.store.isEmpty
+        "wordLe evaluated its right operand after a left fault"
+  | result =>
+      throw (IO.userError s!"wordLe exposed the wrong fault: {reprStr result}")
+
   let ltFault : Program := {
     resultType := .bool
     body := Expr.wordLt (.var 99) rightWithEffect
@@ -134,6 +156,14 @@ private def testEffectOrder : IO Unit := do
   let two := Word.ofNatModulo 2
   let left := allocatingWritingWord Word.zero one Word.maximum
   let right := allocatingWritingWord Word.zero two Word.zero
+  let ne : Program := {
+    resultType := .bool
+    body := Expr.wordNe left right
+  }
+  let le : Program := {
+    resultType := .bool
+    body := Expr.wordLe left right
+  }
   let lt : Program := {
     resultType := .bool
     body := Expr.wordLt left right
@@ -142,8 +172,17 @@ private def testEffectOrder : IO Unit := do
     resultType := .bool
     body := Expr.wordGe left right
   }
-  assertTrue lt.check "effectful wordLt failed to type-check"
-  assertTrue ge.check "effectful wordGe failed to type-check"
+  for (name, program) in [("wordNe", ne), ("wordLe", le),
+      ("wordLt", lt), ("wordGe", ge)] do
+    assertTrue program.check s!"effectful {name} failed to type-check"
+  assertTrue
+    (ne.runStateful 31 ==
+      .done (.bool true) [.word one, .word two])
+    "wordNe must evaluate and write left then right exactly once"
+  assertTrue
+    (le.runStateful 31 ==
+      .done (.bool false) [.word one, .word two])
+    "wordLe must evaluate and write left then right exactly once"
   assertTrue
     (lt.runStateful 35 ==
       .done (.bool false) [.word one, .word two])
