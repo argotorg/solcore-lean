@@ -16,6 +16,7 @@ import Solcore.Core.DerivedComparisonFlags
 import Solcore.Core.DerivedComparisonFlagEval
 import Solcore.Core.Conversions
 import Solcore.Core.ComparisonFlags
+import Solcore.Core.SignedComparisonFlags
 import Solcore.Core.UnaryPrimitives
 import Solcore.Core.CountLeadingZeros
 import Solcore.Core.ByteSelection

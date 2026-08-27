@@ -258,6 +258,9 @@ def wordEqFlag (left right : Expr) : Expr :=
 def wordGtFlag (left right : Expr) : Expr :=
   boolToWord (.binary .wordGt left right)
 
+def wordSgtFlag (left right : Expr) : Expr :=
+  boolToWord (.binary .wordSgt left right)
+
 def wordLt (left right : Expr) : Expr :=
   wordGtWithSwappedValues left right
 
@@ -275,6 +278,9 @@ def wordNeFlag (left right : Expr) : Expr :=
 
 def wordLtFlag (left right : Expr) : Expr :=
   boolToWord (wordLt left right)
+
+def wordSltFlag (left right : Expr) : Expr :=
+  boolToWord (wordSlt left right)
 
 def wordLeFlag (left right : Expr) : Expr :=
   boolToWord (wordLe left right)
