@@ -96,6 +96,18 @@ def byteAt (index value : Word) : Word :=
   else
     zero
 
+def signExtend (index value : Word) : Word :=
+  if index.val < 32 then
+    let width := 8 * (index.val + 1)
+    let low := value.val % 2 ^ width
+    let sign := 2 ^ (width - 1)
+    if low < sign then
+      ofNatModulo low
+    else
+      ofNatModulo (wordModulus - 2 ^ width + low)
+  else
+    value
+
 end Word
 
 namespace UnaryOp
@@ -147,6 +159,8 @@ def apply : BinaryOp → Value → Value → Option Value
   | .wordSar, .word value, .word shift =>
       some (.word (value.shiftArithmeticRight shift))
   | .wordPow, .word base, .word exponent => some (.word (base.pow exponent))
+  | .wordSignExtend, .word index, .word value =>
+      some (.word (index.signExtend value))
   | _, _, _ => none
 
 theorem apply_total_of_types
