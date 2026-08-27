@@ -75,6 +75,9 @@ representation. Its independent audit found no P0-P3 issue.
 [ADR-0046](adr/0046-core-vnext-signed-word-nonstrict-comparisons.md) completes
 effect-safe boolean signed ≤ and ≥ builders with no new tag or public
 representation. Its independent audit found no P0-P3 issue.
+[ADR-0047](adr/0047-core-vnext-word-sign-extension.md) accepts the active
+internal word sign-extension slice with index-left/value-right evaluation and
+no public Wire representation.
 
 ## Implementation status
 
@@ -577,6 +580,15 @@ sign/equality, type, underlying invalid and ordered-fault, effect/store, exact
 Focused and full builds, the full test runner, kernel policy, and metadata
 verification pass. Public behavior remains unchanged; the independent audit
 found no P0-P3 issue.
+
+## Active Core vNext word sign-extension slice
+
+[ADR-0047](adr/0047-core-vnext-word-sign-extension.md) adds internal
+`BinaryOp.wordSignExtend`. The left word selects a byte width and the right word
+is the value. Indices below 32 extend the selected sign bit through the upper
+word; indices at least 32 return the value unchanged. The planned exact ten
+theorems and focused value/type/fault/effect/store/fuel/Wire regressions add no
+public format or source commitment.
 
 ## Meaning of completion
 
