@@ -61,10 +61,11 @@ These results remain regression obligations for every extension.
 | 35 | Strict Address↔Word bridge | Complete | Adds lossless widening and a strict partial inverse before contract state |
 | 36 | Strict 20-byte Address representation | Complete | Fixes exact big-endian bytes and strict width before contract state |
 | 37 | Address text and byte coherence | Complete | Proves the completed strict representations agree without a new API |
-| 38 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 39 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 40 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 41 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 38 | Minimal Account and WorldState carrier | Active | Fixes explicit absence and canonical storage values before transitions |
+| 39 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 40 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 41 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 42 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -619,6 +620,19 @@ or public format. All four public laws report `propext`, `Classical.choice`, and
 `Quot.sound`; no custom axiom or unchecked declaration is present. Trust-zero,
 focused and full builds and tests, semantic-kernel, and metadata checks pass.
 The independent audit found no P0-P3 issue.
+
+## Active minimal WorldState slice
+
+[ADR-0056](adr/0056-minimal-world-state.md) introduces exactly two public
+carriers backed by private finite extensional maps and eight public operations.
+WorldState preserves Account absence. Account storage contains no zero entries:
+missing keys read as zero, zero writes erase, and nonzero writes insert. A
+storage write to an absent Account fails instead of creating it.
+
+The planned exact twelve laws and twelve runtime assertions cover all same-key,
+different-key, same-address, different-address, and absent-Account boundaries.
+Rollback, transactions, ABI, balances, nonce, code, logs, calls, creation,
+layout, ordering, serialization, and public formats remain outside the slice.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

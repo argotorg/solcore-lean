@@ -43,7 +43,8 @@ effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
 The strict address-and-word bridge and strict 20-byte address encoding are
 complete, including Address text-and-byte coherence. Further Core conversions
-and primitives remain planned.
+and primitives remain planned. The active runtime slice introduces only
+explicit Account identity, absence, and canonical storage values.
 The completed seventeenth slice,
 [ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md), completes focused
 proof and regression interfaces for the existing raw `wordShl` and `wordShr`
@@ -221,6 +222,12 @@ big-endian encoding, including complete decoder agreement for arbitrary text.
 It adds no ABI, state, or public format. The independent audit found no P0-P3
 issue.
 
+The active minimal world-state slice,
+[ADR-0056](adr/0056-minimal-world-state.md), adds finite Account and WorldState
+carriers. Missing storage reads as zero, zero writes delete the entry, and an
+absent Account is never created by a storage write. Rollback, balances, code,
+calls, ABI behavior, ordering, and publication remain outside this slice.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -360,6 +367,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0054 completes an exact 20-byte big-endian internal address
   representation; its independent audit found no P0-P3 issue.
 - ADR-0055 completes proof-only coherence between canonical Address text and bytes.
+- ADR-0056 accepts the minimal explicit Account and WorldState carrier.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
