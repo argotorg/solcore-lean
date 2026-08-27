@@ -27,6 +27,7 @@ import Solcore.Core.ArithmeticShift
 import Solcore.Core.SignExtension
 import Solcore.Core.ModularExponentiation
 import Solcore.Core.UnsignedDivision
+import Solcore.Core.SignedDivision
 import Solcore.Core.LogicalShifts
 import Solcore.Core.ModularArithmetic
 import Solcore.Core.BitwiseLogic
