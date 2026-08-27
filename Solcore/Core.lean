@@ -12,6 +12,7 @@ import Solcore.Core.DerivedComparisons
 import Solcore.Core.DerivedSignedComparisons
 import Solcore.Core.DerivedSignedNonStrictComparisons
 import Solcore.Core.DerivedSignedComparisonEval
+import Solcore.Core.DerivedSignedNonStrictComparisonEval
 import Solcore.Core.DerivedComparisonEval
 import Solcore.Core.DerivedComparisonFlags
 import Solcore.Core.DerivedComparisonFlagEval
