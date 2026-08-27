@@ -1,4 +1,5 @@
 import Solcore.Semantics.RuntimeScalars
+import Solcore.Semantics.AddressWordBridge
 import Solcore.Semantics.FrameOutcome
 import Solcore.Semantics.FrameOutcomeProperties
 import Solcore.Semantics.RuntimeScalars.TextProperties
