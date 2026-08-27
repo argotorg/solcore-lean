@@ -1,5 +1,5 @@
 import Solcore.Core.DerivedComparisons
-import Solcore.Core.Eval
+import Solcore.Core.DirectWordComparisons
 import Solcore.Core.RenamingInsertion
 
 set_option autoImplicit false
@@ -19,7 +19,7 @@ theorem wordNe
       Evaluates environment intermediateStore right (.word rightValue) finalStore) :
     Evaluates environment initialStore (left.wordNe right)
       (.bool (!(leftValue == rightValue))) finalStore :=
-  .unary (.binary leftEvaluation rightEvaluation rfl) rfl
+  .unary (leftEvaluation.wordEq rightEvaluation) rfl
 
 theorem wordNe_eq
     {environment : Environment} {initialStore intermediateStore finalStore : Store}
@@ -57,7 +57,7 @@ theorem wordLe
       Evaluates environment intermediateStore right (.word rightValue) finalStore) :
     Evaluates environment initialStore (left.wordLe right)
       (.bool (!(decide (leftValue > rightValue)))) finalStore :=
-  .unary (.binary leftEvaluation rightEvaluation rfl) rfl
+  .unary (leftEvaluation.wordGt rightEvaluation) rfl
 
 theorem wordLe_gt
     {environment : Environment} {initialStore intermediateStore finalStore : Store}
@@ -117,7 +117,7 @@ theorem wordLt
       Evaluates (.word rightValue :: .word leftValue :: environment)
         finalStore (.var 1) (.word leftValue) finalStore :=
     .var (by simp)
-  exact .binary rightVariable leftVariable rfl
+  exact rightVariable.wordGt leftVariable
 
 theorem wordGe
     {definitions : DataEnvironment}

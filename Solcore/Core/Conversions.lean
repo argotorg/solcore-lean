@@ -1,4 +1,4 @@
-import Solcore.Core.Eval
+import Solcore.Core.DirectWordComparisons
 import Solcore.Core.RenamingSyntax
 
 set_option autoImplicit false
@@ -111,7 +111,7 @@ theorem wordToBool
       Evaluates environment initialStore operand (.word value) finalStore) :
     Evaluates environment initialStore operand.wordToBool
       (.bool (!(value == Word.zero))) finalStore :=
-  .unary (.binary evaluation .word rfl) rfl
+  .unary (evaluation.wordEq .word) rfl
 
 theorem wordToBool_zero
     {environment : Environment} {initialStore finalStore : Store}
@@ -142,7 +142,7 @@ theorem wordIsZero
     Evaluates environment initialStore operand.wordIsZero
       (.word (if value == Word.zero then Word.ofNatModulo 1 else Word.zero))
       finalStore :=
-  (Evaluates.binary evaluation .word rfl).boolToWord
+  (evaluation.wordEq .word).boolToWord
 
 theorem wordIsZero_zero
     {environment : Environment} {initialStore finalStore : Store}

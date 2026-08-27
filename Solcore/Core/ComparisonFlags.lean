@@ -62,7 +62,7 @@ theorem wordEqFlag
     Evaluates environment initialStore (left.wordEqFlag right)
       (.word (if leftValue == rightValue then Word.ofNatModulo 1 else Word.zero))
       finalStore :=
-  (Evaluates.binary leftEvaluation rightEvaluation rfl).boolToWord
+  (leftEvaluation.wordEq rightEvaluation).boolToWord
 
 theorem wordEqFlag_eq
     {environment : Environment} {initialStore intermediateStore finalStore : Store}
@@ -101,7 +101,7 @@ theorem wordGtFlag
     Evaluates environment initialStore (left.wordGtFlag right)
       (.word (if decide (leftValue > rightValue) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
-  (Evaluates.binary leftEvaluation rightEvaluation rfl).boolToWord
+  (leftEvaluation.wordGt rightEvaluation).boolToWord
 
 theorem wordGtFlag_gt
     {environment : Environment} {initialStore intermediateStore finalStore : Store}
