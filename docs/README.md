@@ -83,6 +83,12 @@ builder. `swap01` golden tests exchange two free variables, and runtime tests
 evaluate all three builder families in corresponding environments. Weakening,
 runtime semantics, and wire behavior do not change. The next feature is
 selected by a separate ADR.
+The active fifteenth slice,
+[ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md), completes
+the focused proof and test interface for the existing raw `boolNot` and
+`wordNot` expressions. It adds named typing, inference, evaluation, renaming,
+and weakening results plus value, fuel, fault, effect, and Wire regressions. It
+adds no Expr alias, operation tag, or public behavior.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -130,6 +136,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0030 completes proof interfaces for existing derived word comparisons.
 - ADR-0031 derives word-valued flags for the remaining word comparisons.
 - ADR-0032 backfills arbitrary renaming laws for eight older derived builders.
+- ADR-0033 completes the focused interface for direct unary primitives.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

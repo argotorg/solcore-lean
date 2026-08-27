@@ -178,6 +178,14 @@ short-circuit, and comparison-flag witnesses. Existing weakening, evaluation,
 store, fault, fuel, and wire behavior remain unchanged. The next feature is
 selected by a separate ADR.
 
+The active ADR-0033 slice keeps boolean negation and word complement as direct
+`.unary` expressions. Named typing, inference, store-threaded evaluation cases,
+arbitrary renaming, and weakening theorems make the existing primitives easier
+to use without adding aliases. Boundary and effect tests cover both boolean
+values, word complement, exact fuel, raw faults, and the existing Wire v1/v2
+split. Generic Safety and machine correspondence remain unchanged, as do all
+tags and bytes.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

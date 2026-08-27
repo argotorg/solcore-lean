@@ -38,11 +38,12 @@ These results remain regression obligations for every extension.
 | 12 | Derived boolean word comparisons | Complete | Completes proof interfaces for the existing comparison builders |
 | 13 | Derived word comparison flags | Complete | Wraps existing boolean comparisons with canonical word conversion |
 | 14 | Derived-builder arbitrary renaming laws | Complete | Backfills the general renaming API for eight existing builders |
-| 15 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 16 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 17 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 18 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 19 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 15 | Direct unary primitive interface | Active | Completes focused APIs and regressions for existing boolNot and wordNot |
+| 16 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 17 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 18 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 19 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 20 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -283,6 +284,15 @@ and `wordGeFlag` retain the completed left store while weakening lifts their
 variable index across the internal binding. The slice keeps left-to-right
 exactly-once evaluation and adds no Core or wire tag. The next feature is
 selected by a separate ADR.
+
+## Active Core vNext slice: direct unary primitives
+
+[ADR-0033](adr/0033-core-vnext-direct-unary-primitive-interface.md) keeps
+`boolNot` and `wordNot` as raw `.unary` expressions and adds their named typing,
+inference, evaluation-case, renaming, and weakening interfaces. Focused tests
+cover values, complement boundaries and involution samples, types, faults,
+effects, exact fuel, and the existing Wire v1/v2 boundary. No alias, tag,
+runtime meaning, or byte encoding changes.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
