@@ -13,6 +13,12 @@ inductive Frame where
   | unaryApply (op : UnaryOp)
   | binaryRight (op : BinaryOp) (right : Expr) (environment : Environment)
   | binaryApply (op : BinaryOp) (leftValue : Value)
+  | ternarySecond
+      (op : TernaryOp) (second third : Expr) (environment : Environment)
+  | ternaryThird
+      (op : TernaryOp) (firstValue : Value) (third : Expr)
+      (environment : Environment)
+  | ternaryApply (op : TernaryOp) (firstValue secondValue : Value)
   | pairRight (right : Expr) (environment : Environment)
   | pairApply (leftValue : Value)
   | firstApply
@@ -323,6 +329,30 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.ret rightValue, .binaryApply op leftValue :: continuation, store⟩
         ⟨.ret result, continuation, store⟩
+  | enterTernarySecond
+      {environment : Environment} {op : TernaryOp} {second third : Expr}
+      {firstValue : Value} {continuation : List Frame} {store : Store} :
+      Transition
+        ⟨.ret firstValue,
+          .ternarySecond op second third environment :: continuation, store⟩
+        ⟨.eval second environment,
+          .ternaryThird op firstValue third environment :: continuation, store⟩
+  | enterTernaryThird
+      {environment : Environment} {op : TernaryOp} {third : Expr}
+      {firstValue secondValue : Value} {continuation : List Frame} {store : Store} :
+      Transition
+        ⟨.ret secondValue,
+          .ternaryThird op firstValue third environment :: continuation, store⟩
+        ⟨.eval third environment,
+          .ternaryApply op firstValue secondValue :: continuation, store⟩
+  | applyTernary
+      {op : TernaryOp} {firstValue secondValue thirdValue result : Value}
+      {continuation : List Frame} {store : Store} :
+      op.apply firstValue secondValue thirdValue = some result →
+      Transition
+        ⟨.ret thirdValue,
+          .ternaryApply op firstValue secondValue :: continuation, store⟩
+        ⟨.ret result, continuation, store⟩
   | enterLet
       {environment : Environment} {value body : Expr} {continuation : List Frame}
       {store : Store} :
@@ -371,6 +401,8 @@ inductive MachineFault where
   | invalidConstructorBranch (constructor : ConstructorId)
   | invalidUnaryOperand (op : UnaryOp) (actual : Value)
   | invalidBinaryOperands (op : BinaryOp) (left right : Value)
+  | invalidTernaryOperands
+      (op : TernaryOp) (first second third : Value)
   deriving Repr, BEq, DecidableEq
 
 inductive AdvanceResult where
@@ -460,6 +492,17 @@ def advance (state : State) : AdvanceResult :=
           match op.apply leftValue value with
           | some result => .next ⟨.ret result, continuation, state.store⟩
           | none => .fault (.invalidBinaryOperands op leftValue value)
+      | .ternarySecond op second third environment :: continuation =>
+          .next ⟨.eval second environment,
+            .ternaryThird op value third environment :: continuation, state.store⟩
+      | .ternaryThird op firstValue third environment :: continuation =>
+          .next ⟨.eval third environment,
+            .ternaryApply op firstValue value :: continuation, state.store⟩
+      | .ternaryApply op firstValue secondValue :: continuation =>
+          match op.apply firstValue secondValue value with
+          | some result => .next ⟨.ret result, continuation, state.store⟩
+          | none =>
+              .fault (.invalidTernaryOperands op firstValue secondValue value)
       | .pairRight right environment :: continuation =>
           .next ⟨.eval right environment, .pairApply value :: continuation,
             state.store⟩

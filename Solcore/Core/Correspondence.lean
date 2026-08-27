@@ -448,6 +448,33 @@ inductive Continues :
       Continues
         (.binaryApply op leftValue :: continuation)
         rightValue store finalValue finalStore
+  | ternarySecond
+      {op : TernaryOp} {second third : Expr} {environment : Environment}
+      {continuation : List Frame}
+      {initialStore secondStore thirdStore finalStore : Store}
+      {firstValue secondValue thirdValue result finalValue : Value} :
+      Evaluates environment initialStore second secondValue secondStore →
+      Evaluates environment secondStore third thirdValue thirdStore →
+      op.apply firstValue secondValue thirdValue = some result →
+      Continues continuation result thirdStore finalValue finalStore →
+      Continues (.ternarySecond op second third environment :: continuation)
+        firstValue initialStore finalValue finalStore
+  | ternaryThird
+      {op : TernaryOp} {firstValue secondValue thirdValue result finalValue : Value}
+      {third : Expr} {environment : Environment} {continuation : List Frame}
+      {initialStore thirdStore finalStore : Store} :
+      Evaluates environment initialStore third thirdValue thirdStore →
+      op.apply firstValue secondValue thirdValue = some result →
+      Continues continuation result thirdStore finalValue finalStore →
+      Continues (.ternaryThird op firstValue third environment :: continuation)
+        secondValue initialStore finalValue finalStore
+  | ternaryApply
+      {op : TernaryOp} {firstValue secondValue thirdValue result finalValue : Value}
+      {continuation : List Frame} {store finalStore : Store} :
+      op.apply firstValue secondValue thirdValue = some result →
+      Continues continuation result store finalValue finalStore →
+      Continues (.ternaryApply op firstValue secondValue :: continuation)
+        thirdValue store finalValue finalStore
   | pairRight
       {right : Expr} {environment : Environment}
       {continuation : List Frame} {initialStore rightStore finalStore : Store}
@@ -848,6 +875,22 @@ theorem transition_reflects_denotation
       cases denotes with
       | ret continuation =>
           exact .ret (.binaryApply applied continuation)
+  | enterTernarySecond =>
+      cases denotes with
+      | eval secondEvaluation continuation =>
+          cases continuation with
+          | ternaryThird thirdEvaluation applied rest =>
+              exact .ret (.ternarySecond secondEvaluation thirdEvaluation applied rest)
+  | enterTernaryThird =>
+      cases denotes with
+      | eval thirdEvaluation continuation =>
+          cases continuation with
+          | ternaryApply applied rest =>
+              exact .ret (.ternaryThird thirdEvaluation applied rest)
+  | applyTernary applied =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.ternaryApply applied continuation)
   | enterLet =>
       cases denotes with
       | eval boundEvaluation continuation =>

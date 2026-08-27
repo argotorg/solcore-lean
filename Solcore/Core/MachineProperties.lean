@@ -122,6 +122,21 @@ theorem advance_next_iff {state next : State} :
                     simp [advance, applied] at advanced
                     cases advanced
                     exact .applyBinary applied
+            | ternarySecond op second third environment =>
+                simp [advance] at advanced
+                cases advanced
+                exact .enterTernarySecond
+            | ternaryThird op firstValue third environment =>
+                simp [advance] at advanced
+                cases advanced
+                exact .enterTernaryThird
+            | ternaryApply op firstValue secondValue =>
+                cases applied : op.apply firstValue secondValue value with
+                | none => simp [advance, applied] at advanced
+                | some result =>
+                    simp [advance, applied] at advanced
+                    cases advanced
+                    exact .applyTernary applied
             | pairRight right environment =>
                 simp [advance] at advanced
                 cases advanced
@@ -286,6 +301,13 @@ theorem advance_done_iff {state : State} {value : Value} :
                 simp [advance] at advanced
             | binaryApply op leftValue =>
                 cases applied : op.apply leftValue returned <;>
+                  simp [advance, applied] at advanced
+            | ternarySecond op second third environment =>
+                simp [advance] at advanced
+            | ternaryThird op firstValue third environment =>
+                simp [advance] at advanced
+            | ternaryApply op firstValue secondValue =>
+                cases applied : op.apply firstValue secondValue returned <;>
                   simp [advance, applied] at advanced
             | pairRight right environment => simp [advance] at advanced
             | pairApply leftValue => simp [advance] at advanced

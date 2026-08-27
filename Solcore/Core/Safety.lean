@@ -135,6 +135,17 @@ theorem binary_apply_result_has_type
     simp [Value.type, BinaryOp.resultType] at resultType
   all_goals constructor
 
+theorem ternary_apply_result_has_type
+    {op : TernaryOp} {first second third result : Value}
+    (applied : op.apply first second third = some result)
+    (definitions : DataEnvironment := []) :
+    ValueHasType result op.resultType definitions := by
+  have resultType := TernaryOp.apply_result_type applied
+  clear applied first second third
+  cases op <;> cases result <;>
+    simp [Value.type, TernaryOp.resultType] at resultType
+  all_goals constructor
+
 /-! ## Worlds, runtime typing, and typed stores -/
 
 def WorldExtends (initial future : StoreTyping) : Prop :=
@@ -606,6 +617,18 @@ theorem binary_apply_result_has_runtime_type
     (elementType := op.resultType)
     (definitions := definitions)
     (typing := binary_apply_result_has_type applied (definitions := []))
+  cases op <;> constructor
+
+theorem ternary_apply_result_has_runtime_type
+    {world : StoreTyping} {op : TernaryOp}
+    {first second third result : Value}
+    (applied : op.apply first second third = some result)
+    (definitions : DataEnvironment := []) :
+    RuntimeValueHasType world result op.resultType definitions := by
+  apply CellPayload.runtimeValueHasType
+    (elementType := op.resultType)
+    (definitions := definitions)
+    (typing := ternary_apply_result_has_type applied (definitions := []))
   cases op <;> constructor
 
 theorem BranchesHaveType.lookup
@@ -1858,6 +1881,30 @@ inductive FrameHasType
       RuntimeValueHasType world leftValue op.leftType definitions →
       FrameHasType world (.binaryApply op leftValue)
         op.rightType op.resultType definitions
+  | ternarySecond
+      {definitions : DataEnvironment} {op : TernaryOp}
+      {second third : Expr} {environment : Environment} {context : Context} :
+      RuntimeEnvironmentHasTypes world environment context definitions →
+      HasType context second op.secondType definitions →
+      HasType context third op.thirdType definitions →
+      FrameHasType world (.ternarySecond op second third environment)
+        op.firstType op.resultType definitions
+  | ternaryThird
+      {definitions : DataEnvironment} {op : TernaryOp}
+      {firstValue : Value} {third : Expr} {environment : Environment}
+      {context : Context} :
+      RuntimeValueHasType world firstValue op.firstType definitions →
+      RuntimeEnvironmentHasTypes world environment context definitions →
+      HasType context third op.thirdType definitions →
+      FrameHasType world (.ternaryThird op firstValue third environment)
+        op.secondType op.resultType definitions
+  | ternaryApply
+      {definitions : DataEnvironment} {op : TernaryOp}
+      {firstValue secondValue : Value} :
+      RuntimeValueHasType world firstValue op.firstType definitions →
+      RuntimeValueHasType world secondValue op.secondType definitions →
+      FrameHasType world (.ternaryApply op firstValue secondValue)
+        op.thirdType op.resultType definitions
   | pairRight
       {definitions : DataEnvironment}
       {right : Expr} {environment : Environment} {context : Context}
@@ -1997,6 +2044,15 @@ theorem FrameHasType.weaken
       exact .binaryRight (environmentTyping.weaken extension) rightTyping
   | binaryApply leftTyping =>
       exact .binaryApply (leftTyping.weaken extension)
+  | ternarySecond environmentTyping secondTyping thirdTyping =>
+      exact .ternarySecond (environmentTyping.weaken extension)
+        secondTyping thirdTyping
+  | ternaryThird firstTyping environmentTyping thirdTyping =>
+      exact .ternaryThird (firstTyping.weaken extension)
+        (environmentTyping.weaken extension) thirdTyping
+  | ternaryApply firstTyping secondTyping =>
+      exact .ternaryApply (firstTyping.weaken extension)
+        (secondTyping.weaken extension)
   | pairRight environmentTyping rightTyping =>
       exact .pairRight (environmentTyping.weaken extension) rightTyping
   | pairApply leftTyping =>
@@ -2434,6 +2490,35 @@ theorem transition_preserves_state_type
                   exact .ret storeTyping
                     (binary_apply_result_has_runtime_type
                       (definitions := definitions) applied) restTyping
+  | enterTernarySecond =>
+      cases stateTyping with
+      | ret storeTyping firstTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | ternarySecond environmentTyping secondTyping thirdTyping =>
+                  exact .eval storeTyping environmentTyping secondTyping
+                    (.cons (.ternaryThird firstTyping environmentTyping thirdTyping)
+                      restTyping)
+  | enterTernaryThird =>
+      cases stateTyping with
+      | ret storeTyping secondTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | ternaryThird firstTyping environmentTyping thirdTyping =>
+                  exact .eval storeTyping environmentTyping thirdTyping
+                    (.cons (.ternaryApply firstTyping secondTyping) restTyping)
+  | applyTernary applied =>
+      cases stateTyping with
+      | ret storeTyping thirdTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | ternaryApply firstTyping secondTyping =>
+                  exact .ret storeTyping
+                    (ternary_apply_result_has_runtime_type
+                      (definitions := definitions) applied) restTyping
   | enterLet =>
       cases stateTyping with
       | eval storeTyping environmentTyping exprTyping continuationTyping =>
@@ -2526,6 +2611,13 @@ theorem state_progress
                 BinaryOp.apply_total_of_types _ _ _
                   leftTyping.type_eq valueTyping.type_eq
               exact .inr ⟨_, .applyBinary applied⟩
+          | ternarySecond => exact .inr ⟨_, .enterTernarySecond⟩
+          | ternaryThird => exact .inr ⟨_, .enterTernaryThird⟩
+          | ternaryApply firstTyping secondTyping =>
+              obtain ⟨result, applied, _⟩ :=
+                TernaryOp.apply_total_of_types _ _ _ _
+                  firstTyping.type_eq secondTyping.type_eq valueTyping.type_eq
+              exact .inr ⟨_, .applyTernary applied⟩
           | pairRight => exact .inr ⟨_, .enterPairRight⟩
           | pairApply => exact .inr ⟨_, .applyPair⟩
           | firstApply =>
