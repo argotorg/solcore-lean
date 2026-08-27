@@ -36,6 +36,18 @@ theorem advance_next_iff {state next : State} :
             simp [advance] at advanced
             cases advanced
             exact .enterSecond
+        | inLeft rightType payload =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterInLeft
+        | inRight leftType payload =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterInRight
+        | caseE scrutinee leftBranch rightBranch =>
+            simp [advance] at advanced
+            cases advanced
+            exact .enterCase
         | lambda parameterType resultType body =>
             simp [advance] at advanced
             cases advanced
@@ -100,21 +112,43 @@ theorem advance_next_iff {state next : State} :
                 exact .applyPair
             | firstApply =>
                 cases value with
-                | unit | bool | word | closure => simp [advance] at advanced
+                | unit | bool | word | inLeft | inRight | closure =>
+                    simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
                     cases advanced
                     exact .applyFirst
             | secondApply =>
                 cases value with
-                | unit | bool | word | closure => simp [advance] at advanced
+                | unit | bool | word | inLeft | inRight | closure =>
+                    simp [advance] at advanced
                 | pair leftValue rightValue =>
                     simp [advance] at advanced
                     cases advanced
                     exact .applySecond
+            | inLeftApply rightType =>
+                simp [advance] at advanced
+                cases advanced
+                exact .applyInLeft
+            | inRightApply leftType =>
+                simp [advance] at advanced
+                cases advanced
+                exact .applyInRight
+            | caseBranches leftBranch rightBranch environment =>
+                cases value with
+                | unit | bool | word | pair | closure => simp [advance] at advanced
+                | inLeft rightType payload =>
+                    simp [advance] at advanced
+                    cases advanced
+                    exact .chooseLeft
+                | inRight leftType payload =>
+                    simp [advance] at advanced
+                    cases advanced
+                    exact .chooseRight
             | applyArgument argument callerEnvironment =>
                 cases value with
-                | unit | bool | word | pair => simp [advance] at advanced
+                | unit | bool | word | pair | inLeft | inRight =>
+                    simp [advance] at advanced
                 | closure parameterType resultType body capturedEnvironment =>
                     simp [advance] at advanced
                     cases advanced
@@ -129,7 +163,8 @@ theorem advance_next_iff {state next : State} :
                 exact .bindLet
             | ifBranches thenBranch elseBranch environment =>
                 cases value with
-                | unit | word | pair | closure => simp [advance] at advanced
+                | unit | word | pair | inLeft | inRight | closure =>
+                    simp [advance] at advanced
                 | bool decision =>
                     cases decision with
                     | false =>
@@ -151,8 +186,8 @@ theorem advance_done_iff {state : State} {value : Value} :
     cases control with
     | eval expr environment =>
         cases expr with
-        | unit | bool | word | pair | first | second | lambda | apply | unary | binary |
-            letE | ifE =>
+        | unit | bool | word | pair | first | second | inLeft | inRight | caseE |
+            lambda | apply | unary | binary | letE | ifE =>
             simp [advance] at advanced
         | var index =>
             cases lookup : environment[index]? <;> simp [advance, lookup] at advanced
@@ -178,6 +213,10 @@ theorem advance_done_iff {state : State} {value : Value} :
                 cases returned <;> simp [advance] at advanced
             | secondApply =>
                 cases returned <;> simp [advance] at advanced
+            | inLeftApply rightType => simp [advance] at advanced
+            | inRightApply leftType => simp [advance] at advanced
+            | caseBranches leftBranch rightBranch environment =>
+                cases returned <;> simp [advance] at advanced
             | applyArgument argument callerEnvironment =>
                 cases returned <;> simp [advance] at advanced
             | applyClosure parameterType resultType body capturedEnvironment =>
@@ -185,7 +224,8 @@ theorem advance_done_iff {state : State} {value : Value} :
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with
-                | unit | word | pair | closure => simp [advance] at advanced
+                | unit | word | pair | inLeft | inRight | closure =>
+                    simp [advance] at advanced
                 | bool decision =>
                     cases decision <;> simp [advance] at advanced
   · intro final

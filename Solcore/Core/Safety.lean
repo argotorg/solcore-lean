@@ -15,6 +15,14 @@ mutual
         ValueHasType left leftType →
         ValueHasType right rightType →
         ValueHasType (.pair left right) (.product leftType rightType)
+    | inLeft
+        {payload : Value} {leftType rightType : Ty} :
+        ValueHasType payload leftType →
+        ValueHasType (.inLeft rightType payload) (.sum leftType rightType)
+    | inRight
+        {payload : Value} {leftType rightType : Ty} :
+        ValueHasType payload rightType →
+        ValueHasType (.inRight leftType payload) (.sum leftType rightType)
     | closure
         {parameterType resultType : Ty} {body : Expr}
         {environment : Environment} {context : Context} :
@@ -43,7 +51,7 @@ theorem EnvironmentHasTypes.lookup
     ∃ value, environment[index]? = some value ∧ ValueHasType value type := by
   induction hasTypes using EnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ => True) generalizing index with
-  | unit | bool | word | pair | closure => exact True.intro
+  | unit | bool | word | pair | inLeft | inRight | closure => exact True.intro
   | nil =>
       simp at typeLookup
   | cons valueTyping tailTyping _ tailIH =>
@@ -73,6 +81,10 @@ theorem ValueHasType.type_eq
   | unit | bool | word | closure => rfl
   | pair leftTyping rightTyping leftIH rightIH =>
       simp [Value.type, leftIH, rightIH]
+  | inLeft payloadTyping payloadIH =>
+      simp [Value.type, payloadIH]
+  | inRight payloadTyping payloadIH =>
+      simp [Value.type, payloadIH]
   | nil | cons => exact True.intro
 
 theorem unary_apply_result_has_type
@@ -128,6 +140,34 @@ theorem evaluation_preserves_type
             operandIH operandTyping environmentTyping
           cases operandValueTyping with
           | pair leftTyping rightTyping => exact rightTyping
+  | inLeft payloadEvaluation payloadIH =>
+      cases typing with
+      | inLeft payloadTyping =>
+          exact .inLeft (payloadIH payloadTyping environmentTyping)
+  | inRight payloadEvaluation payloadIH =>
+      cases typing with
+      | inRight payloadTyping =>
+          exact .inRight (payloadIH payloadTyping environmentTyping)
+  | caseLeft scrutineeEvaluation branchEvaluation scrutineeIH branchIH =>
+      cases typing with
+      | caseE scrutineeTyping leftTyping rightTyping =>
+          have scrutineeValueTyping :=
+            scrutineeIH scrutineeTyping environmentTyping
+          cases scrutineeValueTyping with
+          | inLeft payloadTyping =>
+              exact branchIH
+                leftTyping
+                (.cons payloadTyping environmentTyping)
+  | caseRight scrutineeEvaluation branchEvaluation scrutineeIH branchIH =>
+      cases typing with
+      | caseE scrutineeTyping leftTyping rightTyping =>
+          have scrutineeValueTyping :=
+            scrutineeIH scrutineeTyping environmentTyping
+          cases scrutineeValueTyping with
+          | inRight payloadTyping =>
+              exact branchIH
+                rightTyping
+                (.cons payloadTyping environmentTyping)
   | lambda =>
       cases typing with
       | lambda bodyTyping => exact .closure environmentTyping bodyTyping
@@ -184,6 +224,13 @@ def ReducibleValue : (type : Ty) → Value → Prop
         value = .pair left right ∧
         ReducibleValue leftType left ∧
         ReducibleValue rightType right
+  | .sum leftType rightType, value =>
+      (∃ payload,
+        value = .inLeft rightType payload ∧
+        ReducibleValue leftType payload) ∨
+      (∃ payload,
+        value = .inRight leftType payload ∧
+        ReducibleValue rightType payload)
   | .function parameterType resultType, value =>
       ∃ body environment context,
         value = .closure parameterType resultType body environment ∧
@@ -251,6 +298,15 @@ theorem ReducibleValue.hasType
       obtain ⟨body, environment, context, rfl,
         environmentTyping, bodyTyping, _⟩ := reducible
       exact .closure environmentTyping bodyTyping
+  | sum leftType rightType leftIH rightIH =>
+      simp only [ReducibleValue] at reducible
+      cases reducible with
+      | inl leftReducible =>
+          obtain ⟨payload, rfl, payloadReducible⟩ := leftReducible
+          exact .inLeft (leftIH payloadReducible)
+      | inr rightReducible =>
+          obtain ⟨payload, rfl, payloadReducible⟩ := rightReducible
+          exact .inRight (rightIH payloadReducible)
 
 theorem ReducibleEnvironment.hasTypes
     {environment : Environment} {context : Context}
@@ -368,6 +424,42 @@ theorem reducibility_fundamental
       exact ⟨result,
         .apply functionEvaluation argumentEvaluation bodyEvaluation,
         resultReducible⟩
+  | @inLeft context rightType leftType payload payloadTyping payloadIH =>
+      obtain ⟨payloadValue, payloadEvaluation, payloadReducible⟩ :=
+        payloadIH environmentReducible
+      refine ⟨.inLeft rightType payloadValue,
+        .inLeft payloadEvaluation, ?_⟩
+      simp only [ReducibleValue]
+      exact .inl ⟨payloadValue, rfl, payloadReducible⟩
+  | @inRight context leftType rightType payload payloadTyping payloadIH =>
+      obtain ⟨payloadValue, payloadEvaluation, payloadReducible⟩ :=
+        payloadIH environmentReducible
+      refine ⟨.inRight leftType payloadValue,
+        .inRight payloadEvaluation, ?_⟩
+      simp only [ReducibleValue]
+      exact .inr ⟨payloadValue, rfl, payloadReducible⟩
+  | @caseE context scrutinee leftBranch rightBranch
+      leftType rightType resultType
+      scrutineeTyping leftTyping rightTyping
+      scrutineeIH leftIH rightIH =>
+      obtain ⟨scrutineeValue, scrutineeEvaluation, scrutineeReducible⟩ :=
+        scrutineeIH environmentReducible
+      simp only [ReducibleValue] at scrutineeReducible
+      cases scrutineeReducible with
+      | inl leftReducible =>
+          obtain ⟨payload, rfl, payloadReducible⟩ := leftReducible
+          obtain ⟨result, branchEvaluation, resultReducible⟩ :=
+            leftIH (.cons payloadReducible environmentReducible)
+          exact ⟨result,
+            .caseLeft scrutineeEvaluation branchEvaluation,
+            resultReducible⟩
+      | inr rightReducible =>
+          obtain ⟨payload, rfl, payloadReducible⟩ := rightReducible
+          obtain ⟨result, branchEvaluation, resultReducible⟩ :=
+            rightIH (.cons payloadReducible environmentReducible)
+          exact ⟨result,
+            .caseRight scrutineeEvaluation branchEvaluation,
+            resultReducible⟩
   | unary operandTyping operandIH =>
       obtain ⟨operandValue, operandEvaluation, operandReducible⟩ :=
         operandIH environmentReducible
@@ -427,6 +519,12 @@ theorem ValueHasType.reducible
   | pair leftTyping rightTyping leftIH rightIH =>
       simp only [ReducibleValue]
       exact ⟨_, _, rfl, leftIH, rightIH⟩
+  | inLeft payloadTyping payloadIH =>
+      simp only [ReducibleValue]
+      exact .inl ⟨_, rfl, payloadIH⟩
+  | inRight payloadTyping payloadIH =>
+      simp only [ReducibleValue]
+      exact .inr ⟨_, rfl, payloadIH⟩
   | @closure parameterType resultType body environment context
       environmentTyping bodyTyping environmentIH =>
       simp only [ReducibleValue]
@@ -540,6 +638,29 @@ inductive FrameHasType : Frame → Ty → Ty → Prop where
   | secondApply
       {leftType rightType : Ty} :
       FrameHasType .secondApply (.product leftType rightType) rightType
+  | inLeftApply
+      {leftType rightType : Ty} :
+      FrameHasType
+        (.inLeftApply rightType)
+        leftType
+        (.sum leftType rightType)
+  | inRightApply
+      {leftType rightType : Ty} :
+      FrameHasType
+        (.inRightApply leftType)
+        rightType
+        (.sum leftType rightType)
+  | caseBranches
+      {leftBranch rightBranch : Expr}
+      {environment : Environment} {context : Context}
+      {leftType rightType resultType : Ty} :
+      EnvironmentHasTypes environment context →
+      HasType (leftType :: context) leftBranch resultType →
+      HasType (rightType :: context) rightBranch resultType →
+      FrameHasType
+        (.caseBranches leftBranch rightBranch environment)
+        (.sum leftType rightType)
+        resultType
   | applyArgument
       {argument : Expr} {environment : Environment} {context : Context}
       {parameterType resultType : Ty} :
@@ -688,6 +809,77 @@ theorem transition_preserves_state_type
                   cases pairTyping with
                   | pair leftTyping rightTyping =>
                       exact .ret rightTyping restTyping
+  | enterInLeft =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | inLeft payloadTyping =>
+              exact .eval
+                environmentTyping
+                payloadTyping
+                (.cons .inLeftApply continuationTyping)
+  | applyInLeft =>
+      cases stateTyping with
+      | ret payloadTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | inLeftApply =>
+                  exact .ret (.inLeft payloadTyping) restTyping
+  | enterInRight =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | inRight payloadTyping =>
+              exact .eval
+                environmentTyping
+                payloadTyping
+                (.cons .inRightApply continuationTyping)
+  | applyInRight =>
+      cases stateTyping with
+      | ret payloadTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | inRightApply =>
+                  exact .ret (.inRight payloadTyping) restTyping
+  | enterCase =>
+      cases stateTyping with
+      | eval environmentTyping exprTyping continuationTyping =>
+          cases exprTyping with
+          | caseE scrutineeTyping leftTyping rightTyping =>
+              exact .eval
+                environmentTyping
+                scrutineeTyping
+                (.cons
+                  (.caseBranches environmentTyping leftTyping rightTyping)
+                  continuationTyping)
+  | chooseLeft =>
+      cases stateTyping with
+      | ret sumTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | caseBranches environmentTyping leftTyping rightTyping =>
+                  cases sumTyping with
+                  | inLeft payloadTyping =>
+                      exact .eval
+                        (.cons payloadTyping environmentTyping)
+                        leftTyping
+                        restTyping
+  | chooseRight =>
+      cases stateTyping with
+      | ret sumTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | caseBranches environmentTyping leftTyping rightTyping =>
+                  cases sumTyping with
+                  | inRight payloadTyping =>
+                      exact .eval
+                        (.cons payloadTyping environmentTyping)
+                        rightTyping
+                        restTyping
   | lambda =>
       cases stateTyping with
       | eval environmentTyping exprTyping continuationTyping =>
@@ -856,6 +1048,9 @@ theorem state_progress
       | pair => exact .inr ⟨_, .enterPair⟩
       | first => exact .inr ⟨_, .enterFirst⟩
       | second => exact .inr ⟨_, .enterSecond⟩
+      | inLeft => exact .inr ⟨_, .enterInLeft⟩
+      | inRight => exact .inr ⟨_, .enterInRight⟩
+      | caseE => exact .inr ⟨_, .enterCase⟩
       | lambda => exact .inr ⟨_, .lambda⟩
       | apply => exact .inr ⟨_, .enterApply⟩
       | var typeLookup =>
@@ -900,6 +1095,14 @@ theorem state_progress
           | secondApply =>
               cases valueTyping with
               | pair => exact .inr ⟨_, .applySecond⟩
+          | inLeftApply =>
+              exact .inr ⟨_, .applyInLeft⟩
+          | inRightApply =>
+              exact .inr ⟨_, .applyInRight⟩
+          | caseBranches =>
+              cases valueTyping with
+              | inLeft => exact .inr ⟨_, .chooseLeft⟩
+              | inRight => exact .inr ⟨_, .chooseRight⟩
           | applyArgument =>
               cases valueTyping with
               | closure => exact .inr ⟨_, .beginArgument⟩

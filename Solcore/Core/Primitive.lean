@@ -137,6 +137,15 @@ def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
       .lambda parameterType resultType (body.weakenAt (cutoff + 1))
   | .apply function argument =>
       .apply (function.weakenAt cutoff) (argument.weakenAt cutoff)
+  | .inLeft rightType payload =>
+      .inLeft rightType (payload.weakenAt cutoff)
+  | .inRight leftType payload =>
+      .inRight leftType (payload.weakenAt cutoff)
+  | .caseE scrutinee leftBranch rightBranch =>
+      .caseE
+        (scrutinee.weakenAt cutoff)
+        (leftBranch.weakenAt (cutoff + 1))
+        (rightBranch.weakenAt (cutoff + 1))
   | .unary op operand => .unary op (operand.weakenAt cutoff)
   | .binary op left right =>
       .binary op (left.weakenAt cutoff) (right.weakenAt cutoff)

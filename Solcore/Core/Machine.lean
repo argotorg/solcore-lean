@@ -17,6 +17,11 @@ inductive Frame where
   | pairApply (leftValue : Value)
   | firstApply
   | secondApply
+  | inLeftApply (rightType : Ty)
+  | inRightApply (leftType : Ty)
+  | caseBranches
+      (leftBranch rightBranch : Expr)
+      (environment : Environment)
   | applyArgument (argument : Expr) (environment : Environment)
   | applyClosure
       (parameterType resultType : Ty)
@@ -95,6 +100,49 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.ret (.pair leftValue rightValue), .secondApply :: continuation⟩
         ⟨.ret rightValue, continuation⟩
+  | enterInLeft
+      {environment : Environment} {rightType : Ty} {payload : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.inLeft rightType payload) environment, continuation⟩
+        ⟨.eval payload environment, .inLeftApply rightType :: continuation⟩
+  | applyInLeft
+      {rightType : Ty} {payload : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret payload, .inLeftApply rightType :: continuation⟩
+        ⟨.ret (.inLeft rightType payload), continuation⟩
+  | enterInRight
+      {environment : Environment} {leftType : Ty} {payload : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.inRight leftType payload) environment, continuation⟩
+        ⟨.eval payload environment, .inRightApply leftType :: continuation⟩
+  | applyInRight
+      {leftType : Ty} {payload : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret payload, .inRightApply leftType :: continuation⟩
+        ⟨.ret (.inRight leftType payload), continuation⟩
+  | enterCase
+      {environment : Environment} {scrutinee leftBranch rightBranch : Expr}
+      {continuation : List Frame} :
+      Transition
+        ⟨.eval (.caseE scrutinee leftBranch rightBranch) environment, continuation⟩
+        ⟨.eval scrutinee environment,
+          .caseBranches leftBranch rightBranch environment :: continuation⟩
+  | chooseLeft
+      {environment : Environment} {leftBranch rightBranch : Expr}
+      {rightType : Ty} {payload : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret (.inLeft rightType payload),
+          .caseBranches leftBranch rightBranch environment :: continuation⟩
+        ⟨.eval leftBranch (payload :: environment), continuation⟩
+  | chooseRight
+      {environment : Environment} {leftBranch rightBranch : Expr}
+      {leftType : Ty} {payload : Value} {continuation : List Frame} :
+      Transition
+        ⟨.ret (.inRight leftType payload),
+          .caseBranches leftBranch rightBranch environment :: continuation⟩
+        ⟨.eval rightBranch (payload :: environment), continuation⟩
   | lambda
       {environment : Environment} {parameterType resultType : Ty}
       {body : Expr} {continuation : List Frame} :
@@ -201,6 +249,7 @@ inductive MachineFault where
   | unboundVariable (index : Nat)
   | expectedBool (actual : Value)
   | expectedProduct (actual : Value)
+  | expectedSum (actual : Value)
   | expectedFunction (actual : Value)
   | invalidUnaryOperand (op : UnaryOp) (actual : Value)
   | invalidBinaryOperands (op : BinaryOp) (left right : Value)
@@ -226,6 +275,15 @@ def advance (state : State) : AdvanceResult :=
           .next ⟨.eval operand environment, .firstApply :: state.continuation⟩
       | .second operand =>
           .next ⟨.eval operand environment, .secondApply :: state.continuation⟩
+      | .inLeft rightType payload =>
+          .next ⟨.eval payload environment,
+            .inLeftApply rightType :: state.continuation⟩
+      | .inRight leftType payload =>
+          .next ⟨.eval payload environment,
+            .inRightApply leftType :: state.continuation⟩
+      | .caseE scrutinee leftBranch rightBranch =>
+          .next ⟨.eval scrutinee environment,
+            .caseBranches leftBranch rightBranch environment :: state.continuation⟩
       | .lambda parameterType resultType body =>
           .next ⟨.ret (.closure parameterType resultType body environment),
             state.continuation⟩
@@ -272,6 +330,17 @@ def advance (state : State) : AdvanceResult :=
           match value with
           | .pair _ rightValue => .next ⟨.ret rightValue, continuation⟩
           | actual => .fault (.expectedProduct actual)
+      | .inLeftApply rightType :: continuation =>
+          .next ⟨.ret (.inLeft rightType value), continuation⟩
+      | .inRightApply leftType :: continuation =>
+          .next ⟨.ret (.inRight leftType value), continuation⟩
+      | .caseBranches leftBranch rightBranch environment :: continuation =>
+          match value with
+          | .inLeft _ payload =>
+              .next ⟨.eval leftBranch (payload :: environment), continuation⟩
+          | .inRight _ payload =>
+              .next ⟨.eval rightBranch (payload :: environment), continuation⟩
+          | actual => .fault (.expectedSum actual)
       | .applyArgument argument callerEnvironment :: continuation =>
           match value with
           | .closure parameterType resultType body capturedEnvironment =>

@@ -29,6 +29,7 @@ adapter.
 | Semantic Core primitive subset | Complete | Complete | Oracle v3 / Core v2 |
 | Internal Core binary products | Complete | Complete | Not published |
 | Internal non-recursive functions | Complete | Complete, including totality | Not published |
+| Internal binary sums | Complete | Complete, including totality | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -64,7 +65,6 @@ unreachability for well-typed closed programs.
 The public Core fragment is complete, but it is not the complete Solcore
 language. The following remain:
 
-- sum values;
 - explicit return, recursion, and divergence;
 - mutable locals and assignment;
 - user-defined algebraic data and direct pattern matching;
@@ -100,7 +100,7 @@ The first Core vNext vertical slice adds:
 - first and second projection;
 - left-to-right pair evaluation;
 - executable inference and detailed checking;
-- CEK execution and big-step semantics; and
+- CEK execution and big-step semantics;
 - soundness, completeness, correspondence, and safety results; and
 - regression tests for nesting, exact fuel, evaluation order, invalid
   projection, and old-wire rejection.
@@ -126,8 +126,21 @@ Frozen wire projections reject function types, lambdas, applications,
 closures, and programs containing them. See
 [ADR-0020](adr/0020-core-vnext-non-recursive-functions.md).
 
-The next active step is sum values and elimination. User algebraic data and
-source-level pattern syntax remain later decisions.
+The third vertical slice adds:
+
+- nestable binary sum types;
+- left and right injections;
+- exhaustive case elimination with a payload binding;
+- scrutinee-first, selected-branch-only evaluation;
+- detailed sum diagnostics and branch paths; and
+- logical-reducibility, CEK correspondence, safety, exact-fuel, interaction,
+  and old-wire rejection coverage.
+
+Named algebraic data and source-level pattern syntax remain later decisions.
+See [ADR-0021](adr/0021-core-vnext-binary-sums.md).
+
+The next active step is explicit mutable locals and assignment, with state
+identity and evaluation order fixed independently of contract storage.
 
 ## Meaning of completion
 

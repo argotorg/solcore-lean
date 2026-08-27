@@ -24,6 +24,7 @@ inductive Ty where
   | word
   | product (left : Ty) (right : Ty)
   | function (parameter : Ty) (result : Ty)
+  | sum (left : Ty) (right : Ty)
   deriving Repr, BEq, DecidableEq
 
 inductive UnaryOp where
@@ -90,6 +91,9 @@ inductive Expr where
   | second (operand : Expr)
   | lambda (parameterType resultType : Ty) (body : Expr)
   | apply (function : Expr) (argument : Expr)
+  | inLeft (rightType : Ty) (payload : Expr)
+  | inRight (leftType : Ty) (payload : Expr)
+  | caseE (scrutinee leftBranch rightBranch : Expr)
   | unary (op : UnaryOp) (operand : Expr)
   | binary (op : BinaryOp) (left : Expr) (right : Expr)
   | letE (value : Expr) (body : Expr)
@@ -105,6 +109,8 @@ inductive Value where
       (parameterType resultType : Ty)
       (body : Expr)
       (environment : List Value)
+  | inLeft (rightType : Ty) (payload : Value)
+  | inRight (leftType : Ty) (payload : Value)
   deriving Repr
 
 mutual
@@ -177,26 +183,80 @@ mutual
             intro closureEquality
             cases closureEquality
             exact parameterEquality rfl)
+    | .inLeft leftRightType leftPayload,
+        .inLeft rightRightType rightPayload =>
+        if typeEquality : leftRightType = rightRightType then
+          match Value.decEq leftPayload rightPayload with
+          | isFalse notEqual =>
+              isFalse (by
+                intro injectionEquality
+                cases injectionEquality
+                exact notEqual rfl)
+          | isTrue payloadEquality =>
+              isTrue (by cases typeEquality; cases payloadEquality; rfl)
+        else
+          isFalse (by
+            intro injectionEquality
+            cases injectionEquality
+            exact typeEquality rfl)
+    | .inRight leftLeftType leftPayload,
+        .inRight rightLeftType rightPayload =>
+        if typeEquality : leftLeftType = rightLeftType then
+          match Value.decEq leftPayload rightPayload with
+          | isFalse notEqual =>
+              isFalse (by
+                intro injectionEquality
+                cases injectionEquality
+                exact notEqual rfl)
+          | isTrue payloadEquality =>
+              isTrue (by cases typeEquality; cases payloadEquality; rfl)
+        else
+          isFalse (by
+            intro injectionEquality
+            cases injectionEquality
+            exact typeEquality rfl)
     | .unit, .bool _
     | .unit, .word _
     | .unit, .pair _ _
     | .unit, .closure _ _ _ _
+    | .unit, .inLeft _ _
+    | .unit, .inRight _ _
     | .bool _, .unit
     | .bool _, .word _
     | .bool _, .pair _ _
     | .bool _, .closure _ _ _ _
+    | .bool _, .inLeft _ _
+    | .bool _, .inRight _ _
     | .word _, .unit
     | .word _, .bool _
     | .word _, .pair _ _
     | .word _, .closure _ _ _ _
+    | .word _, .inLeft _ _
+    | .word _, .inRight _ _
     | .pair _ _, .unit
     | .pair _ _, .bool _
     | .pair _ _, .word _
     | .pair _ _, .closure _ _ _ _
+    | .pair _ _, .inLeft _ _
+    | .pair _ _, .inRight _ _
     | .closure _ _ _ _, .unit
     | .closure _ _ _ _, .bool _
     | .closure _ _ _ _, .word _
-    | .closure _ _ _ _, .pair _ _ =>
+    | .closure _ _ _ _, .pair _ _
+    | .closure _ _ _ _, .inLeft _ _
+    | .closure _ _ _ _, .inRight _ _
+    | .inLeft _ _, .unit
+    | .inLeft _ _, .bool _
+    | .inLeft _ _, .word _
+    | .inLeft _ _, .pair _ _
+    | .inLeft _ _, .closure _ _ _ _
+    | .inLeft _ _, .inRight _ _
+    | .inRight _ _, .unit
+    | .inRight _ _, .bool _
+    | .inRight _ _, .word _
+    | .inRight _ _, .pair _ _
+    | .inRight _ _, .closure _ _ _ _
+    | .inRight _ _, .inLeft _ _ =>
         isFalse (by intro equality; cases equality)
   termination_by sizeOf left + sizeOf right
   decreasing_by all_goals simp_wf <;> omega
@@ -250,6 +310,8 @@ def Value.type : Value → Ty
   | .pair left right => .product left.type right.type
   | .closure parameterType resultType _ _ =>
       .function parameterType resultType
+  | .inLeft rightType payload => .sum payload.type rightType
+  | .inRight leftType payload => .sum leftType payload.type
 
 abbrev Context := List Ty
 

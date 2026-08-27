@@ -86,9 +86,9 @@ correspondence, state safety, old-wire rejection, and focused regressions. A
 logical-relations argument preserves total evaluation and sufficient fuel for
 the extended non-recursive language.
 
-## Next active design: sums and elimination
+## Completed Core vNext slice: sums and elimination
 
-The next decision must fix:
+ADR-0021 fixes:
 
 - left and right injection representation;
 - how both alternative payload types remain available at runtime;
@@ -97,8 +97,27 @@ The next decision must fix:
 - detailed checking paths and mismatch diagnostics; and
 - the boundary between binary sums and later named algebraic data.
 
-Exhaustive binary elimination can be completed without choosing Surface
-pattern syntax or constructor identity.
+Exhaustive binary elimination is complete without choosing Surface pattern
+syntax or constructor identity.
+
+The implementation now covers both injections, payload binders, selected-only
+branch evaluation, detailed diagnostics, weakening, CEK/big-step
+correspondence, safety, logical-relations totality, exact fuel, interactions
+with products and closures, and old-wire rejection.
+
+## Next active design: mutable locals
+
+The next decision must fix:
+
+- whether bindings denote values or stable cell identities;
+- allocation order and lifetime;
+- assignment result and evaluation order;
+- how closures share captured mutable cells;
+- explicit store typing and preservation; and
+- the boundary between local cells and future contract storage.
+
+This slice must keep local state explicit in the semantics and must not depend
+on host-language mutation.
 
 ## State and contracts
 

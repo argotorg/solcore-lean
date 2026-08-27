@@ -27,6 +27,30 @@ inductive Evaluates : Environment → Expr → Value → Prop where
       {leftValue rightValue : Value} :
       Evaluates environment operand (.pair leftValue rightValue) →
       Evaluates environment (.second operand) rightValue
+  | inLeft
+      {environment : Environment} {rightType : Ty} {payload : Expr}
+      {payloadValue : Value} :
+      Evaluates environment payload payloadValue →
+      Evaluates environment (.inLeft rightType payload)
+        (.inLeft rightType payloadValue)
+  | inRight
+      {environment : Environment} {leftType : Ty} {payload : Expr}
+      {payloadValue : Value} :
+      Evaluates environment payload payloadValue →
+      Evaluates environment (.inRight leftType payload)
+        (.inRight leftType payloadValue)
+  | caseLeft
+      {environment : Environment} {scrutinee leftBranch rightBranch : Expr}
+      {rightType : Ty} {payload result : Value} :
+      Evaluates environment scrutinee (.inLeft rightType payload) →
+      Evaluates (payload :: environment) leftBranch result →
+      Evaluates environment (.caseE scrutinee leftBranch rightBranch) result
+  | caseRight
+      {environment : Environment} {scrutinee leftBranch rightBranch : Expr}
+      {leftType : Ty} {payload result : Value} :
+      Evaluates environment scrutinee (.inRight leftType payload) →
+      Evaluates (payload :: environment) rightBranch result →
+      Evaluates environment (.caseE scrutinee leftBranch rightBranch) result
   | lambda
       {environment : Environment} {parameterType resultType : Ty}
       {body : Expr} :
@@ -110,6 +134,34 @@ theorem evaluation_deterministic
           have pairEquality := operandIH otherOperand
           cases pairEquality
           rfl
+  | inLeft _ payloadIH =>
+      cases rightEvaluation with
+      | inLeft otherPayload =>
+          cases payloadIH otherPayload
+          rfl
+  | inRight _ payloadIH =>
+      cases rightEvaluation with
+      | inRight otherPayload =>
+          cases payloadIH otherPayload
+          rfl
+  | caseLeft _ _ scrutineeIH branchIH =>
+      cases rightEvaluation with
+      | caseLeft otherScrutinee otherBranch =>
+          have scrutineeEquality := scrutineeIH otherScrutinee
+          cases scrutineeEquality
+          exact branchIH otherBranch
+      | caseRight otherScrutinee _ =>
+          have impossible := scrutineeIH otherScrutinee
+          cases impossible
+  | caseRight _ _ scrutineeIH branchIH =>
+      cases rightEvaluation with
+      | caseLeft otherScrutinee _ =>
+          have impossible := scrutineeIH otherScrutinee
+          cases impossible
+      | caseRight otherScrutinee otherBranch =>
+          have scrutineeEquality := scrutineeIH otherScrutinee
+          cases scrutineeEquality
+          exact branchIH otherBranch
   | lambda =>
       cases rightEvaluation
       rfl

@@ -36,6 +36,21 @@ inductive HasType : Context → Expr → Ty → Prop where
       HasType context function (.function parameterType resultType) →
       HasType context argument parameterType →
       HasType context (.apply function argument) resultType
+  | inLeft
+      {context : Context} {rightType leftType : Ty} {payload : Expr} :
+      HasType context payload leftType →
+      HasType context (.inLeft rightType payload) (.sum leftType rightType)
+  | inRight
+      {context : Context} {leftType rightType : Ty} {payload : Expr} :
+      HasType context payload rightType →
+      HasType context (.inRight leftType payload) (.sum leftType rightType)
+  | caseE
+      {context : Context} {scrutinee leftBranch rightBranch : Expr}
+      {leftType rightType resultType : Ty} :
+      HasType context scrutinee (.sum leftType rightType) →
+      HasType (leftType :: context) leftBranch resultType →
+      HasType (rightType :: context) rightBranch resultType →
+      HasType context (.caseE scrutinee leftBranch rightBranch) resultType
   | unary
       {context : Context} {op : UnaryOp} {operand : Expr} :
       HasType context operand op.operandType →
@@ -87,6 +102,27 @@ def infer? (context : Context) : Expr → Option Ty
           else
             none
       | _ => none
+  | .inLeft rightType payload =>
+      match infer? context payload with
+      | some leftType => some (.sum leftType rightType)
+      | none => none
+  | .inRight leftType payload =>
+      match infer? context payload with
+      | some rightType => some (.sum leftType rightType)
+      | none => none
+  | .caseE scrutinee leftBranch rightBranch =>
+      match infer? context scrutinee with
+      | some (.sum leftType rightType) =>
+          match
+              infer? (leftType :: context) leftBranch,
+              infer? (rightType :: context) rightBranch with
+          | some leftResultType, some rightResultType =>
+              if leftResultType = rightResultType then
+                some leftResultType
+              else
+                none
+          | _, _ => none
+      | _ => none
   | .unary op operand =>
       if infer? context operand = some op.operandType then
         some op.resultType
@@ -121,6 +157,10 @@ theorem infer_complete
   | second _ operandIH => simp [infer?, operandIH]
   | lambda bodyTyping bodyIH => simp [infer?, bodyIH]
   | apply _ _ functionIH argumentIH => simp [infer?, functionIH, argumentIH]
+  | inLeft _ payloadIH => simp [infer?, payloadIH]
+  | inRight _ payloadIH => simp [infer?, payloadIH]
+  | caseE _ _ _ scrutineeIH leftIH rightIH =>
+      simp [infer?, scrutineeIH, leftIH, rightIH]
   | unary _ operandIH => simp [infer?, operandIH]
   | binary _ _ leftIH rightIH => simp [infer?, leftIH, rightIH]
   | letE _ _ valueIH bodyIH => simp_all [infer?]
@@ -175,6 +215,8 @@ theorem infer_sound
               exact .first (operandIH operandInferred)
           | function parameterType resultType =>
               simp [infer?, operandInferred] at inferred
+          | sum leftType rightType =>
+              simp [infer?, operandInferred] at inferred
   | second operand operandIH =>
       cases operandInferred : infer? context operand with
       | none => simp [infer?, operandInferred] at inferred
@@ -190,6 +232,8 @@ theorem infer_sound
               subst type
               exact .second (operandIH operandInferred)
           | function parameterType resultType =>
+              simp [infer?, operandInferred] at inferred
+          | sum leftType rightType =>
               simp [infer?, operandInferred] at inferred
   | lambda parameterType resultType body bodyIH =>
       by_cases bodyInferred :
@@ -221,6 +265,65 @@ theorem infer_sound
                   (functionIH functionInferred)
                   (argumentIH argumentInferred)
               · simp [infer?, functionInferred, argumentInferred] at inferred
+          | sum leftType rightType =>
+              simp [infer?, functionInferred] at inferred
+  | inLeft rightType payload payloadIH =>
+      cases payloadInferred : infer? context payload with
+      | none => simp [infer?, payloadInferred] at inferred
+      | some leftType =>
+          have sumType : Ty.sum leftType rightType = type := by
+            exact Option.some.inj (by
+              simpa [infer?, payloadInferred] using inferred)
+          subst type
+          exact .inLeft (payloadIH payloadInferred)
+  | inRight leftType payload payloadIH =>
+      cases payloadInferred : infer? context payload with
+      | none => simp [infer?, payloadInferred] at inferred
+      | some rightType =>
+          have sumType : Ty.sum leftType rightType = type := by
+            exact Option.some.inj (by
+              simpa [infer?, payloadInferred] using inferred)
+          subst type
+          exact .inRight (payloadIH payloadInferred)
+  | caseE scrutinee leftBranch rightBranch scrutineeIH leftIH rightIH =>
+      cases scrutineeInferred : infer? context scrutinee with
+      | none => simp [infer?, scrutineeInferred] at inferred
+      | some scrutineeType =>
+          cases scrutineeType with
+          | unit => simp [infer?, scrutineeInferred] at inferred
+          | bool => simp [infer?, scrutineeInferred] at inferred
+          | word => simp [infer?, scrutineeInferred] at inferred
+          | product firstType secondType =>
+              simp [infer?, scrutineeInferred] at inferred
+          | function parameterType resultType =>
+              simp [infer?, scrutineeInferred] at inferred
+          | sum leftType rightType =>
+              cases leftInferred : infer? (leftType :: context) leftBranch with
+              | none => simp [infer?, scrutineeInferred, leftInferred] at inferred
+              | some leftResultType =>
+                  cases rightInferred : infer? (rightType :: context) rightBranch with
+                  | none =>
+                      simp [infer?, scrutineeInferred, leftInferred, rightInferred]
+                        at inferred
+                  | some rightResultType =>
+                      by_cases equalTypes : leftResultType = rightResultType
+                      · subst rightResultType
+                        have inferredResult : leftResultType = type := by
+                          exact Option.some.inj (by
+                            simpa [infer?, scrutineeInferred, leftInferred, rightInferred]
+                              using inferred)
+                        subst type
+                        exact .caseE
+                          (scrutineeIH scrutineeInferred)
+                          (leftIH leftInferred)
+                          (rightIH rightInferred)
+                      · simp [
+                          infer?,
+                          scrutineeInferred,
+                          leftInferred,
+                          rightInferred,
+                          equalTypes
+                        ] at inferred
   | unary op operand operandIH =>
       by_cases operandInferred :
           infer? context operand = some op.operandType
@@ -261,6 +364,8 @@ theorem infer_sound
           | product leftType rightType =>
               simp [infer?, conditionInferred] at inferred
           | function parameterType resultType =>
+              simp [infer?, conditionInferred] at inferred
+          | sum leftType rightType =>
               simp [infer?, conditionInferred] at inferred
           | bool =>
               cases thenInferred : infer? context thenBranch with

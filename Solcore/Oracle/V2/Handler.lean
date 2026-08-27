@@ -32,6 +32,11 @@ private def checkPathStepName : Core.CheckPathStep → String
   | .lambdaBody => "lambdaBody"
   | .applyFunction => "applyFunction"
   | .applyArgument => "applyArgument"
+  | .inLeftPayload => "inLeftPayload"
+  | .inRightPayload => "inRightPayload"
+  | .caseScrutinee => "caseScrutinee"
+  | .caseLeftBranch => "caseLeftBranch"
+  | .caseRightBranch => "caseRightBranch"
   | .unaryOperand => "unaryOperand"
   | .binaryLeft => "binaryLeft"
   | .binaryRight => "binaryRight"
@@ -72,6 +77,16 @@ private def checkErrorArguments : Core.CheckErrorData → Option Lean.Json
       pure (.mkObj [
         ("declared", declared),
         ("actual", actual)
+      ])
+  | .expectedSum actual => do
+      let actual ← encodeCoreType? actual
+      pure (.mkObj [("actual", actual)])
+  | .caseBranchTypeMismatch leftType rightType => do
+      let leftType ← encodeCoreType? leftType
+      let rightType ← encodeCoreType? rightType
+      pure (.mkObj [
+        ("leftType", leftType),
+        ("rightType", rightType)
       ])
   | .primitiveOperandTypeMismatch expected actual => do
       let expected ← encodeCoreType? expected

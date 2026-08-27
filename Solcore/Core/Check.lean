@@ -12,6 +12,11 @@ inductive CheckPathStep where
   | lambdaBody
   | applyFunction
   | applyArgument
+  | inLeftPayload
+  | inRightPayload
+  | caseScrutinee
+  | caseLeftBranch
+  | caseRightBranch
   | unaryOperand
   | binaryLeft
   | binaryRight
@@ -34,6 +39,8 @@ inductive CheckErrorCode where
   | expectedFunction
   | functionArgumentTypeMismatch
   | lambdaResultTypeMismatch
+  | expectedSum
+  | caseBranchTypeMismatch
   | primitiveOperandTypeMismatch
   | branchTypeMismatch
   | declaredResultTypeMismatch
@@ -47,6 +54,8 @@ def CheckErrorCode.name : CheckErrorCode → String
   | .functionArgumentTypeMismatch =>
       "core.check.function-argument-type-mismatch"
   | .lambdaResultTypeMismatch => "core.check.lambda-result-type-mismatch"
+  | .expectedSum => "core.check.expected-sum"
+  | .caseBranchTypeMismatch => "core.check.case-branch-type-mismatch"
   | .primitiveOperandTypeMismatch =>
       "core.check.primitive-operand-type-mismatch"
   | .branchTypeMismatch => "core.check.branch-type-mismatch"
@@ -59,6 +68,8 @@ inductive CheckErrorData where
   | expectedFunction (actual : Ty)
   | functionArgumentTypeMismatch (expected actual : Ty)
   | lambdaResultTypeMismatch (declared actual : Ty)
+  | expectedSum (actual : Ty)
+  | caseBranchTypeMismatch (leftType rightType : Ty)
   | primitiveOperandTypeMismatch (expected actual : Ty)
   | branchTypeMismatch (thenType elseType : Ty)
   | declaredResultTypeMismatch (declaredType inferredType : Ty)
@@ -71,6 +82,8 @@ def CheckErrorData.code : CheckErrorData → CheckErrorCode
   | .expectedFunction .. => .expectedFunction
   | .functionArgumentTypeMismatch .. => .functionArgumentTypeMismatch
   | .lambdaResultTypeMismatch .. => .lambdaResultTypeMismatch
+  | .expectedSum .. => .expectedSum
+  | .caseBranchTypeMismatch .. => .caseBranchTypeMismatch
   | .primitiveOperandTypeMismatch .. => .primitiveOperandTypeMismatch
   | .branchTypeMismatch .. => .branchTypeMismatch
   | .declaredResultTypeMismatch .. => .declaredResultTypeMismatch
@@ -157,6 +170,47 @@ def inferDetailed (context : Context) (path : CheckPath := []) : Expr → Except
           .error {
             path := functionPath
             data := .expectedFunction actualType
+          }
+  | .inLeft rightType payload =>
+      match inferDetailed context (path.child .inLeftPayload) payload with
+      | .error error => .error error
+      | .ok leftType => .ok (.sum leftType rightType)
+  | .inRight leftType payload =>
+      match inferDetailed context (path.child .inRightPayload) payload with
+      | .error error => .error error
+      | .ok rightType => .ok (.sum leftType rightType)
+  | .caseE scrutinee leftBranch rightBranch =>
+      let scrutineePath := path.child .caseScrutinee
+      match inferDetailed context scrutineePath scrutinee with
+      | .error error => .error error
+      | .ok (.sum leftType rightType) =>
+          match
+              inferDetailed
+                (leftType :: context)
+                (path.child .caseLeftBranch)
+                leftBranch with
+          | .error error => .error error
+          | .ok leftResultType =>
+              match
+                  inferDetailed
+                    (rightType :: context)
+                    (path.child .caseRightBranch)
+                    rightBranch with
+              | .error error => .error error
+              | .ok rightResultType =>
+                  if leftResultType = rightResultType then
+                    .ok leftResultType
+                  else
+                    .error {
+                      path := path.child .caseRightBranch
+                      data := .caseBranchTypeMismatch
+                        leftResultType
+                        rightResultType
+                    }
+      | .ok actualType =>
+          .error {
+            path := scrutineePath
+            data := .expectedSum actualType
           }
   | .unary op operand =>
       let operandPath := path.child .unaryOperand
@@ -460,6 +514,210 @@ theorem inferDetailed_toOption
                       argumentInferred,
                       matchingArgument
                     ]
+          | sum leftType rightType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                functionDetailed,
+                functionInferred
+              ]
+  | inLeft rightType payload payloadIH =>
+      cases payloadDetailed :
+          inferDetailed context (path.child .inLeftPayload) payload with
+      | error error =>
+          have payloadNotInferred : infer? context payload = none := by
+            simpa [payloadDetailed, Except.toOption] using
+              (payloadIH context (path.child .inLeftPayload)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            payloadDetailed,
+            payloadNotInferred
+          ]
+      | ok leftType =>
+          have payloadInferred : infer? context payload = some leftType := by
+            simpa [payloadDetailed, Except.toOption] using
+              (payloadIH context (path.child .inLeftPayload)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            payloadDetailed,
+            payloadInferred
+          ]
+  | inRight leftType payload payloadIH =>
+      cases payloadDetailed :
+          inferDetailed context (path.child .inRightPayload) payload with
+      | error error =>
+          have payloadNotInferred : infer? context payload = none := by
+            simpa [payloadDetailed, Except.toOption] using
+              (payloadIH context (path.child .inRightPayload)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            payloadDetailed,
+            payloadNotInferred
+          ]
+      | ok rightType =>
+          have payloadInferred : infer? context payload = some rightType := by
+            simpa [payloadDetailed, Except.toOption] using
+              (payloadIH context (path.child .inRightPayload)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            payloadDetailed,
+            payloadInferred
+          ]
+  | caseE scrutinee leftBranch rightBranch scrutineeIH leftIH rightIH =>
+      cases scrutineeDetailed :
+          inferDetailed context (path.child .caseScrutinee) scrutinee with
+      | error error =>
+          have scrutineeNotInferred : infer? context scrutinee = none := by
+            simpa [scrutineeDetailed, Except.toOption] using
+              (scrutineeIH context (path.child .caseScrutinee)).symm
+          simp [
+            inferDetailed,
+            infer?,
+            Except.toOption,
+            scrutineeDetailed,
+            scrutineeNotInferred
+          ]
+      | ok scrutineeType =>
+          have scrutineeInferred :
+              infer? context scrutinee = some scrutineeType := by
+            simpa [scrutineeDetailed, Except.toOption] using
+              (scrutineeIH context (path.child .caseScrutinee)).symm
+          cases scrutineeType with
+          | unit =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                scrutineeDetailed,
+                scrutineeInferred
+              ]
+          | bool =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                scrutineeDetailed,
+                scrutineeInferred
+              ]
+          | word =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                scrutineeDetailed,
+                scrutineeInferred
+              ]
+          | product firstType secondType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                scrutineeDetailed,
+                scrutineeInferred
+              ]
+          | function parameterType resultType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                scrutineeDetailed,
+                scrutineeInferred
+              ]
+          | sum leftType rightType =>
+              cases leftDetailed :
+                  inferDetailed
+                    (leftType :: context)
+                    (path.child .caseLeftBranch)
+                    leftBranch with
+              | error error =>
+                  have leftNotInferred :
+                      infer? (leftType :: context) leftBranch = none := by
+                    simpa [leftDetailed, Except.toOption] using
+                      (leftIH
+                        (leftType :: context)
+                        (path.child .caseLeftBranch)).symm
+                  simp [
+                    inferDetailed,
+                    infer?,
+                    Except.toOption,
+                    scrutineeDetailed,
+                    scrutineeInferred,
+                    leftDetailed,
+                    leftNotInferred
+                  ]
+              | ok leftResultType =>
+                  have leftInferred :
+                      infer? (leftType :: context) leftBranch =
+                        some leftResultType := by
+                    simpa [leftDetailed, Except.toOption] using
+                      (leftIH
+                        (leftType :: context)
+                        (path.child .caseLeftBranch)).symm
+                  cases rightDetailed :
+                      inferDetailed
+                        (rightType :: context)
+                        (path.child .caseRightBranch)
+                        rightBranch with
+                  | error error =>
+                      have rightNotInferred :
+                          infer? (rightType :: context) rightBranch = none := by
+                        simpa [rightDetailed, Except.toOption] using
+                          (rightIH
+                            (rightType :: context)
+                            (path.child .caseRightBranch)).symm
+                      simp [
+                        inferDetailed,
+                        infer?,
+                        Except.toOption,
+                        scrutineeDetailed,
+                        scrutineeInferred,
+                        leftDetailed,
+                        leftInferred,
+                        rightDetailed,
+                        rightNotInferred
+                      ]
+                  | ok rightResultType =>
+                      have rightInferred :
+                          infer? (rightType :: context) rightBranch =
+                            some rightResultType := by
+                        simpa [rightDetailed, Except.toOption] using
+                          (rightIH
+                            (rightType :: context)
+                            (path.child .caseRightBranch)).symm
+                      by_cases equalTypes : leftResultType = rightResultType
+                      · subst rightResultType
+                        simp [
+                          inferDetailed,
+                          infer?,
+                          Except.toOption,
+                          scrutineeDetailed,
+                          scrutineeInferred,
+                          leftDetailed,
+                          leftInferred,
+                          rightDetailed,
+                          rightInferred
+                        ]
+                      · simp [
+                          inferDetailed,
+                          infer?,
+                          Except.toOption,
+                          scrutineeDetailed,
+                          scrutineeInferred,
+                          leftDetailed,
+                          leftInferred,
+                          rightDetailed,
+                          rightInferred,
+                          equalTypes
+                        ]
   | unary op operand operandIH =>
       cases operandDetailed :
           inferDetailed context (path.child .unaryOperand) operand with
@@ -627,6 +885,14 @@ theorem inferDetailed_toOption
                 conditionInferred
               ]
           | function parameterType resultType =>
+              simp [
+                inferDetailed,
+                infer?,
+                Except.toOption,
+                conditionDetailed,
+                conditionInferred
+              ]
+          | sum leftType rightType =>
               simp [
                 inferDetailed,
                 infer?,

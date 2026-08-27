@@ -36,8 +36,8 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Functions and application | ADR-0020 Accepted | Complete | typing/checker equivalence, ordered application, correspondence, logical-relations totality, safety, and old-wire rejection complete | None |
 | Lexical closures | ADR-0020 Accepted | Complete | capture typing, environment correspondence, invocation, and fault exclusion complete | None |
 | Recursion and divergence | Decision incomplete | Blocked | divergence/resource model and replacement for finite termination | None |
-| Mutable locals and assignment | Direction accepted | Planned | cell identity, evaluation order, state typing, preservation | None |
-| Sum values | Direction accepted | Active design | injections, elimination, value typing, safety | None |
+| Mutable locals and assignment | Direction accepted | Active design | cell identity, evaluation order, state typing, preservation | None |
+| Sum values | ADR-0021 Accepted | Complete | injections, exhaustive elimination, checker equivalence, CEK correspondence, logical-relations totality, safety, and old-wire rejection complete | None |
 | User algebraic data | Direction accepted | Planned | constructor identity and value algebra | Low |
 | Direct pattern matching | Direction accepted | Planned | matching order, exhaustiveness, failure policy | Low |
 | Additional conversions and primitives | Per-feature decisions needed | Planned | total application and typed results | None |

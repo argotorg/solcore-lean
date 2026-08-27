@@ -95,6 +95,90 @@ theorem Evaluates.toStepsWithContinuation
           (@Transition.applySecond leftValue rightValue continuation)
           .refl
       exact ⟨_, enterPath.trans (operandPath.trans applyPath)⟩
+  | @inLeft environment rightType payload payloadValue
+      payloadEvaluation payloadIH =>
+      obtain ⟨payloadSteps, payloadPath⟩ :=
+        payloadIH (.inLeftApply rightType :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.inLeft rightType payload) environment, continuation⟩
+          ⟨.eval payload environment, .inLeftApply rightType :: continuation⟩ :=
+        .cons
+          (@Transition.enterInLeft environment rightType payload continuation)
+          .refl
+      let applyPath : Steps 1
+          ⟨.ret payloadValue, .inLeftApply rightType :: continuation⟩
+          ⟨.ret (.inLeft rightType payloadValue), continuation⟩ :=
+        .cons
+          (@Transition.applyInLeft rightType payloadValue continuation)
+          .refl
+      exact ⟨_, enterPath.trans (payloadPath.trans applyPath)⟩
+  | @inRight environment leftType payload payloadValue
+      payloadEvaluation payloadIH =>
+      obtain ⟨payloadSteps, payloadPath⟩ :=
+        payloadIH (.inRightApply leftType :: continuation)
+      let enterPath : Steps 1
+          ⟨.eval (.inRight leftType payload) environment, continuation⟩
+          ⟨.eval payload environment, .inRightApply leftType :: continuation⟩ :=
+        .cons
+          (@Transition.enterInRight environment leftType payload continuation)
+          .refl
+      let applyPath : Steps 1
+          ⟨.ret payloadValue, .inRightApply leftType :: continuation⟩
+          ⟨.ret (.inRight leftType payloadValue), continuation⟩ :=
+        .cons
+          (@Transition.applyInRight leftType payloadValue continuation)
+          .refl
+      exact ⟨_, enterPath.trans (payloadPath.trans applyPath)⟩
+  | @caseLeft environment scrutinee leftBranch rightBranch rightType payload result
+      scrutineeEvaluation branchEvaluation scrutineeIH branchIH =>
+      obtain ⟨scrutineeSteps, scrutineePath⟩ :=
+        scrutineeIH
+          (.caseBranches leftBranch rightBranch environment :: continuation)
+      obtain ⟨branchSteps, branchPath⟩ := branchIH continuation
+      let enterPath : Steps 1
+          ⟨.eval (.caseE scrutinee leftBranch rightBranch) environment, continuation⟩
+          ⟨.eval scrutinee environment,
+            .caseBranches leftBranch rightBranch environment :: continuation⟩ :=
+        .cons
+          (@Transition.enterCase environment scrutinee leftBranch rightBranch
+            continuation)
+          .refl
+      let choosePath : Steps 1
+          ⟨.ret (.inLeft rightType payload),
+            .caseBranches leftBranch rightBranch environment :: continuation⟩
+          ⟨.eval leftBranch (payload :: environment), continuation⟩ :=
+        .cons
+          (@Transition.chooseLeft environment leftBranch rightBranch rightType payload
+            continuation)
+          .refl
+      exact ⟨_,
+        enterPath.trans
+          (scrutineePath.trans (choosePath.trans branchPath))⟩
+  | @caseRight environment scrutinee leftBranch rightBranch leftType payload result
+      scrutineeEvaluation branchEvaluation scrutineeIH branchIH =>
+      obtain ⟨scrutineeSteps, scrutineePath⟩ :=
+        scrutineeIH
+          (.caseBranches leftBranch rightBranch environment :: continuation)
+      obtain ⟨branchSteps, branchPath⟩ := branchIH continuation
+      let enterPath : Steps 1
+          ⟨.eval (.caseE scrutinee leftBranch rightBranch) environment, continuation⟩
+          ⟨.eval scrutinee environment,
+            .caseBranches leftBranch rightBranch environment :: continuation⟩ :=
+        .cons
+          (@Transition.enterCase environment scrutinee leftBranch rightBranch
+            continuation)
+          .refl
+      let choosePath : Steps 1
+          ⟨.ret (.inRight leftType payload),
+            .caseBranches leftBranch rightBranch environment :: continuation⟩
+          ⟨.eval rightBranch (payload :: environment), continuation⟩ :=
+        .cons
+          (@Transition.chooseRight environment leftBranch rightBranch leftType payload
+            continuation)
+          .refl
+      exact ⟨_,
+        enterPath.trans
+          (scrutineePath.trans (choosePath.trans branchPath))⟩
   | @lambda environment parameterType resultType body =>
       exact ⟨1, .cons .lambda .refl⟩
   | @apply environment capturedEnvironment function argument body
@@ -318,6 +402,42 @@ inductive Continues : List Frame → Value → Value → Prop where
         (.secondApply :: continuation)
         (.pair leftValue rightValue)
         finalValue
+  | inLeftApply
+      {rightType : Ty} {payload finalValue : Value}
+      {continuation : List Frame} :
+      Continues continuation (.inLeft rightType payload) finalValue →
+      Continues
+        (.inLeftApply rightType :: continuation)
+        payload
+        finalValue
+  | inRightApply
+      {leftType : Ty} {payload finalValue : Value}
+      {continuation : List Frame} :
+      Continues continuation (.inRight leftType payload) finalValue →
+      Continues
+        (.inRightApply leftType :: continuation)
+        payload
+        finalValue
+  | caseLeft
+      {leftBranch rightBranch : Expr} {environment : Environment}
+      {rightType : Ty} {payload result finalValue : Value}
+      {continuation : List Frame} :
+      Evaluates (payload :: environment) leftBranch result →
+      Continues continuation result finalValue →
+      Continues
+        (.caseBranches leftBranch rightBranch environment :: continuation)
+        (.inLeft rightType payload)
+        finalValue
+  | caseRight
+      {leftBranch rightBranch : Expr} {environment : Environment}
+      {leftType : Ty} {payload result finalValue : Value}
+      {continuation : List Frame} :
+      Evaluates (payload :: environment) rightBranch result →
+      Continues continuation result finalValue →
+      Continues
+        (.caseBranches leftBranch rightBranch environment :: continuation)
+        (.inRight leftType payload)
+        finalValue
   | applyArgument
       {argument : Expr} {callerEnvironment capturedEnvironment : Environment}
       {parameterType resultType : Ty} {body : Expr}
@@ -429,6 +549,42 @@ theorem transition_reflects_denotation
       cases denotes with
       | ret continuation =>
           exact .ret (.secondApply continuation)
+  | enterInLeft =>
+      cases denotes with
+      | eval payloadEvaluation continuation =>
+          cases continuation with
+          | inLeftApply rest =>
+              exact .eval (.inLeft payloadEvaluation) rest
+  | applyInLeft =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.inLeftApply continuation)
+  | enterInRight =>
+      cases denotes with
+      | eval payloadEvaluation continuation =>
+          cases continuation with
+          | inRightApply rest =>
+              exact .eval (.inRight payloadEvaluation) rest
+  | applyInRight =>
+      cases denotes with
+      | ret continuation =>
+          exact .ret (.inRightApply continuation)
+  | enterCase =>
+      cases denotes with
+      | eval scrutineeEvaluation continuation =>
+          cases continuation with
+          | caseLeft branchEvaluation rest =>
+              exact .eval (.caseLeft scrutineeEvaluation branchEvaluation) rest
+          | caseRight branchEvaluation rest =>
+              exact .eval (.caseRight scrutineeEvaluation branchEvaluation) rest
+  | chooseLeft =>
+      cases denotes with
+      | eval branchEvaluation continuation =>
+          exact .ret (.caseLeft branchEvaluation continuation)
+  | chooseRight =>
+      cases denotes with
+      | eval branchEvaluation continuation =>
+          exact .ret (.caseRight branchEvaluation continuation)
   | lambda =>
       cases denotes with
       | ret continuation => exact .eval .lambda continuation

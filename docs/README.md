@@ -53,6 +53,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0018 records the semantics-first development pivot.
 - ADR-0019 defines the first internal Core vNext feature.
 - ADR-0020 defines non-recursive functions and lexical closures.
+- ADR-0021 defines binary sums and exhaustive elimination.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

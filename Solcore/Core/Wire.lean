@@ -37,6 +37,7 @@ def ofCore? : Solcore.Core.Ty → Option Ty
   | .word => some .word
   | .product _ _ => none
   | .function _ _ => none
+  | .sum _ _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (type : Ty) :
@@ -74,6 +75,8 @@ def ofCore? : Solcore.Core.Value → Option Value
   | .word value => some (.word value)
   | .pair _ _ => none
   | .closure _ _ _ _ => none
+  | .inLeft _ _ => none
+  | .inRight _ _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (value : Value) :
@@ -133,6 +136,9 @@ def ofCore? : Solcore.Core.Expr → Option Expr
   | .second _ => none
   | .lambda _ _ _ => none
   | .apply _ _ => none
+  | .inLeft _ _ => none
+  | .inRight _ _ => none
+  | .caseE _ _ _ => none
   | _ => none
 
 @[simp] theorem ofCore?_toCore (expr : Expr) :
