@@ -13,6 +13,7 @@ import Solcore.Test.CoreBooleanConnectives
 import Solcore.Test.CoreCells
 import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
+import Solcore.Test.CoreDerivedComparisonWire
 import Solcore.Test.CoreDerivedComparisons
 import Solcore.Test.CoreFunctions
 import Solcore.Test.CoreNamedData
@@ -4799,6 +4800,7 @@ def run : IO Unit := do
   testCoreBooleanConnectives
   testCoreComparisonFlags
   testCoreConversions
+  testCoreDerivedComparisonWire
   testCoreDerivedComparisons
   testCoreNamedData
   testCoreRenaming
