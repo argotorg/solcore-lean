@@ -37,11 +37,12 @@ These results remain regression obligations for every extension.
 | 11 | Renaming and environment insertion | Complete | Establishes static and dynamic weakening without changing semantics |
 | 12 | Derived boolean word comparisons | Complete | Completes proof interfaces for the existing comparison builders |
 | 13 | Derived word comparison flags | Complete | Wraps existing boolean comparisons with canonical word conversion |
-| 14 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
-| 15 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 16 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
-| 17 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
-| 18 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 14 | Derived-builder arbitrary renaming laws | Active | Backfills the general renaming API for eight existing builders |
+| 15 | Additional primitives and conversions | Planned | Added one closed, typed family at a time |
+| 16 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 17 | Contract runtime state and observations | Planned | Adds external effects independently of source syntax |
+| 18 | ABI and storage | Planned | Follows accepted layout and admissibility decisions |
+| 19 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -282,6 +283,15 @@ and `wordGeFlag` retain the completed left store while weakening lifts their
 variable index across the internal binding. The slice keeps left-to-right
 exactly-once evaluation and adds no Core or wire tag. The next feature is
 selected by a separate ADR.
+
+## Active Core vNext slice: derived-builder renaming laws
+
+[ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) backfills
+arbitrary `Expr.rename` laws for exactly eight older derived builders:
+`boolToWord`, `wordToBool`, `wordIsZero`, `wordIsNonzero`, `boolAnd`, `boolOr`,
+`wordEqFlag`, and `wordGtFlag`. The work also relocates `rename_boolToWord` to
+`Conversions`, its owning module, and adds non-insertion/free-variable
+regressions. It changes no weakening law, runtime semantics, or wire behavior.
 
 ## State and contracts
 

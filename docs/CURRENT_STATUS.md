@@ -34,6 +34,9 @@ interfaces for the existing `wordNe`, `wordLt`, `wordLe`, and `wordGe`
 builders. Core vNext remains active.
 [ADR-0031](adr/0031-core-vnext-derived-word-comparison-flags.md) completes
 word-valued flags for the four existing derived comparisons.
+[ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) makes the
+arbitrary renaming-law backfill for eight older derived builders the active
+slice.
 
 ## Implementation status
 
@@ -55,6 +58,7 @@ word-valued flags for the four existing derived comparisons.
 | Internal renaming and environment simulation | Complete | Complete | Not published |
 | Internal derived boolean word comparisons | Complete | Complete | Not published |
 | Internal derived word comparison flags | Complete | Complete | Not published |
+| Internal derived-builder arbitrary renaming laws | In progress | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -337,6 +341,15 @@ projection and round trips. For `wordLtFlag` and `wordGeFlag`, a faulting right
 variable is correctly lifted across the internal binding and observes the
 completed left store. This work adds no Core or wire tag and changes no
 published behavior. The next feature is selected by a separate ADR.
+
+## Active Core vNext derived-builder renaming backfill
+
+[ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) adds arbitrary
+renaming laws for eight derived builders completed before ADR-0029: the four
+boolean/word conversions, two short-circuit booleans, and two original word
+comparison flags. It moves `rename_boolToWord` to the module that owns
+`boolToWord` and adds focused non-insertion/free-variable regressions. Existing
+weakening laws and all runtime and wire behavior remain unchanged.
 
 ## Meaning of completion
 

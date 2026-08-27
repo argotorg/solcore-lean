@@ -168,6 +168,14 @@ under the internal binding, so its variable index is lifted while the completed
 left store is retained. No Core form, wire tag, or published behavior changes.
 The next feature is selected by a separate ADR.
 
+The active ADR-0032 slice fills a static API gap left by the order of earlier
+work. `boolToWord`, `wordToBool`, `wordIsZero`, `wordIsNonzero`, `boolAnd`,
+`boolOr`, `wordEqFlag`, and `wordGtFlag` gain arbitrary renaming laws in their
+owning modules. `rename_boolToWord` moves from the later derived-comparison-flag
+module to `Conversions`. Non-insertion mappings and free variables receive
+focused regressions. Existing weakening, evaluation, store, fault, fuel, and
+wire behavior remain unchanged.
+
 ### Contract runtime
 
 The future runtime will make all external state explicit: storage, balances,

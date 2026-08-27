@@ -74,6 +74,13 @@ weakening boundary under the less-than binders. The builders preserve evaluation
 order, stores, and fuel through ordinary `boolToWord` composition and add no
 Core form, wire tag, or public behavior. The next feature is selected by a
 separate ADR.
+The active fourteenth slice,
+[ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md), adds arbitrary
+renaming laws for the eight older conversion, short-circuit, and comparison-flag
+builders that previously exposed only weakening laws. It also places
+`rename_boolToWord` with `boolToWord` in `Conversions`. Focused tests use a
+non-insertion mapping and free variables. Runtime and wire behavior do not
+change.
 These slices add no source spelling for mutable
 declarations, assignment, data declarations, patterns, or casts; the conversions
 also remain separate from future ABI decoding. Further Core work follows the
@@ -120,6 +127,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0029 defines the renaming and environment-insertion proof foundation.
 - ADR-0030 completes proof interfaces for existing derived word comparisons.
 - ADR-0031 derives word-valued flags for the remaining word comparisons.
+- ADR-0032 backfills arbitrary renaming laws for eight older derived builders.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
