@@ -60,6 +60,7 @@ import Solcore.Test.CoreUnaryPrimitiveWire
 import Solcore.Test.CoreUnaryPrimitives
 import Solcore.Test.CoreUnsignedDivision
 import Solcore.Test.CoreUnsignedDivisionWire
+import Solcore.Test.FrameOutcome
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.SurfaceMultiCertifiedFrontend
 import Solcore.Test.SurfaceMultiExactToken
@@ -4884,6 +4885,7 @@ def run : IO Unit := do
   testCoreUnaryPrimitives
   testCoreUnsignedDivision
   testCoreUnsignedDivisionWire
+  testFrameOutcome
   testRuntimeScalars
   testM1bProfile
   testM1cProfile
