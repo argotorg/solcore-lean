@@ -627,6 +627,11 @@ ADR-0103 proves the coherence boundary between that retained-address writer
 and its underlying address-parameterized values writer. Projecting successful
 results to their values removes only the wrapper and preserves failure exactly.
 
+ADR-0104 accepts whole-context coherence between the two pure construction
+routes out of parent-indexed initialization. Forgetting the proof-refined
+parent context yields the same plain continuation context as the checkpointed-
+working-pair adapter when both receive the same caller-supplied outcome.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

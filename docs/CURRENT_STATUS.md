@@ -260,6 +260,10 @@ same selector, checkpoint, and working effect journal.
 [ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
 completes the proof that projecting a retained-address write result to its
 values recovers the underlying address-parameterized write.
+[ADR-0104](adr/0104-parent-indexed-initialization-continuation-context-coherence.md)
+accepts a proof that the parent-indexed trace-extension route and checkpointed-
+working-pair route construct the same plain continuation context;
+implementation is planned.
 
 ## Implementation status
 
@@ -350,6 +354,7 @@ values recovers the underlying address-parameterized write.
 | Address-bound working storage-write algebra | No new operation | Complete | Not published |
 | Address-bound working storage-write preservation | No new operation | Complete | Not published |
 | Address-bound working storage-write values coherence | No new operation | Complete | Not published |
+| Parent-indexed initialization continuation-context coherence | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1787,6 +1792,16 @@ single public simp law, and the 38-line compile-only module contains exactly two
 private regressions. The law reports `[propext]`; full validation and
 independent audits pass. The slice adds no operation, carrier, address policy,
 runtime assertion, or runner call.
+
+## Planned parent-indexed initialization continuation-context coherence
+
+[ADR-0104](adr/0104-parent-indexed-initialization-continuation-context-coherence.md)
+specifies one proof-only equality between the two existing continuation-context
+construction routes out of parent-indexed initialization.
+
+The equality forgets only prefix and parent-index evidence from the refined
+route and keeps every base-context field exact. It adds no operation, frame
+transition, outcome provenance, runtime assertion, or runner call.
 
 ## Meaning of completion
 
