@@ -65,6 +65,7 @@ import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameEffectJournal
+import Solcore.Test.FrameRunContinuation
 import Solcore.Test.FrameRunEffectComposition
 import Solcore.Test.FrameRunEffectContinuation
 import Solcore.Test.FrameRunEffectResolution
@@ -4903,6 +4904,7 @@ def run : IO Unit := do
   testAddressWordBridge
   testFrameOutcome
   testFrameEffectJournal
+  testFrameRunContinuation
   testFrameRunEffectComposition
   testFrameRunEffectContinuation
   testFrameRunEffectResolution
