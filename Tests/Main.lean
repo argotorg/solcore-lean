@@ -64,6 +64,7 @@ import Solcore.Test.CoreUnsignedDivisionWire
 import Solcore.Test.AddressBytesBE
 import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
+import Solcore.Test.AddressSelectedHostCode
 import Solcore.Test.CheckedCoreProgram
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
@@ -4958,6 +4959,7 @@ def run : IO Unit := do
   testAddressBytesBE
   testAddressCodecCoherence
   testAddressWordBridge
+  testAddressSelectedHostCode
   testCheckedCoreProgram
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
