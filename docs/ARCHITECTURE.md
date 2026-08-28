@@ -419,6 +419,8 @@ ADR-0061 separates rollback-scoped frame effects from an opaque accumulated
 trace that survives revert. Return keeps the working journal; revert combines
 checkpoint rollback state with working trace; trap remains unresolved. Nested
 laws describe composition without introducing a frame stack or event order.
+The completed carrier and resolver have five axiom-free laws and five runtime
+assertions; rollback and trace contents remain fully parametric.
 
 ### Observation
 

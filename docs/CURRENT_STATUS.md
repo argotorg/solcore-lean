@@ -125,7 +125,7 @@ executable API or operational decision.
 [ADR-0060](adr/0060-external-checkpoint-frame-run-result.md) completes the
 minimal frame-run payload. It pairs speculative working state with an outcome
 while checkpoint ownership remains external.
-[ADR-0061](adr/0061-frame-effect-journal-policy.md) accepts the active parametric
+[ADR-0061](adr/0061-frame-effect-journal-policy.md) completes the parametric
 effect policy. It separates rollback-scoped and surviving snapshots without a
 concrete event taxonomy or order.
 
@@ -175,7 +175,7 @@ concrete event taxonomy or order.
 | WorldState observational update algebra | Complete | Complete | Not published |
 | WorldState storage-write algebra | Complete | Complete | Not published |
 | External-checkpoint frame run result | Complete | Complete | Not published |
-| Parametric frame effect journal policy | Active | In progress | Not published |
+| Parametric frame effect journal policy | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -879,15 +879,22 @@ resolver and the three simp laws in the 32-line properties module all report
 runner lines cover both resolution and projections. Full validation and audits
 pass.
 
-## Active parametric frame effect policy
+## Completed parametric frame effect policy
 
-[ADR-0061](adr/0061-frame-effect-journal-policy.md) plans one public carrier,
+[ADR-0061](adr/0061-frame-effect-journal-policy.md) provides one public carrier,
 one named resolver, five laws, and five Nat-fixture runtime assertions. Return
 keeps the working journal; revert restores checkpoint rollback state while the
 working trace survives; trap remains unresolved. Two nested bind laws cover
 child return followed by parent revert and child revert followed by parent
 revert. No concrete effects, trace order, append algebra, invocation stack,
 transaction, ABI, Core adaptation, EVM, gas, or publication is selected.
+
+The definition and properties modules contain 32 and 57 lines with one umbrella
+import each. The carrier has two public fields and one resolver. Exactly five
+laws comprise three simp constructor equations and two non-simp nested laws;
+the resolver and all laws introduce no axioms. Five assertions in a 64-line
+definition-only test module plus two runner lines pass full validation. The
+independent audits found no P0-P3 issue.
 
 ## Meaning of completion
 

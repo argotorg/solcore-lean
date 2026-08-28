@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: rollback-scoped state and surviving trace snapshots
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -135,3 +135,21 @@ serialization, canonical delta, or frozen artifact. Integration with
 Rollback-scoped and surviving observations can be modeled independently of
 their eventual concrete contents. Nested composition is specified only as pure
 resolver composition, not as an execution stack.
+
+## Implementation record
+
+The completed internal slice adds exactly one public carrier with two public
+fields and one named executable resolver. The definition module contains 32
+lines plus one umbrella import. It adds no deriving clause, instance,
+extensionality law, or helper.
+
+The 57-line properties module plus one umbrella import publishes exactly five
+laws: three simp constructor equations and two non-simp nested equations. The
+resolver and all five laws introduce no axioms. Exactly five runtime assertions
+live in a 64-line definition-only test module with two runner lines.
+
+The implementation commits are `8b5aa9f` (181 changed lines), `26f609f` (33),
+`a31e18f` (58), and `3f66922` (66). Each remains below 300 changed lines.
+Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+forbidden-declaration, document-link, and diff checks pass. Independent stage
+audits found no P0-P3 issue.

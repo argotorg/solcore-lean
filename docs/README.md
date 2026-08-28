@@ -262,11 +262,13 @@ uses a caller-owned checkpoint and leaves trap disposition unresolved.
 Its carrier, one named resolver, three constructor laws, and three runtime
 assertions covering both projections add no instance or private representation.
 
-The active effect-policy slice,
+The completed effect-policy slice,
 [ADR-0061](adr/0061-frame-effect-journal-policy.md), separates an opaque
 rollback-scoped snapshot from an opaque surviving trace snapshot. It fixes
 return/revert/trap resolution and two nested rollback laws without choosing an
 event taxonomy, ordering, append algebra, or transaction model.
+Its one carrier, one resolver, five laws, and five runtime assertions introduce
+no axioms or concrete effect representation.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -412,7 +414,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0058 completes the proof-only WorldState observational update algebra.
 - ADR-0059 completes the proof-only WorldState storage-write algebra.
 - ADR-0060 completes the internal external-checkpoint frame run result.
-- ADR-0061 accepts the parametric frame effect-journal policy.
+- ADR-0061 completes the parametric frame effect-journal policy.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
