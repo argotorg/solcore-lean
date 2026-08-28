@@ -124,7 +124,7 @@ These results remain regression obligations for every extension.
 | 98 | Address-selected checked Core code | Complete | Stores checker-accepted Core code in Account and executes exact address selection without an ABI or frame-result conversion |
 | 99 | Typed Core storage-read suspension | Complete | Reuses typed function application for typed requests, exact CEK suspension, finite-run safety, and repeated resume without weakening pure completion |
 | 100 | Working-storage read handler | Complete | Interprets one request through the proven-present Account carrier and preserves the context; the future driver, not the handler, owns remaining fuel |
-| 101 | Address-selected host-code driver | Planned | Migrates retained code only after the Core protocol and storage handler are proved |
+| 101 | Address-selected host-code driver | In progress | Migrates retained code and handles requests with exact remaining-fuel reuse while keeping code and storage addresses separate |
 | 102 | Storage-write capability | Planned | Appends a typed capability and returns an updated proven-present carrier |
 | 103 | Further contract-entry input roles | Planned | Adds caller, callee, data, value, or kind only when a Core consumer exists |
 | 104 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |

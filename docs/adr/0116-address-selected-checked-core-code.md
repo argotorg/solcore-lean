@@ -1,9 +1,14 @@
 # ADR-0116: Address-selected checked Core code
 
-- Status: Accepted
+- Status: Accepted; Account carrier superseded by ADR-0118
 - Decision date: 2026-08-29
 - Scope: checked code association, address selection, and pure Core execution
 - Implementation: Complete
+
+ADR-0118 later replaces Account's closed checked-code carrier with the
+host-checked carrier and replaces address-selected pure execution with handled
+host execution. The closed carrier and its pure completion theorems remain
+valid outside Account state.
 
 ## Context
 

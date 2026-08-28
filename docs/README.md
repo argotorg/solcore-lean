@@ -804,6 +804,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes checked Account code association, address selection, and raw Core execution.
 - [ADR-0117](adr/0117-typed-core-storage-read-suspension.md)
   fixes typed storage-read requests, CEK suspension, and resumable host execution.
+- [ADR-0118](adr/0118-address-selected-host-code-driver.md)
+  fixes Account host-code migration and fuel-preserving handled execution.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
