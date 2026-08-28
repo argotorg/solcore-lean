@@ -82,6 +82,7 @@ import Solcore.Test.ParentIndexedFrameContinuationContext
 import Solcore.Test.ParentIndexedFrameContinuationConstruction
 import Solcore.Test.ParentIndexedFrameTrapRollback
 import Solcore.Test.ParentIndexedFrameTrapPropagationPayload
+import Solcore.Test.ParentIndexedFrameTrapPropagationPayloadCoherence
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
 import Solcore.Test.WorldStateStorageWriteAlgebra
