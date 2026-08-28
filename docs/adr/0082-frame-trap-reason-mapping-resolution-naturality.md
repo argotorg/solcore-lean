@@ -117,8 +117,8 @@ Reason translation is now proved natural with respect to total frame
 resolution: mapping before or after resolution selects identical state,
 effects, and bytes and differs only by the same caller-supplied reason mapper.
 
-Future proof-only work may establish the corresponding `continue?` invariance,
-without changing any execution operation.
+ADR-0083 fixes the corresponding `continue?` result-value invariance without
+changing any execution operation.
 
 ## Implementation record
 

@@ -541,6 +541,11 @@ ADR-0082 completes the proof that context mapping commutes with total
 resolution. It adds no operation and changes no resolution policy; both pure
 routes produce the same mapped resolution result.
 
+ADR-0083 fixes the active proof that the `Option Next` value produced by
+`FrameContinuationContext.continue?` is unchanged by context reason mapping.
+It adds no operation and makes no claim about evaluation cost, step count, or
+exactly-once invocation.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
