@@ -227,8 +227,9 @@ continuation result unchanged.
 [ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) completes the
 working-only storage-write boundary for checkpointed pairs while preserving
 the checkpoint and complete working journal.
-[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) accepts a
-storage-address refinement of those values; its implementation is planned.
+[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) completes a
+storage-address refinement that removes per-write address choice while
+retaining the selector beside the checkpointed working values.
 
 ## Implementation status
 
@@ -308,7 +309,7 @@ storage-address refinement of those values; its implementation is planned.
 | Frame continuation branch/byte erasure coherence | Complete | Complete | Not published |
 | Frame-resolution continuation trap-reason mapping invariance | Complete | Complete | Not published |
 | Checkpointed working-pair storage write | Complete | Complete | Not published |
-| Checkpointed working-pair storage address | Planned | Decision accepted | Not published |
+| Checkpointed working-pair storage address | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1587,15 +1588,20 @@ P0-P3 audits pass. The address is caller-selected; the slice adds no
 authorization, account creation, checkpoint lifecycle, outcome, parent
 mutation, scheduling, trap, gas, or transaction policy.
 
-## Planned checkpointed working-pair storage address
+## Completed checkpointed working-pair storage address
 
-[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) specifies one
-`FrameCheckpointedWorkingPairWithStorageAddress` carrier and one planned
+[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) adds one
+`FrameCheckpointedWorkingPairWithStorageAddress` carrier and one
 `writeStorage?` operation. One caller-designated storage address is retained
-beside the existing checkpointed working values and supplies every delegated
-ADR-0092 write.
+beside the existing checkpointed working values and supplies each delegated
+ADR-0092 write without another address argument.
 
-Exactly two simp laws and three definition-only runtime assertions are planned.
+The 34-line definition and 44-line properties modules each add one umbrella
+import. Exactly two simp laws report `[propext]`. A 94-line definition-only
+test module plus one runner import and call contains exactly three runtime
+assertions. All staged commits remain below 300 changed lines; full validation
+and independent P0-P3 audits pass.
+
 The carrier establishes no current-contract identity, address authority,
 account creation, contract entry, outcome, parent mutation, scheduling, trap,
 gas, ABI, or transaction policy.

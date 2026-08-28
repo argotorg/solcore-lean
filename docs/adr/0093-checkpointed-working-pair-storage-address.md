@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: bind one caller-designated storage address to checkpointed working values
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -191,6 +191,32 @@ umbrella import; the exact two laws plus one umbrella import; the exact three
 runtime assertions plus one runner import and call; independent audit and
 completion evidence.
 
+## Implementation record
+
+The completed slice adds one 34-line definition module plus one umbrella
+import. Its single carrier retains a caller-supplied storage selector beside
+the existing checkpointed working values. Its single operation accepts only a
+slot and value, delegates to ADR-0092 with that stored selector, and retains
+the selector on success.
+
+One 44-line properties module plus one umbrella import publishes exactly the
+two required simp laws. Both reuse the ADR-0092 branch laws, terminate at the
+explicit absent or present result, and report exactly `[propext]`. The carrier,
+its generated declarations, the operation, and its generated equation also
+report exactly `[propext]`.
+
+One 94-line definition-only test module plus one runner import and one call
+contains exactly three runtime assertions. They reject lookup through an
+unrelated working account or the checkpoint and verify symmetric selection of
+two stored addresses while preserving the checkpoint, both journal fields,
+the selector, and the unselected account.
+
+The implementation commits are `aa74372` (251 changed lines), `b9103a6` (35),
+`b5e914a` (45), and `fab671e` (96), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, full build and
+test runs, metadata and kernel checks, diff checks, declaration inventories,
+simp review, and independent P0-P3 audits pass.
+
 ## Publication and exclusions
 
 This internal carrier and operation are not published. They change no frozen
@@ -206,4 +232,3 @@ working journal.
 Contract entry may later supply a storage address and separately introduce
 code, caller, or callee addresses. This decision does not require those values
 to coincide.
-

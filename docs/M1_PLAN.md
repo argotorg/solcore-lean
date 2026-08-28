@@ -98,7 +98,7 @@ These results remain regression obligations for every extension.
 | 72 | Frame continuation branch/byte erasure coherence | Complete | Proves the richer result route conservatively recovers bytes-insensitive context continuation |
 | 73 | Frame-resolution continuation trap-reason mapping invariance | Complete | Proves heterogeneous reason mapping is invisible to the same bytes-aware callbacks |
 | 74 | Checkpointed working-pair storage write | Complete | Lifts strict storage writes to only the working WorldState while retaining checkpoint and journal |
-| 75 | Checkpointed working-pair storage address | Planned | Binds one caller-designated storage target to checkpointed working values and subsequent writes |
+| 75 | Checkpointed working-pair storage address | Complete | Binds one caller-designated storage target to checkpointed working values and subsequent writes |
 | 76 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 77 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 78 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1292,18 +1292,20 @@ P0-P3 audits pass. The caller supplies the address. The slice adds no
 authorization, account creation, checkpoint lifecycle, outcome, parent
 mutation, scheduling, trap, gas, or transaction policy.
 
-## Planned checkpointed working-pair storage address
+## Completed checkpointed working-pair storage address
 
-[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) accepts one
-`FrameCheckpointedWorkingPairWithStorageAddress` carrier and one planned
+[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) adds one
+`FrameCheckpointedWorkingPairWithStorageAddress` carrier and one
 `writeStorage?` operation. The carrier stores a caller-designated storage
 address beside ADR-0087 values; the operation delegates to ADR-0092 without an
 address argument and retains the same selector on success.
 
-Exactly two simp laws and three definition-only runtime assertions are planned.
-The address is not yet a current contract, callee, code address, owner, or
-authorized principal. Entry, account creation, scheduling, trap, gas, ABI, and
-transaction policy remain outside the slice.
+The 34-line definition and 44-line properties modules add one umbrella import
+each. Exactly two simp laws and three definition-only runtime assertions pass,
+as do the full validation and independent P0-P3 audits. The address is not a
+current contract, callee, code address, owner, or authorized principal. Entry,
+account creation, scheduling, trap, gas, ABI, and transaction policy remain
+outside the slice.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

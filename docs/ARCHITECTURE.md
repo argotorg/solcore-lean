@@ -583,9 +583,9 @@ ADR-0092 completes the conditional lift of strict WorldState storage writes to
 only the working state in a checkpointed pair. The checkpoint and working
 journal stay exact; the address remains caller-selected.
 
-ADR-0093 fixes the next storage-scope boundary: one caller-designated storage
-address is retained beside checkpointed working values and supplies delegated
-writes without becoming a current-contract or authorization claim.
+ADR-0093 completes the next storage-scope boundary: one caller-designated
+storage address is retained beside checkpointed working values and supplies
+delegated writes without becoming a current-contract or authorization claim.
 
 ### Observation
 
