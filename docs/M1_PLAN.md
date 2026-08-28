@@ -94,10 +94,11 @@ These results remain regression obligations for every extension.
 | 68 | Nominal frame checkpoint snapshot | Complete | Names a caller-supplied synchronized checkpoint pair without claiming capture, ownership, or execution |
 | 69 | Frame checkpointed working pair | Complete | Stores a checkpoint snapshot beside an independent working pair without adding an operation or relation proof |
 | 70 | Continuation context from checkpointed working pair | Complete | Canonically assembles every stored value plus an opaque outcome into the existing continuation context |
-| 71 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 72 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 73 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 74 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 71 | Bytes-aware frame resolution continuation | Active | Passes selected state/effects and bytes to distinct caller-owned return/revert callbacks while leaving traps unresolved |
+| 72 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 73 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 74 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 75 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1218,6 +1219,17 @@ The four implementation commits contain 225, 26, 48, and 69 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The adapter does not resolve, continue, or execute the
 context.
+
+## Active bytes-aware frame resolution continuation
+
+[ADR-0089](adr/0089-bytes-aware-frame-resolution-continuation.md) adds one
+planned `FrameResolutionResult.continue?` partial dispatcher. Return and revert
+use separate caller callbacks, each receiving the complete selected
+state/effect pair and bytes. Trap remains `none`.
+
+Exactly three `rfl` simp laws and three definition-only runtime assertions are
+planned. This seam preserves branch and bytes but performs no delivery, parent
+update, scheduling, trap handling, or transaction transition.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

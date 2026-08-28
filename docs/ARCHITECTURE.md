@@ -567,6 +567,10 @@ ADR-0088 completes the pure adapter from that pair plus a caller-supplied
 outcome into the existing continuation context. It assembles values without
 claiming that a frame ran or that the outcome arose from its working state.
 
+ADR-0089 fixes the active bytes-aware continuation seam on total resolution
+results. Separate return and revert callbacks receive the exact selected
+state/effects and bytes; traps remain unresolved as `none`.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

@@ -421,6 +421,11 @@ The completed continuation-context construction slice,
 assembles those values and an opaque outcome into the existing context without
 claiming execution.
 
+The active bytes-aware continuation slice,
+[ADR-0089](adr/0089-bytes-aware-frame-resolution-continuation.md), passes
+resolved return/revert state, effects, and bytes to separate caller callbacks
+while leaving traps unresolved.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -618,6 +623,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   pairing of a checkpoint snapshot with independent working values.
 - [ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md)
   fixes pure construction of a continuation context from those values.
+- [ADR-0089](adr/0089-bytes-aware-frame-resolution-continuation.md) fixes a
+  caller-owned non-trapping continuation over total resolution results.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

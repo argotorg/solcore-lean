@@ -215,6 +215,9 @@ pair without claiming any relationship or transition.
 [ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md)
 completes the pure adapter from those values and a caller-supplied outcome
 to the existing continuation context.
+[ADR-0089](adr/0089-bytes-aware-frame-resolution-continuation.md) fixes the
+active caller-owned continuation seam that preserves return/revert branch,
+selected state/effects, and bytes while leaving traps unresolved.
 
 ## Implementation status
 
@@ -290,6 +293,7 @@ to the existing continuation context.
 | Nominal frame checkpoint snapshot | Complete | Complete | Not published |
 | Frame checkpointed working pair | Complete | Complete | Not published |
 | Continuation context from checkpointed working pair | Complete | Complete | Not published |
+| Bytes-aware frame resolution continuation | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1499,6 +1503,17 @@ The four implementation commits contain 225, 26, 48, and 69 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Resolution, continuation, outcome provenance, execution,
 initialization, scheduling, and transaction policy remain outside this slice.
+
+## Active bytes-aware frame resolution continuation
+
+[ADR-0089](adr/0089-bytes-aware-frame-resolution-continuation.md) specifies one
+`FrameResolutionResult.continue?` operation. Separate return and revert
+callbacks receive the exact selected state/effect pair and bytes; trap yields
+`none` without selecting either callback.
+
+Exactly three definitional simp laws and three runtime assertions are planned.
+The operation performs no delivery, parent mutation, scheduling, trap handling,
+resolution, or transaction transition.
 
 ## Meaning of completion
 
