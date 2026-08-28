@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: structural pairing of one checkpoint snapshot with independent working values
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -135,3 +135,31 @@ structural boundary.
 The next adapter can turn these values plus an outcome into the existing
 continuation context. Checkpoint creation, initialization, execution,
 scheduling, diagnostics, and transaction policy remain separate decisions.
+
+## Implementation record
+
+The completed slice adds exactly one `FrameCheckpointedWorkingPair` carrier in
+a 17-line definition module plus one umbrella import. Its only intentional API
+is the generated constructor and the `checkpoint` and `working` projections;
+there is no custom operation, theorem, properties module, instance, coercion,
+or validity predicate.
+
+The carrier, constructor, and both projections report exactly `[propext]`. The
+carrier imports only ADR-0086 and keeps the existing synchronized working pair
+whole.
+
+A 53-line definition-only test module plus one runner import contains exactly
+three private compile examples and no runtime declaration, assertion, or call.
+They cover universe-polymorphic construction, exact checkpoint projection, and
+exact working-pair projection. Concrete checkpoint and working fixtures use
+storage values `0x56` and `0x78`, rollback sentinels `10` and `20`, and traces
+`[1]` and `[1, 2]` respectively.
+
+The implementation commits are `e3ee763` (186 changed lines), `8791470` (18),
+and `e765508` (54), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+
+The carrier establishes no checkpoint/working relationship, capture or entry
+event, currentness, initialization, lifecycle, ownership, execution,
+scheduling, or transaction policy.

@@ -412,7 +412,7 @@ The completed checkpoint-snapshot slice,
 caller-supplied synchronized state/effect pair without claiming capture time,
 ownership, or execution.
 
-The active checkpoint-and-working slice,
+The completed checkpoint-and-working slice,
 [ADR-0087](adr/0087-frame-checkpointed-working-pair.md), stores one checkpoint
 snapshot beside an independent working pair without adding lifecycle meaning.
 
