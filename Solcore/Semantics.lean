@@ -12,6 +12,7 @@ import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
 import Solcore.Semantics.WorldState
 import Solcore.Semantics.WorldStateProperties
+import Solcore.Semantics.WorldStateExtensionalityProperties
 
 /-!
 Umbrella module for syntax-independent runtime values, observations, and their
