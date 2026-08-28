@@ -92,10 +92,11 @@ These results remain regression obligations for every extension.
 | 66 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Preserves the base mapper and exact trace-prefix evidence without adding provenance or execution |
 | 67 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Preserves the exact parent index and checkpoint equality while mapping only the refined context |
 | 68 | Nominal frame checkpoint snapshot | Complete | Names a caller-supplied synchronized checkpoint pair without claiming capture, ownership, or execution |
-| 69 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 70 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 71 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 72 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 69 | Frame checkpointed working pair | Active | Stores a checkpoint snapshot beside an independent working pair without adding an operation or relation proof |
+| 70 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 71 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 72 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 73 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1181,6 +1182,19 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The following slice must consume this snapshot beside an
 independent working pair, without assuming checkpoint/working equality or
 choosing initialization order.
+
+## Active frame checkpointed working pair
+
+[ADR-0087](adr/0087-frame-checkpointed-working-pair.md) adds one planned
+carrier with an ADR-0086 checkpoint snapshot and a separate synchronized
+working pair. Generated construction and projection form its complete API;
+custom operations and laws are deliberately absent.
+
+Exactly three private compile-only regressions will use visibly distinct
+checkpoint and working state, rollback, and trace values. The following slice
+must consume every field through
+`FrameContinuationContext.fromCheckpointedWorkingPair` plus an outcome,
+without asserting execution or initialization history.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

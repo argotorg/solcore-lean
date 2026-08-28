@@ -209,6 +209,9 @@ exact `parentWorking` index and checkpoint equality.
 [ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md) completes the
 nominal representation of one caller-supplied synchronized checkpoint pair.
 It does not claim actual capture, entry, ownership, or runtime execution.
+[ADR-0087](adr/0087-frame-checkpointed-working-pair.md) fixes the active
+structural carrier that stores such a snapshot beside an independent working
+pair without claiming any relationship or transition.
 
 ## Implementation status
 
@@ -282,6 +285,7 @@ It does not claim actual capture, entry, ownership, or runtime execution.
 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Nominal frame checkpoint snapshot | Complete | Complete | Not published |
+| Frame checkpointed working pair | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1457,6 +1461,18 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Checkpoint creation time, ownership, lifetime, entry
 provenance, working initialization, scheduling, and transaction atomicity
 remain undecided.
+
+## Active frame checkpointed working pair
+
+[ADR-0087](adr/0087-frame-checkpointed-working-pair.md) specifies one
+`FrameCheckpointedWorkingPair` carrier with a checkpoint snapshot and an
+independent synchronized working pair. The generated constructor and
+projections are its complete API; no custom operation or law is planned.
+
+Exactly three private definition-only compile regressions will cover abstract
+construction and concrete, visibly distinct checkpoint and working values.
+There will be no runtime test. Equality, derivation, initialization, execution,
+ownership, scheduling, and transaction policy remain undecided.
 
 ## Meaning of completion
 

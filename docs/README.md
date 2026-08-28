@@ -412,6 +412,10 @@ The completed checkpoint-snapshot slice,
 caller-supplied synchronized state/effect pair without claiming capture time,
 ownership, or execution.
 
+The active checkpoint-and-working slice,
+[ADR-0087](adr/0087-frame-checkpointed-working-pair.md), stores one checkpoint
+snapshot beside an independent working pair without adding lifecycle meaning.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -605,6 +609,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes reason mapping for parent-indexed continuation contexts.
 - [ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md) fixes the nominal
   representation of a caller-supplied synchronized checkpoint snapshot.
+- [ADR-0087](adr/0087-frame-checkpointed-working-pair.md) fixes the structural
+  pairing of a checkpoint snapshot with independent working values.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

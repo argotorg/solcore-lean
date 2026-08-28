@@ -559,6 +559,10 @@ caller-supplied synchronized state/effect pair can be represented by a
 distinct type without claiming entry time, ownership, provenance, or a
 runtime transition. Existing raw-pair resolution APIs remain unchanged.
 
+ADR-0087 fixes the active structural pairing boundary. One ADR-0086 snapshot
+is stored beside an independent synchronized working pair without a relation
+proof, custom operation, lifecycle claim, or execution transition.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
