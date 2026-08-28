@@ -219,8 +219,8 @@ to the existing continuation context.
 caller-owned continuation seam that preserves return/revert branch,
 selected state/effects, and bytes while leaving traps unresolved.
 [ADR-0090](adr/0090-frame-continuation-branch-byte-erasure-coherence.md)
-specifies the active proof obligation that erasing branch and bytes from the
-richer continuation recovers the existing context continuation.
+completes the proof that erasing branch and bytes from the richer continuation
+recovers the existing context continuation.
 
 ## Implementation status
 
@@ -297,7 +297,7 @@ richer continuation recovers the existing context continuation.
 | Frame checkpointed working pair | Complete | Complete | Not published |
 | Continuation context from checkpointed working pair | Complete | Complete | Not published |
 | Bytes-aware frame resolution continuation | Complete | Complete | Not published |
-| Frame continuation branch/byte erasure coherence | Not implemented | Decision accepted | Not published |
+| Frame continuation branch/byte erasure coherence | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1526,16 +1526,21 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The operation performs no delivery, parent mutation,
 scheduling, trap handling, resolution, or transaction transition.
 
-## Active frame continuation branch/byte erasure coherence
+## Completed frame continuation branch/byte erasure coherence
 
 [ADR-0090](adr/0090-frame-continuation-branch-byte-erasure-coherence.md)
-specifies one proof-only non-simp law. It equates the explicit
+adds one proof-only non-simp law. It equates the explicit
 `context.resolve.continue?` route with the established context `continue?`
 only when both branch callbacks are the same and ignore bytes.
 
-Exactly two private compile regressions are planned. The slice adds no carrier,
-operation, runtime assertion, delivery, callback-count claim, trap handling,
-or transaction transition.
+The 29-line properties module adds one umbrella import and reports exactly
+`[propext]`. A 45-line test module plus one runner import contains exactly two
+private compile regressions and no runtime call.
+
+The three implementation commits contain 199, 30, and 46 changed lines; this
+completion update is the fourth commit. Full validation and independent P0-P3
+audits pass. The slice adds no carrier, operation, delivery, callback-count
+claim, trap handling, or transaction transition.
 
 ## Meaning of completion
 

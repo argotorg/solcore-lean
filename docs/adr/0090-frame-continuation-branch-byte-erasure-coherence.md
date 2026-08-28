@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only compatibility between bytes-aware and bytes-insensitive continuation
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -141,12 +141,39 @@ concrete event taxonomy, storage layout, frozen artifact, or public format.
 
 ## Consequences
 
-Once implemented, this theorem will prove that the result-level bytes-aware
-continuation conservatively extends the established context continuation after
-branch and byte erasure. Callers that do not need branch identity or bytes can
-retain the old API without a new alias, while richer callers keep using the
-explicit `context.resolve.continue?` composition.
+The result-level bytes-aware continuation now provably extends the established
+context continuation after branch and byte erasure. Callers that do not need
+branch identity or bytes can retain the old API without a new alias, while
+richer callers keep using the explicit `context.resolve.continue?`
+composition.
 
 Actual payload consumption, parent-frame mutation, trap disposition,
 scheduling, checkpoint lifecycle, and transaction atomicity remain separate
 decisions.
+
+## Implementation record
+
+The completed proof-only slice adds one 29-line properties module plus one
+semantic-umbrella import. It publishes exactly one non-simp
+`FrameContinuationContext.resolve_continue?_ignoreBranchAndBytes` theorem and
+no carrier, executable operation, helper, alias, reverse rule, specialization,
+or runtime declaration. The theorem reports exactly `[propext]`.
+
+The proof exposes the context, frame-run result, and outcome constructors; all
+three outcome branches then close by reflexivity. Keeping the theorem out of
+the simp set avoids the documented incomplete path through inner context
+reason mapping.
+
+A 45-line compile-regression module plus one runner import contains exactly two
+private examples and no runtime call. The first consumes the theorem directly
+at fully polymorphic types. The second explicitly rewrites a heterogeneously
+reason-mapped context before applying the existing continuation-invariance law.
+
+The implementation commits are `51d095e` (199 changed lines), `163b580` (30),
+and `3b69be5` (46), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+
+The equality establishes no operational execution, callback evaluation count,
+cost, byte recovery, delivery, parent mutation, trap handling, scheduling,
+checkpoint lifecycle, or transaction policy.

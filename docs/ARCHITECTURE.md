@@ -571,9 +571,9 @@ ADR-0089 completes the bytes-aware continuation seam on total resolution
 results. Separate return and revert callbacks receive the exact selected
 state/effects and bytes; traps remain unresolved as `none`.
 
-ADR-0090 specifies the active proof obligation that this richer result-level
-continuation reduces to the existing context continuation when both callbacks
-are identical and explicitly ignore return and revert bytes.
+ADR-0090 completes the proof that this richer result-level continuation reduces
+to the existing context continuation when both callbacks are identical and
+explicitly ignore return and revert bytes.
 
 ### Observation
 

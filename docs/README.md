@@ -426,10 +426,10 @@ The completed bytes-aware continuation slice,
 resolved return/revert state, effects, and bytes to separate caller callbacks
 while leaving traps unresolved.
 
-The active continuation-erasure slice,
+The completed continuation-erasure slice,
 [ADR-0090](adr/0090-frame-continuation-branch-byte-erasure-coherence.md),
-specifies the proof obligation that identical bytes-ignoring branch callbacks
-recover the existing bytes-insensitive context continuation.
+proves that identical bytes-ignoring branch callbacks recover the existing
+bytes-insensitive context continuation.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
