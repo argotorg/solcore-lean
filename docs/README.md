@@ -377,6 +377,11 @@ The completed frame-result mapping slice,
 lifts that translation while keeping the result's working state unchanged. It
 does not resolve state or imply that a trap was propagated at runtime.
 
+The active total-resolution mapping slice,
+[ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md),
+keeps return/revert state, effects, and bytes unchanged while translating only
+trapped reasons. It does not rerun the resolver.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -556,6 +561,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   caller-supplied mapping between different frame trap-reason types.
 - [ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md)
   fixes the working-state-preserving lift to frame-run results.
+- [ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md)
+  fixes caller-supplied reason mapping on total frame-resolution results.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

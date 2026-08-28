@@ -142,8 +142,9 @@ frozen artifact.
 ## Consequences
 
 Consumers can now inspect every frame-resolution branch without losing payload
-or reason information and without inventing a continuation. Nested invocation
-and transaction policy remain later, explicit decisions.
+or reason information and without inventing a continuation. ADR-0080 adds a
+downstream reason-type mapping without changing this carrier or resolver.
+Nested invocation and transaction policy remain later, explicit decisions.
 
 ## Implementation record
 

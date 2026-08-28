@@ -188,6 +188,9 @@ return/revert bytes and changes only trapped reasons.
 [ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md)
 completes the lift to `FrameRunResult`: keep its working state exactly and
 delegate only its outcome to ADR-0078.
+[ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md)
+now fixes the active mapping for total frame-resolution results while
+preserving return/revert state, effects, and bytes.
 
 ## Implementation status
 
@@ -254,6 +257,7 @@ delegate only its outcome to ADR-0078.
 | Parent-indexed trap propagation payload coherence | Complete | Complete | Not published |
 | Heterogeneous frame-outcome trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-run-result trap-reason mapping | Complete | Complete | Not published |
+| Heterogeneous frame-resolution-result trap-reason mapping | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1304,6 +1308,18 @@ The four implementation commits contain 235, 21, 58, and 85 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. No resolver, payload, journal, trace, propagation, taxonomy,
 or transaction policy is included.
+
+## Active heterogeneous frame-resolution-result trap-reason mapping
+
+[ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md)
+fixes one pure mapper on the total `FrameResolutionResult`. Return and revert
+keep exact selected state, effects, and bytes; trap alone changes its reason.
+
+The planned surface is one operation, exactly five constructor, identity, and
+composition simp laws, and exactly three definition-only runtime assertions.
+All operation and proof declarations must report `[propext]`. Resolution,
+continuation contexts, payloads, propagation, and transaction policy remain
+outside this slice.
 
 ## Meaning of completion
 

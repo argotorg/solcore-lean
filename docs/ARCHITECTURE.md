@@ -529,6 +529,10 @@ ADR-0079 completes the lift of that caller-supplied mapping to
 outcome is delegated to ADR-0078. This remains a pure value transformation,
 not state resolution, rollback, ancestry, or runtime propagation.
 
+ADR-0080 fixes the corresponding active mapping boundary on the total
+`FrameResolutionResult`. Return and revert preserve their selected state,
+effects, and bytes; only a trapped reason changes. Resolution is not rerun.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
