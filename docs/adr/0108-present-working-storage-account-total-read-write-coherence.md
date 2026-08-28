@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: prove same-slot and distinct-slot observations of total working writes
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -107,6 +107,26 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact two laws plus one umbrella import; the exact
 three compile regressions plus one runner import and no call; independent audit
 and completion evidence.
+
+## Implementation record
+
+The completed proof-only slice adds a 37-line properties module plus one
+semantic umbrella import. It publishes exactly the two required simp laws and
+adds no helper, operation, carrier, coercion, or instance. Both laws report
+exactly `[propext]`, are registered with the intended orientation, and
+normalize nested writes without a loop.
+
+The 48-line compile-only module plus one runner import contains exactly three
+private examples. Two name the laws directly; the third composes ADR-0106
+conditional-read coherence with the same-slot law. The test layer adds no
+runtime or public declaration, fixture, helper, assertion, or runner call.
+
+The implementation commits are `e251f1d` (161 changed lines), `5ef2212` (38),
+and `bda0eba` (49), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 561-job full build, the
+1012-job full test run, metadata and kernel checks, diff checks, declaration
+and simp-registration inventories, named composition checks, and independent
+P0-P3 audits pass.
 
 ## Publication and consequences
 

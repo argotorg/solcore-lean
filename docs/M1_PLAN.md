@@ -113,7 +113,7 @@ These results remain regression obligations for every extension.
 | 87 | Present working storage Account refinement | Complete | Bundles the exact retained-address working Account and its lookup evidence for total consumers |
 | 88 | Present working storage Account total read | Complete | Reads the proven-present selected Account without another lookup or failure branch |
 | 89 | Present working storage Account total write | Complete | Synchronizes the selected Account, working-state entry, and evidence without another lookup |
-| 90 | Present working storage Account total read/write coherence | Planned | Normalizes same-slot and distinct-slot reads after total writes |
+| 90 | Present working storage Account total read/write coherence | Complete | Normalizes same-slot and distinct-slot reads after total writes |
 | 91 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 92 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 93 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1502,15 +1502,18 @@ generated equation, and law report `[propext]`; full validation and independent
 P0-P3 audits pass. Read-after-write, algebra, address authority, lifetime, and
 transition policies remain later work.
 
-## Planned present working storage Account total read/write coherence
+## Completed present working storage Account total read/write coherence
 
 [ADR-0108](adr/0108-present-working-storage-account-total-read-write-coherence.md)
 adds same-slot read-after-write and distinct-slot read preservation for the
 total refined operations.
 
 The laws delegate directly to Account semantics and add no new operation.
-Overwrite, commutation, projection preservation, address authority, lifetime,
-and transition policies remain later work.
+Both report `[propext]`; three private compile regressions cover direct use and
+named composition with ADR-0106 conditional-read coherence. Full validation
+and independent P0-P3 audits pass. Overwrite, commutation, projection
+preservation, address authority, lifetime, and transition policies remain
+later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

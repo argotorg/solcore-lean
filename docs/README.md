@@ -508,9 +508,9 @@ The completed
 total slot write that keeps the checked Account and its working-state entry in
 sync.
 
-The accepted
+The completed
 [ADR-0108](adr/0108-present-working-storage-account-total-read-write-coherence.md)
-plans same-slot and distinct-slot read-after-write laws for those total
+adds same-slot and distinct-slot read-after-write laws for those total
 operations.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
@@ -749,7 +749,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0107](adr/0107-present-working-storage-account-total-write.md) fixes the
   synchronized total write.
 - [ADR-0108](adr/0108-present-working-storage-account-total-read-write-coherence.md)
-  fixes the planned read-after-write laws for the total operations.
+  fixes the read-after-write laws for the total operations.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -274,7 +274,7 @@ total slot write that synchronizes the retained Account, working-state entry,
 and new presence evidence; implementation is complete.
 [ADR-0108](adr/0108-present-working-storage-account-total-read-write-coherence.md)
 accepts same-slot and distinct-slot read-after-write laws for the total carrier;
-implementation is planned.
+implementation is complete.
 
 ## Implementation status
 
@@ -369,7 +369,7 @@ implementation is planned.
 | Present working storage Account refinement | Complete | Complete | Not published |
 | Present working storage Account total read | Complete | Complete | Not published |
 | Present working storage Account total write | Complete | Complete | Not published |
-| Present working storage Account total read/write coherence | No new operation | Planned | Not published |
+| Present working storage Account total read/write coherence | No new operation | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1861,15 +1861,17 @@ generated equation, and law report `[propext]`; full validation and independent
 P0-P3 audits pass. It adds no Account creation, address authority, frame
 transition, or published surface.
 
-## Planned present working storage Account total read/write coherence
+## Completed present working storage Account total read/write coherence
 
 [ADR-0108](adr/0108-present-working-storage-account-total-read-write-coherence.md)
-specifies same-slot read-after-write and distinct-slot read preservation for
+adds same-slot read-after-write and distinct-slot read preservation for
 the ADR-0106/0107 total operations.
 
-The proof-only slice delegates to existing Account laws and adds no lookup,
-mutation, runtime assertion, address authority, transition, or published
-surface.
+The two simp laws delegate to existing Account laws and report `[propext]`.
+Three private compile regressions cover both laws directly and their named
+composition with ADR-0106 conditional-read coherence. Full validation and
+independent P0-P3 audits pass. The slice adds no lookup, mutation, runtime
+assertion, address authority, transition, or published surface.
 
 ## Meaning of completion
 
