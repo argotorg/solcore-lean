@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: extensional equality and update algebra for ADR-0056
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -76,3 +76,21 @@ revision, opcode, gas, or resource-limit rule.
 Later state transitions can reason about replacement and independent updates
 without unfolding private carriers. No operational slice is selected by this
 decision.
+
+## Implementation record
+
+The proof-only slice is complete with exactly zero executable API, carrier, or
+instance additions. It publishes exactly six laws: two extensionality laws in
+a 31-line module and four update-algebra laws in a 66-line module, with one
+umbrella import for each. Exactly two compile-time theorem-use examples and
+four runtime assertions live in a 76-line test module with two runner lines.
+
+Both extensionality laws carry `@[ext]`. Only the two overwrite laws carry
+`@[simp]`; the two commutation laws remain outside the simp set. All six laws
+report exactly `[propext, Quot.sound]`. There is no `Classical.choice`, custom
+axiom, `sorryAx`, or unchecked declaration.
+
+The implementation commits are `a3bfd88` (123 changed lines), `7ae4bb0` (32),
+`64590b0` (67), and `05e5f5d` (78). Each is below 300 changed lines. Focused and
+full builds, tests, trust-zero, semantic-kernel, metadata, forbidden-declaration,
+document-link, diff, and independent audits pass.

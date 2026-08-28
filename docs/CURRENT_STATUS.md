@@ -116,8 +116,8 @@ without defining transactions, rollback, balances, or calls.
 [ADR-0057](adr/0057-frame-outcome-world-state-resolution.md) completes the
 minimal outcome-to-state resolver. Return selects working state, revert selects
 the supplied checkpoint, and trap disposition remains deliberately unresolved.
-[ADR-0058](adr/0058-world-state-observational-update-algebra.md) accepts the
-active proof-only update algebra for Account and WorldState. It adds no
+[ADR-0058](adr/0058-world-state-observational-update-algebra.md) completes the
+proof-only update algebra for Account and WorldState. It adds no
 executable API or new state meaning.
 
 ## Implementation status
@@ -163,7 +163,7 @@ executable API or new state meaning.
 | Address text and byte coherence | Complete | Complete | Not published |
 | Minimal Account and WorldState carrier | Complete | Complete | Not published |
 | Frame-outcome WorldState resolution | Complete | Complete | Not published |
-| WorldState observational update algebra | Active | In progress | Not published |
+| WorldState observational update algebra | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -814,15 +814,23 @@ states. All three laws report exactly `[propext]`; no custom axiom, `sorryAx`,
 or unchecked declaration is present. Builds, tests, trust-zero, kernel,
 metadata, link, and diff checks pass.
 
-## Active WorldState observational update algebra
+## Completed WorldState observational update algebra
 
-[ADR-0058](adr/0058-world-state-observational-update-algebra.md) plans exactly
+[ADR-0058](adr/0058-world-state-observational-update-algebra.md) provides exactly
 six public laws, two compile-time theorem-use examples, and four runtime
 assertions, with no new executable API, carrier, or instance. Extensionality
 uses public lookups; same-key updates overwrite; and distinct-slot or
 distinct-address updates commute. The commutation laws are not simp rules.
 This proof-only slice makes no trap, nested-effect, lifecycle, delta, ordering,
 serialization, ABI, Core-adapter, EVM, or gas decision.
+
+The extensionality and algebra modules contain 31 and 66 lines, with one
+umbrella import each. Two compile-time examples and four runtime assertions are
+in a 76-line test module with two runner lines. The two extensionality laws are
+`@[ext]`, only the two overwrite laws are `@[simp]`, and both commutation laws
+remain non-simp. All six laws report exactly `[propext, Quot.sound]`, with no
+`Classical.choice`, custom axiom, `sorryAx`, or unchecked declaration. Full
+validation and independent audits pass.
 
 ## Meaning of completion
 

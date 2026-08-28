@@ -398,6 +398,8 @@ ADR-0058 derives an observational update algebra from ADR-0056 without adding
 an operation or carrier. Extensionality hides private lookup representation;
 same-key updates overwrite, while distinct-key Account writes and WorldState
 puts commute. The commutation laws deliberately are not simplification rules.
+The completed proof-only layer adds no executable API, carrier, or instance;
+its six laws and six compile-time/runtime regressions expose no representation.
 
 ### Observation
 

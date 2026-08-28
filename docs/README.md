@@ -243,9 +243,9 @@ rollback, nested frames, surviving effects, ABI behavior, or EVM rules.
 Exactly three constructor laws and three runtime assertions cover the operation;
 all three laws report only `propext`.
 
-The active proof-only update-algebra slice,
+The completed proof-only update-algebra slice,
 [ADR-0058](adr/0058-world-state-observational-update-algebra.md), adds no
-executable API. It plans six extensionality, overwrite, and distinct-key
+executable API. It provides six extensionality, overwrite, and distinct-key
 commutation laws plus two compile-time examples and four runtime assertions for
 the already-completed Account and WorldState operations.
 
@@ -390,7 +390,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0055 completes proof-only coherence between canonical Address text and bytes.
 - ADR-0056 completes the minimal explicit Account and WorldState carrier.
 - ADR-0057 completes the minimal internal frame-outcome state resolver.
-- ADR-0058 accepts the proof-only WorldState observational update algebra.
+- ADR-0058 completes the proof-only WorldState observational update algebra.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

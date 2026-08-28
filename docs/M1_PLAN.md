@@ -63,7 +63,7 @@ These results remain regression obligations for every extension.
 | 37 | Address text and byte coherence | Complete | Proves the completed strict representations agree without a new API |
 | 38 | Minimal Account and WorldState carrier | Complete | Fixes explicit absence and canonical storage values before transitions |
 | 39 | Frame-outcome WorldState resolution | Complete | Selects working/checkpoint state while leaving trap disposition open |
-| 40 | WorldState observational update algebra | Active | Proves extensionality and independent-update algebra without new operations |
+| 40 | WorldState observational update algebra | Complete | Proves extensionality and independent-update algebra without new operations |
 | 41 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 42 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
 | 43 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -658,14 +658,20 @@ implemented. The 24-line definition, 32-line properties, and 53-line test
 modules plus two runner lines pass focused and full validation. Each law reports
 only `[propext]`, with no custom axiom or unchecked declaration.
 
-## Active WorldState observational update algebra
+## Completed WorldState observational update algebra
 
 [ADR-0058](adr/0058-world-state-observational-update-algebra.md) adds no
-operation, carrier, or instance. It plans exactly six public laws, two
+operation, carrier, or instance. It provides exactly six public laws, two
 compile-time theorem-use examples, and four runtime assertions for extensional
 equality, overwrite, and distinct-key commutation. The commutation laws remain
 outside the simp set. This is proof coverage for ADR-0056, not selection of the
 next operational state-transition slice.
+
+The 31-line extensionality and 66-line algebra modules add exactly six public
+laws and no executable API, carrier, or instance. The 76-line test module plus
+two runner lines supplies the exact two compile-time and four runtime checks.
+All six laws report `[propext, Quot.sound]`; focused, full, trust-zero, kernel,
+metadata, forbidden-declaration, and independent audit checks pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
