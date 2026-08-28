@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: parent-index-preserving lift of refined context reason mapping
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -200,3 +200,35 @@ rebuilding its trace-prefix refinement, parent index, or checkpoint equality.
 Proof-only rollback invariance or propagation-payload naturality can now be
 considered separately. Neither law nor nested execution behavior is selected
 by this decision.
+
+## Implementation record
+
+The completed slice adds exactly one public
+`ParentIndexedFrameContinuationContext.mapTrapReason` operation in a 29-line
+definition module plus one umbrella import. The operation delegates the refined
+context to ADR-0084 while retaining the identical `parentWorking` type index
+and directly reusing `checkpoint_eq_parentWorking`. The operation and its
+generated equation report exactly `[propext]`.
+
+A 67-line properties module plus one umbrella import publishes exactly four
+simp laws: the parent-indexed constructor, immediate refined projection,
+identity, and composition. Concrete and abstract dependent records normalize
+without unfolding the definition. All four laws report exactly `[propext]`,
+and their critical paths converge to the same dependent-record normal form.
+
+A 109-line definition-only test module plus one runner import contains exactly
+three private compile examples and no runtime function, assertion, or call.
+They cover whole-constructor reduction with the same checkpoint equality,
+recovery of the original exact checkpoint proposition, and a complete concrete
+parent-indexed equality with distinct states, journals, nonempty traces, both
+proofs, the fixed index, and one mapped trap reason.
+
+The implementation commits are `68b751c` (259 changed lines), `f6546ac` (30),
+`3e3c63d` (68), and `6a1a181` (110), all below 300 changed lines; this
+completion update is the fifth staged commit. Focused and full builds, tests,
+trust-zero, axiom, simp-termination, semantic-kernel, metadata, diff, and
+independent P0-P3 audits pass.
+
+The lift maps no parent state, effects, trace, type index, or proof object and
+establishes no rollback, propagation, scheduling, nested-runtime, or
+transaction policy.

@@ -402,7 +402,7 @@ The completed trace-prefix context mapping slice,
 maps only the inherited continuation context while retaining the same trace
 prefix evidence.
 
-The active parent-indexed context mapping slice,
+The completed parent-indexed context mapping slice,
 [ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md),
 maps only the trace-prefix context while retaining the same parent index and
 checkpoint equality.

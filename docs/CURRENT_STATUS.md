@@ -204,7 +204,7 @@ value produced by `FrameContinuationContext.continue?` unchanged.
 completes the lift to trace-prefix refined contexts without rebuilding
 their proof evidence.
 [ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md)
-now fixes the active final lift to parent-indexed contexts while preserving the
+completes the final lift to parent-indexed contexts while preserving the
 exact `parentWorking` index and checkpoint equality.
 
 ## Implementation status
@@ -277,7 +277,7 @@ exact `parentWorking` index and checkpoint equality.
 | Frame trap-reason mapping resolution naturality | Complete | Complete | Not published |
 | Frame trap-reason mapping continuation-result invariance | Complete | Complete | Not published |
 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Complete | Not published |
-| Heterogeneous parent-indexed continuation-context trap-reason mapping | Not implemented | Decision accepted | Not published |
+| Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1417,17 +1417,23 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Parent indexing, checkpoint equality, payloads, provenance,
 propagation, and transaction policy remain outside this slice.
 
-## Active heterogeneous parent-indexed context trap-reason mapping
+## Completed heterogeneous parent-indexed context trap-reason mapping
 
 [ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md)
-fixes one planned pure lift of ADR-0084 to the ADR-0073 parent-indexed context.
-The trace-prefix context is mapped while the exact parent index and checkpoint
-equality are reused.
+adds one pure lift of ADR-0084 to the ADR-0073 parent-indexed context. The
+trace-prefix context is mapped while the exact parent index and checkpoint
+equality are reused without a cast or helper.
 
-The planned surface is one operation, exactly four `[propext]` simp laws, and
-exactly three definition-only private compile regressions. Rollback selection,
-payloads, provenance, propagation, nested execution, and transaction policy
-remain outside this final mapper slice.
+The 29-line definition and 67-line properties modules each add one umbrella
+import. The operation, generated equation, and exactly four simp laws report
+exactly `[propext]`. A 109-line definition-only test module plus one runner
+import contains exactly three private compile examples and no runtime call.
+
+The four implementation commits contain 259, 30, 68, and 110 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Rollback selection, payloads, provenance, propagation,
+nested execution, and transaction policy remain outside this final mapper
+slice.
 
 ## Meaning of completion
 

@@ -90,7 +90,7 @@ These results remain regression obligations for every extension.
 | 64 | Frame trap-reason mapping resolution naturality | Complete | Proves that context mapping commutes with total resolution without adding execution |
 | 65 | Frame trap-reason mapping continuation-result invariance | Complete | Proves equality of `continue?` result values under reason mapping without adding execution |
 | 66 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Preserves the base mapper and exact trace-prefix evidence without adding provenance or execution |
-| 67 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Active | Preserves the exact parent index and checkpoint equality while mapping only the refined context |
+| 67 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Preserves the exact parent index and checkpoint equality while mapping only the refined context |
 | 68 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 69 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
 | 70 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1145,18 +1145,23 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. This slice does not map traces, parent indexing, payloads,
 or choose provenance, propagation, or transaction behavior.
 
-## Active heterogeneous parent-indexed context trap-reason mapping
+## Completed heterogeneous parent-indexed context trap-reason mapping
 
 [ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md)
-adds one planned lift of ADR-0084. It maps the trace-prefix context and directly
+adds one lift of ADR-0084. It maps the trace-prefix context and directly
 reuses the `parentWorking` type index and checkpoint-equality evidence.
 
-Four simp laws will cover the parent-indexed constructor, refined projection,
-identity, and composition. Three definition-only private compile regressions
-will cover whole-constructor reduction, exact checkpoint-evidence reuse, and
-one concrete trapped refined context. This final mapper slice does not select
-rollback, construct a payload, or choose provenance, propagation, nested
-execution, or transaction behavior.
+The 29-line definition and 67-line properties modules each add one umbrella
+import. Exactly four `[propext]` simp laws cover the parent-indexed constructor,
+refined projection, identity, and composition. A 109-line definition-only test
+module plus one runner import contains exactly three private compile regressions
+and no runtime call.
+
+The four implementation commits contain 259, 30, 68, and 110 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. This final mapper slice does not select rollback, construct
+a payload, or choose provenance, propagation, nested execution, or transaction
+behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
