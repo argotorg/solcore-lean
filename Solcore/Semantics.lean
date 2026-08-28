@@ -77,6 +77,7 @@ import Solcore.Semantics.WorldStateProperties
 import Solcore.Semantics.WorldStateExtensionalityProperties
 import Solcore.Semantics.WorldStateUpdateAlgebraProperties
 import Solcore.Semantics.WorldStateStorageWriteAlgebraProperties
+import Solcore.Semantics.WorldStateStorageReadWriteProperties
 
 /-!
 Umbrella module for syntax-independent runtime values, observations, and their
