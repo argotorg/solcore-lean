@@ -99,10 +99,11 @@ These results remain regression obligations for every extension.
 | 73 | Frame-resolution continuation trap-reason mapping invariance | Complete | Proves heterogeneous reason mapping is invisible to the same bytes-aware callbacks |
 | 74 | Checkpointed working-pair storage write | Complete | Lifts strict storage writes to only the working WorldState while retaining checkpoint and journal |
 | 75 | Checkpointed working-pair storage address | Complete | Binds one caller-designated storage target to checkpointed working values and subsequent writes |
-| 76 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 77 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 78 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 79 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 76 | Conditional WorldState storage read | Planned | Preserves Account absence while lifting zero-default slot reads to WorldState |
+| 77 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 78 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 79 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 80 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1306,6 +1307,17 @@ as do the full validation and independent P0-P3 audits. The address is not a
 current contract, callee, code address, owner, or authorized principal. Entry,
 account creation, scheduling, trap, gas, ABI, and transaction policy remain
 outside the slice.
+
+## Planned conditional WorldState storage read
+
+[ADR-0094](adr/0094-world-state-storage-read.md) accepts one planned
+`WorldState.readStorage?` operation. It composes explicit Account lookup with
+the existing zero-default Account storage read, returning `none` only when the
+Account itself is absent.
+
+Exactly two simp laws and three definition-only runtime assertions are planned.
+The following slice may lift this operation through the stored-address carrier;
+no frame, mutation, gas, ABI, or transaction rule is added here.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

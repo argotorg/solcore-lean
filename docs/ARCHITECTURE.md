@@ -587,6 +587,10 @@ ADR-0093 completes the next storage-scope boundary: one caller-designated
 storage address is retained beside checkpointed working values and supplies
 delegated writes without becoming a current-contract or authorization claim.
 
+ADR-0094 accepts the corresponding WorldState read boundary. Account absence
+is `none`; every slot in a present Account is `some value`, with missing or
+deleted slots observed as `some zero`.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

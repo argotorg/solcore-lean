@@ -230,6 +230,8 @@ the checkpoint and complete working journal.
 [ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) completes a
 storage-address refinement that removes per-write address choice while
 retaining the selector beside the checkpointed working values.
+[ADR-0094](adr/0094-world-state-storage-read.md) accepts a strict WorldState
+storage-read boundary; its implementation is planned.
 
 ## Implementation status
 
@@ -310,6 +312,7 @@ retaining the selector beside the checkpointed working values.
 | Frame-resolution continuation trap-reason mapping invariance | Complete | Complete | Not published |
 | Checkpointed working-pair storage write | Complete | Complete | Not published |
 | Checkpointed working-pair storage address | Complete | Complete | Not published |
+| Conditional WorldState storage read | Planned | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1605,6 +1608,16 @@ and independent P0-P3 audits pass.
 The carrier establishes no current-contract identity, address authority,
 account creation, contract entry, outcome, parent mutation, scheduling, trap,
 gas, ABI, or transaction policy.
+
+## Planned conditional WorldState storage read
+
+[ADR-0094](adr/0094-world-state-storage-read.md) specifies one planned
+`WorldState.readStorage?` operation. It returns `none` only for an absent
+Account; a present Account with a missing slot returns `some zero`.
+
+Exactly two simp laws and three definition-only runtime assertions are planned.
+No frame lift, mutation, authorization, gas, ABI, or transaction policy is
+included.
 
 ## Meaning of completion
 
