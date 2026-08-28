@@ -175,9 +175,10 @@ indexed extension without accepting a complete working trace.
 opt-in frame-local trap rollback selector. Return and revert produce `none`;
 trap selects parent checkpoint state and rollback with the accumulated internal
 working trace without changing the existing generic resolvers.
-[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) is active. It
-specifies one opt-in payload selector that combines ADR-0075's selected pair
-with the original trapped outcome for a caller-designated enclosing boundary.
+[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) completes one
+opt-in payload selector. It combines ADR-0075's selected pair with the original
+trapped outcome for a caller-designated prospective enclosing boundary without
+performing or proving runtime propagation.
 
 ## Implementation status
 
@@ -240,7 +241,7 @@ with the original trapped outcome for a caller-designated enclosing boundary.
 | Parent-indexed frame continuation context | Complete | Complete | Not published |
 | Parent-indexed frame continuation construction | Complete | Complete | Not published |
 | Parent-indexed trapped-frame rollback selection | Complete | Complete | Not published |
-| Parent-indexed trap propagation payload selection | Not implemented | Decision accepted | Not published |
+| Parent-indexed trap propagation payload selection | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1213,16 +1214,27 @@ P0-P3 audits pass. Internal `FrameTrace` retention is the new narrow policy
 selected here; it does not claim that concrete contract logs survive a trap.
 Propagation, fatality, resumption, and transaction disposition remain outside.
 
-## Active parent-indexed trap propagation payload selection
+## Completed parent-indexed trap propagation payload selection
 
-[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) specifies one
+[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) adds one
 `ParentIndexedFrameContinuationContext.trapPropagationPayload?` operation. It
 maps the ADR-0075 rollback pair into a prospective enclosing frame result and
 selected journal while preserving the original trapped outcome.
 
-Exactly three non-simp laws and three definition-only assertions are planned.
-No runtime transition, parent execution, ancestry, handling, repeated
-propagation, or transaction policy is claimed.
+A 24-line definition module plus one umbrella import contains the selector. A
+56-line properties module plus one umbrella import publishes exactly three
+non-simp outcome laws. The selector, its generated equation, and all three laws
+report exactly `[propext]`. A 91-line definition-only test module plus two
+runner lines contains exactly three assertions covering return, revert, and
+trap with distinct designated enclosing and working state and rollback values,
+the exact parent-then-nested trace, and one preserved concrete trap reason.
+
+The four implementation commits contain 224, 25, 57, and 93 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. The completed operation only constructs a value for one
+caller-designated prospective enclosing boundary. It does not perform or prove
+a runtime transition, parent execution, ancestry, handling, repeated
+propagation, or transaction policy.
 
 ## Meaning of completion
 

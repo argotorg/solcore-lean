@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Decision date: 2026-08-28
-- Scope: opt-in construction of one trap-only payload for a caller-designated enclosing boundary
-- Implementation: Active
+- Scope: opt-in construction of one trap-only payload for a caller-designated prospective enclosing boundary
+- Implementation: Complete
 
 ## Context
 
@@ -127,10 +127,11 @@ values, rollback values, a nonempty parent trace extended by one nested event,
 and concrete payload/reason values.
 
 Return and revert must each produce `none`. Trap must produce `some` whose
-`FrameRunResult.working` is the parent state, whose outcome contains the exact
-original trap reason, and whose selected journal contains parent rollback with
-the exact parent-then-nested trace. Do not import or invoke the laws, and do not
-repeat prefix testing.
+`FrameRunResult.working` is the designated enclosing state, whose outcome
+contains the exact original trap reason, and whose selected journal contains
+the designated enclosing working pair's rollback component with the exact
+parent-then-nested trace. Do not import or invoke the laws, and do not repeat
+prefix testing.
 
 ## Dependency boundary
 
@@ -174,3 +175,33 @@ A caller can construct one parent-indexed, trap-only propagation payload while
 keeping execution, handling, ancestry, and transaction policy explicit and
 separate. The payload is a value-level option, not evidence that propagation
 occurred.
+
+## Implementation record
+
+The completed slice adds exactly one public `trapPropagationPayload?` selector
+in a 24-line definition module plus one umbrella import. It uses `Option.map`
+over ADR-0075's selector and does not repeat the outcome match or rollback
+policy. Return and revert produce `none`; trap pairs the ADR-0075-selected
+designated enclosing working state with the existing trapped outcome and
+retains the selected journal. That journal combines the designated enclosing
+working pair's rollback component with the accumulated internal working
+`FrameTrace`; it is not the original child working journal.
+
+A 56-line properties module plus one umbrella import publishes exactly three
+non-simp outcome laws by rewriting with ADR-0075's laws. The selector, its
+generated equation, and all three laws report exactly `[propext]`. A 91-line
+definition-only test module plus two runner lines contains exactly three
+runtime assertions. Return and revert check absence; trap distinguishes
+designated enclosing and working state and rollback values, checks the exact
+parent-then-nested trace, and preserves one concrete trap reason.
+
+The implementation commits are `8f89c3c` (224 changed lines), `9e6a3aa` (25),
+`c8a6330` (57), and `3e7afee` (93), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+
+The operation constructs a value for one caller-designated prospective
+enclosing boundary. It still does not perform or prove runtime propagation,
+parent execution, ancestry, handling, repeated ancestor propagation, or any
+transaction disposition. Carrying ADR-0075's internal `FrameTrace` adds no
+concrete-log survival, authenticity, or publication claim.

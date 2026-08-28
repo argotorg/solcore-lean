@@ -81,7 +81,7 @@ These results remain regression obligations for every extension.
 | 55 | Parent-indexed frame continuation context | Complete | Binds a completed context's checkpoints and trace prefix to an exact parent working pair |
 | 56 | Parent-indexed frame continuation construction | Complete | Derives the indexed context and proofs from an event-only trace extension |
 | 57 | Parent-indexed trapped-frame rollback selection | Complete | Selects a frame-local parent rollback pair for traps while leaving propagation and transactions open |
-| 58 | Parent-indexed trap propagation payload selection | Active | Constructs one opt-in caller-designated enclosing payload while leaving handling and transactions open |
+| 58 | Parent-indexed trap propagation payload selection | Complete | Constructs one opt-in caller-designated prospective enclosing payload while leaving handling and transactions open |
 | 59 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 60 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after one-step trap payload construction |
 | 61 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -979,16 +979,24 @@ frame-local trace-retention policy, not a reinterpretation of ADR-0061 or a
 concrete-log rule. Generic resolvers remain unchanged; propagation, fatality,
 resumption, and transactions remain later.
 
-## Active parent-indexed trap propagation payload selection
+## Completed parent-indexed trap propagation payload selection
 
-[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) specifies one
+[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) adds one
 opt-in `trapPropagationPayload?` operation. It maps ADR-0075's selected pair to
 a `FrameRunResult` with the original trapped outcome plus the selected journal.
 
-The planned interface contains exactly three non-simp laws and three
-definition-only branch assertions. It constructs one caller-designated
-enclosing payload but does not execute or prove propagation, parent execution,
-handling, repetition through ancestors, or transaction behavior.
+The definition and properties modules contain 24 and 56 lines with one umbrella
+import each. Exactly three non-simp laws report `[propext]`, as do the selector
+and its generated equation. A 91-line definition-only test module plus two
+runner lines contains exactly three branch assertions. The trap assertion
+distinguishes designated enclosing and working state and rollback values,
+checks the exact parent-then-nested trace, and preserves one concrete reason.
+
+The four implementation commits contain 224, 25, 57, and 93 changed lines.
+Full validation and independent P0-P3 audits pass. The operation constructs one
+caller-designated prospective enclosing payload but does not execute or prove
+propagation, parent execution, ancestry, handling, repetition through
+ancestors, or transaction behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

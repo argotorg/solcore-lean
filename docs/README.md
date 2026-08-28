@@ -357,10 +357,10 @@ The completed parent-indexed trapped-frame rollback slice,
 parent rollback pair only when explicitly asked about a trap. Propagation,
 fatality, parent resumption, and transaction handling remain separate.
 
-The active parent-indexed trap-propagation payload slice,
+The completed parent-indexed trap-propagation payload slice,
 [ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md), packages that
 rollback pair with the original trapped outcome for one caller-designated
-enclosing boundary. It does not execute or prove propagation.
+prospective enclosing boundary. It does not execute or prove propagation.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
