@@ -342,6 +342,11 @@ once and then accepts only individual events. It generates prefix evidence
 without adding another public operation that accepts an ambiguous trace
 fragment.
 
+The active parent-indexed continuation-context slice,
+[ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md), requires one
+completed context's checkpoints to equal an exact parent working pair. It
+reuses existing resolution and does not claim a runtime invocation occurred.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -507,6 +512,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   refined continuation context whose exact traces carry prefix evidence.
 - [ADR-0072](adr/0072-indexed-frame-trace-extension.md) fixes event-only
   incremental extension from one indexed earlier trace.
+- [ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) fixes the
+  continuation context indexed by one exact parent working pair.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -78,10 +78,11 @@ These results remain regression obligations for every extension.
 | 52 | Frame trace prefix relation | Complete | Makes ordered trace consistency an explicit proof obligation without claiming provenance |
 | 53 | Trace-prefixed frame continuation context | Complete | Binds prefix evidence to one context's exact checkpoint/working traces |
 | 54 | Indexed frame trace extension | Complete | Generates canonical prefix evidence through event-only incremental construction |
-| 55 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 56 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
-| 57 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 58 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 55 | Parent-indexed frame continuation context | Active | Binds a completed context's checkpoints and trace prefix to an exact parent working pair |
+| 56 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 57 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the parent-indexed context |
+| 58 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 59 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -922,6 +923,19 @@ and integration with the refined continuation context.
 The four implementation commits contain 206, 44, 39, and 73 changed lines.
 Full validation and independent P0-P3 audits pass. Provenance, checkpoint
 ownership, child transitions, and transactions remain separate.
+
+## Active parent-indexed frame continuation context
+
+[ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) packages a
+completed ADR-0071 context with equality between its state/effect checkpoints
+and one parent working pair used as a type index. It adds no resolver alias;
+inherited total resolution remains the executable path.
+
+The planned proof surface bridges the parent trace prefix and characterizes
+known return and revert outcomes at that exact index. ADR-0072 supplies the
+canonical event-only construction path used by three definition-only branch
+tests. Invocation provenance, stack scheduling, trap disposition, and
+transactions remain later. Implementation is active.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
