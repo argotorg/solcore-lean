@@ -579,6 +579,10 @@ ADR-0091 completes the proof that heterogeneous trap-reason mapping is
 unobservable to the same bytes-aware result callbacks. It adds no operation or
 runtime transition.
 
+ADR-0092 fixes the active conditional lift of strict WorldState storage writes
+to only the working state in a checkpointed pair. The checkpoint and working
+journal stay exact; the address remains caller-selected.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

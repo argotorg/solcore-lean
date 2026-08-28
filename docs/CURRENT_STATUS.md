@@ -224,6 +224,9 @@ recovers the existing context continuation.
 [ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md)
 completes the proof that result-level reason mapping leaves the bytes-aware
 continuation result unchanged.
+[ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) fixes the active
+working-only storage-write boundary for checkpointed pairs while preserving
+the checkpoint and complete working journal.
 
 ## Implementation status
 
@@ -302,6 +305,7 @@ continuation result unchanged.
 | Bytes-aware frame resolution continuation | Complete | Complete | Not published |
 | Frame continuation branch/byte erasure coherence | Complete | Complete | Not published |
 | Frame-resolution continuation trap-reason mapping invariance | Complete | Complete | Not published |
+| Checkpointed working-pair storage write | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1561,6 +1565,18 @@ The three implementation commits contain 187, 28, and 43 changed lines; this
 completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. The slice adds no carrier, operation, callback-count claim, trap
 handling, or transaction transition. ADR-0090 remains non-simp.
+
+## Active checkpointed working-pair storage write
+
+[ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) specifies one
+working-only `FrameCheckpointedWorkingPair.writeWorkingStorage?` operation.
+It reuses the existing strict WorldState write, preserves the exact checkpoint
+and working journal, and returns `none` for an absent working account.
+
+Exactly two branch laws and three definition-only runtime assertions are
+planned. The address is caller-selected; the slice adds no authorization,
+account creation, checkpoint lifecycle, frame outcome, parent mutation,
+scheduling, trap, gas, or transaction policy.
 
 ## Meaning of completion
 

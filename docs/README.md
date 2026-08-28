@@ -436,6 +436,11 @@ The completed result-mapping continuation slice,
 proves that bytes-aware continuation is invariant under heterogeneous
 trap-reason mapping.
 
+The active checkpointed storage slice,
+[ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md), conditionally
+updates only a pair's working WorldState while retaining its checkpoint and
+working journal.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -639,6 +644,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes proof-only compatibility after branch and byte erasure.
 - [ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md)
   fixes bytes-aware continuation-result invariance under reason mapping.
+- [ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) fixes a
+  working-only lift of strict WorldState storage writes.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
