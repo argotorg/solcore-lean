@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only equality of `continue?` results under reason mapping
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -128,3 +128,33 @@ with the same selected state and effects, while trap remains `none`.
 
 Together with ADR-0082, this closes the two immediate semantic observations of
 the canonical continuation context without adding execution behavior.
+
+## Implementation record
+
+The completed proof-only slice adds one 30-line properties module plus one
+semantic-umbrella import. It publishes exactly one
+`FrameContinuationContext.continue?_mapTrapReason` simp theorem and no
+operation, carrier, alias, instance, helper, lower-level duplicate, or
+branch-specific law.
+
+The proof exposes the existing context, frame-result, and outcome constructors,
+then reuses the ADR-0066 branch laws, ADR-0067 context coherence, and ADR-0081
+mapping laws. It does not unfold or restate the continuation policy. The
+theorem removes context mapping beneath `continue?`, supports heterogeneous
+reason universes, converges with repeated mapping, and reports exactly
+`[propext]`.
+
+A 38-line test module plus one runner import contains exactly two private
+compile examples and no runtime function or assertion. One consumes the
+single-map theorem through `simp`; the other reduces two successive
+heterogeneous mappings to the original `continue?` result.
+
+The implementation commits are `8a9b1b4` (187 changed lines), `9bfacdb` (31),
+and `70cdc05` (39), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+simp-termination, semantic-kernel, metadata, diff, and independent P0-P3 audits
+pass.
+
+The equality remains limited to the returned `Option Next` value. It adds no
+claim about mapper evaluation, cost, step count, exactly-once invocation,
+parent indexing, payloads, propagation, or transaction policy.

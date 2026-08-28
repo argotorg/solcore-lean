@@ -392,7 +392,7 @@ The completed resolution-naturality slice,
 that mapping before total resolution agrees with mapping the resolved value.
 It adds no execution operation.
 
-The active continuation-result slice,
+The completed continuation-result slice,
 [ADR-0083](adr/0083-frame-trap-reason-mapping-continuation-invariance.md),
 proves that context reason mapping leaves the `Option` value produced by
 `FrameContinuationContext.continue?` unchanged. It adds no execution operation.
