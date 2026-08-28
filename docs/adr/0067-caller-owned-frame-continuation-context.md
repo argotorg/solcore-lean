@@ -116,7 +116,8 @@ frozen artifact.
 
 The caller-owned continuation inputs now have one stable nominal boundary.
 Future runtime carriers can contain or replace this bundle deliberately rather
-than relying on an unstructured argument list.
+than relying on an unstructured argument list. ADR-0081 adds a downstream
+trap-reason mapping without changing this carrier or its continuation.
 
 ## Implementation record
 

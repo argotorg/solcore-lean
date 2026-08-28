@@ -86,10 +86,11 @@ These results remain regression obligations for every extension.
 | 60 | Heterogeneous frame-outcome trap-reason mapping | Complete | Maps only reason types while preserving return/revert payloads and leaving policy caller-owned |
 | 61 | Heterogeneous frame-run-result trap-reason mapping | Complete | Preserves working state while lifting the completed outcome mapping, without adding runtime propagation |
 | 62 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Preserves selected state, effects, and bytes while mapping only the total result's trapped reason |
-| 63 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 64 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
-| 65 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 66 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 63 | Heterogeneous frame-continuation-context trap-reason mapping | Active | Preserves all caller-owned inputs while mapping only the contained frame result |
+| 64 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 65 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
+| 66 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 67 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1073,6 +1074,19 @@ The four implementation commits contain 249, 25, 69, and 94 changed lines.
 Full validation and independent P0-P3 audits pass. The slice does not rerun
 resolution, map a context or payload, or choose propagation or transaction
 behavior.
+
+## Active heterogeneous frame-continuation-context trap-reason mapping
+
+[ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
+adds one planned context lift of ADR-0079. It copies the state checkpoint,
+effect checkpoint, and working effects unchanged, then maps only the
+`FrameRunResult` field.
+
+The planned proof surface contains exactly seven simp laws for construction,
+the four projections, identity, and composition. Three definition-only branch
+tests will observe every field with distinct witnesses. This slice does not run
+a continuation or resolver, map an indexed context or payload, or choose
+propagation or transaction behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

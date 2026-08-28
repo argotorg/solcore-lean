@@ -191,6 +191,9 @@ delegate only its outcome to ADR-0078.
 [ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md)
 completes mapping for total frame-resolution results while preserving
 return/revert state, effects, and bytes.
+[ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
+now fixes the active lift to caller-owned continuation contexts while
+preserving every checkpoint and working field.
 
 ## Implementation status
 
@@ -258,6 +261,7 @@ return/revert state, effects, and bytes.
 | Heterogeneous frame-outcome trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-run-result trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Complete | Not published |
+| Heterogeneous frame-continuation-context trap-reason mapping | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1325,6 +1329,18 @@ runner lines contains exactly three assertions.
 The four implementation commits contain 249, 25, 69, and 94 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Resolution, continuation contexts, payloads, propagation,
+and transaction policy remain outside this slice.
+
+## Active heterogeneous frame-continuation-context trap-reason mapping
+
+[ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
+fixes one pure context lift of ADR-0079. State and effect checkpoints, working
+effects, and the result's working state remain exact; only its outcome reason
+can change.
+
+The planned surface is one operation, exactly seven construction, projection,
+identity, and composition simp laws, and exactly three definition-only runtime
+assertions. Continuation, resolution, parent indexing, payloads, propagation,
 and transaction policy remain outside this slice.
 
 ## Meaning of completion
