@@ -203,6 +203,9 @@ value produced by `FrameContinuationContext.continue?` unchanged.
 [ADR-0084](adr/0084-heterogeneous-trace-prefixed-frame-continuation-context-trap-reason-mapping.md)
 completes the lift to trace-prefix refined contexts without rebuilding
 their proof evidence.
+[ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md)
+now fixes the active final lift to parent-indexed contexts while preserving the
+exact `parentWorking` index and checkpoint equality.
 
 ## Implementation status
 
@@ -274,6 +277,7 @@ their proof evidence.
 | Frame trap-reason mapping resolution naturality | Complete | Complete | Not published |
 | Frame trap-reason mapping continuation-result invariance | Complete | Complete | Not published |
 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Complete | Not published |
+| Heterogeneous parent-indexed continuation-context trap-reason mapping | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1412,6 +1416,18 @@ The four implementation commits contain 246, 28, 62, and 96 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Parent indexing, checkpoint equality, payloads, provenance,
 propagation, and transaction policy remain outside this slice.
+
+## Active heterogeneous parent-indexed context trap-reason mapping
+
+[ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md)
+fixes one planned pure lift of ADR-0084 to the ADR-0073 parent-indexed context.
+The trace-prefix context is mapped while the exact parent index and checkpoint
+equality are reused.
+
+The planned surface is one operation, exactly four `[propext]` simp laws, and
+exactly three definition-only private compile regressions. Rollback selection,
+payloads, provenance, propagation, nested execution, and transaction policy
+remain outside this final mapper slice.
 
 ## Meaning of completion
 

@@ -550,6 +550,10 @@ ADR-0084 completes the lift of reason mapping to the trace-prefix refined
 context. The base context changes through ADR-0081 while both traces and the
 existing prefix evidence remain exact.
 
+ADR-0085 fixes the active final lift to the parent-indexed context. Its refined
+base changes through ADR-0084 while the `parentWorking` index and checkpoint
+equality remain exact. This is an adapter, not a nested-runtime transition.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

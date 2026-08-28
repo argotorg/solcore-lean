@@ -162,6 +162,9 @@ are one exact parent working pair and that its accumulated trace extends that
 pair's trace. Concrete nested invocation, scheduling, traps, and transaction
 policy remain later decisions.
 
+ADR-0085 adds reason mapping while retaining this carrier's exact parent index,
+checkpoint equality, and inherited trace-prefix evidence.
+
 ## Implementation record
 
 The completed slice adds one 22-line carrier module plus one umbrella import.

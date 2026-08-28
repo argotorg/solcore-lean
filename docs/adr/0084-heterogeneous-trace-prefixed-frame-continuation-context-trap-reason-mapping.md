@@ -189,8 +189,8 @@ Consumers can change a trace-prefixed context's reason type without rebuilding
 its base value or proof. Both traces and their existing non-strict prefix
 evidence remain exact.
 
-The parent-indexed context can now receive the same lift in a separate slice,
-while preserving its additional checkpoint-to-parent equality proof.
+ADR-0085 fixes the parent-indexed lift while preserving the additional
+checkpoint-to-parent equality proof.
 
 ## Implementation record
 
