@@ -227,6 +227,8 @@ continuation result unchanged.
 [ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) completes the
 working-only storage-write boundary for checkpointed pairs while preserving
 the checkpoint and complete working journal.
+[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) accepts a
+storage-address refinement of those values; its implementation is planned.
 
 ## Implementation status
 
@@ -306,6 +308,7 @@ the checkpoint and complete working journal.
 | Frame continuation branch/byte erasure coherence | Complete | Complete | Not published |
 | Frame-resolution continuation trap-reason mapping invariance | Complete | Complete | Not published |
 | Checkpointed working-pair storage write | Complete | Complete | Not published |
+| Checkpointed working-pair storage address | Planned | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1583,6 +1586,19 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The address is caller-selected; the slice adds no
 authorization, account creation, checkpoint lifecycle, outcome, parent
 mutation, scheduling, trap, gas, or transaction policy.
+
+## Planned checkpointed working-pair storage address
+
+[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) specifies one
+`FrameCheckpointedWorkingPairWithStorageAddress` carrier and one planned
+`writeStorage?` operation. One caller-designated storage address is retained
+beside the existing checkpointed working values and supplies every delegated
+ADR-0092 write.
+
+Exactly two simp laws and three definition-only runtime assertions are planned.
+The carrier establishes no current-contract identity, address authority,
+account creation, contract entry, outcome, parent mutation, scheduling, trap,
+gas, ABI, or transaction policy.
 
 ## Meaning of completion
 
