@@ -70,10 +70,11 @@ These results remain regression obligations for every extension.
 | 44 | Synchronized frame state/effect resolution | Complete | Resolves state and effects from one shared frame outcome |
 | 45 | Synchronized child-frame composition | Complete | Proves child return/revert followed by parent rollback without a stack API |
 | 46 | Unresolved trap propagation | Complete | Proves that trapped synchronized resolution remains `none` through any continuation |
-| 47 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 48 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 49 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 50 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 47 | Resolved frame continuation laws | Active | Passes returned/reverted synchronized pairs to arbitrary continuations without a new API |
+| 48 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 49 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 50 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 51 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -771,6 +772,20 @@ audits pass. No next operational slice is activated here.
 This does not choose checkpoint or working state, effect rollback, trace
 survival, fatal-error handling, or transaction behavior. Those operational
 decisions remain separate.
+
+## Active resolved frame continuation laws
+
+[ADR-0065](adr/0065-resolved-frame-continuation-laws.md) fixes exactly two
+non-simp equations for binding arbitrary Option continuations after returned
+and reverted synchronized resolution. The continuation receives the same
+WorldState and effect journal selected by the existing resolver. With
+ADR-0064, the proof boundary covers all three FrameOutcome constructors.
+
+The slice adds no carrier, executable operation, instance, or helper. Its two
+definition-only runtime assertions use sentinel continuations to inspect the
+selected state, rollback snapshot, and trace snapshot. It does not choose
+checkpoint creation, trace accumulation or order, invocation ownership,
+transactions, or trap disposition.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

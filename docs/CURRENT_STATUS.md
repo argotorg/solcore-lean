@@ -137,6 +137,9 @@ proof-only child composition laws. They add no executable API or nested stack.
 trap-propagation slice. It records that a trapped synchronized resolution
 remains `none` through any continuation, without selecting a trap or
 transaction policy.
+[ADR-0065](adr/0065-resolved-frame-continuation-laws.md) is the active
+proof-only slice. It fixes the matching generic continuation equations for
+returned and reverted synchronized results without adding an execution API.
 
 ## Implementation status
 
@@ -188,6 +191,7 @@ transaction policy.
 | Synchronized frame state/effect resolution | Complete | Complete | Not published |
 | Synchronized child-frame composition | Complete | Complete | Not published |
 | Unresolved trap propagation | Complete | Complete | Not published |
+| Resolved frame continuation laws | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -955,6 +959,20 @@ The three implementation commits contain 122, 27, and 36 changed lines; this
 completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. `none` remains limited to unresolved trap disposition and chooses
 no rollback, working state, trace, fatal, or transaction policy.
+
+## Active resolved frame continuation laws
+
+[ADR-0065](adr/0065-resolved-frame-continuation-laws.md) adds no carrier,
+executable API, instance, or helper. Its proof-only scope is exactly two
+non-simp laws: after synchronized return or revert resolution, binding an
+arbitrary continuation invokes it with exactly the selected state-and-effect
+pair. Together with ADR-0064, these equations cover every FrameOutcome
+constructor.
+
+The planned definition-only test module has exactly two sentinel assertions,
+one for return and one for revert. Checkpoint creation and ownership, trace
+append and ordering, invocation, transactions, and trap disposition remain
+separate decisions.
 
 ## Meaning of completion
 

@@ -443,6 +443,12 @@ reports `[propext]`, and one sentinel runtime assertion covers the same path.
 It deliberately leaves rollback,
 trace, fatal-error, and transaction handling undecided.
 
+ADR-0065 fixes the matching continuation equations for returned and reverted
+frames. Each equation passes the pair already selected by synchronized
+resolution to an arbitrary Option continuation. The proof-only slice adds no
+operation and leaves checkpoint creation, trace accumulation, and invocation
+ownership undecided.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
