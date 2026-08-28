@@ -544,6 +544,11 @@ The completed
 checks a storage selector against caller-supplied `initialWorld` and returns the
 proven-present carrier used by total storage operations on success.
 
+The active
+[ADR-0116](adr/0116-address-selected-checked-core-code.md) adds checker-accepted
+Core code to Account state, selects it by Address, and runs it without inventing
+an ABI or frame-result conversion.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -794,6 +799,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
   fixes optional/total write re-refinement coherence.
 - [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
+- [ADR-0116](adr/0116-address-selected-checked-core-code.md)
   fixes initialization-to-present-storage refinement.
 
 Historical ADRs are retained even when their implementation is no longer the

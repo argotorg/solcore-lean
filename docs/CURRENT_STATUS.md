@@ -296,6 +296,10 @@ writer; implementation is complete.
 [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
 accepts a partial adapter from parent-indexed initialization to the existing
 proven-present storage carrier; implementation is complete.
+[ADR-0116](adr/0116-address-selected-checked-core-code.md) accepts checked
+Core code as rollback-visible Account state and fixes address-selected raw Core
+execution as the next active slice. It deliberately leaves frame outcomes,
+ABI conversion, contract inputs, and WorldState effects unresolved.
 
 ## Implementation status
 
@@ -308,6 +312,7 @@ proven-present storage carrier; implementation is complete.
 | Internal non-recursive functions | Complete | Complete, including totality | Not published |
 | Internal binary sums | Complete | Complete, including totality | Not published |
 | Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
+| Address-selected checked Core code | Planned | ADR accepted; implementation active | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |

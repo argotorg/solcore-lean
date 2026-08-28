@@ -121,11 +121,12 @@ These results remain regression obligations for every extension.
 | 95 | Present working storage Account total-write sparse preservation | Complete | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
 | 96 | Present working storage Account optional/total re-refinement coherence | Complete | Makes the failure-aware write/refine path equal the total writer and reusable across refined optional-write sequences |
 | 97 | Parent-indexed initialization present storage Account refinement | Complete | Checks Account presence for the initialization-bound selector and reaches existing total storage consumers without a new carrier |
-| 98 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 99 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 100 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 101 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 102 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 98 | Address-selected checked Core code | Active | Stores checker-accepted Core code in Account and executes exact address selection without an ABI or frame-result conversion |
+| 99 | Further contract-entry input roles | Planned | Adds caller, callee, data, value, or kind only when a Core consumer exists |
+| 100 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 101 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 102 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 103 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
