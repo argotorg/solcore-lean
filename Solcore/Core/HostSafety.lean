@@ -131,6 +131,19 @@ theorem HostRuntimeValueHasType.word_shape
   cases typing with
   | word => exact ⟨_, rfl⟩
 
+/-- A value typed as a pair of Words has exactly two Word components. -/
+theorem HostRuntimeValueHasType.wordPair_shape
+    {definitions : DataEnvironment}
+    {world : StoreTyping} {value : Value}
+    (typing : HostRuntimeValueHasType world value
+      (.product .word .word) definitions) :
+    ∃ left right, value = .pair (.word left) (.word right) := by
+  cases typing with
+  | pair leftTyping rightTyping =>
+      obtain ⟨left, rfl⟩ := leftTyping.word_shape
+      obtain ⟨right, rfl⟩ := rightTyping.word_shape
+      exact ⟨left, right, rfl⟩
+
 theorem HostRuntimeValueHasType.function_shape
     {definitions : DataEnvironment}
     {world : StoreTyping} {value : Value} {parameterType resultType : Ty}
