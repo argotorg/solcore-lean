@@ -269,6 +269,9 @@ working Account, and its presence evidence; implementation is complete.
 [ADR-0106](adr/0106-present-working-storage-account-total-read.md) accepts a
 total slot read from that proven-present Account and a coherence law with the
 existing conditional context read; implementation is complete.
+[ADR-0107](adr/0107-present-working-storage-account-total-write.md) accepts a
+total slot write that synchronizes the retained Account, working-state entry,
+and new presence evidence; implementation is planned.
 
 ## Implementation status
 
@@ -362,6 +365,7 @@ existing conditional context read; implementation is complete.
 | Parent-indexed initialization continuation-context coherence | No new operation | Complete | Not published |
 | Present working storage Account refinement | Complete | Complete | Not published |
 | Present working storage Account total read | Complete | Complete | Not published |
+| Present working storage Account total write | Planned | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1838,6 +1842,15 @@ reads; two private compile regressions exercise direct and `Option.getD`
 consumers. The operation, generated equation, and law report `[propext]`; full
 validation and independent P0-P3 audits pass. It adds no write, Account
 creation, address authority, transition, or published surface.
+
+## Planned present working storage Account total write
+
+[ADR-0107](adr/0107-present-working-storage-account-total-write.md) specifies
+one total write that updates the selected working Account in both the retained
+carrier and its context, together with fresh presence evidence.
+
+The operation performs no lookup and cannot fail after refinement. It adds no
+Account creation, address authority, frame transition, or published surface.
 
 ## Meaning of completion
 

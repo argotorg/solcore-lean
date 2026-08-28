@@ -641,6 +641,10 @@ ADR-0106 accepts a total slot read on that refinement. It reads the stored
 Account directly and proves agreement with the earlier conditional context
 read, without another WorldState lookup or absence branch.
 
+ADR-0107 accepts a total slot write on the same refinement. It synchronously
+updates the stored Account, selected working-state entry, and presence evidence
+while retaining the selector, checkpoint, and working journal.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

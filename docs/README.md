@@ -503,6 +503,11 @@ The completed
 total slot read from that checked Account, together with agreement with the
 existing conditional read.
 
+The accepted
+[ADR-0107](adr/0107-present-working-storage-account-total-write.md) plans a
+total slot write that keeps the checked Account and its working-state entry in
+sync.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -736,6 +741,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   evidence-carrying refinement for a present working Account.
 - [ADR-0106](adr/0106-present-working-storage-account-total-read.md) fixes the
   total read from that refinement.
+- [ADR-0107](adr/0107-present-working-storage-account-total-write.md) fixes the
+  planned synchronized total write.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

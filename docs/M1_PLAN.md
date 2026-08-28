@@ -112,11 +112,12 @@ These results remain regression obligations for every extension.
 | 86 | Parent-indexed initialization continuation-context coherence | Complete | Equates the refined trace-extension route with the plain checkpointed-values route |
 | 87 | Present working storage Account refinement | Complete | Bundles the exact retained-address working Account and its lookup evidence for total consumers |
 | 88 | Present working storage Account total read | Complete | Reads the proven-present selected Account without another lookup or failure branch |
-| 89 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 90 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 91 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 92 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 93 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 89 | Present working storage Account total write | Planned | Synchronizes the selected Account, working-state entry, and evidence without another lookup |
+| 90 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 91 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 92 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 93 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 94 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1485,6 +1486,16 @@ consumers. The operation, generated equation, and coherence law report
 `[propext]`; full validation and independent P0-P3 audits pass. Account absence
 remains handled only by refinement; storage writes and all address-role,
 lifetime, and transition policies remain later work.
+
+## Planned present working storage Account total write
+
+[ADR-0107](adr/0107-present-working-storage-account-total-write.md) adds one
+total write that synchronizes the selected Account, working-state entry, and
+new presence evidence without another lookup or failure branch.
+
+The first law relates its context projection to the existing optional write.
+Read-after-write, algebra, address authority, lifetime, and transition policies
+remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
