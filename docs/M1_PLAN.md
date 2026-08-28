@@ -95,10 +95,11 @@ These results remain regression obligations for every extension.
 | 69 | Frame checkpointed working pair | Complete | Stores a checkpoint snapshot beside an independent working pair without adding an operation or relation proof |
 | 70 | Continuation context from checkpointed working pair | Complete | Canonically assembles every stored value plus an opaque outcome into the existing continuation context |
 | 71 | Bytes-aware frame resolution continuation | Complete | Passes selected state/effects and bytes to distinct caller-owned return/revert callbacks while leaving traps unresolved |
-| 72 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 73 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 74 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 75 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 72 | Frame continuation branch/byte erasure coherence | Active | Requires proof that the richer result route conservatively recovers bytes-insensitive context continuation |
+| 73 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 74 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 75 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 76 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1236,6 +1237,17 @@ The four implementation commits contain 244, 29, 55, and 85 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. This seam preserves branch and bytes but performs no
 delivery, parent update, scheduling, trap handling, or transaction transition.
+
+## Active frame continuation branch/byte erasure coherence
+
+[ADR-0090](adr/0090-frame-continuation-branch-byte-erasure-coherence.md) adds
+one planned proof-only non-simp law. When both callbacks supplied after total
+resolution are the same and ignore bytes, their `Option` result equals the
+existing bytes-insensitive context `continue?` result.
+
+Exactly two private compile regressions and no runtime call are planned. This
+slice adds no operation, callback-count claim, delivery, parent update,
+scheduling, trap handling, or transaction transition.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

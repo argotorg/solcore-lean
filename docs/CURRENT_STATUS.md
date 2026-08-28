@@ -218,6 +218,9 @@ to the existing continuation context.
 [ADR-0089](adr/0089-bytes-aware-frame-resolution-continuation.md) completes the
 caller-owned continuation seam that preserves return/revert branch,
 selected state/effects, and bytes while leaving traps unresolved.
+[ADR-0090](adr/0090-frame-continuation-branch-byte-erasure-coherence.md)
+specifies the active proof obligation that erasing branch and bytes from the
+richer continuation recovers the existing context continuation.
 
 ## Implementation status
 
@@ -294,6 +297,7 @@ selected state/effects, and bytes while leaving traps unresolved.
 | Frame checkpointed working pair | Complete | Complete | Not published |
 | Continuation context from checkpointed working pair | Complete | Complete | Not published |
 | Bytes-aware frame resolution continuation | Complete | Complete | Not published |
+| Frame continuation branch/byte erasure coherence | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1521,6 +1525,17 @@ The four implementation commits contain 244, 29, 55, and 85 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The operation performs no delivery, parent mutation,
 scheduling, trap handling, resolution, or transaction transition.
+
+## Active frame continuation branch/byte erasure coherence
+
+[ADR-0090](adr/0090-frame-continuation-branch-byte-erasure-coherence.md)
+specifies one proof-only non-simp law. It equates the explicit
+`context.resolve.continue?` route with the established context `continue?`
+only when both branch callbacks are the same and ignore bytes.
+
+Exactly two private compile regressions are planned. The slice adds no carrier,
+operation, runtime assertion, delivery, callback-count claim, trap handling,
+or transaction transition.
 
 ## Meaning of completion
 
