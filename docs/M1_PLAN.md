@@ -103,11 +103,12 @@ These results remain regression obligations for every extension.
 | 77 | Address-bound working storage read | Complete | Uses the retained storage address to read only the working WorldState |
 | 78 | WorldState storage read/write coherence | Complete | Normalizes reads after conditional writes and preserves independent observations |
 | 79 | Address-bound working storage read/write coherence | Complete | Lifts same-slot and different-slot observations through the retained selector |
-| 80 | Contract-entry boundary design | Planned | Reassesses checkpoint initialization, child working values, address roles, invocation inputs, and outcome provenance before adding an entry carrier |
-| 81 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 82 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 83 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 84 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 80 | Parent-indexed frame initialization | Planned | Builds a canonical trace start and checkpointed working pair from caller-supplied initial state values |
+| 81 | Contract-entry input roles | Planned | Adds address and invocation inputs only after their consumers and lifetime rules are selected |
+| 82 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 83 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 84 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 85 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1362,10 +1363,20 @@ other-address overload, checkpoint policy, or address authority. Exactly two
 private compile examples and no runtime call are present. Both laws report
 exactly `[propext]`, and full validation plus independent P0-P3 audits pass.
 
-With ADR-0097 complete, active design returns to the contract-entry boundary.
-Checkpoint initialization, child working values, address roles, invocation
-inputs, and outcome provenance must be considered together before an entry
-carrier is added.
+The contract-entry boundary review selected ADR-0098's payload-free
+initialization layer. Address roles, invocation inputs, and outcome provenance
+remain later decisions before an entry carrier is added.
+
+## Planned parent-indexed frame initialization
+
+[ADR-0098](adr/0098-parent-indexed-frame-initialization.md) accepts one
+payload-free initialization carrier. The exact parent working pair is its type
+index; initial WorldState and rollback values remain explicit caller inputs.
+
+One operation starts an indexed trace extension at the parent trace. A second
+constructs the existing checkpointed working pair with the parent snapshot,
+the caller's initial values, and that exact initial trace. The slice adds no
+address role, call data, value, kind, event, scheduling, or execution policy.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

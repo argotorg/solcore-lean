@@ -601,6 +601,11 @@ ADR-0097 completes the proof-only lift of the same-slot and different-slot cases
 through the retained-address working carrier. No new operation or address role
 is introduced.
 
+ADR-0098 accepts a pure parent-indexed initialization recipe. The caller
+supplies initial WorldState and rollback values; the recipe derives a trace
+extension at the parent trace and a checkpointed working pair whose checkpoint
+is the exact parent pair.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

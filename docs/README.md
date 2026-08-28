@@ -454,6 +454,11 @@ addresses unchanged. The completed
 makes the same-slot and different-slot results directly available through the
 retained address.
 
+The accepted [ADR-0098](adr/0098-parent-indexed-frame-initialization.md) plans a
+small frame-initialization value. A caller supplies the initial WorldState and
+rollback value; the implementation will reuse the designated parent values as
+the checkpoint and trace starting point. It does not run or schedule a frame.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -669,6 +674,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   stage-preserving WorldState read/write coherence.
 - [ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
   fixes the carrier-level lift of that coherence.
+- [ADR-0098](adr/0098-parent-indexed-frame-initialization.md) fixes the planned
+  parent-indexed frame-initialization recipe.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
