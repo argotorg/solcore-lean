@@ -62,17 +62,20 @@ namespace Solcore.Semantics.WorldState
     state.runCode? codeAddress fuel = some (code.runStateful fuel) := by
   simp [runCode?, code?, accountPresent, codePresent]
 
-/-- An exactly selected checked-code run cannot return a machine fault. -/
+/-- Address-selected checked-code execution cannot return a machine fault. -/
 theorem runCode?_ne_some_fault
     (state : WorldState)
     (codeAddress : Address)
-    (code : CheckedCoreProgram)
     (fuel : Nat)
-    (selected : state.code? codeAddress = some code)
     (error : Core.MachineFault)
     (faultState : Core.State) :
     state.runCode? codeAddress fuel ≠ some (.fault error faultState) := by
-  rw [runCode?, selected]
-  simpa using code.runStateful_ne_fault fuel error faultState
+  unfold runCode?
+  cases selected : state.code? codeAddress with
+  | none => simp
+  | some code =>
+      intro same
+      exact code.runStateful_ne_fault fuel error faultState
+        (Option.some.inj same)
 
 end Solcore.Semantics.WorldState

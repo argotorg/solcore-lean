@@ -19,6 +19,18 @@ namespace Solcore.Semantics.CheckedCoreProgram
     ofProgram? program = none := by
   simp [ofProgram?, rejected]
 
+/-- Every retained non-recursive Core program completes above some fuel bound. -/
+theorem runStateful_has_sufficient_fuel
+    (code : CheckedCoreProgram) :
+    ∃ required finalWorld finalStore value,
+      Core.StoreHasTypes finalWorld finalStore ∧
+      Core.RuntimeValueHasType finalWorld value code.program.resultType
+        code.program.dataDefinitions ∧
+      ∀ fuel, required ≤ fuel →
+        code.runStateful fuel = .done value finalStore := by
+  simpa [runStateful] using
+    Core.Program.checked_runStateful_has_sufficient_fuel code.checked
+
 /-- Checker-accepted Core execution cannot produce a machine fault. -/
 theorem runStateful_ne_fault
     (code : CheckedCoreProgram)
