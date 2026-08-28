@@ -185,6 +185,9 @@ attach the existing non-strict trace-prefix fact to its journal.
 [ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md)
 completes one caller-supplied pure mapping on `FrameOutcome` that preserves
 return/revert bytes and changes only trapped reasons.
+[ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md)
+now fixes the active lift to `FrameRunResult`: keep its working state exactly
+and delegate only its outcome to ADR-0078.
 
 ## Implementation status
 
@@ -250,6 +253,7 @@ return/revert bytes and changes only trapped reasons.
 | Parent-indexed trap propagation payload selection | Complete | Complete | Not published |
 | Parent-indexed trap propagation payload coherence | Complete | Complete | Not published |
 | Heterogeneous frame-outcome trap-reason mapping | Complete | Complete | Not published |
+| Heterogeneous frame-run-result trap-reason mapping | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1282,6 +1286,18 @@ The four implementation commits contain 227, 27, 52, and 66 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. No `Functor`, taxonomy, payload mapper, runtime propagation,
 ancestry, handling, or transaction policy is added.
+
+## Active heterogeneous frame-run-result trap-reason mapping
+
+[ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md)
+fixes one pure lift of ADR-0078 to `FrameRunResult`. It preserves the exact
+working state and maps only the contained outcome with a caller-owned function.
+
+The planned surface is one operation, exactly five simp laws for construction,
+both projections, identity, and composition, and exactly three definition-only
+runtime assertions. The operation and proofs must report `[propext]` because
+the result contains `WorldState`. No resolver, payload, journal, trace,
+propagation, taxonomy, or transaction policy is included.
 
 ## Meaning of completion
 

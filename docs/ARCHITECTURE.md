@@ -524,6 +524,11 @@ on `FrameOutcome`. A caller-supplied pure function changes only trapped reasons;
 return and revert bytes are preserved. No payload, state, effect, trace, or
 runtime propagation behavior is added.
 
+ADR-0079 lifts that caller-supplied mapping to `FrameRunResult`. The result's
+working state is preserved exactly and only its outcome is delegated to
+ADR-0078. This remains a pure value transformation, not state resolution,
+rollback, ancestry, or runtime propagation.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

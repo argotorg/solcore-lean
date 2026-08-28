@@ -173,9 +173,9 @@ concrete log rule, frozen artifact, or public format.
 ## Consequences
 
 Semantic layers can translate only the trap reason of a frame outcome while
-preserving return/revert bytes and keeping the mapping policy explicit. Future
-lifting to frame results or prospective propagation payloads can reuse this
-operation without changing its lower-layer meaning.
+preserving return/revert bytes and keeping the mapping policy explicit.
+ADR-0079 reuses this operation when lifting the mapping to frame results,
+without changing ADR-0078's lower-layer meaning.
 
 ## Implementation record
 

@@ -372,6 +372,11 @@ The completed heterogeneous trap-reason mapping slice,
 caller translate only trapped reasons while keeping return and revert bytes
 unchanged. It adds no taxonomy or propagation policy.
 
+The active frame-result mapping slice,
+[ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md),
+lifts that translation while keeping the result's working state unchanged. It
+does not resolve state or imply that a trap was propagated at runtime.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -549,6 +554,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes the proof interface for successful payload selection and its trace.
 - [ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md) fixes
   caller-supplied mapping between different frame trap-reason types.
+- [ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md)
+  fixes the working-state-preserving lift to frame-run results.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -84,10 +84,11 @@ These results remain regression obligations for every extension.
 | 58 | Parent-indexed trap propagation payload selection | Complete | Constructs one opt-in caller-designated prospective enclosing payload while leaving handling and transactions open |
 | 59 | Parent-indexed trap propagation payload coherence | Complete | Inverts successful selection and carries existing non-strict prefix evidence without adding execution |
 | 60 | Heterogeneous frame-outcome trap-reason mapping | Complete | Maps only reason types while preserving return/revert payloads and leaving policy caller-owned |
-| 61 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 62 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
-| 63 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 64 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 61 | Heterogeneous frame-run-result trap-reason mapping | Active | Preserves working state while lifting the completed outcome mapping, without adding runtime propagation |
+| 62 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 63 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
+| 64 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 65 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1035,6 +1036,19 @@ The four implementation commits contain 227, 27, 52, and 66 changed lines.
 Full validation and independent P0-P3 audits pass. No Functor instance,
 observer coherence, frame-result or payload lifting, reason classification,
 ancestry, propagation, or transaction behavior is included.
+
+## Active heterogeneous frame-run-result trap-reason mapping
+
+[ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md)
+adds one planned `FrameRunResult.mapTrapReason` operation above ADR-0078. It
+copies the result's working state unchanged and applies the caller's mapper only
+through `FrameOutcome.mapTrapReason`.
+
+The planned proof surface contains exactly five simp laws for construction,
+the two projections, identity, and composition. Three definition-only branch
+tests will observe distinct working-state values, exact return/revert bytes,
+and one exact mapped trap reason. This slice does not resolve state, map effects
+or traces, construct a payload, or claim that runtime propagation occurred.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
