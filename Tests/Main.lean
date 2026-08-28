@@ -79,6 +79,7 @@ import Solcore.Test.FrameRunEffectTrapPropagation
 import Solcore.Test.FrameRunResult
 import Solcore.Test.FrameStateResolution
 import Solcore.Test.ParentIndexedFrameContinuationContext
+import Solcore.Test.ParentIndexedFrameContinuationConstruction
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
 import Solcore.Test.WorldStateStorageWriteAlgebra
@@ -4923,6 +4924,7 @@ def run : IO Unit := do
   testFrameRunResult
   testFrameStateResolution
   testParentIndexedFrameContinuationContext
+  testParentIndexedFrameContinuationConstruction
   testRuntimeScalars
   testWorldState
   testWorldStateStorageWriteAlgebra
