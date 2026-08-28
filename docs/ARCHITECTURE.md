@@ -645,6 +645,9 @@ ADR-0107 accepts a total slot write on the same refinement. It synchronously
 updates the stored Account, selected working-state entry, and presence evidence
 while retaining the selector, checkpoint, and working journal.
 
+ADR-0108 accepts the direct observations of that total write: the written slot
+reads back the new value, while every distinct slot keeps its prior total read.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
