@@ -73,6 +73,7 @@ import Solcore.Test.FrameResolutionResult
 import Solcore.Test.FrameResolutionResultContinuation
 import Solcore.Test.FrameContinuationContextResolutionContinuationCoherence
 import Solcore.Test.FrameResolutionResultTrapReasonMap
+import Solcore.Test.FrameResolutionResultContinueTrapReasonMap
 import Solcore.Test.FrameTrace
 import Solcore.Test.FrameTraceExtension
 import Solcore.Test.FrameTracePrefix
