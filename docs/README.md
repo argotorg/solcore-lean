@@ -321,6 +321,11 @@ that preserves return/revert payloads and trap reasons. State and effects are
 selected only for return and revert, so trap and transaction disposition remain
 open.
 
+The active trace slice,
+[ADR-0069](adr/0069-ordered-frame-trace-algebra.md), adds an opt-in finite
+chronological event sequence with tail recording and ordered append. Event
+kinds remain parametric, and existing generic effect journals are unchanged.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -478,6 +483,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   nominal caller-owned continuation-input bundle.
 - [ADR-0068](adr/0068-total-frame-resolution-result.md) fixes the total
   branch-complete frame-resolution result.
+- [ADR-0069](adr/0069-ordered-frame-trace-algebra.md) fixes the opt-in ordered
+  frame-trace extension algebra.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

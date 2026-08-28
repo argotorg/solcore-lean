@@ -149,6 +149,9 @@ without defining a full execution frame.
 [ADR-0068](adr/0068-total-frame-resolution-result.md) completes the total
 frame-resolution result. It converts one continuation context into a
 branch-complete value without choosing trap or transaction disposition.
+[ADR-0069](adr/0069-ordered-frame-trace-algebra.md) is the active trace slice.
+It adds an opt-in finite chronological extension algebra while leaving event
+kinds and the generic effect journal open.
 
 ## Implementation status
 
@@ -204,6 +207,7 @@ branch-complete value without choosing trap or transaction disposition.
 | Caller-owned frame continuation | Complete | Complete | Not published |
 | Caller-owned frame continuation context | Complete | Complete | Not published |
 | Total frame resolution result | Complete | Complete | Not published |
+| Ordered frame trace algebra | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1045,6 +1049,19 @@ The four implementation commits contain 198, 44, 51, and 79 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Stack/depth, checkpoint lineage, trace append/order, trap
 disposition, and transaction atomicity remain outside.
+
+## Active ordered frame trace algebra
+
+[ADR-0069](adr/0069-ordered-frame-trace-algebra.md) adds one constructor-private
+`FrameTrace Event` carrier with empty, chronological observation, tail record,
+and earlier-before-later append operations. It is an opt-in `TraceState` for
+the existing generic FrameEffectJournal, not a replacement for that parameter.
+
+The planned proof interface has exactly seven laws: three observation
+equations, observation injectivity, two append identities, and associativity.
+Exactly six definition-only assertions will cover order, duplicates, identity,
+association, and journal specialization. Event taxonomy, trace lineage, call
+scheduling, and transaction behavior remain outside.
 
 ## Meaning of completion
 
