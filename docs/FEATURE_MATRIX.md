@@ -103,7 +103,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Caller-owned frame continuation | Complete | Exactly one higher-order resolver/bind operation, three simp `rfl` constructor laws, and three definition-only assertions complete without creating checkpoints or traces | None |
 | Caller-owned frame continuation context | Complete | One four-field nominal carrier, one delegating operation, one non-simp `rfl` coherence law, and three definition-only assertions complete without a full frame model | None |
 | Total frame resolution result | Complete | One three-constructor total carrier, one context resolver, exactly three simp `rfl` laws, and three definition-only assertions preserve payloads and trap reasons without choosing trap disposition | None |
-| Ordered frame trace algebra | Active | ADR-0069 accepted; add one constructor-private opt-in trace carrier, four operations, seven axiom-free laws, and six definition-only assertions for finite chronological extension | None |
+| Ordered frame trace algebra | Complete | One constructor-private opt-in trace carrier, four operations, exactly seven axiom-free laws, and six definition-only assertions complete finite chronological extension without fixing event kinds | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation, call nesting, and transaction atomicity remain undecided | None |

@@ -467,7 +467,7 @@ its reason without selecting state or effects. This avoids the Option
 continuation's diagnostic ambiguity while leaving trap disposition and
 transaction policy unresolved.
 
-ADR-0069 accepts an opt-in `FrameTrace Event` extension algebra. It observes a
+ADR-0069 completes an opt-in `FrameTrace Event` extension algebra. It observes a
 finite chronological event sequence, records at the tail, and appends an
 earlier trace before a later fragment. Event kinds remain parametric and the
 generic `FrameEffectJournal` remains unchanged; trace lineage, call scheduling,

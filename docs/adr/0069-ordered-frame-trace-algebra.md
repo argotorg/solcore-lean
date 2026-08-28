@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: opt-in finite chronological trace accumulation for frame effects
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -155,3 +155,27 @@ Future runtime transitions can accumulate finite semantic events explicitly
 and combine an earlier trace with a later fragment in one proved order. Event
 meaning, trace ownership, nested scheduling, and transaction policy remain
 separate decisions.
+
+## Implementation record
+
+The completed slice adds one constructor-private carrier and exactly four
+public operations in a 37-line definition module plus one umbrella import.
+The carrier and all four operations are axiom-free. No deriving clause,
+instance, coercion, default, alias, or helper is added.
+
+A 65-line properties module plus one umbrella import publishes exactly seven
+axiom-free laws. The three observation equations and two identity laws are
+simp; observation injectivity and associativity are non-simp. The right
+identity and associativity proofs use local structural induction rather than
+stronger library dependencies.
+
+Exactly six runtime assertions live in an 87-line definition-only test module
+with two runner lines. They cover empty and tail observation, duplicate
+retention, ordered append through a specialized FrameEffectJournal, both
+identities, and association.
+
+The implementation commits are `fc8ecb1` (210 changed lines), `fc9859b` (38),
+`4306c0c` (66), and `f1f9245` (89), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+audits pass.

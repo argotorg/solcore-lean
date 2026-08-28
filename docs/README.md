@@ -321,7 +321,7 @@ that preserves return/revert payloads and trap reasons. State and effects are
 selected only for return and revert, so trap and transaction disposition remain
 open.
 
-The active trace slice,
+The completed trace slice,
 [ADR-0069](adr/0069-ordered-frame-trace-algebra.md), adds an opt-in finite
 chronological event sequence with tail recording and ordered append. Event
 kinds remain parametric, and existing generic effect journals are unchanged.

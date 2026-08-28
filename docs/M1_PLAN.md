@@ -74,7 +74,7 @@ These results remain regression obligations for every extension.
 | 48 | Caller-owned frame continuation | Complete | Names the resolver/bind seam while checkpoint and accumulated-trace inputs stay external |
 | 49 | Caller-owned frame continuation context | Complete | Groups one completed frame's continuation inputs without defining a full frame |
 | 50 | Total frame resolution result | Complete | Preserves payloads and trap reasons in a total first-order result |
-| 51 | Ordered frame trace algebra | Active | Defines opt-in finite chronological extension without fixing event kinds |
+| 51 | Ordered frame trace algebra | Complete | Defines opt-in finite chronological extension without fixing event kinds |
 | 52 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 53 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
 | 54 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -849,18 +849,22 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Trap disposition, checkpoint lineage, trace construction,
 nested scheduling, and transaction atomicity remain outside.
 
-## Active ordered frame trace algebra
+## Completed ordered frame trace algebra
 
 [ADR-0069](adr/0069-ordered-frame-trace-algebra.md) adds one constructor-private
 FrameTrace carrier with four operations: empty, chronological observation,
 tail record, and earlier-before-later append. It specializes the existing
 generic trace parameter only when a consumer opts in.
 
-Exactly seven planned axiom-free laws fix observation, injectivity, append
-identity, and association. Six definition-only runtime assertions cover finite
-order, duplicate retention, journal specialization, identities, and association.
-Concrete events, trace lineage, call scheduling, rollback filtering, and
-transaction ownership remain separate.
+A 37-line definition module plus one umbrella import contains the carrier and
+operations. A 65-line properties module plus one umbrella import contains
+exactly seven axiom-free laws. An 87-line definition-only test module plus two
+runner lines supplies exactly six assertions.
+
+The four implementation commits contain 210, 38, 66, and 89 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Concrete events, trace lineage, call scheduling, rollback
+filtering, and transaction ownership remain separate.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
