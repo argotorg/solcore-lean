@@ -654,6 +654,10 @@ to the same slot supersedes an earlier one, and writes to distinct slots commute
 ADR-0110 accepts non-selected Account isolation: a total write through the
 refined carrier preserves the working WorldState lookup at every other address.
 
+ADR-0111 accepts the total-write data projections: selector, checkpoint, and
+working journal are preserved, while the stored Account receives the exact
+lower-level storage update.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
