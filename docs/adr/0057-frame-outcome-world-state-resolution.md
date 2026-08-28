@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: minimal frame-outcome and WorldState connection
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -73,3 +73,20 @@ frame or mutate either input WorldState.
 Later frame execution can reuse one explicit and tested outcome-to-state seam.
 All difficult questions about nested effects and trap handling remain visible
 instead of being hidden inside this minimal selector.
+
+## Implementation record
+
+The completed internal slice publishes exactly one executable operation, three
+constructor laws, and three runtime assertions. The definition module is 24
+lines, the properties module is 32 lines, and the test module is 53 lines with
+two runner lines. Returned nonempty data selects a distinguishable working
+state, reverted empty data selects the checkpoint, and a concrete trap reason
+leaves state resolution open.
+
+The work landed in four commits: `345cb95` specifies the decision, `e9f1861`
+adds the operation, `d1baf80` adds the laws, and `8ff8bae` adds the tests. Each
+commit remains below 300 changed lines.
+
+All three public laws report exactly `[propext]`. No custom axiom, `sorryAx`, or
+unchecked declaration is present. Focused and full builds, tests, trust-zero,
+semantic-kernel, metadata, document-link, and diff checks pass.

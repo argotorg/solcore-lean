@@ -391,7 +391,8 @@ Its final independent audit found no P0-P3 issue.
 ADR-0057 adds the minimal seam between frame outcomes and explicit state. A
 return selects the working WorldState, a revert selects the supplied checkpoint,
 and a trap produces no resolved state until a later trap policy is chosen. The
-operation does not own checkpoints or define nested rollback.
+completed operation has exactly three constructor laws and three runtime
+assertions. It does not own checkpoints or define nested rollback.
 
 ### Observation
 

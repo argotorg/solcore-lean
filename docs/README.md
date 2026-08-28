@@ -43,8 +43,9 @@ effects, exact fuel, distinctions, and exact v1/v2 boundaries are proved and
 tested, and the audits pass.
 The strict address-and-word bridge and strict 20-byte address encoding are
 complete, including Address text-and-byte coherence. Further Core conversions
-and primitives remain planned. The active runtime slice introduces only
-explicit Account identity, absence, and canonical storage values.
+and primitives remain planned. The completed runtime-state foundation covers
+explicit Account absence, canonical storage values, and outcome-directed
+selection between checkpoint and working state.
 The completed seventeenth slice,
 [ADR-0035](adr/0035-core-vnext-bounded-logical-shifts.md), completes focused
 proof and regression interfaces for the existing raw `wordShl` and `wordShr`
@@ -234,11 +235,13 @@ privacy and recursor checks limit observation to the same semantic lookup
 behavior as the public queries. The final independent audit found no P0-P3
 issue.
 
-The active outcome-resolution slice,
+The completed outcome-resolution slice,
 [ADR-0057](adr/0057-frame-outcome-world-state-resolution.md), adds one internal
 operation that selects working state after return, checkpoint state after
 revert, and leaves trap disposition unresolved. It does not define transaction
 rollback, nested frames, surviving effects, ABI behavior, or EVM rules.
+Exactly three constructor laws and three runtime assertions cover the operation;
+all three laws report only `propext`.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -380,7 +383,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   representation; its independent audit found no P0-P3 issue.
 - ADR-0055 completes proof-only coherence between canonical Address text and bytes.
 - ADR-0056 completes the minimal explicit Account and WorldState carrier.
-- ADR-0057 accepts the minimal internal frame-outcome state resolver.
+- ADR-0057 completes the minimal internal frame-outcome state resolver.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
