@@ -121,10 +121,10 @@ These results remain regression obligations for every extension.
 | 95 | Present working storage Account total-write sparse preservation | Complete | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
 | 96 | Present working storage Account optional/total re-refinement coherence | Complete | Makes the failure-aware write/refine path equal the total writer and reusable across refined optional-write sequences |
 | 97 | Parent-indexed initialization present storage Account refinement | Complete | Checks Account presence for the initialization-bound selector and reaches existing total storage consumers without a new carrier |
-| 98 | Address-selected checked Core code | Complete | Stores checker-accepted Core code in Account and executes exact address selection without an ABI or frame-result conversion |
+| 98 | Address-selected closed Core code | Complete, superseded at Account boundary | ADR-0116 established the pure carrier and selection laws retained as historical foundations for ADR-0118 |
 | 99 | Typed Core storage-read suspension | Complete | Reuses typed function application for typed requests, exact CEK suspension, finite-run safety, and repeated resume without weakening pure completion |
-| 100 | Working-storage read handler | Complete | Interprets one request through the proven-present Account carrier and preserves the context; the future driver, not the handler, owns remaining fuel |
-| 101 | Address-selected host-code driver | In progress | Migrates retained code and handles requests with exact remaining-fuel reuse while keeping code and storage addresses separate |
+| 100 | Working-storage read handler | Complete | Interprets one request through the proven-present Account carrier and preserves the context; ADR-0118 owns repeated handling and remaining fuel |
+| 101 | Address-selected host-code driver | Complete | Stores host-checked code, handles dependent reads with exact remaining-fuel reuse, and keeps code and storage addresses separate |
 | 102 | Storage-write capability | Planned | Appends a typed capability and returns an updated proven-present carrier |
 | 103 | Further contract-entry input roles | Planned | Adds caller, callee, data, value, or kind only when a Core consumer exists |
 | 104 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
@@ -1610,19 +1610,30 @@ regressions cover both branches and an end-to-end total write/read consumer.
 Full validation and independent P0-P3 audits pass; no additional carrier or
 contract-entry identity claim was added.
 
-## Completed address-selected checked Core code
+## Historical address-selected closed Core code
 
-[ADR-0116](adr/0116-address-selected-checked-core-code.md) makes checker-accepted
-closed Core programs optional Account state and adds exact Address lookup plus
-stateful Core execution. The final Core-local store remains present, invalid
-programs cannot enter the carrier, and checked execution has an existential
-completion threshold and cannot machine-fault.
+[ADR-0116](adr/0116-address-selected-checked-core-code.md) established the
+closed checked-code carrier, optional Account association, exact Address
+lookup, and stateful pure execution. Its pure carrier and completion theorem
+remain available, but ADR-0118 supersedes its Account field and selected runner.
 
 Four checked-code laws, four Account laws, seven WorldState laws, and two
-focused regression modules pass full validation and independent audit. This is
-still pure Core execution: return-byte conversion, frame outcomes, contract
-inputs, WorldState effects, ABI, fuel classification, and publication remain
-separate decisions.
+focused regression modules remain historical proof foundations.
+
+## Completed address-selected host-code driver
+
+[ADR-0118](adr/0118-address-selected-host-code-driver.md) migrates Account code
+to `CheckedHostCoreProgram`, promotes closed checked programs without changing
+their bodies, selects code from the working WorldState, and handles storage
+reads through a separately selected proven-present Account.
+
+The driver uses the exact remaining fuel returned at every suspension. Its
+handled-step relation proves bounded completion and exact exhaustion; typed
+checked runs cannot fault. Exact 11/12-fuel regressions cover two dependent
+reads, zero-fuel final observation, distinct code/storage/checkpoint Accounts,
+working-storage sensitivity, and Core-local store preservation. ABI conversion,
+frame outcomes, contract inputs beyond storage read, nested calls, storage
+write, and publication remain separate decisions.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

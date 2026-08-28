@@ -150,11 +150,11 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Present working storage Account total-write sparse preservation | Complete | ADR-0113 preserves an optional sparse entry at every distinct slot, first on Account and then on the proven-present carrier | None |
 | Present working storage Account optional/total re-refinement coherence | Complete | ADR-0114 equates optional write plus canonical Account refinement with the total writer | None |
 | Parent-indexed initialization present storage Account refinement | Complete | ADR-0115 checks initial Account presence and returns the existing proven-present carrier used by total storage operations | None |
-| Address-selected checked Core code | Complete | ADR-0116 admits checker-accepted Core programs, stores them with Account state, selects by Address, and returns raw stateful Core execution results without ABI or frame-outcome conversion | None |
+| Address-selected closed Core code | Complete historical foundation | ADR-0116's pure carrier and completion theorems remain; ADR-0118 supersedes its Account association and selected runner | None |
 | Typed Core storage-read suspension | Complete | ADR-0117 provides typed admission, request/step correspondence, exact CEK suspension and fuel accounting, typed finite results, no-fault safety, repeated-resume tests, and a proven-present Account read handler without importing WorldState into Core | None |
-| Address-selected host-code driver | In progress | ADR-0118 migrates Account code to the host-checked carrier and threads the proven-present storage context through a remaining-fuel-preserving driver | None |
+| Address-selected host-code driver | Complete | ADR-0118 stores host-checked code, promotes closed checked code unchanged, handles dependent working-storage reads with exact remaining fuel, proves handled-step accounting and no-fault safety, and keeps code/storage addresses separate | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
-| Extended contract runtime state | Planned | Minimal storage, frame, checked-code association, and address-selected pure Core execution are complete; WorldState effects, balances, transactions, authority, and lifetime remain undecided | None |
+| Extended contract runtime state | Planned | Storage/frame carriers and address-selected handled storage reads are complete; writes from Core, balances, transactions, authority, and lifetime remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |
 | Storage | Blocked | storage-layout ADR | Low |
 | External calls and creation | Planned | host transition and call-depth rules | None |

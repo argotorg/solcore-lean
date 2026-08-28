@@ -546,8 +546,17 @@ proven-present carrier used by total storage operations on success.
 
 The completed
 [ADR-0116](adr/0116-address-selected-checked-core-code.md) adds checker-accepted
-Core code to Account state, selects it by Address, and runs it without inventing
-an ABI or frame-result conversion.
+closed Core code to Account state and establishes the pure selection foundation
+later superseded at the Account boundary by ADR-0118.
+
+The completed
+[ADR-0117](adr/0117-typed-core-storage-read-suspension.md) adds a typed
+storage-read request, resumable Core state, and a proven-present Account handler.
+
+The completed
+[ADR-0118](adr/0118-address-selected-host-code-driver.md) stores host-checked
+code, selects code and working storage independently, and handles repeated reads
+without replenishing fuel or losing the Core-local store.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from

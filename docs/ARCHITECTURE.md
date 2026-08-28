@@ -675,12 +675,9 @@ checks the caller-supplied selector in `initialWorld`, which becomes the derived
 working WorldState, and returns the existing proven-present carrier only when
 that Account exists.
 
-Completed ADR-0116 makes checker-accepted `Core.Program` values optional Account
-state. Code selection is an ordinary WorldState Address lookup, so checkpoints
-and rollback retain code identity together with storage. The first consumer
-returns the exact stateful Core machine result. It does not yet expose
-WorldState to Core, convert `Core.Value` to return bytes, or classify fuel
-exhaustion as a frame outcome.
+Completed ADR-0116 established optional closed checked code and exact WorldState
+Address selection. ADR-0118 later supersedes that Account carrier with
+host-checked code; the pure carrier and its completion theorem remain separate.
 
 Completed ADR-0117 adds the host boundary without adding Core expression
 syntax. A fixed typed context supplies a runtime-only storage-read function.
@@ -692,8 +689,15 @@ cannot machine-fault.
 
 Concrete WorldState handling stays outside Core. The Semantics handler reads
 through a proven-present working Account, leaves that context unchanged, and
-resumes the exact continuation and local store. A later driver will own repeated
-handler invocation and the remaining fuel budget.
+resumes the exact continuation and local store.
+
+Completed ADR-0118 connects that handler to Account code selection. The driver
+selects host-checked code from the working WorldState by an explicit code
+address, reads through the separately retained storage address, and resumes
+with exactly the fuel left by Core. A handled-step relation accounts for every
+Core segment and request emission. Read-only checked execution returns a typed
+done or out-of-fuel outcome and cannot fault; it does not define an ABI, frame
+outcome, caller identity, nested call, or storage write.
 
 ### Observation
 

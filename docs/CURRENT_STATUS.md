@@ -300,6 +300,12 @@ proven-present storage carrier; implementation is complete.
 Core code as rollback-visible Account state and fixes address-selected raw Core
 execution; implementation is complete. It deliberately leaves frame outcomes,
 ABI conversion, contract inputs, and WorldState effects unresolved.
+[ADR-0117](adr/0117-typed-core-storage-read-suspension.md) accepts the typed
+storage-read capability, resumable Core boundary, finite-run safety, and
+proven-present Account handler; implementation is complete.
+[ADR-0118](adr/0118-address-selected-host-code-driver.md) supersedes the
+Account carrier from ADR-0116 with host-checked code and completes
+fuel-preserving address-selected handled reads; implementation is complete.
 
 ## Implementation status
 
@@ -312,7 +318,9 @@ ABI conversion, contract inputs, and WorldState effects unresolved.
 | Internal non-recursive functions | Complete | Complete, including totality | Not published |
 | Internal binary sums | Complete | Complete, including totality | Not published |
 | Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
-| Address-selected checked Core code | Complete | Admission, Account association, selection, stateful execution, termination threshold, and no-fault safety proved | Not published |
+| Address-selected closed Core code | Complete historical foundation | Pure admission, completion, and stateful-run safety remain; Account association is superseded by ADR-0118 | Not published |
+| Typed Core storage-read suspension | Complete | Typed request/resume, exact boundary fuel, finite-run typing, and no-fault safety proved | Not published |
+| Address-selected host-code driver | Complete | Host Account association, separate code/storage selection, handled-step fuel accounting, typed outcomes, and no-fault safety proved | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -1986,21 +1994,16 @@ total write/read interface. Full validation and independent P0-P3 audits pass.
 The adapter adds no Account creation, entry identity, authority, lifetime
 claim, or runtime fixture.
 
-## Completed address-selected checked Core code
+## Historical address-selected closed Core code
 
 [ADR-0116](adr/0116-address-selected-checked-core-code.md) admits exactly the
-closed Core programs accepted by the existing checker, associates optional code
-with Account state, selects it through WorldState by Address, and returns the
-complete stateful Core-machine result.
+closed Core programs accepted by the existing checker and established optional
+Account association, Address selection, and complete stateful pure results.
+ADR-0118 now supersedes that Account association and selected runner; the pure
+carrier and its completion proof remain available independently.
 
-Four checked-code laws, four Account laws, and seven WorldState laws cover
-admission, typed eventual completion, no-fault safety, storage/code preservation,
-all lookup branches, and exact execution. Runtime regressions retain a returned
-cell reference together with its local store, distinguish absent and no-code
-Accounts, select different programs at two addresses, preserve code through a
-storage write, and leave fuel exhaustion unclassified. Full validation and two
-independent P0-P3 audits pass. No FrameOutcome, ABI, contract input, WorldState
-effect, or published interface was added.
+Four checked-code laws and the historical Account/WorldState laws continue to
+cover pure admission, eventual completion, no-fault safety, and exact execution.
 
 ## Completed typed Core storage-read suspension
 
@@ -2017,9 +2020,26 @@ the request through the proven-present working Account and resumes the typed
 state without changing the Account context or Core-local store.
 
 Core requests contain words only; WorldState, addresses, checkpoints, rollback,
-and commit policy stay in Semantics. Address-selected host-code migration, the
-fuel-preserving handler loop, and storage write remain later work. Full
-validation and two independent audits pass.
+and commit policy stay in Semantics. ADR-0118 now supplies the address-selected
+read driver; storage write remains later work. Full validation and two
+independent audits pass.
+
+## Completed address-selected host-code driver
+
+[ADR-0118](adr/0118-address-selected-host-code-driver.md) stores
+`CheckedHostCoreProgram` in Account state and explicitly promotes a closed
+checked program without changing its body. Code is selected from the working
+WorldState by `codeAddress`; requests read through the separately retained
+`storageAddress` and proven-present Account.
+
+The read-specific driver threads the complete context and exact remaining fuel
+until done or out of fuel. Its handled-step relation proves bounded terminal
+execution and exact exhaustion, and checked/address-selected runs cannot fault.
+Runtime regressions use distinct code, storage, and checkpoint Accounts; chain
+two dependent reads across exact fuel 11/12 boundaries; finish from zero
+remaining fuel; preserve a local cell; and show that changing working storage
+changes the returned value. Full build, test, trust-zero, metadata, and kernel
+checks pass together with three independent audits.
 
 ## Meaning of completion
 

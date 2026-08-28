@@ -26,7 +26,7 @@ settings, or different EVM revisions do not belong to this baseline.
 | Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
 | Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
 | Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
-| Contract runtime | Internal storage, frame, checked-code, and typed-read slices; no compiler adapter | No end-to-end contract execution conformance claim exists |
+| Contract runtime | Internal storage/frame carriers and address-selected handled storage reads; no compiler adapter | No end-to-end contract execution conformance claim exists |
 
 ## Evidence rules
 

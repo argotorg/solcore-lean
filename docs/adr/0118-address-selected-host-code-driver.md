@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: Account code migration, handled host execution, and fuel preservation
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -40,6 +40,10 @@ Do not keep parallel pure and host code fields, and do not introduce a sum
 type. A single Account has one selected executable program. A closed program
 that is to be stored must be admitted by the host checker just like any other
 stored program.
+
+Closed checked code has an explicit program-preserving promotion. A proof that
+`Program.check = true` implies `Program.checkHost = true` constructs
+`CheckedCoreProgram.toHost` without changing the retained `Core.Program`.
 
 ## Driver result
 
@@ -103,6 +107,7 @@ outcome policy.
 Publish and verify:
 
 - driver termination from strict remaining-fuel decrease;
+- exact program-preserving promotion from closed checked code;
 - exact preservation of Core's suspension fuel across every resume;
 - context threading across all terminal branches;
 - typed done and out-of-fuel outcomes from a typed initial state;
@@ -141,11 +146,35 @@ Tests cover:
 - read-only final-context equality; and
 - direct use of checked and address-selected no-fault theorems.
 
+## Implementation record
+
+Account and WorldState now retain and select `CheckedHostCoreProgram`. The raw
+WorldState runner stops at the first Core boundary, while the read-specific
+driver repeatedly handles storage requests and returns only done, out-of-fuel,
+or raw fault outcomes. Checked and address-selected runs prove the fault branch
+unreachable.
+
+The driver threads the complete proven-present context and recurses on the
+exact remaining fuel. A handled-step relation accounts for Core transition
+segments and request emissions: completion uses no more than the supplied
+budget, and exhaustion uses it exactly. The read-only APIs are named
+`runWithStorageReads` and `runCodeWithStorageReads?`; their context-equality
+theorems do not claim that a future write-capable driver is immutable.
+
+Regressions separate code, working storage, and checkpoint Accounts; execute
+two dependent reads at exact fuel 11/12 boundaries; finish from a resumed final
+state with zero remaining fuel; preserve a Core-local cell; change the result
+when working storage changes; and directly consume the public selection,
+typing, no-fault, promotion, resumption, and fuel-accounting theorems. Full
+build, test, trust-zero, metadata, and kernel-policy checks pass, as do three
+independent P0-P3 audits. Every implementation commit remains below 300 changed
+lines.
+
 ## Consequences
 
 Stored code can now use the typed Core host protocol without hiding WorldState
-inside Core. The same context-threading loop can later interpret storage write
-by extending the request algebra and handler.
+inside Core. The context-threading result protocol and remaining-fuel pattern
+can be reused by a later write-capable driver.
 
 This decision does not define contract arguments, caller or callee identity,
 call depth, nested invocation, rollback ownership, transaction atomicity, ABI
