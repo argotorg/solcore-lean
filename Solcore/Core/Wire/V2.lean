@@ -76,6 +76,7 @@ def ofCore? : Solcore.Core.Value → Option Value
   | .unit => some .unit
   | .bool value => some (.bool value)
   | .word value => some (.word value)
+  | .hostFunction _ => none
   | .pair _ _ => none
   | .closure _ _ _ _ => none
   | .inLeft _ _ => none

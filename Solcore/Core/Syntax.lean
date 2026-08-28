@@ -109,6 +109,41 @@ theorem isCellPayload_iff
 
 end Ty
 
+/-- Runtime functions supplied by a host rather than constructed by Core syntax. -/
+inductive HostFunction where
+  | storageRead
+  deriving Repr, BEq, DecidableEq
+
+namespace HostFunction
+
+def parameterType (_ : HostFunction) : Ty := .word
+
+def resultType (_ : HostFunction) : Ty := .word
+
+def functionType (function : HostFunction) : Ty :=
+  .function function.parameterType function.resultType
+
+@[simp] theorem parameterType_eq_word (function : HostFunction) :
+    function.parameterType = .word := by
+  cases function
+  rfl
+
+@[simp] theorem resultType_eq_word (function : HostFunction) :
+    function.resultType = .word := by
+  cases function
+  rfl
+
+@[simp] theorem functionType_eq (function : HostFunction) :
+    function.functionType = .function .word .word := by
+  cases function
+  rfl
+
+/-- Stable position in the append-only host capability context. -/
+def index : HostFunction → Nat
+  | .storageRead => 0
+
+end HostFunction
+
 inductive UnaryOp where
   | boolNot
   | wordNot
@@ -367,6 +402,7 @@ inductive Value where
   | unit
   | bool (value : Bool)
   | word (value : Word)
+  | hostFunction (function : HostFunction)
   | pair (left : Value) (right : Value)
   | closure
       (parameterType resultType : Ty)
@@ -393,6 +429,14 @@ mutual
             exact equality rfl)
     | .word leftValue, .word rightValue =>
         if equality : leftValue = rightValue then
+          isTrue (by cases equality; rfl)
+        else
+          isFalse (by
+            intro valueEquality
+            cases valueEquality
+            exact equality rfl)
+    | .hostFunction leftFunction, .hostFunction rightFunction =>
+        if equality : leftFunction = rightFunction then
           isTrue (by cases equality; rfl)
         else
           isFalse (by
@@ -520,6 +564,7 @@ mutual
     | .unit, .bool _
     | .unit, .word _
     | .unit, .pair _ _
+    | .unit, .hostFunction _
     | .unit, .closure _ _ _ _
     | .unit, .inLeft _ _
     | .unit, .inRight _ _
@@ -528,6 +573,7 @@ mutual
     | .bool _, .unit
     | .bool _, .word _
     | .bool _, .pair _ _
+    | .bool _, .hostFunction _
     | .bool _, .closure _ _ _ _
     | .bool _, .inLeft _ _
     | .bool _, .inRight _ _
@@ -536,6 +582,7 @@ mutual
     | .word _, .unit
     | .word _, .bool _
     | .word _, .pair _ _
+    | .word _, .hostFunction _
     | .word _, .closure _ _ _ _
     | .word _, .inLeft _ _
     | .word _, .inRight _ _
@@ -544,6 +591,7 @@ mutual
     | .pair _ _, .unit
     | .pair _ _, .bool _
     | .pair _ _, .word _
+    | .pair _ _, .hostFunction _
     | .pair _ _, .closure _ _ _ _
     | .pair _ _, .inLeft _ _
     | .pair _ _, .inRight _ _
@@ -552,6 +600,7 @@ mutual
     | .closure _ _ _ _, .unit
     | .closure _ _ _ _, .bool _
     | .closure _ _ _ _, .word _
+    | .closure _ _ _ _, .hostFunction _
     | .closure _ _ _ _, .pair _ _
     | .closure _ _ _ _, .inLeft _ _
     | .closure _ _ _ _, .inRight _ _
@@ -560,6 +609,7 @@ mutual
     | .inLeft _ _, .unit
     | .inLeft _ _, .bool _
     | .inLeft _ _, .word _
+    | .inLeft _ _, .hostFunction _
     | .inLeft _ _, .pair _ _
     | .inLeft _ _, .closure _ _ _ _
     | .inLeft _ _, .inRight _ _
@@ -568,6 +618,7 @@ mutual
     | .inRight _ _, .unit
     | .inRight _ _, .bool _
     | .inRight _ _, .word _
+    | .inRight _ _, .hostFunction _
     | .inRight _ _, .pair _ _
     | .inRight _ _, .closure _ _ _ _
     | .inRight _ _, .inLeft _ _
@@ -576,6 +627,7 @@ mutual
     | .cellRef _ _, .unit
     | .cellRef _ _, .bool _
     | .cellRef _ _, .word _
+    | .cellRef _ _, .hostFunction _
     | .cellRef _ _, .pair _ _
     | .cellRef _ _, .closure _ _ _ _
     | .cellRef _ _, .inLeft _ _
@@ -584,11 +636,22 @@ mutual
     | .constructed _ _, .unit
     | .constructed _ _, .bool _
     | .constructed _ _, .word _
+    | .constructed _ _, .hostFunction _
     | .constructed _ _, .pair _ _
     | .constructed _ _, .closure _ _ _ _
     | .constructed _ _, .inLeft _ _
     | .constructed _ _, .inRight _ _
     | .constructed _ _, .cellRef _ _ =>
+        isFalse (by intro equality; cases equality)
+    | .hostFunction _, .unit
+    | .hostFunction _, .bool _
+    | .hostFunction _, .word _
+    | .hostFunction _, .pair _ _
+    | .hostFunction _, .closure _ _ _ _
+    | .hostFunction _, .inLeft _ _
+    | .hostFunction _, .inRight _ _
+    | .hostFunction _, .cellRef _ _
+    | .hostFunction _, .constructed _ _ =>
         isFalse (by intro equality; cases equality)
   termination_by sizeOf left + sizeOf right
   decreasing_by all_goals simp_wf <;> omega
@@ -639,6 +702,7 @@ def Value.type : Value → Ty
   | .unit => .unit
   | .bool _ => .bool
   | .word _ => .word
+  | .hostFunction function => function.functionType
   | .pair left right => .product left.type right.type
   | .closure parameterType resultType _ _ =>
       .function parameterType resultType

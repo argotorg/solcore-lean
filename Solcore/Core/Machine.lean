@@ -401,6 +401,7 @@ inductive MachineFault where
   | expectedProduct (actual : Value)
   | expectedSum (actual : Value)
   | expectedFunction (actual : Value)
+  | unhandledHostFunction (function : HostFunction)
   | expectedCell (actual : Value)
   | invalidCellLocation (location : Location)
   | expectedNamedData (actual : Value)
@@ -586,6 +587,7 @@ def advance (state : State) : AdvanceResult :=
                 .applyClosure parameterType resultType body capturedEnvironment ::
                   continuation,
                 state.store⟩
+          | .hostFunction function => .fault (.unhandledHostFunction function)
           | actual => .fault (.expectedFunction actual)
       | .applyClosure _ _ body capturedEnvironment :: continuation =>
           .next ⟨.eval body (value :: capturedEnvironment), continuation, state.store⟩

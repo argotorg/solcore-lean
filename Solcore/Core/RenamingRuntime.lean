@@ -11,6 +11,8 @@ mutual
     | unit : ValuesRelated .unit .unit
     | bool (value : Bool) : ValuesRelated (.bool value) (.bool value)
     | word (value : Word) : ValuesRelated (.word value) (.word value)
+    | hostFunction (function : HostFunction) :
+        ValuesRelated (.hostFunction function) (.hostFunction function)
     | pair {left left' right right' : Value} :
         ValuesRelated left left' → ValuesRelated right right' →
         ValuesRelated (.pair left right) (.pair left' right')
@@ -106,6 +108,7 @@ mutual
     | .unit => .unit
     | .bool value => .bool value
     | .word value => .word value
+    | .hostFunction function => .hostFunction function
     | .pair left right =>
         .pair (ValuesRelated.refl left) (ValuesRelated.refl right)
     | .closure parameterType resultType body environment => by
