@@ -93,6 +93,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Minimal Account and WorldState carrier | Complete | Two public carriers backed only by private semantic lookup functions, eight public operations, exactly twelve laws, and twelve runtime assertions; no concrete map representation, rollback, balances, code, calls, ordering, serialization, or publication; audit clean | None |
 | Frame-outcome WorldState resolution | Complete | One internal operation, exactly three constructor laws, and three runtime assertions select working/checkpoint state while leaving trap disposition open; no nested rollback, surviving effects, ABI, EVM, or publication | None |
 | WorldState observational update algebra | Complete | No executable API, carrier, or instance; exactly six extensionality/overwrite/commutation laws, two compile-time examples, and four runtime assertions complete; no new state meaning or publication | None |
+| WorldState storage-write algebra | Active | No executable API, carrier, or instance; one private helper, exactly four sequential/commutation/zero-deletion laws, and four runtime assertions planned; no operational or publication decision | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
 | Revert and rollback | Planned | nested rollback and surviving observation policy | None |

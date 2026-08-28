@@ -401,6 +401,11 @@ puts commute. The commutation laws deliberately are not simplification rules.
 The completed proof-only layer adds no executable API, carrier, or instance;
 its six laws and six compile-time/runtime regressions expose no representation.
 
+ADR-0059 lifts that algebra through the partial `WorldState.writeStorage?`
+operation. Sequential overwrite and independent writes are derived with
+`Option.bind`; zero deletion keeps the Account present. An absent-address
+`none` gains no halt, revert, trap, or rollback meaning.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

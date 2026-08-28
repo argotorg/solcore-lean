@@ -64,10 +64,11 @@ These results remain regression obligations for every extension.
 | 38 | Minimal Account and WorldState carrier | Complete | Fixes explicit absence and canonical storage values before transitions |
 | 39 | Frame-outcome WorldState resolution | Complete | Selects working/checkpoint state while leaving trap disposition open |
 | 40 | WorldState observational update algebra | Complete | Proves extensionality and independent-update algebra without new operations |
-| 41 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 42 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 43 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 44 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 41 | WorldState storage-write algebra | Active | Lifts overwrite, commutation, and zero deletion through conditional writes |
+| 42 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 43 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 44 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 45 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -672,6 +673,15 @@ laws and no executable API, carrier, or instance. The 76-line test module plus
 two runner lines supplies the exact two compile-time and four runtime checks.
 All six laws report `[propext, Quot.sound]`; focused, full, trust-zero, kernel,
 metadata, forbidden-declaration, and independent audit checks pass.
+
+## Active WorldState storage-write algebra
+
+[ADR-0059](adr/0059-world-state-storage-write-algebra.md) adds no executable
+operation, carrier, or instance. It plans one private helper, exactly four laws,
+and four runtime assertions for overwrite, distinct-slot and distinct-address
+commutation, and zero deletion with Account presence preserved. `Option.none`
+retains only its absent-Account meaning. This derived proof slice selects no
+operational transition, rollback, ABI, EVM, or gas policy.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
