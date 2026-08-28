@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: opt-in selection of one frame-local rollback pair for a trapped frame
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -172,3 +172,29 @@ An opt-in consumer can obtain the parent-indexed frame-local rollback pair for
 a trap while the generic reason-only and unresolved-trap APIs remain unchanged.
 Propagation, fatality, resumption, and transaction policy remain later
 decisions.
+
+## Implementation record
+
+The completed slice adds exactly one public `trapRollback?` selector in a
+30-line definition module plus one umbrella import. It matches the stored
+outcome without inspecting either proof field. Return and revert produce
+`none`; trap selects checkpoint WorldState and rollback with the accumulated
+internal working trace. It adds no carrier, generic resolver change, reason or
+prefix duplication, continuation, resumption operation, or second selector.
+
+A 56-line properties module plus one umbrella import publishes exactly three
+non-simp outcome laws. The selector and all three laws report exactly
+`[propext]`. An 84-line definition-only test module plus two runner lines
+contains exactly three runtime assertions covering returned, reverted, and
+trapped inputs with distinct parent and working state, rollback, and trace
+witnesses.
+
+The implementation commits are `73c87f6` (226 changed lines), `dece6a7` (31),
+`2a43bb0` (57), and `d290213` (86), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+
+The retained `FrameTrace` is the new narrow internal policy fixed by this ADR;
+it does not imply survival of concrete contract logs or every future effect.
+Frame-local selection is complete, while propagation, fatality, parent
+resumption, and transaction disposition remain separate decisions.

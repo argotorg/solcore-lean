@@ -352,7 +352,7 @@ The completed parent-indexed continuation-construction slice,
 that carrier and both relationship proofs from an indexed trace extension. It
 does not turn the selected inputs into evidence of an actual invocation.
 
-The active parent-indexed trapped-frame rollback slice,
+The completed parent-indexed trapped-frame rollback slice,
 [ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md), selects a local
 parent rollback pair only when explicitly asked about a trap. Propagation,
 fatality, parent resumption, and transaction handling remain separate.

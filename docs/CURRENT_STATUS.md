@@ -171,10 +171,10 @@ existing resolver.
 the restricted construction path for that carrier. Its one operation derives
 the checkpoints, working trace, and relationship proofs from an ADR-0072
 indexed extension without accepting a complete working trace.
-[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) is active. It
-specifies one opt-in selector for the parent checkpoint state and rollback with
-the trapped frame's accumulated internal trace, without changing the existing
-generic resolvers.
+[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) completes the
+opt-in frame-local trap rollback selector. Return and revert produce `none`;
+trap selects parent checkpoint state and rollback with the accumulated internal
+working trace without changing the existing generic resolvers.
 
 ## Implementation status
 
@@ -236,7 +236,7 @@ generic resolvers.
 | Indexed frame trace extension | Complete | Complete | Not published |
 | Parent-indexed frame continuation context | Complete | Complete | Not published |
 | Parent-indexed frame continuation construction | Complete | Complete | Not published |
-| Parent-indexed trapped-frame rollback selection | Not implemented | Decision accepted | Not published |
+| Parent-indexed trapped-frame rollback selection | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1189,17 +1189,25 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Runtime provenance, invocation, scheduling, trap
 disposition, and transaction behavior remain outside.
 
-## Active parent-indexed trapped-frame rollback selection
+## Completed parent-indexed trapped-frame rollback selection
 
-[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) specifies one
+[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) adds exactly one
 `ParentIndexedFrameContinuationContext.trapRollback?` selector. Return and
 revert produce `none`; trap selects the indexed parent state and rollback with
 the accumulated working trace.
 
-Exactly three non-simp laws and three definition-only assertions are planned.
-The existing trap reason, prefix proof, and generic resolver remain separate.
-Frame-local selection is fixed here; propagation, fatality, resumption, and
-transaction disposition remain outside.
+A 30-line definition module plus one umbrella import contains the selector. A
+56-line properties module plus one umbrella import publishes exactly three
+non-simp outcome laws. The selector and all three laws report exactly
+`[propext]`. An 84-line definition-only test module plus two runner lines
+contains exactly three assertions covering return, revert, and trapped
+frame-local selection with distinct parent and working witnesses.
+
+The four implementation commits contain 226, 31, 57, and 86 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Internal `FrameTrace` retention is the new narrow policy
+selected here; it does not claim that concrete contract logs survive a trap.
+Propagation, fatality, resumption, and transaction disposition remain outside.
 
 ## Meaning of completion
 

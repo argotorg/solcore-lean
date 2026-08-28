@@ -503,7 +503,7 @@ extension, and a frame result, then derives both stored proofs without proof
 arguments or an ambiguous complete trace. It does not claim those inputs came
 from one runtime invocation.
 
-ADR-0075 fixes the active opt-in trapped-frame rollback selector. Only for a
+ADR-0075 completes the opt-in trapped-frame rollback selector. Only for a
 trapped parent-indexed context, it selects checkpoint state and rollback with
 the accumulated internal working trace. Existing generic resolvers remain
 unchanged; propagation, fatality, resumption, and transaction disposition are
