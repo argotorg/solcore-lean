@@ -295,7 +295,7 @@ accepts equality between optional write plus canonical refinement and the total
 writer; implementation is complete.
 [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
 accepts a partial adapter from parent-indexed initialization to the existing
-proven-present storage carrier; implementation is planned.
+proven-present storage carrier; implementation is complete.
 
 ## Implementation status
 
@@ -397,7 +397,7 @@ proven-present storage carrier; implementation is planned.
 | Present working storage Account total-write presence | No new operation | Complete | Not published |
 | Present working storage Account total-write sparse preservation | No new operation | Complete | Not published |
 | Present working storage Account optional/total re-refinement coherence | No new operation | Complete | Not published |
-| Parent-indexed initialization present storage Account refinement | Partial adapter planned | Planned | Not published |
+| Parent-indexed initialization present storage Account refinement | Partial adapter complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1969,16 +1969,17 @@ optional-write/refinement stages. Two compile-only regressions cover direct use
 and two-stage composition; full validation and independent P0-P3 audits pass.
 No new executable behavior or runtime fixture was added.
 
-## Planned parent-indexed initialization present storage Account refinement
+## Completed parent-indexed initialization present storage Account refinement
 
 [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
-will compose the existing initialization storage-address adapter with working
+composes the existing initialization storage-address adapter with working
 Account presence refinement.
 
-Explicit absent and present branch laws will preserve the initial WorldState
-lookup result. A compile-only consumer will connect the successful branch to
-the existing total write/read interface. The adapter adds no Account creation,
-entry identity, authority, lifetime claim, or runtime fixture.
+Explicit absent and present branch laws preserve the `initialWorld` lookup
+result. A compile-only consumer connects the successful branch to the existing
+total write/read interface. Full validation and independent P0-P3 audits pass.
+The adapter adds no Account creation, entry identity, authority, lifetime
+claim, or runtime fixture.
 
 ## Meaning of completion
 

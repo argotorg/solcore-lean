@@ -539,10 +539,10 @@ The completed
 makes optional write plus canonical Account refinement equal the total writer,
 including the complete proof-carrying result.
 
-The accepted
+The completed
 [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
-will check a storage selector against caller-supplied `initialWorld` and return
-the proven-present carrier used by total storage operations on success.
+checks a storage selector against caller-supplied `initialWorld` and returns the
+proven-present carrier used by total storage operations on success.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from

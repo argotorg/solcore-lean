@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: refine an initialization-bound storage selector in caller-supplied state
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -172,9 +172,34 @@ import; the exact two branch laws plus one semantic umbrella import; the exact
 three compile regressions plus one runner import and no call; independent audit
 and completion evidence.
 
+## Implementation record
+
+The completed slice adds a 26-line definition module plus one semantic umbrella
+import. It publishes exactly the partial adapter and no helper, carrier,
+constructor, coercion, instance, default, or alternate failure representation.
+The operation and its generated equation report exactly `[propext]`.
+
+The 54-line properties module plus one umbrella import publishes exactly the
+two required simp branch laws. Both directly apply the matching ADR-0105 law,
+report exactly `[propext]`, terminate, and converge with explicit unfolding of
+the adapter.
+
+The 83-line compile-only module plus one runner import contains exactly three
+private examples. Two directly apply the fully qualified branch laws. The third
+rewrites by the new present law and applies ADR-0108 to connect parent-indexed
+initialization to total write/read behavior. No runtime declaration, assertion,
+fixture, or runner call was added.
+
+The implementation commits are `e4bd5fd` (231 changed lines), `ea12a69` (27),
+`9c5b2fe` (55), and `4839106` (84), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, the 578-job full
+build, the 1044-job full test run, metadata and kernel checks, diff checks,
+declaration, generated-equation, axiom, dependency, simp-convergence,
+proof-masking, and runtime inventories, and independent P0-P3 audits pass.
+
 ## Publication and consequences
 
-This internal adapter changes no frozen or published boundary. When complete,
-one caller-supplied storage selector can be checked against the initialized
-working WorldState and, on success, passed directly to the existing total
-storage semantics without introducing a broader contract-entry model.
+This internal adapter changes no frozen or published boundary. One
+caller-supplied storage selector can be checked against `initialWorld`, used as
+the derived working WorldState, and on success passed directly to the existing
+total storage semantics without introducing a broader contract-entry model.

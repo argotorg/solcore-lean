@@ -120,7 +120,7 @@ These results remain regression obligations for every extension.
 | 94 | Present working storage Account total-write presence | Complete | Exposes zero deletion and nonzero sparse-entry presence |
 | 95 | Present working storage Account total-write sparse preservation | Complete | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
 | 96 | Present working storage Account optional/total re-refinement coherence | Complete | Makes the failure-aware write/refine path equal the total writer and reusable across refined optional-write sequences |
-| 97 | Parent-indexed initialization present storage Account refinement | Active | Checks Account presence for the initialization-bound selector and reaches existing total storage consumers without a new carrier |
+| 97 | Parent-indexed initialization present storage Account refinement | Complete | Checks Account presence for the initialization-bound selector and reaches existing total storage consumers without a new carrier |
 | 98 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 99 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 100 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1592,7 +1592,7 @@ so no fixed-depth theorem or batch-write operation is needed. Two compile-only
 regressions cover the declaration and its two-write composition; full
 validation and independent P0-P3 audits pass.
 
-## Active parent-indexed initialization present storage Account refinement
+## Completed parent-indexed initialization present storage Account refinement
 
 [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
 names the canonical composition from ADR-0098/0099 initialization into
@@ -1601,8 +1601,9 @@ selected Account stays absent, while success returns the existing carrier used
 by total storage reads and writes.
 
 The slice adds one partial adapter and two branch laws. Three compile-only
-regressions will cover both branches and an end-to-end total write/read consumer
-without adding another carrier or any contract-entry identity claim.
+regressions cover both branches and an end-to-end total write/read consumer.
+Full validation and independent P0-P3 audits pass; no additional carrier or
+contract-entry identity claim was added.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
