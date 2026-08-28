@@ -23,6 +23,7 @@ import Solcore.Semantics.FrameContinuationContext
 import Solcore.Semantics.FrameContinuationContextProperties
 import Solcore.Semantics.FrameResolutionResult
 import Solcore.Semantics.FrameResolutionResultProperties
+import Solcore.Semantics.FrameContinuationContextWithTracePrefix
 import Solcore.Semantics.FrameRunEffectResolutionProperties
 import Solcore.Semantics.FrameRunEffectCompositionProperties
 import Solcore.Semantics.FrameRunEffectTrapPropagationProperties
