@@ -85,7 +85,7 @@ These results remain regression obligations for every extension.
 | 59 | Parent-indexed trap propagation payload coherence | Complete | Inverts successful selection and carries existing non-strict prefix evidence without adding execution |
 | 60 | Heterogeneous frame-outcome trap-reason mapping | Complete | Maps only reason types while preserving return/revert payloads and leaving policy caller-owned |
 | 61 | Heterogeneous frame-run-result trap-reason mapping | Complete | Preserves working state while lifting the completed outcome mapping, without adding runtime propagation |
-| 62 | Heterogeneous frame-resolution-result trap-reason mapping | Active | Preserves selected state, effects, and bytes while mapping only the total result's trapped reason |
+| 62 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Preserves selected state, effects, and bytes while mapping only the total result's trapped reason |
 | 63 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 64 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
 | 65 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1056,18 +1056,23 @@ The four implementation commits contain 235, 21, 58, and 85 changed lines.
 Full validation and independent P0-P3 audits pass. This slice does not resolve
 state, map effects or traces, construct a payload, or claim runtime propagation.
 
-## Active heterogeneous frame-resolution-result trap-reason mapping
+## Completed heterogeneous frame-resolution-result trap-reason mapping
 
 [ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md)
-adds one planned `FrameResolutionResult.mapTrapReason` operation. It maps only
-the trapped reason and preserves exact state, effects, and bytes in the return
-and revert constructors.
+adds one `FrameResolutionResult.mapTrapReason` operation. It maps only the
+trapped reason and preserves exact state, effects, and bytes in the return and
+revert constructors.
 
-The planned proof surface is exactly five simp laws: three constructor
-equations, identity, and composition. Three definition-only runtime assertions
-will observe distinct state, effect, byte, and reason witnesses. The slice does
-not rerun resolution, map a context or payload, or choose propagation or
-transaction behavior.
+The 24-line definition module and 68-line properties module add one umbrella
+import each. Exactly five simp laws cover the three constructors, identity,
+and composition; all report `[propext]`. The 92-line definition-only test
+module plus two runner lines contains exactly three assertions with distinct
+state, effect, byte, and reason witnesses.
+
+The four implementation commits contain 249, 25, 69, and 94 changed lines.
+Full validation and independent P0-P3 audits pass. The slice does not rerun
+resolution, map a context or payload, or choose propagation or transaction
+behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

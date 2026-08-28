@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: caller-supplied pure mapping of total frame-resolution trap reasons
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -192,3 +192,35 @@ bytes. Reason policy remains explicit and caller-owned.
 
 Future context mapping or resolve-coherence work can build on this operation,
 but must specify its own boundary in a separate decision.
+
+## Implementation record
+
+The completed slice adds exactly one public
+`FrameResolutionResult.mapTrapReason` operation in a 24-line downstream
+definition module plus one umbrella import. The ADR-0068, ADR-0078, and
+ADR-0079 definition, properties, and test modules remain unchanged. The mapper
+is function-first, supports different source and target universes, preserves
+exact return/revert state, effects, and bytes, and changes only trapped reasons.
+
+A 68-line properties module plus one umbrella import publishes exactly five
+simp laws: three constructor equations, identity, and composition. Composition
+reduces two nested mappings to one composed mapping; no reverse equation is
+present. The operation, its three generated equations, and all five laws report
+exactly `[propext]`, and the combined simp surface terminates at constructor
+normal forms.
+
+A 92-line definition-only test module plus two runner lines contains exactly
+three runtime assertions. Separate two-constructor source and target reason
+types and a nonconstant mapper verify distinct return/revert state storage,
+rollback and trace values, exact nonempty byte payloads, and one exact mapped
+trap reason without importing the laws.
+
+The implementation commits are `857d567` (249 changed lines), `8fa78a2` (25),
+`b9d11fa` (69), and `0759da1` (94), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, simp-termination, semantic-kernel, metadata, diff, and independent P0-P3
+audits pass.
+
+The mapper remains a pure transformation of an already-resolved value. It
+reruns no resolver, maps no continuation context or payload, and establishes
+no rollback, propagation, ancestry, handling, or transaction policy.

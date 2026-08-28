@@ -377,7 +377,7 @@ The completed frame-result mapping slice,
 lifts that translation while keeping the result's working state unchanged. It
 does not resolve state or imply that a trap was propagated at runtime.
 
-The active total-resolution mapping slice,
+The completed total-resolution mapping slice,
 [ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md),
 keeps return/revert state, effects, and bytes unchanged while translating only
 trapped reasons. It does not rerun the resolver.

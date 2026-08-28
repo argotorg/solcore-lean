@@ -189,8 +189,8 @@ return/revert bytes and changes only trapped reasons.
 completes the lift to `FrameRunResult`: keep its working state exactly and
 delegate only its outcome to ADR-0078.
 [ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md)
-now fixes the active mapping for total frame-resolution results while
-preserving return/revert state, effects, and bytes.
+completes mapping for total frame-resolution results while preserving
+return/revert state, effects, and bytes.
 
 ## Implementation status
 
@@ -257,7 +257,7 @@ preserving return/revert state, effects, and bytes.
 | Parent-indexed trap propagation payload coherence | Complete | Complete | Not published |
 | Heterogeneous frame-outcome trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-run-result trap-reason mapping | Complete | Complete | Not published |
-| Heterogeneous frame-resolution-result trap-reason mapping | Not implemented | Decision accepted | Not published |
+| Heterogeneous frame-resolution-result trap-reason mapping | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1309,17 +1309,23 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. No resolver, payload, journal, trace, propagation, taxonomy,
 or transaction policy is included.
 
-## Active heterogeneous frame-resolution-result trap-reason mapping
+## Completed heterogeneous frame-resolution-result trap-reason mapping
 
 [ADR-0080](adr/0080-heterogeneous-frame-resolution-result-trap-reason-mapping.md)
-fixes one pure mapper on the total `FrameResolutionResult`. Return and revert
-keep exact selected state, effects, and bytes; trap alone changes its reason.
+adds exactly one pure `FrameResolutionResult.mapTrapReason` operation. Return
+and revert keep exact selected state, effects, and bytes; trap alone changes
+its reason through the caller's function.
 
-The planned surface is one operation, exactly five constructor, identity, and
-composition simp laws, and exactly three definition-only runtime assertions.
-All operation and proof declarations must report `[propext]`. Resolution,
-continuation contexts, payloads, propagation, and transaction policy remain
-outside this slice.
+A 24-line definition module and a 68-line properties module each add one
+umbrella import. Exactly five simp laws cover all constructors, identity, and
+composition. The operation, its three generated equations, and all five laws
+report exactly `[propext]`. A 92-line definition-only test module plus two
+runner lines contains exactly three assertions.
+
+The four implementation commits contain 249, 25, 69, and 94 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Resolution, continuation contexts, payloads, propagation,
+and transaction policy remain outside this slice.
 
 ## Meaning of completion
 
