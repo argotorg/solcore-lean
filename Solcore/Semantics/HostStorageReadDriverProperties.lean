@@ -206,26 +206,26 @@ end HostStorageReadDriver
 
 namespace CheckedHostCoreProgram
 
-@[simp] theorem runWithStorage_context
+@[simp] theorem runWithStorageReads_context
     {RollbackState : Type u}
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageReadDriver.Context RollbackState TraceState)
     (fuel : Nat) :
-    (code.runWithStorage context fuel).context = context := by
+    (code.runWithStorageReads context fuel).context = context := by
   exact HostStorageReadDriver.run_context context fuel _
 
-theorem runWithStorage_hasType
+theorem runWithStorageReads_hasType
     {RollbackState : Type u}
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageReadDriver.Context RollbackState TraceState)
     (fuel : Nat) :
-    (code.runWithStorage context fuel).outcome.HasType
+    (code.runWithStorageReads context fuel).outcome.HasType
       code.program.resultType code.program.dataDefinitions := by
   exact HostStorageReadDriver.run_hasType context fuel _ code.initialState_hasType
 
-theorem runWithStorage_ne_fault
+theorem runWithStorageReads_ne_fault
     {RollbackState : Type u}
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
@@ -233,12 +233,12 @@ theorem runWithStorage_ne_fault
     (fuel : Nat)
     (error : Core.MachineFault)
     (faultState : Core.State) :
-    (code.runWithStorage context fuel).outcome ≠
+    (code.runWithStorageReads context fuel).outcome ≠
       .fault error faultState := by
   exact HostStorageReadDriver.run_ne_fault context fuel _ faultState error
     code.initialState_hasType
 
-theorem runWithStorage_done_hasType
+theorem runWithStorageReads_done_hasType
     {RollbackState : Type u}
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
@@ -247,16 +247,16 @@ theorem runWithStorage_done_hasType
     {value : Core.Value}
     {store : Core.Store}
     (result :
-      (code.runWithStorage context fuel).outcome = .done value store) :
+      (code.runWithStorageReads context fuel).outcome = .done value store) :
     ∃ world,
       Core.StoreHasTypes world store ∧
         Core.HostRuntimeValueHasType world value code.program.resultType
           code.program.dataDefinitions := by
-  have typing := code.runWithStorage_hasType context fuel
+  have typing := code.runWithStorageReads_hasType context fuel
   rw [result] at typing
   exact typing
 
-theorem runWithStorage_outOfFuel_hasType
+theorem runWithStorageReads_outOfFuel_hasType
     {RollbackState : Type u}
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
@@ -264,10 +264,10 @@ theorem runWithStorage_outOfFuel_hasType
     {fuel : Nat}
     {state : Core.State}
     (result :
-      (code.runWithStorage context fuel).outcome = .outOfFuel state) :
+      (code.runWithStorageReads context fuel).outcome = .outOfFuel state) :
     Core.HostStateHasType state code.program.resultType
       code.program.dataDefinitions := by
-  have typing := code.runWithStorage_hasType context fuel
+  have typing := code.runWithStorageReads_hasType context fuel
   rw [result] at typing
   exact typing
 

@@ -36,7 +36,8 @@ private def checkedUnitProgram : CheckedHostCoreProgram :=
 
 private theorem compileTimePurePromotionRegression :
     checkedUnitProgram.program = unitProgram :=
-  rfl
+  CheckedCoreProgram.toHost_program
+    (⟨unitProgram, unitProgram_checked⟩ : CheckedCoreProgram)
 
 private def addressA : Address := ⟨0, by decide⟩
 private def addressB : Address := ⟨1, by decide⟩

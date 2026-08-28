@@ -15,7 +15,7 @@ namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
 Select code from the working WorldState and handle reads through the separately
 selected storage Account.
 -/
-def runCode?
+def runCodeWithStorageReads?
     {RollbackState : Type u}
     {TraceState : Type v}
     (context :
@@ -27,7 +27,7 @@ def runCode?
       (HostDriverResult
         (HostStorageReadDriver.Context RollbackState TraceState)) :=
   (context.context.values.working.1.code? codeAddress).map fun code =>
-    code.runWithStorage context fuel
+    code.runWithStorageReads context fuel
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount
 

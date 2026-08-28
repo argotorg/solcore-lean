@@ -17,7 +17,7 @@ abbrev CodeRunContext
     (TraceState : Type v) :=
   HostStorageReadDriver.Context RollbackState TraceState
 
-@[simp] theorem runCode?_of_absent
+@[simp] theorem runCodeWithStorageReads?_of_absent
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : CodeRunContext RollbackState TraceState)
@@ -25,10 +25,10 @@ abbrev CodeRunContext
     (fuel : Nat)
     (absent :
       context.context.values.working.1.account? codeAddress = none) :
-    context.runCode? codeAddress fuel = none := by
-  simp [runCode?, WorldState.code?, absent]
+    context.runCodeWithStorageReads? codeAddress fuel = none := by
+  simp [runCodeWithStorageReads?, WorldState.code?, absent]
 
-@[simp] theorem runCode?_of_account_without_code
+@[simp] theorem runCodeWithStorageReads?_of_account_without_code
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : CodeRunContext RollbackState TraceState)
@@ -38,10 +38,10 @@ abbrev CodeRunContext
     (present :
       context.context.values.working.1.account? codeAddress = some account)
     (withoutCode : account.code? = none) :
-    context.runCode? codeAddress fuel = none := by
-  simp [runCode?, WorldState.code?, present, withoutCode]
+    context.runCodeWithStorageReads? codeAddress fuel = none := by
+  simp [runCodeWithStorageReads?, WorldState.code?, present, withoutCode]
 
-@[simp] theorem runCode?_of_present
+@[simp] theorem runCodeWithStorageReads?_of_present
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : CodeRunContext RollbackState TraceState)
@@ -52,31 +52,32 @@ abbrev CodeRunContext
     (accountPresent :
       context.context.values.working.1.account? codeAddress = some account)
     (codePresent : account.code? = some code) :
-    context.runCode? codeAddress fuel =
-      some (code.runWithStorage context fuel) := by
-  simp [runCode?, WorldState.code?, accountPresent, codePresent]
+    context.runCodeWithStorageReads? codeAddress fuel =
+      some (code.runWithStorageReads context fuel) := by
+  simp [runCodeWithStorageReads?, WorldState.code?, accountPresent, codePresent]
 
 /-- Every returned read-only result retains the complete input context. -/
-theorem runCode?_result_context
+theorem runCodeWithStorageReads?_result_context
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : CodeRunContext RollbackState TraceState)
     (codeAddress : Address)
     (fuel : Nat)
     (result : HostDriverResult (CodeRunContext RollbackState TraceState))
-    (executed : context.runCode? codeAddress fuel = some result) :
+    (executed :
+      context.runCodeWithStorageReads? codeAddress fuel = some result) :
     result.context = context := by
-  unfold runCode? at executed
+  unfold runCodeWithStorageReads? at executed
   cases selected : context.context.values.working.1.code? codeAddress with
   | none => simp [selected] at executed
   | some code =>
       rw [selected] at executed
       have same := Option.some.inj executed
       rw [← same]
-      exact code.runWithStorage_context context fuel
+      exact code.runWithStorageReads_context context fuel
 
 /-- Address-selected checked host execution cannot return a driver fault. -/
-theorem runCode?_ne_some_fault
+theorem runCodeWithStorageReads?_ne_some_fault
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : CodeRunContext RollbackState TraceState)
@@ -85,9 +86,9 @@ theorem runCode?_ne_some_fault
     (resultContext : CodeRunContext RollbackState TraceState)
     (error : Core.MachineFault)
     (faultState : Core.State) :
-    context.runCode? codeAddress fuel ≠
+    context.runCodeWithStorageReads? codeAddress fuel ≠
       some ⟨resultContext, .fault error faultState⟩ := by
-  unfold runCode?
+  unfold runCodeWithStorageReads?
   cases selected : context.context.values.working.1.code? codeAddress with
   | none => simp
   | some code =>
@@ -95,7 +96,8 @@ theorem runCode?_ne_some_fault
       intro same
       have resultEq := Option.some.inj same
       have outcomeEq := congrArg HostDriverResult.outcome resultEq
-      exact code.runWithStorage_ne_fault context fuel error faultState outcomeEq
+      exact code.runWithStorageReads_ne_fault context fuel error faultState
+        outcomeEq
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount
 

@@ -66,7 +66,7 @@ end HostStorageReadDriver
 namespace CheckedHostCoreProgram
 
 /-- Start checked host-aware code and handle its working-storage reads. -/
-def runWithStorage
+def runWithStorageReads
     {RollbackState : Type u}
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)

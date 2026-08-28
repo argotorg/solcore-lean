@@ -187,13 +187,13 @@ end HostStorageReadDriver
 namespace CheckedHostCoreProgram
 
 /-- Checked execution inherits the complete handled-step fuel account. -/
-theorem runWithStorage_fuelSound
+theorem runWithStorageReads_fuelSound
     {RollbackState : Type u}
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageReadDriver.Context RollbackState TraceState)
     (fuel : Nat) :
-    (code.runWithStorage context fuel).FuelSound fuel context
+    (code.runWithStorageReads context fuel).FuelSound fuel context
       (Core.State.initial code.program.body Core.hostEnvironment) := by
   exact HostStorageReadDriver.run_fuelSound context fuel _
 
