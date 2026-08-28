@@ -67,6 +67,7 @@ import Solcore.Semantics.CheckedHostCoreProgramExecution
 import Solcore.Semantics.CheckedHostCoreProgramProperties
 import Solcore.Semantics.HostStorageReadHandler
 import Solcore.Semantics.HostStorageReadDriver
+import Solcore.Semantics.HostStorageReadDriverProperties
 import Solcore.Semantics.WorldState
 import Solcore.Semantics.AccountCodeProperties
 import Solcore.Semantics.WorldStateCode
