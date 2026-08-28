@@ -64,6 +64,7 @@ import Solcore.Semantics.CheckedCoreProgramExecution
 import Solcore.Semantics.CheckedCoreProgramProperties
 import Solcore.Semantics.CheckedHostCoreProgram
 import Solcore.Semantics.CheckedHostCoreProgramExecution
+import Solcore.Semantics.HostStorageReadHandler
 import Solcore.Semantics.WorldState
 import Solcore.Semantics.AccountCodeProperties
 import Solcore.Semantics.WorldStateCode
