@@ -2,6 +2,7 @@ import Solcore.Core.Data
 import Solcore.Core.Safety
 import Solcore.Core.Check
 import Solcore.Core.Host
+import Solcore.Core.HostMachine
 import Solcore.Core.Primitive
 import Solcore.Core.RenamingSyntax
 import Solcore.Core.Renaming
