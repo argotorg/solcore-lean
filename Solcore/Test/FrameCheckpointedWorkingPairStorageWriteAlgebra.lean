@@ -16,7 +16,8 @@ private example
     (values.writeWorkingStorage? address slot first).bind
         (fun next => next.writeWorkingStorage? address slot second) =
       values.writeWorkingStorage? address slot second := by
-  simp
+  exact FrameCheckpointedWorkingPair.writeWorkingStorage?_overwrite
+    values address slot first second
 
 private example
     {RollbackState TraceState : Type}

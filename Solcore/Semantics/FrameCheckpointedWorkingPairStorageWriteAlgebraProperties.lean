@@ -27,7 +27,7 @@ private theorem writeWorkingStorage?_bind_eq_map_bind
   rfl
 
 /-- A later write to the same address and slot supersedes an earlier write. -/
-@[simp] theorem writeWorkingStorage?_overwrite
+theorem writeWorkingStorage?_overwrite
     {RollbackState : Type u} {TraceState : Type v}
     (values : FrameCheckpointedWorkingPair RollbackState TraceState)
     (address : Address) (slot first second : Core.Word) :

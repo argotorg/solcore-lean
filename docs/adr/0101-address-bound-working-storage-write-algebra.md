@@ -32,7 +32,7 @@ namespace Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddress
 
 universe u v
 
-@[simp] theorem writeStorage?_overwrite
+theorem writeStorage?_overwrite
     {RollbackState : Type u} {TraceState : Type v}
     (context :
       FrameCheckpointedWorkingPairWithStorageAddress RollbackState TraceState)
@@ -55,9 +55,11 @@ theorem writeStorage?_commute_slots
 end Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddress
 ```
 
-Only overwrite is a simp rule because it reduces two writes to the final one.
-The slot-commutation law remains non-simp: exchanging symmetric orders has no
-canonical simplification direction and would permit a rewrite loop.
+Both laws remain non-simp. Although overwrite reduces two writes to one, the
+existing present-Account branch rule can simplify the first write before the
+surrounding bind is visited. Registering both rules would therefore give
+different normal forms depending on the available hypotheses. Slot
+commutation also has no canonical rewrite direction.
 
 The stored selector is unchanged across either successful sequence. A
 two-write sequence returns `none` exactly when the retained address is absent
@@ -85,7 +87,7 @@ address parameter merely to restate ADR-0100.
 Add exactly two private compile examples importing only the new properties
 module:
 
-1. same-slot overwrite through the public simp rule; and
+1. same-slot overwrite through the named non-simp law; and
 2. distinct-slot commutation through the named non-simp law.
 
 There is no public test function, runtime declaration, runtime assertion,

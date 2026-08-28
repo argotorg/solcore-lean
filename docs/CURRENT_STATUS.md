@@ -1733,8 +1733,10 @@ commutation.
 
 The 77-line properties module has one private normalization helper and exactly
 the three public laws. A 52-line compile-only module has exactly three private
-examples. Only overwrite is a simp rule; both commutation laws remain
-non-simp. All public laws report `[propext, Quot.sound]`, full validation and
+examples. All three laws remain non-simp; a follow-up critical-pair audit
+removed overwrite from simp because the present-Account branch can rewrite its
+first write before the surrounding bind. All public laws report
+`[propext, Quot.sound]`, full validation and
 independent audits pass, and no operation, address authority, runtime
 reordering claim, runtime assertion, or runner call is added.
 
@@ -1745,8 +1747,8 @@ two proof-only laws for the retained-address writer: final-write overwrite and
 distinct-slot commutation.
 
 The thin lift reuses ADR-0100 and adds no operation, address argument, authority
-claim, runtime reordering claim, assertion, or runner call. Only overwrite is
-a simp rule.
+claim, runtime reordering claim, assertion, or runner call. Both laws remain
+named non-simp rules to avoid overlap with present-Account branch reduction.
 
 ## Meaning of completion
 

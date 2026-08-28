@@ -1401,11 +1401,11 @@ independent P0-P3 audits pass.
 the existing WorldState overwrite and independent-write equations through the
 ADR-0092 checkpointed working-write operation.
 
-It adds exactly three proof laws and no executable operation. Overwrite is a
-simp reduction; distinct-slot and distinct-address commutation remain
-non-simp. The equations do not claim runtime, transaction, or external-effect
-reordering. Three private compile regressions, full validation, and independent
-P0-P3 audits pass.
+It adds exactly three named non-simp proof laws and no executable operation.
+Overwrite remains non-simp because present-Account branch reduction can visit
+its first write before the surrounding bind. The equations do not claim
+runtime, transaction, or external-effect reordering. Three private compile
+regressions, full validation, and independent P0-P3 audits pass.
 
 ## Planned address-bound working storage-write algebra
 
@@ -1413,8 +1413,9 @@ P0-P3 audits pass.
 ADR-0100 same-slot overwrite and distinct-slot commutation laws through the
 single retained storage selector.
 
-It adds exactly two proof laws and no executable operation. Overwrite is a simp
-reduction; slot commutation remains non-simp. No distinct-address law or
+It adds exactly two named non-simp proof laws and no executable operation.
+Overwrite avoids a critical overlap with present-Account branch reduction, and
+slot commutation has no canonical orientation. No distinct-address law or
 runtime-order claim is added at this fixed-selector boundary.
 
 ## Completed Core vNext slice: derived-builder renaming laws

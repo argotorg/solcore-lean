@@ -36,7 +36,7 @@ namespace Solcore.Semantics.FrameCheckpointedWorkingPair
 
 universe u v
 
-@[simp] theorem writeWorkingStorage?_overwrite
+theorem writeWorkingStorage?_overwrite
     {RollbackState : Type u} {TraceState : Type v}
     (values : FrameCheckpointedWorkingPair RollbackState TraceState)
     (address : Address) (slot first second : Core.Word) :
@@ -73,10 +73,11 @@ theorem writeWorkingStorage?_commute_addresses
 end Solcore.Semantics.FrameCheckpointedWorkingPair
 ```
 
-Only overwrite is a simp rule: two writes to the same address and slot reduce
-to the final write. Both commutation laws remain non-simp because exchanging
-symmetric orders provides no canonical simplification direction and would
-permit a rewrite loop.
+All three laws remain non-simp. Although overwrite reduces two writes to one,
+the existing present-Account branch rule can simplify the first write before
+the surrounding bind is visited. Registering both rules would therefore give
+different normal forms depending on the available hypotheses. The two
+commutation laws also have no canonical rewrite direction.
 
 These are equalities between pure `Option.bind` expressions. Their final
 `none` means only that at least one required Account was absent; the bind does
@@ -106,7 +107,7 @@ the three-law sequential algebra.
 Add exactly three private compile examples importing only the new properties
 module:
 
-1. same-address, same-slot overwrite through simp;
+1. same-address, same-slot overwrite by the named non-simp law;
 2. same-address, distinct-slot commutation by the named non-simp law; and
 3. distinct-address commutation by the named non-simp law.
 
@@ -158,15 +159,15 @@ umbrella import. One private normalization helper supports exactly the three
 required public laws; no executable operation, carrier, instance, or public
 helper is added.
 
-Only `writeWorkingStorage?_overwrite` is a simp rule. The two commutation laws
-remain non-simp. All three public laws report exactly
-`[propext, Quot.sound]`, and simplification review finds no loop or divergent
-critical overlap with the existing branch laws.
+All three laws remain non-simp. A follow-up critical-pair audit removed the
+initial overwrite simp attribute because the existing present-Account branch
+rule can rewrite the first write before the surrounding bind. All three public
+laws report exactly `[propext, Quot.sound]`.
 
 A 52-line compile-only test module plus one runner import contains exactly
-three private examples. Overwrite uses the public simp rule; both commutation
-examples name their public non-simp law directly. The test layer adds no
-runtime or public declaration, fixture, helper, assertion, or runner call.
+three private examples. All three examples name their public non-simp law
+directly. The test layer adds no runtime or public declaration, fixture,
+helper, assertion, or runner call.
 
 The implementation commits are `7814798` (214 changed lines), `afbd0ec` (78),
 and `a98a71e` (53), all below 300 changed lines; this completion update is the
