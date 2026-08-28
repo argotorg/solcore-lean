@@ -461,7 +461,7 @@ rather than duplicating working WorldState or outcome, and delegates
 continuation behavior unchanged. The bundle proves no checkpoint lineage or
 trace-prefix relation and is not a complete execution frame.
 
-ADR-0068 accepts a total `FrameResolutionResult`. Return and revert retain
+ADR-0068 completes a total `FrameResolutionResult`. Return and revert retain
 their payloads together with the selected WorldState and effects; trap retains
 its reason without selecting state or effects. This avoids the Option
 continuation's diagnostic ambiguity while leaving trap disposition and

@@ -146,9 +146,9 @@ creation, or trace algebra.
 [ADR-0067](adr/0067-caller-owned-frame-continuation-context.md) completes the
 carrier that groups one completed frame's caller-owned continuation inputs
 without defining a full execution frame.
-[ADR-0068](adr/0068-total-frame-resolution-result.md) is the active executable
-slice. It converts one continuation context into a total branch-complete result
-without choosing trap or transaction disposition.
+[ADR-0068](adr/0068-total-frame-resolution-result.md) completes the total
+frame-resolution result. It converts one continuation context into a
+branch-complete value without choosing trap or transaction disposition.
 
 ## Implementation status
 
@@ -203,7 +203,7 @@ without choosing trap or transaction disposition.
 | Resolved frame continuation laws | Complete | Complete | Not published |
 | Caller-owned frame continuation | Complete | Complete | Not published |
 | Caller-owned frame continuation context | Complete | Complete | Not published |
-| Total frame resolution result | Not implemented | Decision accepted | Not published |
+| Total frame resolution result | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1028,17 +1028,23 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The carrier does not establish checkpoint lineage,
 trace-prefix membership, a frame stack, or transaction behavior.
 
-## Active total frame resolution result
+## Completed total frame resolution result
 
 [ADR-0068](adr/0068-total-frame-resolution-result.md) adds exactly one public
 three-constructor carrier and one total context-resolution operation. Return
 and revert carry payload plus selected state/effects; trap carries its reason
 and selects no state/effect pair.
 
-The planned proof interface contains exactly three simp `rfl` laws, and the
-definition-only runtime module contains exactly three assertions. Stack/depth,
-checkpoint lineage, trace append/order, trap disposition, and transaction
-atomicity remain outside.
+A 43-line definition module plus one umbrella import contains the carrier and
+operation. A 50-line properties module plus one umbrella import contains
+exactly three simp `rfl` laws. The carrier, operation, and laws report
+`[propext]`. A 77-line definition-only test module plus two runner lines
+contains exactly three assertions.
+
+The four implementation commits contain 198, 44, 51, and 79 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Stack/depth, checkpoint lineage, trace append/order, trap
+disposition, and transaction atomicity remain outside.
 
 ## Meaning of completion
 

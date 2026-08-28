@@ -73,7 +73,7 @@ These results remain regression obligations for every extension.
 | 47 | Resolved frame continuation laws | Complete | Passes returned/reverted synchronized pairs to arbitrary continuations without a new API |
 | 48 | Caller-owned frame continuation | Complete | Names the resolver/bind seam while checkpoint and accumulated-trace inputs stay external |
 | 49 | Caller-owned frame continuation context | Complete | Groups one completed frame's continuation inputs without defining a full frame |
-| 50 | Total frame resolution result | Active | Preserves payloads and trap reasons in a total first-order result |
+| 50 | Total frame resolution result | Complete | Preserves payloads and trap reasons in a total first-order result |
 | 51 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 52 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, trace construction, diagnostics, and atomicity decisions |
 | 53 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -830,17 +830,23 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Checkpoint lineage, trace-prefix proofs, full frame identity,
 stack/depth, and transactions remain outside.
 
-## Active total frame resolution result
+## Completed total frame resolution result
 
 [ADR-0068](adr/0068-total-frame-resolution-result.md) adds one total
 three-constructor carrier and one operation from FrameContinuationContext.
 Return and revert preserve their bytes with the selected state/effect pair;
 trap preserves its reason and selects no pair.
 
-Exactly three planned simp `rfl` laws and three definition-only runtime
-assertions cover the three branches. This does not choose trap disposition,
-checkpoint lineage, trace construction, nested scheduling, or transaction
-atomicity.
+A 43-line definition module plus one umbrella import contains the carrier and
+operation. A 50-line properties module plus one umbrella import contains
+exactly three simp `rfl` laws. A 77-line definition-only test module plus two
+runner lines supplies exactly three assertions. The carrier, operation, and
+laws report `[propext]`.
+
+The four implementation commits contain 198, 44, 51, and 79 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Trap disposition, checkpoint lineage, trace construction,
+nested scheduling, and transaction atomicity remain outside.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

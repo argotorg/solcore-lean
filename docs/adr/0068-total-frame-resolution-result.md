@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: branch-complete first-order result of one frame resolution
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -144,3 +144,22 @@ frozen artifact.
 Consumers can now inspect every frame-resolution branch without losing payload
 or reason information and without inventing a continuation. Nested invocation
 and transaction policy remain later, explicit decisions.
+
+## Implementation record
+
+The completed slice adds one three-constructor carrier and one total public
+operation in a 43-line definition module plus one umbrella import. The
+operation matches the outcome once and selects exactly the state, effects,
+payload, or reason fixed above. The carrier and operation each report exactly
+`[propext]`; no deriving clause, instance, default, or helper is added.
+
+A 50-line properties module plus one umbrella import publishes exactly three
+simp `rfl` constructor laws, each with axiom set `[propext]`. Exactly three
+runtime assertions live in a 77-line definition-only test module with two
+runner lines.
+
+The implementation commits are `82a2b53` (198 changed lines), `bae3146` (44),
+`31482b4` (51), and `c415427` (79), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+audits pass.

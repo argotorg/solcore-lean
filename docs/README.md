@@ -315,7 +315,7 @@ Its one carrier, one operation, one coherence law, and three definition-only
 assertions pass full validation. It is not a full execution frame and proves no
 checkpoint lineage or trace-prefix relation.
 
-The active total-resolution slice,
+The completed total-resolution slice,
 [ADR-0068](adr/0068-total-frame-resolution-result.md), adds a first-order result
 that preserves return/revert payloads and trap reasons. State and effects are
 selected only for return and revert, so trap and transaction disposition remain
