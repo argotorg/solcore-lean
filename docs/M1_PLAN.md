@@ -122,11 +122,15 @@ These results remain regression obligations for every extension.
 | 96 | Present working storage Account optional/total re-refinement coherence | Complete | Makes the failure-aware write/refine path equal the total writer and reusable across refined optional-write sequences |
 | 97 | Parent-indexed initialization present storage Account refinement | Complete | Checks Account presence for the initialization-bound selector and reaches existing total storage consumers without a new carrier |
 | 98 | Address-selected checked Core code | Complete | Stores checker-accepted Core code in Account and executes exact address selection without an ABI or frame-result conversion |
-| 99 | Further contract-entry input roles | Planned | Adds caller, callee, data, value, or kind only when a Core consumer exists |
-| 100 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 101 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 102 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 103 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 99 | Typed Core storage-read suspension | Active | Reuses typed function application to request storage without adding expression syntax or weakening pure completion |
+| 100 | Working-storage read handler | Planned | Interprets the Core request through the proven-present Account carrier while preserving address separation and remaining fuel |
+| 101 | Address-selected host-code driver | Planned | Migrates retained code only after the Core protocol and storage handler are proved |
+| 102 | Storage-write capability | Planned | Appends a typed capability and returns an updated proven-present carrier |
+| 103 | Further contract-entry input roles | Planned | Adds caller, callee, data, value, or kind only when a Core consumer exists |
+| 104 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 105 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 106 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 107 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.

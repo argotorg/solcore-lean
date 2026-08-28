@@ -682,6 +682,13 @@ returns the exact stateful Core machine result. It does not yet expose
 WorldState to Core, convert `Core.Value` to return bytes, or classify fuel
 exhaustion as a frame outcome.
 
+ADR-0117 adds the host boundary without adding Core expression syntax. A fixed
+typed context supplies a runtime-only storage-read function. Applying it
+produces a first-order suspension that owns the remaining CEK continuation and
+Core-local store; a typed Word response resumes that state. Pure closed-program
+completion remains unchanged, while host execution uses done-or-suspended
+progress. Concrete WorldState handling stays outside Core.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

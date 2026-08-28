@@ -151,6 +151,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Present working storage Account optional/total re-refinement coherence | Complete | ADR-0114 equates optional write plus canonical Account refinement with the total writer | None |
 | Parent-indexed initialization present storage Account refinement | Complete | ADR-0115 checks initial Account presence and returns the existing proven-present carrier used by total storage operations | None |
 | Address-selected checked Core code | Complete | ADR-0116 admits checker-accepted Core programs, stores them with Account state, selects by Address, and returns raw stateful Core execution results without ABI or frame-outcome conversion | None |
+| Typed Core storage-read suspension | Active | ADR-0117 reuses typed function application for a storage-read request and saves the exact CEK continuation/local store without adding expression syntax or importing WorldState into Core | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal storage, frame, checked-code association, and address-selected pure Core execution are complete; WorldState effects, balances, transactions, authority, and lifetime remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |
