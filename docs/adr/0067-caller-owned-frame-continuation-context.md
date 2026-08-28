@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: nominal bundle for one completed frame's continuation inputs
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -117,3 +117,21 @@ frozen artifact.
 The caller-owned continuation inputs now have one stable nominal boundary.
 Future runtime carriers can contain or replace this bundle deliberately rather
 than relying on an unstructured argument list.
+
+## Implementation record
+
+The completed slice adds one four-field carrier and one public operation in a
+35-line definition module plus one umbrella import. The generated constructor,
+projections, and recursor are intentional. The carrier and operation each
+report exactly `[propext]`; no deriving clause, instance, default,
+extensionality law, or helper is added.
+
+A 23-line properties module plus one umbrella import publishes exactly one
+non-simp `rfl` coherence law with axiom set `[propext]`. Exactly three runtime
+assertions live in an 87-line definition-only test module with two runner lines.
+
+The implementation commits are `fead51f` (171 changed lines), `8703b24` (36),
+`0b8804a` (24), and `2e3b16c` (89), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+audits pass.

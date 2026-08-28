@@ -72,7 +72,7 @@ These results remain regression obligations for every extension.
 | 46 | Unresolved trap propagation | Complete | Proves that trapped synchronized resolution remains `none` through any continuation |
 | 47 | Resolved frame continuation laws | Complete | Passes returned/reverted synchronized pairs to arbitrary continuations without a new API |
 | 48 | Caller-owned frame continuation | Complete | Names the resolver/bind seam while checkpoint and accumulated-trace inputs stay external |
-| 49 | Caller-owned frame continuation context | Active | Groups one completed frame's continuation inputs without defining a full frame |
+| 49 | Caller-owned frame continuation context | Complete | Groups one completed frame's continuation inputs without defining a full frame |
 | 50 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 51 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
 | 52 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -811,17 +811,23 @@ audits pass.
 No parent-frame carrier, checkpoint creation, trace append/order, transaction
 atomicity, or diagnostic failure carrier is selected.
 
-## Active caller-owned frame continuation context
+## Completed caller-owned frame continuation context
 
 [ADR-0067](adr/0067-caller-owned-frame-continuation-context.md) adds one nominal
 carrier with four public fields: state checkpoint, effect checkpoint, working
 journal, and the existing FrameRunResult. One operation delegates to ADR-0066,
 so the carrier adds no new branch behavior.
 
-The planned proof interface is exactly one non-simp coherence law. Three
-definition-only runtime assertions cover return, revert, and trap while reading
-the public context projections. Checkpoint lineage, trace-prefix proofs, full
-frame identity, stack/depth, and transactions remain outside.
+A 35-line definition module plus one umbrella import contains the four-field
+carrier and operation. A 23-line properties module plus one umbrella import
+contains exactly one non-simp `rfl` coherence law. The carrier, operation, and
+law report `[propext]`. An 87-line definition-only test module plus two runner
+lines supplies exactly three runtime assertions.
+
+The four implementation commits contain 171, 36, 24, and 89 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Checkpoint lineage, trace-prefix proofs, full frame identity,
+stack/depth, and transactions remain outside.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
