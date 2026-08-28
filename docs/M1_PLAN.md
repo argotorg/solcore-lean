@@ -80,10 +80,11 @@ These results remain regression obligations for every extension.
 | 54 | Indexed frame trace extension | Complete | Generates canonical prefix evidence through event-only incremental construction |
 | 55 | Parent-indexed frame continuation context | Complete | Binds a completed context's checkpoints and trace prefix to an exact parent working pair |
 | 56 | Parent-indexed frame continuation construction | Complete | Derives the indexed context and proofs from an event-only trace extension |
-| 57 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 58 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the parent-indexed construction boundary |
-| 59 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 60 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 57 | Parent-indexed trapped-frame rollback selection | Active | Selects a frame-local parent rollback pair for traps while leaving propagation and transactions open |
+| 58 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 59 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after frame-local trap selection |
+| 60 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 61 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -958,6 +959,18 @@ The four implementation commits contain 217, 32, 59, and 89 changed lines.
 Full validation and independent P0-P3 audits pass. ADR-0073's prefix and
 return/revert laws remain reusable without adapters. Invocation provenance,
 stack scheduling, trap disposition, and transactions remain later.
+
+## Active parent-indexed trapped-frame rollback selection
+
+[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) specifies one
+opt-in `trapRollback?` selector. It returns `none` for return and revert. For a
+trap it selects parent checkpoint state and rollback while retaining the
+accumulated internal working trace.
+
+The planned interface contains exactly three non-simp laws and three
+definition-only branch assertions. Existing reason and prefix interfaces remain
+orthogonal, and generic resolvers are unchanged. Frame-local selection is fixed
+here; propagation, fatality, resumption, and transactions remain later.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -352,6 +352,11 @@ The completed parent-indexed continuation-construction slice,
 that carrier and both relationship proofs from an indexed trace extension. It
 does not turn the selected inputs into evidence of an actual invocation.
 
+The active parent-indexed trapped-frame rollback slice,
+[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md), selects a local
+parent rollback pair only when explicitly asked about a trap. Propagation,
+fatality, parent resumption, and transaction handling remain separate.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -521,6 +526,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   continuation context indexed by one exact parent working pair.
 - [ADR-0074](adr/0074-trace-extension-parent-context-construction.md) fixes the
   restricted construction path from one indexed trace extension.
+- [ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) fixes opt-in
+  frame-local rollback selection for a parent-indexed trapped frame.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

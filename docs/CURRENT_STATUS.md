@@ -171,6 +171,10 @@ existing resolver.
 the restricted construction path for that carrier. Its one operation derives
 the checkpoints, working trace, and relationship proofs from an ADR-0072
 indexed extension without accepting a complete working trace.
+[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) is active. It
+specifies one opt-in selector for the parent checkpoint state and rollback with
+the trapped frame's accumulated internal trace, without changing the existing
+generic resolvers.
 
 ## Implementation status
 
@@ -232,6 +236,7 @@ indexed extension without accepting a complete working trace.
 | Indexed frame trace extension | Complete | Complete | Not published |
 | Parent-indexed frame continuation context | Complete | Complete | Not published |
 | Parent-indexed frame continuation construction | Complete | Complete | Not published |
+| Parent-indexed trapped-frame rollback selection | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1183,6 +1188,18 @@ The four implementation commits contain 217, 32, 59, and 89 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Runtime provenance, invocation, scheduling, trap
 disposition, and transaction behavior remain outside.
+
+## Active parent-indexed trapped-frame rollback selection
+
+[ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) specifies one
+`ParentIndexedFrameContinuationContext.trapRollback?` selector. Return and
+revert produce `none`; trap selects the indexed parent state and rollback with
+the accumulated working trace.
+
+Exactly three non-simp laws and three definition-only assertions are planned.
+The existing trap reason, prefix proof, and generic resolver remain separate.
+Frame-local selection is fixed here; propagation, fatality, resumption, and
+transaction disposition remain outside.
 
 ## Meaning of completion
 
