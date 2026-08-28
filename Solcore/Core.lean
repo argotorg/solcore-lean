@@ -11,6 +11,7 @@ import Solcore.Core.HostTransitionSafety
 import Solcore.Core.HostProgress
 import Solcore.Core.HostRunner
 import Solcore.Core.HostRunnerProperties
+import Solcore.Core.HostRunnerSafety
 import Solcore.Core.Primitive
 import Solcore.Core.RenamingSyntax
 import Solcore.Core.Renaming
