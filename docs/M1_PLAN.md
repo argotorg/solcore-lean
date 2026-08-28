@@ -81,10 +81,11 @@ These results remain regression obligations for every extension.
 | 55 | Parent-indexed frame continuation context | Complete | Binds a completed context's checkpoints and trace prefix to an exact parent working pair |
 | 56 | Parent-indexed frame continuation construction | Complete | Derives the indexed context and proofs from an event-only trace extension |
 | 57 | Parent-indexed trapped-frame rollback selection | Complete | Selects a frame-local parent rollback pair for traps while leaving propagation and transactions open |
-| 58 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 59 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after frame-local trap selection |
-| 60 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 61 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 58 | Parent-indexed trap propagation payload selection | Active | Constructs one opt-in caller-designated enclosing payload while leaving handling and transactions open |
+| 59 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 60 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after one-step trap payload construction |
+| 61 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 62 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -977,6 +978,17 @@ Full validation and independent P0-P3 audits pass. This is a new narrow
 frame-local trace-retention policy, not a reinterpretation of ADR-0061 or a
 concrete-log rule. Generic resolvers remain unchanged; propagation, fatality,
 resumption, and transactions remain later.
+
+## Active parent-indexed trap propagation payload selection
+
+[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) specifies one
+opt-in `trapPropagationPayload?` operation. It maps ADR-0075's selected pair to
+a `FrameRunResult` with the original trapped outcome plus the selected journal.
+
+The planned interface contains exactly three non-simp laws and three
+definition-only branch assertions. It constructs one caller-designated
+enclosing payload but does not execute or prove propagation, parent execution,
+handling, repetition through ancestors, or transaction behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

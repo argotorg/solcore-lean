@@ -175,6 +175,9 @@ indexed extension without accepting a complete working trace.
 opt-in frame-local trap rollback selector. Return and revert produce `none`;
 trap selects parent checkpoint state and rollback with the accumulated internal
 working trace without changing the existing generic resolvers.
+[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) is active. It
+specifies one opt-in payload selector that combines ADR-0075's selected pair
+with the original trapped outcome for a caller-designated enclosing boundary.
 
 ## Implementation status
 
@@ -237,6 +240,7 @@ working trace without changing the existing generic resolvers.
 | Parent-indexed frame continuation context | Complete | Complete | Not published |
 | Parent-indexed frame continuation construction | Complete | Complete | Not published |
 | Parent-indexed trapped-frame rollback selection | Complete | Complete | Not published |
+| Parent-indexed trap propagation payload selection | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1208,6 +1212,17 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Internal `FrameTrace` retention is the new narrow policy
 selected here; it does not claim that concrete contract logs survive a trap.
 Propagation, fatality, resumption, and transaction disposition remain outside.
+
+## Active parent-indexed trap propagation payload selection
+
+[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) specifies one
+`ParentIndexedFrameContinuationContext.trapPropagationPayload?` operation. It
+maps the ADR-0075 rollback pair into a prospective enclosing frame result and
+selected journal while preserving the original trapped outcome.
+
+Exactly three non-simp laws and three definition-only assertions are planned.
+No runtime transition, parent execution, ancestry, handling, repeated
+propagation, or transaction policy is claimed.
 
 ## Meaning of completion
 

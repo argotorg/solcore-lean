@@ -357,6 +357,11 @@ The completed parent-indexed trapped-frame rollback slice,
 parent rollback pair only when explicitly asked about a trap. Propagation,
 fatality, parent resumption, and transaction handling remain separate.
 
+The active parent-indexed trap-propagation payload slice,
+[ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md), packages that
+rollback pair with the original trapped outcome for one caller-designated
+enclosing boundary. It does not execute or prove propagation.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -528,6 +533,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   restricted construction path from one indexed trace extension.
 - [ADR-0075](adr/0075-parent-indexed-trap-rollback-selection.md) fixes opt-in
   frame-local rollback selection for a parent-indexed trapped frame.
+- [ADR-0076](adr/0076-parent-indexed-trap-propagation-payload.md) fixes opt-in
+  construction of one caller-designated trap-propagation payload.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

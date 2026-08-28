@@ -509,6 +509,11 @@ the accumulated internal working trace. Existing generic resolvers remain
 unchanged; propagation, fatality, resumption, and transaction disposition are
 still separate.
 
+ADR-0076 fixes the active parent-indexed trap-propagation payload boundary. It
+maps ADR-0075's selected pair into a prospective enclosing `FrameRunResult` and
+selected journal while preserving the same trapped outcome. This constructs a
+value only; it neither executes nor proves runtime propagation or ancestry.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
