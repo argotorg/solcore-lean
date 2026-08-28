@@ -64,6 +64,7 @@ import Solcore.Test.AddressBytesBE
 import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameContinuationContext
+import Solcore.Test.FrameResolutionResult
 import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameRunContinuation
@@ -4904,6 +4905,7 @@ def run : IO Unit := do
   testAddressCodecCoherence
   testAddressWordBridge
   testFrameContinuationContext
+  testFrameResolutionResult
   testFrameOutcome
   testFrameEffectJournal
   testFrameRunContinuation
