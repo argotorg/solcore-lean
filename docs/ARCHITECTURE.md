@@ -623,6 +623,10 @@ ADR-0102 proves stage-preserving structural observations of that conditional
 write. Successful results retain the exact selector, checkpoint, and working
 effect journal; Account absence remains `none` rather than becoming a default.
 
+ADR-0103 accepts the coherence boundary between that retained-address writer
+and its underlying address-parameterized values writer. Projecting successful
+results to their values removes only the wrapper and preserves failure exactly.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

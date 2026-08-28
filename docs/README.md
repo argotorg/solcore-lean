@@ -483,6 +483,11 @@ proofs that a successful retained-address write keeps the same selector,
 checkpoint, and working effect journal, while an unavailable write remains
 `none`.
 
+The accepted
+[ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
+plans one proof that removing the address wrapper from a write result recovers
+the existing underlying values write without changing success or failure.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -708,6 +713,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixed-selector specialization of that algebra.
 - [ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md)
   fixes the structural-preservation observations for that writer.
+- [ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
+  fixes the planned relation between wrapper and underlying write results.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

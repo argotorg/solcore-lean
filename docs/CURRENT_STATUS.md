@@ -257,6 +257,9 @@ retained storage selector.
 [ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md)
 completes stage-preserving observations that retained-address writes keep the
 same selector, checkpoint, and working effect journal.
+[ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
+accepts a proof that projecting a retained-address write result to its values
+recovers the underlying address-parameterized write; implementation is planned.
 
 ## Implementation status
 
@@ -346,6 +349,7 @@ same selector, checkpoint, and working effect journal.
 | Checkpointed working-pair storage-write algebra | No new operation | Complete | Not published |
 | Address-bound working storage-write algebra | No new operation | Complete | Not published |
 | Address-bound working storage-write preservation | No new operation | Complete | Not published |
+| Address-bound working storage-write values coherence | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1770,6 +1774,16 @@ simp laws, and the 48-line compile-only module contains exactly three private
 regressions. All laws report `[propext]`; full validation and independent
 audits pass. The slice adds no operation, carrier, whole-state preservation
 claim, runtime assertion, or runner call.
+
+## Planned address-bound working storage-write values coherence
+
+[ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
+specifies one proof-only relation between the retained-address writer and its
+underlying address-parameterized values writer.
+
+Projecting a successful wrapper result recovers the exact underlying values,
+while write failure remains `none`. The slice adds no operation, carrier,
+address policy, runtime assertion, or runner call.
 
 ## Meaning of completion
 
