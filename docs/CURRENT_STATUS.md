@@ -233,6 +233,9 @@ retaining the selector beside the checkpointed working values.
 [ADR-0094](adr/0094-world-state-storage-read.md) completes a strict WorldState
 storage-read boundary that keeps an absent Account distinct from a present
 Account whose missing slot reads as zero.
+[ADR-0095](adr/0095-address-bound-working-storage-read.md) accepts the
+stored-address lift of that read over checkpointed working values; its
+implementation is planned.
 
 ## Implementation status
 
@@ -314,6 +317,7 @@ Account whose missing slot reads as zero.
 | Checkpointed working-pair storage write | Complete | Complete | Not published |
 | Checkpointed working-pair storage address | Complete | Complete | Not published |
 | Conditional WorldState storage read | Complete | Complete | Not published |
+| Address-bound working storage read | Planned | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1623,6 +1627,17 @@ call contains exactly three runtime assertions. Full validation and independent
 P0-P3 audits pass.
 
 No frame lift, mutation, authorization, gas, ABI, or transaction policy is
+included.
+
+## Planned address-bound working storage read
+
+[ADR-0095](adr/0095-address-bound-working-storage-read.md) specifies one
+planned carrier-level `readStorage?` operation. It accepts only a slot, selects
+the retained storage address, and delegates the working WorldState read to
+ADR-0094 without consulting the checkpoint.
+
+Exactly two simp laws and three definition-only runtime assertions are planned.
+No address authority, mutation, frame entry, gas, ABI, or transaction policy is
 included.
 
 ## Meaning of completion
