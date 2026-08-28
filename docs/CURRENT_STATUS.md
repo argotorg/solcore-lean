@@ -206,6 +206,9 @@ their proof evidence.
 [ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md)
 completes the final lift to parent-indexed contexts while preserving the
 exact `parentWorking` index and checkpoint equality.
+[ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md) fixes the active
+nominal representation of one caller-supplied synchronized checkpoint pair.
+It does not claim actual capture, entry, ownership, or runtime execution.
 
 ## Implementation status
 
@@ -278,6 +281,7 @@ exact `parentWorking` index and checkpoint equality.
 | Frame trap-reason mapping continuation-result invariance | Complete | Complete | Not published |
 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Complete | Not published |
+| Nominal frame checkpoint snapshot | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1434,6 +1438,19 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Rollback selection, payloads, provenance, propagation,
 nested execution, and transaction policy remain outside this final mapper
 slice.
+
+## Active nominal frame checkpoint snapshot
+
+[ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md) specifies one
+`FrameCheckpointSnapshot` carrier and one `fromWorkingPair` adapter. The
+adapter retains the exact caller-supplied state and effect journal as a single
+nominal value.
+
+Exactly two definitional simp laws will expose its projections. Exactly three
+private definition-only compile regressions will cover an abstract whole value
+and concrete state/effect retention, with no runtime test. Checkpoint creation
+time, ownership, lifetime, entry provenance, working initialization,
+scheduling, and transaction atomicity remain undecided.
 
 ## Meaning of completion
 

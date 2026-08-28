@@ -407,6 +407,11 @@ The completed parent-indexed context mapping slice,
 maps only the trace-prefix context while retaining the same parent index and
 checkpoint equality.
 
+The active checkpoint-snapshot slice,
+[ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md), names one
+caller-supplied synchronized state/effect pair without claiming capture time,
+ownership, or execution.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -598,6 +603,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes reason mapping for trace-prefix refined continuation contexts.
 - [ADR-0085](adr/0085-heterogeneous-parent-indexed-frame-continuation-context-trap-reason-mapping.md)
   fixes reason mapping for parent-indexed continuation contexts.
+- [ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md) fixes the nominal
+  representation of a caller-supplied synchronized checkpoint snapshot.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

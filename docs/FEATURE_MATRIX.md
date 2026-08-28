@@ -120,9 +120,10 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Frame trap-reason mapping continuation-result invariance | Complete | One `[propext]` proof-only simp law equates the `Option Next` values before and after context reason mapping; exactly two private compile regressions complete without an operation, branch duplicate, cost, step-count, exactly-once, payload, or propagation claim | None |
 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | One pure lift maps the base context while reusing exact prefix evidence; exactly four `[propext]` simp laws and three definition-only compile regressions complete without trace, event, rollback, provenance, parent-index, payload, or propagation policy | None |
 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | One pure lift maps the trace-prefix context while reusing the exact parent index and checkpoint equality; exactly four `[propext]` simp laws and three definition-only compile regressions complete without rollback, payload, provenance, propagation, or nested-runtime policy | None |
+| Nominal frame checkpoint snapshot | Active | One planned carrier and from-pair adapter retain caller-supplied synchronized state/effects; two projection laws and three compile-only regressions add no capture time, ownership, provenance, working initialization, or transition policy | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
-| Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation, call nesting, and transaction atomicity remain undecided | None |
+| Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |
 | Storage | Blocked | storage-layout ADR | Low |
 | External calls and creation | Planned | host transition and call-depth rules | None |
 | Logs and canonical observations | Planned | value schemas and normalization | None |

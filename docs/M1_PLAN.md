@@ -91,10 +91,11 @@ These results remain regression obligations for every extension.
 | 65 | Frame trap-reason mapping continuation-result invariance | Complete | Proves equality of `continue?` result values under reason mapping without adding execution |
 | 66 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Preserves the base mapper and exact trace-prefix evidence without adding provenance or execution |
 | 67 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Preserves the exact parent index and checkpoint equality while mapping only the refined context |
-| 68 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 69 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
-| 70 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 71 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 68 | Nominal frame checkpoint snapshot | Active | Names a caller-supplied synchronized checkpoint pair without claiming capture, ownership, or execution |
+| 69 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 70 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 71 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 72 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1162,6 +1163,19 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. This final mapper slice does not select rollback, construct
 a payload, or choose provenance, propagation, nested execution, or transaction
 behavior.
+
+## Active nominal frame checkpoint snapshot
+
+[ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md) adds one planned
+`FrameCheckpointSnapshot` carrier and one `fromWorkingPair` adapter. They name
+one caller-supplied synchronized state/effect pair without asserting when,
+where, or by whom it was captured.
+
+Exactly two definitional simp laws will expose the retained fields. Exactly
+three private compile-only regressions will cover the whole adapter and
+concrete state/effect values. The following slice must consume this snapshot
+beside an independent working pair, without assuming checkpoint/working
+equality or choosing initialization order.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

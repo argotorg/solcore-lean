@@ -554,6 +554,11 @@ ADR-0085 completes the final lift to the parent-indexed context. Its refined
 base changes through ADR-0084 while the `parentWorking` index and checkpoint
 equality remain exact. This is an adapter, not a nested-runtime transition.
 
+ADR-0086 fixes the active nominal checkpoint-snapshot boundary. One
+caller-supplied synchronized state/effect pair can be represented by a
+distinct type without claiming entry time, ownership, provenance, or a
+runtime transition. Existing raw-pair resolution APIs remain unchanged.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
