@@ -107,7 +107,7 @@ These results remain regression obligations for every extension.
 | 81 | Initialization storage-address adapter | Complete | Connects the only input role with existing consumers to the parent-indexed initialization path |
 | 82 | Checkpointed working-pair storage-write algebra | Complete | Lifts overwrite and independent-write commutation through the existing working-write operation |
 | 83 | Address-bound working storage-write algebra | Complete | Specializes overwrite and distinct-slot commutation through the retained storage selector |
-| 84 | Address-bound working storage-write preservation | Planned | Exposes selector, checkpoint, and working-journal preservation without collapsing write failure |
+| 84 | Address-bound working storage-write preservation | Complete | Exposes selector, checkpoint, and working-journal preservation without collapsing write failure |
 | 85 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 86 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 87 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1420,7 +1420,7 @@ slot commutation has no canonical orientation. No distinct-address law or
 runtime-order claim is added at this fixed-selector boundary. Two private
 compile regressions, full validation, and independent P0-P3 audits pass.
 
-## Planned address-bound working storage-write preservation
+## Completed address-bound working storage-write preservation
 
 [ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md)
 lifts three immutable-field observations through the retained-address
@@ -1428,8 +1428,9 @@ conditional write.
 
 The selector, checkpoint, and complete working effect journal are returned
 unchanged on success, while Account absence remains the outer `none`. The
-slice adds exactly three simp laws and no executable operation or whole-state
-preservation claim.
+slice adds exactly three simp laws and three private compile regressions, with
+no executable operation or whole-state preservation claim. All laws report
+`[propext]`; full validation and independent P0-P3 audits pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

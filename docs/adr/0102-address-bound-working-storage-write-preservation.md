@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: stage-preserving structural observations of retained-address writes
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -128,6 +128,27 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact three laws plus one umbrella import; the
 exact three compile regressions plus one runner import and no call; independent
 audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 53-line properties module plus one semantic
+umbrella import. It publishes exactly the three required simp observation laws
+and adds no helper, executable operation, carrier, or instance. All three laws
+report exactly `[propext]`.
+
+A 48-line compile-only test module plus one runner import contains exactly
+three private examples. The abstract address example exercises simp directly;
+the present checkpoint and absent working-effect examples name their new law
+before reducing the Account stage. This prevents the older branch laws from
+masking a missing preservation law. The test layer adds no runtime or public
+declaration, fixture, helper, assertion, or runner call.
+
+The implementation commits are `9745854` (189 changed lines), `8e4e248` (54),
+and `6f22a09` (49), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 544-job full build, the
+976-job full test run, metadata and kernel checks, diff checks, declaration
+inventory, abstract/present/absent critical-path checks, and independent P0-P3
+audits pass.
 
 ## Publication and consequences
 

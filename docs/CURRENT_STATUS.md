@@ -255,9 +255,8 @@ the address-parameterized checkpointed working write.
 a thin lift of same-slot overwrite and distinct-slot commutation through the
 retained storage selector.
 [ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md)
-accepts stage-preserving observations that retained-address writes keep the
-same selector, checkpoint, and working effect journal; implementation is
-planned.
+completes stage-preserving observations that retained-address writes keep the
+same selector, checkpoint, and working effect journal.
 
 ## Implementation status
 
@@ -346,7 +345,7 @@ planned.
 | Parent-indexed initialization storage-address adapter | Complete | Complete | Not published |
 | Checkpointed working-pair storage-write algebra | No new operation | Complete | Not published |
 | Address-bound working storage-write algebra | No new operation | Complete | Not published |
-| Address-bound working storage-write preservation | No new operation | Planned | Not published |
+| Address-bound working storage-write preservation | No new operation | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1759,15 +1758,18 @@ validation and independent audits pass. The thin lift adds no operation,
 address argument, authority claim, runtime reordering claim, assertion, or
 runner call.
 
-## Planned address-bound working storage-write preservation
+## Completed address-bound working storage-write preservation
 
 [ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md)
-specifies three proof-only observations of the retained address, checkpoint,
+adds three proof-only observations of the retained address, checkpoint,
 and working effect journal after a conditional write.
 
 Each observation keeps Account absence as `none` and exposes the exact original
-field on success. The slice adds no operation, carrier, whole-state
-preservation claim, runtime assertion, or runner call.
+field on success. The 53-line properties module contains exactly three public
+simp laws, and the 48-line compile-only module contains exactly three private
+regressions. All laws report `[propext]`; full validation and independent
+audits pass. The slice adds no operation, carrier, whole-state preservation
+claim, runtime assertion, or runner call.
 
 ## Meaning of completion
 

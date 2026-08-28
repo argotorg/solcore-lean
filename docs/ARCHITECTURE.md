@@ -619,7 +619,7 @@ ADR-0101 completes the fixed-selector specialization of same-slot overwrite and
 distinct-slot commutation. It reuses the generic algebra and adds no new
 address input, identity, authority, or runtime-order meaning.
 
-ADR-0102 accepts stage-preserving structural observations of that conditional
+ADR-0102 proves stage-preserving structural observations of that conditional
 write. Successful results retain the exact selector, checkpoint, and working
 effect journal; Account absence remains `none` rather than becoming a default.
 
