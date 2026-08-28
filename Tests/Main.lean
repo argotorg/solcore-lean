@@ -35,6 +35,7 @@ import Solcore.Test.CoreDerivedSignedNonStrictComparisonWire
 import Solcore.Test.CoreDirectWordComparisonWire
 import Solcore.Test.CoreDirectWordComparisons
 import Solcore.Test.CoreFunctions
+import Solcore.Test.CoreHostMachine
 import Solcore.Test.CoreLogicalShiftWire
 import Solcore.Test.CoreLogicalShifts
 import Solcore.Test.CoreModularArithmetic
@@ -4906,6 +4907,7 @@ def run : IO Unit := do
   testCoreArithmeticShiftWire
   testCoreProducts
   testCoreFunctions
+  testCoreHostMachine
   testCoreSums
   testCoreCells
   testCoreBooleanConnectives
