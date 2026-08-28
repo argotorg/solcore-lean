@@ -477,6 +477,12 @@ same-slot overwrite and distinct-slot exchange rules for the retained-address
 writer. It does not add another address input or treat the stored address as an
 authority.
 
+The accepted
+[ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md) plans
+proofs that a successful retained-address write keeps the same selector,
+checkpoint, and working effect journal, while an unavailable write remains
+`none`.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -700,6 +706,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes the sequential-write algebra over checkpointed working values.
 - [ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) fixes the
   fixed-selector specialization of that algebra.
+- [ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md)
+  fixes the planned structural-preservation observations for that writer.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
