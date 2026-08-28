@@ -89,7 +89,7 @@ These results remain regression obligations for every extension.
 | 63 | Heterogeneous frame-continuation-context trap-reason mapping | Complete | Preserves all caller-owned inputs while mapping only the contained frame result |
 | 64 | Frame trap-reason mapping resolution naturality | Complete | Proves that context mapping commutes with total resolution without adding execution |
 | 65 | Frame trap-reason mapping continuation-result invariance | Complete | Proves equality of `continue?` result values under reason mapping without adding execution |
-| 66 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Active | Preserves the base mapper and exact trace-prefix evidence without adding provenance or execution |
+| 66 | Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Preserves the base mapper and exact trace-prefix evidence without adding provenance or execution |
 | 67 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 68 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
 | 69 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1127,16 +1127,21 @@ mapper-evaluation, cost, step-count, or exactly-once invocation claim and does
 not map an indexed context or payload or choose runtime propagation or
 transaction behavior.
 
-## Active heterogeneous trace-prefixed context trap-reason mapping
+## Completed heterogeneous trace-prefixed context trap-reason mapping
 
 [ADR-0084](adr/0084-heterogeneous-trace-prefixed-frame-continuation-context-trap-reason-mapping.md)
-adds one planned lift of ADR-0081. It maps the generated base context and reuses
-the existing proof that the checkpoint trace prefixes the working trace.
+adds one lift of ADR-0081. It maps the generated base context and directly
+reuses the existing proof that the checkpoint trace prefixes the working trace.
 
-Four simp laws will cover the refined constructor, base projection, identity,
-and composition. Three definition-only private compile regressions will cover
-whole-constructor reduction, exact prefix-evidence reuse, and one concrete
-trapped base context. This slice does not map traces, parent indexing, payloads,
+The 27-line definition and 61-line properties modules each add one umbrella
+import. Exactly four `[propext]` simp laws cover the refined constructor, base
+projection, identity, and composition. A 95-line definition-only test module
+plus one runner import contains exactly three private compile regressions and
+no runtime call.
+
+The four implementation commits contain 246, 28, 62, and 96 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. This slice does not map traces, parent indexing, payloads,
 or choose provenance, propagation, or transaction behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws

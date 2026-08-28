@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: prefix-evidence-preserving lift of continuation-context reason mapping
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -191,3 +191,34 @@ evidence remain exact.
 
 The parent-indexed context can now receive the same lift in a separate slice,
 while preserving its additional checkpoint-to-parent equality proof.
+
+## Implementation record
+
+The completed slice adds exactly one public
+`FrameContinuationContextWithTracePrefix.mapTrapReason` operation in a 27-line
+definition module plus one umbrella import. The operation delegates the full
+base context to ADR-0081 and directly reuses the existing `tracePrefix` term;
+it adds no cast, transport helper, replacement proof, or second operation. The
+operation and its generated equation report exactly `[propext]`.
+
+A 61-line properties module plus one umbrella import publishes exactly four
+simp laws: the refined constructor, base projection, identity, and composition.
+Concrete and abstract refined contexts normalize without unfolding the
+definition. All four laws report exactly `[propext]`, and their critical pairs
+converge to the same record and base-context normal forms.
+
+A 95-line definition-only test module plus one runner import contains exactly
+three private compile examples and no runtime function, assertion, or call.
+They cover whole-constructor reduction with the same evidence, recovery of the
+original exact prefix proposition, and a concrete trapped complete-base-record
+equality with distinct states, journals, nonempty traces, and mapped reason.
+
+The implementation commits are `eb333b6` (246 changed lines), `264dac4` (28),
+`1700720` (62), and `366f8e9` (96), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, simp-termination, semantic-kernel, metadata, diff, and independent P0-P3
+audits pass.
+
+The lift maps no parent index, checkpoint equality, rollback selection,
+payload, trace, event, or proof object and establishes no provenance,
+propagation, scheduling, or transaction policy.

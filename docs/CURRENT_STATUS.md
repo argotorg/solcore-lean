@@ -201,7 +201,7 @@ mapping its total resolution result afterward.
 completes the proof that context reason mapping leaves the `Option Next`
 value produced by `FrameContinuationContext.continue?` unchanged.
 [ADR-0084](adr/0084-heterogeneous-trace-prefixed-frame-continuation-context-trap-reason-mapping.md)
-now fixes the active lift to trace-prefix refined contexts without rebuilding
+completes the lift to trace-prefix refined contexts without rebuilding
 their proof evidence.
 
 ## Implementation status
@@ -273,7 +273,7 @@ their proof evidence.
 | Heterogeneous frame-continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Frame trap-reason mapping resolution naturality | Complete | Complete | Not published |
 | Frame trap-reason mapping continuation-result invariance | Complete | Complete | Not published |
-| Heterogeneous trace-prefixed continuation-context trap-reason mapping | Not implemented | Decision accepted | Not published |
+| Heterogeneous trace-prefixed continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1396,16 +1396,22 @@ audits pass. Mapper evaluation, execution cost, step count, exactly-once
 invocation, parent indexing, payloads, propagation, and transaction policy
 remain outside this proof-only slice.
 
-## Active heterogeneous trace-prefixed context trap-reason mapping
+## Completed heterogeneous trace-prefixed context trap-reason mapping
 
 [ADR-0084](adr/0084-heterogeneous-trace-prefixed-frame-continuation-context-trap-reason-mapping.md)
-fixes one planned pure lift of ADR-0081 to the ADR-0071 proof-carrying context.
-The base context is mapped while the exact trace-prefix evidence is reused.
+adds one pure lift of ADR-0081 to the ADR-0071 proof-carrying context. The base
+context is mapped while the exact trace-prefix evidence is reused without a
+cast or helper.
 
-The planned surface is one operation, exactly four `[propext]` simp laws, and
-exactly three definition-only private compile regressions. Parent indexing,
-checkpoint equality, payloads, provenance, propagation, and transaction policy
-remain outside this slice.
+The 27-line definition and 61-line properties modules each add one umbrella
+import. The operation, generated equation, and exactly four simp laws report
+exactly `[propext]`. A 95-line definition-only test module plus one runner
+import contains exactly three private compile examples and no runtime call.
+
+The four implementation commits contain 246, 28, 62, and 96 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Parent indexing, checkpoint equality, payloads, provenance,
+propagation, and transaction policy remain outside this slice.
 
 ## Meaning of completion
 

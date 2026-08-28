@@ -397,7 +397,7 @@ The completed continuation-result slice,
 proves that context reason mapping leaves the `Option` value produced by
 `FrameContinuationContext.continue?` unchanged. It adds no execution operation.
 
-The active trace-prefix context mapping slice,
+The completed trace-prefix context mapping slice,
 [ADR-0084](adr/0084-heterogeneous-trace-prefixed-frame-continuation-context-trap-reason-mapping.md),
 maps only the inherited continuation context while retaining the same trace
 prefix evidence.
