@@ -59,6 +59,7 @@ import Solcore.Semantics.WorldState
 import Solcore.Semantics.FrameCheckpointSnapshot
 import Solcore.Semantics.FrameCheckpointSnapshotProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPair
+import Solcore.Semantics.FrameContinuationContextFromCheckpointedWorkingPair
 import Solcore.Semantics.WorldStateProperties
 import Solcore.Semantics.WorldStateExtensionalityProperties
 import Solcore.Semantics.WorldStateUpdateAlgebraProperties
