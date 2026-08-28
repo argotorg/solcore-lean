@@ -103,6 +103,7 @@ import Solcore.Test.ParentIndexedFrameTrapPropagationPayloadCoherence
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
 import Solcore.Test.WorldStateStorageRead
+import Solcore.Test.WorldStateStorageReadWrite
 import Solcore.Test.WorldStateStorageWriteAlgebra
 import Solcore.Test.WorldStateUpdateAlgebra
 import Solcore.Test.SurfaceMultiCertifiedFrontend
