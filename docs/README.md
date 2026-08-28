@@ -367,6 +367,11 @@ The completed payload-coherence slice,
 characterizes successful selection and carries existing non-strict trace-prefix
 evidence to the selected journal without adding an execution operation.
 
+The active heterogeneous trap-reason mapping slice,
+[ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md), lets a
+caller translate only trapped reasons while keeping return and revert bytes
+unchanged. It adds no taxonomy or propagation policy.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -542,6 +547,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   construction of one caller-designated trap-propagation payload.
 - [ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md)
   fixes the proof interface for successful payload selection and its trace.
+- [ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md) fixes
+  caller-supplied mapping between different frame trap-reason types.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
