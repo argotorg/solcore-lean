@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: read one storage slot while preserving explicit account absence
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -132,6 +132,30 @@ Keep each of five commits below 300 changed lines: this decision and targeted
 roadmap updates; the exact operation and umbrella import; the exact two laws
 and umbrella import; the exact three runtime assertions plus one runner import
 and call; independent audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds exactly one operation in a 17-line definition module
+plus one umbrella import. `WorldState.readStorage?` binds only explicit Account
+lookup and then returns `some (account.storageRead slot)`. The operation and its
+generated equation report exactly `[propext]`.
+
+A 28-line properties module plus one umbrella import publishes exactly the two
+required simp laws. Their exclusive hypotheses reduce Account absence to
+`none` and Account presence to the existing zero-default read. Both laws report
+exactly `[propext]`, with no reverse rule or simplification loop.
+
+A 56-line definition-only test module plus one runner import and one call
+contains exactly three runtime assertions. They distinguish an absent target
+from an unrelated present Account, distinguish `none` from a present missing
+slot's `some zero`, and verify exact address-and-slot selection for nonzero
+values.
+
+The implementation commits are `bde695e` (178 changed lines), `8f2a89c` (18),
+`03f2be3` (29), and `0d6872b` (58), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, full build and
+test runs, metadata and kernel checks, diff checks, simp review, declaration
+inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences
 
