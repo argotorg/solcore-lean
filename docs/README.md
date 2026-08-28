@@ -459,6 +459,12 @@ small frame-initialization value. A caller supplies the initial WorldState and
 rollback value; the implementation reuses the designated parent values as the
 checkpoint and trace starting point. It does not run or schedule a frame.
 
+The accepted
+[ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
+plans a small adapter that attaches a caller-supplied storage address to those
+initialized values. It reuses the existing storage reader and writer and does
+not treat the address as an owner or current contract.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -676,6 +682,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes the carrier-level lift of that coherence.
 - [ADR-0098](adr/0098-parent-indexed-frame-initialization.md) fixes the
   parent-indexed frame-initialization recipe.
+- [ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
+  fixes the planned storage-address adapter for that recipe.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

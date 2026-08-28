@@ -606,6 +606,10 @@ supplies initial WorldState and rollback values; the recipe derives a trace
 extension at the parent trace and a checkpointed working pair whose checkpoint
 is the exact parent pair.
 
+ADR-0099 accepts canonical wiring from that initialization recipe to the
+existing retained-storage-address carrier. The supplied address remains only a
+selector for the established working-storage operations.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

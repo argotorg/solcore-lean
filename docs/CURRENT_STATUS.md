@@ -245,6 +245,9 @@ through the retained-address working carrier.
 [ADR-0098](adr/0098-parent-indexed-frame-initialization.md) completes a pure,
 parent-indexed initialization recipe that keeps initial WorldState and rollback
 values caller-supplied.
+[ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
+accepts a canonical adapter from that initialization to the existing
+storage-address carrier; implementation is planned.
 
 ## Implementation status
 
@@ -330,6 +333,7 @@ values caller-supplied.
 | WorldState storage read/write coherence | No new operation | Complete | Not published |
 | Address-bound working storage read/write coherence | No new operation | Complete | Not published |
 | Parent-indexed frame initialization | Complete | Complete | Not published |
+| Parent-indexed initialization storage-address adapter | Planned | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1698,6 +1702,16 @@ definition, 36-line properties, and 48-line compile-only test modules contain
 exactly two simp laws and three private examples. All declarations meet the
 `[propext]` boundary, full validation and independent audits pass, and no
 address, payload, entry event, scheduler action, or execution claim is added.
+
+## Planned initialization storage-address adapter
+
+[ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
+specifies one pure adapter. It combines an ADR-0098 initialization value and a
+caller-supplied storage selector into the existing ADR-0093 carrier.
+
+The planned proof interface contains exactly two projection laws and three
+private compile regressions. It adds no carrier, storage operation, address
+authority, runtime assertion, or runner call.
 
 ## Meaning of completion
 

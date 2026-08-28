@@ -104,11 +104,12 @@ These results remain regression obligations for every extension.
 | 78 | WorldState storage read/write coherence | Complete | Normalizes reads after conditional writes and preserves independent observations |
 | 79 | Address-bound working storage read/write coherence | Complete | Lifts same-slot and different-slot observations through the retained selector |
 | 80 | Parent-indexed frame initialization | Complete | Builds a canonical trace start and checkpointed working pair from caller-supplied initial state values |
-| 81 | Contract-entry input roles | Planned | Adds address and invocation inputs only after their consumers and lifetime rules are selected |
-| 82 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 83 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 84 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 85 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 81 | Initialization storage-address adapter | Planned | Connects the only input role with existing consumers to the parent-indexed initialization path |
+| 82 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 83 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 84 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 85 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 86 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1379,6 +1380,16 @@ the caller's initial values, and that exact initial trace. The slice adds no
 address role, call data, value, kind, event, scheduling, or execution policy.
 Exactly two simp laws and three private compile regressions pass, as do the full
 validation and independent P0-P3 audits.
+
+## Planned initialization storage-address adapter
+
+[ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
+accepts one operation that combines ADR-0098 initialization with a
+caller-supplied storage address and returns the existing ADR-0093 carrier.
+
+Exactly two projection laws expose the address and checkpointed working values.
+No new carrier, storage behavior, authority, current-contract identity, or
+other invocation input is added.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
