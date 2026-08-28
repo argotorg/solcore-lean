@@ -131,7 +131,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Conditional WorldState storage read | Complete | Account absence remains `none`; every slot of a present Account reads as `some value`, with missing storage represented by zero | None |
 | Address-bound working storage read | Complete | The retained selector supplies working-storage reads without consulting the checkpoint or accepting a fresh address | None |
 | WorldState storage read/write coherence | Complete | Three proof-only laws show how same-slot, different-slot, and different-address reads observe conditional writes while preserving failure stages | None |
-| Address-bound working storage read/write coherence | Active | ADR-0097 plans two proof-only laws for same-slot observation and different-slot preservation through the retained selector | None |
+| Address-bound working storage read/write coherence | Complete | Two proof-only laws expose the written value and preserve a different-slot read through the retained selector | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |

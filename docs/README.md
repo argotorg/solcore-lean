@@ -449,10 +449,10 @@ Working storage now uses one retained address. Writes use that address through
 
 [ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) proves that a
 successful write is visible to a later read and leaves unrelated slots and
-addresses unchanged. The accepted
+addresses unchanged. The completed
 [ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
-will make the same-slot and different-slot results directly available through
-the retained address; implementation is planned.
+makes the same-slot and different-slot results directly available through the
+retained address.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -668,7 +668,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) fixes
   stage-preserving WorldState read/write coherence.
 - [ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
-  fixes the planned carrier-level lift of that coherence.
+  fixes the carrier-level lift of that coherence.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

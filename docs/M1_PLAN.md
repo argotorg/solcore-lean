@@ -102,7 +102,7 @@ These results remain regression obligations for every extension.
 | 76 | Conditional WorldState storage read | Complete | Preserves Account absence while lifting zero-default slot reads to WorldState |
 | 77 | Address-bound working storage read | Complete | Uses the retained storage address to read only the working WorldState |
 | 78 | WorldState storage read/write coherence | Complete | Normalizes reads after conditional writes and preserves independent observations |
-| 79 | Address-bound working storage read/write coherence | Planned | Lifts same-slot and different-slot observations through the retained selector |
+| 79 | Address-bound working storage read/write coherence | Complete | Lifts same-slot and different-slot observations through the retained selector |
 | 80 | Contract-entry boundary design | Planned | Reassesses checkpoint initialization, child working values, address roles, invocation inputs, and outcome provenance before adding an entry carrier |
 | 81 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 82 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1351,17 +1351,18 @@ runtime declaration, assertion, or call. No executable operation is added. All
 three declarations report exactly `[propext]`, and full validation plus
 independent P0-P3 audits pass.
 
-## Planned address-bound working storage read/write coherence
+## Completed address-bound working storage read/write coherence
 
 [ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
-accepts exactly two planned simp laws. They lift ADR-0096 through the existing
+adds exactly two simp laws. They lift ADR-0096 through the existing
 retained-address carrier for the written slot and a distinct slot.
 
 The proof keeps write failure as outer `none`; it adds no executable API,
 other-address overload, checkpoint policy, or address authority. Exactly two
-private compile examples and no runtime call are planned.
+private compile examples and no runtime call are present. Both laws report
+exactly `[propext]`, and full validation plus independent P0-P3 audits pass.
 
-After ADR-0097 completes, active design returns to the contract-entry boundary.
+With ADR-0097 complete, active design returns to the contract-entry boundary.
 Checkpoint initialization, child working values, address roles, invocation
 inputs, and outcome provenance must be considered together before an entry
 carrier is added.

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: stage-preserving reads after address-bound working storage writes
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -112,6 +112,23 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 documentation updates; the exact two laws plus one umbrella import; the exact
 two compile regressions plus one runner import and no call; independent audit
 and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 39-line properties module plus one semantic
+umbrella import. It publishes exactly the two required simp laws and no
+executable API, carrier, or helper. Both declarations report exactly
+`[propext]`.
+
+A 35-line compile-only test module plus one runner import contains exactly two
+private examples, one per law. It adds no public or runtime declaration,
+runtime assertion, or runner call.
+
+The implementation commits are `6db16e0` (201 changed lines), `20ae522` (40),
+and `ebf0deb` (36), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, full build and test runs,
+metadata and kernel checks, diff checks, simplification review, declaration
+inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences
 
