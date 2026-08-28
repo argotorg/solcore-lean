@@ -66,6 +66,7 @@ import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameResolutionResult
 import Solcore.Test.FrameTrace
+import Solcore.Test.FrameTracePrefix
 import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameRunContinuation
