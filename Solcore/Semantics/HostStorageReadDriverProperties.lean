@@ -57,6 +57,54 @@ end HostDriverOutcome
 
 namespace HostStorageReadDriver
 
+@[simp] theorem run_of_done
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State)
+    (value : Core.Value)
+    (store : Core.Store)
+    (execution : Core.hostRun fuel state = .done value store) :
+    run context fuel state = ⟨context, .done value store⟩ := by
+  rw [run, execution]
+
+@[simp] theorem run_of_outOfFuel
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state exhausted : Core.State)
+    (execution : Core.hostRun fuel state = .outOfFuel exhausted) :
+    run context fuel state = ⟨context, .outOfFuel exhausted⟩ := by
+  rw [run, execution]
+
+@[simp] theorem run_of_fault
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state faultState : Core.State)
+    (error : Core.MachineFault)
+    (execution : Core.hostRun fuel state = .fault error faultState) :
+    run context fuel state = ⟨context, .fault error faultState⟩ := by
+  rw [run, execution]
+
+/-- A request resumes with exactly Core's returned remaining fuel. -/
+theorem run_of_suspended
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (suspension : Core.HostSuspension)
+    (execution :
+      Core.hostRun fuel state = .suspended suspension remainingFuel) :
+    run context fuel state =
+      run (handleHostSuspension context suspension).1 remainingFuel
+        (handleHostSuspension context suspension).2 := by
+  rw [run, execution]
+
 @[simp] theorem handleHostSuspension_context
     {RollbackState : Type u}
     {TraceState : Type v}
