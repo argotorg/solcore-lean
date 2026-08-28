@@ -485,7 +485,7 @@ operations remain reusable without aliases. The proof is a construction-time
 invariant, not a runtime provenance check; nested invocation and checkpoint
 ownership remain undecided.
 
-ADR-0072 fixes the active indexed trace-extension boundary. It holds one
+ADR-0072 completes the indexed trace-extension boundary. It holds one
 earlier trace fixed and accepts only individual events after construction, so a
 new same-typed fragment API cannot accidentally append an accumulated prefix
 twice. Its canonical proof remains algebraic rather than runtime provenance.

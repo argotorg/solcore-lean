@@ -336,7 +336,7 @@ The completed trace-prefixed continuation-context slice,
 proof to the exact checkpoint and working traces stored in one context. It
 does not turn prefix factorization into evidence of runtime ancestry.
 
-The active indexed trace-extension slice,
+The completed indexed trace-extension slice,
 [ADR-0072](adr/0072-indexed-frame-trace-extension.md), fixes an earlier trace
 once and then accepts only individual events. It generates prefix evidence
 without adding another public operation that accepts an ambiguous trace

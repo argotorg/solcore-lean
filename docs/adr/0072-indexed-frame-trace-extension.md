@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: safe incremental construction of a trace extending one fixed prefix
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -151,3 +151,22 @@ A caller can extend a fixed trace incrementally and obtain the exact prefix
 evidence required by ADR-0071 without passing an ambiguous same-typed fragment
 to a new API. Child transition and checkpoint provenance remain later,
 separate decisions.
+
+## Implementation record
+
+The completed slice adds one constructor-private indexed carrier, exactly three
+operations, and the canonical non-simp prefix theorem in a 43-line definition
+module plus one umbrella import. The generated eliminators remain public, but
+there is no named fragment projection or operation that accepts an additional
+`FrameTrace`. The carrier, operations, and theorem are axiom-free.
+
+A 34-line properties module plus one umbrella import publishes exactly two simp
+observation laws. Both are axiom-free. A 71-line definition-only test module
+plus one main import and one runtime call contains exactly three assertions and
+one private ADR-0071 integration example.
+
+The implementation commits are `34b43e8` (206 changed lines), `a68391b` (44),
+`0075a51` (39), and `9111f10` (73), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+audits pass.

@@ -106,7 +106,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Ordered frame trace algebra | Complete | One constructor-private opt-in trace carrier, four operations, exactly seven axiom-free laws, and six definition-only assertions complete finite chronological extension without fixing event kinds | None |
 | Frame trace prefix relation | Complete | One proof-only non-strict prefix relation, exactly four non-simp axiom-free laws, and four definition-only compile examples complete value factorization without runtime provenance claims | None |
 | Trace-prefixed frame continuation context | Complete | One refined carrier binds prefix evidence to its exact checkpoint/working traces; three definition-only compile examples complete with no new operation, theorem, runtime checker, or provenance claim | None |
-| Indexed frame trace extension | Active | One constructor-private indexed carrier will fix an earlier trace, expose start/toTrace/event record, and generate prefix evidence without accepting a same-typed fragment | None |
+| Indexed frame trace extension | Complete | One constructor-private indexed carrier, three operations, three axiom-free theorems, three runtime assertions, and one ADR-0071 integration example complete event-only extension without a same-typed fragment input | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation, call nesting, and transaction atomicity remain undecided | None |

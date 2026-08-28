@@ -159,9 +159,10 @@ consistency is used by a child-frame transition.
 refined continuation boundary. It binds that proof to the exact checkpoint and
 working traces in one context without treating value factorization as runtime
 lineage.
-[ADR-0072](adr/0072-indexed-frame-trace-extension.md) is active. It fixes one
-earlier trace as an index and permits only event-by-event extension, producing
-the prefix evidence needed by ADR-0071 without a new fragment append API.
+[ADR-0072](adr/0072-indexed-frame-trace-extension.md) completes indexed trace
+extension. It fixes one earlier trace and permits only event-by-event extension,
+producing the prefix evidence needed by ADR-0071 without a new fragment append
+API.
 
 ## Implementation status
 
@@ -220,7 +221,7 @@ the prefix evidence needed by ADR-0071 without a new fragment append API.
 | Ordered frame trace algebra | Complete | Complete | Not published |
 | Frame trace prefix relation | Complete | Complete | Not published |
 | Trace-prefixed frame continuation context | Complete | Complete | Not published |
-| Indexed frame trace extension | Not implemented | Decision accepted | Not published |
+| Indexed frame trace extension | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1116,19 +1117,24 @@ completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. Producer identity, event authenticity, checkpoint ownership,
 nested scheduling, trap disposition, and transaction atomicity remain outside.
 
-## Active indexed frame trace extension
+## Completed indexed frame trace extension
 
-[ADR-0072](adr/0072-indexed-frame-trace-extension.md) fixes a
+[ADR-0072](adr/0072-indexed-frame-trace-extension.md) adds one
 constructor-private `FrameTrace.ExtensionFrom earlier` carrier. `start` fixes
 the earlier trace once, `record` accepts one event, and `toTrace` observes the
-full chronological value. A canonical theorem supplies the hidden fragment as
-prefix evidence.
+full chronological value. A canonical theorem supplies prefix evidence.
 
-The planned API accepts no trace fragment after construction and adds no
-indexed append or fragment projection. Two observation laws, three runtime
-assertions, and one ADR-0071 integration example are specified. Runtime
-provenance, checkpoint ownership, child identity, and transaction behavior
-remain outside. Implementation is not yet complete.
+The 43-line definition module plus one umbrella import contains exactly three
+operations and the non-simp canonical theorem. A 34-line properties module plus
+one umbrella import contains exactly two simp laws. All declarations are
+axiom-free. A 71-line definition-only test module plus one import and one call
+contains three assertions and one private ADR-0071 integration example.
+
+The four implementation commits contain 206, 44, 39, and 73 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. The API adds no indexed fragment append or named fragment
+projection. Runtime provenance, checkpoint ownership, child identity, and
+transaction behavior remain outside.
 
 ## Meaning of completion
 
