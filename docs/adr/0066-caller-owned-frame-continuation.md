@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: minimal executable continuation after synchronized frame resolution
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -94,3 +94,20 @@ A caller can now resume arbitrary partial computation only after a frame's
 state and effects have been selected from the same outcome. Later runtime work
 can choose concrete parent frames and diagnostic results without changing this
 caller-owned boundary.
+
+## Implementation record
+
+The completed slice adds exactly one public operation in a 25-line definition
+module plus one umbrella import. It adds no carrier, instance, or helper. The
+operation's measured axiom set is `[propext]`.
+
+A 59-line properties module plus one umbrella import publishes exactly three
+simp constructor laws. All three are proved by `rfl` and each reports exactly
+`[propext]`. Exactly three runtime assertions live in a 71-line definition-only
+test module with two runner lines.
+
+The implementation commits are `3bd1e00` (149 changed lines), `f02e3d4` (26),
+`2c9795a` (60), and `bdd7e84` (73), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+audits pass.

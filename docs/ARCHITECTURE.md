@@ -449,7 +449,7 @@ resolution to an arbitrary Option continuation. The proof-only slice adds no
 operation and leaves checkpoint creation, trace accumulation, and invocation
 ownership undecided.
 
-ADR-0066 accepts the first executable caller-owned continuation boundary. It
+ADR-0066 completes the first executable caller-owned continuation boundary. It
 resolves one raw frame result with caller-supplied checkpoints and an
 already-accumulated working trace, then invokes an arbitrary Option
 continuation only for return or revert. It adds no parent-frame carrier,

@@ -300,11 +300,13 @@ definition-only sentinel assertions pass full validation. Checkpoint creation,
 trace accumulation, invocation ownership, and transaction behavior remain
 undecided.
 
-The active caller-owned continuation slice,
+The completed caller-owned continuation slice,
 [ADR-0066](adr/0066-caller-owned-frame-continuation.md), names one executable
 resolver/bind boundary. The caller supplies checkpoints and an opaque
 already-accumulated trace; return and revert invoke the continuation, while a
-trap does not. It adds no frame stack, trace append rule, or transaction policy.
+trap does not. Its one operation, three simp laws, and three definition-only
+assertions pass full validation. It adds no frame stack, trace append rule, or
+transaction policy.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -457,7 +459,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   boundary for unresolved trap propagation through Option bind.
 - [ADR-0065](adr/0065-resolved-frame-continuation-laws.md) completes the proof-only
   continuation equations for resolved return and revert results.
-- [ADR-0066](adr/0066-caller-owned-frame-continuation.md) fixes the first
+- [ADR-0066](adr/0066-caller-owned-frame-continuation.md) completes the first
   executable caller-owned frame continuation boundary.
 
 Historical ADRs are retained even when their implementation is no longer the
