@@ -143,6 +143,9 @@ returned and reverted synchronized results without adding an execution API.
 [ADR-0066](adr/0066-caller-owned-frame-continuation.md) completes the executable
 caller-owned continuation boundary without adding a frame stack, checkpoint
 creation, or trace algebra.
+[ADR-0067](adr/0067-caller-owned-frame-continuation-context.md) is the active
+carrier slice. It groups one completed frame's caller-owned continuation inputs
+without defining a full execution frame.
 
 ## Implementation status
 
@@ -196,6 +199,7 @@ creation, or trace algebra.
 | Unresolved trap propagation | Complete | Complete | Not published |
 | Resolved frame continuation laws | Complete | Complete | Not published |
 | Caller-owned frame continuation | Complete | Complete | Not published |
+| Caller-owned frame continuation context | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1001,6 +1005,18 @@ The four implementation commits contain 149, 26, 60, and 73 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Parent-frame shape, checkpoint creation, trace append/order,
 transaction atomicity, and diagnostic failure carriers remain separate.
+
+## Active caller-owned frame continuation context
+
+[ADR-0067](adr/0067-caller-owned-frame-continuation-context.md) adds exactly one
+carrier with four public fields and one delegating continuation operation. It
+bundles a state checkpoint, effect checkpoint, working journal, and the existing
+FrameRunResult. It does not duplicate working WorldState or outcome.
+
+The planned proof interface contains one non-simp `rfl` coherence law, and the
+definition-only runtime module contains exactly three assertions. The carrier
+does not establish checkpoint lineage, trace-prefix membership, a frame stack,
+or transaction behavior.
 
 ## Meaning of completion
 

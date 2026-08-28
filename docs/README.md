@@ -308,6 +308,12 @@ trap does not. Its one operation, three simp laws, and three definition-only
 assertions pass full validation. It adds no frame stack, trace append rule, or
 transaction policy.
 
+The active continuation-context slice,
+[ADR-0067](adr/0067-caller-owned-frame-continuation-context.md), groups the four
+inputs for one completed frame into a nominal carrier and delegates to ADR-0066.
+It is not a full execution frame and proves no checkpoint lineage or trace
+prefix relation.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -461,6 +467,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   continuation equations for resolved return and revert results.
 - [ADR-0066](adr/0066-caller-owned-frame-continuation.md) completes the first
   executable caller-owned frame continuation boundary.
+- [ADR-0067](adr/0067-caller-owned-frame-continuation-context.md) fixes the
+  nominal caller-owned continuation-input bundle.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

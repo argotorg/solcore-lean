@@ -455,6 +455,12 @@ already-accumulated working trace, then invokes an arbitrary Option
 continuation only for return or revert. It adds no parent-frame carrier,
 checkpoint creation, trace append, or transaction policy.
 
+ADR-0067 accepts a nominal `FrameContinuationContext` that groups the four
+ADR-0066 inputs belonging to one completed frame. It reuses `FrameRunResult`
+rather than duplicating working WorldState or outcome, and delegates
+continuation behavior unchanged. The bundle proves no checkpoint lineage or
+trace-prefix relation and is not a complete execution frame.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
