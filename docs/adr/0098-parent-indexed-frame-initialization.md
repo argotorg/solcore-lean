@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: pure construction of initial frame state relative to a parent pair
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -190,6 +190,28 @@ documentation updates; the exact carrier and two operations plus one umbrella
 import; the exact two laws plus one umbrella import; the exact three compile
 regressions plus one runner import and no call; independent audit and completion
 evidence.
+
+## Implementation record
+
+The completed slice adds a 48-line definition module plus one semantic umbrella
+import. It contains exactly one carrier with two fields and exactly the two
+required operations. The carrier, generated declarations, operations, and
+generated equations report exactly `[propext]`.
+
+A 36-line properties module plus one umbrella import publishes exactly the two
+required simp laws. Both report exactly `[propext]`; their one-way canonical
+reductions introduce no simplification loop or divergent overlap.
+
+A 48-line compile-only test module plus one runner import contains exactly
+three private examples for the trace start, complete pair, and arbitrary
+consumer substitution. It adds no public or runtime declaration, assertion, or
+runner call.
+
+The implementation commits are `c4f11d3` (267 changed lines), `5e614a5` (49),
+`6b32d3e` (37), and `c7c5515` (49), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, full build and
+test runs, metadata and kernel checks, diff checks, simplification review,
+declaration inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences
 

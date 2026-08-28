@@ -103,7 +103,7 @@ These results remain regression obligations for every extension.
 | 77 | Address-bound working storage read | Complete | Uses the retained storage address to read only the working WorldState |
 | 78 | WorldState storage read/write coherence | Complete | Normalizes reads after conditional writes and preserves independent observations |
 | 79 | Address-bound working storage read/write coherence | Complete | Lifts same-slot and different-slot observations through the retained selector |
-| 80 | Parent-indexed frame initialization | Planned | Builds a canonical trace start and checkpointed working pair from caller-supplied initial state values |
+| 80 | Parent-indexed frame initialization | Complete | Builds a canonical trace start and checkpointed working pair from caller-supplied initial state values |
 | 81 | Contract-entry input roles | Planned | Adds address and invocation inputs only after their consumers and lifetime rules are selected |
 | 82 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 83 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1367,9 +1367,9 @@ The contract-entry boundary review selected ADR-0098's payload-free
 initialization layer. Address roles, invocation inputs, and outcome provenance
 remain later decisions before an entry carrier is added.
 
-## Planned parent-indexed frame initialization
+## Completed parent-indexed frame initialization
 
-[ADR-0098](adr/0098-parent-indexed-frame-initialization.md) accepts one
+[ADR-0098](adr/0098-parent-indexed-frame-initialization.md) adds one
 payload-free initialization carrier. The exact parent working pair is its type
 index; initial WorldState and rollback values remain explicit caller inputs.
 
@@ -1377,6 +1377,8 @@ One operation starts an indexed trace extension at the parent trace. A second
 constructs the existing checkpointed working pair with the parent snapshot,
 the caller's initial values, and that exact initial trace. The slice adds no
 address role, call data, value, kind, event, scheduling, or execution policy.
+Exactly two simp laws and three private compile regressions pass, as do the full
+validation and independent P0-P3 audits.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

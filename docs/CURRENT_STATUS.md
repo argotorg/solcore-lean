@@ -242,9 +242,9 @@ without collapsing write failure and read-target absence.
 [ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
 completes the proof-only lift of the same-slot and different-slot observations
 through the retained-address working carrier.
-[ADR-0098](adr/0098-parent-indexed-frame-initialization.md) accepts a pure,
+[ADR-0098](adr/0098-parent-indexed-frame-initialization.md) completes a pure,
 parent-indexed initialization recipe that keeps initial WorldState and rollback
-values caller-supplied; implementation is planned.
+values caller-supplied.
 
 ## Implementation status
 
@@ -329,7 +329,7 @@ values caller-supplied; implementation is planned.
 | Address-bound working storage read | Complete | Complete | Not published |
 | WorldState storage read/write coherence | No new operation | Complete | Not published |
 | Address-bound working storage read/write coherence | No new operation | Complete | Not published |
-| Parent-indexed frame initialization | Planned | Planned | Not published |
+| Parent-indexed frame initialization | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1686,16 +1686,18 @@ The following contract-entry boundary review selected ADR-0098's payload-free
 initialization layer. Address roles, invocation inputs, and outcome provenance
 remain separate decisions before an entry carrier is introduced.
 
-## Planned parent-indexed frame initialization
+## Completed parent-indexed frame initialization
 
-[ADR-0098](adr/0098-parent-indexed-frame-initialization.md) specifies a
+[ADR-0098](adr/0098-parent-indexed-frame-initialization.md) adds a
 two-field carrier for caller-supplied initial WorldState and rollback values,
 indexed by one designated parent working pair.
 
 Exactly two operations derive an indexed trace extension starting at the
-parent trace and an existing checkpointed working-pair value. Exactly two simp
-laws and three private compile regressions are planned. No address, payload,
-entry event, scheduler action, or execution claim is added.
+parent trace and an existing checkpointed working-pair value. The 48-line
+definition, 36-line properties, and 48-line compile-only test modules contain
+exactly two simp laws and three private examples. All declarations meet the
+`[propext]` boundary, full validation and independent audits pass, and no
+address, payload, entry event, scheduler action, or execution claim is added.
 
 ## Meaning of completion
 
