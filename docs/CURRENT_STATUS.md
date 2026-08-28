@@ -246,8 +246,8 @@ through the retained-address working carrier.
 parent-indexed initialization recipe that keeps initial WorldState and rollback
 values caller-supplied.
 [ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
-accepts a canonical adapter from that initialization to the existing
-storage-address carrier; implementation is planned.
+completes a canonical adapter from that initialization to the existing
+storage-address carrier.
 
 ## Implementation status
 
@@ -333,7 +333,7 @@ storage-address carrier; implementation is planned.
 | WorldState storage read/write coherence | No new operation | Complete | Not published |
 | Address-bound working storage read/write coherence | No new operation | Complete | Not published |
 | Parent-indexed frame initialization | Complete | Complete | Not published |
-| Parent-indexed initialization storage-address adapter | Planned | Planned | Not published |
+| Parent-indexed initialization storage-address adapter | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1703,15 +1703,18 @@ exactly two simp laws and three private examples. All declarations meet the
 `[propext]` boundary, full validation and independent audits pass, and no
 address, payload, entry event, scheduler action, or execution claim is added.
 
-## Planned initialization storage-address adapter
+## Completed initialization storage-address adapter
 
 [ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
-specifies one pure adapter. It combines an ADR-0098 initialization value and a
+adds one pure adapter. It combines an ADR-0098 initialization value and a
 caller-supplied storage selector into the existing ADR-0093 carrier.
 
-The planned proof interface contains exactly two projection laws and three
-private compile regressions. It adds no carrier, storage operation, address
-authority, runtime assertion, or runner call.
+The 24-line definition, 34-line properties, and 50-line compile-only test
+modules contain exactly one operation, two simp projection laws, and three
+private examples. The adapter reaches the existing storage-write consumer
+without adding a carrier, storage operation, address authority, runtime
+assertion, helper, or runner call. All declarations meet the `[propext]`
+boundary, and the full validation and independent P0-P3 audits pass.
 
 ## Meaning of completion
 
