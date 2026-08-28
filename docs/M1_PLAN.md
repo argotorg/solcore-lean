@@ -93,10 +93,11 @@ These results remain regression obligations for every extension.
 | 67 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Preserves the exact parent index and checkpoint equality while mapping only the refined context |
 | 68 | Nominal frame checkpoint snapshot | Complete | Names a caller-supplied synchronized checkpoint pair without claiming capture, ownership, or execution |
 | 69 | Frame checkpointed working pair | Complete | Stores a checkpoint snapshot beside an independent working pair without adding an operation or relation proof |
-| 70 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 71 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 72 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 73 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 70 | Continuation context from checkpointed working pair | Active | Canonically assembles every stored value plus an opaque outcome into the existing continuation context |
+| 71 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 72 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 73 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 74 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1200,6 +1201,18 @@ completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. The following slice must consume every field through
 `FrameContinuationContext.fromCheckpointedWorkingPair` plus an outcome,
 without asserting execution or initialization history.
+
+## Active continuation-context construction from checkpointed working values
+
+[ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md)
+adds one planned pure adapter into `FrameContinuationContext`. Checkpoint state
+and effects, working effects, and working state plus the caller-supplied
+outcome populate the existing four fields exactly.
+
+Exactly four definitional simp laws will expose those fields. Exactly three
+private definition-only compile regressions will cover the abstract whole
+record, distinct concrete state/effects, and exact result/outcome retention.
+The adapter does not resolve, continue, or execute the context.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

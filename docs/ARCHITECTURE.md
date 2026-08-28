@@ -563,6 +563,10 @@ ADR-0087 completes the structural pairing boundary. One ADR-0086 snapshot
 is stored beside an independent synchronized working pair without a relation
 proof, custom operation, lifecycle claim, or execution transition.
 
+ADR-0088 fixes the active pure adapter from that pair plus a caller-supplied
+outcome into the existing continuation context. It assembles values without
+claiming that a frame ran or that the outcome arose from its working state.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

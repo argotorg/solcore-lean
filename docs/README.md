@@ -416,6 +416,11 @@ The completed checkpoint-and-working slice,
 [ADR-0087](adr/0087-frame-checkpointed-working-pair.md), stores one checkpoint
 snapshot beside an independent working pair without adding lifecycle meaning.
 
+The active continuation-context construction slice,
+[ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md),
+assembles those values and an opaque outcome into the existing context without
+claiming execution.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -611,6 +616,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   representation of a caller-supplied synchronized checkpoint snapshot.
 - [ADR-0087](adr/0087-frame-checkpointed-working-pair.md) fixes the structural
   pairing of a checkpoint snapshot with independent working values.
+- [ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md)
+  fixes pure construction of a continuation context from those values.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
