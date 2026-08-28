@@ -14,6 +14,7 @@ import Solcore.Semantics.FrameEffectJournal
 import Solcore.Semantics.FrameEffectJournalProperties
 import Solcore.Semantics.FrameTrace
 import Solcore.Semantics.FrameTraceProperties
+import Solcore.Semantics.FrameTracePrefix
 import Solcore.Semantics.FrameRunEffectResolution
 import Solcore.Semantics.FrameRunContinuation
 import Solcore.Semantics.FrameRunContinuationProperties
