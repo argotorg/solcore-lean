@@ -143,6 +143,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Present working storage Account total read | Complete | ADR-0106 reads the proven-present Account without another lookup and proves conditional-read coherence | None |
 | Present working storage Account total write | Complete | ADR-0107 synchronizes the retained Account, working-state entry, and fresh evidence without another lookup | None |
 | Present working storage Account total read/write coherence | Complete | ADR-0108 proves same-slot and distinct-slot observations of total writes | None |
+| Present working storage Account total-write algebra | Active | ADR-0109 plans overwrite normalization and distinct-slot commutation for total writes | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |

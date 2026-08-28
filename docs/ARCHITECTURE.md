@@ -648,6 +648,9 @@ while retaining the selector, checkpoint, and working journal.
 ADR-0108 accepts the direct observations of that total write: the written slot
 reads back the new value, while every distinct slot keeps its prior total read.
 
+ADR-0109 accepts the total-write algebra on the refined carrier: a later write
+to the same slot supersedes an earlier one, and writes to distinct slots commute.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

@@ -114,11 +114,12 @@ These results remain regression obligations for every extension.
 | 88 | Present working storage Account total read | Complete | Reads the proven-present selected Account without another lookup or failure branch |
 | 89 | Present working storage Account total write | Complete | Synchronizes the selected Account, working-state entry, and evidence without another lookup |
 | 90 | Present working storage Account total read/write coherence | Complete | Normalizes same-slot and distinct-slot reads after total writes |
-| 91 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 92 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 93 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 94 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 95 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 91 | Present working storage Account total-write algebra | Planned | Normalizes overwrite and commutes writes to distinct slots |
+| 92 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 93 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 94 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 95 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 96 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1514,6 +1515,16 @@ named composition with ADR-0106 conditional-read coherence. Full validation
 and independent P0-P3 audits pass. Overwrite, commutation, projection
 preservation, address authority, lifetime, and transition policies remain
 later work.
+
+## Planned present working storage Account total-write algebra
+
+[ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
+adds same-slot overwrite and distinct-slot commutation for sequential total
+writes on the refined carrier.
+
+The laws reuse Account and WorldState update algebra and add no operation.
+Non-selected Account isolation, address authority, lifetime, and transition
+policies remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

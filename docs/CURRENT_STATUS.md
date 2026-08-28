@@ -275,6 +275,9 @@ and new presence evidence; implementation is complete.
 [ADR-0108](adr/0108-present-working-storage-account-total-read-write-coherence.md)
 accepts same-slot and distinct-slot read-after-write laws for the total carrier;
 implementation is complete.
+[ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
+accepts overwrite and distinct-slot commutation laws for total carrier writes;
+implementation is planned.
 
 ## Implementation status
 
@@ -370,6 +373,7 @@ implementation is complete.
 | Present working storage Account total read | Complete | Complete | Not published |
 | Present working storage Account total write | Complete | Complete | Not published |
 | Present working storage Account total read/write coherence | No new operation | Complete | Not published |
+| Present working storage Account total-write algebra | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1872,6 +1876,16 @@ Three private compile regressions cover both laws directly and their named
 composition with ADR-0106 conditional-read coherence. Full validation and
 independent P0-P3 audits pass. The slice adds no lookup, mutation, runtime
 assertion, address authority, transition, or published surface.
+
+## Planned present working storage Account total-write algebra
+
+[ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
+specifies same-slot overwrite and distinct-slot commutation for sequential
+ADR-0107 total writes.
+
+The proof-only slice reuses existing Account and WorldState update algebra and
+adds no operation, runtime assertion, address authority, transition, or
+published surface.
 
 ## Meaning of completion
 
