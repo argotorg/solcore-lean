@@ -106,11 +106,12 @@ These results remain regression obligations for every extension.
 | 80 | Parent-indexed frame initialization | Complete | Builds a canonical trace start and checkpointed working pair from caller-supplied initial state values |
 | 81 | Initialization storage-address adapter | Complete | Connects the only input role with existing consumers to the parent-indexed initialization path |
 | 82 | Checkpointed working-pair storage-write algebra | Complete | Lifts overwrite and independent-write commutation through the existing working-write operation |
-| 83 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 84 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 85 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 86 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 87 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 83 | Address-bound working storage-write algebra | Planned | Specializes overwrite and distinct-slot commutation through the retained storage selector |
+| 84 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 85 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 86 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 87 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 88 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1405,6 +1406,16 @@ simp reduction; distinct-slot and distinct-address commutation remain
 non-simp. The equations do not claim runtime, transaction, or external-effect
 reordering. Three private compile regressions, full validation, and independent
 P0-P3 audits pass.
+
+## Planned address-bound working storage-write algebra
+
+[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) lifts the
+ADR-0100 same-slot overwrite and distinct-slot commutation laws through the
+single retained storage selector.
+
+It adds exactly two proof laws and no executable operation. Overwrite is a simp
+reduction; slot commutation remains non-simp. No distinct-address law or
+runtime-order claim is added at this fixed-selector boundary.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

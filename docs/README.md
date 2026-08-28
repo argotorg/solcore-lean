@@ -471,6 +471,12 @@ proofs that repeated writes keep their expected overwrite and independent-
 write behavior after they are lifted into checkpointed working values. It adds
 no new write operation or runtime-order claim.
 
+The accepted
+[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) plans the
+same-slot overwrite and distinct-slot exchange rules for the retained-address
+writer. It does not add another address input or treat the stored address as an
+authority.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -692,6 +698,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes the storage-address adapter for that recipe.
 - [ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md)
   fixes the sequential-write algebra over checkpointed working values.
+- [ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) fixes the
+  planned fixed-selector specialization of that algebra.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

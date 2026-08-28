@@ -615,6 +615,10 @@ checkpointed working-write layer. Overwrite reduces to the final write, while
 independent slot and address writes commute as pure optional-value equations;
 this makes no runtime action-order or transaction claim.
 
+ADR-0101 accepts the fixed-selector specialization of same-slot overwrite and
+distinct-slot commutation. It reuses the generic algebra and adds no new
+address input, identity, authority, or runtime-order meaning.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

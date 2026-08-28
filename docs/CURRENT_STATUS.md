@@ -251,6 +251,9 @@ storage-address carrier.
 [ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md)
 completes a proof-only lift of overwrite and independent-write commutation to
 the address-parameterized checkpointed working write.
+[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) accepts a
+thin lift of same-slot overwrite and distinct-slot commutation through the
+retained storage selector; implementation is planned.
 
 ## Implementation status
 
@@ -338,6 +341,7 @@ the address-parameterized checkpointed working write.
 | Parent-indexed frame initialization | Complete | Complete | Not published |
 | Parent-indexed initialization storage-address adapter | Complete | Complete | Not published |
 | Checkpointed working-pair storage-write algebra | No new operation | Complete | Not published |
+| Address-bound working storage-write algebra | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1733,6 +1737,16 @@ examples. Only overwrite is a simp rule; both commutation laws remain
 non-simp. All public laws report `[propext, Quot.sound]`, full validation and
 independent audits pass, and no operation, address authority, runtime
 reordering claim, runtime assertion, or runner call is added.
+
+## Planned address-bound working storage-write algebra
+
+[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) specifies
+two proof-only laws for the retained-address writer: final-write overwrite and
+distinct-slot commutation.
+
+The thin lift reuses ADR-0100 and adds no operation, address argument, authority
+claim, runtime reordering claim, assertion, or runner call. Only overwrite is
+a simp rule.
 
 ## Meaning of completion
 
