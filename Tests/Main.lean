@@ -101,6 +101,7 @@ import Solcore.Test.ParentIndexedFrameTrapPropagationPayload
 import Solcore.Test.ParentIndexedFrameTrapPropagationPayloadCoherence
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
+import Solcore.Test.WorldStateStorageRead
 import Solcore.Test.WorldStateStorageWriteAlgebra
 import Solcore.Test.WorldStateUpdateAlgebra
 import Solcore.Test.SurfaceMultiCertifiedFrontend
@@ -4955,6 +4956,7 @@ def run : IO Unit := do
   testParentIndexedFrameTrapPropagationPayload
   testRuntimeScalars
   testWorldState
+  testWorldStateStorageRead
   testWorldStateStorageWriteAlgebra
   testWorldStateUpdateAlgebra
   testM1bProfile
