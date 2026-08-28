@@ -167,6 +167,10 @@ API.
 parent-indexed continuation context. It ties one completed context's
 checkpoints and trace prefix to an exact parent working pair while reusing the
 existing resolver.
+[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) is active.
+It specifies one restricted operation that constructs that carrier from an
+ADR-0072 indexed extension without accepting relationship proofs or a complete
+working trace.
 
 ## Implementation status
 
@@ -227,6 +231,7 @@ existing resolver.
 | Trace-prefixed frame continuation context | Complete | Complete | Not published |
 | Indexed frame trace extension | Complete | Complete | Not published |
 | Parent-indexed frame continuation context | Complete | Complete | Not published |
+| Parent-indexed frame continuation construction | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1158,6 +1163,19 @@ The four implementation commits contain 216, 23, 67, and 103 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Runtime parent/child provenance, scheduling, trap
 disposition, and transaction atomicity remain outside.
+
+## Active parent-indexed frame continuation construction
+
+[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) specifies
+one `ParentIndexedFrameContinuationContext.fromTraceExtension` operation. It
+accepts a parent pair, working rollback value, indexed trace extension, and
+frame result, then derives the exact checkpoints, working trace, and both
+stored proofs.
+
+Exactly four simp projection laws and three definition-only construction
+assertions are planned. Existing prefix and resolution laws remain reusable;
+no carrier or resolver is added. Runtime provenance, invocation, scheduling,
+trap disposition, and transaction behavior remain outside.
 
 ## Meaning of completion
 

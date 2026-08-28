@@ -497,6 +497,12 @@ the return and revert laws characterize that inherited resolution while
 retaining trace-prefix evidence at the same index, without claiming an
 invocation actually occurred.
 
+ADR-0074 fixes the active construction boundary for that carrier. It accepts a
+parent working pair, a working rollback value, an ADR-0072 indexed extension,
+and a frame result, then derives both stored proofs without proof arguments or
+an ambiguous complete trace. It does not claim those inputs came from one
+runtime invocation.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

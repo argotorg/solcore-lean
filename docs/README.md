@@ -347,6 +347,11 @@ The completed parent-indexed continuation-context slice,
 completed context's checkpoints to equal an exact parent working pair. It
 reuses existing resolution and does not claim a runtime invocation occurred.
 
+The active parent-indexed continuation-construction slice,
+[ADR-0074](adr/0074-trace-extension-parent-context-construction.md), derives
+that carrier and both relationship proofs from an indexed trace extension. It
+does not turn the selected inputs into evidence of an actual invocation.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -514,6 +519,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   incremental extension from one indexed earlier trace.
 - [ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) fixes the
   continuation context indexed by one exact parent working pair.
+- [ADR-0074](adr/0074-trace-extension-parent-context-construction.md) fixes the
+  restricted construction path from one indexed trace extension.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
