@@ -670,6 +670,11 @@ failure-aware write into present-Account refinement returns the same complete
 carrier as the total writer, and the equality composes across later
 optional-write/refinement stages.
 
+ADR-0115 accepts canonical initialization-to-presence wiring for storage. It
+checks the caller-supplied selector in `initialWorld`, which becomes the derived
+working WorldState, and returns the existing proven-present carrier only when
+that Account exists.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

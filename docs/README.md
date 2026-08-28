@@ -539,6 +539,11 @@ The completed
 makes optional write plus canonical Account refinement equal the total writer,
 including the complete proof-carrying result.
 
+The accepted
+[ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
+will check a storage selector against caller-supplied `initialWorld` and return
+the proven-present carrier used by total storage operations on success.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -788,6 +793,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes distinct-slot sparse-storage preservation.
 - [ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
   fixes optional/total write re-refinement coherence.
+- [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
+  fixes initialization-to-present-storage refinement.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

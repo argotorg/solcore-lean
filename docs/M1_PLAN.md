@@ -120,11 +120,12 @@ These results remain regression obligations for every extension.
 | 94 | Present working storage Account total-write presence | Complete | Exposes zero deletion and nonzero sparse-entry presence |
 | 95 | Present working storage Account total-write sparse preservation | Complete | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
 | 96 | Present working storage Account optional/total re-refinement coherence | Complete | Makes the failure-aware write/refine path equal the total writer and reusable across refined optional-write sequences |
-| 97 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 98 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 99 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 100 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 101 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 97 | Parent-indexed initialization present storage Account refinement | Active | Checks Account presence for the initialization-bound selector and reaches existing total storage consumers without a new carrier |
+| 98 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 99 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 100 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 101 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 102 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1590,6 +1591,18 @@ One named non-simp law is sufficient: callers can apply it at each bind stage,
 so no fixed-depth theorem or batch-write operation is needed. Two compile-only
 regressions cover the declaration and its two-write composition; full
 validation and independent P0-P3 audits pass.
+
+## Active parent-indexed initialization present storage Account refinement
+
+[ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
+names the canonical composition from ADR-0098/0099 initialization into
+ADR-0105 Account presence refinement. The result remains optional: an absent
+selected Account stays absent, while success returns the existing carrier used
+by total storage reads and writes.
+
+The slice adds one partial adapter and two branch laws. Three compile-only
+regressions will cover both branches and an end-to-end total write/read consumer
+without adding another carrier or any contract-entry identity claim.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
