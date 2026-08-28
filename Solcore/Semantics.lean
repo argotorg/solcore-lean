@@ -61,6 +61,7 @@ import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
 import Solcore.Semantics.WorldState
 import Solcore.Semantics.WorldStateStorageRead
+import Solcore.Semantics.WorldStateStorageReadProperties
 import Solcore.Semantics.FrameCheckpointSnapshot
 import Solcore.Semantics.FrameCheckpointSnapshotProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPair
