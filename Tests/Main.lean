@@ -78,6 +78,7 @@ import Solcore.Test.FrameRunEffectContinuation
 import Solcore.Test.FrameRunEffectResolution
 import Solcore.Test.FrameRunEffectTrapPropagation
 import Solcore.Test.FrameRunResult
+import Solcore.Test.FrameRunResultTrapReasonMap
 import Solcore.Test.FrameStateResolution
 import Solcore.Test.ParentIndexedFrameContinuationContext
 import Solcore.Test.ParentIndexedFrameContinuationConstruction
@@ -4927,6 +4928,7 @@ def run : IO Unit := do
   testFrameRunEffectResolution
   testFrameRunEffectTrapPropagation
   testFrameRunResult
+  testFrameRunResultTrapReasonMap
   testFrameStateResolution
   testParentIndexedFrameContinuationContext
   testParentIndexedFrameContinuationConstruction
