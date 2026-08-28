@@ -82,6 +82,7 @@ import Solcore.Test.FrameOutcomeTrapReasonMap
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameCheckpointSnapshot
 import Solcore.Test.FrameCheckpointedWorkingPair
+import Solcore.Test.FrameCheckpointedWorkingPairStorageWrite
 import Solcore.Test.FrameContinuationContextFromCheckpointedWorkingPair
 import Solcore.Test.FrameRunContinuation
 import Solcore.Test.FrameRunEffectComposition
@@ -4937,6 +4938,7 @@ def run : IO Unit := do
   testFrameOutcome
   testFrameOutcomeTrapReasonMap
   testFrameEffectJournal
+  testFrameCheckpointedWorkingPairStorageWrite
   testFrameRunContinuation
   testFrameRunEffectComposition
   testFrameRunEffectContinuation
