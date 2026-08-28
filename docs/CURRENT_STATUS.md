@@ -280,7 +280,7 @@ accepts overwrite and distinct-slot commutation laws for total carrier writes;
 implementation is complete.
 [ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
 accepts non-selected working Account isolation for total carrier writes;
-implementation is planned.
+implementation is complete.
 
 ## Implementation status
 
@@ -377,7 +377,7 @@ implementation is planned.
 | Present working storage Account total write | Complete | Complete | Not published |
 | Present working storage Account total read/write coherence | No new operation | Complete | Not published |
 | Present working storage Account total-write algebra | No new operation | Complete | Not published |
-| Present working storage Account total-write isolation | No new operation | Planned | Not published |
+| Present working storage Account total-write isolation | No new operation | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1893,14 +1893,16 @@ compile regressions name the laws directly, and full validation plus independent
 P0-P3 audit pass. The proof-only slice adds no operation, runtime assertion,
 address authority, transition, or published surface.
 
-## Planned present working storage Account total-write isolation
+## Completed present working storage Account total-write isolation
 
 [ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
-specifies that a total write preserves the complete optional Account lookup at
-every working address different from the selected storage address.
+adds a law proving that a total write preserves the complete optional Account
+lookup at every working address different from the selected storage address.
 
-The proof-only slice reuses existing WorldState non-interference and adds no
-operation, runtime assertion, address role, transition, or published surface.
+The simp law reports `[propext]`. Two private compile regressions apply it
+directly and across two sequential writes; full validation and independent
+P0-P3 audit pass. The proof-only slice adds no operation, runtime assertion,
+address role, transition, or published surface.
 
 ## Meaning of completion
 

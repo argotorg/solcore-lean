@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: preserve every non-selected working Account across a total write
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -46,11 +46,12 @@ presence and absence at every non-selected address. Its inequality orientation
 matches `WorldState.account?_putAccount_other` and requires no decidable address
 ordering.
 
-Register the law as simp: its left side contains one total write and its right
-side contains none. Repeated writes therefore normalize toward the original
-non-selected lookup. This direction also converges with ADR-0109 overwrite:
-either eliminate the same-slot overwrite first or eliminate each isolated
-lookup, and both paths reach the same observation.
+Register the law as simp: for one exposed write, its left side contains that
+write and its right side contains none. Generic nested writes are composed by
+applying the named law at each stage; automatic nested normalization is not
+claimed before a separate selector-projection simp law exists. When ADR-0109's
+overwrite law is in scope, a same-slot nested write can first collapse to one
+write and then use this isolation rule.
 
 The proof applies `WorldState.account?_putAccount_other` directly to the
 carrier's working WorldState and selected address. It must report exactly
@@ -109,6 +110,26 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact one law plus one umbrella import; the exact
 two compile regressions plus one runner import and no call; independent audit
 and completion evidence.
+
+## Implementation record
+
+The completed proof-only slice adds a 28-line properties module plus one
+semantic umbrella import. It publishes exactly the one required simp law and
+adds no helper, operation, carrier, coercion, or instance. The law applies the
+existing WorldState non-interference theorem directly and reports exactly
+`[propext]`.
+
+The 42-line compile-only module plus one runner import contains exactly two
+private examples. The first applies the fully qualified law directly; the
+second applies it by name at each of two sequential writes. The test layer adds
+no runtime or public declaration, fixture, helper, assertion, or runner call.
+
+The implementation commits are `633a4a7` (161 changed lines), `b49a68d` (29),
+and `867bb51` (43), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 566-job full build, the
+1020-job full test run, metadata and kernel checks, diff checks, declaration,
+axiom, dependency, and simp-registration inventories, named two-write
+composition and proof-masking checks, and independent P0-P3 audit pass.
 
 ## Publication and consequences
 

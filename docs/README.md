@@ -517,9 +517,9 @@ The completed
 [ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
 adds overwrite normalization and distinct-slot commutation for total writes.
 
-The accepted
+The completed
 [ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
-plans preservation of every non-selected working Account across a total write.
+proves preservation of every non-selected working Account across a total write.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -761,7 +761,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
   fixes the algebra of sequential total writes.
 - [ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
-  fixes the planned non-selected Account isolation boundary.
+  fixes the non-selected Account isolation boundary.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

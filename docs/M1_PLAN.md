@@ -115,7 +115,7 @@ These results remain regression obligations for every extension.
 | 89 | Present working storage Account total write | Complete | Synchronizes the selected Account, working-state entry, and evidence without another lookup |
 | 90 | Present working storage Account total read/write coherence | Complete | Normalizes same-slot and distinct-slot reads after total writes |
 | 91 | Present working storage Account total-write algebra | Complete | Normalizes overwrite and commutes writes to distinct slots |
-| 92 | Present working storage Account total-write isolation | Planned | Preserves every non-selected working Account across a total write |
+| 92 | Present working storage Account total-write isolation | Complete | Preserves every non-selected working Account across a total write |
 | 93 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 94 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 95 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1472,8 +1472,7 @@ The refinement keeps Account absence explicit as `none` and stores exact
 presence evidence on success. Its two simp branch laws report `[propext]`;
 three runtime assertions and three private compile regressions cover exact
 failure, success, preservation, and reuse by existing read and write laws.
-Full validation and independent P0-P3 audits pass. Total read and write
-operations remain separate immediate consumer slices; no Account creation,
+Full validation and independent P0-P3 audits pass. No Account creation,
 authority, or lifetime policy is introduced here.
 
 ## Completed present working storage Account total read
@@ -1487,8 +1486,8 @@ Three runtime assertions cover zero-default and exact two-address/two-slot
 reads; two private compile regressions cover direct and `Option.getD`
 consumers. The operation, generated equation, and coherence law report
 `[propext]`; full validation and independent P0-P3 audits pass. Account absence
-remains handled only by refinement; storage writes and all address-role,
-lifetime, and transition policies remain later work.
+remains handled only by refinement; address-role, lifetime, and transition
+policies remain later work.
 
 ## Completed present working storage Account total write
 
@@ -1501,8 +1500,8 @@ Three runtime assertions cover nonzero synchronization, zero deletion, and
 sequential overwrite; three private compile regressions cover context
 coherence, arbitrary observation, and canonical re-refinement. The operation,
 generated equation, and law report `[propext]`; full validation and independent
-P0-P3 audits pass. Read-after-write, algebra, address authority, lifetime, and
-transition policies remain later work.
+P0-P3 audits pass. Address authority, lifetime, and transition policies remain
+later work.
 
 ## Completed present working storage Account total read/write coherence
 
@@ -1513,9 +1512,8 @@ total refined operations.
 The laws delegate directly to Account semantics and add no new operation.
 Both report `[propext]`; three private compile regressions cover direct use and
 named composition with ADR-0106 conditional-read coherence. Full validation
-and independent P0-P3 audits pass. Overwrite, commutation, projection
-preservation, address authority, lifetime, and transition policies remain
-later work.
+and independent P0-P3 audits pass. Projection preservation, address authority,
+lifetime, and transition policies remain later work.
 
 ## Completed present working storage Account total-write algebra
 
@@ -1526,18 +1524,19 @@ writes on the refined carrier.
 The overwrite law is the only new simp rule; commutation remains caller-directed.
 Both report `[propext, Quot.sound]`, and two private compile regressions apply
 the laws by name. Full validation and independent P0-P3 audit pass. The slice
-adds no operation. Non-selected Account isolation, address authority, lifetime,
-and transition policies remain later work.
+adds no operation. Address authority, lifetime, and transition policies remain
+later work.
 
-## Planned present working storage Account total-write isolation
+## Completed present working storage Account total-write isolation
 
 [ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
 adds one law preserving the complete optional Account lookup at every working
 address different from the selected storage address.
 
-The law reuses WorldState non-interference and adds no operation or runtime
-fixture. Structural projections, address roles, lifetime, and transition
-policies remain later work.
+The simp law reports `[propext]`; two private compile regressions apply it
+directly and across two writes. Full validation and independent P0-P3 audit
+pass. The slice adds no operation or runtime fixture. Structural projections,
+address roles, lifetime, and transition policies remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
