@@ -59,6 +59,9 @@ import Solcore.Semantics.FrameRunEffectTrapPropagationProperties
 import Solcore.Semantics.FrameRunEffectContinuationProperties
 import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
+import Solcore.Semantics.CheckedCoreProgram
+import Solcore.Semantics.CheckedCoreProgramExecution
+import Solcore.Semantics.CheckedCoreProgramProperties
 import Solcore.Semantics.WorldState
 import Solcore.Semantics.WorldStateStorageRead
 import Solcore.Semantics.WorldStateStorageReadProperties

@@ -1,0 +1,31 @@
+import Solcore.Semantics.CheckedCoreProgramExecution
+import Solcore.Core.Safety
+
+/-! Admission and machine-safety laws for checker-accepted Core programs. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Semantics.CheckedCoreProgram
+
+@[simp] theorem ofProgram?_of_checked
+    (program : Core.Program)
+    (checked : program.check = true) :
+    ofProgram? program = some ⟨program, checked⟩ := by
+  simp [ofProgram?, checked]
+
+@[simp] theorem ofProgram?_of_rejected
+    (program : Core.Program)
+    (rejected : program.check = false) :
+    ofProgram? program = none := by
+  simp [ofProgram?, rejected]
+
+/-- Checker-accepted Core execution cannot produce a machine fault. -/
+theorem runStateful_ne_fault
+    (code : CheckedCoreProgram)
+    (fuel : Nat)
+    (error : Core.MachineFault)
+    (faultState : Core.State) :
+    code.runStateful fuel ≠ .fault error faultState :=
+  Core.Program.checked_runStateful_never_faults code.checked
+
+end Solcore.Semantics.CheckedCoreProgram
