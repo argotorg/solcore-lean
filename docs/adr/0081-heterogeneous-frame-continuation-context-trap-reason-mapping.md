@@ -108,9 +108,9 @@ variable {TrapReason : Type w} {MappedTrapReason : Type x}
     mapTrapReason (fun reason => reason) context = context
 
 @[simp] theorem mapTrapReason_comp
-    {IntermediateTrapReason : Type x} {TargetTrapReason : Type y}
+    {IntermediateTrapReason : Type y}
     (first : TrapReason → IntermediateTrapReason)
-    (second : IntermediateTrapReason → TargetTrapReason)
+    (second : IntermediateTrapReason → MappedTrapReason)
     (context : FrameContinuationContext RollbackState TraceState TrapReason) :
     mapTrapReason second (mapTrapReason first context) =
       mapTrapReason (fun reason => second (first reason)) context

@@ -27,6 +27,7 @@ import Solcore.Semantics.FrameRunContinuation
 import Solcore.Semantics.FrameRunContinuationProperties
 import Solcore.Semantics.FrameContinuationContext
 import Solcore.Semantics.FrameContinuationContextProperties
+import Solcore.Semantics.FrameContinuationContextTrapReasonMap
 import Solcore.Semantics.FrameResolutionResult
 import Solcore.Semantics.FrameResolutionResultProperties
 import Solcore.Semantics.FrameResolutionResultTrapReasonMap
