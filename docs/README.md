@@ -315,6 +315,12 @@ Its one carrier, one operation, one coherence law, and three definition-only
 assertions pass full validation. It is not a full execution frame and proves no
 checkpoint lineage or trace-prefix relation.
 
+The active total-resolution slice,
+[ADR-0068](adr/0068-total-frame-resolution-result.md), adds a first-order result
+that preserves return/revert payloads and trap reasons. State and effects are
+selected only for return and revert, so trap and transaction disposition remain
+open.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -470,6 +476,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   executable caller-owned frame continuation boundary.
 - [ADR-0067](adr/0067-caller-owned-frame-continuation-context.md) completes the
   nominal caller-owned continuation-input bundle.
+- [ADR-0068](adr/0068-total-frame-resolution-result.md) fixes the total
+  branch-complete frame-resolution result.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -102,6 +102,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Resolved frame continuation laws | Complete | Proof-only; no carrier, API, instance, or helper; exactly two generic non-simp `rfl` bind laws and two definition-only sentinel assertions complete the returned/reverted continuation boundary | None |
 | Caller-owned frame continuation | Complete | Exactly one higher-order resolver/bind operation, three simp `rfl` constructor laws, and three definition-only assertions complete without creating checkpoints or traces | None |
 | Caller-owned frame continuation context | Complete | One four-field nominal carrier, one delegating operation, one non-simp `rfl` coherence law, and three definition-only assertions complete without a full frame model | None |
+| Total frame resolution result | Active | ADR-0068 accepted; add one three-constructor total carrier, one context resolver, three simp laws, and three definition-only assertions while preserving payloads and trap reasons | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation, call nesting, and transaction atomicity remain undecided | None |
