@@ -64,6 +64,7 @@ import Solcore.Test.AddressBytesBE
 import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameOutcome
+import Solcore.Test.FrameStateResolution
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
 import Solcore.Test.SurfaceMultiCertifiedFrontend
@@ -4893,6 +4894,7 @@ def run : IO Unit := do
   testAddressCodecCoherence
   testAddressWordBridge
   testFrameOutcome
+  testFrameStateResolution
   testRuntimeScalars
   testWorldState
   testM1bProfile
