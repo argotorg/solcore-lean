@@ -116,6 +116,9 @@ resolution operations. Generic frame semantics remain reusable for other trace
 representations. Runtime provenance and the actual nested invocation transition
 remain later, separate decisions.
 
+ADR-0084 adds reason mapping while retaining this carrier's exact prefix
+evidence and without changing its provenance boundary.
+
 ## Implementation record
 
 The completed slice adds exactly one 21-line carrier module plus one umbrella

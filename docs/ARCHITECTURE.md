@@ -546,6 +546,10 @@ ADR-0083 completes the proof that the `Option Next` value produced by
 It adds no operation and makes no claim about evaluation cost, step count, or
 exactly-once invocation.
 
+ADR-0084 fixes the active lift of reason mapping to the trace-prefix refined
+context. The base context changes through ADR-0081 while both traces and the
+existing prefix evidence remain exact.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

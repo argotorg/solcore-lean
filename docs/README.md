@@ -397,6 +397,11 @@ The completed continuation-result slice,
 proves that context reason mapping leaves the `Option` value produced by
 `FrameContinuationContext.continue?` unchanged. It adds no execution operation.
 
+The active trace-prefix context mapping slice,
+[ADR-0084](adr/0084-heterogeneous-trace-prefixed-frame-continuation-context-trap-reason-mapping.md),
+maps only the inherited continuation context while retaining the same trace
+prefix evidence.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -584,6 +589,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   the proof that context mapping commutes with total resolution.
 - [ADR-0083](adr/0083-frame-trap-reason-mapping-continuation-invariance.md)
   fixes `continue?` result invariance under context reason mapping.
+- [ADR-0084](adr/0084-heterogeneous-trace-prefixed-frame-continuation-context-trap-reason-mapping.md)
+  fixes reason mapping for trace-prefix refined continuation contexts.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

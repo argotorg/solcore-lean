@@ -195,6 +195,8 @@ exactly caller-owned values.
 
 ADR-0082 fixes resolve naturality using the canonical context and
 resolution-result mappings, without adding another executable operation.
+ADR-0084 lifts this mapping to the ADR-0071 trace-prefix refinement while
+reusing its existing proof evidence.
 
 ## Implementation record
 
