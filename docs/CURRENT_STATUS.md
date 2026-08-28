@@ -284,6 +284,9 @@ implementation is complete.
 [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
 accepts the four selector, checkpoint, journal, and stored-Account projections;
 implementation is complete.
+[ADR-0112](adr/0112-present-working-storage-account-total-write-presence.md)
+accepts zero deletion and nonzero sparse-entry presence after total writes;
+implementation is planned.
 
 ## Implementation status
 
@@ -382,6 +385,7 @@ implementation is complete.
 | Present working storage Account total-write algebra | No new operation | Complete | Not published |
 | Present working storage Account total-write isolation | No new operation | Complete | Not published |
 | Present working storage Account total-write projections | No new operation | Complete | Not published |
+| Present working storage Account total-write presence | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1918,6 +1922,15 @@ All four simp laws report `[propext]`. Five private compile regressions name
 the projections directly and verify nested ADR-0110 composition; full
 validation and independent P0-P3 audit pass. The proof-only slice adds no
 operation, runtime assertion, address role, transition, or published surface.
+
+## Planned present working storage Account total-write presence
+
+[ADR-0112](adr/0112-present-working-storage-account-total-write-presence.md)
+specifies deletion of the selected sparse-storage entry after a zero write and
+`some value` presence after a nonzero write.
+
+The proof-only slice keeps both laws named and non-simp, and adds no operation,
+runtime assertion, address role, transition, or published surface.
 
 ## Meaning of completion
 

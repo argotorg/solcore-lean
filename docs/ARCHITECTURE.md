@@ -658,6 +658,9 @@ ADR-0111 accepts the total-write data projections: selector, checkpoint, and
 working journal are preserved, while the stored Account receives the exact
 lower-level storage update.
 
+ADR-0112 accepts sparse storage presence after a total write: zero deletes the
+slot entry, while a nonzero word produces the corresponding present value.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
