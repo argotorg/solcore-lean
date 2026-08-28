@@ -431,6 +431,11 @@ The completed continuation-erasure slice,
 proves that identical bytes-ignoring branch callbacks recover the existing
 bytes-insensitive context continuation.
 
+The active result-mapping continuation slice,
+[ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md),
+specifies proof-only invariance of bytes-aware continuation under heterogeneous
+trap-reason mapping.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -632,6 +637,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   caller-owned non-trapping continuation over total resolution results.
 - [ADR-0090](adr/0090-frame-continuation-branch-byte-erasure-coherence.md)
   fixes proof-only compatibility after branch and byte erasure.
+- [ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md)
+  fixes bytes-aware continuation-result invariance under reason mapping.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

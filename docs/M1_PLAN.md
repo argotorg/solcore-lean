@@ -96,10 +96,11 @@ These results remain regression obligations for every extension.
 | 70 | Continuation context from checkpointed working pair | Complete | Canonically assembles every stored value plus an opaque outcome into the existing continuation context |
 | 71 | Bytes-aware frame resolution continuation | Complete | Passes selected state/effects and bytes to distinct caller-owned return/revert callbacks while leaving traps unresolved |
 | 72 | Frame continuation branch/byte erasure coherence | Complete | Proves the richer result route conservatively recovers bytes-insensitive context continuation |
-| 73 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 74 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 75 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 76 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 73 | Frame-resolution continuation trap-reason mapping invariance | Active | Proves heterogeneous reason mapping is invisible to the same bytes-aware callbacks |
+| 74 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 75 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 76 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 77 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1253,6 +1254,18 @@ The three implementation commits contain 199, 30, and 46 changed lines; this
 completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. This slice adds no operation, callback-count claim, delivery,
 parent update, scheduling, trap handling, or transaction transition.
+
+## Active frame-resolution continuation trap-reason mapping invariance
+
+[ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md)
+adds one planned proof-only simp law. It removes heterogeneous trap-reason
+mapping around a total result before bytes-aware continuation while retaining
+the same arbitrary return and revert callbacks.
+
+Exactly two private compile regressions and no runtime call are planned. This
+slice adds no operation, callback-count claim, delivery, parent update,
+scheduling, trap handling, or transaction transition. ADR-0090 remains
+non-simp.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

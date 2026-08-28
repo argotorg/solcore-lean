@@ -575,6 +575,10 @@ ADR-0090 completes the proof that this richer result-level continuation reduces
 to the existing context continuation when both callbacks are identical and
 explicitly ignore return and revert bytes.
 
+ADR-0091 specifies the active proof obligation that heterogeneous trap-reason
+mapping is unobservable to the same bytes-aware result callbacks. It adds no
+operation or runtime transition.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
