@@ -67,6 +67,7 @@ import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextWithTracePrefix
 import Solcore.Test.FrameResolutionResult
 import Solcore.Test.FrameTrace
+import Solcore.Test.FrameTraceExtension
 import Solcore.Test.FrameTracePrefix
 import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameEffectJournal
@@ -4910,6 +4911,7 @@ def run : IO Unit := do
   testFrameContinuationContext
   testFrameResolutionResult
   testFrameTrace
+  testFrameTraceExtension
   testFrameOutcome
   testFrameEffectJournal
   testFrameRunContinuation
