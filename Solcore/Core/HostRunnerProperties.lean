@@ -152,4 +152,35 @@ theorem hostRun_suspended_sound
           subst emitted
           exact ⟨0, state, .refl, hostAdvance_suspended_iff.mp advanced, by omega⟩
 
+theorem hostRun_outOfFuel_sound
+    {fuel : Nat}
+    {state exhausted : State}
+    (result : hostRun fuel state = .outOfFuel exhausted) :
+    HostSteps fuel state exhausted ∧
+      ((∃ next, HostTransition exhausted next) ∨
+        ∃ suspension, HostRequestEmission exhausted suspension) := by
+  induction fuel generalizing state with
+  | zero =>
+      cases advanced : hostAdvance state with
+      | done value => rw [hostRun, advanced] at result; cases result
+      | fault error => rw [hostRun, advanced] at result; cases result
+      | next next =>
+          rw [hostRun, advanced] at result
+          cases result
+          exact ⟨.refl, .inl ⟨next, hostAdvance_next_iff.mp advanced⟩⟩
+      | suspended suspension =>
+          rw [hostRun, advanced] at result
+          cases result
+          exact ⟨.refl,
+            .inr ⟨suspension, hostAdvance_suspended_iff.mp advanced⟩⟩
+  | succ fuel ih =>
+      cases advanced : hostAdvance state with
+      | done value => rw [hostRun, advanced] at result; cases result
+      | fault error => rw [hostRun, advanced] at result; cases result
+      | suspended suspension => rw [hostRun, advanced] at result; cases result
+      | next next =>
+          rw [hostRun, advanced] at result
+          obtain ⟨path, ready⟩ := ih result
+          exact ⟨.cons (hostAdvance_next_iff.mp advanced) path, ready⟩
+
 end Solcore.Core
