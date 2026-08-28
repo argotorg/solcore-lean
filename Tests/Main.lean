@@ -65,6 +65,7 @@ import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
+import Solcore.Test.FrameContinuationContextResolveTrapReasonMap
 import Solcore.Test.FrameContinuationContextWithTracePrefix
 import Solcore.Test.FrameResolutionResult
 import Solcore.Test.FrameResolutionResultTrapReasonMap
