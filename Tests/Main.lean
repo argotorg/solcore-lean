@@ -67,6 +67,7 @@ import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameRunEffectComposition
 import Solcore.Test.FrameRunEffectResolution
+import Solcore.Test.FrameRunEffectTrapPropagation
 import Solcore.Test.FrameRunResult
 import Solcore.Test.FrameStateResolution
 import Solcore.Test.RuntimeScalars
@@ -4903,6 +4904,7 @@ def run : IO Unit := do
   testFrameEffectJournal
   testFrameRunEffectComposition
   testFrameRunEffectResolution
+  testFrameRunEffectTrapPropagation
   testFrameRunResult
   testFrameStateResolution
   testRuntimeScalars
