@@ -597,6 +597,10 @@ and the working WorldState. The checkpoint remains outside the read path.
 ADR-0096 completes the proof that conditional storage writes and subsequent
 reads agree at the selected slot and preserve independent slots and addresses.
 
+ADR-0097 accepts the proof-only lift of the same-slot and different-slot cases
+through the retained-address working carrier. No new operation or address role
+is introduced.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

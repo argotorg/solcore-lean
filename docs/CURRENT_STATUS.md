@@ -239,6 +239,9 @@ only the working WorldState and never consults the checkpoint.
 [ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) completes the
 proof interface for observing conditional writes through subsequent reads
 without collapsing write failure and read-target absence.
+[ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
+accepts the proof-only lift of the same-slot and different-slot observations
+through the retained-address working carrier; implementation is planned.
 
 ## Implementation status
 
@@ -322,6 +325,7 @@ without collapsing write failure and read-target absence.
 | Conditional WorldState storage read | Complete | Complete | Not published |
 | Address-bound working storage read | Complete | Complete | Not published |
 | WorldState storage read/write coherence | No new operation | Complete | Not published |
+| Address-bound working storage read/write coherence | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1661,6 +1665,21 @@ The 99-line properties module adds no executable API, carrier, or helper. A
 41-line compile-only module contains exactly three private examples; the runner
 imports it once and makes no call. All three laws report exactly `[propext]`,
 and full validation plus independent P0-P3 audits pass.
+
+## Planned address-bound working storage read/write coherence
+
+[ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
+specifies exactly two carrier-level simp laws. They expose the newly written
+value at the retained address and preserve a different-slot read while keeping
+working-Account absence as outer `none`.
+
+The planned slice adds no executable API or carrier. It requires exactly two
+private compile examples and no runtime declaration, assertion, or call.
+
+After this proof boundary is complete, the next task is contract-entry boundary
+design. Checkpoint initialization, child working values, address roles,
+invocation inputs, and outcome provenance will be reviewed together before an
+entry carrier is introduced.
 
 ## Meaning of completion
 

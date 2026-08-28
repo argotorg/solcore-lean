@@ -102,10 +102,12 @@ These results remain regression obligations for every extension.
 | 76 | Conditional WorldState storage read | Complete | Preserves Account absence while lifting zero-default slot reads to WorldState |
 | 77 | Address-bound working storage read | Complete | Uses the retained storage address to read only the working WorldState |
 | 78 | WorldState storage read/write coherence | Complete | Normalizes reads after conditional writes and preserves independent observations |
-| 79 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 80 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 81 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 82 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 79 | Address-bound working storage read/write coherence | Planned | Lifts same-slot and different-slot observations through the retained selector |
+| 80 | Contract-entry boundary design | Planned | Reassesses checkpoint initialization, child working values, address roles, invocation inputs, and outcome provenance before adding an entry carrier |
+| 81 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 82 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 83 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 84 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1348,6 +1350,21 @@ the other-address case can therefore distinguish outer `none` from
 runtime declaration, assertion, or call. No executable operation is added. All
 three declarations report exactly `[propext]`, and full validation plus
 independent P0-P3 audits pass.
+
+## Planned address-bound working storage read/write coherence
+
+[ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
+accepts exactly two planned simp laws. They lift ADR-0096 through the existing
+retained-address carrier for the written slot and a distinct slot.
+
+The proof keeps write failure as outer `none`; it adds no executable API,
+other-address overload, checkpoint policy, or address authority. Exactly two
+private compile examples and no runtime call are planned.
+
+After ADR-0097 completes, active design returns to the contract-entry boundary.
+Checkpoint initialization, child working values, address roles, invocation
+inputs, and outcome provenance must be considered together before an entry
+carrier is added.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

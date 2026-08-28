@@ -441,6 +441,19 @@ The completed checkpointed storage slice,
 updates only a pair's working WorldState while retaining its checkpoint and
 working journal.
 
+Working storage now uses one retained address. Writes use that address through
+[ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md), while
+[ADR-0094](adr/0094-world-state-storage-read.md) and
+[ADR-0095](adr/0095-address-bound-working-storage-read.md) make reads return
+`none` for an absent Account and zero for a missing slot in a present Account.
+
+[ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) proves that a
+successful write is visible to a later read and leaves unrelated slots and
+addresses unchanged. The accepted
+[ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
+will make the same-slot and different-slot results directly available through
+the retained address; implementation is planned.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -646,6 +659,16 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes bytes-aware continuation-result invariance under reason mapping.
 - [ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) fixes a
   working-only lift of strict WorldState storage writes.
+- [ADR-0093](adr/0093-checkpointed-working-pair-storage-address.md) fixes one
+  retained storage selector for checkpointed working values.
+- [ADR-0094](adr/0094-world-state-storage-read.md) fixes strict conditional
+  WorldState storage reads.
+- [ADR-0095](adr/0095-address-bound-working-storage-read.md) fixes the
+  retained-address lift of working storage reads.
+- [ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) fixes
+  stage-preserving WorldState read/write coherence.
+- [ADR-0097](adr/0097-address-bound-working-storage-read-write-coherence.md)
+  fixes the planned carrier-level lift of that coherence.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
