@@ -14,6 +14,7 @@ import Solcore.Semantics.FrameEffectJournal
 import Solcore.Semantics.FrameEffectJournalProperties
 import Solcore.Semantics.FrameRunEffectResolution
 import Solcore.Semantics.FrameRunEffectResolutionProperties
+import Solcore.Semantics.FrameRunEffectCompositionProperties
 import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
 import Solcore.Semantics.WorldState
