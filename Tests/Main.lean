@@ -66,6 +66,7 @@ import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameRunEffectComposition
+import Solcore.Test.FrameRunEffectContinuation
 import Solcore.Test.FrameRunEffectResolution
 import Solcore.Test.FrameRunEffectTrapPropagation
 import Solcore.Test.FrameRunResult
@@ -4903,6 +4904,7 @@ def run : IO Unit := do
   testFrameOutcome
   testFrameEffectJournal
   testFrameRunEffectComposition
+  testFrameRunEffectContinuation
   testFrameRunEffectResolution
   testFrameRunEffectTrapPropagation
   testFrameRunResult
