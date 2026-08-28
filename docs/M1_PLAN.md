@@ -118,7 +118,7 @@ These results remain regression obligations for every extension.
 | 92 | Present working storage Account total-write isolation | Complete | Preserves every non-selected working Account across a total write |
 | 93 | Present working storage Account total-write projections | Complete | Exposes the exact selector, checkpoint, journal, and updated Account projections |
 | 94 | Present working storage Account total-write presence | Complete | Exposes zero deletion and nonzero sparse-entry presence |
-| 95 | Present working storage Account total-write sparse preservation | Active | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
+| 95 | Present working storage Account total-write sparse preservation | Complete | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
 | 96 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 97 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 98 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1565,16 +1565,17 @@ existing Account simp policy unchanged and add no operation or runtime fixture.
 Other-slot representation, address roles, lifetime, and transition policies
 remain later work.
 
-## Active present working storage Account total-write sparse preservation
+## Completed present working storage Account total-write sparse preservation
 
 [ADR-0113](adr/0113-present-working-storage-account-total-write-sparse-preservation.md)
-completes the single-write sparse representation boundary. One base Account law
-preserves `storageValue?` at a distinct slot; one refined law exposes the same
-fact through the proven-present total writer.
+completes the single-write sparse representation boundary. One base Account
+law preserves `storageValue?` at a distinct slot; one refined law exposes the
+same fact through the proven-present total writer.
 
 The laws remain named and non-simp so automatic projection rewriting does not
-silently broaden the older Account observation policy. The slice needs exactly
-two direct compile regressions and no new executable behavior.
+silently broaden the older Account observation policy. The slice contains
+exactly two direct compile regressions and no new executable behavior. Full
+validation and independent P0-P3 audits pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

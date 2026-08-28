@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: preserve a distinct sparse-storage observation across one write
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -122,9 +122,29 @@ internal documentation; the two proof modules plus two semantic umbrella
 imports; the exact two compile regressions plus one runner import and no call;
 independent audit and completion evidence.
 
+## Implementation record
+
+The completed proof-only slice adds a 20-line Account properties module and a
+27-line refined-carrier properties module, plus two semantic umbrella imports.
+It publishes exactly the two required named non-simp laws and adds no helper,
+operation, carrier, coercion, or instance. Both laws report exactly `[propext]`.
+
+The 32-line compile-only module plus one runner import contains exactly two
+private examples. Each uses a fully qualified direct application of its target
+public theorem. The test layer adds no runtime declaration, assertion, fixture,
+or runner call because existing suites already execute both underlying
+distinct-slot behaviors.
+
+The implementation commits are `28d8b35` (179 changed lines), `35c04a5` (49),
+and `38774f3` (33), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 573-job full build, the
+1034-job full test run, metadata and kernel checks, diff checks, declaration,
+axiom, dependency, simp-registration, proof-masking, and critical-pair
+inventories, and independent P0-P3 audits pass.
+
 ## Publication and consequences
 
-This proof-only layer changes no frozen or published boundary. When complete,
-semantic consumers can state the full single-write sparse-storage behavior by
-name at either the Account or proven-present carrier boundary while retaining
-the existing controlled simp policy.
+This proof-only layer changes no frozen or published boundary. Semantic
+consumers can state the full single-write sparse-storage behavior by name at
+either the Account or proven-present carrier boundary while retaining the
+existing controlled simp policy.

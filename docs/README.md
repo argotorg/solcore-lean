@@ -529,10 +529,10 @@ The completed
 [ADR-0112](adr/0112-present-working-storage-account-total-write-presence.md)
 adds named zero-deletion and nonzero-presence observations after total writes.
 
-The accepted
+The completed
 [ADR-0113](adr/0113-present-working-storage-account-total-write-sparse-preservation.md)
-will preserve the optional sparse entry at every distinct slot, both directly
-on Account and through the proven-present total writer.
+preserves the optional sparse entry at every distinct slot, both directly on
+Account and through the proven-present total writer.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
