@@ -534,10 +534,10 @@ The completed
 preserves the optional sparse entry at every distinct slot, both directly on
 Account and through the proven-present total writer.
 
-The accepted
+The completed
 [ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
-will make optional write plus canonical Account refinement equal the total
-writer, including the complete proof-carrying result.
+makes optional write plus canonical Account refinement equal the total writer,
+including the complete proof-carrying result.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from

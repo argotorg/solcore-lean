@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: equate optional write plus canonical refinement with the total writer
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -124,9 +124,30 @@ internal documentation; the exact one law plus one semantic umbrella import;
 the exact two compile regressions plus one runner import and no call;
 independent audit and completion evidence.
 
+## Implementation record
+
+The completed proof-only slice adds a 30-line properties module plus one
+semantic umbrella import. It publishes exactly the required named non-simp law
+and adds no helper, operation, carrier, coercion, or instance. Its proof uses
+only the two declared lower boundaries and reports exactly `[propext]`.
+
+The 43-line compile-only module plus one runner import contains exactly two
+private examples. The first directly applies the fully qualified public law.
+The second uses that law at both optional-write/refinement stages and reaches
+the corresponding two total writes without simplification, reflexivity,
+unfolding, or a lower-law substitute. No runtime declaration, assertion,
+fixture, or runner call was added.
+
+The implementation commits are `9d8054f` (183 changed lines), `70c12cf` (31),
+and `9578990` (44), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 575-job full build, the
+1038-job full test run, metadata and kernel checks, diff checks, declaration,
+axiom, dependency, simp-registration, critical-pair, proof-masking, and runtime
+inventories, and independent P0-P3 audits pass.
+
 ## Publication and consequences
 
-This proof-only layer changes no frozen or published boundary. When complete,
-consumers can move from the failure-aware address-bound writer back to the
-canonical proven-present total carrier by one named equality and can reuse that
-equality at every subsequent optional-write/refinement stage.
+This proof-only layer changes no frozen or published boundary. Consumers can
+move from the failure-aware address-bound writer back to the canonical
+proven-present total carrier by one named equality and can reuse that equality
+at every subsequent optional-write/refinement stage.
