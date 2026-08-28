@@ -12,6 +12,7 @@ import Solcore.Semantics.FrameStateResolution
 import Solcore.Semantics.FrameStateResolutionProperties
 import Solcore.Semantics.FrameRunResult
 import Solcore.Semantics.FrameRunResultProperties
+import Solcore.Semantics.FrameRunResultTrapReasonMap
 import Solcore.Semantics.FrameEffectJournal
 import Solcore.Semantics.FrameEffectJournalProperties
 import Solcore.Semantics.FrameTrace
