@@ -326,6 +326,11 @@ The completed trace slice,
 chronological event sequence with tail recording and ordered append. Event
 kinds remain parametric, and existing generic effect journals are unchanged.
 
+The active trace-prefix slice,
+[ADR-0070](adr/0070-frame-trace-prefix-relation.md), makes ordered prefix
+consistency an explicit proof obligation. It describes value factorization,
+not runtime lineage or parent/child identity.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -485,6 +490,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   branch-complete frame-resolution result.
 - [ADR-0069](adr/0069-ordered-frame-trace-algebra.md) fixes the opt-in ordered
   frame-trace extension algebra.
+- [ADR-0070](adr/0070-frame-trace-prefix-relation.md) fixes the proof-only
+  ordered frame-trace prefix relation.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
