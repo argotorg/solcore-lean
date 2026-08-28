@@ -63,6 +63,7 @@ import Solcore.Semantics.WorldState
 import Solcore.Semantics.FrameCheckpointSnapshot
 import Solcore.Semantics.FrameCheckpointSnapshotProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPair
+import Solcore.Semantics.FrameCheckpointedWorkingPairStorageWrite
 import Solcore.Semantics.FrameContinuationContextFromCheckpointedWorkingPair
 import Solcore.Semantics.FrameContinuationContextFromCheckpointedWorkingPairProperties
 import Solcore.Semantics.WorldStateProperties
