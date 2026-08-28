@@ -270,6 +270,11 @@ event taxonomy, ordering, append algebra, or transaction model.
 Its one carrier, one resolver, five laws, and five runtime assertions introduce
 no axioms or concrete effect representation.
 
+The active synchronized-resolution slice,
+[ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md), adds one
+internal operation that resolves WorldState and the parametric effect journal
+from one outcome branch. It adds no carrier or nested execution policy.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -415,6 +420,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0059 completes the proof-only WorldState storage-write algebra.
 - ADR-0060 completes the internal external-checkpoint frame run result.
 - ADR-0061 completes the parametric frame effect-journal policy.
+- ADR-0062 accepts synchronized frame state-and-effect resolution.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

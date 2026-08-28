@@ -422,6 +422,11 @@ laws describe composition without introducing a frame stack or event order.
 The completed carrier and resolver have five axiom-free laws and five runtime
 assertions; rollback and trace contents remain fully parametric.
 
+ADR-0062 synchronizes WorldState and effect-journal resolution by matching one
+FrameOutcome once. Its projection laws recover the existing independent state
+and effect resolvers. It adds no result carrier, child composition, event order,
+or transaction meaning.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
