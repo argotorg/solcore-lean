@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose zero deletion and nonzero slot presence after a total write
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -114,6 +114,27 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact two laws plus one umbrella import; the exact
 two compile regressions plus one runner import and no call; independent audit
 and completion evidence.
+
+## Implementation record
+
+The completed proof-only slice adds a 38-line properties module plus one
+semantic umbrella import. It publishes exactly the two required named non-simp
+laws and adds no helper, operation, carrier, coercion, or instance. Both proofs
+use ADR-0111's stored-Account projection explicitly, apply the corresponding
+Account law, and report exactly `[propext]`.
+
+The 34-line compile-only module plus one runner import contains exactly two
+private examples. Each applies its fully qualified refined-carrier law directly,
+so definitional reduction, the projection theorem, and lower Account laws
+cannot mask a missing declaration. The test layer adds no runtime or public
+declaration, fixture, helper, assertion, or runner call.
+
+The implementation commits are `58038be` (166 changed lines), `bb1e05a` (39),
+and `21c7f29` (35), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 570-job full build, the
+1028-job full test run, metadata and kernel checks, diff checks, declaration,
+axiom, dependency, and simp-registration inventories, projection-first and
+proof-masking checks, and independent P0-P3 audit pass.
 
 ## Publication and consequences
 

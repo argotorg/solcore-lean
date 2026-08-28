@@ -146,7 +146,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Present working storage Account total-write algebra | Complete | ADR-0109 normalizes overwrite and commutes distinct-slot total writes | None |
 | Present working storage Account total-write isolation | Complete | ADR-0110 preserves every non-selected working Account across total writes | None |
 | Present working storage Account total-write projections | Complete | ADR-0111 exposes four direct data projections for total writes | None |
-| Present working storage Account total-write presence | Active | ADR-0112 plans zero deletion and nonzero sparse-entry presence | None |
+| Present working storage Account total-write presence | Complete | ADR-0112 proves zero deletion and nonzero sparse-entry presence | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |

@@ -117,7 +117,7 @@ These results remain regression obligations for every extension.
 | 91 | Present working storage Account total-write algebra | Complete | Normalizes overwrite and commutes writes to distinct slots |
 | 92 | Present working storage Account total-write isolation | Complete | Preserves every non-selected working Account across a total write |
 | 93 | Present working storage Account total-write projections | Complete | Exposes the exact selector, checkpoint, journal, and updated Account projections |
-| 94 | Present working storage Account total-write presence | Planned | Exposes zero deletion and nonzero sparse-entry presence |
+| 94 | Present working storage Account total-write presence | Complete | Exposes zero deletion and nonzero sparse-entry presence |
 | 95 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 96 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 97 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1549,18 +1549,20 @@ updated stored Account.
 The selector law completes nested simp composition with ADR-0110 isolation.
 All four laws report `[propext]`; five private compile regressions apply the
 projections directly and exercise that integration. Full validation and
-independent P0-P3 audit pass. Storage-value presence, address roles, lifetime,
-and transition policies remain later work.
+independent P0-P3 audit pass. Address roles, lifetime, and transition policies
+remain later work.
 
-## Planned present working storage Account total-write presence
+## Completed present working storage Account total-write presence
 
 [ADR-0112](adr/0112-present-working-storage-account-total-write-presence.md)
 adds named zero-deletion and nonzero-presence observations for the stored
 Account returned by a total write.
 
-The laws keep the existing Account simp policy unchanged and add no operation
-or runtime fixture. Other-slot representation, address roles, lifetime, and
-transition policies remain later work.
+Both laws report `[propext]`; two private compile regressions apply them
+directly. Full validation and independent P0-P3 audit pass. The laws keep the
+existing Account simp policy unchanged and add no operation or runtime fixture.
+Other-slot representation, address roles, lifetime, and transition policies
+remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

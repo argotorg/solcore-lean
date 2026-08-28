@@ -525,9 +525,9 @@ The completed
 [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
 adds direct selector, checkpoint, journal, and stored-Account projections.
 
-The accepted
+The completed
 [ADR-0112](adr/0112-present-working-storage-account-total-write-presence.md)
-plans named zero-deletion and nonzero-presence observations after total writes.
+adds named zero-deletion and nonzero-presence observations after total writes.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -773,7 +773,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
   fixes the total-write data projections.
 - [ADR-0112](adr/0112-present-working-storage-account-total-write-presence.md)
-  fixes the planned sparse-storage presence observations.
+  fixes the sparse-storage presence observations.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
