@@ -22,9 +22,9 @@ namespace Solcore.Semantics.CheckedCoreProgram
 /-- Every retained non-recursive Core program completes above some fuel bound. -/
 theorem runStateful_has_sufficient_fuel
     (code : CheckedCoreProgram) :
-    ∃ required finalWorld finalStore value,
-      Core.StoreHasTypes finalWorld finalStore ∧
-      Core.RuntimeValueHasType finalWorld value code.program.resultType
+    ∃ required storeTyping finalStore value,
+      Core.StoreHasTypes storeTyping finalStore ∧
+      Core.RuntimeValueHasType storeTyping value code.program.resultType
         code.program.dataDefinitions ∧
       ∀ fuel, required ≤ fuel →
         code.runStateful fuel = .done value finalStore := by

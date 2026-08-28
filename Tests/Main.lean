@@ -63,6 +63,7 @@ import Solcore.Test.CoreUnsignedDivisionWire
 import Solcore.Test.AddressBytesBE
 import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
+import Solcore.Test.CheckedCoreProgram
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
 import Solcore.Test.FrameContinuationContextResolveTrapReasonMap
@@ -124,6 +125,7 @@ import Solcore.Test.ParentIndexedFrameTrapPropagationPayload
 import Solcore.Test.ParentIndexedFrameTrapPropagationPayloadCoherence
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
+import Solcore.Test.WorldStateCode
 import Solcore.Test.WorldStateStorageRead
 import Solcore.Test.WorldStateStorageReadWrite
 import Solcore.Test.WorldStateStorageWriteAlgebra
@@ -4954,6 +4956,7 @@ def run : IO Unit := do
   testAddressBytesBE
   testAddressCodecCoherence
   testAddressWordBridge
+  testCheckedCoreProgram
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
   testFrameResolutionResult
@@ -4984,6 +4987,7 @@ def run : IO Unit := do
   testParentIndexedFrameTrapPropagationPayload
   testRuntimeScalars
   testWorldState
+  testWorldStateCode
   testWorldStateStorageRead
   testWorldStateStorageWriteAlgebra
   testWorldStateUpdateAlgebra
