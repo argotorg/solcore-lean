@@ -179,9 +179,9 @@ working trace without changing the existing generic resolvers.
 opt-in payload selector. It combines ADR-0075's selected pair with the original
 trapped outcome for a caller-designated prospective enclosing boundary without
 performing or proving runtime propagation.
-[ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md) is
-active. It specifies two proof-only laws that invert a successful payload
-selection and attach the existing non-strict trace-prefix fact to its journal.
+[ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md)
+completes two proof-only laws that invert a successful payload selection and
+attach the existing non-strict trace-prefix fact to its journal.
 
 ## Implementation status
 
@@ -245,7 +245,7 @@ selection and attach the existing non-strict trace-prefix fact to its journal.
 | Parent-indexed frame continuation construction | Complete | Complete | Not published |
 | Parent-indexed trapped-frame rollback selection | Complete | Complete | Not published |
 | Parent-indexed trap propagation payload selection | Complete | Complete | Not published |
-| Parent-indexed trap propagation payload coherence | Not implemented | Decision accepted | Not published |
+| Parent-indexed trap propagation payload coherence | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1240,17 +1240,25 @@ caller-designated prospective enclosing boundary. It does not perform or prove
 a runtime transition, parent execution, ancestry, handling, repeated
 propagation, or transaction policy.
 
-## Active parent-indexed trap propagation payload coherence
+## Completed parent-indexed trap propagation payload coherence
 
 [ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md)
-specifies exactly two non-simp proof laws and no new executable operation. One
+adds exactly two non-simp proof laws and no new executable operation. One
 law recovers the trapped reason and complete canonical payload from a `some`
 selector equality. The other reuses ADR-0073 to prove that the designated
 enclosing trace prefixes the selected journal's internal working trace.
 
-Exactly two private compile regressions are planned. Successful selection is a
-value-level fact, and the prefix is non-strict; neither claims runtime
-propagation, ancestry, parent execution, handling, or transaction behavior.
+A 58-line properties module plus one umbrella import contains both laws. Each
+reports exactly `[propext]` and neither is a simp rule. A 78-line compile-only
+test module plus one runner import contains exactly two private examples: iff
+elimination and reconstruction of the exact payload, then prefix recovery with
+the exact parent-then-nested trace.
+
+The three implementation commits contain 209, 59, and 79 changed lines; this
+completion update is the fourth commit. Full validation and independent P0-P3
+audits pass. Successful selection remains a value-level fact, and the prefix is
+non-strict; neither claims runtime propagation, ancestry, parent execution,
+handling, or transaction behavior.
 
 ## Meaning of completion
 

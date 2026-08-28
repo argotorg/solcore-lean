@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only characterization of selected trap propagation payloads
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -156,3 +156,29 @@ A proof consumer can safely invert a selected parent-indexed trap payload and
 carry its existing non-strict trace-prefix evidence without unfolding the
 selector. Execution, ancestry, handling, repeated propagation, and transaction
 policy remain explicit later decisions.
+
+## Implementation record
+
+The completed proof-only slice adds no carrier, executable operation, alias,
+coercion, instance, or helper. A 58-line properties module plus one umbrella
+import publishes exactly the two specified non-simp laws. The successful-value
+characterization reuses ADR-0076's three outcome laws; the payload-prefix law
+then reuses that characterization and ADR-0073's existing prefix law. Neither
+proof unfolds or reimplements the selector or rollback policy.
+
+Both laws report exactly `[propext]` and neither is registered as a simp rule.
+A 78-line compile-only test module plus one runner import contains exactly two
+private examples. The first uses both iff directions to recover and reconstruct
+the complete concrete payload. The second recovers its non-strict prefix proof
+and checks the exact parent-then-nested trace by reduction. No runtime assertion,
+test function, or runner call is added.
+
+The implementation commits are `4193f22` (209 changed lines), `edd88b4` (59),
+and `e01f208` (79), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+non-simp, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+
+Successful selection is still only a pure value-level fact, and the prefix is
+still non-strict. These laws prove no runtime propagation, enclosing-frame
+existence, ancestry, parent execution, handling, repeated propagation,
+transaction disposition, or concrete-log behavior.

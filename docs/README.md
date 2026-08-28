@@ -362,7 +362,7 @@ The completed parent-indexed trap-propagation payload slice,
 rollback pair with the original trapped outcome for one caller-designated
 prospective enclosing boundary. It does not execute or prove propagation.
 
-The active payload-coherence slice,
+The completed payload-coherence slice,
 [ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md),
 characterizes successful selection and carries existing non-strict trace-prefix
 evidence to the selected journal without adding an execution operation.
