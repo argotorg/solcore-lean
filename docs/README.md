@@ -498,8 +498,8 @@ The completed
 checked form of an address-bound working context that carries the exact
 selected Account when that Account exists.
 
-The accepted
-[ADR-0106](adr/0106-present-working-storage-account-total-read.md) plans a
+The completed
+[ADR-0106](adr/0106-present-working-storage-account-total-read.md) adds a
 total slot read from that checked Account, together with agreement with the
 existing conditional read.
 
@@ -735,7 +735,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0105](adr/0105-present-working-storage-account-refinement.md) fixes an
   evidence-carrying refinement for a present working Account.
 - [ADR-0106](adr/0106-present-working-storage-account-total-read.md) fixes the
-  planned total read from that refinement.
+  total read from that refinement.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

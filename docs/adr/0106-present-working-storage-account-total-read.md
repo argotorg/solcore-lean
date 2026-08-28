@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose a total slot read from a proven-present working Account
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -132,6 +132,27 @@ Keep each of five commits below 300 changed lines: this decision and targeted
 internal documentation; the exact total operation plus one umbrella import;
 the exact coherence law plus one umbrella import; runtime and compile-only
 regressions plus runner wiring; independent audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 20-line definition module and a 24-line properties
+module, with one semantic umbrella import for each. It publishes exactly the
+required total operation and one simp coherence law. The operation, generated
+equation, and law report exactly `[propext]`; only the law is registered with
+the intended simp orientation.
+
+The 70-line runtime module contains exactly three assertions, all of which
+reach `readStorage` through a successful refinement. The 34-line compile-only
+module contains exactly two private examples and names the coherence law in
+both. The runner imports both modules once, calls the sole public runtime test
+once, and adds no compile-only call.
+
+The implementation commits are `6b319ab` (187 changed lines), `f1e0dc1` (21),
+`af37c2d` (25), and `8c391b8` (107), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, the 554-job full
+build, the 1000-job full test run, metadata and kernel checks, diff checks,
+declaration and simp-registration inventories, exact dependency audits, and
+independent P0-P3 audits pass.
 
 ## Publication and consequences
 

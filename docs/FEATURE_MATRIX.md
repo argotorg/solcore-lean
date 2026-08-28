@@ -140,7 +140,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Address-bound working storage-write values coherence | Complete | ADR-0103 proves one exact relation from the wrapper write to its underlying values write | None |
 | Parent-indexed initialization continuation-context coherence | Complete | ADR-0104 proves equality of the two pure base-context construction routes | None |
 | Present working storage Account refinement | Complete | ADR-0105 retains the exact address-bound context, selected working Account, and lookup evidence for total consumers | None |
-| Present working storage Account total read | Active | ADR-0106 plans a total slot read coherent with the existing conditional context read | None |
+| Present working storage Account total read | Complete | ADR-0106 reads the proven-present Account without another lookup and proves conditional-read coherence | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |

@@ -111,7 +111,7 @@ These results remain regression obligations for every extension.
 | 85 | Address-bound working storage-write values coherence | Complete | Relates wrapper write results to the existing address-parameterized values writer |
 | 86 | Parent-indexed initialization continuation-context coherence | Complete | Equates the refined trace-extension route with the plain checkpointed-values route |
 | 87 | Present working storage Account refinement | Complete | Bundles the exact retained-address working Account and its lookup evidence for total consumers |
-| 88 | Present working storage Account total read | Planned | Reads the proven-present selected Account without another lookup or failure branch |
+| 88 | Present working storage Account total read | Complete | Reads the proven-present selected Account without another lookup or failure branch |
 | 89 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 90 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 91 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1472,15 +1472,19 @@ Full validation and independent P0-P3 audits pass. Total read and write
 operations remain separate immediate consumer slices; no Account creation,
 authority, or lifetime policy is introduced here.
 
-## Planned present working storage Account total read
+## Completed present working storage Account total read
 
 [ADR-0106](adr/0106-present-working-storage-account-total-read.md) adds one
 total slot read to the ADR-0105 refinement and proves that the existing
 conditional context read returns that value in `some`.
 
 The operation reads the stored Account without another WorldState lookup.
-Account absence remains handled only by refinement; storage writes and all
-address-role, lifetime, and transition policies remain later work.
+Three runtime assertions cover zero-default and exact two-address/two-slot
+reads; two private compile regressions cover direct and `Option.getD`
+consumers. The operation, generated equation, and coherence law report
+`[propext]`; full validation and independent P0-P3 audits pass. Account absence
+remains handled only by refinement; storage writes and all address-role,
+lifetime, and transition policies remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
