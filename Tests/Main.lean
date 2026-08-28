@@ -67,6 +67,7 @@ import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameStateResolution
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
+import Solcore.Test.WorldStateUpdateAlgebra
 import Solcore.Test.SurfaceMultiCertifiedFrontend
 import Solcore.Test.SurfaceMultiExactToken
 import Solcore.Test.SurfaceMultiFastParser
@@ -4897,6 +4898,7 @@ def run : IO Unit := do
   testFrameStateResolution
   testRuntimeScalars
   testWorldState
+  testWorldStateUpdateAlgebra
   testM1bProfile
   testM1cProfile
   testM2bFrontendProfile
