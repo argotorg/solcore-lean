@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: non-strict prefix factorization for ordered frame traces
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -114,3 +114,20 @@ Later frame-transition carriers can require explicit evidence that an
 accumulated working trace extends its entry trace, without blindly appending a
 same-typed value. The relation alone does not establish who produced either
 trace; invocation and checkpoint provenance remain separate decisions.
+
+## Implementation record
+
+The completed slice adds exactly one proposition-valued definition in a
+16-line module plus one umbrella import. The relation is axiom-free and adds no
+carrier, executable operation, checker, instance, alias, or helper.
+
+A 37-line properties module plus one umbrella import publishes exactly four
+non-simp, axiom-free laws for empty, reflexive, direct-append, and transitive
+prefixes. A 41-line definition-only compile-regression module plus one main
+test import contains exactly four private examples and no runtime call.
+
+The implementation commits are `183e0a2` (165 changed lines), `cb423e4` (17),
+`7644bba` (38), and `51f793a` (42), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+audits pass.

@@ -326,7 +326,7 @@ The completed trace slice,
 chronological event sequence with tail recording and ordered append. Event
 kinds remain parametric, and existing generic effect journals are unchanged.
 
-The active trace-prefix slice,
+The completed trace-prefix slice,
 [ADR-0070](adr/0070-frame-trace-prefix-relation.md), makes ordered prefix
 consistency an explicit proof obligation. It describes value factorization,
 not runtime lineage or parent/child identity.

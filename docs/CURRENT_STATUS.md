@@ -152,9 +152,9 @@ branch-complete value without choosing trap or transaction disposition.
 [ADR-0069](adr/0069-ordered-frame-trace-algebra.md) completes the ordered trace
 slice. It adds an opt-in finite chronological extension algebra while leaving
 event kinds and the generic effect journal open.
-[ADR-0070](adr/0070-frame-trace-prefix-relation.md) is the active proof slice.
-It adds an explicit non-strict prefix relation before trace consistency is used
-by a child-frame transition.
+[ADR-0070](adr/0070-frame-trace-prefix-relation.md) completes the trace-prefix
+proof slice. It adds an explicit non-strict factorization relation before trace
+consistency is used by a child-frame transition.
 
 ## Implementation status
 
@@ -211,7 +211,7 @@ by a child-frame transition.
 | Caller-owned frame continuation context | Complete | Complete | Not published |
 | Total frame resolution result | Complete | Complete | Not published |
 | Ordered frame trace algebra | Complete | Complete | Not published |
-| Frame trace prefix relation | Not implemented | Decision accepted | Not published |
+| Frame trace prefix relation | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1071,17 +1071,22 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Event taxonomy, trace lineage, call scheduling, and
 transaction behavior remain outside.
 
-## Active frame trace prefix relation
+## Completed frame trace prefix relation
 
 [ADR-0070](adr/0070-frame-trace-prefix-relation.md) adds exactly one
 proposition-valued relation: an earlier trace is a prefix of a later trace when
 some ordered fragment extends it to that later value.
 
-Exactly four planned non-simp, axiom-free laws cover the empty trace,
-reflexivity, direct append, and transitivity. Four definition-only compile
-examples will fix the relation's direction without adding an equality instance
-or executable checker. Runtime provenance, frame identity, checkpoint
-ownership, and trap or transaction behavior remain outside.
+A 16-line definition module plus one umbrella import contains the relation. A
+37-line properties module plus one umbrella import contains exactly four
+non-simp, axiom-free laws. A 41-line definition-only compile-regression module
+plus one main test import contains exactly four private examples and no runtime
+call.
+
+The four implementation commits contain 165, 17, 38, and 42 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Runtime provenance, frame identity, checkpoint ownership,
+and trap or transaction behavior remain outside.
 
 ## Meaning of completion
 

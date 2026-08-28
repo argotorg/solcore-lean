@@ -75,7 +75,7 @@ These results remain regression obligations for every extension.
 | 49 | Caller-owned frame continuation context | Complete | Groups one completed frame's continuation inputs without defining a full frame |
 | 50 | Total frame resolution result | Complete | Preserves payloads and trap reasons in a total first-order result |
 | 51 | Ordered frame trace algebra | Complete | Defines opt-in finite chronological extension without fixing event kinds |
-| 52 | Frame trace prefix relation | Active | Makes ordered trace consistency an explicit proof obligation without claiming provenance |
+| 52 | Frame trace prefix relation | Complete | Makes ordered trace consistency an explicit proof obligation without claiming provenance |
 | 53 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 54 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
 | 55 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -867,15 +867,20 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Concrete events, trace lineage, call scheduling, rollback
 filtering, and transaction ownership remain separate.
 
-## Active frame trace prefix relation
+## Completed frame trace prefix relation
 
 [ADR-0070](adr/0070-frame-trace-prefix-relation.md) adds one non-strict
 proposition: an earlier trace is a prefix of a later trace exactly when some
 ordered fragment extends it to the later value.
 
-Exactly four planned non-simp, axiom-free laws cover empty, reflexive, direct
-append, and transitive cases. Four definition-only compile examples will fix
-the orientation. This relation proves sequence factorization, not runtime
+A 16-line definition module plus one umbrella import contains the relation. A
+37-line properties module plus one umbrella import contains exactly four
+non-simp, axiom-free laws. A 41-line definition-only compile-regression module
+plus one main test import contains exactly four examples and no runtime call.
+
+The four implementation commits contain 165, 17, 38, and 42 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. The relation proves sequence factorization, not runtime
 ancestry, checkpoint ownership, or child-frame identity.
 
 ## Completed Core vNext slice: derived-builder renaming laws

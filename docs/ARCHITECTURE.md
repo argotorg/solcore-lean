@@ -473,7 +473,7 @@ earlier trace before a later fragment. Event kinds remain parametric and the
 generic `FrameEffectJournal` remains unchanged; trace lineage, call scheduling,
 and transaction ownership are still separate.
 
-ADR-0070 accepts a non-strict `FrameTrace.IsPrefixOf` relation. It records that
+ADR-0070 completes a non-strict `FrameTrace.IsPrefixOf` relation. It records that
 a later trace factors into an earlier trace followed by some fragment. This is
 a value-level proof obligation for future frame transitions, not evidence of
 runtime ancestry, checkpoint ownership, or parent/child identity.
