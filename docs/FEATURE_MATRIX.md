@@ -152,7 +152,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Parent-indexed initialization present storage Account refinement | Complete | ADR-0115 checks initial Account presence and returns the existing proven-present carrier used by total storage operations | None |
 | Address-selected checked Core code | Active | ADR-0116 admits checker-accepted Core programs, stores them with Account state, selects by Address, and returns raw stateful Core execution results without ABI or frame-outcome conversion | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
-| Extended contract runtime state | Active | Minimal storage and frame foundations are complete; checked Account code ownership and address-selected pure Core execution are the active slice, while balances, transactions, and ownership remain undecided | None |
+| Extended contract runtime state | Active | Minimal storage and frame foundations are complete; checked Account code association and address-selected pure Core execution are the active slice, while balances, transactions, authority, and lifetime remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |
 | Storage | Blocked | storage-layout ADR | Low |
 | External calls and creation | Planned | host transition and call-depth rules | None |

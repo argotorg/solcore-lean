@@ -799,8 +799,9 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
   fixes optional/total write re-refinement coherence.
 - [ADR-0115](adr/0115-parent-indexed-initialization-present-storage-account-refinement.md)
-- [ADR-0116](adr/0116-address-selected-checked-core-code.md)
   fixes initialization-to-present-storage refinement.
+- [ADR-0116](adr/0116-address-selected-checked-core-code.md)
+  fixes checked Account code association, address selection, and raw Core execution.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

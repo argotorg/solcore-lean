@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Decision date: 2026-08-29
-- Scope: checked code ownership, address selection, and pure Core execution
+- Scope: checked code association, address selection, and pure Core execution
 - Implementation: Planned
 
 ## Context
@@ -17,7 +17,7 @@ The next missing input has a concrete consumer. `Core.Program.runStateful`
 already executes a closed Core program from an empty lexical environment and
 empty Core-local store. The checker already proves when such a program is
 well-typed, and the safety layer proves that checked execution cannot produce
-a machine fault. What is missing is rollback-visible ownership of that code,
+a machine fault. What is missing is rollback-visible association of that code,
 selection by an Address, and one honest execution operation.
 
 The current Core is still pure with respect to `WorldState`: it cannot read
