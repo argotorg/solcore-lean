@@ -256,4 +256,25 @@ theorem HostRuntimeEnvironmentHasTypes.weaken
   | cons valueTyping _ _ environmentIH =>
       exact .cons (valueTyping.weaken extension) environmentIH
 
+/-- Cell payload types cannot contain host capabilities, so their structural
+typing can be recovered before writing them to the Core-local store. -/
+theorem CellPayload.valueHasType_of_hostRuntimeValueHasType
+    {elementType : Ty}
+    (payload : CellPayload elementType)
+    {definitions : DataEnvironment} {world : StoreTyping} {value : Value}
+    (typing : HostRuntimeValueHasType world value elementType definitions) :
+    ValueHasType value elementType definitions := by
+  induction payload generalizing value with
+  | unit => cases typing; exact .unit
+  | bool => cases typing; exact .bool
+  | word => cases typing; exact .word
+  | product leftPayload rightPayload leftIH rightIH =>
+      cases typing with
+      | pair leftTyping rightTyping =>
+          exact .pair (leftIH leftTyping) (rightIH rightTyping)
+  | sum leftPayload rightPayload leftIH rightIH =>
+      cases typing with
+      | inLeft payloadTyping => exact .inLeft (leftIH payloadTyping)
+      | inRight payloadTyping => exact .inRight (rightIH payloadTyping)
+
 end Solcore.Core
