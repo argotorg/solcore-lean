@@ -1,4 +1,5 @@
 import Solcore.Semantics.AccountCodeProperties
+import Solcore.Semantics.CheckedCoreProgramHostPromotion
 import Solcore.Semantics.WorldStateCodeProperties
 
 /-! Runtime and direct-law regressions for address-selected host code. -/
@@ -25,13 +26,17 @@ private def unitProgram : Program := {
 }
 
 private theorem cellProgram_checked : cellProgram.checkHost = true := by decide
-private theorem unitProgram_checked : unitProgram.checkHost = true := by decide
+private theorem unitProgram_checked : unitProgram.check = true := by decide
 
 private def checkedCellProgram : CheckedHostCoreProgram :=
   ⟨cellProgram, cellProgram_checked⟩
 
 private def checkedUnitProgram : CheckedHostCoreProgram :=
-  ⟨unitProgram, unitProgram_checked⟩
+  (⟨unitProgram, unitProgram_checked⟩ : CheckedCoreProgram).toHost
+
+private theorem compileTimePurePromotionRegression :
+    checkedUnitProgram.program = unitProgram :=
+  rfl
 
 private def addressA : Address := ⟨0, by decide⟩
 private def addressB : Address := ⟨1, by decide⟩

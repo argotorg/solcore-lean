@@ -1,4 +1,4 @@
-import Solcore.Core.Typing
+import Solcore.Core.Renaming
 
 /-! Fixed runtime capabilities and checking for Core programs that use them. -/
 
@@ -91,6 +91,26 @@ theorem checkHost_complete
     Ty.isWellFormed_complete wellTyped.resultTypeWellFormed,
     infer_complete wellTyped.bodyHasType
   ]
+
+/-- Every closed well-typed program is also well typed with host capabilities
+available but unused. -/
+theorem WellTyped.toHostWellTyped
+    {program : Program}
+    (wellTyped : program.WellTyped) :
+    program.HostWellTyped := by
+  refine ⟨wellTyped.dataDefinitionsWellFormed,
+    wellTyped.resultTypeWellFormed, ?_⟩
+  simpa using wellTyped.bodyHasType.rename
+    (target := hostContext) (mapping := Renaming.id) (by
+      intro index type found
+      simp at found)
+
+/-- Closed-checker acceptance is sufficient for host-checker admission. -/
+theorem checkHost_of_check
+    {program : Program}
+    (checked : program.check = true) :
+    program.checkHost = true :=
+  checkHost_complete (check_full_sound checked).toHostWellTyped
 
 theorem checkHost_iff_hostWellTyped
     {program : Program} :
