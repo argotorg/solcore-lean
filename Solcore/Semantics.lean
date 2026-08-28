@@ -6,6 +6,7 @@ import Solcore.Semantics.AddressWordBridge
 import Solcore.Semantics.AddressWordBridgeProperties
 import Solcore.Semantics.FrameOutcome
 import Solcore.Semantics.FrameOutcomeProperties
+import Solcore.Semantics.FrameStateResolution
 import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
 import Solcore.Semantics.WorldState
