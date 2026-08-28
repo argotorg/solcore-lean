@@ -387,7 +387,7 @@ The completed continuation-context mapping slice,
 keeps caller-owned checkpoints and working inputs unchanged while mapping only
 the contained frame result.
 
-The active resolution-naturality slice,
+The completed resolution-naturality slice,
 [ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md), proves
 that mapping before total resolution agrees with mapping the resolved value.
 It adds no execution operation.

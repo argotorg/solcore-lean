@@ -194,8 +194,8 @@ return/revert state, effects, and bytes.
 [ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
 completes the lift to caller-owned continuation contexts while preserving
 every checkpoint and working field.
-[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md) now
-fixes the active proof that mapping a context before resolution agrees with
+[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md)
+completes the proof that mapping a context before resolution agrees with
 mapping its total resolution result afterward.
 
 ## Implementation status
@@ -265,7 +265,7 @@ mapping its total resolution result afterward.
 | Heterogeneous frame-run-result trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-continuation-context trap-reason mapping | Complete | Complete | Not published |
-| Frame trap-reason mapping resolution naturality | Not implemented | Decision accepted | Not published |
+| Frame trap-reason mapping resolution naturality | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1353,15 +1353,22 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Continuation, resolution, parent indexing, payloads,
 propagation, and transaction policy remain outside this slice.
 
-## Active frame trap-reason mapping resolution naturality
+## Completed frame trap-reason mapping resolution naturality
 
-[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md) fixes
-one planned proof that context reason mapping commutes with total resolution.
-It introduces no executable operation and no branch-specific law.
+[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md) adds
+exactly one simp theorem proving that context reason mapping commutes with
+total resolution. It introduces no executable operation or branch-specific
+law, and the theorem reports exactly `[propext]`.
 
-The planned surface is exactly one `[propext]` simp theorem and two private
-compile regressions. Continuation execution, parent indexing, payloads,
-propagation, and transaction policy remain outside this proof-only slice.
+The 26-line properties module adds one umbrella import. A 34-line compile-only
+test module plus one runner import contains exactly two private examples for
+heterogeneous naturality and ordered two-map composition, with no runtime
+assertion or call.
+
+The three implementation commits contain 175, 27, and 35 changed lines; this
+completion update is the fourth commit. Full validation and independent P0-P3
+audits pass. Continuation execution, parent indexing, payloads, propagation,
+and transaction policy remain outside this proof-only slice.
 
 ## Meaning of completion
 

@@ -537,7 +537,7 @@ ADR-0081 completes the lift to `FrameContinuationContext`. Its checkpoint and
 working inputs remain exact, while only the contained frame result uses
 ADR-0079's mapping. Continuation and resolution are not executed.
 
-ADR-0082 fixes the active proof that context mapping commutes with total
+ADR-0082 completes the proof that context mapping commutes with total
 resolution. It adds no operation and changes no resolution policy; both pure
 routes produce the same mapped resolution result.
 

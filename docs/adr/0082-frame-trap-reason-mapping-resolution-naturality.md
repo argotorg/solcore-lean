@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only commutation of context mapping and total resolution
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -119,3 +119,32 @@ effects, and bytes and differs only by the same caller-supplied reason mapper.
 
 Future proof-only work may establish the corresponding `continue?` invariance,
 without changing any execution operation.
+
+## Implementation record
+
+The completed proof-only slice adds one 26-line properties module plus one
+semantic-umbrella import. It publishes exactly one
+`FrameContinuationContext.resolve_mapTrapReason` simp theorem and no operation,
+carrier, alias, instance, helper, or branch-specific law. The proof exposes the
+existing context, frame-result, and outcome constructors and then reuses the
+ADR-0068, ADR-0080, and ADR-0081 simp laws without unfolding resolution policy.
+
+The theorem is heterogeneous in the source and mapped reason universes. Its
+orientation removes `resolve (mapTrapReason ...)` in favor of mapping the total
+resolution result, composes with the existing identity and composition laws,
+and reports exactly `[propext]`.
+
+A 34-line test module plus one runner import contains exactly two private
+compile examples and no runtime function or assertion. One consumes abstract
+heterogeneous naturality; the other reduces two successive context mappings to
+one result mapping by `fun reason => second (first reason)`.
+
+The implementation commits are `727fedd` (175 changed lines), `2006e89` (27),
+and `966816f` (35), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+simp-termination, semantic-kernel, metadata, diff, and independent P0-P3 audits
+pass.
+
+The theorem remains a pure equality. It invokes no continuation, maps no
+indexed context or payload, and establishes no propagation, ancestry, handling,
+or transaction policy.
