@@ -194,6 +194,9 @@ return/revert state, effects, and bytes.
 [ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
 completes the lift to caller-owned continuation contexts while preserving
 every checkpoint and working field.
+[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md) now
+fixes the active proof that mapping a context before resolution agrees with
+mapping its total resolution result afterward.
 
 ## Implementation status
 
@@ -262,6 +265,7 @@ every checkpoint and working field.
 | Heterogeneous frame-run-result trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-continuation-context trap-reason mapping | Complete | Complete | Not published |
+| Frame trap-reason mapping resolution naturality | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1348,6 +1352,16 @@ The four implementation commits contain 250, 32, 88, and 120 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Continuation, resolution, parent indexing, payloads,
 propagation, and transaction policy remain outside this slice.
+
+## Active frame trap-reason mapping resolution naturality
+
+[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md) fixes
+one planned proof that context reason mapping commutes with total resolution.
+It introduces no executable operation and no branch-specific law.
+
+The planned surface is exactly one `[propext]` simp theorem and two private
+compile regressions. Continuation execution, parent indexing, payloads,
+propagation, and transaction policy remain outside this proof-only slice.
 
 ## Meaning of completion
 

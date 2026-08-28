@@ -387,6 +387,11 @@ The completed continuation-context mapping slice,
 keeps caller-owned checkpoints and working inputs unchanged while mapping only
 the contained frame result.
 
+The active resolution-naturality slice,
+[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md), proves
+that mapping before total resolution agrees with mapping the resolved value.
+It adds no execution operation.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -570,6 +575,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes caller-supplied reason mapping on total frame-resolution results.
 - [ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
   fixes the checkpoint-preserving lift to continuation contexts.
+- [ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md) fixes
+  the proof that context mapping commutes with total resolution.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

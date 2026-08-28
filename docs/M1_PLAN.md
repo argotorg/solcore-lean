@@ -87,10 +87,11 @@ These results remain regression obligations for every extension.
 | 61 | Heterogeneous frame-run-result trap-reason mapping | Complete | Preserves working state while lifting the completed outcome mapping, without adding runtime propagation |
 | 62 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Preserves selected state, effects, and bytes while mapping only the total result's trapped reason |
 | 63 | Heterogeneous frame-continuation-context trap-reason mapping | Complete | Preserves all caller-owned inputs while mapping only the contained frame result |
-| 64 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 65 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
-| 66 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 67 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 64 | Frame trap-reason mapping resolution naturality | Active | Proves that context mapping commutes with total resolution without adding execution |
+| 65 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 66 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
+| 67 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 68 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1091,6 +1092,17 @@ every field with distinct witnesses.
 The four implementation commits contain 250, 32, 88, and 120 changed lines.
 Full validation and independent P0-P3 audits pass. This slice does not run a
 continuation or resolver, map an indexed context or payload, or choose
+propagation or transaction behavior.
+
+## Active frame trap-reason mapping resolution naturality
+
+[ADR-0082](adr/0082-frame-trap-reason-mapping-resolution-naturality.md) adds no
+operation. Its planned single simp theorem moves a trap-reason mapper through
+`FrameContinuationContext.resolve` to the completed ADR-0080 result mapper.
+
+Two private compile regressions will cover an abstract heterogeneous mapper and
+two mappings reduced to one composed result mapping. This proof-only slice does
+not invoke a continuation, map an indexed context or payload, or choose runtime
 propagation or transaction behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws

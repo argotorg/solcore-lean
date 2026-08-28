@@ -193,8 +193,8 @@ Consumers can translate a continuation context's trap-reason type without
 manually rebuilding its four fields. Checkpoint and working inputs remain
 exactly caller-owned values.
 
-Future proof-only work can state resolve naturality using the canonical context
-and resolution-result mappings, without adding another executable operation.
+ADR-0082 fixes resolve naturality using the canonical context and
+resolution-result mappings, without adding another executable operation.
 
 ## Implementation record
 

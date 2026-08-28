@@ -190,8 +190,8 @@ Consumers can translate a total resolution result's trap-reason type without
 reimplementing its three branches or changing selected state, effects, or
 bytes. Reason policy remains explicit and caller-owned.
 
-Future context mapping or resolve-coherence work can build on this operation,
-but must specify its own boundary in a separate decision.
+ADR-0081 adds the downstream context mapping, and ADR-0082 fixes the proof that
+it commutes with resolution. Neither changes this operation's meaning.
 
 ## Implementation record
 
