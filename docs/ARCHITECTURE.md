@@ -533,8 +533,8 @@ ADR-0080 completes the corresponding mapping boundary on the total
 `FrameResolutionResult`. Return and revert preserve their selected state,
 effects, and bytes; only a trapped reason changes. Resolution is not rerun.
 
-ADR-0081 fixes the active lift to `FrameContinuationContext`. Its checkpoint
-and working inputs remain exact, while only the contained frame result uses
+ADR-0081 completes the lift to `FrameContinuationContext`. Its checkpoint and
+working inputs remain exact, while only the contained frame result uses
 ADR-0079's mapping. Continuation and resolution are not executed.
 
 ### Observation

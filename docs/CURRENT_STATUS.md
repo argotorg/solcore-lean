@@ -192,8 +192,8 @@ delegate only its outcome to ADR-0078.
 completes mapping for total frame-resolution results while preserving
 return/revert state, effects, and bytes.
 [ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
-now fixes the active lift to caller-owned continuation contexts while
-preserving every checkpoint and working field.
+completes the lift to caller-owned continuation contexts while preserving
+every checkpoint and working field.
 
 ## Implementation status
 
@@ -261,7 +261,7 @@ preserving every checkpoint and working field.
 | Heterogeneous frame-outcome trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-run-result trap-reason mapping | Complete | Complete | Not published |
 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Complete | Not published |
-| Heterogeneous frame-continuation-context trap-reason mapping | Not implemented | Decision accepted | Not published |
+| Heterogeneous frame-continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1331,17 +1331,23 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Resolution, continuation contexts, payloads, propagation,
 and transaction policy remain outside this slice.
 
-## Active heterogeneous frame-continuation-context trap-reason mapping
+## Completed heterogeneous frame-continuation-context trap-reason mapping
 
 [ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
-fixes one pure context lift of ADR-0079. State and effect checkpoints, working
-effects, and the result's working state remain exact; only its outcome reason
-can change.
+adds exactly one pure `FrameContinuationContext.mapTrapReason` operation. State
+and effect checkpoints, working effects, and the result's working state remain
+exact; only its outcome reason can change through ADR-0079.
 
-The planned surface is one operation, exactly seven construction, projection,
-identity, and composition simp laws, and exactly three definition-only runtime
-assertions. Continuation, resolution, parent indexing, payloads, propagation,
-and transaction policy remain outside this slice.
+A 27-line definition module and an 87-line properties module each add one
+umbrella import. Exactly seven simp laws cover construction, four projections,
+identity, and composition. The operation, its generated equation, and all
+seven laws report exactly `[propext]`. A 118-line definition-only test module
+plus two runner lines contains exactly three assertions.
+
+The four implementation commits contain 250, 32, 88, and 120 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Continuation, resolution, parent indexing, payloads,
+propagation, and transaction policy remain outside this slice.
 
 ## Meaning of completion
 

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: checkpoint-preserving lift of frame-run trap-reason mapping
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -195,3 +195,37 @@ exactly caller-owned values.
 
 Future proof-only work can state resolve naturality using the canonical context
 and resolution-result mappings, without adding another executable operation.
+
+## Implementation record
+
+The completed slice adds exactly one public
+`FrameContinuationContext.mapTrapReason` operation in a 27-line downstream
+definition module plus one umbrella import. The ADR-0067 and ADR-0079
+definition, properties, and test modules remain unchanged. The mapper is
+function-first, supports different reason universes, preserves the three
+caller-owned context inputs, and delegates only the result field to ADR-0079.
+
+An 87-line properties module plus one umbrella import publishes exactly seven
+simp laws: one constructor equation, four projections, identity, and
+composition. Concrete and abstract contexts both simplify without unfolding
+the definition. Composition reduces two nested mappings to one composed
+mapping. The operation, its generated equation, and all seven laws report
+exactly `[propext]`, and the combined simp surface terminates at record normal
+forms.
+
+A 118-line definition-only test module plus two runner lines contains exactly
+three runtime assertions. Returned, reverted, and trapped contexts use
+different state checkpoints, effect checkpoints, working effects, and result
+working states. The tests also verify distinct exact nonempty return/revert
+bytes and one exact mapped trap reason without importing the laws.
+
+The implementation commits are `8c26b3a` (250 changed lines), `43ef3c8` (32),
+`4b598ee` (88), and `96577a1` (120), all below 300 changed lines; this completion
+update is the fifth staged commit. The definition-stage commit also aligns the
+documented composition binder with the shared `MappedTrapReason` API name.
+Focused and full builds, tests, trust-zero, axiom, simp-termination,
+semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+
+The lift remains a pure record transformation. It invokes no continuation or
+resolver, maps no indexed context or payload, and establishes no rollback,
+propagation, ancestry, handling, or transaction policy.

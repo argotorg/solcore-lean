@@ -86,7 +86,7 @@ These results remain regression obligations for every extension.
 | 60 | Heterogeneous frame-outcome trap-reason mapping | Complete | Maps only reason types while preserving return/revert payloads and leaving policy caller-owned |
 | 61 | Heterogeneous frame-run-result trap-reason mapping | Complete | Preserves working state while lifting the completed outcome mapping, without adding runtime propagation |
 | 62 | Heterogeneous frame-resolution-result trap-reason mapping | Complete | Preserves selected state, effects, and bytes while mapping only the total result's trapped reason |
-| 63 | Heterogeneous frame-continuation-context trap-reason mapping | Active | Preserves all caller-owned inputs while mapping only the contained frame result |
+| 63 | Heterogeneous frame-continuation-context trap-reason mapping | Complete | Preserves all caller-owned inputs while mapping only the contained frame result |
 | 64 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 65 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
 | 66 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1075,17 +1075,22 @@ Full validation and independent P0-P3 audits pass. The slice does not rerun
 resolution, map a context or payload, or choose propagation or transaction
 behavior.
 
-## Active heterogeneous frame-continuation-context trap-reason mapping
+## Completed heterogeneous frame-continuation-context trap-reason mapping
 
 [ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md)
-adds one planned context lift of ADR-0079. It copies the state checkpoint,
-effect checkpoint, and working effects unchanged, then maps only the
-`FrameRunResult` field.
+adds one context lift of ADR-0079. It copies the state checkpoint, effect
+checkpoint, and working effects unchanged, then maps only the `FrameRunResult`
+field.
 
-The planned proof surface contains exactly seven simp laws for construction,
-the four projections, identity, and composition. Three definition-only branch
-tests will observe every field with distinct witnesses. This slice does not run
-a continuation or resolver, map an indexed context or payload, or choose
+The 27-line definition module and 87-line properties module add one umbrella
+import each. Exactly seven simp laws cover construction, four projections,
+identity, and composition; all report `[propext]`. The 118-line definition-only
+test module plus two runner lines contains exactly three assertions observing
+every field with distinct witnesses.
+
+The four implementation commits contain 250, 32, 88, and 120 changed lines.
+Full validation and independent P0-P3 audits pass. This slice does not run a
+continuation or resolver, map an indexed context or payload, or choose
 propagation or transaction behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws

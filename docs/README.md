@@ -382,7 +382,7 @@ The completed total-resolution mapping slice,
 keeps return/revert state, effects, and bytes unchanged while translating only
 trapped reasons. It does not rerun the resolver.
 
-The active continuation-context mapping slice,
+The completed continuation-context mapping slice,
 [ADR-0081](adr/0081-heterogeneous-frame-continuation-context-trap-reason-mapping.md),
 keeps caller-owned checkpoints and working inputs unchanged while mapping only
 the contained frame result.
