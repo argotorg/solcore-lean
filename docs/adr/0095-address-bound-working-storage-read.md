@@ -86,7 +86,8 @@ operation, so they introduce no simp loop.
 
 Add no checkpoint specialization, empty or stored-slot specialization,
 read-after-write law, write-after-read law, unchanged-carrier theorem, generic
-delegation equality, reverse rule, or resolution coherence theorem here.
+delegation law beyond the generated equation, reverse rule, or resolution
+coherence theorem here.
 
 ## Required runtime regressions
 
