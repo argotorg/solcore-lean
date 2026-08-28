@@ -255,6 +255,8 @@ theorem advance_next_iff {state next : State} :
                 simp [advance] at advanced
                 cases advanced
                 exact .invokeClosure
+            | hostApply function =>
+                simp [advance] at advanced
             | letBody body environment =>
                 simp [advance] at advanced
                 cases advanced
@@ -361,6 +363,7 @@ theorem advance_done_iff {state : State} {value : Value} :
                 cases returned <;> simp [advance] at advanced
             | applyClosure parameterType resultType body capturedEnvironment =>
                 simp [advance] at advanced
+            | hostApply function => simp [advance] at advanced
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with

@@ -42,6 +42,7 @@ inductive Frame where
       (parameterType resultType : Ty)
       (body : Expr)
       (environment : Environment)
+  | hostApply (function : HostFunction)
   | letBody (body : Expr) (environment : Environment)
   | ifBranches (thenBranch : Expr) (elseBranch : Expr) (environment : Environment)
   deriving Repr, BEq, DecidableEq
@@ -591,6 +592,8 @@ def advance (state : State) : AdvanceResult :=
           | actual => .fault (.expectedFunction actual)
       | .applyClosure _ _ body capturedEnvironment :: continuation =>
           .next ⟨.eval body (value :: capturedEnvironment), continuation, state.store⟩
+      | .hostApply function :: _ =>
+          .fault (.unhandledHostFunction function)
       | .letBody body environment :: continuation =>
           .next ⟨.eval body (value :: environment), continuation, state.store⟩
       | .ifBranches thenBranch elseBranch environment :: continuation =>
