@@ -34,6 +34,16 @@ private theorem storageReadProgram_closed_rejected :
     storageReadProgram.check = false := by
   decide
 
+private def illTypedStorageReadProgram : Program := {
+  resultType := .word
+  body :=
+    .apply (.var HostFunction.storageRead.index) (.bool true)
+}
+
+private theorem illTypedStorageReadProgram_host_rejected :
+    illTypedStorageReadProgram.checkHost = false := by
+  decide
+
 private def checkedStorageReadProgram : CheckedHostCoreProgram :=
   ⟨storageReadProgram, storageReadProgram_host_checked⟩
 
@@ -42,6 +52,11 @@ private theorem compileTimeAdmissionRegression :
       some checkedStorageReadProgram := by
   exact CheckedHostCoreProgram.ofProgram?_of_checked
     storageReadProgram storageReadProgram_host_checked
+
+private theorem compileTimeRejectedAdmissionRegression :
+    CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram = none :=
+  CheckedHostCoreProgram.ofProgram?_of_rejected
+    illTypedStorageReadProgram illTypedStorageReadProgram_host_rejected
 
 private theorem compileTimeHostContextIndexRegression :
     hostContext[HostFunction.storageRead.index]? =
@@ -157,6 +172,11 @@ def testCoreHostMachine : IO Unit := do
     "the host checker rejected a storage-read program"
   assertTrue (!storageReadProgram.check)
     "the closed checker accepted a program with an unbound host capability"
+  assertTrue (!illTypedStorageReadProgram.checkHost)
+    "the host checker accepted a storage read with a Boolean argument"
+  assertTrue
+    (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
+    "checked host admission retained a program rejected by the host checker"
   match CheckedHostCoreProgram.ofProgram? storageReadProgram with
   | none =>
       throw (IO.userError "checked host admission rejected accepted code")
