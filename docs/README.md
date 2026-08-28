@@ -488,9 +488,9 @@ The completed
 adds one proof that removing the address wrapper from a write result recovers
 the existing underlying values write without changing success or failure.
 
-The accepted
+The completed
 [ADR-0104](adr/0104-parent-indexed-initialization-continuation-context-coherence.md)
-plans one proof that the two existing initialization routes build the same
+adds one proof that the two existing initialization routes build the same
 plain continuation context when given the same outcome.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
@@ -721,7 +721,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
   fixes the relation between wrapper and underlying write results.
 - [ADR-0104](adr/0104-parent-indexed-initialization-continuation-context-coherence.md)
-  fixes the planned equality of two initialization construction routes.
+  fixes the equality of two initialization construction routes.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: equate two pure continuation-context construction routes
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -115,6 +115,26 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact non-simp law plus one umbrella import; the
 exact two compile regressions plus one runner import and no call; independent
 audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 29-line properties module plus one semantic
+umbrella import. It publishes exactly the required named non-simp coherence law
+and adds no helper, executable operation, carrier, or instance. The `rfl` law
+reports exactly `[propext]`.
+
+A 52-line compile-only test module plus one runner import contains exactly two
+private examples. The first names the whole base-context equality directly.
+The second transports that equality through the existing `continue?` consumer
+with `congrArg` and an arbitrary callback. The test layer adds no runtime or
+public declaration, fixture, helper, assertion, or runner call.
+
+The implementation commits are `b63720a` (175 changed lines), `06c7cdd` (30),
+and `e98f8e5` (53), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 548-job full build, the
+984-job full test run, metadata and kernel checks, diff checks, declaration and
+simp-registration inventories, existing projection-law interactions, consumer
+transport, and independent P0-P3 audits pass.
 
 ## Publication and consequences
 

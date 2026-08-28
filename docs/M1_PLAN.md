@@ -109,7 +109,7 @@ These results remain regression obligations for every extension.
 | 83 | Address-bound working storage-write algebra | Complete | Specializes overwrite and distinct-slot commutation through the retained storage selector |
 | 84 | Address-bound working storage-write preservation | Complete | Exposes selector, checkpoint, and working-journal preservation without collapsing write failure |
 | 85 | Address-bound working storage-write values coherence | Complete | Relates wrapper write results to the existing address-parameterized values writer |
-| 86 | Parent-indexed initialization continuation-context coherence | Planned | Equates the refined trace-extension route with the plain checkpointed-values route |
+| 86 | Parent-indexed initialization continuation-context coherence | Complete | Equates the refined trace-extension route with the plain checkpointed-values route |
 | 87 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 88 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 89 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1446,15 +1446,16 @@ claim. Two private compile regressions cover direct simplification and an
 arbitrary pure consumer; the law reports `[propext]`, and full validation and
 independent P0-P3 audits pass.
 
-## Planned parent-indexed initialization continuation-context coherence
+## Completed parent-indexed initialization continuation-context coherence
 
 [ADR-0104](adr/0104-parent-indexed-initialization-continuation-context-coherence.md)
 equates the plain base contexts produced by the existing trace-extension and
 checkpointed-working-pair construction routes.
 
 The single named non-simp law adds no constructor, frame transition, outcome
-generation, or runtime policy. Two compile-only regressions will cover the
-whole equality and one existing continuation consumer.
+generation, or runtime policy. Two compile-only regressions cover the whole
+equality and the existing `continue?` consumer. The law reports `[propext]`;
+full validation and independent P0-P3 audits pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
