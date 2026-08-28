@@ -483,9 +483,9 @@ proofs that a successful retained-address write keeps the same selector,
 checkpoint, and working effect journal, while an unavailable write remains
 `none`.
 
-The accepted
+The completed
 [ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
-plans one proof that removing the address wrapper from a write result recovers
+adds one proof that removing the address wrapper from a write result recovers
 the existing underlying values write without changing success or failure.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
@@ -714,7 +714,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0102](adr/0102-address-bound-working-storage-write-preservation.md)
   fixes the structural-preservation observations for that writer.
 - [ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
-  fixes the planned relation between wrapper and underlying write results.
+  fixes the relation between wrapper and underlying write results.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

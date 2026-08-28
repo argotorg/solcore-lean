@@ -108,7 +108,7 @@ These results remain regression obligations for every extension.
 | 82 | Checkpointed working-pair storage-write algebra | Complete | Lifts overwrite and independent-write commutation through the existing working-write operation |
 | 83 | Address-bound working storage-write algebra | Complete | Specializes overwrite and distinct-slot commutation through the retained storage selector |
 | 84 | Address-bound working storage-write preservation | Complete | Exposes selector, checkpoint, and working-journal preservation without collapsing write failure |
-| 85 | Address-bound working storage-write values coherence | Planned | Relates wrapper write results to the existing address-parameterized values writer |
+| 85 | Address-bound working storage-write values coherence | Complete | Relates wrapper write results to the existing address-parameterized values writer |
 | 86 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 87 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 88 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1433,7 +1433,7 @@ slice adds exactly three simp laws and three private compile regressions, with
 no executable operation or whole-state preservation claim. All laws report
 `[propext]`; full validation and independent P0-P3 audits pass.
 
-## Planned address-bound working storage-write values coherence
+## Completed address-bound working storage-write values coherence
 
 [ADR-0103](adr/0103-address-bound-working-storage-write-values-coherence.md)
 relates the retained-address optional write to the existing generic values
@@ -1441,7 +1441,9 @@ write after projecting away only the wrapper.
 
 The single simp law keeps success and failure stages exact, enabling generic
 values consumers without a new operation, carrier, address role, or runtime
-claim.
+claim. Two private compile regressions cover direct simplification and an
+arbitrary pure consumer; the law reports `[propext]`, and full validation and
+independent P0-P3 audits pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
