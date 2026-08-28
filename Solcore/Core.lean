@@ -5,6 +5,7 @@ import Solcore.Core.Host
 import Solcore.Core.HostSafety
 import Solcore.Core.HostMachine
 import Solcore.Core.HostStateSafety
+import Solcore.Core.HostCoreTransitionSafety
 import Solcore.Core.HostMachineProperties
 import Solcore.Core.HostRunner
 import Solcore.Core.HostRunnerProperties
