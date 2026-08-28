@@ -11,13 +11,13 @@ namespace Solcore.Semantics.Account
 
 @[simp] theorem code?_withCode
     (account : Account)
-    (code : CheckedCoreProgram) :
+    (code : CheckedHostCoreProgram) :
     (account.withCode code).code? = some code := by
   rfl
 
 @[simp] theorem storageValue?_withCode
     (account : Account)
-    (code : CheckedCoreProgram)
+    (code : CheckedHostCoreProgram)
     (slot : Core.Word) :
     (account.withCode code).storageValue? slot = account.storageValue? slot := by
   rfl

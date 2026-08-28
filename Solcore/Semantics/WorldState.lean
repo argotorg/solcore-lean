@@ -1,5 +1,5 @@
 import Solcore.Semantics.RuntimeScalars
-import Solcore.Semantics.CheckedCoreProgram
+import Solcore.Semantics.CheckedHostCoreProgram
 
 set_option autoImplicit false
 
@@ -10,7 +10,7 @@ structure Account where private mk ::
   private storage : Core.Word → Option Core.Word
   private storage_nonzero :
     ∀ slot value, storage slot = some value → value ≠ Core.Word.zero
-  private code : Option CheckedCoreProgram
+  private code : Option CheckedHostCoreProgram
 
 /-- Semantic lookup for an explicitly present or absent account. -/
 structure WorldState where private mk ::
@@ -22,14 +22,14 @@ namespace Account
 def empty : Account :=
   ⟨fun _ => none, by simp, none⟩
 
-/-- Observe the checker-accepted code associated with this Account. -/
-def code? (account : Account) : Option CheckedCoreProgram :=
+/-- Observe the host-checker-accepted code associated with this Account. -/
+def code? (account : Account) : Option CheckedHostCoreProgram :=
   account.code
 
 /-- Associate checker-accepted code while preserving the complete storage. -/
 def withCode
     (account : Account)
-    (code : CheckedCoreProgram) : Account :=
+    (code : CheckedHostCoreProgram) : Account :=
   ⟨account.storage, account.storage_nonzero, some code⟩
 
 /-- Observe whether a semantic nonzero storage value exists. -/

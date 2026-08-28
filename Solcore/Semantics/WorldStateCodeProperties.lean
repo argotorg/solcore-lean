@@ -1,7 +1,7 @@
 import Solcore.Semantics.WorldStateCodeExecution
-import Solcore.Semantics.CheckedCoreProgramProperties
+import Solcore.Semantics.CheckedHostCoreProgramProperties
 
-/-! Explicit lookup branches and execution safety for selected checked code. -/
+/-! Lookup branches and finite-run safety for selected host-aware code. -/
 
 set_option autoImplicit false
 
@@ -27,7 +27,7 @@ namespace Solcore.Semantics.WorldState
     (state : WorldState)
     (codeAddress : Address)
     (account : Account)
-    (code : CheckedCoreProgram)
+    (code : CheckedHostCoreProgram)
     (accountPresent : state.account? codeAddress = some account)
     (codePresent : account.code? = some code) :
     state.code? codeAddress = some code := by
@@ -55,14 +55,14 @@ namespace Solcore.Semantics.WorldState
     (state : WorldState)
     (codeAddress : Address)
     (account : Account)
-    (code : CheckedCoreProgram)
+    (code : CheckedHostCoreProgram)
     (fuel : Nat)
     (accountPresent : state.account? codeAddress = some account)
     (codePresent : account.code? = some code) :
     state.runCode? codeAddress fuel = some (code.runStateful fuel) := by
   simp [runCode?, code?, accountPresent, codePresent]
 
-/-- Address-selected checked-code execution cannot return a machine fault. -/
+/-- Address-selected host-checked execution cannot return a machine fault. -/
 theorem runCode?_ne_some_fault
     (state : WorldState)
     (codeAddress : Address)

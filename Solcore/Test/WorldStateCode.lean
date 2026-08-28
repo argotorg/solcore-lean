@@ -1,7 +1,7 @@
 import Solcore.Semantics.AccountCodeProperties
 import Solcore.Semantics.WorldStateCodeProperties
 
-/-! Runtime and direct-law regressions for address-selected checked code. -/
+/-! Runtime and direct-law regressions for address-selected host code. -/
 
 set_option autoImplicit false
 
@@ -24,13 +24,13 @@ private def unitProgram : Program := {
   body := .unit
 }
 
-private theorem cellProgram_checked : cellProgram.check = true := by decide
-private theorem unitProgram_checked : unitProgram.check = true := by decide
+private theorem cellProgram_checked : cellProgram.checkHost = true := by decide
+private theorem unitProgram_checked : unitProgram.checkHost = true := by decide
 
-private def checkedCellProgram : CheckedCoreProgram :=
+private def checkedCellProgram : CheckedHostCoreProgram :=
   ⟨cellProgram, cellProgram_checked⟩
 
-private def checkedUnitProgram : CheckedCoreProgram :=
+private def checkedUnitProgram : CheckedHostCoreProgram :=
   ⟨unitProgram, unitProgram_checked⟩
 
 private def addressA : Address := ⟨0, by decide⟩
@@ -52,7 +52,7 @@ private def twoCodeAccounts : WorldState :=
 
 private theorem compileTimeWithCodeStorageRegression
     (account : Account)
-    (code : CheckedCoreProgram)
+    (code : CheckedHostCoreProgram)
     (storedSlot : Word) :
     (account.withCode code).storageValue? storedSlot =
       account.storageValue? storedSlot :=
@@ -60,7 +60,7 @@ private theorem compileTimeWithCodeStorageRegression
 
 private theorem compileTimeStoragePreservationRegression
     (account : Account)
-    (code : CheckedCoreProgram)
+    (code : CheckedHostCoreProgram)
     (writtenSlot value : Word) :
     ((account.withCode code).storageWrite writtenSlot value).code? = some code := by
   rw [Account.code?_storageWrite]
@@ -70,7 +70,7 @@ private theorem compileTimeSelectionRegression
     (state : WorldState)
     (codeAddress : Address)
     (account : Account)
-    (code : CheckedCoreProgram)
+    (code : CheckedHostCoreProgram)
     (accountPresent : state.account? codeAddress = some account)
     (codePresent : account.code? = some code) :
     state.code? codeAddress = some code :=
@@ -81,7 +81,7 @@ private theorem compileTimeExecutionRegression
     (state : WorldState)
     (codeAddress : Address)
     (account : Account)
-    (code : CheckedCoreProgram)
+    (code : CheckedHostCoreProgram)
     (fuel : Nat)
     (accountPresent : state.account? codeAddress = some account)
     (codePresent : account.code? = some code) :
