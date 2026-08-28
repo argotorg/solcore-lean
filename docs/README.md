@@ -372,7 +372,7 @@ The completed heterogeneous trap-reason mapping slice,
 caller translate only trapped reasons while keeping return and revert bytes
 unchanged. It adds no taxonomy or propagation policy.
 
-The active frame-result mapping slice,
+The completed frame-result mapping slice,
 [ADR-0079](adr/0079-heterogeneous-frame-run-result-trap-reason-mapping.md),
 lifts that translation while keeping the result's working state unchanged. It
 does not resolve state or imply that a trap was propagated at runtime.

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: working-state-preserving mapping of frame-run trap reasons
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -176,3 +176,36 @@ inherits ADR-0078's branch behavior while keeping reason policy explicit.
 Future payload or continuation integration can reuse this operation, but must
 specify its own state, effect, trace, and runtime-propagation meaning in a
 separate decision.
+
+## Implementation record
+
+The completed slice adds exactly one public `FrameRunResult.mapTrapReason`
+operation in a 20-line downstream definition module plus one umbrella import.
+The ADR-0060 and ADR-0078 definition, properties, and test modules remain
+unchanged. The function is caller-supplied and function-first, supports
+different source and target universes, keeps the exact working state, and
+delegates only the outcome to ADR-0078.
+
+A 57-line properties module plus one umbrella import publishes exactly five
+simp laws: one constructor equation, two projections, identity, and
+composition. Constructor consumers and abstract-result consumers both reduce
+without unfolding the definition. Composition reduces two nested mappings to
+one composed mapping, and the combined simp surface converges without a loop.
+The operation, its one generated equation, and all five laws report exactly
+`[propext]`.
+
+An 83-line definition-only test module plus two runner lines contains exactly
+three runtime assertions. Separate two-constructor source and target reason
+types and a nonconstant mapper check exact return bytes, distinct exact revert
+bytes, one exact mapped trap reason, and three different observed working-state
+storage values without importing the proof laws.
+
+The implementation commits are `d21219c` (235 changed lines), `24bae38` (21),
+`92634b5` (58), and `4a06204` (85), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, simp-termination, semantic-kernel, metadata, diff, and independent P0-P3
+audits pass.
+
+The lift remains a pure value transformation. It resolves no state, maps no
+journal, trace, continuation, resolution result, or payload, and establishes
+no runtime propagation, ancestry, handling, or transaction policy.
