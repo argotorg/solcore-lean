@@ -6,15 +6,17 @@ namespace Solcore.Semantics
 
 @[ext] theorem Account.ext
     {left right : Account}
-    (same : ∀ slot,
-      left.storageValue? slot = right.storageValue? slot) :
+    (sameStorage : ∀ slot,
+      left.storageValue? slot = right.storageValue? slot)
+    (sameCode : left.code? = right.code?) :
     left = right := by
   cases left
   cases right
-  simp only [Account.storageValue?] at same
+  simp only [Account.storageValue?] at sameStorage
+  simp only [Account.code?] at sameCode
   congr
   funext slot
-  exact same slot
+  exact sameStorage slot
 
 @[ext] theorem WorldState.ext
     {left right : WorldState}

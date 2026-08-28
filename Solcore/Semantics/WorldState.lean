@@ -1,14 +1,16 @@
 import Solcore.Semantics.RuntimeScalars
+import Solcore.Semantics.CheckedCoreProgram
 
 set_option autoImplicit false
 
 namespace Solcore.Semantics
 
-/-- An account whose semantic storage lookup never returns a stored zero. -/
+/-- Account code and sparse storage whose lookup never returns a stored zero. -/
 structure Account where private mk ::
   private storage : Core.Word → Option Core.Word
   private storage_nonzero :
     ∀ slot value, storage slot = some value → value ≠ Core.Word.zero
+  private code : Option CheckedCoreProgram
 
 /-- Semantic lookup for an explicitly present or absent account. -/
 structure WorldState where private mk ::
@@ -16,9 +18,19 @@ structure WorldState where private mk ::
 
 namespace Account
 
-/-- The present account whose storage contains no entries. -/
+/-- The present account with neither code nor stored values. -/
 def empty : Account :=
-  ⟨fun _ => none, by simp⟩
+  ⟨fun _ => none, by simp, none⟩
+
+/-- Observe the checker-accepted code associated with this Account. -/
+def code? (account : Account) : Option CheckedCoreProgram :=
+  account.code
+
+/-- Associate checker-accepted code while preserving the complete storage. -/
+def withCode
+    (account : Account)
+    (code : CheckedCoreProgram) : Account :=
+  ⟨account.storage, account.storage_nonzero, some code⟩
 
 /-- Observe whether a semantic nonzero storage value exists. -/
 def storageValue?
@@ -40,7 +52,8 @@ def storageWrite
         intro current stored present
         split at present
         · contradiction
-        · exact account.storage_nonzero current stored present⟩
+        · exact account.storage_nonzero current stored present,
+      account.code⟩
   else
     ⟨fun current => if current = slot then some value else account.storage current,
       by
@@ -48,7 +61,8 @@ def storageWrite
         split at present
         · intro stored_zero
           exact zero ((Option.some.inj present).trans stored_zero)
-        · exact account.storage_nonzero current stored present⟩
+        · exact account.storage_nonzero current stored present,
+      account.code⟩
 
 end Account
 

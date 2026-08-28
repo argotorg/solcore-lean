@@ -11,9 +11,11 @@ open Solcore.Semantics
 
 private theorem compileTimeExtRegression_account
     {left right : Account}
-    (same : ∀ slot, left.storageValue? slot = right.storageValue? slot) :
+    (sameStorage : ∀ slot,
+      left.storageValue? slot = right.storageValue? slot)
+    (sameCode : left.code? = right.code?) :
     left = right :=
-  Account.ext same
+  Account.ext sameStorage sameCode
 
 private theorem compileTimeExtRegression_worldState
     {left right : WorldState}

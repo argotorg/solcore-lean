@@ -10,12 +10,15 @@ namespace Solcore.Semantics
     (account.storageWrite slot first).storageWrite slot second =
       account.storageWrite slot second := by
   apply Account.ext
-  intro current
-  by_cases firstZero : first = Core.Word.zero
-  <;> by_cases secondZero : second = Core.Word.zero
-  <;> by_cases selected : current = slot
-  <;> simp [Account.storageWrite, Account.storageValue?, firstZero,
-    secondZero, selected]
+  · intro current
+    by_cases firstZero : first = Core.Word.zero
+    <;> by_cases secondZero : second = Core.Word.zero
+    <;> by_cases selected : current = slot
+    <;> simp [Account.storageWrite, Account.storageValue?, firstZero,
+      secondZero, selected]
+  · by_cases firstZero : first = Core.Word.zero
+    <;> by_cases secondZero : second = Core.Word.zero
+    <;> simp [Account.storageWrite, Account.code?, firstZero, secondZero]
 
 theorem Account.storageWrite_commute
     (account : Account)
@@ -27,13 +30,16 @@ theorem Account.storageWrite_commute
         leftSlot leftValue := by
   have reverse : rightSlot ≠ leftSlot := Ne.symm different
   apply Account.ext
-  intro current
-  by_cases leftZero : leftValue = Core.Word.zero
-  <;> by_cases rightZero : rightValue = Core.Word.zero
-  <;> by_cases atLeft : current = leftSlot
-  <;> by_cases atRight : current = rightSlot
-  <;> simp [Account.storageWrite, Account.storageValue?, leftZero, rightZero,
-    atLeft, atRight, different, reverse]
+  · intro current
+    by_cases leftZero : leftValue = Core.Word.zero
+    <;> by_cases rightZero : rightValue = Core.Word.zero
+    <;> by_cases atLeft : current = leftSlot
+    <;> by_cases atRight : current = rightSlot
+    <;> simp [Account.storageWrite, Account.storageValue?, leftZero, rightZero,
+      atLeft, atRight, different, reverse]
+  · by_cases leftZero : leftValue = Core.Word.zero
+    <;> by_cases rightZero : rightValue = Core.Word.zero
+    <;> simp [Account.storageWrite, Account.code?, leftZero, rightZero]
 
 @[simp] theorem WorldState.putAccount_overwrite
     (state : WorldState)
