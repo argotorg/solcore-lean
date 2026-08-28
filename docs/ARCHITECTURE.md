@@ -394,6 +394,11 @@ and a trap produces no resolved state until a later trap policy is chosen. The
 completed operation has exactly three constructor laws and three runtime
 assertions. It does not own checkpoints or define nested rollback.
 
+ADR-0058 derives an observational update algebra from ADR-0056 without adding
+an operation or carrier. Extensionality hides private lookup representation;
+same-key updates overwrite, while distinct-key Account writes and WorldState
+puts commute. The commutation laws deliberately are not simplification rules.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

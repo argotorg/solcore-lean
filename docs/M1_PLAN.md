@@ -63,10 +63,11 @@ These results remain regression obligations for every extension.
 | 37 | Address text and byte coherence | Complete | Proves the completed strict representations agree without a new API |
 | 38 | Minimal Account and WorldState carrier | Complete | Fixes explicit absence and canonical storage values before transitions |
 | 39 | Frame-outcome WorldState resolution | Complete | Selects working/checkpoint state while leaving trap disposition open |
-| 40 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 41 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 42 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 43 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 40 | WorldState observational update algebra | Active | Proves extensionality and independent-update algebra without new operations |
+| 41 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 42 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 43 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 44 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -656,6 +657,15 @@ The operation, exact three laws, and exact three runtime assertions are
 implemented. The 24-line definition, 32-line properties, and 53-line test
 modules plus two runner lines pass focused and full validation. Each law reports
 only `[propext]`, with no custom axiom or unchecked declaration.
+
+## Active WorldState observational update algebra
+
+[ADR-0058](adr/0058-world-state-observational-update-algebra.md) adds no
+operation, carrier, or instance. It plans exactly six public laws, two
+compile-time theorem-use examples, and four runtime assertions for extensional
+equality, overwrite, and distinct-key commutation. The commutation laws remain
+outside the simp set. This is proof coverage for ADR-0056, not selection of the
+next operational state-transition slice.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
