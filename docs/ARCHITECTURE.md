@@ -591,8 +591,8 @@ ADR-0094 completes the corresponding WorldState read boundary. Account absence
 is `none`; every slot in a present Account is `some value`, with missing or
 deleted slots observed as `some zero`.
 
-ADR-0095 accepts the lift of that read through the retained storage address and
-the working WorldState. The checkpoint remains outside the read path.
+ADR-0095 completes the lift of that read through the retained storage address
+and the working WorldState. The checkpoint remains outside the read path.
 
 ### Observation
 

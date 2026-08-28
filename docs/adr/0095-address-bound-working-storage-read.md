@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: read working storage through a retained storage address
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -140,6 +140,30 @@ Keep each of five commits below 300 changed lines: this decision and targeted
 roadmap updates; the exact operation and umbrella import; the exact two laws
 and umbrella import; the exact three runtime assertions plus one runner import
 and call; independent audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds exactly one operation in a 20-line definition module
+plus one umbrella import. It passes the carrier's working WorldState, retained
+storage address, and caller-supplied slot directly to ADR-0094. The operation
+and its generated equation report exactly `[propext]`.
+
+A 37-line properties module plus one umbrella import publishes exactly the two
+required simp laws. Each proof delegates directly to the matching ADR-0094 law.
+Both report exactly `[propext]`; their exclusive hypotheses and one-way
+reductions introduce no critical overlap or simplification loop.
+
+An 84-line definition-only test module plus one runner import and one call
+contains exactly three runtime assertions. They reject checkpoint fallback and
+unrelated-account rescue, distinguish working Account absence from a present
+empty Account, and verify all four combinations of two retained addresses and
+two slots against distinct working values.
+
+The implementation commits are `c905bef` (186 changed lines), `8d702dd` (24),
+`4563d31` (38), and `ba00324` (86), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, full build and
+test runs, metadata and kernel checks, diff checks, simp review, declaration
+inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences
 

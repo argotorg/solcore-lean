@@ -100,7 +100,7 @@ These results remain regression obligations for every extension.
 | 74 | Checkpointed working-pair storage write | Complete | Lifts strict storage writes to only the working WorldState while retaining checkpoint and journal |
 | 75 | Checkpointed working-pair storage address | Complete | Binds one caller-designated storage target to checkpointed working values and subsequent writes |
 | 76 | Conditional WorldState storage read | Complete | Preserves Account absence while lifting zero-default slot reads to WorldState |
-| 77 | Address-bound working storage read | Planned | Uses the retained storage address to read only the working WorldState |
+| 77 | Address-bound working storage read | Complete | Uses the retained storage address to read only the working WorldState |
 | 78 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 79 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 80 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1322,16 +1322,18 @@ pass, as do full validation and independent P0-P3 audits. The following slice
 may lift this operation through the stored-address carrier; no frame, mutation,
 gas, ABI, or transaction rule is added here.
 
-## Planned address-bound working storage read
+## Completed address-bound working storage read
 
-[ADR-0095](adr/0095-address-bound-working-storage-read.md) accepts one planned
+[ADR-0095](adr/0095-address-bound-working-storage-read.md) adds one
 carrier-level `readStorage?` operation. It uses the retained address and the
 working WorldState, then delegates account absence and zero-default slot
 behavior to ADR-0094.
 
-Exactly two simp laws and three definition-only runtime assertions are planned.
-The checkpoint does not participate in the read. Address authority, mutation,
-frame entry, gas, ABI, and transaction policy remain outside the slice.
+The 20-line definition and 37-line properties modules each add one umbrella
+import. Exactly two simp laws and three definition-only runtime assertions
+pass, as do full validation and independent P0-P3 audits. The checkpoint does
+not participate in the read. Address authority, mutation, frame entry, gas,
+ABI, and transaction policy remain outside the slice.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
