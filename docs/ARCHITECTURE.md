@@ -519,7 +519,7 @@ recovers the exact trapped payload shape from a `some` equality and carries the
 existing non-strict parent trace-prefix fact to that selected journal. It adds
 no execution operation or runtime provenance.
 
-ADR-0078 fixes the active heterogeneous trap-reason mapping boundary directly
+ADR-0078 completes the heterogeneous trap-reason mapping boundary directly
 on `FrameOutcome`. A caller-supplied pure function changes only trapped reasons;
 return and revert bytes are preserved. No payload, state, effect, trace, or
 runtime propagation behavior is added.

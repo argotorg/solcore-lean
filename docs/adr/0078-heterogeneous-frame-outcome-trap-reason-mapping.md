@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: caller-supplied pure mapping of frame trap reasons
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -176,3 +176,36 @@ Semantic layers can translate only the trap reason of a frame outcome while
 preserving return/revert bytes and keeping the mapping policy explicit. Future
 lifting to frame results or prospective propagation payloads can reuse this
 operation without changing its lower-layer meaning.
+
+## Implementation record
+
+The completed slice adds exactly one public `mapTrapReason` operation in a
+22-line downstream definition module plus one umbrella import. The original
+ADR-0052 definition, properties, and tests remain unchanged. The mapper is
+function-first, supports different source and target universes, preserves exact
+return/revert bytes, and applies the caller's pure function only to trapped
+reasons. No instance, alias, helper, or second operation is added.
+
+A 51-line properties module plus one umbrella import publishes exactly five
+simp laws: three constructor equations, identity, and composition. Composition
+reduces two nested mappings to one composed mapping; no reverse equation is
+present. The operation, its three generated equations, and all five laws are
+axiom-free, and the combined simp surface terminates at the expected constructor
+normal forms.
+
+A 64-line definition-only test module plus two runner lines contains exactly
+three runtime assertions. Separate two-constructor source and target reason
+types and a nonconstant mapper verify exact return bytes, different exact revert
+bytes, and one concrete mapped trap reason without importing the laws.
+
+The implementation commits are `4b28f83` (227 changed lines), `0273aca` (27),
+`045a326` (52), and `d37a1a8` (66), all below 300 changed lines; this completion
+update is the fifth staged commit. The definition-stage commit also corrects
+the ADR to describe Lean's three generated equations in the plural. Focused and
+full builds, tests, trust-zero, axiom, simp-termination, semantic-kernel,
+metadata, diff, and independent P0-P3 audits pass.
+
+Mapping remains caller-owned and may be lossy. This slice proves no runtime
+propagation, ancestry, fatality, recoverability, parent execution, handling,
+transaction disposition, or reason taxonomy, and it maps no frame result,
+payload, state, effect, or trace.

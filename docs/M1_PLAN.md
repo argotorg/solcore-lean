@@ -83,7 +83,7 @@ These results remain regression obligations for every extension.
 | 57 | Parent-indexed trapped-frame rollback selection | Complete | Selects a frame-local parent rollback pair for traps while leaving propagation and transactions open |
 | 58 | Parent-indexed trap propagation payload selection | Complete | Constructs one opt-in caller-designated prospective enclosing payload while leaving handling and transactions open |
 | 59 | Parent-indexed trap propagation payload coherence | Complete | Inverts successful selection and carries existing non-strict prefix evidence without adding execution |
-| 60 | Heterogeneous frame-outcome trap-reason mapping | Active | Maps only reason types while preserving return/revert payloads and leaving policy caller-owned |
+| 60 | Heterogeneous frame-outcome trap-reason mapping | Complete | Maps only reason types while preserving return/revert payloads and leaving policy caller-owned |
 | 61 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 62 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the current frame-local foundations |
 | 63 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1019,17 +1019,22 @@ validation and independent P0-P3 audits pass. The laws characterize pure value
 selection only; they do not prove propagation occurred, introduce runtime
 ancestry, execute a parent, handle a trap, or choose transaction behavior.
 
-## Active heterogeneous frame-outcome trap-reason mapping
+## Completed heterogeneous frame-outcome trap-reason mapping
 
 [ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md) adds one
 pure `mapTrapReason` operation below the payload layers. A caller-supplied
 function changes trapped reasons between arbitrary types while return and
 revert keep their exact byte payloads.
 
-Exactly five axiom-free simp laws cover all constructors, identity, and
-composition. Exactly three definition-only runtime assertions are planned. No
-Functor instance, observer coherence, frame-result or payload lifting, reason
-classification, ancestry, propagation, or transaction behavior is included.
+A 22-line definition module and a 51-line properties module each add one
+umbrella import. Exactly five axiom-free simp laws cover all constructors,
+identity, and composition. A 64-line definition-only test module plus two
+runner lines contains exactly three runtime assertions.
+
+The four implementation commits contain 227, 27, 52, and 66 changed lines.
+Full validation and independent P0-P3 audits pass. No Functor instance,
+observer coherence, frame-result or payload lifting, reason classification,
+ancestry, propagation, or transaction behavior is included.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

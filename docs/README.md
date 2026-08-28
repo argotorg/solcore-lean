@@ -367,7 +367,7 @@ The completed payload-coherence slice,
 characterizes successful selection and carries existing non-strict trace-prefix
 evidence to the selected journal without adding an execution operation.
 
-The active heterogeneous trap-reason mapping slice,
+The completed heterogeneous trap-reason mapping slice,
 [ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md), lets a
 caller translate only trapped reasons while keeping return and revert bytes
 unchanged. It adds no taxonomy or propagation policy.

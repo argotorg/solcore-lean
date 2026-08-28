@@ -182,9 +182,9 @@ performing or proving runtime propagation.
 [ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md)
 completes two proof-only laws that invert a successful payload selection and
 attach the existing non-strict trace-prefix fact to its journal.
-[ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md) is
-active. It specifies one caller-supplied pure mapping on `FrameOutcome` that
-preserves return/revert bytes and changes only trapped reasons.
+[ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md)
+completes one caller-supplied pure mapping on `FrameOutcome` that preserves
+return/revert bytes and changes only trapped reasons.
 
 ## Implementation status
 
@@ -249,7 +249,7 @@ preserves return/revert bytes and changes only trapped reasons.
 | Parent-indexed trapped-frame rollback selection | Complete | Complete | Not published |
 | Parent-indexed trap propagation payload selection | Complete | Complete | Not published |
 | Parent-indexed trap propagation payload coherence | Complete | Complete | Not published |
-| Heterogeneous frame-outcome trap-reason mapping | Not implemented | Decision accepted | Not published |
+| Heterogeneous frame-outcome trap-reason mapping | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1264,15 +1264,23 @@ audits pass. Successful selection remains a value-level fact, and the prefix is
 non-strict; neither claims runtime propagation, ancestry, parent execution,
 handling, or transaction behavior.
 
-## Active heterogeneous frame-outcome trap-reason mapping
+## Completed heterogeneous frame-outcome trap-reason mapping
 
 [ADR-0078](adr/0078-heterogeneous-frame-outcome-trap-reason-mapping.md)
-specifies exactly one `FrameOutcome.mapTrapReason` operation. The caller owns
+adds exactly one `FrameOutcome.mapTrapReason` operation. The caller owns
 the pure function; return and revert retain their exact bytes, and only a
 trapped reason is mapped to the target reason type.
 
-Exactly five axiom-free simp laws and three definition-only runtime assertions
-are planned. No `Functor`, taxonomy, payload mapper, runtime propagation,
+A 22-line definition module plus one umbrella import contains the operation. A
+51-line properties module plus one umbrella import publishes exactly five simp
+laws covering all constructors, identity, and composition. The operation, its
+three generated equations, and all five laws are axiom-free. A 64-line
+definition-only test module plus two runner lines contains exactly three
+assertions with different source and target reason types.
+
+The four implementation commits contain 227, 27, 52, and 66 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. No `Functor`, taxonomy, payload mapper, runtime propagation,
 ancestry, handling, or transaction policy is added.
 
 ## Meaning of completion
