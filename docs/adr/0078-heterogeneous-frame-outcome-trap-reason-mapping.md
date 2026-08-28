@@ -51,7 +51,7 @@ trapped outcome applies the function exactly once to its reason.
 
 Do not add a `Functor` instance, generic `map` alias, coercion, default mapper,
 canonical mapper, relation between reason types, or second executable operation.
-The generated definitional equation is an intentional reduction artifact.
+The generated definitional equations are intentional reduction artifacts.
 
 This downstream operation narrowly fills the heterogeneous reason-mapping gap
 left open by ADR-0076 and ADR-0077. It imports neither payload layer and changes
@@ -110,7 +110,7 @@ to one composed mapping, strictly reducing the number of map calls. Add no
 reverse equation. Constructor, identity, and composition simplification all
 converge to the same constructor normal forms without a loop.
 
-The operation, its generated equation, and all five laws must be axiom-free.
+The operation, its generated equations, and all five laws must be axiom-free.
 Add no kind, return-data, revert-data, trap-reason observer, injectivity,
 surjectivity, equivalence, admissibility, or losslessness theorem. The five laws
 fully cover this slice; further consumer-specific coherence remains separate.
