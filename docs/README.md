@@ -407,7 +407,7 @@ The completed parent-indexed context mapping slice,
 maps only the trace-prefix context while retaining the same parent index and
 checkpoint equality.
 
-The active checkpoint-snapshot slice,
+The completed checkpoint-snapshot slice,
 [ADR-0086](adr/0086-nominal-frame-checkpoint-snapshot.md), names one
 caller-supplied synchronized state/effect pair without claiming capture time,
 ownership, or execution.

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: nominal value representation of a caller-supplied synchronized checkpoint snapshot
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -181,3 +181,33 @@ Checkpoint creation time, ownership, lifetime, active-frame transitions,
 scheduling, diagnostics, and transaction atomicity remain open. The next slice
 will pair this snapshot with independent working values; it will still not
 choose how either value was produced.
+
+## Implementation record
+
+The completed slice adds exactly one `FrameCheckpointSnapshot` carrier and one
+`fromWorkingPair` operation in a 29-line definition module plus one umbrella
+import. The carrier remains generic in rollback and trace types, and the
+operation definitionally retains both members of the supplied pair. The
+carrier, constructor, projections, operation, and generated equation report
+exactly `[propext]`.
+
+A 25-line properties module plus one umbrella import publishes exactly two
+definitional simp laws for state and effect projection. Both report exactly
+`[propext]`; their one-way reductions introduce no simp overlap or loop.
+
+A 47-line definition-only test module plus one runner import contains exactly
+three private compile examples and no runtime declaration, assertion, or call.
+They cover the abstract whole constructor, a concrete nonempty world state,
+and a complete journal with rollback sentinel `37` and nonempty trace
+`[2, 3]`. The module imports the definition only and does not consume the
+published laws.
+
+The implementation commits are `cbbc5a8` (237 changed lines), `19e38de` (30),
+`447be7f` (26), and `2d1f44d` (48), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, simp-termination, semantic-kernel, metadata, diff, and independent
+P0-P3 audits pass.
+
+This nominal value representation establishes no capture time, entry
+authenticity, freshness, ownership, lifetime, provenance, working
+initialization, scheduling, or transaction policy.
