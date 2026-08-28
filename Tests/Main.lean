@@ -66,6 +66,7 @@ import Solcore.Test.AddressWordBridge
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextWithTracePrefix
 import Solcore.Test.FrameResolutionResult
+import Solcore.Test.FrameResolutionResultTrapReasonMap
 import Solcore.Test.FrameTrace
 import Solcore.Test.FrameTraceExtension
 import Solcore.Test.FrameTracePrefix
@@ -4917,6 +4918,7 @@ def run : IO Unit := do
   testAddressWordBridge
   testFrameContinuationContext
   testFrameResolutionResult
+  testFrameResolutionResultTrapReasonMap
   testFrameTrace
   testFrameTraceExtension
   testFrameOutcome
