@@ -431,9 +431,9 @@ The completed continuation-erasure slice,
 proves that identical bytes-ignoring branch callbacks recover the existing
 bytes-insensitive context continuation.
 
-The active result-mapping continuation slice,
+The completed result-mapping continuation slice,
 [ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md),
-specifies proof-only invariance of bytes-aware continuation under heterogeneous
+proves that bytes-aware continuation is invariant under heterogeneous
 trap-reason mapping.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only equality of bytes-aware continuation results under reason mapping
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -129,11 +129,39 @@ taxonomy, storage layout, frozen artifact, or public format.
 
 ## Consequences
 
-Once implemented, reason translation on a total resolution result will be
-provably unobservable to the same bytes-aware return and revert callbacks.
-This closes the immediate algebraic connection between ADR-0080 and ADR-0089
-without adding execution behavior.
+Reason translation on a total resolution result is now provably unobservable
+to the same bytes-aware return and revert callbacks. This closes the immediate
+algebraic connection between ADR-0080 and ADR-0089 without adding execution
+behavior.
 
 Actual payload consumption, parent-frame mutation, trap disposition,
 scheduling, checkpoint lifecycle, and transaction atomicity remain separate
 decisions.
+
+## Implementation record
+
+The completed proof-only slice adds one 27-line properties module plus one
+semantic-umbrella import. It publishes exactly one
+`FrameResolutionResult.continue?_mapTrapReason` simp theorem and no carrier,
+operation, helper, alias, branch specialization, identity duplicate, or
+composition duplicate. The theorem reports exactly `[propext]`.
+
+The proof cases on the total result and reuses the existing ADR-0080 mapping
+and ADR-0089 continuation constructor laws. Constructor, identity, composition,
+and context-resolution mapping paths converge without a simp loop. ADR-0090
+remains non-simp.
+
+A 42-line compile-regression module plus one runner import contains exactly two
+private examples and no runtime call. The first covers one arbitrary
+heterogeneous mapper; the second covers two successive heterogeneous mappers.
+Both retain distinct arbitrary return and revert callbacks and close by `simp`.
+
+The implementation commits are `1c557e3` (187 changed lines), `67419cf` (28),
+and `3006788` (43), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+simp-convergence, semantic-kernel, metadata, diff, and independent P0-P3 audits
+pass.
+
+The equality establishes no mapper evaluation behavior, callback invocation
+count, cost, delivery, parent mutation, trap handling, scheduling, checkpoint
+lifecycle, or transaction policy.

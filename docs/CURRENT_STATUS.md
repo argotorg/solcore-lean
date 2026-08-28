@@ -222,8 +222,8 @@ selected state/effects, and bytes while leaving traps unresolved.
 completes the proof that erasing branch and bytes from the richer continuation
 recovers the existing context continuation.
 [ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md)
-specifies the active proof obligation that result-level reason mapping leaves
-the bytes-aware continuation result unchanged.
+completes the proof that result-level reason mapping leaves the bytes-aware
+continuation result unchanged.
 
 ## Implementation status
 
@@ -301,7 +301,7 @@ the bytes-aware continuation result unchanged.
 | Continuation context from checkpointed working pair | Complete | Complete | Not published |
 | Bytes-aware frame resolution continuation | Complete | Complete | Not published |
 | Frame continuation branch/byte erasure coherence | Complete | Complete | Not published |
-| Frame-resolution continuation trap-reason mapping invariance | Not implemented | Decision accepted | Not published |
+| Frame-resolution continuation trap-reason mapping invariance | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1546,16 +1546,21 @@ completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. The slice adds no carrier, operation, delivery, callback-count
 claim, trap handling, or transaction transition.
 
-## Active frame-resolution continuation trap-reason mapping invariance
+## Completed frame-resolution continuation trap-reason mapping invariance
 
 [ADR-0091](adr/0091-frame-resolution-continuation-trap-reason-mapping-invariance.md)
-specifies one proof-only simp law. It equates bytes-aware continuation after
+adds one proof-only simp law. It equates bytes-aware continuation after
 heterogeneous result reason mapping with continuation of the original result,
 using the same arbitrary return and revert callbacks.
 
-Exactly two private compile regressions are planned. The slice adds no carrier,
-operation, runtime assertion, callback-count claim, trap handling, or
-transaction transition. ADR-0090 remains non-simp.
+The 27-line properties module adds one umbrella import and reports exactly
+`[propext]`. A 42-line test module plus one runner import contains exactly two
+private compile regressions and no runtime call.
+
+The three implementation commits contain 187, 28, and 43 changed lines; this
+completion update is the fourth commit. Full validation and independent P0-P3
+audits pass. The slice adds no carrier, operation, callback-count claim, trap
+handling, or transaction transition. ADR-0090 remains non-simp.
 
 ## Meaning of completion
 
