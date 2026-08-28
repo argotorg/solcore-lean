@@ -22,7 +22,7 @@ namespace HostStorageReadDriver
     (store : Core.Store)
     (execution : Core.hostRun fuel state = .done value store) :
     run context fuel state = ⟨context, .done value store⟩ := by
-  rw [run, execution]
+  rw [run, HostDriver.run, execution]
 
 @[simp] theorem run_of_outOfFuel
     {RollbackState : Type u}
@@ -32,7 +32,7 @@ namespace HostStorageReadDriver
     (state exhausted : Core.State)
     (execution : Core.hostRun fuel state = .outOfFuel exhausted) :
     run context fuel state = ⟨context, .outOfFuel exhausted⟩ := by
-  rw [run, execution]
+  rw [run, HostDriver.run, execution]
 
 @[simp] theorem run_of_fault
     {RollbackState : Type u}
@@ -43,7 +43,7 @@ namespace HostStorageReadDriver
     (error : Core.MachineFault)
     (execution : Core.hostRun fuel state = .fault error faultState) :
     run context fuel state = ⟨context, .fault error faultState⟩ := by
-  rw [run, execution]
+  rw [run, HostDriver.run, execution]
 
 /-- A request resumes with exactly Core's returned remaining fuel. -/
 theorem run_of_suspended
@@ -58,7 +58,9 @@ theorem run_of_suspended
     run context fuel state =
       run (handleHostSuspension context suspension).1 remainingFuel
         (handleHostSuspension context suspension).2 := by
-  rw [run, execution]
+  simpa only [run, handler_handleSuspension] using
+    HostDriver.run_of_suspended handler context fuel remainingFuel state
+      suspension execution
 
 @[simp] theorem handleHostSuspension_context
     {RollbackState : Type u}
@@ -90,24 +92,12 @@ theorem handleHostSuspension_state_hasType
     (fuel : Nat)
     (state : Core.State) :
     (run context fuel state).context = context := by
-  induction fuel using Nat.strongRecOn generalizing context state with
-  | ind fuel ih =>
-      cases execution : Core.hostRun fuel state with
-      | done value store => rw [run, execution]
-      | outOfFuel exhausted => rw [run, execution]
-      | fault error faultState => rw [run, execution]
-      | suspended suspension remainingFuel =>
-          rw [run, execution]
-          change
-            (run (handleHostSuspension context suspension).1 remainingFuel
-              (handleHostSuspension context suspension).2).context = context
-          calc
-            _ = (handleHostSuspension context suspension).1 :=
-              ih remainingFuel
-                (Core.HostRunResult.remainingFuel_lt execution)
-                (handleHostSuspension context suspension).1
-                (handleHostSuspension context suspension).2
-            _ = context := handleHostSuspension_context context suspension
+  simpa only [run] using
+    HostDriver.run_observe
+      (@handler RollbackState TraceState)
+      (fun current => current)
+      (fun current request => by cases request; rfl)
+      context fuel state
 
 /-- Handling typed storage requests preserves the terminal result type. -/
 theorem run_hasType
@@ -121,24 +111,10 @@ theorem run_hasType
     (stateTyping :
       Core.HostStateHasType state resultType definitions) :
     (run context fuel state).outcome.HasType resultType definitions := by
-  induction fuel using Nat.strongRecOn generalizing context state with
-  | ind fuel ih =>
-      cases execution : Core.hostRun fuel state with
-      | done value store =>
-          rw [run, execution]
-          exact Core.hostRun_done_hasType stateTyping execution
-      | outOfFuel exhausted =>
-          rw [run, execution]
-          exact Core.hostRun_outOfFuel_hasType stateTyping execution
-      | fault error faultState =>
-          rw [run, execution]
-          exact Core.hostRun_never_faults stateTyping execution
-      | suspended suspension remainingFuel =>
-          rw [run, execution]
-          apply ih remainingFuel
-            (Core.HostRunResult.remainingFuel_lt execution)
-          apply handleHostSuspension_state_hasType
-          exact Core.hostRun_suspended_hasType stateTyping execution
+  simpa only [run] using
+    HostDriver.run_hasType
+      (@handler RollbackState TraceState)
+      context fuel state stateTyping
 
 theorem run_ne_fault
     {RollbackState : Type u}
@@ -152,10 +128,10 @@ theorem run_ne_fault
     (stateTyping :
       Core.HostStateHasType state resultType definitions) :
     (run context fuel state).outcome ≠ .fault error faultState := by
-  intro fault
-  have typing := run_hasType context fuel state stateTyping
-  rw [fault] at typing
-  exact typing
+  simpa only [run] using
+    HostDriver.run_ne_fault
+      (@handler RollbackState TraceState)
+      context fuel state faultState error stateTyping
 
 end HostStorageReadDriver
 

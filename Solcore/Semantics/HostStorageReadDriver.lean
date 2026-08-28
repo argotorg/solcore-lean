@@ -59,16 +59,7 @@ def run
     (fuel : Nat)
     (state : Core.State) :
     HostDriverResult (Context RollbackState TraceState) :=
-  match _execution : Core.hostRun fuel state with
-  | .done value store => ⟨context, .done value store⟩
-  | .outOfFuel exhausted => ⟨context, .outOfFuel exhausted⟩
-  | .fault error faultState => ⟨context, .fault error faultState⟩
-  | .suspended suspension remainingFuel =>
-      let handled := handleHostSuspension context suspension
-      run handled.1 remainingFuel handled.2
-termination_by fuel
-decreasing_by
-  exact Core.HostRunResult.remainingFuel_lt _execution
+  HostDriver.run handler context fuel state
 
 end HostStorageReadDriver
 
