@@ -128,8 +128,8 @@ while checkpoint ownership remains external.
 [ADR-0061](adr/0061-frame-effect-journal-policy.md) completes the parametric
 effect policy. It separates rollback-scoped and surviving snapshots without a
 concrete event taxonomy or order.
-[ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) accepts the
-active synchronized resolver. One outcome selects WorldState and parametric
+[ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) completes the
+synchronized resolver. One outcome selects WorldState and parametric
 effects together without a new carrier.
 
 ## Implementation status
@@ -179,7 +179,7 @@ effects together without a new carrier.
 | WorldState storage-write algebra | Complete | Complete | Not published |
 | External-checkpoint frame run result | Complete | Complete | Not published |
 | Parametric frame effect journal policy | Complete | Complete | Not published |
-| Synchronized frame state/effect resolution | Active | In progress | Not published |
+| Synchronized frame state/effect resolution | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -900,9 +900,9 @@ the resolver and all laws introduce no axioms. Five assertions in a 64-line
 definition-only test module plus two runner lines pass full validation. The
 independent audits found no P0-P3 issue.
 
-## Active synchronized frame state/effect resolution
+## Completed synchronized frame state/effect resolution
 
-[ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) plans one
+[ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) provides one
 public executable operation, five laws, and three definition-only runtime
 assertions, with no carrier, instance, or helper. Return keeps both working
 components; revert restores checkpoint WorldState and rollback effects while
@@ -910,6 +910,13 @@ preserving working trace; trap remains unresolved. Two projection laws prove
 coherence with the existing independent resolvers. Nested composition, trace
 ownership, concrete effects or order, transactions, ABI, Core adaptation, EVM,
 gas, and publication remain outside.
+
+The 27-line definition module and 78-line properties module each have one
+umbrella import. No carrier, instance, or helper is added. Exactly five laws
+split into three simp constructor equations and two non-simp coherence laws;
+the resolver and every law report `[propext]`. Three assertions in a 66-line
+definition-only test module plus two runner lines cover both projections. Full
+validation and independent P0-P3 audits pass.
 
 ## Meaning of completion
 

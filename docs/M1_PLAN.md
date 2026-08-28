@@ -67,7 +67,7 @@ These results remain regression obligations for every extension.
 | 41 | WorldState storage-write algebra | Complete | Lifts overwrite, commutation, and zero deletion through conditional writes |
 | 42 | External-checkpoint frame run result | Complete | Pairs speculative working state with outcome under caller-owned checkpoint |
 | 43 | Parametric frame effect journal policy | Complete | Separates rollback-scoped state from surviving opaque trace snapshots |
-| 44 | Synchronized frame state/effect resolution | Active | Resolves state and effects from one shared frame outcome |
+| 44 | Synchronized frame state/effect resolution | Complete | Resolves state and effects from one shared frame outcome |
 | 45 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 46 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
 | 47 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -723,14 +723,20 @@ two non-simp nested rules. The 64-line definition-only test module plus two
 runner lines supplies five runtime assertions. Full checks and independent
 P0-P3 audits pass.
 
-## Active synchronized frame state/effect resolution
+## Completed synchronized frame state/effect resolution
 
-[ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) adds one
+[ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) provides one
 resolver and no carrier, instance, or helper. Exactly five laws include three
 constructor equations and two projection-coherence equations; three runtime
 assertions exercise both projections with distinct WorldState and Nat fixtures.
 Nested child composition, trace ownership, concrete effects, ordering, and
 transaction semantics remain separate.
+
+The 27-line definition and 78-line properties modules each have one umbrella
+import. The resolver and all five laws report `[propext]`; the laws split into
+three simp constructor and two non-simp projection rules. A 66-line
+definition-only test module plus two runner lines supplies three checks. No
+carrier, instance, helper, or next operational policy is introduced.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

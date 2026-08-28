@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: one-outcome resolution of WorldState and parametric effects
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -138,3 +138,21 @@ canonical delta, or frozen artifact.
 State and effects now share one explicit halt branch. Child adoption and nested
 execution remain separate decisions rather than hidden behavior of this
 resolver.
+
+## Implementation record
+
+The completed internal slice adds no carrier, instance, or helper and publishes
+exactly one executable resolver. Its definition module contains 27 lines plus
+one umbrella import.
+
+The 78-line properties module plus one umbrella import publishes exactly five
+laws: three simp constructor equations and two non-simp projection-coherence
+equations. The definition and all five laws report exactly `[propext]`.
+Exactly three runtime assertions live in a 66-line definition-only test module
+with two runner lines and exercise both product projections.
+
+The implementation commits are `f12a3fa` (185 changed lines), `bc0183c` (28),
+`7481d5c` (79), and `c86afac` (68). Each remains below 300 changed lines.
+Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+forbidden-declaration, document-link, and diff checks pass. Independent stage
+audits found no P0-P3 issue.

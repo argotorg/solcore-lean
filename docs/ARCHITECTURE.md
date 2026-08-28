@@ -426,6 +426,8 @@ ADR-0062 synchronizes WorldState and effect-journal resolution by matching one
 FrameOutcome once. Its projection laws recover the existing independent state
 and effect resolvers. It adds no result carrier, child composition, event order,
 or transaction meaning.
+The completed resolver and all five laws report only `propext`; three runtime
+assertions exercise both synchronized projections.
 
 ### Observation
 
