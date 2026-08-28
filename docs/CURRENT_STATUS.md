@@ -263,6 +263,9 @@ values recovers the underlying address-parameterized write.
 [ADR-0104](adr/0104-parent-indexed-initialization-continuation-context-coherence.md)
 completes the proof that the parent-indexed trace-extension route and
 checkpointed-working-pair route construct the same plain continuation context.
+[ADR-0105](adr/0105-present-working-storage-account-refinement.md) accepts a
+partial refinement that retains the exact address-bound context, selected
+working Account, and its presence evidence; implementation is planned.
 
 ## Implementation status
 
@@ -354,6 +357,7 @@ checkpointed-working-pair route construct the same plain continuation context.
 | Address-bound working storage-write preservation | No new operation | Complete | Not published |
 | Address-bound working storage-write values coherence | No new operation | Complete | Not published |
 | Parent-indexed initialization continuation-context coherence | No new operation | Complete | Not published |
+| Present working storage Account refinement | Planned | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1804,6 +1808,16 @@ contains one named non-simp law, and the 52-line compile-only module contains
 two private regressions. The law reports `[propext]`; full validation and
 independent audits pass. It adds no operation, frame transition, outcome
 provenance, runtime assertion, or runner call.
+
+## Planned present working storage Account refinement
+
+[ADR-0105](adr/0105-present-working-storage-account-refinement.md) specifies
+one carrier and one partial producer for the Account selected by an
+address-bound context's working WorldState.
+
+Failure remains `none`; success retains the exact context, Account, and lookup
+evidence. The slice creates no Account, assigns no address authority, and adds
+no total storage operation, runtime transition, or published surface.
 
 ## Meaning of completion
 

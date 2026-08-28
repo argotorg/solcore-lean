@@ -632,6 +632,11 @@ routes out of parent-indexed initialization. Forgetting the proof-refined
 parent context yields the same plain continuation context as the checkpointed-
 working-pair adapter when both receive the same caller-supplied outcome.
 
+ADR-0105 accepts a snapshot-local refinement of an address-bound working pair
+whose retained Account is present. It stores the exact original context,
+selected Account, and working-lookup evidence without creating an Account or
+assigning authority to the retained address.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

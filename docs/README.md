@@ -493,6 +493,11 @@ The completed
 adds one proof that the two existing initialization routes build the same
 plain continuation context when given the same outcome.
 
+The accepted
+[ADR-0105](adr/0105-present-working-storage-account-refinement.md) plans a
+checked form of an address-bound working context that carries the exact
+selected Account when that Account exists.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -722,6 +727,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes the relation between wrapper and underlying write results.
 - [ADR-0104](adr/0104-parent-indexed-initialization-continuation-context-coherence.md)
   fixes the equality of two initialization construction routes.
+- [ADR-0105](adr/0105-present-working-storage-account-refinement.md) fixes the
+  planned evidence-carrying refinement for a present working Account.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
