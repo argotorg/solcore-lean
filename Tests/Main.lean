@@ -77,6 +77,7 @@ import Solcore.Test.FrameTracePrefix
 import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameOutcomeTrapReasonMap
 import Solcore.Test.FrameEffectJournal
+import Solcore.Test.FrameCheckpointSnapshot
 import Solcore.Test.FrameRunContinuation
 import Solcore.Test.FrameRunEffectComposition
 import Solcore.Test.FrameRunEffectContinuation
