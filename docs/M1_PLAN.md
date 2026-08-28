@@ -101,10 +101,11 @@ These results remain regression obligations for every extension.
 | 75 | Checkpointed working-pair storage address | Complete | Binds one caller-designated storage target to checkpointed working values and subsequent writes |
 | 76 | Conditional WorldState storage read | Complete | Preserves Account absence while lifting zero-default slot reads to WorldState |
 | 77 | Address-bound working storage read | Complete | Uses the retained storage address to read only the working WorldState |
-| 78 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 79 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 80 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 81 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 78 | WorldState storage read/write coherence | Planned | Normalizes reads after conditional writes and preserves independent observations |
+| 79 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 80 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 81 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 82 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1334,6 +1335,17 @@ import. Exactly two simp laws and three definition-only runtime assertions
 pass, as do full validation and independent P0-P3 audits. The checkpoint does
 not participate in the read. Address authority, mutation, frame entry, gas,
 ABI, and transaction policy remain outside the slice.
+
+## Planned WorldState storage read/write coherence
+
+[ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) accepts
+exactly three planned simp laws. They characterize a read of the written slot
+and preservation of a different slot or a different address.
+
+All three theorems preserve write-stage failure through an outer `Option.map`;
+the other-address case can therefore distinguish outer `none` from
+`some none`. Exactly three private compile examples and no runtime call are
+planned; no executable operation is added.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -236,6 +236,9 @@ Account whose missing slot reads as zero.
 [ADR-0095](adr/0095-address-bound-working-storage-read.md) completes the
 stored-address lift of that read over checkpointed working values. It reads
 only the working WorldState and never consults the checkpoint.
+[ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) accepts the
+proof interface for observing conditional writes through subsequent reads; its
+implementation is planned.
 
 ## Implementation status
 
@@ -318,6 +321,7 @@ only the working WorldState and never consults the checkpoint.
 | Checkpointed working-pair storage address | Complete | Complete | Not published |
 | Conditional WorldState storage read | Complete | Complete | Not published |
 | Address-bound working storage read | Complete | Complete | Not published |
+| WorldState storage read/write coherence | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1644,6 +1648,16 @@ P0-P3 audits pass.
 
 No address authority, mutation, frame entry, gas, ABI, or transaction policy
 is included.
+
+## Planned WorldState storage read/write coherence
+
+[ADR-0096](adr/0096-world-state-storage-read-write-coherence.md) specifies
+exactly three planned simp laws for same-slot observation, different-slot
+preservation, and different-address preservation after conditional writes.
+
+All three laws retain the outer write result with `Option.map`, distinguishing
+write failure from a successful write followed by an absent read target.
+Exactly three private compile examples and no runtime call are planned.
 
 ## Meaning of completion
 
