@@ -65,7 +65,7 @@ These results remain regression obligations for every extension.
 | 39 | Frame-outcome WorldState resolution | Complete | Selects working/checkpoint state while leaving trap disposition open |
 | 40 | WorldState observational update algebra | Complete | Proves extensionality and independent-update algebra without new operations |
 | 41 | WorldState storage-write algebra | Complete | Lifts overwrite, commutation, and zero deletion through conditional writes |
-| 42 | External-checkpoint frame run result | Active | Pairs speculative working state with outcome under caller-owned checkpoint |
+| 42 | External-checkpoint frame run result | Complete | Pairs speculative working state with outcome under caller-owned checkpoint |
 | 43 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 44 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
 | 45 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -691,14 +691,21 @@ laws. Overwrite alone is simp; commutation and zero deletion are non-simp. The
 assertions. Axiom, trust-zero, build, test, metadata, kernel, forbidden, and
 independent audit checks pass.
 
-## Active external-checkpoint frame run result
+## Completed external-checkpoint frame run result
 
-[ADR-0060](adr/0060-external-checkpoint-frame-run-result.md) adds exactly one
+[ADR-0060](adr/0060-external-checkpoint-frame-run-result.md) provides exactly one
 public carrier with intentional `working` and `outcome` fields and one named
 resolver. The external checkpoint is supplied only when resolving. Exactly
 three constructor laws and three runtime assertions cover returned, reverted,
 and trapped results. Nested frames, effects, transactions, ABI, Core adaptation,
 trap taxonomy, EVM, and gas remain separate decisions.
+
+The 28-line definition and 32-line properties modules are each connected by one
+umbrella import. The carrier intentionally exposes two fields and generated
+structure surface, while adding no instance, extensionality law, or helper. All
+three simp/rfl laws and the resolver report `[propext]`. The 68-line
+definition-only test module plus two runner lines supplies exactly three
+projection-aware checks.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

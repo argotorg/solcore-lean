@@ -412,6 +412,8 @@ ADR-0060 adds a public semantic payload containing a frame's speculative
 working WorldState and halt outcome. The caller continues to own the checkpoint;
 one resolver delegates to ADR-0057. This adds no nested-frame, effect-journal,
 transaction, ABI, or EVM meaning.
+The completed carrier intentionally exposes only its working state and outcome;
+the generated constructor, projections, and recursor add no hidden payload.
 
 ### Observation
 

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: minimal state-only result of running one frame
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -110,3 +110,22 @@ frame and does not choose how the external checkpoint was created.
 A future frame evaluator can return one explicit state-and-outcome payload and
 reuse the completed resolver. Nested effects and transaction semantics remain
 separate decisions.
+
+## Implementation record
+
+The completed internal slice adds exactly one public carrier in a 28-line
+definition module with one umbrella import. Its two public fields and generated
+constructor, projections, and recursor are the intentional payload surface.
+There is exactly one named executable resolver and no deriving clause,
+instance, extensionality law, or helper.
+
+The 32-line properties module plus one umbrella import publishes exactly three
+constructor laws. All three are simp laws proved by `rfl`; each reports exactly
+`[propext]`. The resolver definition also reports `[propext]`. Exactly three
+runtime assertions in a 68-line definition-only test module plus two runner
+lines cover resolution and the public working, payload, and reason projections.
+
+The implementation commits are `0e4baab` (156 changed lines), `cb58b25` (29),
+`116f3f9` (33), and `5e83e6d` (70). Each remains below 300 changed lines.
+Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+forbidden-declaration, document-link, diff, and independent audits pass.
