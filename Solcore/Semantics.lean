@@ -7,6 +7,7 @@ import Solcore.Semantics.AddressWordBridgeProperties
 import Solcore.Semantics.FrameOutcome
 import Solcore.Semantics.FrameOutcomeProperties
 import Solcore.Semantics.FrameOutcomeTrapReasonMap
+import Solcore.Semantics.FrameOutcomeTrapReasonMapProperties
 import Solcore.Semantics.FrameStateResolution
 import Solcore.Semantics.FrameStateResolutionProperties
 import Solcore.Semantics.FrameRunResult
