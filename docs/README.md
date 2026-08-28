@@ -416,7 +416,7 @@ The completed checkpoint-and-working slice,
 [ADR-0087](adr/0087-frame-checkpointed-working-pair.md), stores one checkpoint
 snapshot beside an independent working pair without adding lifecycle meaning.
 
-The active continuation-context construction slice,
+The completed continuation-context construction slice,
 [ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md),
 assembles those values and an opaque outcome into the existing context without
 claiming execution.

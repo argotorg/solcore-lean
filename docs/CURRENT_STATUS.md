@@ -213,7 +213,7 @@ It does not claim actual capture, entry, ownership, or runtime execution.
 structural carrier that stores such a snapshot beside an independent working
 pair without claiming any relationship or transition.
 [ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md)
-fixes the active pure adapter from those values and a caller-supplied outcome
+completes the pure adapter from those values and a caller-supplied outcome
 to the existing continuation context.
 
 ## Implementation status
@@ -289,7 +289,7 @@ to the existing continuation context.
 | Heterogeneous parent-indexed continuation-context trap-reason mapping | Complete | Complete | Not published |
 | Nominal frame checkpoint snapshot | Complete | Complete | Not published |
 | Frame checkpointed working pair | Complete | Complete | Not published |
-| Continuation context from checkpointed working pair | Not implemented | Decision accepted | Not published |
+| Continuation context from checkpointed working pair | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1483,17 +1483,22 @@ completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. Equality, derivation, initialization, execution, ownership,
 scheduling, and transaction policy remain undecided.
 
-## Active continuation-context construction from checkpointed working values
+## Completed continuation-context construction from checkpointed working values
 
 [ADR-0088](adr/0088-continuation-context-from-checkpointed-working-pair.md)
-specifies one `FrameContinuationContext.fromCheckpointedWorkingPair` adapter.
+adds one `FrameContinuationContext.fromCheckpointedWorkingPair` adapter.
 It maps checkpoint state/effects, working effects, and working state plus an
 opaque supplied outcome into the existing four context fields.
 
-Exactly four definitional simp laws and three private definition-only compile
-regressions are planned. Resolution, continuation, outcome provenance,
-execution, initialization, scheduling, and transaction policy remain outside
-this value-construction slice.
+The 25-line definition and 47-line properties modules each add one umbrella
+import. The operation, generated equation, and exactly four simp laws report
+exactly `[propext]`. A 68-line definition-only test module plus one runner
+import contains exactly three private compile examples and no runtime call.
+
+The four implementation commits contain 225, 26, 48, and 69 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Resolution, continuation, outcome provenance, execution,
+initialization, scheduling, and transaction policy remain outside this slice.
 
 ## Meaning of completion
 

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: pure construction of an existing completed-frame context from structural values
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -174,3 +174,34 @@ continuation boundary.
 Future proof-only slices may state resolution or continuation coherence when
 needed. Runtime transitions, checkpoint creation, scheduling, and transaction
 policy remain separate decisions.
+
+## Implementation record
+
+The completed slice adds exactly one
+`FrameContinuationContext.fromCheckpointedWorkingPair` operation in a 25-line
+definition module plus one umbrella import. It consumes every checkpoint,
+working, and outcome value exactly once and performs no outcome match. The
+operation and its generated equation report exactly `[propext]`.
+
+A 47-line properties module plus one umbrella import publishes exactly four
+definitional simp laws for the target context's direct fields. All four report
+exactly `[propext]`; their disjoint one-way reductions introduce no critical
+overlap or simp loop.
+
+A 68-line definition-only test module plus one runner import contains exactly
+three private compile examples and no runtime declaration, assertion, or call.
+They cover an abstract whole-record equation over arbitrary outcome, exact
+checkpoint and working-effect retention with distinct concrete values, and an
+exact result containing working state plus nonempty return bytes
+`[0x12, 0xff]`. The test imports no laws and calls neither resolution nor
+continuation.
+
+The implementation commits are `4910627` (225 changed lines), `1d18d3f` (26),
+`4b0f21a` (48), and `a9c3825` (69), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, simp-termination, semantic-kernel, metadata, diff, and independent
+P0-P3 audits pass.
+
+The adapter establishes no execution completion, outcome provenance,
+checkpoint capture, initialization, lifecycle, ownership, trace relationship,
+scheduling, delivery, trap handling, or transaction policy.
