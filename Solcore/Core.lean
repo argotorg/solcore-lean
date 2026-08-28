@@ -5,6 +5,7 @@ import Solcore.Core.Host
 import Solcore.Core.HostMachine
 import Solcore.Core.HostMachineProperties
 import Solcore.Core.HostRunner
+import Solcore.Core.HostRunnerProperties
 import Solcore.Core.Primitive
 import Solcore.Core.RenamingSyntax
 import Solcore.Core.Renaming
