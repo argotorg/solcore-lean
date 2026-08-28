@@ -503,8 +503,8 @@ The completed
 total slot read from that checked Account, together with agreement with the
 existing conditional read.
 
-The accepted
-[ADR-0107](adr/0107-present-working-storage-account-total-write.md) plans a
+The completed
+[ADR-0107](adr/0107-present-working-storage-account-total-write.md) adds a
 total slot write that keeps the checked Account and its working-state entry in
 sync.
 
@@ -742,7 +742,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0106](adr/0106-present-working-storage-account-total-read.md) fixes the
   total read from that refinement.
 - [ADR-0107](adr/0107-present-working-storage-account-total-write.md) fixes the
-  planned synchronized total write.
+  synchronized total write.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

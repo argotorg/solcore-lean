@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: synchronously update a proven-present working Account and its context
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -155,6 +155,29 @@ Keep each of five commits below 300 changed lines: this decision and targeted
 internal documentation; the exact total operation plus one umbrella import;
 the exact coherence law plus one umbrella import; runtime and compile-only
 regressions plus runner wiring; independent audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 32-line definition module and a 26-line properties
+module, with one semantic umbrella import for each. It publishes exactly the
+required total operation and one simp coherence law. The operation, generated
+equation, and law report exactly `[propext]`; only the law is registered with
+the intended simp orientation. Its critical pair with the older present-write
+law converges on the same exact context.
+
+The 119-line runtime module contains exactly three assertions covering
+nonzero synchronization, zero deletion with Account presence, and sequential
+overwrite with other-slot preservation. The 56-line compile-only module
+contains exactly three private examples and names both required laws directly.
+The runner imports both modules once, calls the sole public runtime test once,
+and adds no compile-only call.
+
+The implementation commits are `a19f9f2` (210 changed lines), `107c9ab` (33),
+`14366fc` (27), and `569a734` (178), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, the 558-job full
+build, the 1008-job full test run, metadata and kernel checks, diff checks,
+declaration and simp-registration inventories, exact dependency audits,
+critical-pair checks, and independent P0-P3 audits pass.
 
 ## Publication and consequences
 
