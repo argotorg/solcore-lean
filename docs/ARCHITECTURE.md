@@ -408,6 +408,11 @@ operation. Sequential overwrite and independent writes are derived with
 The completed layer adds no executable API, carrier, or instance; its four laws
 and four definition-only runtime assertions expose no private representation.
 
+ADR-0060 adds a public semantic payload containing a frame's speculative
+working WorldState and halt outcome. The caller continues to own the checkpoint;
+one resolver delegates to ADR-0057. This adds no nested-frame, effect-journal,
+transaction, ABI, or EVM meaning.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

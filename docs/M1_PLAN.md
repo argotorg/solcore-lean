@@ -65,10 +65,11 @@ These results remain regression obligations for every extension.
 | 39 | Frame-outcome WorldState resolution | Complete | Selects working/checkpoint state while leaving trap disposition open |
 | 40 | WorldState observational update algebra | Complete | Proves extensionality and independent-update algebra without new operations |
 | 41 | WorldState storage-write algebra | Complete | Lifts overwrite, commutation, and zero deletion through conditional writes |
-| 42 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 43 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 44 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 45 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 42 | External-checkpoint frame run result | Active | Pairs speculative working state with outcome under caller-owned checkpoint |
+| 43 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 44 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 45 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 46 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -689,6 +690,15 @@ laws. Overwrite alone is simp; commutation and zero deletion are non-simp. The
 94-line definition-only test module plus two runner lines supplies four runtime
 assertions. Axiom, trust-zero, build, test, metadata, kernel, forbidden, and
 independent audit checks pass.
+
+## Active external-checkpoint frame run result
+
+[ADR-0060](adr/0060-external-checkpoint-frame-run-result.md) adds exactly one
+public carrier with intentional `working` and `outcome` fields and one named
+resolver. The external checkpoint is supplied only when resolving. Exactly
+three constructor laws and three runtime assertions cover returned, reverted,
+and trapped results. Nested frames, effects, transactions, ABI, Core adaptation,
+trap taxonomy, EVM, and gas remain separate decisions.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

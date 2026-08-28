@@ -255,6 +255,11 @@ API. It provides four laws and four runtime assertions for conditional
 overwrite, independent updates, and canonical zero deletion through
 `writeStorage?`.
 
+The active external-checkpoint frame-result slice,
+[ADR-0060](adr/0060-external-checkpoint-frame-run-result.md), pairs a speculative
+working WorldState with a parametric FrameOutcome. Its single named resolver
+uses a caller-owned checkpoint and leaves trap disposition unresolved.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -398,6 +403,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0057 completes the minimal internal frame-outcome state resolver.
 - ADR-0058 completes the proof-only WorldState observational update algebra.
 - ADR-0059 completes the proof-only WorldState storage-write algebra.
+- ADR-0060 accepts the internal external-checkpoint frame run result.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

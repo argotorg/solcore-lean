@@ -122,6 +122,9 @@ executable API or new state meaning.
 [ADR-0059](adr/0059-world-state-storage-write-algebra.md) completes the
 proof-only algebra for conditional WorldState storage writes. It adds no
 executable API or operational decision.
+[ADR-0060](adr/0060-external-checkpoint-frame-run-result.md) accepts the active
+minimal frame-run payload. It pairs speculative working state with an outcome
+while checkpoint ownership remains external.
 
 ## Implementation status
 
@@ -168,6 +171,7 @@ executable API or operational decision.
 | Frame-outcome WorldState resolution | Complete | Complete | Not published |
 | WorldState observational update algebra | Complete | Complete | Not published |
 | WorldState storage-write algebra | Complete | Complete | Not published |
+| External-checkpoint frame run result | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -852,6 +856,16 @@ non-simp. The first three laws report `[propext, Quot.sound]`, while zero
 deletion reports `[propext]`. No `Classical.choice`, custom axiom, `sorryAx`, or
 unchecked declaration is present. Four assertions in a 94-line definition-only
 test module plus two runner lines pass full validation and independent audits.
+
+## Active external-checkpoint frame run result
+
+[ADR-0060](adr/0060-external-checkpoint-frame-run-result.md) plans exactly one
+public carrier and one named executable resolver. Its public fields expose the
+speculative working WorldState and parametric FrameOutcome intentionally. Three
+constructor laws and three runtime assertions cover return, revert, and trap;
+tests also observe the payload projections. The checkpoint remains caller-owned
+and trap resolution remains open. Nested frames, surviving effects,
+transactions, ABI, Core adaptation, EVM, gas, and publication remain outside.
 
 ## Meaning of completion
 
