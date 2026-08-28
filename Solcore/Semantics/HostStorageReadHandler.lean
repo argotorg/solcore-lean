@@ -1,4 +1,4 @@
-import Solcore.Core.HostMachine
+import Solcore.Core.HostStateSafety
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageRead
 
 /-! Interpretation of one Core storage-read request by a proven-present Account. -/
@@ -80,5 +80,27 @@ def handleStorageReadSuspension
   | mk request continuation store =>
       cases request
       rfl
+
+/-- Interpreting a well-typed request produces a well-typed resumed Core
+state, independently of the storage word returned by the host. -/
+theorem handleStorageReadSuspension_state_hasType
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    {definitions : Core.DataEnvironment}
+    {resultType : Core.Ty}
+    (context :
+      FrameCheckpointedWorkingPairWithPresentStorageAccount
+        RollbackState TraceState)
+    (suspension : Core.HostSuspension)
+    (typing :
+      Core.HostSuspensionHasType suspension resultType definitions) :
+    Core.HostStateHasType
+      (handleStorageReadSuspension context suspension).2
+      resultType definitions := by
+  cases suspension with
+  | mk request continuation store =>
+      cases request with
+      | storageRead slot =>
+          exact typing.resume (context.readStorage slot)
 
 end Solcore.Semantics
