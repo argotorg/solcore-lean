@@ -2,7 +2,7 @@ import Solcore.Core.HostMachineProperties
 import Solcore.Core.HostRunner
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
-import Solcore.Semantics.CheckedHostCoreProgramExecution
+import Solcore.Semantics.CheckedHostCoreProgramProperties
 
 /-! Focused admission and runtime regressions for the Core host boundary. -/
 
@@ -19,6 +19,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def slot : Word := ⟨0x11, by decide⟩
 private def response : Word := ⟨0xaa, by decide⟩
+private def secondSlot : Word := ⟨0x22, by decide⟩
 
 private def storageReadProgram : Program := {
   resultType := .word
@@ -103,6 +104,22 @@ private theorem compileTimeResumeRegression :
   HostSuspension.resume_storageRead
     slot response retainedContinuation retainedStore
 
+private theorem compileTimeSuspensionTypingRegression :
+    HostSuspensionHasType requestSuspension .word [] := by
+  apply CheckedHostCoreProgram.runStateful_suspended_hasType
+    (fuel := 5) (remainingFuel := 0) checkedStorageReadProgram
+  decide
+
+private theorem compileTimeTypedResumeRegression :
+    HostStateHasType (requestSuspension.resume response) .word [] :=
+  compileTimeSuspensionTypingRegression.resume response
+
+private theorem compileTimeCheckedRunNeverFaults
+    (fuel : Nat) (error : MachineFault) (faultState : State) :
+    checkedStorageReadProgram.runStateful fuel ≠ .fault error faultState :=
+  CheckedHostCoreProgram.runStateful_ne_fault
+    checkedStorageReadProgram fuel error faultState
+
 private theorem compileTimeWireV1RejectionRegression :
     Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead) = none :=
   rfl
@@ -121,6 +138,18 @@ private def cellStorageReadProgram : Program := {
 
 private theorem cellStorageReadProgram_host_checked :
     cellStorageReadProgram.checkHost = true := by
+  decide
+
+private def twoStorageReadProgram : Program := {
+  resultType := .word
+  body :=
+    .letE
+      (.apply (.var HostFunction.storageRead.index) (.word slot))
+      (.apply (.var (HostFunction.storageRead.index + 1)) (.word secondSlot))
+}
+
+private theorem twoStorageReadProgram_host_checked :
+    twoStorageReadProgram.checkHost = true := by
   decide
 
 def testCoreHostMachine : IO Unit := do
@@ -185,6 +214,27 @@ def testCoreHostMachine : IO Unit := do
   | result =>
       throw (IO.userError
         s!"the cell program did not suspend: {reprStr result}")
+
+  match twoStorageReadProgram.runHostStateful 64 with
+  | .suspended first remainingFuel =>
+      assertTrue (first.request == .storageRead slot)
+        "the repeated-read program emitted the wrong first request"
+      match hostRun remainingFuel (first.resume response) with
+      | .suspended second secondRemainingFuel =>
+          assertTrue (second.request == .storageRead secondSlot)
+            "the repeated-read program emitted the wrong second request"
+          assertTrue (decide (secondRemainingFuel < remainingFuel))
+            "resuming a request failed to preserve decreasing fuel"
+          assertTrue
+            (hostRun secondRemainingFuel (second.resume response) ==
+              .done (.word response) [])
+            "the second response did not complete the repeated-read program"
+      | result =>
+          throw (IO.userError
+            s!"the repeated-read program did not suspend twice: {reprStr result}")
+  | result =>
+      throw (IO.userError
+        s!"the repeated-read program did not emit its first request: {reprStr result}")
 
   assertTrue
     (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead)).isNone
