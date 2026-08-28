@@ -116,7 +116,7 @@ These results remain regression obligations for every extension.
 | 90 | Present working storage Account total read/write coherence | Complete | Normalizes same-slot and distinct-slot reads after total writes |
 | 91 | Present working storage Account total-write algebra | Complete | Normalizes overwrite and commutes writes to distinct slots |
 | 92 | Present working storage Account total-write isolation | Complete | Preserves every non-selected working Account across a total write |
-| 93 | Present working storage Account total-write projections | Planned | Exposes the exact selector, checkpoint, journal, and updated Account projections |
+| 93 | Present working storage Account total-write projections | Complete | Exposes the exact selector, checkpoint, journal, and updated Account projections |
 | 94 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 95 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 96 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1513,8 +1513,8 @@ total refined operations.
 The laws delegate directly to Account semantics and add no new operation.
 Both report `[propext]`; three private compile regressions cover direct use and
 named composition with ADR-0106 conditional-read coherence. Full validation
-and independent P0-P3 audits pass. Projection preservation, address authority,
-lifetime, and transition policies remain later work.
+and independent P0-P3 audits pass. Address authority, lifetime, and transition
+policies remain later work.
 
 ## Completed present working storage Account total-write algebra
 
@@ -1536,18 +1536,20 @@ address different from the selected storage address.
 
 The simp law reports `[propext]`; two private compile regressions apply it
 directly and across two writes. Full validation and independent P0-P3 audit
-pass. The slice adds no operation or runtime fixture. Structural projections,
-address roles, lifetime, and transition policies remain later work.
+pass. The slice adds no operation or runtime fixture. Address roles, lifetime,
+and transition policies remain later work.
 
-## Planned present working storage Account total-write projections
+## Completed present working storage Account total-write projections
 
 [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
 adds four simp laws for the retained selector, checkpoint, working journal, and
 updated stored Account.
 
 The selector law completes nested simp composition with ADR-0110 isolation.
-Storage-value presence, address roles, lifetime, and transition policies remain
-later work.
+All four laws report `[propext]`; five private compile regressions apply the
+projections directly and exercise that integration. Full validation and
+independent P0-P3 audit pass. Storage-value presence, address roles, lifetime,
+and transition policies remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

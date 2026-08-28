@@ -521,9 +521,9 @@ The completed
 [ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
 proves preservation of every non-selected working Account across a total write.
 
-The accepted
+The completed
 [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
-plans direct selector, checkpoint, journal, and stored-Account projections.
+adds direct selector, checkpoint, journal, and stored-Account projections.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -767,7 +767,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
   fixes the non-selected Account isolation boundary.
 - [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
-  fixes the planned total-write data projections.
+  fixes the total-write data projections.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

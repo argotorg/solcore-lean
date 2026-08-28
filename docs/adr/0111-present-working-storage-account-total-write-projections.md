@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose the four meaningful data projections of a total write
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -135,6 +135,28 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact four laws plus one umbrella import; the exact
 five compile regressions plus one runner import and no call; independent audit
 and completion evidence.
+
+## Implementation record
+
+The completed proof-only slice adds a 55-line properties module plus one
+semantic umbrella import. It publishes exactly the four required simp laws and
+adds no helper, operation, carrier, coercion, or instance. All four laws are
+proved by reflexivity and report exactly `[propext]`; the generated
+`writeStorage.eq_1` remains outside the simp registry.
+
+The 71-line compile-only module plus one runner import contains exactly five
+private examples. Four apply the fully qualified public laws directly. The
+fifth proves arbitrary two-write ADR-0110 isolation with simp and fails when the
+new selector rule is absent, so it audits the intended registry integration.
+The test layer adds no runtime or public declaration, fixture, helper,
+assertion, or runner call.
+
+The implementation commits are `916891a` (188 changed lines), `88f4df4` (56),
+and `8151a3b` (72), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 568-job full build, the
+1024-job full test run, metadata and kernel checks, diff checks, declaration,
+axiom, dependency, equation-attribute, and simp-registration inventories,
+critical-pair and proof-masking checks, and independent P0-P3 audit pass.
 
 ## Publication and consequences
 

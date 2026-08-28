@@ -283,7 +283,7 @@ accepts non-selected working Account isolation for total carrier writes;
 implementation is complete.
 [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
 accepts the four selector, checkpoint, journal, and stored-Account projections;
-implementation is planned.
+implementation is complete.
 
 ## Implementation status
 
@@ -381,7 +381,7 @@ implementation is planned.
 | Present working storage Account total read/write coherence | No new operation | Complete | Not published |
 | Present working storage Account total-write algebra | No new operation | Complete | Not published |
 | Present working storage Account total-write isolation | No new operation | Complete | Not published |
-| Present working storage Account total-write projections | No new operation | Planned | Not published |
+| Present working storage Account total-write projections | No new operation | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1908,14 +1908,16 @@ directly and across two sequential writes; full validation and independent
 P0-P3 audit pass. The proof-only slice adds no operation, runtime assertion,
 address role, transition, or published surface.
 
-## Planned present working storage Account total-write projections
+## Completed present working storage Account total-write projections
 
 [ADR-0111](adr/0111-present-working-storage-account-total-write-projections.md)
-specifies exact projections for the retained selector, checkpoint, working
+adds exact projections for the retained selector, checkpoint, working
 journal, and updated stored Account.
 
-The proof-only slice adds no operation or runtime assertion. Its selector law
-also completes automatic nested composition of ADR-0110 isolation.
+All four simp laws report `[propext]`. Five private compile regressions name
+the projections directly and verify nested ADR-0110 composition; full
+validation and independent P0-P3 audit pass. The proof-only slice adds no
+operation, runtime assertion, address role, transition, or published surface.
 
 ## Meaning of completion
 
