@@ -119,11 +119,12 @@ These results remain regression obligations for every extension.
 | 93 | Present working storage Account total-write projections | Complete | Exposes the exact selector, checkpoint, journal, and updated Account projections |
 | 94 | Present working storage Account total-write presence | Complete | Exposes zero deletion and nonzero sparse-entry presence |
 | 95 | Present working storage Account total-write sparse preservation | Complete | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
-| 96 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 97 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 98 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 99 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 100 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 96 | Present working storage Account optional/total re-refinement coherence | Active | Makes the failure-aware write/refine path equal the total writer and reusable across refined optional-write sequences |
+| 97 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 98 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 99 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 100 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 101 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1576,6 +1577,18 @@ The laws remain named and non-simp so automatic projection rewriting does not
 silently broaden the older Account observation policy. The slice contains
 exactly two direct compile regressions and no new executable behavior. Full
 validation and independent P0-P3 audits pass.
+
+## Active present working storage Account optional/total re-refinement coherence
+
+[ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
+closes the boundary between the existing failure-aware writer and the
+proven-present total writer. Binding a successful optional result into canonical
+Account refinement will produce the complete total result, including its
+snapshot-specific evidence.
+
+One named non-simp law is sufficient: callers can apply it at each bind stage,
+so no fixed-depth theorem or batch-write operation is needed. Two compile-only
+regressions will cover the declaration and its two-write composition.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

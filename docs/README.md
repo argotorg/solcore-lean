@@ -534,6 +534,11 @@ The completed
 preserves the optional sparse entry at every distinct slot, both directly on
 Account and through the proven-present total writer.
 
+The accepted
+[ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
+will make optional write plus canonical Account refinement equal the total
+writer, including the complete proof-carrying result.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -781,6 +786,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes the sparse-storage presence observations.
 - [ADR-0113](adr/0113-present-working-storage-account-total-write-sparse-preservation.md)
   fixes distinct-slot sparse-storage preservation.
+- [ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
+  fixes optional/total write re-refinement coherence.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

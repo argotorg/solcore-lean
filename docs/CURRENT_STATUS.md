@@ -290,6 +290,9 @@ implementation is complete.
 [ADR-0113](adr/0113-present-working-storage-account-total-write-sparse-preservation.md)
 accepts preservation of every distinct sparse-storage entry at the Account and
 proven-present carrier boundaries; implementation is complete.
+[ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
+accepts equality between optional write plus canonical refinement and the total
+writer; implementation is planned.
 
 ## Implementation status
 
@@ -390,6 +393,7 @@ proven-present carrier boundaries; implementation is complete.
 | Present working storage Account total-write projections | No new operation | Complete | Not published |
 | Present working storage Account total-write presence | No new operation | Complete | Not published |
 | Present working storage Account total-write sparse preservation | No new operation | Complete | Not published |
+| Present working storage Account optional/total re-refinement coherence | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1949,6 +1953,17 @@ regressions cover the two abstraction boundaries; full validation and
 independent P0-P3 audits pass. No operation or runtime fixture was added because
 existing execution tests already exercise the underlying distinct-slot
 behavior.
+
+## Planned present working storage Account optional/total re-refinement coherence
+
+[ADR-0114](adr/0114-present-working-storage-account-optional-total-re-refinement-coherence.md)
+will expose one complete-carrier equality between the failure-aware optional
+writer followed by Account refinement and the proven-present total writer.
+
+The law will remain named and non-simp, report exactly `[propext]`, and support
+repeated optional-write/refinement stages. Two compile-only regressions will
+cover direct use and two-stage composition; no new executable behavior or
+runtime fixture is needed.
 
 ## Meaning of completion
 

@@ -665,6 +665,11 @@ ADR-0113 accepts sparse storage preservation at every other slot. The base
 Account law and its proven-present carrier lift complete the representation
 truth table for one write without changing the automatic simplification policy.
 
+ADR-0114 accepts canonical re-refinement after an optional write. Binding the
+failure-aware write into present-Account refinement returns the same complete
+carrier as the total writer, and the equality composes across later
+optional-write/refinement stages.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
