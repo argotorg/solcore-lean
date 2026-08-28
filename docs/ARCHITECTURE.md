@@ -651,6 +651,9 @@ reads back the new value, while every distinct slot keeps its prior total read.
 ADR-0109 accepts the total-write algebra on the refined carrier: a later write
 to the same slot supersedes an earlier one, and writes to distinct slots commute.
 
+ADR-0110 accepts non-selected Account isolation: a total write through the
+refined carrier preserves the working WorldState lookup at every other address.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

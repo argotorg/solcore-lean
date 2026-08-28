@@ -115,11 +115,12 @@ These results remain regression obligations for every extension.
 | 89 | Present working storage Account total write | Complete | Synchronizes the selected Account, working-state entry, and evidence without another lookup |
 | 90 | Present working storage Account total read/write coherence | Complete | Normalizes same-slot and distinct-slot reads after total writes |
 | 91 | Present working storage Account total-write algebra | Complete | Normalizes overwrite and commutes writes to distinct slots |
-| 92 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 93 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 94 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 95 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 96 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 92 | Present working storage Account total-write isolation | Planned | Preserves every non-selected working Account across a total write |
+| 93 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 94 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 95 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 96 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 97 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1527,6 +1528,16 @@ Both report `[propext, Quot.sound]`, and two private compile regressions apply
 the laws by name. Full validation and independent P0-P3 audit pass. The slice
 adds no operation. Non-selected Account isolation, address authority, lifetime,
 and transition policies remain later work.
+
+## Planned present working storage Account total-write isolation
+
+[ADR-0110](adr/0110-present-working-storage-account-total-write-isolation.md)
+adds one law preserving the complete optional Account lookup at every working
+address different from the selected storage address.
+
+The law reuses WorldState non-interference and adds no operation or runtime
+fixture. Structural projections, address roles, lifetime, and transition
+policies remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
