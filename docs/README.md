@@ -249,10 +249,11 @@ executable API. It provides six extensionality, overwrite, and distinct-key
 commutation laws plus two compile-time examples and four runtime assertions for
 the already-completed Account and WorldState operations.
 
-The active proof-only storage-write slice,
+The completed proof-only storage-write slice,
 [ADR-0059](adr/0059-world-state-storage-write-algebra.md), adds no executable
-API. It plans four laws and four runtime assertions for conditional overwrite,
-independent updates, and canonical zero deletion through `writeStorage?`.
+API. It provides four laws and four runtime assertions for conditional
+overwrite, independent updates, and canonical zero deletion through
+`writeStorage?`.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -396,7 +397,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0056 completes the minimal explicit Account and WorldState carrier.
 - ADR-0057 completes the minimal internal frame-outcome state resolver.
 - ADR-0058 completes the proof-only WorldState observational update algebra.
-- ADR-0059 accepts the proof-only WorldState storage-write algebra.
+- ADR-0059 completes the proof-only WorldState storage-write algebra.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

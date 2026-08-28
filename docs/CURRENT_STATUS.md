@@ -119,7 +119,7 @@ the supplied checkpoint, and trap disposition remains deliberately unresolved.
 [ADR-0058](adr/0058-world-state-observational-update-algebra.md) completes the
 proof-only update algebra for Account and WorldState. It adds no
 executable API or new state meaning.
-[ADR-0059](adr/0059-world-state-storage-write-algebra.md) accepts the active
+[ADR-0059](adr/0059-world-state-storage-write-algebra.md) completes the
 proof-only algebra for conditional WorldState storage writes. It adds no
 executable API or operational decision.
 
@@ -167,7 +167,7 @@ executable API or operational decision.
 | Minimal Account and WorldState carrier | Complete | Complete | Not published |
 | Frame-outcome WorldState resolution | Complete | Complete | Not published |
 | WorldState observational update algebra | Complete | Complete | Not published |
-| WorldState storage-write algebra | Active | In progress | Not published |
+| WorldState storage-write algebra | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -836,15 +836,22 @@ remain non-simp. All six laws report exactly `[propext, Quot.sound]`, with no
 `Classical.choice`, custom axiom, `sorryAx`, or unchecked declaration. Full
 validation and independent audits pass.
 
-## Active WorldState storage-write algebra
+## Completed WorldState storage-write algebra
 
-[ADR-0059](adr/0059-world-state-storage-write-algebra.md) plans one private
+[ADR-0059](adr/0059-world-state-storage-write-algebra.md) provides one private
 helper, exactly four public laws, and four runtime assertions, with no public
 executable API, carrier, or instance. The laws cover sequential overwrite,
 distinct-slot and distinct-address commutation, and zero deletion while the
 Account remains present. An absent-address `none` is only storage-write failure;
 it is not a trap, revert, rollback, or inconclusive result. Operational effects,
 lifecycle, serialization, ABI, Core adaptation, EVM, and gas remain undecided.
+
+The 189-line properties module plus one umbrella import publishes exactly four
+laws. Only overwrite is simp; both commutation laws and zero deletion are
+non-simp. The first three laws report `[propext, Quot.sound]`, while zero
+deletion reports `[propext]`. No `Classical.choice`, custom axiom, `sorryAx`, or
+unchecked declaration is present. Four assertions in a 94-line definition-only
+test module plus two runner lines pass full validation and independent audits.
 
 ## Meaning of completion
 

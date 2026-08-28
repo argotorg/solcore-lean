@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only sequential algebra for `WorldState.writeStorage?`
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -120,3 +120,21 @@ resource-limit rule.
 Future transitions can compose conditional storage writes without unfolding
 their implementation. No new operational slice or semantic decision follows
 from these derived laws.
+
+## Implementation record
+
+The proof-only slice is complete with exactly zero public executable API,
+carrier, or instance additions. One private helper supports exactly four public
+laws in a 189-line properties module with one umbrella import. Only overwrite
+is `@[simp]`; both commutation laws and zero deletion remain non-simp.
+
+The overwrite and two commutation laws report exactly
+`[propext, Quot.sound]`. Zero deletion reports exactly `[propext]`. There is no
+`Classical.choice`, custom axiom, `sorryAx`, or unchecked declaration. Exactly
+four runtime assertions live in a 94-line definition-only test module with two
+runner lines.
+
+The implementation commits are `c09942c` (166 changed lines), `0fa26af` (80),
+`104d3aa` (110), and `bb63ed1` (96). Each remains below 300 changed lines.
+Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+forbidden-declaration, document-link, diff, and independent audits pass.

@@ -405,6 +405,8 @@ ADR-0059 lifts that algebra through the partial `WorldState.writeStorage?`
 operation. Sequential overwrite and independent writes are derived with
 `Option.bind`; zero deletion keeps the Account present. An absent-address
 `none` gains no halt, revert, trap, or rollback meaning.
+The completed layer adds no executable API, carrier, or instance; its four laws
+and four definition-only runtime assertions expose no private representation.
 
 ### Observation
 
