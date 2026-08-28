@@ -79,7 +79,7 @@ These results remain regression obligations for every extension.
 | 53 | Trace-prefixed frame continuation context | Complete | Binds prefix evidence to one context's exact checkpoint/working traces |
 | 54 | Indexed frame trace extension | Complete | Generates canonical prefix evidence through event-only incremental construction |
 | 55 | Parent-indexed frame continuation context | Complete | Binds a completed context's checkpoints and trace prefix to an exact parent working pair |
-| 56 | Parent-indexed frame continuation construction | Active | Derives the indexed context and proofs from an event-only trace extension |
+| 56 | Parent-indexed frame continuation construction | Complete | Derives the indexed context and proofs from an event-only trace extension |
 | 57 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 58 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the parent-indexed construction boundary |
 | 59 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -942,17 +942,21 @@ The four implementation commits contain 216, 23, 67, and 103 changed lines.
 Full validation and independent P0-P3 audits pass. Invocation provenance,
 stack scheduling, trap disposition, and transactions remain later.
 
-## Active parent-indexed frame continuation construction
+## Completed parent-indexed frame continuation construction
 
-[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) specifies
-one constrained `fromTraceExtension` operation. It accepts the parent working
-pair, working rollback value, ADR-0072 extension, and frame result; the
-checkpoint pair, complete working trace, prefix proof, and checkpoint equality
-are derived rather than supplied separately.
+[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) adds one
+constrained `fromTraceExtension` operation. The parent working pair, working
+rollback value, ADR-0072 extension, and frame result determine the checkpoint
+pair, complete working trace, prefix proof, and checkpoint equality.
 
-The planned interface contains exactly four simp projection laws and three
-definition-only assertions. It reuses ADR-0073's existing prefix and
-return/revert laws and adds no carrier or resolver. Invocation provenance,
+The definition and properties modules contain 31 and 58 lines with one umbrella
+import each. Exactly four simp `rfl` projection laws report `[propext]`. An
+87-line definition-only test module plus two runner lines contains exactly
+three construction assertions.
+
+The four implementation commits contain 217, 32, 59, and 89 changed lines.
+Full validation and independent P0-P3 audits pass. ADR-0073's prefix and
+return/revert laws remain reusable without adapters. Invocation provenance,
 stack scheduling, trap disposition, and transactions remain later.
 
 ## Completed Core vNext slice: derived-builder renaming laws

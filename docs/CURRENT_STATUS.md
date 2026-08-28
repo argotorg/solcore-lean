@@ -167,10 +167,10 @@ API.
 parent-indexed continuation context. It ties one completed context's
 checkpoints and trace prefix to an exact parent working pair while reusing the
 existing resolver.
-[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) is active.
-It specifies one restricted operation that constructs that carrier from an
-ADR-0072 indexed extension without accepting relationship proofs or a complete
-working trace.
+[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) completes
+the restricted construction path for that carrier. Its one operation derives
+the checkpoints, working trace, and relationship proofs from an ADR-0072
+indexed extension without accepting a complete working trace.
 
 ## Implementation status
 
@@ -231,7 +231,7 @@ working trace.
 | Trace-prefixed frame continuation context | Complete | Complete | Not published |
 | Indexed frame trace extension | Complete | Complete | Not published |
 | Parent-indexed frame continuation context | Complete | Complete | Not published |
-| Parent-indexed frame continuation construction | Not implemented | Decision accepted | Not published |
+| Parent-indexed frame continuation construction | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1164,18 +1164,25 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Runtime parent/child provenance, scheduling, trap
 disposition, and transaction atomicity remain outside.
 
-## Active parent-indexed frame continuation construction
+## Completed parent-indexed frame continuation construction
 
-[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) specifies
+[ADR-0074](adr/0074-trace-extension-parent-context-construction.md) adds exactly
 one `ParentIndexedFrameContinuationContext.fromTraceExtension` operation. It
-accepts a parent pair, working rollback value, indexed trace extension, and
-frame result, then derives the exact checkpoints, working trace, and both
-stored proofs.
+accepts a parent working pair, working rollback value, indexed trace extension,
+and frame result, then constructs the exact checkpoints and working journal
+while deriving both stored relationship proofs.
 
-Exactly four simp projection laws and three definition-only construction
-assertions are planned. Existing prefix and resolution laws remain reusable;
-no carrier or resolver is added. Runtime provenance, invocation, scheduling,
-trap disposition, and transaction behavior remain outside.
+A 31-line definition module plus one umbrella import contains the operation. A
+58-line properties module plus one umbrella import publishes exactly four simp
+`rfl` projection laws. The operation and all four laws report exactly
+`[propext]`. An 87-line definition-only test module plus two runner lines
+contains exactly three assertions covering checkpoint observations, the
+nonduplicated extended working trace, and preservation of the supplied result.
+
+The four implementation commits contain 217, 32, 59, and 89 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Runtime provenance, invocation, scheduling, trap
+disposition, and transaction behavior remain outside.
 
 ## Meaning of completion
 

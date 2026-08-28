@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: construct one parent-indexed context from an indexed trace extension
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -161,3 +161,22 @@ A caller can construct the exact ADR-0073 carrier from the restricted ADR-0072
 extension path without supplying relationship proofs or an ambiguous complete
 trace. Runtime provenance, invocation, scheduling, trap disposition, and
 transaction policy remain separate decisions.
+
+## Implementation record
+
+The completed slice adds exactly one public `fromTraceExtension` operation in a
+31-line definition module plus one umbrella import. It accepts no raw trace,
+full working journal, or proof argument, and adds no carrier, resolver,
+coercion, instance, alias, or second constructor operation.
+
+A 58-line properties module plus one umbrella import publishes exactly four
+simp `rfl` projection laws. The operation and all four laws report exactly
+`[propext]`. An 87-line definition-only test module plus two runner lines
+contains exactly three runtime assertions covering checkpoint observations,
+working rollback with the exact nonduplicated trace extension, and preservation
+of the supplied frame result.
+
+The implementation commits are `d2e1959` (217 changed lines), `ef17abe` (32),
+`d2b9e30` (59), and `fc3956b` (89), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.

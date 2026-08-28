@@ -347,7 +347,7 @@ The completed parent-indexed continuation-context slice,
 completed context's checkpoints to equal an exact parent working pair. It
 reuses existing resolution and does not claim a runtime invocation occurred.
 
-The active parent-indexed continuation-construction slice,
+The completed parent-indexed continuation-construction slice,
 [ADR-0074](adr/0074-trace-extension-parent-context-construction.md), derives
 that carrier and both relationship proofs from an indexed trace extension. It
 does not turn the selected inputs into evidence of an actual invocation.
