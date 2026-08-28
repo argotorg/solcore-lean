@@ -92,4 +92,89 @@ def resume
 
 end HostSuspension
 
+/-- One executable step at the Core/host boundary. -/
+inductive HostAdvanceResult where
+  | next (state : State)
+  | done (value : Value)
+  | fault (error : MachineFault)
+  | suspended (suspension : HostSuspension)
+  deriving Repr, BEq, DecidableEq
+
+namespace HostAdvanceResult
+
+def ofAdvance : AdvanceResult → HostAdvanceResult
+  | .next state => .next state
+  | .done value => .done value
+  | .fault error => .fault error
+
+@[simp] theorem ofAdvance_next (state : State) :
+    ofAdvance (.next state) = .next state :=
+  rfl
+
+@[simp] theorem ofAdvance_done (value : Value) :
+    ofAdvance (.done value) = .done value :=
+  rfl
+
+@[simp] theorem ofAdvance_fault (error : MachineFault) :
+    ofAdvance (.fault error) = .fault error :=
+  rfl
+
+end HostAdvanceResult
+
+/--
+Advance ordinary Core states normally, but turn application of a supplied host
+function into argument evaluation followed by a first-order suspension.
+-/
+def hostAdvance (state : State) : HostAdvanceResult :=
+  match state.control, state.continuation with
+  | .ret (.hostFunction function),
+      .applyArgument argument environment :: continuation =>
+      .next {
+        control := .eval argument environment
+        continuation := .hostApply function :: continuation
+        store := state.store
+      }
+  | .ret argument, .hostApply function :: continuation =>
+      match function, argument with
+      | .storageRead, .word slot =>
+          .suspended {
+            request := .storageRead slot
+            continuation
+            store := state.store
+          }
+      | function, actual => .fault (.invalidHostArgument function actual)
+  | _, _ => .ofAdvance (advance state)
+
+@[simp] theorem hostAdvance_begin_storageRead
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .storageRead),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .storageRead :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_storageRead
+    (slot : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.word slot), .hostApply .storageRead :: continuation, store⟩ =
+      .suspended ⟨.storageRead slot, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_storageRead_argument
+    (actual : Value)
+    (notWord : ∀ slot, actual ≠ .word slot)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .storageRead :: continuation, store⟩ =
+      .fault (.invalidHostArgument .storageRead actual) := by
+  cases actual <;> simp_all [hostAdvance]
+
 end Solcore.Core

@@ -403,6 +403,7 @@ inductive MachineFault where
   | expectedSum (actual : Value)
   | expectedFunction (actual : Value)
   | unhandledHostFunction (function : HostFunction)
+  | invalidHostArgument (function : HostFunction) (actual : Value)
   | expectedCell (actual : Value)
   | invalidCellLocation (location : Location)
   | expectedNamedData (actual : Value)
