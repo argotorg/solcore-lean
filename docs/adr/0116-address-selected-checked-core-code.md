@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: checked code association, address selection, and pure Core execution
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -178,6 +178,43 @@ Keep every commit below 300 changed lines:
 5. add safety and preservation properties;
 6. add focused runtime and compile regressions;
 7. run independent audit and record completion evidence.
+
+## Implementation record
+
+The completed checked-code layer has one proof-carrying carrier, one executable
+admission function, and one stateful execution function. Its four laws cover
+accepted and rejected admission, existence of a typed completion above some
+fuel threshold, and impossibility of a machine fault at every fuel value.
+
+Account now privately retains optional checked code. `empty`, `withCode`, and
+both sparse-storage write branches establish the intended association and
+preservation behavior. `Account.ext` observes both pointwise storage and code;
+the two existing storage algebra proofs and their compile regression were
+migrated to the stronger identity rule. Four Account code laws expose empty,
+association, storage preservation, and code preservation observations.
+
+WorldState adds one address-selected code lookup and one stateful runner. Six
+explicit simp laws cover absent Account, present Account without code, and
+present code for both lookup and execution. One non-simp law proves that no
+address-selected run can return a machine fault. No WorldState liveness wrapper
+or frame-result conversion was added.
+
+The 79-line checked-code regression and 145-line WorldState-code regression
+directly exercise the public laws and run executable cases. A well-typed cell
+program returns both its cell reference and final Core-local store. Separate
+addresses execute different programs; absent and no-code cases remain `none`;
+storage and code coexist across a storage write; insufficient fuel remains
+`some (.outOfFuel state)`; and an ill-typed program is rejected.
+
+Implementation commits are `45a896f`, `8e42979`, `e643dca`, `6416914`,
+`15d3793`, and `08a571e`. Specification and audit corrections are `ad71993`,
+`9993c07`, and `851b3fd`. Their changed-line counts are respectively 75, 72,
+35, 113, 25, 234, 216, 9, and 12; every commit is below 300 changed lines.
+
+Trust-zero checks report only `[propext]` or `[propext, Quot.sound]` exactly as
+specified. The 587-job full build, 1062-job full test run, metadata verification,
+kernel policy, dependency and declaration inventories, diff checks, and
+independent P0-P3 semantic and static audits pass.
 
 ## Publication and consequences
 

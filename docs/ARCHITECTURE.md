@@ -675,12 +675,12 @@ checks the caller-supplied selector in `initialWorld`, which becomes the derived
 working WorldState, and returns the existing proven-present carrier only when
 that Account exists.
 
-ADR-0116 makes checker-accepted `Core.Program` values optional Account state.
-Code selection is an ordinary WorldState Address lookup, so checkpoints and
-rollback retain code identity together with storage. The first consumer returns
-the exact stateful Core machine result. It does not yet expose WorldState to
-Core, convert `Core.Value` to return bytes, or classify fuel exhaustion as a
-frame outcome.
+Completed ADR-0116 makes checker-accepted `Core.Program` values optional Account
+state. Code selection is an ordinary WorldState Address lookup, so checkpoints
+and rollback retain code identity together with storage. The first consumer
+returns the exact stateful Core machine result. It does not yet expose
+WorldState to Core, convert `Core.Value` to return bytes, or classify fuel
+exhaustion as a frame outcome.
 
 ### Observation
 

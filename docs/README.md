@@ -544,7 +544,7 @@ The completed
 checks a storage selector against caller-supplied `initialWorld` and returns the
 proven-present carrier used by total storage operations on success.
 
-The active
+The completed
 [ADR-0116](adr/0116-address-selected-checked-core-code.md) adds checker-accepted
 Core code to Account state, selects it by Address, and runs it without inventing
 an ABI or frame-result conversion.

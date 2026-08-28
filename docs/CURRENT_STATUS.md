@@ -298,7 +298,7 @@ accepts a partial adapter from parent-indexed initialization to the existing
 proven-present storage carrier; implementation is complete.
 [ADR-0116](adr/0116-address-selected-checked-core-code.md) accepts checked
 Core code as rollback-visible Account state and fixes address-selected raw Core
-execution as the next active slice. It deliberately leaves frame outcomes,
+execution; implementation is complete. It deliberately leaves frame outcomes,
 ABI conversion, contract inputs, and WorldState effects unresolved.
 
 ## Implementation status
@@ -312,7 +312,7 @@ ABI conversion, contract inputs, and WorldState effects unresolved.
 | Internal non-recursive functions | Complete | Complete, including totality | Not published |
 | Internal binary sums | Complete | Complete, including totality | Not published |
 | Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
-| Address-selected checked Core code | Planned | ADR accepted; implementation active | Not published |
+| Address-selected checked Core code | Complete | Admission, Account association, selection, stateful execution, termination threshold, and no-fault safety proved | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -1985,6 +1985,22 @@ result. A compile-only consumer connects the successful branch to the existing
 total write/read interface. Full validation and independent P0-P3 audits pass.
 The adapter adds no Account creation, entry identity, authority, lifetime
 claim, or runtime fixture.
+
+## Completed address-selected checked Core code
+
+[ADR-0116](adr/0116-address-selected-checked-core-code.md) admits exactly the
+closed Core programs accepted by the existing checker, associates optional code
+with Account state, selects it through WorldState by Address, and returns the
+complete stateful Core-machine result.
+
+Four checked-code laws, four Account laws, and seven WorldState laws cover
+admission, typed eventual completion, no-fault safety, storage/code preservation,
+all lookup branches, and exact execution. Runtime regressions retain a returned
+cell reference together with its local store, distinguish absent and no-code
+Accounts, select different programs at two addresses, preserve code through a
+storage write, and leave fuel exhaustion unclassified. Full validation and two
+independent P0-P3 audits pass. No FrameOutcome, ABI, contract input, WorldState
+effect, or published interface was added.
 
 ## Meaning of completion
 
