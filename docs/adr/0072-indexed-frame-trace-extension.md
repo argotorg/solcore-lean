@@ -33,7 +33,9 @@ structure FrameTrace.ExtensionFrom
 
 The hidden fragment contains only events recorded after `start`. The fixed
 `earlier` trace is a type index. External callers can neither construct the
-carrier from an arbitrary fragment nor inspect the fragment directly.
+carrier from an arbitrary fragment nor use a named fragment projection. Lean's
+generated eliminators remain available, as for other structures; privacy here
+controls the direct construction surface rather than making data secret.
 
 Add exactly three public executable operations:
 
