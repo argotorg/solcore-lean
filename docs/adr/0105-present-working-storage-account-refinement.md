@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: refine an address-bound working context with exact Account presence
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -157,6 +157,27 @@ Keep each of five commits below 300 changed lines: this decision and targeted
 internal documentation; the exact carrier and producer plus one umbrella
 import; the exact two laws plus one umbrella import; runtime and compile-only
 regressions plus runner wiring; independent audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 38-line definition module and a 41-line properties
+module, with one semantic umbrella import for each. It publishes exactly the
+required carrier, partial producer, and two simp branch laws. The carrier and
+its generated declarations, producer and generated equation, and both laws
+report exactly `[propext]`; both laws are registered with the intended simp
+orientation.
+
+The 98-line runtime module contains exactly three assertions. The 64-line
+compile-only module contains exactly three private examples and applies all
+four branch laws by name. The runner imports both modules once, calls the sole
+public runtime test once, and adds no compile-only call.
+
+The implementation commits are `fca91ac` (213 changed lines), `758527c` (39),
+`2b60e17` (42), and `1682e92` (165), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused trust-zero checks, the 550-job full
+build, the 992-job full test run, metadata and kernel checks, diff checks,
+declaration and simp-registration inventories, exact dependency audits, and
+independent P0-P3 audits pass.
 
 ## Publication and consequences
 

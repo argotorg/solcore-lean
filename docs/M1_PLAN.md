@@ -110,7 +110,7 @@ These results remain regression obligations for every extension.
 | 84 | Address-bound working storage-write preservation | Complete | Exposes selector, checkpoint, and working-journal preservation without collapsing write failure |
 | 85 | Address-bound working storage-write values coherence | Complete | Relates wrapper write results to the existing address-parameterized values writer |
 | 86 | Parent-indexed initialization continuation-context coherence | Complete | Equates the refined trace-extension route with the plain checkpointed-values route |
-| 87 | Present working storage Account refinement | Planned | Bundles the exact retained-address working Account and its lookup evidence for total consumers |
+| 87 | Present working storage Account refinement | Complete | Bundles the exact retained-address working Account and its lookup evidence for total consumers |
 | 88 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
 | 89 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 90 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1458,15 +1458,18 @@ generation, or runtime policy. Two compile-only regressions cover the whole
 equality and the existing `continue?` consumer. The law reports `[propext]`;
 full validation and independent P0-P3 audits pass.
 
-## Planned present working storage Account refinement
+## Completed present working storage Account refinement
 
 [ADR-0105](adr/0105-present-working-storage-account-refinement.md) adds one
 snapshot-local carrier and one partial producer at the retained working address.
 
 The refinement keeps Account absence explicit as `none` and stores exact
-presence evidence on success. Total read and write operations remain separate
-immediate consumer slices; no Account creation, authority, or lifetime policy
-is introduced here.
+presence evidence on success. Its two simp branch laws report `[propext]`;
+three runtime assertions and three private compile regressions cover exact
+failure, success, preservation, and reuse by existing read and write laws.
+Full validation and independent P0-P3 audits pass. Total read and write
+operations remain separate immediate consumer slices; no Account creation,
+authority, or lifetime policy is introduced here.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
