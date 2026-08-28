@@ -287,6 +287,9 @@ implementation is complete.
 [ADR-0112](adr/0112-present-working-storage-account-total-write-presence.md)
 accepts zero deletion and nonzero sparse-entry presence after total writes;
 implementation is complete.
+[ADR-0113](adr/0113-present-working-storage-account-total-write-sparse-preservation.md)
+accepts preservation of every distinct sparse-storage entry at the Account and
+proven-present carrier boundaries; implementation is planned.
 
 ## Implementation status
 
@@ -386,6 +389,7 @@ implementation is complete.
 | Present working storage Account total-write isolation | No new operation | Complete | Not published |
 | Present working storage Account total-write projections | No new operation | Complete | Not published |
 | Present working storage Account total-write presence | No new operation | Complete | Not published |
+| Present working storage Account total-write sparse preservation | No new operation | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1933,6 +1937,17 @@ Both named non-simp laws report `[propext]`. Two private compile regressions
 apply them directly; full validation and independent P0-P3 audit pass. The
 proof-only slice adds no operation, runtime assertion, address role, transition,
 or published surface.
+
+## Planned present working storage Account total-write sparse preservation
+
+[ADR-0113](adr/0113-present-working-storage-account-total-write-sparse-preservation.md)
+will add one Account law and one proven-present carrier lift showing that a
+write preserves the optional sparse entry at every distinct slot.
+
+Both laws will remain named non-simp rules and must report exactly `[propext]`.
+Two direct compile regressions will cover the two abstraction boundaries. No
+operation or runtime fixture is needed because existing execution tests already
+exercise the underlying distinct-slot behavior.
 
 ## Meaning of completion
 

@@ -118,11 +118,12 @@ These results remain regression obligations for every extension.
 | 92 | Present working storage Account total-write isolation | Complete | Preserves every non-selected working Account across a total write |
 | 93 | Present working storage Account total-write projections | Complete | Exposes the exact selector, checkpoint, journal, and updated Account projections |
 | 94 | Present working storage Account total-write presence | Complete | Exposes zero deletion and nonzero sparse-entry presence |
-| 95 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 96 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 97 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 98 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 99 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 95 | Present working storage Account total-write sparse preservation | Active | Completes one-write sparse representation behavior at Account and proven-present carrier boundaries |
+| 96 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 97 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 98 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 99 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 100 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1563,6 +1564,17 @@ directly. Full validation and independent P0-P3 audit pass. The laws keep the
 existing Account simp policy unchanged and add no operation or runtime fixture.
 Other-slot representation, address roles, lifetime, and transition policies
 remain later work.
+
+## Active present working storage Account total-write sparse preservation
+
+[ADR-0113](adr/0113-present-working-storage-account-total-write-sparse-preservation.md)
+completes the single-write sparse representation boundary. One base Account law
+preserves `storageValue?` at a distinct slot; one refined law exposes the same
+fact through the proven-present total writer.
+
+The laws remain named and non-simp so automatic projection rewriting does not
+silently broaden the older Account observation policy. The slice needs exactly
+two direct compile regressions and no new executable behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

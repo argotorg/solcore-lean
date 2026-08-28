@@ -661,6 +661,10 @@ lower-level storage update.
 ADR-0112 accepts sparse storage presence after a total write: zero deletes the
 slot entry, while a nonzero word produces the corresponding present value.
 
+ADR-0113 accepts sparse storage preservation at every other slot. The base
+Account law and its proven-present carrier lift complete the representation
+truth table for one write without changing the automatic simplification policy.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
