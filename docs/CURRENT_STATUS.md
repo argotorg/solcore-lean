@@ -277,7 +277,7 @@ accepts same-slot and distinct-slot read-after-write laws for the total carrier;
 implementation is complete.
 [ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
 accepts overwrite and distinct-slot commutation laws for total carrier writes;
-implementation is planned.
+implementation is complete.
 
 ## Implementation status
 
@@ -373,7 +373,7 @@ implementation is planned.
 | Present working storage Account total read | Complete | Complete | Not published |
 | Present working storage Account total write | Complete | Complete | Not published |
 | Present working storage Account total read/write coherence | No new operation | Complete | Not published |
-| Present working storage Account total-write algebra | No new operation | Planned | Not published |
+| Present working storage Account total-write algebra | No new operation | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1877,15 +1877,17 @@ composition with ADR-0106 conditional-read coherence. Full validation and
 independent P0-P3 audits pass. The slice adds no lookup, mutation, runtime
 assertion, address authority, transition, or published surface.
 
-## Planned present working storage Account total-write algebra
+## Completed present working storage Account total-write algebra
 
 [ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
-specifies same-slot overwrite and distinct-slot commutation for sequential
-ADR-0107 total writes.
+adds same-slot overwrite and distinct-slot commutation for sequential ADR-0107
+total writes.
 
-The proof-only slice reuses existing Account and WorldState update algebra and
-adds no operation, runtime assertion, address authority, transition, or
-published surface.
+The overwrite law is the sole new simp rule; commutation remains explicitly
+directed by its caller. Both laws report `[propext, Quot.sound]`. Two private
+compile regressions name the laws directly, and full validation plus independent
+P0-P3 audit pass. The proof-only slice adds no operation, runtime assertion,
+address authority, transition, or published surface.
 
 ## Meaning of completion
 

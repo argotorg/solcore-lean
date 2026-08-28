@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: normalize overwrite and commute distinct total working-storage writes
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -110,6 +110,27 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact two laws plus one umbrella import; the exact
 two compile regressions plus one runner import and no call; independent audit
 and completion evidence.
+
+## Implementation record
+
+The completed proof-only slice adds a 39-line properties module plus one
+semantic umbrella import. It publishes exactly the two required laws and adds
+no helper, operation, carrier, coercion, or instance. The overwrite law is a
+simp rule, the commutation law is not, and both report exactly
+`[propext, Quot.sound]`.
+
+The 36-line compile-only module plus one runner import contains exactly two
+private examples. Each applies its fully qualified public law directly, so
+existing Account and WorldState algebra cannot mask a missing refined-carrier
+declaration. The test layer adds no runtime or public declaration, fixture,
+helper, assertion, or runner call.
+
+The implementation commits are `2ae2256` (163 changed lines), `de4fd39` (40),
+and `09aa0d0` (37), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 564-job full build, the
+1016-job full test run, metadata and kernel checks, diff checks, declaration,
+axiom, and simp-registration inventories, proof-masking checks, and independent
+P0-P3 audit pass.
 
 ## Publication and consequences
 

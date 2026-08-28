@@ -513,9 +513,9 @@ The completed
 adds same-slot and distinct-slot read-after-write laws for those total
 operations.
 
-The accepted
+The completed
 [ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
-plans overwrite normalization and distinct-slot commutation for total writes.
+adds overwrite normalization and distinct-slot commutation for total writes.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -755,7 +755,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0108](adr/0108-present-working-storage-account-total-read-write-coherence.md)
   fixes the read-after-write laws for the total operations.
 - [ADR-0109](adr/0109-present-working-storage-account-total-write-algebra.md)
-  fixes the planned algebra of sequential total writes.
+  fixes the algebra of sequential total writes.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
