@@ -8,6 +8,7 @@ import Solcore.Semantics.FrameOutcome
 import Solcore.Semantics.FrameOutcomeProperties
 import Solcore.Semantics.FrameStateResolution
 import Solcore.Semantics.FrameStateResolutionProperties
+import Solcore.Semantics.FrameRunResult
 import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
 import Solcore.Semantics.WorldState
