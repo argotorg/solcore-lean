@@ -69,10 +69,11 @@ These results remain regression obligations for every extension.
 | 43 | Parametric frame effect journal policy | Complete | Separates rollback-scoped state from surviving opaque trace snapshots |
 | 44 | Synchronized frame state/effect resolution | Complete | Resolves state and effects from one shared frame outcome |
 | 45 | Synchronized child-frame composition | Complete | Proves child return/revert followed by parent rollback without a stack API |
-| 46 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 47 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 48 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 49 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 46 | Unresolved trap propagation | Active | Proves that trapped synchronized resolution remains `none` through any continuation |
+| 47 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 48 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 49 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 50 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -752,6 +753,18 @@ The 47-line properties module and one umbrella import provide two non-simp,
 `rfl` laws with `[propext]`. The 74-line definition-only test module plus two
 runner lines provides two intermediate-and-final projection checks. No carrier,
 API, instance, helper, or next operational policy is introduced.
+
+## Active unresolved trap propagation
+
+[ADR-0064](adr/0064-unresolved-trap-propagation.md) adds no carrier, executable
+API, instance, or helper. Its proof-only scope is exactly one non-simp law:
+binding an arbitrary continuation after trapped synchronized resolution still
+produces `none`. One definition-only runtime assertion uses a sentinel
+continuation to confirm that it is not invoked.
+
+This does not choose checkpoint or working state, effect rollback, trace
+survival, fatal-error handling, or transaction behavior. Those operational
+decisions remain separate.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

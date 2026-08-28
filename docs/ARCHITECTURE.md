@@ -436,6 +436,11 @@ trace snapshot. No trace append or event order is chosen.
 The completed proof-only layer adds no carrier or operation; its two rfl laws
 and two runtime assertions preserve the same opaque trace convention.
 
+ADR-0064 isolates the next proof boundary: once synchronized resolution yields
+`none` for a trapped frame, binding any continuation still yields `none`. The
+active slice adds no carrier or operation and deliberately leaves rollback,
+trace, fatal-error, and transaction handling undecided.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

@@ -133,6 +133,9 @@ synchronized resolver. One outcome selects WorldState and parametric
 effects together without a new carrier.
 [ADR-0063](adr/0063-synchronized-child-frame-composition.md) completes the
 proof-only child composition laws. They add no executable API or nested stack.
+[ADR-0064](adr/0064-unresolved-trap-propagation.md) is the active proof-only
+slice. It records that a trapped synchronized resolution remains `none`
+through any continuation, without selecting a trap or transaction policy.
 
 ## Implementation status
 
@@ -183,6 +186,7 @@ proof-only child composition laws. They add no executable API or nested stack.
 | Parametric frame effect journal policy | Complete | Complete | Not published |
 | Synchronized frame state/effect resolution | Complete | Complete | Not published |
 | Synchronized child-frame composition | Complete | Complete | Not published |
+| Unresolved trap propagation | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
