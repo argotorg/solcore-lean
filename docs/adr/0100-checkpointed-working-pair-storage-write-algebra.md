@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: lift sequential storage-write algebra to checkpointed working values
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -150,6 +150,29 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact private helper and three laws plus one
 umbrella import; the exact three compile regressions plus one runner import and
 no call; independent audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 77-line properties module plus one semantic
+umbrella import. One private normalization helper supports exactly the three
+required public laws; no executable operation, carrier, instance, or public
+helper is added.
+
+Only `writeWorkingStorage?_overwrite` is a simp rule. The two commutation laws
+remain non-simp. All three public laws report exactly
+`[propext, Quot.sound]`, and simplification review finds no loop or divergent
+critical overlap with the existing branch laws.
+
+A 52-line compile-only test module plus one runner import contains exactly
+three private examples. Overwrite uses the public simp rule; both commutation
+examples name their public non-simp law directly. The test layer adds no
+runtime or public declaration, fixture, helper, assertion, or runner call.
+
+The implementation commits are `7814798` (214 changed lines), `afbd0ec` (78),
+and `a98a71e` (53), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused trust-zero checks, the 540-job full build, the
+968-job full test run, metadata and kernel checks, diff checks, declaration
+inventory, failure-stage review, and independent P0-P3 audits pass.
 
 ## Publication and consequences
 

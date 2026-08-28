@@ -610,7 +610,7 @@ ADR-0099 completes canonical wiring from that initialization recipe to the
 existing retained-storage-address carrier. The supplied address remains only a
 selector for the established working-storage operations.
 
-ADR-0100 accepts a proof-only sequential algebra at the address-parameterized
+ADR-0100 completes a proof-only sequential algebra at the address-parameterized
 checkpointed working-write layer. Overwrite reduces to the final write, while
 independent slot and address writes commute as pure optional-value equations;
 this makes no runtime action-order or transaction claim.

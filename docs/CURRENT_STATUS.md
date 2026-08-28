@@ -249,9 +249,8 @@ values caller-supplied.
 completes a canonical adapter from that initialization to the existing
 storage-address carrier.
 [ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md)
-accepts a proof-only lift of overwrite and independent-write commutation to
-the address-parameterized checkpointed working write; implementation is
-planned.
+completes a proof-only lift of overwrite and independent-write commutation to
+the address-parameterized checkpointed working write.
 
 ## Implementation status
 
@@ -338,7 +337,7 @@ planned.
 | Address-bound working storage read/write coherence | No new operation | Complete | Not published |
 | Parent-indexed frame initialization | Complete | Complete | Not published |
 | Parent-indexed initialization storage-address adapter | Complete | Complete | Not published |
-| Checkpointed working-pair storage-write algebra | No new operation | Planned | Not published |
+| Checkpointed working-pair storage-write algebra | No new operation | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1721,16 +1720,19 @@ without adding a carrier, storage operation, address authority, runtime
 assertion, helper, or runner call. All declarations meet the `[propext]`
 boundary, and the full validation and independent P0-P3 audits pass.
 
-## Planned checkpointed working-pair storage-write algebra
+## Completed checkpointed working-pair storage-write algebra
 
 [ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md)
-specifies three proof-only laws for the existing address-parameterized working
+adds three proof-only laws for the existing address-parameterized working
 write: final-write overwrite, distinct-slot commutation, and distinct-address
 commutation.
 
-The laws retain the checkpoint and working journal through the existing
-carrier. They add no operation, address authority, runtime reordering claim,
-runtime assertion, or runner call. Only overwrite is a simp rule.
+The 77-line properties module has one private normalization helper and exactly
+the three public laws. A 52-line compile-only module has exactly three private
+examples. Only overwrite is a simp rule; both commutation laws remain
+non-simp. All public laws report `[propext, Quot.sound]`, full validation and
+independent audits pass, and no operation, address authority, runtime
+reordering claim, runtime assertion, or runner call is added.
 
 ## Meaning of completion
 
