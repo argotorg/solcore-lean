@@ -594,8 +594,8 @@ deleted slots observed as `some zero`.
 ADR-0095 completes the lift of that read through the retained storage address
 and the working WorldState. The checkpoint remains outside the read path.
 
-ADR-0096 accepts the proof that conditional storage writes and subsequent reads
-agree at the selected slot and preserve independent slots and addresses.
+ADR-0096 completes the proof that conditional storage writes and subsequent
+reads agree at the selected slot and preserve independent slots and addresses.
 
 ### Observation
 
