@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only child resolution followed by parent revert
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -108,3 +108,20 @@ canonical delta, or frozen artifact.
 The approved non-trapping child policy has one explicit synchronized proof
 boundary. A concrete nested evaluator and trap policy still require separate
 decisions.
+
+## Implementation record
+
+The completed proof-only slice adds no carrier, executable API, instance, or
+helper. A 47-line properties module plus one umbrella import publishes exactly
+two non-simp laws. Both are proved by `rfl` and report exactly `[propext]`.
+
+Exactly two runtime assertions live in a 74-line definition-only test module
+with two runner lines. Each checks the intermediate child resolution and the
+final parent-revert projections using distinct state, rollback, and trace
+fixtures.
+
+The implementation commits are `5066992` (154 changed lines), `e1fc6f4` (48),
+and `7e7f6ca` (76). Each remains below 300 changed lines; this completion update
+is the fourth staged commit. Focused and full builds, tests, trust-zero,
+semantic-kernel, metadata, forbidden-declaration, document-link, and diff
+checks pass. Independent stage audits found no P0-P3 issue.

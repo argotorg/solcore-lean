@@ -131,7 +131,7 @@ concrete event taxonomy or order.
 [ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) completes the
 synchronized resolver. One outcome selects WorldState and parametric
 effects together without a new carrier.
-[ADR-0063](adr/0063-synchronized-child-frame-composition.md) accepts the active
+[ADR-0063](adr/0063-synchronized-child-frame-composition.md) completes the
 proof-only child composition laws. They add no executable API or nested stack.
 
 ## Implementation status
@@ -182,7 +182,7 @@ proof-only child composition laws. They add no executable API or nested stack.
 | External-checkpoint frame run result | Complete | Complete | Not published |
 | Parametric frame effect journal policy | Complete | Complete | Not published |
 | Synchronized frame state/effect resolution | Complete | Complete | Not published |
-| Synchronized child-frame composition | Active | In progress | Not published |
+| Synchronized child-frame composition | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -921,9 +921,9 @@ the resolver and every law report `[propext]`. Three assertions in a 66-line
 definition-only test module plus two runner lines cover both projections. Full
 validation and independent P0-P3 audits pass.
 
-## Active synchronized child-frame composition
+## Completed synchronized child-frame composition
 
-[ADR-0063](adr/0063-synchronized-child-frame-composition.md) plans exactly two
+[ADR-0063](adr/0063-synchronized-child-frame-composition.md) provides exactly two
 non-simp laws and two definition-only runtime assertions, with no carrier, API,
 instance, or helper. Child return is adopted before parent revert; child revert
 first restores the child checkpoint. Both paths finish at parent checkpoint
@@ -931,6 +931,12 @@ WorldState and rollback state while preserving the child's accumulated working
 trace. That trace already includes the parent prefix. Stack ownership,
 invocation, checkpoint creation, append/order, transactions, trap policy, ABI,
 Core adaptation, EVM, gas, and publication remain outside.
+
+The 47-line properties module plus one umbrella import contains two non-simp,
+`rfl` laws, each reporting `[propext]`. Two assertions in a 74-line
+definition-only test module plus two runner lines inspect both intermediate and
+final projections. No carrier, API, instance, or helper is added. Full
+validation and independent P0-P3 audits pass.
 
 ## Meaning of completion
 

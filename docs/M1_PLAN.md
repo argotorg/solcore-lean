@@ -68,7 +68,7 @@ These results remain regression obligations for every extension.
 | 42 | External-checkpoint frame run result | Complete | Pairs speculative working state with outcome under caller-owned checkpoint |
 | 43 | Parametric frame effect journal policy | Complete | Separates rollback-scoped state from surviving opaque trace snapshots |
 | 44 | Synchronized frame state/effect resolution | Complete | Resolves state and effects from one shared frame outcome |
-| 45 | Synchronized child-frame composition | Active | Proves child return/revert followed by parent rollback without a stack API |
+| 45 | Synchronized child-frame composition | Complete | Proves child return/revert followed by parent rollback without a stack API |
 | 46 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 47 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
 | 48 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -739,7 +739,7 @@ three simp constructor and two non-simp projection rules. A 66-line
 definition-only test module plus two runner lines supplies three checks. No
 carrier, instance, helper, or next operational policy is introduced.
 
-## Active synchronized child-frame composition
+## Completed synchronized child-frame composition
 
 [ADR-0063](adr/0063-synchronized-child-frame-composition.md) adds no carrier,
 operation, instance, or helper. Exactly two non-simp laws and two runtime
@@ -747,6 +747,11 @@ assertions compose child return or revert with a later parent revert. The trace
 is an already-accumulated snapshot containing the parent prefix; no append or
 ordering rule is introduced. Concrete invocation and trap handling remain
 separate decisions.
+
+The 47-line properties module and one umbrella import provide two non-simp,
+`rfl` laws with `[propext]`. The 74-line definition-only test module plus two
+runner lines provides two intermediate-and-final projection checks. No carrier,
+API, instance, helper, or next operational policy is introduced.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

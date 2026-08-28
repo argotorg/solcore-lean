@@ -433,6 +433,8 @@ ADR-0063 proves two-stage child/parent composition without an execution stack.
 Whether the child returns or reverts, a later parent revert restores parent
 WorldState and rollback effects while preserving the child's already-accumulated
 trace snapshot. No trace append or event order is chosen.
+The completed proof-only layer adds no carrier or operation; its two rfl laws
+and two runtime assertions preserve the same opaque trace convention.
 
 ### Observation
 
