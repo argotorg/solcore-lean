@@ -101,8 +101,8 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Unresolved trap propagation | Complete | Proof-only; no carrier, API, instance, or helper; exactly one generic non-simp `rfl` bind law and one definition-only sentinel runtime assertion complete | None |
 | Resolved frame continuation laws | Complete | Proof-only; no carrier, API, instance, or helper; exactly two generic non-simp `rfl` bind laws and two definition-only sentinel assertions complete the returned/reverted continuation boundary | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
-| Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
-| Revert and rollback | Planned | nested rollback and surviving observation policy | None |
+| Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
+| Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation, call nesting, and transaction atomicity remain undecided | None |
 | Storage | Blocked | storage-layout ADR | Low |
 | External calls and creation | Planned | host transition and call-depth rules | None |
 | Logs and canonical observations | Planned | value schemas and normalization | None |
