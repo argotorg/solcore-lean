@@ -514,6 +514,11 @@ maps ADR-0075's selected pair into a prospective enclosing `FrameRunResult` and
 selected journal while preserving the same trapped outcome. This constructs a
 value only; it neither executes nor proves runtime propagation or ancestry.
 
+ADR-0077 fixes the active proof boundary for successful payload selection. It
+recovers the exact trapped payload shape from a `some` equality and carries the
+existing non-strict parent trace-prefix fact to that selected journal. It adds
+no execution operation or runtime provenance.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

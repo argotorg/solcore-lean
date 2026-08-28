@@ -82,10 +82,11 @@ These results remain regression obligations for every extension.
 | 56 | Parent-indexed frame continuation construction | Complete | Derives the indexed context and proofs from an event-only trace extension |
 | 57 | Parent-indexed trapped-frame rollback selection | Complete | Selects a frame-local parent rollback pair for traps while leaving propagation and transactions open |
 | 58 | Parent-indexed trap propagation payload selection | Complete | Constructs one opt-in caller-designated prospective enclosing payload while leaving handling and transactions open |
-| 59 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 60 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after one-step trap payload construction |
-| 61 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 62 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 59 | Parent-indexed trap propagation payload coherence | Active | Inverts successful selection and carries existing non-strict prefix evidence without adding execution |
+| 60 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 61 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after payload coherence |
+| 62 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 63 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -997,6 +998,19 @@ Full validation and independent P0-P3 audits pass. The operation constructs one
 caller-designated prospective enclosing payload but does not execute or prove
 propagation, parent execution, ancestry, handling, repetition through
 ancestors, or transaction behavior.
+
+## Active parent-indexed trap propagation payload coherence
+
+[ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md) adds
+no executable operation or carrier. It specifies one non-simp iff law for
+recovering the reason and complete selected payload shape, plus one non-simp
+law carrying ADR-0073's existing non-strict trace-prefix proof to the selected
+journal.
+
+Exactly two private compile regressions are planned. The laws characterize
+pure value selection only; they do not prove propagation occurred, introduce
+runtime ancestry, execute a parent, handle a trap, or choose transaction
+behavior.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

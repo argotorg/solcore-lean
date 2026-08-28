@@ -179,6 +179,9 @@ working trace without changing the existing generic resolvers.
 opt-in payload selector. It combines ADR-0075's selected pair with the original
 trapped outcome for a caller-designated prospective enclosing boundary without
 performing or proving runtime propagation.
+[ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md) is
+active. It specifies two proof-only laws that invert a successful payload
+selection and attach the existing non-strict trace-prefix fact to its journal.
 
 ## Implementation status
 
@@ -242,6 +245,7 @@ performing or proving runtime propagation.
 | Parent-indexed frame continuation construction | Complete | Complete | Not published |
 | Parent-indexed trapped-frame rollback selection | Complete | Complete | Not published |
 | Parent-indexed trap propagation payload selection | Complete | Complete | Not published |
+| Parent-indexed trap propagation payload coherence | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1235,6 +1239,18 @@ P0-P3 audits pass. The completed operation only constructs a value for one
 caller-designated prospective enclosing boundary. It does not perform or prove
 a runtime transition, parent execution, ancestry, handling, repeated
 propagation, or transaction policy.
+
+## Active parent-indexed trap propagation payload coherence
+
+[ADR-0077](adr/0077-parent-indexed-trap-propagation-payload-coherence.md)
+specifies exactly two non-simp proof laws and no new executable operation. One
+law recovers the trapped reason and complete canonical payload from a `some`
+selector equality. The other reuses ADR-0073 to prove that the designated
+enclosing trace prefixes the selected journal's internal working trace.
+
+Exactly two private compile regressions are planned. Successful selection is a
+value-level fact, and the prefix is non-strict; neither claims runtime
+propagation, ancestry, parent execution, handling, or transaction behavior.
 
 ## Meaning of completion
 
