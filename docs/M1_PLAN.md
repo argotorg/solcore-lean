@@ -69,7 +69,7 @@ These results remain regression obligations for every extension.
 | 43 | Parametric frame effect journal policy | Complete | Separates rollback-scoped state from surviving opaque trace snapshots |
 | 44 | Synchronized frame state/effect resolution | Complete | Resolves state and effects from one shared frame outcome |
 | 45 | Synchronized child-frame composition | Complete | Proves child return/revert followed by parent rollback without a stack API |
-| 46 | Unresolved trap propagation | Active | Proves that trapped synchronized resolution remains `none` through any continuation |
+| 46 | Unresolved trap propagation | Complete | Proves that trapped synchronized resolution remains `none` through any continuation |
 | 47 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 48 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
 | 49 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -754,13 +754,19 @@ The 47-line properties module and one umbrella import provide two non-simp,
 runner lines provides two intermediate-and-final projection checks. No carrier,
 API, instance, helper, or next operational policy is introduced.
 
-## Active unresolved trap propagation
+## Completed unresolved trap propagation
 
 [ADR-0064](adr/0064-unresolved-trap-propagation.md) adds no carrier, executable
 API, instance, or helper. Its proof-only scope is exactly one non-simp law:
 binding an arbitrary continuation after trapped synchronized resolution still
-produces `none`. One definition-only runtime assertion uses a sentinel
-continuation to confirm that it is not invoked.
+produces `none`. A 26-line properties module plus one umbrella import provides
+that `rfl` law with `[propext]`. One assertion in a 34-line definition-only
+test module plus two runner lines uses a sentinel continuation and confirms
+that it is not invoked.
+
+The implementation commits contain 122, 27, and 36 changed lines; this
+completion update is the fourth commit. Full validation and independent P0-P3
+audits pass. No next operational slice is activated here.
 
 This does not choose checkpoint or working state, effect rollback, trace
 survival, fatal-error handling, or transaction behavior. Those operational

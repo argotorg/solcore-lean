@@ -284,11 +284,11 @@ resolver. It adds no operation, frame stack, or trace-order rule.
 Its two non-simp laws and two definition-only runtime assertions cover both
 intermediate child resolution and final parent rollback.
 
-The active proof-only trap-propagation slice,
+The completed proof-only trap-propagation slice,
 [ADR-0064](adr/0064-unresolved-trap-propagation.md), adds no carrier or
 operation. It proves one generic fact: a trapped synchronized resolution stays
-`none` when bound to any continuation. One definition-only sentinel test will
-confirm that the continuation is not invoked. Trap disposition, rollback,
+`none` when bound to any continuation. One definition-only sentinel test
+confirms that the continuation is not invoked. Trap disposition, rollback,
 trace survival, fatal handling, and transaction behavior remain undecided.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
@@ -438,8 +438,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0061 completes the parametric frame effect-journal policy.
 - ADR-0062 completes synchronized frame state-and-effect resolution.
 - ADR-0063 completes proof-only synchronized child-frame composition.
-- [ADR-0064](adr/0064-unresolved-trap-propagation.md) fixes the active
-  proof-only boundary for unresolved trap propagation through Option bind.
+- [ADR-0064](adr/0064-unresolved-trap-propagation.md) completes the proof-only
+  boundary for unresolved trap propagation through Option bind.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

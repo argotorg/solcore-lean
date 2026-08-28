@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only propagation through synchronized partial resolution
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -37,9 +37,9 @@ theorem resolvedWorldStateAndEffects?_trapped_bind
         FrameRunResult TrapReason)).bind next = none
 ```
 
-The proof is `rfl` and is expected to report exactly `[propext]`; completion
-records the measured result. The theorem is not a simp rule: it documents a
-continuation boundary rather than local constructor normalization.
+The proof is `rfl` and reports exactly `[propext]`. The theorem is not a simp
+rule: it documents a continuation boundary rather than local constructor
+normalization.
 
 The quantification over `Next` and `next` is intentional. No continuation can
 turn the resolver's trapped `none` into a successful value.
@@ -80,3 +80,19 @@ canonical delta, or frozen artifact.
 The synchronized resolver now has a generic proof boundary for unresolved
 traps. A later ADR may choose how an enclosing invocation or transaction
 interprets that absence without changing this propagation fact.
+
+## Implementation record
+
+The completed proof-only slice adds no carrier, executable API, instance, or
+helper. A 26-line properties module plus one umbrella import publishes exactly
+one non-simp `rfl` law, whose measured axiom set is `[propext]`.
+
+One runtime assertion lives in a 34-line definition-only test module with two
+runner lines. It supplies a concrete trap reason, observes the initial `none`,
+and confirms that binding a sentinel continuation still returns `none`.
+
+The implementation commits are `6baba07` (122 changed lines), `12fa73d` (27),
+and `a1aca0f` (36), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+semantic-kernel, metadata, document-link, diff, and independent P0-P3 audits
+pass.

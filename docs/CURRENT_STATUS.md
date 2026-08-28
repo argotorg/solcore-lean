@@ -133,9 +133,10 @@ synchronized resolver. One outcome selects WorldState and parametric
 effects together without a new carrier.
 [ADR-0063](adr/0063-synchronized-child-frame-composition.md) completes the
 proof-only child composition laws. They add no executable API or nested stack.
-[ADR-0064](adr/0064-unresolved-trap-propagation.md) is the active proof-only
-slice. It records that a trapped synchronized resolution remains `none`
-through any continuation, without selecting a trap or transaction policy.
+[ADR-0064](adr/0064-unresolved-trap-propagation.md) completes the proof-only
+trap-propagation slice. It records that a trapped synchronized resolution
+remains `none` through any continuation, without selecting a trap or
+transaction policy.
 
 ## Implementation status
 
@@ -186,7 +187,7 @@ through any continuation, without selecting a trap or transaction policy.
 | Parametric frame effect journal policy | Complete | Complete | Not published |
 | Synchronized frame state/effect resolution | Complete | Complete | Not published |
 | Synchronized child-frame composition | Complete | Complete | Not published |
-| Unresolved trap propagation | Active | In progress | Not published |
+| Unresolved trap propagation | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -941,6 +942,19 @@ The 47-line properties module plus one umbrella import contains two non-simp,
 definition-only test module plus two runner lines inspect both intermediate and
 final projections. No carrier, API, instance, or helper is added. Full
 validation and independent P0-P3 audits pass.
+
+## Completed unresolved trap propagation
+
+[ADR-0064](adr/0064-unresolved-trap-propagation.md) adds no carrier, executable
+API, instance, or helper. Its 26-line properties module plus one umbrella
+import publishes exactly one non-simp `rfl` law with axiom set `[propext]`.
+One assertion in a 34-line definition-only test module plus two runner lines
+checks a concrete reason, the trapped `none`, and sentinel-bind propagation.
+
+The three implementation commits contain 122, 27, and 36 changed lines; this
+completion update is the fourth commit. Full validation and independent P0-P3
+audits pass. `none` remains limited to unresolved trap disposition and chooses
+no rollback, working state, trace, fatal, or transaction policy.
 
 ## Meaning of completion
 
