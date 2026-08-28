@@ -86,6 +86,7 @@ import Solcore.Test.FrameRunResult
 import Solcore.Test.FrameRunResultTrapReasonMap
 import Solcore.Test.FrameStateResolution
 import Solcore.Test.ParentIndexedFrameContinuationContext
+import Solcore.Test.ParentIndexedFrameContinuationContextTrapReasonMap
 import Solcore.Test.ParentIndexedFrameContinuationConstruction
 import Solcore.Test.ParentIndexedFrameTrapRollback
 import Solcore.Test.ParentIndexedFrameTrapPropagationPayload
