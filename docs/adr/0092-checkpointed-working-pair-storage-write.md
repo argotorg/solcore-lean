@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: conditional storage update of only the working world state
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -171,11 +171,42 @@ artifact, schema, profile, capability report, or public format.
 
 ## Consequences
 
-Once implemented, callers can apply the established strict storage-write rule
-to a checkpointed carrier without manually rebuilding it or risking accidental
+Callers can now apply the established strict storage-write rule to a
+checkpointed carrier without manually rebuilding it or risking accidental
 checkpoint or journal replacement. The operation remains a pure function that
 returns a new value.
 
 Checkpoint creation, concrete frame identity, broader account state, parent
 resumption, scheduling, trap disposition, and transaction atomicity remain
 separate decisions.
+
+## Implementation record
+
+The completed slice adds exactly one
+`FrameCheckpointedWorkingPair.writeWorkingStorage?` operation in a 20-line
+definition module plus one umbrella import. It maps a successful working-world
+write into a new carrier while reusing the exact checkpoint and working
+journal. The operation and its one generated equation report exactly
+`[propext]`.
+
+A 33-line properties module plus one umbrella import publishes exactly two
+simp laws for absent and present working accounts. Both report exactly
+`[propext]`; their exclusive hypotheses and one-way reductions introduce no
+critical overlap or simp loop. The present law exposes exact checkpoint and
+whole-journal preservation in its result.
+
+A 98-line definition-only test module plus one runner import and one call
+contains exactly three runtime assertions. They cover a checkpoint-present but
+working-absent failure, a nonzero working-slot replacement, and zero deletion
+with account retention. Checkpoint state, both journal fields, an unrelated
+slot, and an unrelated account remain observable sentinels.
+
+The implementation commits are `f1275c4` (230 changed lines), `1ce5dbc` (21),
+`31d0ad1` (34), and `02589d3` (100), all below 300 changed lines; this
+completion update is the fifth staged commit. Focused and full builds, tests,
+trust-zero, axiom, simp-termination, semantic-kernel, metadata, diff, and
+independent P0-P3 audits pass.
+
+The operation establishes no address authority, account creation, checkpoint
+capture or lifecycle, in-place mutation, outcome, parent transition, trap
+handling, scheduling, gas, or transaction policy.

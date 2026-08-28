@@ -436,7 +436,7 @@ The completed result-mapping continuation slice,
 proves that bytes-aware continuation is invariant under heterogeneous
 trap-reason mapping.
 
-The active checkpointed storage slice,
+The completed checkpointed storage slice,
 [ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md), conditionally
 updates only a pair's working WorldState while retaining its checkpoint and
 working journal.

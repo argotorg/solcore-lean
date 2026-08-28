@@ -97,7 +97,7 @@ These results remain regression obligations for every extension.
 | 71 | Bytes-aware frame resolution continuation | Complete | Passes selected state/effects and bytes to distinct caller-owned return/revert callbacks while leaving traps unresolved |
 | 72 | Frame continuation branch/byte erasure coherence | Complete | Proves the richer result route conservatively recovers bytes-insensitive context continuation |
 | 73 | Frame-resolution continuation trap-reason mapping invariance | Complete | Proves heterogeneous reason mapping is invisible to the same bytes-aware callbacks |
-| 74 | Checkpointed working-pair storage write | Active | Lifts strict storage writes to only the working WorldState while retaining checkpoint and journal |
+| 74 | Checkpointed working-pair storage write | Complete | Lifts strict storage writes to only the working WorldState while retaining checkpoint and journal |
 | 75 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 76 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 77 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1273,17 +1273,23 @@ audits pass. This slice adds no operation, callback-count claim, delivery,
 parent update, scheduling, trap handling, or transaction transition. ADR-0090
 remains non-simp.
 
-## Active checkpointed working-pair storage write
+## Completed checkpointed working-pair storage write
 
-[ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) adds one planned
+[ADR-0092](adr/0092-checkpointed-working-pair-storage-write.md) adds one
 `FrameCheckpointedWorkingPair.writeWorkingStorage?` operation. It conditionally
 updates only the working WorldState through the existing strict storage rule
 and retains the exact checkpoint and working effect journal.
 
-Exactly two simp laws and three definition-only runtime assertions are planned.
-The caller supplies the address. The slice adds no authorization, account
-creation, checkpoint lifecycle, outcome, parent mutation, scheduling, trap,
-gas, or transaction policy.
+The 20-line definition and 33-line properties modules each add one umbrella
+import. The operation, generated equation, and exactly two simp laws report
+exactly `[propext]`. A 98-line definition-only test module plus one runner
+import and call contains exactly three runtime assertions.
+
+The four implementation commits contain 230, 21, 34, and 100 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. The caller supplies the address. The slice adds no
+authorization, account creation, checkpoint lifecycle, outcome, parent
+mutation, scheduling, trap, gas, or transaction policy.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
