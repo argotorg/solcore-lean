@@ -251,9 +251,9 @@ storage-address carrier.
 [ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md)
 completes a proof-only lift of overwrite and independent-write commutation to
 the address-parameterized checkpointed working write.
-[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) accepts a
-thin lift of same-slot overwrite and distinct-slot commutation through the
-retained storage selector; implementation is planned.
+[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) completes
+a thin lift of same-slot overwrite and distinct-slot commutation through the
+retained storage selector.
 
 ## Implementation status
 
@@ -341,7 +341,7 @@ retained storage selector; implementation is planned.
 | Parent-indexed frame initialization | Complete | Complete | Not published |
 | Parent-indexed initialization storage-address adapter | Complete | Complete | Not published |
 | Checkpointed working-pair storage-write algebra | No new operation | Complete | Not published |
-| Address-bound working storage-write algebra | No new operation | Planned | Not published |
+| Address-bound working storage-write algebra | No new operation | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1740,15 +1740,19 @@ first write before the surrounding bind. All public laws report
 independent audits pass, and no operation, address authority, runtime
 reordering claim, runtime assertion, or runner call is added.
 
-## Planned address-bound working storage-write algebra
+## Completed address-bound working storage-write algebra
 
-[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) specifies
+[ADR-0101](adr/0101-address-bound-working-storage-write-algebra.md) adds
 two proof-only laws for the retained-address writer: final-write overwrite and
 distinct-slot commutation.
 
-The thin lift reuses ADR-0100 and adds no operation, address argument, authority
-claim, runtime reordering claim, assertion, or runner call. Both laws remain
-named non-simp rules to avoid overlap with present-Account branch reduction.
+The 58-line properties module has one private normalization helper and exactly
+the two public laws. A 38-line compile-only module has exactly two private
+examples. Both laws remain named non-simp rules to avoid overlap with
+present-Account branch reduction and report `[propext, Quot.sound]`. Full
+validation and independent audits pass. The thin lift adds no operation,
+address argument, authority claim, runtime reordering claim, assertion, or
+runner call.
 
 ## Meaning of completion
 

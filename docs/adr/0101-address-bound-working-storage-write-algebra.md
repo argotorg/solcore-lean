@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: specialize sequential storage-write algebra through one retained address
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -129,6 +129,27 @@ Keep each of four commits below 300 changed lines: this decision and targeted
 internal documentation; the exact private helper and two laws plus one
 umbrella import; the exact two compile regressions plus one runner import and
 no call; independent audit and completion evidence.
+
+## Implementation record
+
+The completed slice adds a 58-line properties module plus one semantic
+umbrella import. One private normalization helper supports exactly the two
+required public laws; no executable operation, carrier, instance, or public
+helper is added. Both laws are named non-simp rules and report exactly
+`[propext, Quot.sound]`.
+
+A 38-line compile-only test module plus one runner import contains exactly two
+private examples. Each example names its public law directly. The test layer
+adds no runtime or public declaration, fixture, helper, assertion, or runner
+call.
+
+The implementation commits are `dc15fbc` (186 changed lines), `f0efa42` (69),
+`0cce11e` (59), and `58d8e43` (39), all below 300 changed lines; this completion
+update is the fifth commit after the critical-pair correction added one stage
+to the original plan. Focused trust-zero checks, the 542-job full build, the
+972-job full test run, metadata and kernel checks, diff checks, declaration
+inventory, named-rewrite present-case checks, and independent P0-P3 audits
+pass.
 
 ## Publication and consequences
 

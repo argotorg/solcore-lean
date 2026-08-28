@@ -162,7 +162,8 @@ helper is added.
 All three laws remain non-simp. A follow-up critical-pair audit removed the
 initial overwrite simp attribute because the existing present-Account branch
 rule can rewrite the first write before the surrounding bind. All three public
-laws report exactly `[propext, Quot.sound]`.
+laws report exactly `[propext, Quot.sound]`. The corrective commit is
+`f0efa42` (69 changed lines shared with the ADR-0101 specification correction).
 
 A 52-line compile-only test module plus one runner import contains exactly
 three private examples. All three examples name their public non-simp law
