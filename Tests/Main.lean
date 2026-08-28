@@ -70,6 +70,7 @@ import Solcore.Test.FrameContinuationContextContinueTrapReasonMap
 import Solcore.Test.FrameContinuationContextWithTracePrefix
 import Solcore.Test.FrameContinuationContextWithTracePrefixTrapReasonMap
 import Solcore.Test.FrameResolutionResult
+import Solcore.Test.FrameResolutionResultContinuation
 import Solcore.Test.FrameResolutionResultTrapReasonMap
 import Solcore.Test.FrameTrace
 import Solcore.Test.FrameTraceExtension
@@ -4927,6 +4928,7 @@ def run : IO Unit := do
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
   testFrameResolutionResult
+  testFrameResolutionResultContinuation
   testFrameResolutionResultTrapReasonMap
   testFrameTrace
   testFrameTraceExtension
