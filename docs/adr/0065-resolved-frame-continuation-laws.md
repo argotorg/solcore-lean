@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: proof-only continuation equations for synchronized partial resolution
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -88,3 +88,19 @@ canonical delta, or frozen artifact.
 Any continuation after a resolved return or revert receives exactly the
 synchronized pair already selected by the resolver. A later invocation API can
 reuse these equations without this ADR deciding how its inputs are produced.
+
+## Implementation record
+
+The completed proof-only slice adds no carrier, executable API, instance, or
+helper. A 44-line properties module plus one umbrella import publishes exactly
+two non-simp `rfl` laws. Each measured axiom set is `[propext]`.
+
+Two runtime assertions live in a 61-line definition-only test module with two
+runner lines. Their sentinel continuations observe the selected WorldState
+value, rollback snapshot, and trace snapshot for return and revert.
+
+The implementation commits are `25ce7bf` (147 changed lines), `c98d2e3` (45),
+and `9bc43c5` (63), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+semantic-kernel, metadata, document-link, diff, and independent P0-P3 audits
+pass.

@@ -99,7 +99,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Synchronized frame state/effect resolution | Complete | No new carrier, instance, or helper; one resolver, exactly five laws, and three runtime assertions select WorldState and effects from one outcome branch | None |
 | Synchronized child-frame composition | Complete | Proof-only; no carrier, API, instance, or helper; exactly two nested non-simp laws and two runtime assertions complete with opaque accumulated trace ownership | None |
 | Unresolved trap propagation | Complete | Proof-only; no carrier, API, instance, or helper; exactly one generic non-simp `rfl` bind law and one definition-only sentinel runtime assertion complete | None |
-| Resolved frame continuation laws | Active | ADR-0065 accepted; add exactly two generic non-simp bind laws and two definition-only sentinel assertions for returned and reverted synchronized results; no new executable API | None |
+| Resolved frame continuation laws | Complete | Proof-only; no carrier, API, instance, or helper; exactly two generic non-simp `rfl` bind laws and two definition-only sentinel assertions complete the returned/reverted continuation boundary | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
 | Revert and rollback | Planned | nested rollback and surviving observation policy | None |

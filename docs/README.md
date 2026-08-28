@@ -291,12 +291,14 @@ operation. It proves one generic fact: a trapped synchronized resolution stays
 confirms that the continuation is not invoked. Trap disposition, rollback,
 trace survival, fatal handling, and transaction behavior remain undecided.
 
-The active proof-only continuation slice,
+The completed proof-only continuation slice,
 [ADR-0065](adr/0065-resolved-frame-continuation-laws.md), adds no carrier or
 operation. It records the two matching facts for returned and reverted
 synchronized results: any Option continuation receives exactly the pair
-selected by the existing resolver. Checkpoint creation, trace accumulation,
-invocation ownership, and transaction behavior remain undecided.
+selected by the existing resolver. Its two non-simp laws and two
+definition-only sentinel assertions pass full validation. Checkpoint creation,
+trace accumulation, invocation ownership, and transaction behavior remain
+undecided.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -447,7 +449,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0063 completes proof-only synchronized child-frame composition.
 - [ADR-0064](adr/0064-unresolved-trap-propagation.md) completes the proof-only
   boundary for unresolved trap propagation through Option bind.
-- [ADR-0065](adr/0065-resolved-frame-continuation-laws.md) fixes the proof-only
+- [ADR-0065](adr/0065-resolved-frame-continuation-laws.md) completes the proof-only
   continuation equations for resolved return and revert results.
 
 Historical ADRs are retained even when their implementation is no longer the
