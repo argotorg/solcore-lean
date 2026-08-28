@@ -68,6 +68,7 @@ import Solcore.Test.FrameContinuationContextTrapReasonMap
 import Solcore.Test.FrameContinuationContextResolveTrapReasonMap
 import Solcore.Test.FrameContinuationContextContinueTrapReasonMap
 import Solcore.Test.FrameContinuationContextWithTracePrefix
+import Solcore.Test.FrameContinuationContextWithTracePrefixTrapReasonMap
 import Solcore.Test.FrameResolutionResult
 import Solcore.Test.FrameResolutionResultTrapReasonMap
 import Solcore.Test.FrameTrace
