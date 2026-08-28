@@ -78,7 +78,7 @@ These results remain regression obligations for every extension.
 | 52 | Frame trace prefix relation | Complete | Makes ordered trace consistency an explicit proof obligation without claiming provenance |
 | 53 | Trace-prefixed frame continuation context | Complete | Binds prefix evidence to one context's exact checkpoint/working traces |
 | 54 | Indexed frame trace extension | Complete | Generates canonical prefix evidence through event-only incremental construction |
-| 55 | Parent-indexed frame continuation context | Active | Binds a completed context's checkpoints and trace prefix to an exact parent working pair |
+| 55 | Parent-indexed frame continuation context | Complete | Binds a completed context's checkpoints and trace prefix to an exact parent working pair |
 | 56 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 57 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after the parent-indexed context |
 | 58 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -924,18 +924,22 @@ The four implementation commits contain 206, 44, 39, and 73 changed lines.
 Full validation and independent P0-P3 audits pass. Provenance, checkpoint
 ownership, child transitions, and transactions remain separate.
 
-## Active parent-indexed frame continuation context
+## Completed parent-indexed frame continuation context
 
 [ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) packages a
 completed ADR-0071 context with equality between its state/effect checkpoints
 and one parent working pair used as a type index. It adds no resolver alias;
 inherited total resolution remains the executable path.
 
-The planned proof surface bridges the parent trace prefix and characterizes
-known return and revert outcomes at that exact index. ADR-0072 supplies the
-canonical event-only construction path used by three definition-only branch
-tests. Invocation provenance, stack scheduling, trap disposition, and
-transactions remain later. Implementation is active.
+The 22-line carrier module plus one umbrella import adds no operation. A
+66-line properties module plus one umbrella import publishes exactly three
+non-simp laws. The carrier and all three laws report exactly `[propext]`. A
+101-line definition-only test module plus two runner lines uses ADR-0072's
+canonical event-only construction path in exactly three branch assertions.
+
+The four implementation commits contain 216, 23, 67, and 103 changed lines.
+Full validation and independent P0-P3 audits pass. Invocation provenance,
+stack scheduling, trap disposition, and transactions remain later.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

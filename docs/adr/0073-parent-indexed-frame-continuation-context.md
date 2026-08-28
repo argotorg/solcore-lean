@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: tie one completed frame's checkpoints to an exact parent working pair
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -161,3 +161,25 @@ A consumer can resolve one completed context while proving that its checkpoints
 are one exact parent working pair and that its accumulated trace extends that
 pair's trace. Concrete nested invocation, scheduling, traps, and transaction
 policy remain later decisions.
+
+## Implementation record
+
+The completed slice adds one 22-line carrier module plus one umbrella import.
+`ParentIndexedFrameContinuationContext` extends the ADR-0071 carrier and adds
+only `checkpoint_eq_parentWorking`; no executable operation, alias, coercion,
+instance, default, smart constructor, or new result carrier is added. The
+carrier reports exactly `[propext]`.
+
+A 66-line properties module plus one umbrella import publishes exactly three
+non-simp laws: `parentWorking_tracePrefix`, `resolve_returned`, and
+`resolve_reverted`. Each reports exactly `[propext]`. A 101-line
+definition-only test module plus one main import and one runtime call contains
+exactly three assertions. It constructs the ADR-0071 context with ADR-0072's
+canonical prefix theorem and covers returned, reverted, and trapped resolution
+with distinct parent and nested state/rollback witnesses.
+
+The implementation commits are `981548d` (216 changed lines), `09a8a2c` (23),
+`a9e9fa2` (67), and `7186ef1` (103), all below 300 changed lines; this
+completion update is the fifth staged commit. Focused and full builds, tests,
+trust-zero, axiom, semantic-kernel, metadata, document-link, diff, and
+independent P0-P3 audits pass.

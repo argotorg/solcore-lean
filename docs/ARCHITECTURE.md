@@ -490,11 +490,12 @@ earlier trace fixed and accepts only individual events after construction, so a
 new same-typed fragment API cannot accidentally append an accumulated prefix
 twice. Its canonical proof remains algebraic rather than runtime provenance.
 
-ADR-0073 fixes the active parent-indexed continuation boundary. It packages a
+ADR-0073 completes the parent-indexed continuation boundary. It packages a
 completed trace-prefixed context with proof that its state/effect checkpoints
 equal one exact parent working pair. Existing total resolution is reused;
-return and revert laws transport its selected values and trace prefix to that
-index without claiming an invocation actually occurred.
+the return and revert laws characterize that inherited resolution while
+retaining trace-prefix evidence at the same index, without claiming an
+invocation actually occurred.
 
 ### Observation
 

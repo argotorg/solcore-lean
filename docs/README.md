@@ -342,7 +342,7 @@ once and then accepts only individual events. It generates prefix evidence
 without adding another public operation that accepts an ambiguous trace
 fragment.
 
-The active parent-indexed continuation-context slice,
+The completed parent-indexed continuation-context slice,
 [ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md), requires one
 completed context's checkpoints to equal an exact parent working pair. It
 reuses existing resolution and does not claim a runtime invocation occurred.

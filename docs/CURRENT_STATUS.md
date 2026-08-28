@@ -153,8 +153,8 @@ branch-complete value without choosing trap or transaction disposition.
 slice. It adds an opt-in finite chronological extension algebra while leaving
 event kinds and the generic effect journal open.
 [ADR-0070](adr/0070-frame-trace-prefix-relation.md) completes the trace-prefix
-proof slice. It adds an explicit non-strict factorization relation before trace
-consistency is used by a child-frame transition.
+proof slice. It adds an explicit non-strict factorization relation, which
+ADR-0071 attaches to one context's exact checkpoint and working traces.
 [ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) completes the
 refined continuation boundary. It binds that proof to the exact checkpoint and
 working traces in one context without treating value factorization as runtime
@@ -163,9 +163,10 @@ lineage.
 extension. It fixes one earlier trace and permits only event-by-event extension,
 producing the prefix evidence needed by ADR-0071 without a new fragment append
 API.
-[ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) is active. It
-ties one completed context's checkpoints and trace prefix to an exact parent
-working pair while reusing the existing resolver.
+[ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) completes the
+parent-indexed continuation context. It ties one completed context's
+checkpoints and trace prefix to an exact parent working pair while reusing the
+existing resolver.
 
 ## Implementation status
 
@@ -225,7 +226,7 @@ working pair while reusing the existing resolver.
 | Frame trace prefix relation | Complete | Complete | Not published |
 | Trace-prefixed frame continuation context | Complete | Complete | Not published |
 | Indexed frame trace extension | Complete | Complete | Not published |
-| Parent-indexed frame continuation context | Not implemented | Decision accepted | Not published |
+| Parent-indexed frame continuation context | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1140,18 +1141,23 @@ P0-P3 audits pass. The API adds no indexed fragment append or named fragment
 projection. Runtime provenance, checkpoint ownership, child identity, and
 transaction behavior remain outside.
 
-## Active parent-indexed frame continuation context
+## Completed parent-indexed frame continuation context
 
-[ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) fixes one
+[ADR-0073](adr/0073-parent-indexed-frame-continuation-context.md) adds one
 `ParentIndexedFrameContinuationContext` indexed by a designated parent working
 WorldState and effect journal. It inherits the ADR-0071 trace-prefix proof and
 adds equality between its checkpoints and that exact pair.
 
-No resolver alias is added. Three non-simp laws will bridge the parent prefix
-and characterize inherited return/revert resolution at the index. Three
-definition-only branch assertions are specified. Runtime parent/child
-provenance, scheduling, trap disposition, and transaction atomicity remain
-outside. Implementation is not yet complete.
+The 22-line carrier module plus one umbrella import adds no operation. A
+66-line properties module plus one umbrella import publishes exactly three
+non-simp laws. The carrier and all three laws report exactly `[propext]`. A
+101-line definition-only test module plus one import and one call contains
+exactly three runtime assertions covering return, revert, and trap.
+
+The four implementation commits contain 216, 23, 67, and 103 changed lines;
+this completion update is the fifth commit. Full validation and independent
+P0-P3 audits pass. Runtime parent/child provenance, scheduling, trap
+disposition, and transaction atomicity remain outside.
 
 ## Meaning of completion
 
