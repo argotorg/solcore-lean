@@ -87,9 +87,10 @@ callee identity, an authorization principal, or a frame field.
 
 ## Required proof interface
 
-The checked-code layer publishes direct accepted/rejected constructor laws and
-a no-machine-fault theorem for every fuel value. The no-fault theorem delegates
-to the existing checked Core safety result; `outOfFuel` remains possible.
+The checked-code layer publishes direct accepted/rejected constructor laws, an
+existential sufficient-fuel completion threshold, and a no-machine-fault
+theorem for every fuel value. These delegate to existing checked Core safety;
+`outOfFuel` remains possible when a run is below the threshold.
 
 The Account layer publishes observations sufficient to prevent hidden state
 loss:
@@ -110,8 +111,9 @@ retained checked program run. A checked selected run cannot be a machine fault.
 No theorem converts `outOfFuel` to a semantic trap or claims sufficient fuel
 was supplied by a caller.
 
-Definitions, generated equations, and all laws must remain axiom-free except
-for unavoidable proof extensionality reported by their checked dependencies.
+Every new declaration must pass trust-zero checking. Exact axiom reports are
+limited to `[propext]` or `[propext, Quot.sound]` inherited from existing proof
+and finite-word infrastructure.
 Simp rules are limited to constructor or explicitly selected lookup branches
 whose right side removes the new operation. No broad execution simp rule may
 hide address selection.
