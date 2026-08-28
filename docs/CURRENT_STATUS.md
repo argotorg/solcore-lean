@@ -159,6 +159,9 @@ consistency is used by a child-frame transition.
 refined continuation boundary. It binds that proof to the exact checkpoint and
 working traces in one context without treating value factorization as runtime
 lineage.
+[ADR-0072](adr/0072-indexed-frame-trace-extension.md) is active. It fixes one
+earlier trace as an index and permits only event-by-event extension, producing
+the prefix evidence needed by ADR-0071 without a new fragment append API.
 
 ## Implementation status
 
@@ -217,6 +220,7 @@ lineage.
 | Ordered frame trace algebra | Complete | Complete | Not published |
 | Frame trace prefix relation | Complete | Complete | Not published |
 | Trace-prefixed frame continuation context | Complete | Complete | Not published |
+| Indexed frame trace extension | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1111,6 +1115,20 @@ The three implementation commits contain 174, 22, and 53 changed lines; this
 completion update is the fourth commit. Full validation and independent P0-P3
 audits pass. Producer identity, event authenticity, checkpoint ownership,
 nested scheduling, trap disposition, and transaction atomicity remain outside.
+
+## Active indexed frame trace extension
+
+[ADR-0072](adr/0072-indexed-frame-trace-extension.md) fixes a
+constructor-private `FrameTrace.ExtensionFrom earlier` carrier. `start` fixes
+the earlier trace once, `record` accepts one event, and `toTrace` observes the
+full chronological value. A canonical theorem supplies the hidden fragment as
+prefix evidence.
+
+The planned API accepts no trace fragment after construction and adds no
+indexed append or fragment projection. Two observation laws, three runtime
+assertions, and one ADR-0071 integration example are specified. Runtime
+provenance, checkpoint ownership, child identity, and transaction behavior
+remain outside. Implementation is not yet complete.
 
 ## Meaning of completion
 

@@ -77,10 +77,11 @@ These results remain regression obligations for every extension.
 | 51 | Ordered frame trace algebra | Complete | Defines opt-in finite chronological extension without fixing event kinds |
 | 52 | Frame trace prefix relation | Complete | Makes ordered trace consistency an explicit proof obligation without claiming provenance |
 | 53 | Trace-prefixed frame continuation context | Complete | Binds prefix evidence to one context's exact checkpoint/working traces |
-| 54 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 55 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
-| 56 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 57 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 54 | Indexed frame trace extension | Active | Generates canonical prefix evidence through event-only incremental construction |
+| 55 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 56 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
+| 57 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 58 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -902,6 +903,20 @@ full validation and independent P0-P3 audits pass.
 
 This slice does not infer trace provenance, checkpoint ownership, parent/child
 identity, nested scheduling, trap policy, or transaction rollback.
+
+## Active indexed frame trace extension
+
+[ADR-0072](adr/0072-indexed-frame-trace-extension.md) introduces an indexed
+builder from one fixed earlier trace. After `start`, the only extension input is
+one event; callers cannot pass an arbitrary `FrameTrace` as a hidden fragment.
+The complete trace and its canonical prefix evidence remain available for
+constructing ADR-0071 contexts.
+
+The exact planned surface is one constructor-private carrier, three executable
+operations, one canonical prefix theorem, and two observation laws. Tests cover
+start, chronological recording, duplicates, and integration with the refined
+continuation context. Provenance, checkpoint ownership, child transitions, and
+transactions remain separate. Implementation is active.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

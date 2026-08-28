@@ -336,6 +336,12 @@ The completed trace-prefixed continuation-context slice,
 proof to the exact checkpoint and working traces stored in one context. It
 does not turn prefix factorization into evidence of runtime ancestry.
 
+The active indexed trace-extension slice,
+[ADR-0072](adr/0072-indexed-frame-trace-extension.md), fixes an earlier trace
+once and then accepts only individual events. It generates prefix evidence
+without adding another public operation that accepts an ambiguous trace
+fragment.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -499,6 +505,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   ordered frame-trace prefix relation.
 - [ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) fixes the
   refined continuation context whose exact traces carry prefix evidence.
+- [ADR-0072](adr/0072-indexed-frame-trace-extension.md) fixes event-only
+  incremental extension from one indexed earlier trace.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
