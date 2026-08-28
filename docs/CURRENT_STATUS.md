@@ -113,6 +113,9 @@ exact 20-byte decoding agree for arbitrary input.
 [ADR-0056](adr/0056-minimal-world-state.md) completes the minimal WorldState
 slice. It fixes explicit Account absence and canonical nonzero storage entries
 without defining transactions, rollback, balances, or calls.
+[ADR-0057](adr/0057-frame-outcome-world-state-resolution.md) accepts the active
+minimal outcome-to-state resolver. Return selects working state, revert selects
+the supplied checkpoint, and trap disposition remains unresolved.
 
 ## Implementation status
 
@@ -156,6 +159,7 @@ without defining transactions, rollback, balances, or calls.
 | Strict 20-byte address representation | Complete | Complete | Not published |
 | Address text and byte coherence | Complete | Complete | Not published |
 | Minimal Account and WorldState carrier | Complete | Complete | Not published |
+| Frame-outcome WorldState resolution | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -788,6 +792,17 @@ recursor, trust-zero, build, test, metadata, and semantic-kernel checks pass.
 Ten laws report only `[propext]`; the two empty Account laws additionally
 report `Quot.sound`. No custom axiom, `sorryAx`, or unchecked declaration is
 present. The final independent audit found no P0-P3 issue.
+
+## Active frame-outcome state-resolution slice
+
+[ADR-0057](adr/0057-frame-outcome-world-state-resolution.md) plans exactly one
+internal operation, three constructor laws, and three runtime assertions.
+Returned frames select the working WorldState; reverted frames select the
+supplied checkpoint; trapped frames return `none` because trap disposition is
+not yet decided. That `none` does not mean rollback, deletion, Account absence,
+or an inconclusive execution. Nested checkpoints, surviving effects,
+transaction atomicity, ABI, Core-result adaptation, EVM, and gas remain outside
+the slice.
 
 ## Meaning of completion
 

@@ -234,6 +234,12 @@ privacy and recursor checks limit observation to the same semantic lookup
 behavior as the public queries. The final independent audit found no P0-P3
 issue.
 
+The active outcome-resolution slice,
+[ADR-0057](adr/0057-frame-outcome-world-state-resolution.md), adds one internal
+operation that selects working state after return, checkpoint state after
+revert, and leaves trap disposition unresolved. It does not define transaction
+rollback, nested frames, surviving effects, ABI behavior, or EVM rules.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -374,6 +380,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   representation; its independent audit found no P0-P3 issue.
 - ADR-0055 completes proof-only coherence between canonical Address text and bytes.
 - ADR-0056 completes the minimal explicit Account and WorldState carrier.
+- ADR-0057 accepts the minimal internal frame-outcome state resolver.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

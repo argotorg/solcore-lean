@@ -62,10 +62,11 @@ These results remain regression obligations for every extension.
 | 36 | Strict 20-byte Address representation | Complete | Fixes exact big-endian bytes and strict width before contract state |
 | 37 | Address text and byte coherence | Complete | Proves the completed strict representations agree without a new API |
 | 38 | Minimal Account and WorldState carrier | Complete | Fixes explicit absence and canonical storage values before transitions |
-| 39 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 40 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 41 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 42 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 39 | Frame-outcome WorldState resolution | Active | Selects working/checkpoint state while leaving trap disposition open |
+| 40 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 41 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 42 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 43 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -641,6 +642,15 @@ lookup are the complete carrier data. Constructors and fields remain private;
 there is no concrete map, `BEq`, `DecidableEq`, or `Repr`. Privacy, recursor,
 trust-zero, build, test, metadata, and semantic-kernel checks pass. The final
 independent audit found no P0-P3 issue.
+
+## Active frame-outcome state-resolution slice
+
+[ADR-0057](adr/0057-frame-outcome-world-state-resolution.md) adds exactly one
+internal selector with three constructor laws and three runtime assertions.
+Return selects working state, revert selects the supplied checkpoint, and trap
+remains unresolved. It owns neither snapshot creation nor nested rollback and
+does not decide surviving logs, calls, creations, transaction atomicity, ABI,
+Core-result adaptation, EVM behavior, or gas.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
