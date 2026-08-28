@@ -95,6 +95,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | WorldState observational update algebra | Complete | No executable API, carrier, or instance; exactly six extensionality/overwrite/commutation laws, two compile-time examples, and four runtime assertions complete; no new state meaning or publication | None |
 | WorldState storage-write algebra | Complete | No executable API, carrier, or instance; one private helper, exactly four sequential/commutation/zero-deletion laws, and four runtime assertions complete; no operational or publication decision | None |
 | External-checkpoint frame run result | Complete | One public semantic carrier and one named resolver; exactly three constructor laws and three runtime assertions pair speculative working state with an outcome while checkpoint ownership remains external | None |
+| Parametric frame effect journal policy | Active | One public two-snapshot carrier and one resolver planned; exactly five laws and five runtime assertions separate rollback-scoped state from an opaque surviving trace without concrete event order | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Explicit contract runtime state | Planned | accounts, frames, transactions, balances; distinct from the implemented Core-local cell store | None |
 | Revert and rollback | Planned | nested rollback and surviving observation policy | None |

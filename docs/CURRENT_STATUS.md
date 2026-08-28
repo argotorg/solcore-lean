@@ -125,6 +125,9 @@ executable API or operational decision.
 [ADR-0060](adr/0060-external-checkpoint-frame-run-result.md) completes the
 minimal frame-run payload. It pairs speculative working state with an outcome
 while checkpoint ownership remains external.
+[ADR-0061](adr/0061-frame-effect-journal-policy.md) accepts the active parametric
+effect policy. It separates rollback-scoped and surviving snapshots without a
+concrete event taxonomy or order.
 
 ## Implementation status
 
@@ -172,6 +175,7 @@ while checkpoint ownership remains external.
 | WorldState observational update algebra | Complete | Complete | Not published |
 | WorldState storage-write algebra | Complete | Complete | Not published |
 | External-checkpoint frame run result | Complete | Complete | Not published |
+| Parametric frame effect journal policy | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -874,6 +878,16 @@ resolver and the three simp laws in the 32-line properties module all report
 `[propext]`. Three assertions in a 68-line definition-only test module plus two
 runner lines cover both resolution and projections. Full validation and audits
 pass.
+
+## Active parametric frame effect policy
+
+[ADR-0061](adr/0061-frame-effect-journal-policy.md) plans one public carrier,
+one named resolver, five laws, and five Nat-fixture runtime assertions. Return
+keeps the working journal; revert restores checkpoint rollback state while the
+working trace survives; trap remains unresolved. Two nested bind laws cover
+child return followed by parent revert and child revert followed by parent
+revert. No concrete effects, trace order, append algebra, invocation stack,
+transaction, ABI, Core adaptation, EVM, gas, or publication is selected.
 
 ## Meaning of completion
 

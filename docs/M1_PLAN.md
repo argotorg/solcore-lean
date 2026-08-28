@@ -66,10 +66,11 @@ These results remain regression obligations for every extension.
 | 40 | WorldState observational update algebra | Complete | Proves extensionality and independent-update algebra without new operations |
 | 41 | WorldState storage-write algebra | Complete | Lifts overwrite, commutation, and zero deletion through conditional writes |
 | 42 | External-checkpoint frame run result | Complete | Pairs speculative working state with outcome under caller-owned checkpoint |
-| 43 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 44 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 45 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 46 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 43 | Parametric frame effect journal policy | Active | Separates rollback-scoped state from surviving opaque trace snapshots |
+| 44 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 45 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 46 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 47 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -706,6 +707,14 @@ structure surface, while adding no instance, extensionality law, or helper. All
 three simp/rfl laws and the resolver report `[propext]`. The 68-line
 definition-only test module plus two runner lines supplies exactly three
 projection-aware checks.
+
+## Active parametric frame effect policy
+
+[ADR-0061](adr/0061-frame-effect-journal-policy.md) adds one public carrier with
+opaque rollback and trace snapshots and one resolver. Exactly five laws and five
+runtime assertions cover constructors and the two child/parent revert
+compositions. This fixes trace survival without selecting concrete effects,
+ordering, append behavior, nested invocation, or transaction semantics.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
