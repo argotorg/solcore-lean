@@ -76,7 +76,7 @@ These results remain regression obligations for every extension.
 | 50 | Total frame resolution result | Complete | Preserves payloads and trap reasons in a total first-order result |
 | 51 | Ordered frame trace algebra | Complete | Defines opt-in finite chronological extension without fixing event kinds |
 | 52 | Frame trace prefix relation | Complete | Makes ordered trace consistency an explicit proof obligation without claiming provenance |
-| 53 | Trace-prefixed frame continuation context | Active | Binds prefix evidence to one context's exact checkpoint/working traces |
+| 53 | Trace-prefixed frame continuation context | Complete | Binds prefix evidence to one context's exact checkpoint/working traces |
 | 54 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 55 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
 | 56 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -884,7 +884,7 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The relation proves sequence factorization, not runtime
 ancestry, checkpoint ownership, or child-frame identity.
 
-## Active trace-prefixed frame continuation context
+## Completed trace-prefixed frame continuation context
 
 [ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) refines the
 existing continuation context only when its trace state is `FrameTrace`. A
@@ -894,10 +894,14 @@ operations remain usable through the inherited context, so this slice adds no
 alias or duplicate branch law.
 
 The proof is required when the refined context is constructed and is not
-checked during execution. This slice does not infer trace provenance,
-checkpoint ownership, parent/child identity, nested scheduling, trap policy,
-or transaction rollback. Carrier implementation and compile regressions are
-active.
+checked during execution. The 21-line carrier module plus one umbrella import
+adds no operation or named theorem. A 52-line definition-only regression module
+plus one main test import supplies exactly three private examples and no runtime
+call. The three implementation commits contain 174, 22, and 53 changed lines;
+full validation and independent P0-P3 audits pass.
+
+This slice does not infer trace provenance, checkpoint ownership, parent/child
+identity, nested scheduling, trap policy, or transaction rollback.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

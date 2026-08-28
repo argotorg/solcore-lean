@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: bind ordered trace-prefix evidence to one frame continuation context
-- Implementation: Active
+- Implementation: Complete
 
 ## Context
 
@@ -115,3 +115,21 @@ it describes as one value while reusing existing continuation and total
 resolution operations. Generic frame semantics remain reusable for other trace
 representations. Runtime provenance and the actual nested invocation transition
 remain later, separate decisions.
+
+## Implementation record
+
+The completed slice adds exactly one 21-line carrier module plus one umbrella
+import. The carrier extends the existing context, adds only the dependent
+`tracePrefix` field, and reports exactly `[propext]`. It adds no public
+operation, theorem, properties module, instance, coercion, alias, or helper.
+
+A 52-line definition-only regression module plus one main test import contains
+exactly three private examples and no runtime call. They cover direct
+construction, proof projection from the exact inherited journals, and `rfl`
+reuse of the existing total resolver.
+
+The implementation commits are `091434c` (174 changed lines), `d3e0649` (22),
+and `52bab8f` (53), all below 300 changed lines; this completion update is the
+fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
+semantic-kernel, metadata, document-link, diff, and independent P0-P3 audits
+pass.

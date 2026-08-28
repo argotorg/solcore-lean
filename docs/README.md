@@ -331,7 +331,7 @@ The completed trace-prefix slice,
 consistency an explicit proof obligation. It describes value factorization,
 not runtime lineage or parent/child identity.
 
-The active trace-prefixed continuation-context slice,
+The completed trace-prefixed continuation-context slice,
 [ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md), binds that
 proof to the exact checkpoint and working traces stored in one context. It
 does not turn prefix factorization into evidence of runtime ancestry.

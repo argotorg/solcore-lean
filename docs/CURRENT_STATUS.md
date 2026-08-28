@@ -155,9 +155,10 @@ event kinds and the generic effect journal open.
 [ADR-0070](adr/0070-frame-trace-prefix-relation.md) completes the trace-prefix
 proof slice. It adds an explicit non-strict factorization relation before trace
 consistency is used by a child-frame transition.
-[ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) is active. It
-binds that proof to the exact checkpoint and working traces in one continuation
-context without treating value factorization as runtime lineage.
+[ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) completes the
+refined continuation boundary. It binds that proof to the exact checkpoint and
+working traces in one context without treating value factorization as runtime
+lineage.
 
 ## Implementation status
 
@@ -215,7 +216,7 @@ context without treating value factorization as runtime lineage.
 | Total frame resolution result | Complete | Complete | Not published |
 | Ordered frame trace algebra | Complete | Complete | Not published |
 | Frame trace prefix relation | Complete | Complete | Not published |
-| Trace-prefixed frame continuation context | Not implemented | Decision accepted | Not published |
+| Trace-prefixed frame continuation context | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1092,19 +1093,24 @@ this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. Runtime provenance, frame identity, checkpoint ownership,
 and trap or transaction behavior remain outside.
 
-## Active trace-prefixed frame continuation context
+## Completed trace-prefixed frame continuation context
 
-[ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) fixes one
-refined carrier over `FrameContinuationContext`. Its proof field must relate
-the exact trace stored in the effect checkpoint to the exact working trace in
-that same context. Existing continuation and total-resolution operations remain
-available without aliases. Three definition-only compile examples will fix
-construction, proof projection, and reuse of the inherited resolver.
+[ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) adds exactly
+one refined carrier over `FrameContinuationContext`. Its proof field relates
+the exact effect-checkpoint trace to the exact working trace in that same value.
+Existing continuation and total-resolution operations remain available without
+aliases.
 
-This construction-time boundary rejects non-prefix journal pairs unless new
-evidence is supplied. It does not prove producer identity, event authenticity,
-checkpoint ownership, nested scheduling, trap disposition, or transaction
-atomicity. Implementation is not yet complete.
+A 21-line definition module plus one umbrella import contains the carrier. It
+reports exactly `[propext]` and adds no operation, theorem, properties module,
+instance, coercion, alias, or helper. A 52-line definition-only regression
+module plus one main test import contains exactly three private examples and no
+runtime call.
+
+The three implementation commits contain 174, 22, and 53 changed lines; this
+completion update is the fourth commit. Full validation and independent P0-P3
+audits pass. Producer identity, event authenticity, checkpoint ownership,
+nested scheduling, trap disposition, and transaction atomicity remain outside.
 
 ## Meaning of completion
 

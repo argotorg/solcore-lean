@@ -478,7 +478,7 @@ a later trace factors into an earlier trace followed by some fragment. This is
 a value-level proof obligation for future frame transitions, not evidence of
 runtime ancestry, checkpoint ownership, or parent/child identity.
 
-ADR-0071 fixes the active refined continuation boundary. It attaches prefix
+ADR-0071 completes the refined continuation boundary. It attaches prefix
 evidence to the exact checkpoint and working traces stored in one inherited
 `FrameContinuationContext`. Existing continuation and total-resolution
 operations remain reusable without aliases. The proof is a construction-time
