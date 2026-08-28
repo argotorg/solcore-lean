@@ -1,5 +1,5 @@
-import Solcore.Core.HostRunnerSafety
 import Solcore.Semantics.CheckedHostCoreProgramProperties
+import Solcore.Semantics.HostDriverProperties
 import Solcore.Semantics.HostStorageReadDriver
 
 /-! Context preservation and type safety for handled storage-read execution. -/
@@ -9,51 +9,6 @@ set_option autoImplicit false
 namespace Solcore.Semantics
 
 universe u v
-
-namespace HostDriverOutcome
-
-/-- Typed terminal outcomes exclude the raw fault branch. -/
-def HasType
-    (outcome : HostDriverOutcome)
-    (resultType : Core.Ty)
-    (definitions : Core.DataEnvironment := []) : Prop :=
-  match outcome with
-  | .done value store =>
-      ∃ world,
-        Core.StoreHasTypes world store ∧
-          Core.HostRuntimeValueHasType world value resultType definitions
-  | .outOfFuel state =>
-      Core.HostStateHasType state resultType definitions
-  | .fault _ _ => False
-
-@[simp] theorem done_hasType_iff
-    {value : Core.Value}
-    {store : Core.Store}
-    {resultType : Core.Ty}
-    {definitions : Core.DataEnvironment} :
-    HasType (.done value store) resultType definitions ↔
-      ∃ world,
-        Core.StoreHasTypes world store ∧
-          Core.HostRuntimeValueHasType world value resultType definitions := by
-  rfl
-
-@[simp] theorem outOfFuel_hasType_iff
-    {state : Core.State}
-    {resultType : Core.Ty}
-    {definitions : Core.DataEnvironment} :
-    HasType (.outOfFuel state) resultType definitions ↔
-      Core.HostStateHasType state resultType definitions := by
-  rfl
-
-@[simp] theorem fault_not_hasType
-    {error : Core.MachineFault}
-    {state : Core.State}
-    {resultType : Core.Ty}
-    {definitions : Core.DataEnvironment} :
-    ¬ HasType (.fault error state) resultType definitions := by
-  simp [HasType]
-
-end HostDriverOutcome
 
 namespace HostStorageReadDriver
 
