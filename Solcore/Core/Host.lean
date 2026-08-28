@@ -1,0 +1,102 @@
+import Solcore.Core.Typing
+
+/-! Fixed runtime capabilities and checking for Core programs that use them. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Core
+
+/-- Append-only types supplied to a host-aware Core program. -/
+def hostContext : Context :=
+  [HostFunction.functionType .storageRead]
+
+/-- Runtime values corresponding positionally to `hostContext`. -/
+def hostEnvironment : Environment :=
+  [.hostFunction .storageRead]
+
+@[simp] theorem hostContext_storageRead :
+    hostContext[HostFunction.storageRead.index]? =
+      some (HostFunction.functionType .storageRead) :=
+  rfl
+
+@[simp] theorem hostEnvironment_storageRead :
+    hostEnvironment[HostFunction.storageRead.index]? =
+      some (.hostFunction .storageRead) :=
+  rfl
+
+@[simp] theorem hostContext_length : hostContext.length = 1 :=
+  rfl
+
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 1 :=
+  rfl
+
+namespace Program
+
+/-- Declarative validity under the exact runtime capability context. -/
+structure HostWellTyped (program : Program) : Prop where
+  dataDefinitionsWellFormed : program.dataDefinitions.WellFormed
+  resultTypeWellFormed : Ty.WellFormed program.dataDefinitions program.resultType
+  bodyHasType :
+    HasType hostContext program.body program.resultType program.dataDefinitions
+
+/-- Check a Core program under the fixed host capability context. -/
+def checkHost (program : Program) : Bool :=
+  if program.dataDefinitions.isWellFormed then
+    if program.resultType.isWellFormed program.dataDefinitions then
+      match infer? hostContext program.body program.dataDefinitions with
+      | some inferredType => decide (inferredType = program.resultType)
+      | none => false
+    else
+      false
+  else
+    false
+
+theorem checkHost_full_sound
+    {program : Program}
+    (checked : program.checkHost = true) :
+    program.HostWellTyped := by
+  by_cases definitionsAccepted : program.dataDefinitions.isWellFormed = true
+  · by_cases resultAccepted :
+        program.resultType.isWellFormed program.dataDefinitions = true
+    · cases inferred : infer? hostContext program.body program.dataDefinitions with
+      | none =>
+          simp [checkHost, definitionsAccepted, resultAccepted, inferred] at checked
+      | some inferredType =>
+          have typeEquality : inferredType = program.resultType := by
+            simpa [checkHost, definitionsAccepted, resultAccepted, inferred]
+              using checked
+          subst inferredType
+          exact {
+            dataDefinitionsWellFormed :=
+              DataEnvironment.isWellFormed_sound definitionsAccepted
+            resultTypeWellFormed := Ty.isWellFormed_sound resultAccepted
+            bodyHasType := infer_sound inferred
+          }
+    · simp [checkHost, definitionsAccepted, resultAccepted] at checked
+  · simp [checkHost, definitionsAccepted] at checked
+
+theorem checkHost_sound
+    {program : Program}
+    (checked : program.checkHost = true) :
+    HasType hostContext program.body program.resultType program.dataDefinitions :=
+  (checkHost_full_sound checked).bodyHasType
+
+theorem checkHost_complete
+    {program : Program}
+    (wellTyped : program.HostWellTyped) :
+    program.checkHost = true := by
+  simp [
+    checkHost,
+    DataEnvironment.isWellFormed_complete wellTyped.dataDefinitionsWellFormed,
+    Ty.isWellFormed_complete wellTyped.resultTypeWellFormed,
+    infer_complete wellTyped.bodyHasType
+  ]
+
+theorem checkHost_iff_hostWellTyped
+    {program : Program} :
+    program.checkHost = true ↔ program.HostWellTyped :=
+  ⟨checkHost_full_sound, checkHost_complete⟩
+
+end Program
+
+end Solcore.Core

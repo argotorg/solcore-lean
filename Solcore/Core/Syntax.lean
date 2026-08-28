@@ -120,22 +120,15 @@ def parameterType (_ : HostFunction) : Ty := .word
 
 def resultType (_ : HostFunction) : Ty := .word
 
-def functionType (function : HostFunction) : Ty :=
+@[simp] def functionType (function : HostFunction) : Ty :=
   .function function.parameterType function.resultType
 
-@[simp] theorem parameterType_eq_word (function : HostFunction) :
-    function.parameterType = .word := by
-  cases function
+@[simp] theorem parameterType_storageRead :
+    parameterType .storageRead = .word :=
   rfl
 
-@[simp] theorem resultType_eq_word (function : HostFunction) :
-    function.resultType = .word := by
-  cases function
-  rfl
-
-@[simp] theorem functionType_eq (function : HostFunction) :
-    function.functionType = .function .word .word := by
-  cases function
+@[simp] theorem resultType_storageRead :
+    resultType .storageRead = .word :=
   rfl
 
 /-- Stable position in the append-only host capability context. -/
