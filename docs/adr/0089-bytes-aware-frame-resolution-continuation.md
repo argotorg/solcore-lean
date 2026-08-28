@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: caller-owned partial dispatch of resolved return and revert payloads
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -195,3 +195,31 @@ Future work can compose ADR-0088 construction, total resolution, and this
 continuation after deciding whether a direct coherence theorem is useful.
 Actual parent-frame mutation, trap disposition, scheduling, and transaction
 atomicity remain open.
+
+## Implementation record
+
+The completed slice adds exactly one `FrameResolutionResult.continue?`
+operation in a 28-line definition module plus one umbrella import. Its three
+generated match equations cover return, revert, and trap. The operation and
+all three equations report exactly `[propext]`.
+
+A 54-line properties module plus one umbrella import publishes exactly three
+definitional simp laws, one for each result constructor. All three report
+exactly `[propext]`; their disjoint one-way reductions introduce no critical
+overlap or simp loop.
+
+An 83-line definition-only test module plus one runner import and one call
+contains exactly three runtime assertions in one public test function. Distinct
+return and revert fixtures check the selected state, rollback value, nonempty
+trace, bytes, and callback sentinel. The trap fixture checks that neither
+callback is selected. The tests import no laws and call no resolver.
+
+The implementation commits are `4eb7b0c` (244 changed lines), `e5db941` (29),
+`a3d1899` (55), and `695dc84` (85), all below 300 changed lines; this completion
+update is the fifth staged commit. Focused and full builds, tests, trust-zero,
+axiom, simp-termination, semantic-kernel, metadata, diff, and independent
+P0-P3 audits pass.
+
+The continuation establishes no delivery, parent mutation, scheduling,
+callback evaluation count, trap handling or diagnosis, frame resumption,
+checkpoint lifecycle, or transaction policy.

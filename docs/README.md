@@ -421,7 +421,7 @@ The completed continuation-context construction slice,
 assembles those values and an opaque outcome into the existing context without
 claiming execution.
 
-The active bytes-aware continuation slice,
+The completed bytes-aware continuation slice,
 [ADR-0089](adr/0089-bytes-aware-frame-resolution-continuation.md), passes
 resolved return/revert state, effects, and bytes to separate caller callbacks
 while leaving traps unresolved.
