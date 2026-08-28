@@ -116,9 +116,11 @@ inductive HostFunction where
 
 namespace HostFunction
 
-def parameterType (_ : HostFunction) : Ty := .word
+def parameterType : HostFunction → Ty
+  | .storageRead => .word
 
-def resultType (_ : HostFunction) : Ty := .word
+def resultType : HostFunction → Ty
+  | .storageRead => .word
 
 @[simp] def functionType (function : HostFunction) : Ty :=
   .function function.parameterType function.resultType
