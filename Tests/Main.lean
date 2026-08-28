@@ -84,6 +84,7 @@ import Solcore.Test.FrameCheckpointSnapshot
 import Solcore.Test.FrameCheckpointedWorkingPair
 import Solcore.Test.ParentIndexedFrameInitialization
 import Solcore.Test.ParentIndexedFrameInitializationStorageAddress
+import Solcore.Test.ParentIndexedFrameInitializationPresentStorageAccount
 import Solcore.Test.FrameCheckpointedWorkingPairStorageWrite
 import Solcore.Test.FrameCheckpointedWorkingPairStorageWriteAlgebra
 import Solcore.Test.FrameCheckpointedWorkingPairWithStorageAddress
