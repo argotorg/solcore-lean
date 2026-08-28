@@ -682,12 +682,18 @@ returns the exact stateful Core machine result. It does not yet expose
 WorldState to Core, convert `Core.Value` to return bytes, or classify fuel
 exhaustion as a frame outcome.
 
-ADR-0117 adds the host boundary without adding Core expression syntax. A fixed
-typed context supplies a runtime-only storage-read function. Applying it
-produces a first-order suspension that owns the remaining CEK continuation and
-Core-local store; a typed Word response resumes that state. Pure closed-program
-completion remains unchanged, while host execution uses done-or-suspended
-progress. Concrete WorldState handling stays outside Core.
+Completed ADR-0117 adds the host boundary without adding Core expression
+syntax. A fixed typed context supplies a runtime-only storage-read function.
+Applying it produces a first-order suspension that owns the remaining CEK
+continuation and Core-local store; a typed Word response resumes that state.
+Pure closed-program completion remains unchanged. Every finite run from a
+well-typed host state has a typed done, out-of-fuel, or suspended result and
+cannot machine-fault.
+
+Concrete WorldState handling stays outside Core. The Semantics handler reads
+through a proven-present working Account, leaves that context unchanged, and
+resumes the exact continuation and local store. A later driver will own repeated
+handler invocation and the remaining fuel budget.
 
 ### Observation
 

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: syntax-independent host requests, resumable Core execution, and safety
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -90,10 +90,12 @@ also retains out-of-fuel state. Reaching a suspension consumes one CEK unit and
 returns the remaining fuel, so a later driver cannot obtain unbounded execution
 by repeatedly resuming with the original budget.
 
-The legacy raw machine reports an explicit unhandled-host fault if manually
-given a host value or host frame. This branch is unreachable for a normally
-checked closed program. Existing pure checking, evaluation, correspondence,
-sufficient-fuel completion, and no-fault statements remain unchanged.
+The legacy raw machine reports an explicit unhandled-host fault if asked to
+apply a host value or process a host-application frame. A host value in a final
+state remains an ordinary final value. These application branches are
+unreachable for a normally checked closed program. Existing pure checking,
+evaluation, correspondence, sufficient-fuel completion, and no-fault
+statements remain unchanged.
 
 ## Required proof interface
 
@@ -123,8 +125,8 @@ Wire v1 and v2 explicitly reject `Value.hostFunction`. No existing schema,
 Oracle command, profile, capability document, or golden stream changes.
 
 Core defines only the host function, typed request, suspension, and resumption.
-It does not import `Solcore.Semantics`. The next runtime slice interprets a
-read request through the existing proven-present working Account operation and
+It does not import `Solcore.Semantics`. The Semantics handler interprets a read
+request through the existing proven-present working Account operation and
 returns the observed Word while leaving that carrier unchanged. Code address
 and storage address remain separate inputs.
 
@@ -142,19 +144,22 @@ continuation and local-store preservation, typed resume, repeated suspensions,
 exact fuel edges, unchanged pure execution, both frozen wire rejections, and
 direct use of the safety and correspondence theorems.
 
-## Staged implementation plan
+## Implementation record
 
-Keep every commit below 300 changed lines and green:
+The implementation now includes the fixed capability environment and checker,
+first-order requests and resumable CEK state, exact runner fuel accounting, and
+host-aware typing for values, frames, continuations, states, and suspensions.
+Preservation and progress show that a checked finite run returns a typed value,
+retains a typed out-of-fuel state, or emits a typed suspension; it cannot return
+a machine fault.
 
-1. record this decision and update targeted internal roadmaps;
-2. add host-function values, legacy-machine rejection, and frozen-wire rejection;
-3. add the fixed host context, host checker, and proof-carrying admission;
-4. add request, suspension, typed response, and resume;
-5. add declarative and executable interactive advance;
-6. add the fuelled interactive runner and resource laws;
-7. add host-aware runtime typing, preservation, progress, and no-fault safety;
-8. add the Semantics storage-read handler and focused regressions;
-9. run trust-zero checks and independent audit, then record completion.
+The Semantics handler reads from the proven-present working Account and resumes
+the saved continuation without changing that Account context or the Core-local
+store. Tests cover accepted and rejected admission, request order and slots,
+invalid raw arguments, local cells, exact fuel edges, repeated suspensions,
+typed resume, and frozen Wire rejection. Full build and test validation,
+trust-zero checks, kernel and metadata policy checks, and two independent
+audits pass. Every implementation commit stayed below 300 changed lines.
 
 ## Consequences
 

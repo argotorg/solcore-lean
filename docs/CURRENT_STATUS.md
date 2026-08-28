@@ -2002,18 +2002,24 @@ storage write, and leave fuel exhaustion unclassified. Full validation and two
 independent P0-P3 audits pass. No FrameOutcome, ABI, contract input, WorldState
 effect, or published interface was added.
 
-## Active typed Core storage-read suspension
+## Completed typed Core storage-read suspension
 
-[ADR-0117](adr/0117-typed-core-storage-read-suspension.md) is implementing a
+[ADR-0117](adr/0117-typed-core-storage-read-suspension.md) provides a
 syntax-independent storage-read request. Existing Core function application
 receives one runtime-only capability through a fixed typed context. Execution
-may return a first-order suspension that retains the exact CEK continuation and
+can return a first-order suspension that retains the exact CEK continuation and
 Core-local store, then resume with a typed Word response.
 
 The closed checker and its sufficient-fuel completion theorem remain unchanged.
-Host-checked execution instead proves fault exclusion and typed
-done-or-suspended progress. Core requests contain words only; WorldState,
-addresses, checkpoints, rollback, and commit policy stay in Semantics.
+Every finite host-checked run instead has a typed done, out-of-fuel, or
+suspended result, and machine faults are excluded. A Semantics handler reads
+the request through the proven-present working Account and resumes the typed
+state without changing the Account context or Core-local store.
+
+Core requests contain words only; WorldState, addresses, checkpoints, rollback,
+and commit policy stay in Semantics. Address-selected host-code migration, the
+fuel-preserving handler loop, and storage write remain later work. Full
+validation and two independent audits pass.
 
 ## Meaning of completion
 
