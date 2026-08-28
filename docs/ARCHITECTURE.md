@@ -379,12 +379,14 @@ and both decoder paths agree for arbitrary input text. This proof-only
 layer is complete without a public executable API and changes no ABI, state, or
 publication boundary. Its independent audit found no P0-P3 issue.
 
-ADR-0056 begins explicit world state with two public carriers backed by private
-semantic lookup functions over the finite Word and Address domains.
+ADR-0056 completes the first explicit world-state foundation with two public
+carriers. Their private data consists of semantic lookup functions over the
+finite Word and Address domains.
 WorldState distinguishes an absent Account from a present empty Account.
 Account storage contains only nonzero entries: missing keys read as zero and a
-zero write erases the entry without deleting the Account. This active slice has
-no transaction, rollback, balance, code, call, or serialization meaning.
+zero write erases the entry without deleting the Account. This completed slice
+has no transaction, rollback, balance, code, call, or serialization meaning.
+Its final independent audit found no P0-P3 issue.
 
 ### Observation
 

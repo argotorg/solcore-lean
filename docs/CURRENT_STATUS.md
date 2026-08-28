@@ -110,9 +110,9 @@ P0-P3 issue.
 proof-only Address coherence slice. It adds no public executable API; 15
 private helpers and exactly four public laws prove that canonical text and
 exact 20-byte decoding agree for arbitrary input.
-[ADR-0056](adr/0056-minimal-world-state.md) accepts the active minimal
-WorldState slice. It fixes explicit Account absence and canonical nonzero
-storage entries without defining transactions, rollback, balances, or calls.
+[ADR-0056](adr/0056-minimal-world-state.md) completes the minimal WorldState
+slice. It fixes explicit Account absence and canonical nonzero storage entries
+without defining transactions, rollback, balances, or calls.
 
 ## Implementation status
 
@@ -155,7 +155,7 @@ storage entries without defining transactions, rollback, balances, or calls.
 | Strict address and word bridge | Complete | Complete | Not published |
 | Strict 20-byte address representation | Complete | Complete | Not published |
 | Address text and byte coherence | Complete | Complete | Not published |
-| Minimal Account and WorldState carrier | Active | In progress | Not published |
+| Minimal Account and WorldState carrier | Complete | Complete | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -766,7 +766,7 @@ semantic-kernel, and metadata checks pass. ABI behavior, source casts, contract
 state, EVM rules, and every public format remain unchanged. The independent
 audit found no P0-P3 issue.
 
-## Active minimal WorldState slice
+## Completed minimal WorldState slice
 
 [ADR-0056](adr/0056-minimal-world-state.md) introduces exactly two carriers and
 eight public operations over private semantic lookup functions. The finite Word
@@ -775,11 +775,19 @@ hash, iteration, or insertion order. An absent Account stays distinct from a
 present empty Account. Missing storage reads as Word zero; zero writes
 canonically erase the entry; and storage writes never create a missing Account.
 
-The planned exact twelve laws and twelve runtime assertions cover Account
+The exact twelve laws and twelve runtime assertions cover Account
 lookup, explicit insertion, storage presence and reads, zero deletion,
 nonzero insertion, absent-Account write failure, and preservation at different
 keys and addresses. Transactions, rollback, ABI, balances, code, calls,
 ordering, serialization, and publication remain separate decisions.
+
+The two carriers expose only private semantic lookup functions; Account also
+contains a private zero-free proposition. Constructors and fields are private,
+and there is no concrete map, `BEq`, `DecidableEq`, or `Repr`. Privacy,
+recursor, trust-zero, build, test, metadata, and semantic-kernel checks pass.
+Ten laws report only `[propext]`; the two empty Account laws additionally
+report `Quot.sound`. No custom axiom, `sorryAx`, or unchecked declaration is
+present. The final independent audit found no P0-P3 issue.
 
 ## Meaning of completion
 

@@ -61,7 +61,7 @@ These results remain regression obligations for every extension.
 | 35 | Strict Address↔Word bridge | Complete | Adds lossless widening and a strict partial inverse before contract state |
 | 36 | Strict 20-byte Address representation | Complete | Fixes exact big-endian bytes and strict width before contract state |
 | 37 | Address text and byte coherence | Complete | Proves the completed strict representations agree without a new API |
-| 38 | Minimal Account and WorldState carrier | Active | Fixes explicit absence and canonical storage values before transitions |
+| 38 | Minimal Account and WorldState carrier | Complete | Fixes explicit absence and canonical storage values before transitions |
 | 39 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 40 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
 | 41 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -621,7 +621,7 @@ or public format. All four public laws report `propext`, `Classical.choice`, and
 focused and full builds and tests, semantic-kernel, and metadata checks pass.
 The independent audit found no P0-P3 issue.
 
-## Active minimal WorldState slice
+## Completed minimal WorldState slice
 
 [ADR-0056](adr/0056-minimal-world-state.md) introduces exactly two public
 carriers backed by private semantic lookup functions and eight public
@@ -631,10 +631,16 @@ absence. Account storage contains no zero entries: missing keys read as zero,
 zero writes erase, and nonzero writes insert. A storage write to an absent
 Account fails instead of creating it.
 
-The planned exact twelve laws and twelve runtime assertions cover all same-key,
+The exact twelve laws and twelve runtime assertions cover all same-key,
 different-key, same-address, different-address, and absent-Account boundaries.
 Rollback, transactions, ABI, balances, nonce, code, logs, calls, creation,
 layout, ordering, serialization, and public formats remain outside the slice.
+
+Account's private lookup and zero-free proposition and WorldState's private
+lookup are the complete carrier data. Constructors and fields remain private;
+there is no concrete map, `BEq`, `DecidableEq`, or `Repr`. Privacy, recursor,
+trust-zero, build, test, metadata, and semantic-kernel checks pass. The final
+independent audit found no P0-P3 issue.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

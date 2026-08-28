@@ -222,12 +222,17 @@ big-endian encoding, including complete decoder agreement for arbitrary text.
 It adds no ABI, state, or public format. The independent audit found no P0-P3
 issue.
 
-The active minimal world-state slice,
+The completed minimal world-state slice,
 [ADR-0056](adr/0056-minimal-world-state.md), adds finite Account and WorldState
 carriers whose private data is limited to semantic lookup functions and
 zero-free evidence. Missing storage reads as zero, zero writes delete the entry,
 and an absent Account is never created by a storage write. Rollback, balances,
 code, calls, ABI behavior, ordering, and publication remain outside this slice.
+Exactly twelve laws and twelve runtime assertions cover its eight operations.
+The carriers expose no concrete map, comparison, or printable representation;
+privacy and recursor checks limit observation to the same semantic lookup
+behavior as the public queries. The final independent audit found no P0-P3
+issue.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -368,7 +373,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0054 completes an exact 20-byte big-endian internal address
   representation; its independent audit found no P0-P3 issue.
 - ADR-0055 completes proof-only coherence between canonical Address text and bytes.
-- ADR-0056 accepts the minimal explicit Account and WorldState carrier.
+- ADR-0056 completes the minimal explicit Account and WorldState carrier.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

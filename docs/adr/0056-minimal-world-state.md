@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-28
 - Scope: first explicit world-state carrier slice
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -150,3 +150,26 @@ Later transition rules can receive and return an explicit finite WorldState
 without hidden host mutation. Account absence, missing storage, and zero-value
 deletion are fixed independently of transaction rollback, calls, ABI behavior,
 and serialization.
+
+## Completion evidence
+
+The implementation is complete with exactly two public carriers, eight public
+executable definitions, twelve public laws, and twelve runtime assertions.
+Account contains only a private semantic lookup and its zero-free proposition;
+WorldState contains only a private semantic lookup. Their constructors and
+fields remain private. Neither carrier has `BEq`, `DecidableEq`, or `Repr`, and
+there is no concrete map representation. Recursor-visible lookup behavior is
+pointwise identical to `storageValue?` and `account?`.
+
+The work landed as six review-sized commits: `4fc0aea` (203 changed lines),
+`186931e` (81), `6025a34` (118), `c7cd560` (76), `d003ded` (51), and `ba1458b`
+(103). Every commit remained below 300 changed lines.
+
+Axiom inspection reports only `[propext]` for ten laws: the three empty/put
+WorldState lookup laws, the four Account write/read laws, and the three absent,
+same-address, and other-address WorldState write laws. The two empty Account
+laws, `storageValue?_empty` and `storageRead_empty`, report
+`[propext, Quot.sound]`. No custom axiom, `sorryAx`, or unchecked declaration is
+present. Trust-zero, focused and full builds and tests, metadata, semantic
+kernel, privacy, and recursor checks pass. The final independent audit found no
+P0-P3 issue.
