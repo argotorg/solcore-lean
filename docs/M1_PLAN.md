@@ -105,11 +105,12 @@ These results remain regression obligations for every extension.
 | 79 | Address-bound working storage read/write coherence | Complete | Lifts same-slot and different-slot observations through the retained selector |
 | 80 | Parent-indexed frame initialization | Complete | Builds a canonical trace start and checkpointed working pair from caller-supplied initial state values |
 | 81 | Initialization storage-address adapter | Complete | Connects the only input role with existing consumers to the parent-indexed initialization path |
-| 82 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
-| 83 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 84 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 85 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 86 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 82 | Checkpointed working-pair storage-write algebra | Planned | Lifts overwrite and independent-write commutation through the existing working-write operation |
+| 83 | Further contract-entry input roles | Planned | Adds caller, callee, code, data, value, or kind only after consumers and lifetime rules are selected |
+| 84 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 85 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 86 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 87 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1392,6 +1393,17 @@ No new carrier, storage behavior, authority, current-contract identity, or
 other invocation input is added. Three private compile regressions cover both
 projections and the existing storage-write consumer; full validation and
 independent P0-P3 audits pass.
+
+## Planned checkpointed working-pair storage-write algebra
+
+[ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md) lifts
+the existing WorldState overwrite and independent-write equations through the
+ADR-0092 checkpointed working-write operation.
+
+It adds exactly three proof laws and no executable operation. Overwrite is a
+simp reduction; distinct-slot and distinct-address commutation remain
+non-simp. The equations do not claim runtime, transaction, or external-effect
+reordering.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

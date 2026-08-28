@@ -465,6 +465,12 @@ adds a small adapter that attaches a caller-supplied storage address to those
 initialized values. It reuses the existing storage reader and writer and does
 not treat the address as an owner or current contract.
 
+The accepted
+[ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md) plans
+proofs that repeated writes keep their expected overwrite and independent-
+write behavior after they are lifted into checkpointed working values. It adds
+no new write operation or runtime-order claim.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -684,6 +690,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   parent-indexed frame-initialization recipe.
 - [ADR-0099](adr/0099-parent-indexed-frame-initialization-storage-address.md)
   fixes the storage-address adapter for that recipe.
+- [ADR-0100](adr/0100-checkpointed-working-pair-storage-write-algebra.md)
+  fixes the planned sequential-write algebra over checkpointed working values.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

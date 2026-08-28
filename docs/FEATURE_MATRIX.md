@@ -134,6 +134,7 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Address-bound working storage read/write coherence | Complete | Two proof-only laws expose the written value and preserve a different-slot read through the retained selector | None |
 | Parent-indexed frame initialization | Complete | A payload-free carrier derives the initial trace extension and checkpointed working pair while leaving initial state and rollback caller-supplied | None |
 | Parent-indexed initialization storage-address adapter | Complete | ADR-0099 binds a caller-supplied storage selector to initialized values without a new carrier or authority claim | None |
+| Checkpointed working-pair storage-write algebra | Active | ADR-0100 plans three proof-only overwrite and commutation laws over the existing address-parameterized write | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
 | Extended contract runtime state | Planned | Minimal Account and WorldState are complete; frames, transactions, balances, code, and ownership remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |
