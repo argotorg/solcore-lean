@@ -498,6 +498,11 @@ The completed
 checked form of an address-bound working context that carries the exact
 selected Account when that Account exists.
 
+The accepted
+[ADR-0106](adr/0106-present-working-storage-account-total-read.md) plans a
+total slot read from that checked Account, together with agreement with the
+existing conditional read.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -729,6 +734,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes the equality of two initialization construction routes.
 - [ADR-0105](adr/0105-present-working-storage-account-refinement.md) fixes an
   evidence-carrying refinement for a present working Account.
+- [ADR-0106](adr/0106-present-working-storage-account-total-read.md) fixes the
+  planned total read from that refinement.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

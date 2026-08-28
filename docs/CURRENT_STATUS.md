@@ -266,6 +266,9 @@ checkpointed-working-pair route construct the same plain continuation context.
 [ADR-0105](adr/0105-present-working-storage-account-refinement.md) accepts a
 partial refinement that retains the exact address-bound context, selected
 working Account, and its presence evidence; implementation is complete.
+[ADR-0106](adr/0106-present-working-storage-account-total-read.md) accepts a
+total slot read from that proven-present Account and a coherence law with the
+existing conditional context read; implementation is planned.
 
 ## Implementation status
 
@@ -358,6 +361,7 @@ working Account, and its presence evidence; implementation is complete.
 | Address-bound working storage-write values coherence | No new operation | Complete | Not published |
 | Parent-indexed initialization continuation-context coherence | No new operation | Complete | Not published |
 | Present working storage Account refinement | Complete | Complete | Not published |
+| Present working storage Account total read | Planned | Planned | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -1821,6 +1825,16 @@ three private compile regressions cover absence, exact success, retained state,
 and direct reuse by the existing read and write laws. Full validation and
 independent P0-P3 audits pass. The slice creates no Account, assigns no address
 authority, and adds no total storage operation, transition, or published surface.
+
+## Planned present working storage Account total read
+
+[ADR-0106](adr/0106-present-working-storage-account-total-read.md) specifies
+one total slot read from the Account stored by ADR-0105 and one coherence law
+with the existing conditional context read.
+
+The operation performs no WorldState lookup and cannot fail after refinement.
+It adds no write, Account creation, address authority, transition, or published
+surface.
 
 ## Meaning of completion
 

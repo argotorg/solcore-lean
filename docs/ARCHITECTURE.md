@@ -637,6 +637,10 @@ whose retained Account is present. It stores the exact original context,
 selected Account, and working-lookup evidence without creating an Account or
 assigning authority to the retained address.
 
+ADR-0106 accepts a total slot read on that refinement. It reads the stored
+Account directly and proves agreement with the earlier conditional context
+read, without another WorldState lookup or absence branch.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
