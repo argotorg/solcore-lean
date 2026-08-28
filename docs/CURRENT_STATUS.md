@@ -140,6 +140,9 @@ transaction policy.
 [ADR-0065](adr/0065-resolved-frame-continuation-laws.md) completes the
 proof-only slice that fixes the matching generic continuation equations for
 returned and reverted synchronized results without adding an execution API.
+[ADR-0066](adr/0066-caller-owned-frame-continuation.md) is the active executable
+slice. It names the caller-owned continuation boundary without adding a frame
+stack, checkpoint creation, or trace algebra.
 
 ## Implementation status
 
@@ -192,6 +195,7 @@ returned and reverted synchronized results without adding an execution API.
 | Synchronized child-frame composition | Complete | Complete | Not published |
 | Unresolved trap propagation | Complete | Complete | Not published |
 | Resolved frame continuation laws | Complete | Complete | Not published |
+| Caller-owned frame continuation | Not implemented | Decision accepted | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -978,6 +982,19 @@ independent P0-P3 audits pass.
 
 Checkpoint creation and ownership, trace append and ordering, invocation,
 transactions, and trap disposition remain separate decisions.
+
+## Active caller-owned frame continuation
+
+[ADR-0066](adr/0066-caller-owned-frame-continuation.md) adds exactly one public
+operation and no carrier, instance, or helper. The caller supplies state and
+effect checkpoints plus a working journal whose trace is already accumulated.
+The operation resolves one FrameRunResult and invokes an arbitrary Option
+continuation only when synchronized resolution succeeds.
+
+The planned proof interface has exactly three simp `rfl` constructor laws and
+the definition-only runtime module has exactly three assertions. Parent-frame
+shape, checkpoint creation, trace append/order, transaction atomicity, and
+diagnostic failure carriers remain separate decisions.
 
 ## Meaning of completion
 

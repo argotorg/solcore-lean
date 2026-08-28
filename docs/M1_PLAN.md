@@ -71,10 +71,11 @@ These results remain regression obligations for every extension.
 | 45 | Synchronized child-frame composition | Complete | Proves child return/revert followed by parent rollback without a stack API |
 | 46 | Unresolved trap propagation | Complete | Proves that trapped synchronized resolution remains `none` through any continuation |
 | 47 | Resolved frame continuation laws | Complete | Passes returned/reverted synchronized pairs to arbitrary continuations without a new API |
-| 48 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 49 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 50 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 51 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 48 | Caller-owned frame continuation | Active | Names the resolver/bind seam while checkpoint and accumulated-trace inputs stay external |
+| 49 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 50 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 51 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 52 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -790,6 +791,18 @@ fourth commit. Full validation and independent P0-P3 audits pass.
 
 It does not choose checkpoint creation, trace accumulation or order,
 invocation ownership, transactions, or trap disposition.
+
+## Active caller-owned frame continuation
+
+[ADR-0066](adr/0066-caller-owned-frame-continuation.md) adds exactly one
+higher-order operation. It resolves a raw FrameRunResult with caller-supplied
+state/effect checkpoints and an already-accumulated working trace, then binds
+an arbitrary Option continuation to the selected pair.
+
+Exactly three planned simp constructor laws and three definition-only runtime
+assertions cover return, revert, and trap. No parent-frame carrier, checkpoint
+creation, trace append/order, transaction atomicity, or diagnostic failure
+carrier is selected.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
