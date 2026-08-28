@@ -68,10 +68,11 @@ These results remain regression obligations for every extension.
 | 42 | External-checkpoint frame run result | Complete | Pairs speculative working state with outcome under caller-owned checkpoint |
 | 43 | Parametric frame effect journal policy | Complete | Separates rollback-scoped state from surviving opaque trace snapshots |
 | 44 | Synchronized frame state/effect resolution | Complete | Resolves state and effects from one shared frame outcome |
-| 45 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 46 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
-| 47 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 48 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 45 | Synchronized child-frame composition | Active | Proves child return/revert followed by parent rollback without a stack API |
+| 46 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 47 | Contract runtime transitions and observations | Planned | Adds rollback and external effects independently of source syntax |
+| 48 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 49 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -737,6 +738,15 @@ import. The resolver and all five laws report `[propext]`; the laws split into
 three simp constructor and two non-simp projection rules. A 66-line
 definition-only test module plus two runner lines supplies three checks. No
 carrier, instance, helper, or next operational policy is introduced.
+
+## Active synchronized child-frame composition
+
+[ADR-0063](adr/0063-synchronized-child-frame-composition.md) adds no carrier,
+operation, instance, or helper. Exactly two non-simp laws and two runtime
+assertions compose child return or revert with a later parent revert. The trace
+is an already-accumulated snapshot containing the parent prefix; no append or
+ordering rule is introduced. Concrete invocation and trap handling remain
+separate decisions.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -131,6 +131,8 @@ concrete event taxonomy or order.
 [ADR-0062](adr/0062-synchronized-frame-state-effect-resolution.md) completes the
 synchronized resolver. One outcome selects WorldState and parametric
 effects together without a new carrier.
+[ADR-0063](adr/0063-synchronized-child-frame-composition.md) accepts the active
+proof-only child composition laws. They add no executable API or nested stack.
 
 ## Implementation status
 
@@ -180,6 +182,7 @@ effects together without a new carrier.
 | External-checkpoint frame run result | Complete | Complete | Not published |
 | Parametric frame effect journal policy | Complete | Complete | Not published |
 | Synchronized frame state/effect resolution | Complete | Complete | Not published |
+| Synchronized child-frame composition | Active | In progress | Not published |
 | Restricted single-file parser | Complete | Complete | Oracle v4 / Surface v1 |
 | Workspace identity and validation | Complete | Complete | Internal only |
 | Multi lexer and chart parser | Complete for the frozen grammar | Soundness, total selection, and grammar-specific certificates | Internal only |
@@ -917,6 +920,17 @@ split into three simp constructor equations and two non-simp coherence laws;
 the resolver and every law report `[propext]`. Three assertions in a 66-line
 definition-only test module plus two runner lines cover both projections. Full
 validation and independent P0-P3 audits pass.
+
+## Active synchronized child-frame composition
+
+[ADR-0063](adr/0063-synchronized-child-frame-composition.md) plans exactly two
+non-simp laws and two definition-only runtime assertions, with no carrier, API,
+instance, or helper. Child return is adopted before parent revert; child revert
+first restores the child checkpoint. Both paths finish at parent checkpoint
+WorldState and rollback state while preserving the child's accumulated working
+trace. That trace already includes the parent prefix. Stack ownership,
+invocation, checkpoint creation, append/order, transactions, trap policy, ABI,
+Core adaptation, EVM, gas, and publication remain outside.
 
 ## Meaning of completion
 

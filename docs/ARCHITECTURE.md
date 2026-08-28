@@ -429,6 +429,11 @@ or transaction meaning.
 The completed resolver and all five laws report only `propext`; three runtime
 assertions exercise both synchronized projections.
 
+ADR-0063 proves two-stage child/parent composition without an execution stack.
+Whether the child returns or reverts, a later parent revert restores parent
+WorldState and rollback effects while preserving the child's already-accumulated
+trace snapshot. No trace append or event order is chosen.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

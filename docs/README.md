@@ -277,6 +277,11 @@ from one outcome branch. It adds no carrier or nested execution policy.
 Its one resolver, five laws, and three projection-aware runtime assertions all
 retain the existing parametric and unpublished boundaries.
 
+The active proof-only child-composition slice,
+[ADR-0063](adr/0063-synchronized-child-frame-composition.md), proves child
+return and child revert followed by parent revert using the synchronized
+resolver. It adds no operation, frame stack, or trace-order rule.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -423,6 +428,7 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - ADR-0060 completes the internal external-checkpoint frame run result.
 - ADR-0061 completes the parametric frame effect-journal policy.
 - ADR-0062 completes synchronized frame state-and-effect resolution.
+- ADR-0063 accepts proof-only synchronized child-frame composition.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
