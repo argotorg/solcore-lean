@@ -331,6 +331,11 @@ The completed trace-prefix slice,
 consistency an explicit proof obligation. It describes value factorization,
 not runtime lineage or parent/child identity.
 
+The active trace-prefixed continuation-context slice,
+[ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md), binds that
+proof to the exact checkpoint and working traces stored in one context. It
+does not turn prefix factorization into evidence of runtime ancestry.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -492,6 +497,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   frame-trace extension algebra.
 - [ADR-0070](adr/0070-frame-trace-prefix-relation.md) fixes the proof-only
   ordered frame-trace prefix relation.
+- [ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) fixes the
+  refined continuation context whose exact traces carry prefix evidence.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

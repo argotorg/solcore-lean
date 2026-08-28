@@ -76,10 +76,11 @@ These results remain regression obligations for every extension.
 | 50 | Total frame resolution result | Complete | Preserves payloads and trap reasons in a total first-order result |
 | 51 | Ordered frame trace algebra | Complete | Defines opt-in finite chronological extension without fixing event kinds |
 | 52 | Frame trace prefix relation | Complete | Makes ordered trace consistency an explicit proof obligation without claiming provenance |
-| 53 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 54 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
-| 55 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 56 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 53 | Trace-prefixed frame continuation context | Active | Binds prefix evidence to one context's exact checkpoint/working traces |
+| 54 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 55 | Nested invocation, transaction, and external observations | Planned | Needs checkpoint creation, scheduling, diagnostics, and atomicity decisions after trace construction |
+| 56 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 57 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -882,6 +883,21 @@ The four implementation commits contain 165, 17, 38, and 42 changed lines;
 this completion update is the fifth commit. Full validation and independent
 P0-P3 audits pass. The relation proves sequence factorization, not runtime
 ancestry, checkpoint ownership, or child-frame identity.
+
+## Active trace-prefixed frame continuation context
+
+[ADR-0071](adr/0071-trace-prefixed-frame-continuation-context.md) refines the
+existing continuation context only when its trace state is `FrameTrace`. A
+proposition-valued field binds the checkpoint-prefix proof to the exact two
+journals inherited by that value. Existing continuation and total-resolution
+operations remain usable through the inherited context, so this slice adds no
+alias or duplicate branch law.
+
+The proof is required when the refined context is constructed and is not
+checked during execution. This slice does not infer trace provenance,
+checkpoint ownership, parent/child identity, nested scheduling, trap policy,
+or transaction rollback. Carrier implementation and compile regressions are
+active.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
