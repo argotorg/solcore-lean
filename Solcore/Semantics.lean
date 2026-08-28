@@ -16,6 +16,7 @@ import Solcore.Semantics.FrameRunEffectResolution
 import Solcore.Semantics.FrameRunEffectResolutionProperties
 import Solcore.Semantics.FrameRunEffectCompositionProperties
 import Solcore.Semantics.FrameRunEffectTrapPropagationProperties
+import Solcore.Semantics.FrameRunEffectContinuationProperties
 import Solcore.Semantics.RuntimeScalars.TextProperties
 import Solcore.Semantics.RuntimeScalars.WordBytesProperties
 import Solcore.Semantics.WorldState
