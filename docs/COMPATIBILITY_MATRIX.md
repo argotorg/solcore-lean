@@ -26,18 +26,20 @@ settings, or different EVM revisions do not belong to this baseline.
 | Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
 | Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
 | Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
-| Contract runtime | Internal storage/frame carriers, input-indexed handled storage, and call-value observation; no compiler adapter | Lean can test exact internal working-state and parent-resolution behavior, but no end-to-end compiler conformance claim exists |
+| Contract runtime | Internal storage/frame carriers, input-indexed handled storage, call-value observation, and explicit caller-address observation; no compiler adapter | Lean can test exact internal working-state and parent-resolution behavior, but no end-to-end compiler conformance claim exists |
 
 The internal runtime row includes typed Core requests, a generic fuel-preserving
 host driver, and a combined handler for one separately selected working-storage
-Account. One immutable execution input supplies both the selected code Address
-and a caller-chosen Word observed through internal `callValue : unit -> word`.
-The value remains fixed during handled execution; value-dependent completion
-is then checked through parent-indexed resolution. This Lean boundary is
-complete and unpublished. Frozen Core Wire v1/v2 reject the internal
-host-function values, and no Oracle or compiler adapter exposes the driver. A
-handled write updates the returned working context, but neither that write nor
-the call-value Word defines balance movement, transaction commit, or rollback.
+Account. One immutable execution input supplies the selected code Address, a
+caller-chosen Word, and one explicit caller Address. Internal `callValue` and
+`callerAddress : unit -> word` observe those values; caller observation is a
+weak explicit input, needs no Account, and does not alter the completed driver
+context. Caller-only variation, fuel boundaries, parent-indexed completion, and
+resolution-fold consumption are checked internally. This boundary is complete
+and unpublished. Frozen Core Wire v1/v2 reject the host-function values, and no
+Oracle or compiler adapter exposes the driver. Neither the caller Address nor
+the call-value Word defines provenance, authority, balance movement,
+transaction commit, or rollback.
 
 ## Evidence rules
 

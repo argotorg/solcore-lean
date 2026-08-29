@@ -28,14 +28,17 @@ selected by `codeAddress` from a working WorldState. Core supplies typed
 runtime-only storage read and write capabilities, plus a read-only observation
 of the retained storage selector and a separate observation of the selected
 code selector. The same immutable execution input also supplies a
-caller-chosen invocation-value Word through the internal
-`callValue : unit -> word` capability. Each request suspends with its exact
+caller-chosen invocation-value Word and an explicitly supplied caller Address
+through internal `callValue` and `callerAddress : unit -> word` capabilities.
+The latter is the sixth host entry at index 5 and losslessly widens the Address.
+Each request suspends with its exact
 continuation, local cell store, and remaining fuel. A generic host driver
 delegates requests to a combined handler over the Account selected by a
 separate `storageAddress`; the code and storage roles are never equated.
-Reads, both selector observations, and call-value observation leave the host
-context unchanged, while writes update the returned working context and resume
-with Unit. This boundary is proved and tested but unpublished: frozen Wire
+Reads and all four observations leave the complete host context unchanged,
+while writes update the returned working context and resume with Unit. Caller
+observation requires no caller Account. This boundary is proved and tested but
+unpublished: frozen Wire
 formats reject the host values, and source syntax, ABI, gas, calls,
 authorization, balances, transaction commit, and rollback remain separate
 work.
@@ -109,11 +112,14 @@ tests cover exact fuel boundaries, an observe-write-observe program, and
 larger-fuel stability. Frozen Wire v1 and v2 reject the host value. Balance
 transfer, caller identity, ABI, and public formats remain separate.
 
-[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) is now the active
-slice. It adds one caller-supplied Address to the immutable execution input for
-one driver invocation and reserves `callerAddress : unit -> word` at index 5.
-It does not select an Account or parent, authenticate anyone, define origin or
-current/callee identity, or specify caller derivation for nested calls.
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) completes the
+run-fixed caller-address observation. The exact widened Word is stable across
+storage mutation and larger fuel, works when the Address has no Account, and
+changes independently when only the explicit caller input changes. A
+caller-derived write survives parent-indexed completion and the resolution
+fold. Frozen Wire rejects the internal value. The feature does not authenticate
+anyone, identify a parent or origin, define current/callee identity, relate the
+caller to `callValue`, or specify caller derivation for nested calls.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

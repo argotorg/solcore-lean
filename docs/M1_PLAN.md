@@ -57,10 +57,11 @@ fuel evidence, selected completion, and parent-indexed continuation
 construction. Its value-derived result reaches the existing resolution fold.
 The Word is observable by internal Core code without defining a balance
 transfer.
-[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) is the active next
-slice. It appends one caller-supplied Address to the same immutable input for
-one driver invocation and exposes it through internal
-`callerAddress : unit -> word` at index 5. It defines no Account or parent
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) completes the
+run-fixed caller-address observation. One explicitly supplied Address travels
+unchanged with the same immutable input and is observed losslessly through
+internal `callerAddress : unit -> word` at index 5. The request needs no caller
+Account and leaves the complete host context unchanged. It defines no parent
 identity, authentication, origin, current/callee identity, or nested-call rule.
 
 ## Completed foundation
@@ -197,7 +198,7 @@ These results remain regression obligations for every extension.
 | 112 | Parent-indexed trap-aware resolution fold | Complete | Selects one pure caller-owned function for each resolved branch without applying the supplied values |
 | 113 | Resolution-fold trap-reason mapping naturality | Complete | Moves heterogeneous reason mapping through the existing fold without adding execution |
 | 114 | End-to-end call-value observation | Complete | Carries one explicit run-fixed Word through the internal Core request, handled execution, selected completion, and parent-indexed continuation; the value-derived result reaches the existing resolution fold without a balance-transfer claim |
-| 115 | Run-fixed caller-address observation | Active | Append one explicit caller-supplied Address to `ExecutionInputs` and expose its lossless Word at Core host index 5 without broader caller semantics |
+| 115 | Run-fixed caller-address observation | Complete | Carries one explicit caller-supplied Address through `ExecutionInputs` and exposes its exact lossless Word at Core host index 5 without broader caller semantics |
 | 116 | Further contract-entry input roles | Planned | Add current, callee, data, or kind only when an identified Core consumer and lifetime rule exist |
 | 117 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 118 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1938,6 +1939,26 @@ writes, and observes the same Word before its parent-indexed result is consumed
 by the existing resolution fold. Frozen Wire v1 and v2 reject the internal
 host value. Balance movement, caller/current identity, ABI, parser work, and
 publication remain outside this completed slice.
+
+## Completed run-fixed caller-address observation
+
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) appends one
+explicit caller Address to the immutable execution input and
+`callerAddress : unit -> word` to internal Core at index 5. The host context
+and environment now have six append-only entries; frozen Wire v1 and v2 still
+reject every host-function value.
+
+The handler returns the losslessly widened Address exactly, performs no Account
+lookup, and leaves its complete context unchanged. The driver keeps the same
+full input and remaining fuel. Direct observation stops at fuel 4, completes at
+fuel 5, and is identical at fuel 32 even when no caller Account exists. Varying
+only the caller changes only the observed result, not the completed context.
+
+The observe/write/observe fixture completes at fuel 30 and stores and returns
+the same caller-derived Word; its result survives all parent-continuation
+options and the existing resolution fold. Caller provenance, authentication,
+call kind, balances, nested invocation, ABI, parser rules, and publication are
+not defined by this completed internal feature.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
