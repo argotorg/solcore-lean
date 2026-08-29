@@ -1,5 +1,5 @@
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
-import Solcore.Semantics.HostStorageDriverProperties
+import Solcore.Semantics.HostStorageDriverFuelProperties
 import Solcore.Semantics.WorldStateCodeProperties
 
 /-! Selection laws and safety for address-selected handled host execution. -/
@@ -55,6 +55,57 @@ abbrev CodeRunContext
     context.runCodeWithStorage? codeAddress fuel =
       some (code.runWithStorage context fuel) := by
   simp [runCodeWithStorage?, WorldState.code?, accountPresent, codePresent]
+
+/-- A selected run identifies its checked code and inherits exact fuel accounting. -/
+theorem runCodeWithStorage?_some_fuelSound
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : CodeRunContext RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (result : HostDriverResult (CodeRunContext RollbackState TraceState))
+    (executed :
+      context.runCodeWithStorage? codeAddress fuel = some result) :
+    ∃ code,
+      context.context.values.working.1.code? codeAddress = some code ∧
+        HostStorageDriver.FuelSound result fuel context
+          (Core.State.initial code.program.body Core.hostEnvironment) := by
+  unfold runCodeWithStorage? at executed
+  cases selected :
+      context.context.values.working.1.code? codeAddress with
+  | none => simp [selected] at executed
+  | some code =>
+      rw [selected] at executed
+      have resultEq := Option.some.inj executed
+      subst result
+      exact ⟨code, rfl, code.runWithStorage_fuelSound context fuel⟩
+
+/-- A selected combined run preserves checked code at every working Address. -/
+theorem runCodeWithStorage?_some_workingCode?
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : CodeRunContext RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (result : HostDriverResult (CodeRunContext RollbackState TraceState))
+    (executed :
+      context.runCodeWithStorage? codeAddress fuel = some result)
+    (observedAddress : Address) :
+    result.context.context.values.working.1.code? observedAddress =
+      context.context.values.working.1.code? observedAddress := by
+  unfold runCodeWithStorage? at executed
+  cases selected :
+      context.context.values.working.1.code? codeAddress with
+  | none => simp [selected] at executed
+  | some code =>
+      rw [selected] at executed
+      have resultEq := Option.some.inj executed
+      subst result
+      simpa only [CheckedHostCoreProgram.runWithStorage] using
+        HostStorageDriver.run_workingCode?
+          context fuel
+          (Core.State.initial code.program.body Core.hostEnvironment)
+          observedAddress
 
 /-- Address-selected checked host execution cannot return a driver fault. -/
 theorem runCodeWithStorage?_ne_some_fault
