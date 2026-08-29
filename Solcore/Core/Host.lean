@@ -15,14 +15,16 @@ def hostContext : Context :=
     HostFunction.functionType .callValue,
     HostFunction.functionType .callerAddress,
     HostFunction.functionType .inputDataByte?,
-    HostFunction.functionType .inputDataSize]
+    HostFunction.functionType .inputDataSize,
+    HostFunction.functionType .inputDataWordBE?]
 
 /-- Runtime values corresponding positionally to `hostContext`. -/
 def hostEnvironment : Environment :=
   [.hostFunction .storageRead, .hostFunction .storageWrite,
     .hostFunction .storageAddress, .hostFunction .codeAddress,
     .hostFunction .callValue, .hostFunction .callerAddress,
-    .hostFunction .inputDataByte?, .hostFunction .inputDataSize]
+    .hostFunction .inputDataByte?, .hostFunction .inputDataSize,
+    .hostFunction .inputDataWordBE?]
 
 @[simp] theorem hostContext_storageRead :
     hostContext[HostFunction.storageRead.index]? =
@@ -104,10 +106,20 @@ def hostEnvironment : Environment :=
       some (.hostFunction .inputDataSize) :=
   rfl
 
-@[simp] theorem hostContext_length : hostContext.length = 8 :=
+@[simp] theorem hostContext_inputDataWordBE? :
+    hostContext[HostFunction.inputDataWordBE?.index]? =
+      some (HostFunction.functionType .inputDataWordBE?) :=
   rfl
 
-@[simp] theorem hostEnvironment_length : hostEnvironment.length = 8 :=
+@[simp] theorem hostEnvironment_inputDataWordBE? :
+    hostEnvironment[HostFunction.inputDataWordBE?.index]? =
+      some (.hostFunction .inputDataWordBE?) :=
+  rfl
+
+@[simp] theorem hostContext_length : hostContext.length = 9 :=
+  rfl
+
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 9 :=
   rfl
 
 namespace Program

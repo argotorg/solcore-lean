@@ -82,6 +82,14 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
       HostRequestEmission
         ⟨.ret .unit, .hostApply .inputDataSize :: continuation, store⟩
         ⟨.inputDataSize, continuation, store⟩
+  | inputDataWordBE?
+      {offset : Word}
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret (.word offset),
+          .hostApply .inputDataWordBE? :: continuation, store⟩
+        ⟨.inputDataWordBE? offset, continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -144,12 +152,18 @@ theorem hostRequestEmission_iff
                           .hostApply .inputDataByte? :: continuation, store⟩ ∧
                       suspension =
                         ⟨.inputDataByte? offset, continuation, store⟩) ∨
-                    ∃ continuation store,
-                      state =
-                        ⟨.ret .unit,
-                          .hostApply .inputDataSize :: continuation, store⟩ ∧
-                      suspension =
-                        ⟨.inputDataSize, continuation, store⟩ := by
+                    (∃ continuation store,
+                        state =
+                          ⟨.ret .unit,
+                            .hostApply .inputDataSize :: continuation, store⟩ ∧
+                        suspension =
+                          ⟨.inputDataSize, continuation, store⟩) ∨
+                      ∃ offset continuation store,
+                        state =
+                          ⟨.ret (.word offset),
+                            .hostApply .inputDataWordBE? :: continuation, store⟩ ∧
+                        suspension =
+                          ⟨.inputDataWordBE? offset, continuation, store⟩ := by
   constructor
   · intro emission
     cases emission with
@@ -166,7 +180,12 @@ theorem hostRequestEmission_iff
           .inr (.inr (.inr (.inr (.inr (.inr (.inl ⟨_, _, _, rfl, rfl⟩))))))
     | inputDataSize =>
         exact
-          .inr (.inr (.inr (.inr (.inr (.inr (.inr ⟨_, _, rfl, rfl⟩))))))
+          .inr (.inr (.inr (.inr (.inr (.inr (.inr
+            (.inl ⟨_, _, rfl, rfl⟩)))))))
+    | inputDataWordBE? =>
+        exact
+          .inr (.inr (.inr (.inr (.inr (.inr (.inr
+            (.inr ⟨_, _, _, rfl, rfl⟩)))))))
   · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
         ⟨slot, value, continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
@@ -174,7 +193,8 @@ theorem hostRequestEmission_iff
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨offset, continuation, store, rfl, rfl⟩ |
-        ⟨continuation, store, rfl, rfl⟩)
+        ⟨continuation, store, rfl, rfl⟩ |
+        ⟨offset, continuation, store, rfl, rfl⟩)
     · exact .storageRead
     · exact .storageWrite
     · exact .storageAddress
@@ -183,6 +203,7 @@ theorem hostRequestEmission_iff
     · exact .callerAddress
     · exact .inputDataByte?
     · exact .inputDataSize
+    · exact .inputDataWordBE?
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -247,6 +268,8 @@ theorem hostAdvance_next_iff
               | inputDataByte? =>
                   cases value <;> simp [hostAdvance] at advanced
               | inputDataSize =>
+                  cases value <;> simp [hostAdvance] at advanced
+              | inputDataWordBE? =>
                   cases value <;> simp [hostAdvance] at advanced
   · intro step
     cases step with
@@ -342,6 +365,15 @@ theorem hostAdvance_suspended_iff
                       cases advanced
                       exact .inputDataSize
                   | bool | word | hostFunction | pair | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | inputDataWordBE? =>
+                  cases value with
+                  | word offset =>
+                      injection advanced with suspensionEquality
+                      cases suspensionEquality
+                      exact .inputDataWordBE?
+                  | unit | bool | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
   · intro emission

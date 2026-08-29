@@ -119,6 +119,7 @@ inductive HostFunction where
   | callerAddress
   | inputDataByte?
   | inputDataSize
+  | inputDataWordBE?
   deriving Repr, BEq, DecidableEq
 
 namespace HostFunction
@@ -132,6 +133,7 @@ def parameterType : HostFunction → Ty
   | .callerAddress => .unit
   | .inputDataByte? => .word
   | .inputDataSize => .unit
+  | .inputDataWordBE? => .word
 
 def resultType : HostFunction → Ty
   | .storageRead => .word
@@ -142,6 +144,7 @@ def resultType : HostFunction → Ty
   | .callerAddress => .word
   | .inputDataByte? => .sum .unit .word
   | .inputDataSize => .word
+  | .inputDataWordBE? => .sum .unit .word
 
 @[simp] def functionType (function : HostFunction) : Ty :=
   .function function.parameterType function.resultType
@@ -210,6 +213,14 @@ def resultType : HostFunction → Ty
     resultType .inputDataSize = .word :=
   rfl
 
+@[simp] theorem parameterType_inputDataWordBE? :
+    parameterType .inputDataWordBE? = .word :=
+  rfl
+
+@[simp] theorem resultType_inputDataWordBE? :
+    resultType .inputDataWordBE? = .sum .unit .word :=
+  rfl
+
 /-- Stable position in the append-only host capability context. -/
 def index : HostFunction → Nat
   | .storageRead => 0
@@ -220,6 +231,7 @@ def index : HostFunction → Nat
   | .callerAddress => 5
   | .inputDataByte? => 6
   | .inputDataSize => 7
+  | .inputDataWordBE? => 8
 
 @[simp] theorem index_storageRead : index .storageRead = 0 :=
   rfl
@@ -243,6 +255,9 @@ def index : HostFunction → Nat
   rfl
 
 @[simp] theorem index_inputDataSize : index .inputDataSize = 7 :=
+  rfl
+
+@[simp] theorem index_inputDataWordBE? : index .inputDataWordBE? = 8 :=
   rfl
 
 end HostFunction

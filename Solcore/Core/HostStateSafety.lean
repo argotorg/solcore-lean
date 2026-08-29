@@ -227,6 +227,10 @@ theorem HostRequest.responseValue_hasType
       | none => exact .inLeft .unit
       | some => exact .inRight .word
   | inputDataSize => exact .word
+  | inputDataWordBE? =>
+      cases response with
+      | none => exact .inLeft .unit
+      | some => exact .inRight .word
 
 theorem HostSuspensionHasType.resume {definitions : DataEnvironment}
     {suspension : HostSuspension} {resultType : Ty}

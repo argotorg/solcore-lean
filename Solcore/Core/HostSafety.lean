@@ -176,7 +176,8 @@ theorem HostRuntimeValueHasType.function_shape
         (.cons .hostFunction
           (.cons .hostFunction
             (.cons .hostFunction
-              (.cons .hostFunction (.cons .hostFunction .nil)))))))
+              (.cons .hostFunction
+                (.cons .hostFunction (.cons .hostFunction .nil))))))))
 
 mutual
 

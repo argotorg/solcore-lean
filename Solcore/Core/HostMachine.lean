@@ -16,6 +16,7 @@ inductive HostRequest where
   | callerAddress
   | inputDataByte? (offset : Word)
   | inputDataSize
+  | inputDataWordBE? (offset : Word)
   deriving Repr, BEq, DecidableEq
 
 namespace HostRequest
@@ -30,6 +31,7 @@ def Response : HostRequest → Type
   | .callerAddress => Word
   | .inputDataByte? _ => Option Word
   | .inputDataSize => Word
+  | .inputDataWordBE? _ => Option Word
 
 /-- Core type injected when a request is resumed. -/
 def responseType : HostRequest → Ty
@@ -41,6 +43,7 @@ def responseType : HostRequest → Ty
   | .callerAddress => .word
   | .inputDataByte? _ => .sum .unit .word
   | .inputDataSize => .word
+  | .inputDataWordBE? _ => .sum .unit .word
 
 /-- Convert an indexed host response back into a Core runtime value. -/
 def responseValue
@@ -58,6 +61,10 @@ def responseValue
       | none => .inLeft .word .unit
       | some byte => .inRight .unit (.word byte)
   | .inputDataSize => .word response
+  | .inputDataWordBE? _ =>
+      match response with
+      | none => .inLeft .word .unit
+      | some word => .inRight .unit (.word word)
 
 @[simp] theorem responseType_storageRead (slot : Word) :
     responseType (.storageRead slot) = .word :=
@@ -130,12 +137,26 @@ def responseValue
     responseValue .inputDataSize response = .word response :=
   rfl
 
+@[simp] theorem responseType_inputDataWordBE? (offset : Word) :
+    responseType (.inputDataWordBE? offset) = .sum .unit .word :=
+  rfl
+
+@[simp] theorem responseValue_inputDataWordBE?_none (offset : Word) :
+    responseValue (.inputDataWordBE? offset) none = .inLeft .word .unit :=
+  rfl
+
+@[simp] theorem responseValue_inputDataWordBE?_some
+    (offset word : Word) :
+    responseValue (.inputDataWordBE? offset) (some word) =
+      .inRight .unit (.word word) :=
+  rfl
+
 @[simp] theorem responseValue_type
     (request : HostRequest)
     (response : request.Response) :
     (request.responseValue response).type = request.responseType := by
   cases request <;> try rfl
-  cases response <;> rfl
+  all_goals cases response <;> rfl
 
 end HostRequest
 
@@ -249,6 +270,24 @@ def resume
     (store : Store) :
     (HostSuspension.mk .inputDataSize continuation store).resume response =
       ⟨.ret (.word response), continuation, store⟩ :=
+  rfl
+
+@[simp] theorem resume_inputDataWordBE?_none
+    (offset : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk (.inputDataWordBE? offset) continuation store).resume
+        none =
+      ⟨.ret (.inLeft .word .unit), continuation, store⟩ :=
+  rfl
+
+@[simp] theorem resume_inputDataWordBE?_some
+    (offset word : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk (.inputDataWordBE? offset) continuation store).resume
+        (some word) =
+      ⟨.ret (.inRight .unit (.word word)), continuation, store⟩ :=
   rfl
 
 end HostSuspension
@@ -369,6 +408,15 @@ def hostAdvance (state : State) : HostAdvanceResult :=
                 store := state.store
               }
           | actual => .fault (.invalidHostArgument .inputDataSize actual)
+      | .inputDataWordBE? =>
+          match argument with
+          | .word offset =>
+              .suspended {
+                request := .inputDataWordBE? offset
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .inputDataWordBE? actual)
   | _, _ => .ofAdvance (advance state)
 
 @[simp] theorem hostAdvance_begin_storageRead
@@ -649,5 +697,38 @@ def hostAdvance (state : State) : HostAdvanceResult :=
   | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
+
+@[simp] theorem hostAdvance_begin_inputDataWordBE?
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .inputDataWordBE?),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .inputDataWordBE? :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_inputDataWordBE?
+    (offset : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.word offset),
+          .hostApply .inputDataWordBE? :: continuation, store⟩ =
+      .suspended ⟨.inputDataWordBE? offset, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_inputDataWordBE?_argument
+    (actual : Value)
+    (notWord : ∀ offset, actual ≠ .word offset)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .inputDataWordBE? :: continuation, store⟩ =
+      .fault (.invalidHostArgument .inputDataWordBE? actual) := by
+  cases actual <;> simp_all [hostAdvance]
 
 end Solcore.Core
