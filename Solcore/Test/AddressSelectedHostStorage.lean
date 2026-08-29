@@ -173,6 +173,34 @@ private def observeWriteObserveCode : CheckedHostCoreProgram :=
 private def expectedStorageAddressPair : Value :=
   .pair (.word expectedStorageAddressWord) (.word expectedStorageAddressWord)
 
+/-- Observe the code selector, write storage, then observe it again. -/
+private def observeCodeWriteObserveCodeProgram : Program := {
+  resultType := .product .word .word
+  body :=
+    .letE
+      (.apply (.var HostFunction.codeAddress.index) .unit)
+      (.letE
+        (.apply
+          (.var (HostFunction.storageWrite.index + 1))
+          (.pair (.word targetSlot) (.word newValue)))
+        (.letE
+          (.apply
+            (.var (HostFunction.codeAddress.index + 2))
+            .unit)
+          (.pair (.var 2) (.var 0))))
+}
+
+private theorem observeCodeWriteObserveCodeProgram_host_checked :
+    observeCodeWriteObserveCodeProgram.checkHost = true := by
+  decide
+
+private def observeCodeWriteObserveCode : CheckedHostCoreProgram :=
+  ⟨observeCodeWriteObserveCodeProgram,
+    observeCodeWriteObserveCodeProgram_host_checked⟩
+
+private def expectedCodeAddressPair : Value :=
+  .pair (.word expectedCodeAddressWord) (.word expectedCodeAddressWord)
+
 private def codeAccountFor (code : CheckedHostCoreProgram) : Account :=
   Account.empty
     |>.storageWrite codeSlot codeValue
@@ -318,6 +346,11 @@ private def codeAddressRequestReady (state : State) : Bool :=
 private def oneStepBeforeStorageAddressPair (state : State) : Bool :=
   match hostAdvance state with
   | .next next => next == State.final expectedStorageAddressPair
+  | _ => false
+
+private def oneStepBeforeCodeAddressPair (state : State) : Bool :=
+  match hostAdvance state with
+  | .next next => next == State.final expectedCodeAddressPair
   | _ => false
 
 private def assertFixtureContext
@@ -573,6 +606,8 @@ def testAddressSelectedHostStorage : IO Unit := do
     "the host checker rejected the code-address program"
   assertTrue observeWriteObserveProgram.checkHost
     "the host checker rejected observe/write/observe"
+  assertTrue observeCodeWriteObserveCodeProgram.checkHost
+    "the host checker rejected code-observe/write/code-observe"
   assertTrue (codeAddress != storageAddress)
     "the address fixture did not separate code and storage"
   assertTrue (addressToWord storageAddress == expectedStorageAddressWord)
@@ -660,6 +695,63 @@ def testAddressSelectedHostStorage : IO Unit := do
           throw (IO.userError "fuel 5 lost the code-address code")
       | _, none =>
           throw (IO.userError "additional fuel lost the code-address code")
+
+  match
+      (baseContextFor observeCodeWriteObserveCode).withPresentStorageAccount?
+      with
+  | none =>
+      throw (IO.userError
+        "the code-observe/write/code-observe storage Account was absent")
+  | some context =>
+      match context.runCodeWithStorage? codeAddress
+          observeWriteObserveSecondRequestFuel with
+      | some { context := resultContext, outcome := .outOfFuel state } =>
+          assertTrue (codeAddressRequestReady state)
+            "fuel 23 did not stop at the second code-address request"
+          assertFixtureContext resultContext
+            observeCodeWriteObserveCodeProgram newValue
+            "fuel 23 code-observe/write/code-observe"
+      | some result =>
+          throw (IO.userError
+            s!"fuel 23 crossed the second code request: {reprStr result.outcome}")
+      | none =>
+          throw (IO.userError
+            "fuel 23 lost code-observe/write/code-observe code")
+
+      match context.runCodeWithStorage? codeAddress 29 with
+      | some { context := resultContext, outcome := .outOfFuel state } =>
+          assertTrue (oneStepBeforeCodeAddressPair state)
+            "fuel 29 did not stop one step before the code-address pair"
+          assertFixtureContext resultContext
+            observeCodeWriteObserveCodeProgram newValue
+            "fuel 29 code-observe/write/code-observe"
+      | some result =>
+          throw (IO.userError
+            s!"fuel 29 crossed code completion: {reprStr result.outcome}")
+      | none =>
+          throw (IO.userError
+            "fuel 29 lost code-observe/write/code-observe code")
+
+      match context.runCodeWithStorage? codeAddress
+          observeWriteObserveCompletionFuel,
+          context.runCodeWithStorage? codeAddress 64 with
+      | some result, some largerResult =>
+          assertTrue (result.outcome == .done expectedCodeAddressPair [])
+            "fuel 30 returned unequal code selectors"
+          assertTrue (largerResult.outcome == result.outcome)
+            "additional fuel changed code-observe/write/code-observe"
+          assertFixtureContext result.context
+            observeCodeWriteObserveCodeProgram newValue
+            "fuel 30 code-observe/write/code-observe"
+          assertFixtureContext largerResult.context
+            observeCodeWriteObserveCodeProgram newValue
+            "fuel 64 code-observe/write/code-observe"
+      | none, _ =>
+          throw (IO.userError
+            "fuel 30 lost code-observe/write/code-observe code")
+      | _, none =>
+          throw (IO.userError
+            "additional fuel lost code-observe/write/code-observe code")
 
   match (baseContextFor observeWriteObserveCode).withPresentStorageAccount? with
   | none =>
