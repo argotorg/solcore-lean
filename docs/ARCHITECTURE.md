@@ -786,11 +786,11 @@ values fixed by ADR-0127. The returned value has caller-selected type; the fold
 does not mutate a parent or interpret rollback, bytes, or traps. Its coherence
 law reconstructs the complete resolution view for all three branches.
 
-ADR-0130 is the active algebraic closure for that fold. Its single planned
-naturality law moves heterogeneous trap-reason mapping through the fold by
-precomposing only the trap function. Return and revert functions, all resolved
-values, and the caller-selected result type remain unchanged. This is a proof
-interface only and introduces no execution or lifecycle layer.
+ADR-0130 completes the algebraic closure for that fold. Its single naturality
+law moves heterogeneous trap-reason mapping through the fold by precomposing
+only the trap function. Return and revert functions, all resolved values, and
+the caller-selected result type remain unchanged. This is a proof interface
+only and introduces no execution or lifecycle layer.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

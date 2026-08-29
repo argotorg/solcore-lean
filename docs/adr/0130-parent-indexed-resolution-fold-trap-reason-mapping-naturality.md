@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: commute heterogeneous trap-reason mapping through the frame fold
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -139,9 +139,10 @@ This ADR adds no:
 - parser, Surface, ABI, gas, Wire, Oracle, schema, profile, or public format
   change.
 
-## Implementation sequence
+## Implemented sequence
 
-Keep every green commit below roughly 300 changed lines:
+The work was completed in this order, with every green commit below roughly
+300 changed lines:
 
 1. record the exact proof-only contract;
 2. activate it in current-facing internal documents;
@@ -150,6 +151,36 @@ Keep every green commit below roughly 300 changed lines:
 5. run trust, simp, axiom, dependency, build, test, metadata, kernel, and
    independent audits; and
 6. synchronize completion evidence in current-facing internal documents.
+
+## Implementation record
+
+`ParentIndexedFrameResolutionFoldTrapReasonMapProperties.lean` publishes the
+single heterogeneous naturality theorem and one Semantics-facade import. Its
+proof exposes the existing parent-indexed context and frame outcome, then
+closes return, revert, and trap by definitional equality. It adds no operation,
+helper, branch specialization, alias, mapper, or result transformation.
+
+`Solcore/Test/ParentIndexedFrameResolutionFoldTrapReasonMap.lean` contains the
+four compile-only consumers required above. The test runner imports the module
+without adding a runtime call. Production depends only on the existing
+parent-indexed context reason mapper and fold definition; reconstruction and
+resolution-view naturality remain test-only dependencies.
+
+## Acceptance evidence
+
+- the full build completed 638 jobs;
+- the complete test suite completed 1,164 jobs;
+- all changed Lean roots compiled with trust zero and warnings as errors;
+- metadata and semantic-kernel policy checks passed;
+- the single public simp theorem reports exactly `[propext]`;
+- declaration and simplification inventories found exactly one theorem and no
+  operation, helper, unchecked declaration, or reverse simp rule;
+- production dependency inspection found only the context reason mapper and
+  fold definition; and
+- independent specification and implementation audits found no P0-P3 issue.
+
+No Core execution, runtime fixture, parser, Surface, ABI, Oracle, Wire format,
+schema, profile, or root README changed.
 
 ## Consequences
 
