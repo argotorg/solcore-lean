@@ -314,8 +314,14 @@ paused. [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md
 completes the handled-step/fuel relation for the executable driver and proves
 done and raw-fault results stable under added fuel. Relational replay preserves
 the exact final handler context, including storage updates. Out-of-fuel is
-intentionally not stable. The next syntax-independent semantic slice will be
-selected separately.
+intentionally not stable.
+
+[ADR-0121](adr/0121-retained-storage-address-observation.md) is the active
+syntax-independent semantic slice. It exposes the storage selector already
+retained by the combined driver as a lossless Core Word observation. This does
+not make that selector a current, self, code, or caller address, and introduces
+no new address input or identity rule. Parser work remains paused while source
+syntax is still expected to change.
 
 ## Implementation status
 
@@ -333,6 +339,7 @@ selected separately.
 | Address-selected host-code driver | Complete foundation | Separate code/storage selection and exact handled-step fuel accounting; its read-specific API is superseded by ADR-0119 | Not published |
 | Typed storage-write and combined storage driver | Complete | Append-only write capability, generic driver, combined read/write handler, address-selected API, safety, fuel, invariants, and regressions complete | Not published |
 | Handled-execution completeness and terminal fuel stability | Complete | Core and generic relational replay, executable-result iff, exact final context, and done/fault larger-fuel stability complete; out-of-fuel stability is intentionally excluded | Not published |
+| Retained storage-selector observation | Accepted; implementation active | Append-only `unit -> word` capability will expose only the existing caller-designated selector; it is not a current, code, self, or caller address | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2109,7 +2116,22 @@ completed with 1,126 jobs, and every changed Lean module passed trust-zero
 with warnings treated as errors. Metadata and semantic-kernel policy checks
 passed, and an independent final audit found no P0-P3 issue. No parser,
 Surface, ABI, call-input, or lifecycle meaning changed. The next semantic
-slice will be selected separately.
+slice is ADR-0121's retained storage-selector observation.
+
+## Active retained storage-selector observation
+
+[ADR-0121](adr/0121-retained-storage-address-observation.md) adds one small
+read-only capability to the existing handled execution path. A checked Core
+program can ask for the storage selector already carried by
+`HostStorageDriver.Context` and receive its lossless Word representation. The
+handler leaves the complete context unchanged; it does not select another
+Account or alter storage, checkpoint state, effects, or local Core state.
+
+The selector continues to mean only the Address used by the existing storage
+read and write operations. ADR-0121 does not identify it with `codeAddress`, a
+current or self address, a caller, or any future call-frame role. Those inputs
+and their lifecycle meaning remain later decisions. Parser and parser-proof
+work remains paused.
 
 ## Meaning of completion
 

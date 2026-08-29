@@ -9,9 +9,13 @@ read and update working contract storage under one typed, fuel-preserving
 driver. [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
 now completes the proof boundary around that driver: its handled-step relation
 and executable result determine each other, and completed or faulted runs remain
-identical when given more fuel. Selecting the next contract-entry input is the
-next planned step. Concrete grammar and parser proof work stays paused until
-source syntax stabilizes.
+identical when given more fuel.
+[ADR-0121](adr/0121-retained-storage-address-observation.md) is now the active
+slice. It exposes the storage selector already retained by the driver as a
+lossless Core Word observation, without treating it as a current, self, code,
+or caller address. Further contract-entry inputs remain a later selection.
+Concrete grammar and parser proof work stays paused until source syntax
+stabilizes.
 
 ## Completed foundation
 
@@ -136,11 +140,12 @@ These results remain regression obligations for every extension.
 | 101 | Address-selected host-code driver | Complete foundation | Establishes separate code/storage selection and exact remaining-fuel reuse; its read-specific API is superseded by ADR-0119 |
 | 102 | Typed storage-write and combined storage driver | Complete | Appends `(word × word) -> unit`, uses a generic driver and combined handler, and proves address-selected safety, fuel, and context invariants |
 | 103 | Handled-execution completeness and terminal fuel stability | Complete | Makes the generic handled-step relation executable in both directions and proves exact done/fault stability under additional fuel |
-| 104 | Further contract-entry input roles | Planned; next selection | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 105 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 106 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 107 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 108 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 104 | Retained storage-selector observation | Active | Returns the existing storage selector as a lossless Word without assigning current, self, code, caller, or other call-frame identity |
+| 105 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 106 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 107 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 108 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 109 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1695,6 +1700,20 @@ programs at larger budgets and retain their values, local stores, selected
 storage updates, and every exposed frame projection. ADR-0120 adds proofs and
 regressions only. It changes neither runtime execution nor the existing read
 and write request kinds.
+
+## Active retained storage-selector observation
+
+[ADR-0121](adr/0121-retained-storage-address-observation.md) is the active
+implementation slice. The combined driver already retains one storage selector
+used by every working-storage read and write. This slice lets checked Core code
+observe that same selector through its existing lossless Address-to-Word bridge;
+the handler returns the Word and leaves its complete context unchanged.
+
+This is an observation of an existing role, not a new contract-entry input.
+The selector is not defined as `codeAddress`, a current or self address, a
+caller, or any other call-frame identity. Further entry inputs, call lifecycle,
+ABI, source syntax, and parser proofs remain outside this slice. Parser work
+stays paused while syntax remains unstable.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
