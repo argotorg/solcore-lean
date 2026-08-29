@@ -226,7 +226,8 @@ frame layer.
 
 This ADR does not define or claim:
 
-- parent mutation, execution, resumption, byte delivery, or callback storage;
+- parent mutation, execution, resumption, callback storage, or external byte
+  delivery beyond passing existing bytes as a pure callback argument;
 - rollback application, commit, persistence, atomicity, or transaction exit;
 - a root frame, root checkpoint, checkpoint creation, ownership, or lifetime;
 - trap catch, fatality, classification, propagation, recovery, or diagnostics;
@@ -244,13 +245,14 @@ This ADR does not define or claim:
 
 Keep each green commit below roughly 300 changed lines:
 
-1. record and activate the exact fold contract;
-2. add the one operation and Semantics export;
-3. add the four exact laws and Semantics export;
-4. add the three definition-only runtime assertions and runner call;
-5. add compile consumers through the public laws and ADR-0125 producer;
-6. run full validation and independent audit; and
-7. synchronize completion evidence in current-facing internal documents.
+1. record the exact fold contract;
+2. activate it in the current-facing internal roadmap;
+3. add the one operation and Semantics export;
+4. add the four exact laws and Semantics export;
+5. add the three definition-only runtime assertions and runner call;
+6. add compile consumers through the public laws and ADR-0125 producer;
+7. run full validation and independent audit; and
+8. synchronize completion evidence in current-facing internal documents.
 
 ## Consequences
 
