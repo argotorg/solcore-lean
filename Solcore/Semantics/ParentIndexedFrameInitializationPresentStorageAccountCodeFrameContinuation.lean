@@ -12,7 +12,7 @@ universe u v w
 
 /--
 Lift parent-indexed initialization through present storage, selected code, and
-completed handled execution without flattening any partial boundary.
+completed handled execution without merging any optional boundary.
 -/
 def runCodeWithStorageParentIndexedContinuationContext?
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
