@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
+import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationWithInputsCoherenceProperties
 import Solcore.Semantics.ParentIndexedFrameContinuationContextProperties
 import Solcore.Semantics.ParentIndexedFrameTrapPropagationPayloadProperties
 import Solcore.Semantics.FrameResolutionResultContinuation
@@ -20,7 +20,8 @@ private example
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
     (initialization :
       ParentIndexedFrameInitialization RollbackState Event parentWorking)
-    (storageAddress codeAddress : Address)
+    (storageAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
@@ -28,43 +29,43 @@ private example
     (parentContinuation :
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking) :
-    (initialization.runCodeWithStorageParentIndexedContinuationContext?
-          storageAddress codeAddress fuel doneOutcome = none ↔
+    (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+          storageAddress inputs fuel doneOutcome = none ↔
         initialization.initialWorld.account? storageAddress = none) ∧
-      (initialization.runCodeWithStorageParentIndexedContinuationContext?
-            storageAddress codeAddress fuel doneOutcome = some none ↔
+      (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+            storageAddress inputs fuel doneOutcome = some none ↔
         ∃ context,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
-          context.context.values.working.1.code? codeAddress = none) ∧
-      (initialization.runCodeWithStorageParentIndexedContinuationContext?
-            storageAddress codeAddress fuel doneOutcome = some (some none) ↔
+          context.context.values.working.1.code? inputs.codeAddress = none) ∧
+      (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+            storageAddress inputs fuel doneOutcome = some (some none) ↔
         ∃ context resultContext exhausted,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
-          context.runCodeWithStorage? codeAddress fuel =
+          context.runCodeWithStorageWithInputs? inputs fuel =
             some ⟨resultContext, .outOfFuel exhausted⟩) ∧
-      (initialization.runCodeWithStorageParentIndexedContinuationContext?
-            storageAddress codeAddress fuel doneOutcome =
+      (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+            storageAddress inputs fuel doneOutcome =
           some (some (some parentContinuation)) ↔
         ∃ context continuation,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
-          context.runCodeWithStorageContinuationContext?
-              codeAddress fuel doneOutcome = some (some continuation) ∧
+          context.runCodeWithStorageContinuationContextWithInputs?
+              inputs fuel doneOutcome = some (some continuation) ∧
           parentContinuation =
             ParentIndexedFrameContinuationContext.fromTraceExtension
               parentWorking initialization.workingRollback
               initialization.initialTraceExtension continuation.result) := by
   exact
-    ⟨initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_none_iff
-        storageAddress codeAddress fuel doneOutcome,
-      initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_none_iff
-        storageAddress codeAddress fuel doneOutcome,
-      initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_none_iff
-        storageAddress codeAddress fuel doneOutcome,
-      initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_some_iff
-        storageAddress codeAddress fuel doneOutcome parentContinuation⟩
+    ⟨initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_none_iff
+        storageAddress inputs fuel doneOutcome,
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_none_iff
+        storageAddress inputs fuel doneOutcome,
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_some_none_iff
+        storageAddress inputs fuel doneOutcome,
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_some_some_iff
+        storageAddress inputs fuel doneOutcome parentContinuation⟩
 
 /-- Whole-context equality transports resolution and continuation unchanged. -/
 private example
@@ -74,7 +75,8 @@ private example
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
     (initialization :
       ParentIndexedFrameInitialization RollbackState Event parentWorking)
-    (storageAddress codeAddress : Address)
+    (storageAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
@@ -83,8 +85,8 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking)
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContext?
-          storageAddress codeAddress fuel doneOutcome =
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+          storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)))
     (next :
       (WorldState ×
@@ -96,8 +98,8 @@ private example
     ∃ context continuation,
       initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
           storageAddress = some context ∧
-      context.runCodeWithStorageContinuationContext?
-          codeAddress fuel doneOutcome = some (some continuation) ∧
+      context.runCodeWithStorageContinuationContextWithInputs?
+          inputs fuel doneOutcome = some (some continuation) ∧
       parentContinuation.toFrameContinuationContext = continuation ∧
       parentContinuation.toFrameContinuationContext.resolve =
         continuation.resolve ∧
@@ -107,8 +109,8 @@ private example
           onReturned onReverted =
         continuation.resolve.continue? onReturned onReverted := by
   obtain ⟨context, continuation, refined, lowerCompleted, coherent⟩ :=
-    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_toFrameContinuationContext
-      storageAddress codeAddress fuel doneOutcome parentContinuation completed
+    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_toFrameContinuationContext
+      storageAddress inputs fuel doneOutcome parentContinuation completed
   exact ⟨context, continuation, refined, lowerCompleted, coherent,
     congrArg FrameContinuationContext.resolve coherent,
     congrArg (fun current => current.continue? next) coherent,
@@ -182,7 +184,8 @@ private example
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
     (initialization :
       ParentIndexedFrameInitialization RollbackState Event parentWorking)
-    (storageAddress codeAddress : Address)
+    (storageAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
         Solcore.Core.Value → Solcore.Core.Store → FrameOutcome TrapReason)
@@ -191,15 +194,15 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking}
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContext?
-          storageAddress codeAddress fuel doneOutcome =
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+          storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)))
     (more : fuel ≤ largerFuel) :
-    initialization.runCodeWithStorageParentIndexedContinuationContext?
-        storageAddress codeAddress largerFuel doneOutcome =
+    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+        storageAddress inputs largerFuel doneOutcome =
       some (some (some parentContinuation)) := by
   exact
-    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
-      storageAddress codeAddress doneOutcome completed more
+    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_stable
+      storageAddress inputs doneOutcome completed more
 
 end Tests
