@@ -1968,6 +1968,24 @@ options and the existing resolution fold. Caller provenance, authentication,
 call kind, balances, nested invocation, ABI, parser rules, and publication are
 not defined by this completed internal feature.
 
+## Completed bounded optional input-byte observation
+
+[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) adds a required,
+bounded `InputData` value to the immutable execution input and appends internal
+`inputDataByte? : word -> sum unit word` at index 6. Exact natural indexing
+preserves every present octet, including zero, while the Unit branch represents
+only absence.
+
+The Core boundary, safety proofs, exact handler and driver laws, input-only
+variation, byte-derived storage use, fuel boundaries, nested parent completion,
+ADR-0129 fold consumption, and frozen-Wire rejection are complete. The full
+649-job build and 1,186-job executable test suite pass together with trust-zero,
+metadata, semantic-kernel, axiom, compatibility, and independent audits.
+
+Input size, wider loads, endianness, padding, ABI and calldata meaning,
+nested-input derivation, source syntax, and publication remain separate future
+decisions.
+
 ## Completed Core vNext slice: derived-builder renaming laws
 
 [ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) backfills

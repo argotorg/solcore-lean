@@ -2392,6 +2392,34 @@ authentication, origin, call kind, nested invocation, balance/value-transfer
 rule, ABI, parser, Surface, Oracle, schema, profile, Wire tag, or public-format
 meaning was added. Parser and parser-proof work remains paused.
 
+## Completed bounded optional input-byte observation
+
+[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) adds one
+explicitly bounded `InputData` value to the immutable execution input. Exact
+natural indexing returns `none` out of bounds and the losslessly widened byte
+in bounds, so a present zero remains `some Word.zero`. Every position in the
+bounded byte sequence is representable by a Core Word.
+
+Core appends `inputDataByte? : word -> sum unit word` at index 6. Its request,
+optional response injection, machine, progress, typing, preservation, runner,
+checked no-fault, handler, and recursive-driver laws are complete. The handler
+leaves the full mutable context unchanged, and frozen Wire v1 and v2 reject the
+internal host value.
+
+Tests cover exact lookup boundaries, a large non-narrowed offset, fuel 4/5,
+input-only variation, and larger-fuel stability. A second checked program
+case-analyzes the optional result, writes the present byte to storage, observes
+it again, and separates present zero from absence. Its parent-indexed path
+preserves storage absence, code absence, exhaustion, and completion as three
+nested options before ADR-0129's fold recovers the byte-derived storage entry
+and exact terminal bytes. Measured boundaries include fuel 23/29/30/31/32/64.
+
+The 649-job build and complete 1,186-job executable test suite pass. All changed
+Lean roots pass trust-zero with warnings as errors; metadata, semantic-kernel,
+axiom, dependency, compatibility, and independent P0-P3 audits pass. No input
+size, multi-byte load, endianness, padding, ABI, calldata, nested-input rule,
+parser, public format, or root README change was added.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable

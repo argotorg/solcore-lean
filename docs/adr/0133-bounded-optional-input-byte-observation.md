@@ -278,6 +278,46 @@ Keep each green commit at roughly 300 changed lines or fewer:
 Temporary migration names must be removed before completion. No transitional
 API may infer input bytes, omit the size proof, or manufacture empty input.
 
+## Implementation record
+
+`ExecutionInputs` now requires a bounded `InputData` value. Lookup uses the
+exact natural value of the Core Word offset, widens every present byte without
+loss, and keeps `some Word.zero` distinct from `none`. The bound proves that
+every position in the byte sequence has an exact Core Word index.
+
+Core appends `inputDataByte? : word -> sum unit word` at index 6, making both
+host tables length 7 and index 7 the first unbound position. The request uses
+`Option Word`; response injection, suspension, raw invalid-argument faults,
+resumption, progress, typing, preservation, runner correspondence, and checked
+no-fault safety are complete. Frozen Wire v1 and v2 reject the internal host
+value.
+
+The canonical handler returns `inputs.inputData.byte? offset` and preserves the
+complete mutable context, saved continuation, and Core-local Store. The driver
+keeps the same immutable input and remaining fuel. Exact laws cover generic,
+absent, and present responses, and direct execution proves that changing only
+`inputData` changes no part of the completed context.
+
+Runtime regressions cover empty, first, middle, last, last-plus-one, maximum
+Word, and a value above machine-word range without narrowing. Direct
+observation covers fuel 4/5 and larger-fuel stability. A case-analyzing program
+writes a present byte to storage and observes it again, while separate runs
+distinguish a present zero from absence. Parent-indexed execution preserves all
+three optional boundaries and reaches ADR-0129's fold with the exact
+byte-derived storage entry and terminal bytes.
+
+## Acceptance evidence
+
+- the full build completed successfully with 649 jobs;
+- the complete 1,186-job test target and executable suite passed;
+- every changed Lean root passed with `--trust=0` and warnings as errors;
+- metadata verification and semantic-kernel policy checks passed;
+- key axiom reports contain only the existing `propext` and `Quot.sound`;
+- independent Core, handler, end-to-end, parent, and full-ADR audits found no
+  remaining P0-P3 issue; and
+- no parser, Surface, Oracle, schema, profile, Wire tag, public format, or root
+  README changed.
+
 ## Consequences
 
 Internal checked Core code can distinguish an absent indexed byte from every
