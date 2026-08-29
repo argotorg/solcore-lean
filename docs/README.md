@@ -27,15 +27,18 @@ The current internal contract boundary can execute checker-accepted Core code
 selected by `codeAddress` from a working WorldState. Core supplies typed
 runtime-only storage read and write capabilities, plus a read-only observation
 of the retained storage selector and a separate observation of the selected
-code selector. Each request suspends with its exact
+code selector. The same immutable execution input also supplies a
+caller-chosen invocation-value Word through the internal
+`callValue : unit -> word` capability. Each request suspends with its exact
 continuation, local cell store, and remaining fuel. A generic host driver
 delegates requests to a combined handler over the Account selected by a
 separate `storageAddress`; the code and storage roles are never equated.
-Reads and both selector observations leave the host context unchanged, while
-writes update the returned working context and resume with Unit. This boundary is
-proved and tested but unpublished: frozen Wire formats reject the host values,
-and source syntax, ABI, gas, calls, authorization, transaction commit, and
-rollback remain future work.
+Reads, both selector observations, and call-value observation leave the host
+context unchanged, while writes update the returned working context and resume
+with Unit. This boundary is proved and tested but unpublished: frozen Wire
+formats reject the host values, and source syntax, ABI, gas, calls,
+authorization, balances, transaction commit, and rollback remain separate
+work.
 
 [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
 completes the proof interface for this driver without changing its behavior.
@@ -96,11 +99,15 @@ trap-reason mapping composes into only the trap function; return and revert
 functions remain unchanged. No runtime operation, rollback policy, or parser
 dependency is added.
 
-[ADR-0131](adr/0131-end-to-end-call-value-observation.md) is the active
-runtime-semantics slice. It will add one explicit invocation-value Word to the
-fixed inputs of a selected handled run and make it observable by internal Core
-code. Balance transfer, caller identity, ABI, and public formats remain
-separate.
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) completes the
+end-to-end invocation-value observation. One immutable input carries the
+selected code Address and a caller-supplied Word through request handling, fuel
+evidence, selected completion, and parent-indexed construction. Its
+value-derived working state and terminal bytes reach the existing resolution
+fold. Internal Core observes the exact Word through `callValue` at index 4;
+tests cover exact fuel boundaries, an observe-write-observe program, and
+larger-fuel stability. Frozen Wire v1 and v2 reject the host value. Balance
+transfer, caller identity, ABI, and public formats remain separate.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

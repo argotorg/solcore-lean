@@ -50,9 +50,13 @@ return, revert, or trap branch without parent or transaction execution.
 [ADR-0130](adr/0130-parent-indexed-resolution-fold-trap-reason-mapping-naturality.md)
 completes the proof-only algebra. Heterogeneous trap-reason mapping commutes
 with that fold by changing only the trap function.
-[ADR-0131](adr/0131-end-to-end-call-value-observation.md) is active. It adds an
-explicit invocation-value Word to the immutable inputs of one selected handled
-run and exposes it to Core without defining balance transfer.
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) completes the
+invocation-value observation. One immutable execution input now carries the
+selected code Address and a caller-supplied Word through handled execution,
+fuel evidence, selected completion, and parent-indexed continuation
+construction. Its value-derived result reaches the existing resolution fold.
+The Word is observable by internal Core code without defining a balance
+transfer.
 
 ## Completed foundation
 
@@ -187,7 +191,7 @@ These results remain regression obligations for every extension.
 | 111 | Resolution-view trap-reason mapping naturality | Complete | Maps only the total-resolution component and preserves exact optional rollback selection without adding an operation |
 | 112 | Parent-indexed trap-aware resolution fold | Complete | Selects one pure caller-owned function for each resolved branch without applying the supplied values |
 | 113 | Resolution-fold trap-reason mapping naturality | Complete | Moves heterogeneous reason mapping through the existing fold without adding execution |
-| 114 | End-to-end call-value observation | In progress | Adds one explicit run-fixed Word input with an internal Core consumer and no balance-transfer claim |
+| 114 | End-to-end call-value observation | Complete | Carries one explicit run-fixed Word through the internal Core request, handled execution, selected completion, and parent-indexed continuation; the value-derived result reaches the existing resolution fold without a balance-transfer claim |
 | 115 | Further contract-entry input roles | Planned | Add caller, callee, data, or kind only when an identified Core consumer and lifetime rule exist |
 | 116 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 117 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1908,20 +1912,26 @@ trust-zero, metadata, semantic-kernel, and independent audits pass. No runtime
 fixture, branch duplicate, rollback application, parent resumption,
 transaction policy, or parser dependency was added.
 
-## Active end-to-end call-value observation
+## Completed end-to-end call-value observation
 
-[ADR-0131](adr/0131-end-to-end-call-value-observation.md) introduces one
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) introduced one
 immutable execution-input carrier containing the existing selected code
 Address and one caller-supplied invocation-value Word. The input remains fixed
 while the mutable storage context changes.
 
-An append-only internal Unit-to-Word Core capability at index 4 will return the
-exact Word. The same input must parameterize handler recursion, fuel evidence,
-selected lookup, continuation construction, and parent-indexed completion.
-Tests will distinguish storage address, code address, and call value and cover
-the exact request, 4/5 fuel boundary, larger-fuel stability, and frozen-Wire
-rejection. Balance movement, caller/current identity, ABI, parser work, and
-publication remain outside this slice.
+The append-only internal `callValue : unit -> word` Core capability at index 4
+returns that exact Word. The same input now parameterizes handler recursion,
+fuel evidence, selected lookup, continuation construction, and parent-indexed
+completion. The handler leaves the mutable context unchanged and resumption
+preserves the saved continuation, local Store, and remaining fuel.
+
+Tests distinguish storage address, code address, and call value. Direct
+observation reaches its request boundary with fuel 4, completes with fuel 5,
+and has the same completed result with fuel 32. A second program observes,
+writes, and observes the same Word before its parent-indexed result is consumed
+by the existing resolution fold. Frozen Wire v1 and v2 reject the internal
+host value. Balance movement, caller/current identity, ABI, parser work, and
+publication remain outside this completed slice.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
