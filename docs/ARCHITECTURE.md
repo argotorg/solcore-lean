@@ -792,6 +792,12 @@ only the trap function. Return and revert functions, all resolved values, and
 the caller-selected result type remain unchanged. This is a proof interface
 only and introduces no execution or lifecycle layer.
 
+ADR-0131 is the active execution-input extension. It keeps `codeAddress` and a
+new caller-supplied `callValue` Word in one immutable input outside the mutable
+storage context. Checked Core code will observe the exact Word through an
+append-only Unit-to-Word host capability. The value is fixed for one run but
+does not yet mean that any balance transfer occurred.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

@@ -2301,6 +2301,19 @@ semantic-kernel, and independent audits pass. Rollback application, parent
 execution, transaction finalization, parser work, and public formats remain
 outside this slice.
 
+## Active end-to-end call-value observation
+
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) is the active
+runtime-semantics slice. It places the existing code selector and a new
+caller-supplied invocation-value Word in one immutable input for a handled
+run, outside the mutable storage context.
+
+Internal Core will receive an append-only `callValue : unit -> word`
+capability. The exact input must survive request suspension, recursive driving,
+fuel evidence, selected execution, and parent-indexed completion. The Word is
+only an explicit run input: no balance debit, credit, transfer, affordability,
+caller identity, ABI meaning, parser rule, or public format is implied.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable

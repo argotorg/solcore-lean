@@ -96,6 +96,12 @@ trap-reason mapping composes into only the trap function; return and revert
 functions remain unchanged. No runtime operation, rollback policy, or parser
 dependency is added.
 
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) is the active
+runtime-semantics slice. It will add one explicit invocation-value Word to the
+fixed inputs of a selected handled run and make it observable by internal Core
+code. Balance transfer, caller identity, ABI, and public formats remain
+separate.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

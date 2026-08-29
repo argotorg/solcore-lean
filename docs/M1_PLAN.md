@@ -50,6 +50,9 @@ return, revert, or trap branch without parent or transaction execution.
 [ADR-0130](adr/0130-parent-indexed-resolution-fold-trap-reason-mapping-naturality.md)
 completes the proof-only algebra. Heterogeneous trap-reason mapping commutes
 with that fold by changing only the trap function.
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) is active. It adds an
+explicit invocation-value Word to the immutable inputs of one selected handled
+run and exposes it to Core without defining balance transfer.
 
 ## Completed foundation
 
@@ -184,11 +187,12 @@ These results remain regression obligations for every extension.
 | 111 | Resolution-view trap-reason mapping naturality | Complete | Maps only the total-resolution component and preserves exact optional rollback selection without adding an operation |
 | 112 | Parent-indexed trap-aware resolution fold | Complete | Selects one pure caller-owned function for each resolved branch without applying the supplied values |
 | 113 | Resolution-fold trap-reason mapping naturality | Complete | Moves heterogeneous reason mapping through the existing fold without adding execution |
-| 114 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 115 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 116 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 117 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 118 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 114 | End-to-end call-value observation | In progress | Adds one explicit run-fixed Word input with an internal Core consumer and no balance-transfer claim |
+| 115 | Further contract-entry input roles | Planned | Add caller, callee, data, or kind only when an identified Core consumer and lifetime rule exist |
+| 116 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 117 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 118 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 119 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1903,6 +1907,21 @@ resolution-view naturality. The 638-job build, 1,164-job test suite,
 trust-zero, metadata, semantic-kernel, and independent audits pass. No runtime
 fixture, branch duplicate, rollback application, parent resumption,
 transaction policy, or parser dependency was added.
+
+## Active end-to-end call-value observation
+
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) introduces one
+immutable execution-input carrier containing the existing selected code
+Address and one caller-supplied invocation-value Word. The input remains fixed
+while the mutable storage context changes.
+
+An append-only internal Unit-to-Word Core capability at index 4 will return the
+exact Word. The same input must parameterize handler recursion, fuel evidence,
+selected lookup, continuation construction, and parent-indexed completion.
+Tests will distinguish storage address, code address, and call value and cover
+the exact request, 4/5 fuel boundary, larger-fuel stability, and frozen-Wire
+rejection. Balance movement, caller/current identity, ABI, parser work, and
+publication remain outside this slice.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
