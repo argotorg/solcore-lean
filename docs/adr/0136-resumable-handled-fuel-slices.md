@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: resume an exhausted handled Core run with an additional finite budget
-- Implementation: Not started
+- Implementation: In progress
 
 ## Context
 

@@ -842,6 +842,16 @@ fuel 23/31/32/64, parent fuel 29/30 and 11/12, triple-option and fold recovery,
 terminal bytes, and frozen-Wire rejection are proved and tested. ABI, calldata,
 memory, nested calls, parser work, and publication remain outside the slice.
 
+ADR-0136 is active above the existing handled driver. A total result consumer
+will execute again only for `outOfFuel`, using its exact retained context and
+Core state. With the same handler, splitting a budget must equal one run with
+the summed budget; done and fault remain terminal. Sequential addition is
+required for arbitrary result values, but zero identity is intentionally only
+an actual-run law because an arbitrary forged exhausted value may retain a
+terminal state. The storage specialization must reuse the exact same immutable
+`ExecutionInputs` while threading the returned mutable context. This adds no
+gas, persistence, handler/input replacement, call lifecycle, or public format.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to
