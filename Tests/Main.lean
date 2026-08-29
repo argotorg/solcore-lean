@@ -67,6 +67,9 @@ import Solcore.Test.AddressWordBridge
 import Solcore.Test.AddressSelectedHostCode
 import Solcore.Test.AddressSelectedHostInputData
 import Solcore.Test.AddressSelectedHostInputDataParent
+import Solcore.Test.AddressSelectedHostInputDataSize
+import Solcore.Test.AddressSelectedHostInputDataSizeParent
+import Solcore.Test.AddressSelectedHostInputDataSizeStorage
 import Solcore.Test.AddressSelectedHostInputDataStorage
 import Solcore.Test.AddressSelectedHostStorage
 import Solcore.Test.AddressSelectedHostStorageProperties
@@ -4975,6 +4978,9 @@ def run : IO Unit := do
   testAddressSelectedHostCode
   testAddressSelectedHostInputData
   testAddressSelectedHostInputDataParent
+  testAddressSelectedHostInputDataSize
+  testAddressSelectedHostInputDataSizeParent
+  testAddressSelectedHostInputDataSizeStorage
   testAddressSelectedHostInputDataStorage
   testAddressSelectedHostStorage
   testCheckedCoreProgram

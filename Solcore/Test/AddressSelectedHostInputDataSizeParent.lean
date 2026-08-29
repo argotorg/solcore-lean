@@ -92,7 +92,7 @@ private def missingCodeInitialization :
   workingRollback := 201
 }
 
-private inductive TrapReason where
+private inductive InputDataSizeTrapReason where
   | invalidDoneInputs
   deriving Repr, BEq, DecidableEq
 
@@ -101,7 +101,7 @@ private def terminalBytes : Bytes := [0xc5, 0xd6].toByteArray
 private def doneOutcome
     (context : HostStorageDriver.Context Nat (FrameTrace Nat))
     (value : Value)
-    (store : Store) : FrameOutcome TrapReason :=
+    (store : Store) : FrameOutcome InputDataSizeTrapReason :=
   match value, store with
   | .pair (.word first) (.word second), [] =>
       if first = expectedSize ∧ second = expectedSize ∧
@@ -118,7 +118,7 @@ private def storageValueAt?
 private def foldResult
     (continuation :
       ParentIndexedFrameContinuationContext
-        Nat Nat TrapReason parentWorking) : Option Word × Bytes :=
+        Nat Nat InputDataSizeTrapReason parentWorking) : Option Word × Bytes :=
   continuation.foldResolutionWithTrapRollback
     (fun values data =>
       (storageValueAt? values.1 storageAddress targetSlot, data))
@@ -141,7 +141,7 @@ private def oneStepBeforeResult (state : State) : Bool :=
 private theorem parentCompletion_done_stable
     {continuation :
       ParentIndexedFrameContinuationContext
-        Nat Nat TrapReason parentWorking}
+        Nat Nat InputDataSizeTrapReason parentWorking}
     (completed :
       initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress executionInputs 30 doneOutcome =
