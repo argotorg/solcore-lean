@@ -330,6 +330,21 @@ private theorem compileTimeHostCapabilityRegistry :
   ⟨HostFunction.all_nodup, HostFunction.getElem?_all_index,
     HostFunction.all_indices⟩
 
+private theorem compileTimeGenericHostTableLookups :
+    ∀ function : HostFunction,
+      hostContext[function.index]? = some function.functionType ∧
+        hostEnvironment[function.index]? = some (.hostFunction function) :=
+  fun function =>
+    ⟨hostContext_lookup function, hostEnvironment_lookup function⟩
+
+private theorem compileTimeHostTableLookupRange (position : Nat) :
+    (hostContext[position]?.isSome = true ↔
+        position < HostFunction.all.length) ∧
+      (hostEnvironment[position]?.isSome = true ↔
+        position < HostFunction.all.length) :=
+  ⟨hostContext_lookup_isSome_iff position,
+    hostEnvironment_lookup_isSome_iff position⟩
+
 private theorem compileTimeAddressContextIndexRegression :
     hostContext[HostFunction.storageAddress.index]? =
       some (HostFunction.functionType .storageAddress) :=
@@ -407,8 +422,8 @@ private theorem compileTimeHostCapabilityLengths :
 
 private theorem compileTimeFirstUnboundHostIndex :
     hostContext[HostFunction.all.length]? = none ∧
-      hostEnvironment[HostFunction.all.length]? = none := by
-  decide
+      hostEnvironment[HostFunction.all.length]? = none :=
+  ⟨hostContext_firstUnbound, hostEnvironment_firstUnbound⟩
 
 private def beginState : State :=
   ⟨.ret (.hostFunction .storageRead),
@@ -948,6 +963,9 @@ def testCoreHostMachine : IO Unit := do
           .inputDataWordBE?] &&
       HostFunction.all.all (fun function =>
         HostFunction.all[function.index]? == some function) &&
+      HostFunction.all.all (fun function =>
+        hostContext[function.index]? == some function.functionType &&
+          hostEnvironment[function.index]? == some (.hostFunction function)) &&
       decide HostFunction.all.Nodup &&
       HostFunction.storageRead.index == 0 &&
       HostFunction.storageWrite.index == 1 &&

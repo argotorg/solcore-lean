@@ -166,18 +166,26 @@ theorem HostRuntimeValueHasType.function_shape
   | hostFunction => exact .inr ⟨_, rfl, rfl⟩
   | closure => exact .inl ⟨_, _, rfl⟩
 
+/-- Any ordered list of host capabilities is typed by its mapped type list. -/
+theorem hostFunctions_haveTypes
+    (world : StoreTyping)
+    (functions : List HostFunction)
+    (definitions : DataEnvironment := []) :
+    HostRuntimeEnvironmentHasTypes world
+      (functions.map fun function => .hostFunction function)
+      (functions.map HostFunction.functionType)
+      definitions := by
+  induction functions with
+  | nil => exact .nil
+  | cons function functions ih =>
+      exact .cons .hostFunction ih
+
 @[simp] theorem hostEnvironment_hasTypes
     (world : StoreTyping)
     (definitions : DataEnvironment := []) :
-  HostRuntimeEnvironmentHasTypes world hostEnvironment hostContext definitions :=
-  .cons .hostFunction
-    (.cons .hostFunction
-      (.cons .hostFunction
-        (.cons .hostFunction
-          (.cons .hostFunction
-            (.cons .hostFunction
-              (.cons .hostFunction
-                (.cons .hostFunction (.cons .hostFunction .nil))))))))
+  HostRuntimeEnvironmentHasTypes world hostEnvironment hostContext definitions := by
+  simpa only [hostEnvironment, hostContext] using
+    hostFunctions_haveTypes world HostFunction.all definitions
 
 mutual
 

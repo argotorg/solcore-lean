@@ -8,119 +8,143 @@ namespace Solcore.Core
 
 /-- Append-only types supplied to a host-aware Core program. -/
 def hostContext : Context :=
-  [HostFunction.functionType .storageRead,
-    HostFunction.functionType .storageWrite,
-    HostFunction.functionType .storageAddress,
-    HostFunction.functionType .codeAddress,
-    HostFunction.functionType .callValue,
-    HostFunction.functionType .callerAddress,
-    HostFunction.functionType .inputDataByte?,
-    HostFunction.functionType .inputDataSize,
-    HostFunction.functionType .inputDataWordBE?]
+  HostFunction.all.map HostFunction.functionType
 
 /-- Runtime values corresponding positionally to `hostContext`. -/
 def hostEnvironment : Environment :=
-  [.hostFunction .storageRead, .hostFunction .storageWrite,
-    .hostFunction .storageAddress, .hostFunction .codeAddress,
-    .hostFunction .callValue, .hostFunction .callerAddress,
-    .hostFunction .inputDataByte?, .hostFunction .inputDataSize,
-    .hostFunction .inputDataWordBE?]
+  HostFunction.all.map fun function => .hostFunction function
+
+@[simp] theorem hostContext_lookup (function : HostFunction) :
+    hostContext[function.index]? = some function.functionType := by
+  simp [hostContext]
+
+@[simp] theorem hostEnvironment_lookup (function : HostFunction) :
+    hostEnvironment[function.index]? = some (.hostFunction function) := by
+  simp [hostEnvironment]
+
+theorem hostContext_length_all :
+    hostContext.length = HostFunction.all.length := by
+  simp [hostContext]
+
+theorem hostEnvironment_length_all :
+    hostEnvironment.length = HostFunction.all.length := by
+  simp [hostEnvironment]
+
+theorem hostContext_lookup_isSome_iff (position : Nat) :
+    hostContext[position]?.isSome = true ↔
+      position < HostFunction.all.length := by
+  simp [hostContext, Option.isSome_iff_ne_none]
+
+theorem hostEnvironment_lookup_isSome_iff (position : Nat) :
+    hostEnvironment[position]?.isSome = true ↔
+      position < HostFunction.all.length := by
+  simp [hostEnvironment, Option.isSome_iff_ne_none]
+
+@[simp] theorem hostContext_firstUnbound :
+    hostContext[HostFunction.all.length]? = none := by
+  apply List.getElem?_eq_none_iff.mpr
+  simp [hostContext]
+
+@[simp] theorem hostEnvironment_firstUnbound :
+    hostEnvironment[HostFunction.all.length]? = none := by
+  apply List.getElem?_eq_none_iff.mpr
+  simp [hostEnvironment]
 
 @[simp] theorem hostContext_storageRead :
     hostContext[HostFunction.storageRead.index]? =
       some (HostFunction.functionType .storageRead) :=
-  rfl
+  hostContext_lookup .storageRead
 
 @[simp] theorem hostEnvironment_storageRead :
     hostEnvironment[HostFunction.storageRead.index]? =
       some (.hostFunction .storageRead) :=
-  rfl
+  hostEnvironment_lookup .storageRead
 
 @[simp] theorem hostContext_storageWrite :
     hostContext[HostFunction.storageWrite.index]? =
       some (HostFunction.functionType .storageWrite) :=
-  rfl
+  hostContext_lookup .storageWrite
 
 @[simp] theorem hostEnvironment_storageWrite :
     hostEnvironment[HostFunction.storageWrite.index]? =
       some (.hostFunction .storageWrite) :=
-  rfl
+  hostEnvironment_lookup .storageWrite
 
 @[simp] theorem hostContext_storageAddress :
     hostContext[HostFunction.storageAddress.index]? =
       some (HostFunction.functionType .storageAddress) :=
-  rfl
+  hostContext_lookup .storageAddress
 
 @[simp] theorem hostEnvironment_storageAddress :
     hostEnvironment[HostFunction.storageAddress.index]? =
       some (.hostFunction .storageAddress) :=
-  rfl
+  hostEnvironment_lookup .storageAddress
 
 @[simp] theorem hostContext_codeAddress :
     hostContext[HostFunction.codeAddress.index]? =
       some (HostFunction.functionType .codeAddress) :=
-  rfl
+  hostContext_lookup .codeAddress
 
 @[simp] theorem hostEnvironment_codeAddress :
     hostEnvironment[HostFunction.codeAddress.index]? =
       some (.hostFunction .codeAddress) :=
-  rfl
+  hostEnvironment_lookup .codeAddress
 
 @[simp] theorem hostContext_callValue :
     hostContext[HostFunction.callValue.index]? =
       some (HostFunction.functionType .callValue) :=
-  rfl
+  hostContext_lookup .callValue
 
 @[simp] theorem hostEnvironment_callValue :
     hostEnvironment[HostFunction.callValue.index]? =
       some (.hostFunction .callValue) :=
-  rfl
+  hostEnvironment_lookup .callValue
 
 @[simp] theorem hostContext_callerAddress :
     hostContext[HostFunction.callerAddress.index]? =
       some (HostFunction.functionType .callerAddress) :=
-  rfl
+  hostContext_lookup .callerAddress
 
 @[simp] theorem hostEnvironment_callerAddress :
     hostEnvironment[HostFunction.callerAddress.index]? =
       some (.hostFunction .callerAddress) :=
-  rfl
+  hostEnvironment_lookup .callerAddress
 
 @[simp] theorem hostContext_inputDataByte? :
     hostContext[HostFunction.inputDataByte?.index]? =
       some (HostFunction.functionType .inputDataByte?) :=
-  rfl
+  hostContext_lookup .inputDataByte?
 
 @[simp] theorem hostEnvironment_inputDataByte? :
     hostEnvironment[HostFunction.inputDataByte?.index]? =
       some (.hostFunction .inputDataByte?) :=
-  rfl
+  hostEnvironment_lookup .inputDataByte?
 
 @[simp] theorem hostContext_inputDataSize :
     hostContext[HostFunction.inputDataSize.index]? =
       some (HostFunction.functionType .inputDataSize) :=
-  rfl
+  hostContext_lookup .inputDataSize
 
 @[simp] theorem hostEnvironment_inputDataSize :
     hostEnvironment[HostFunction.inputDataSize.index]? =
       some (.hostFunction .inputDataSize) :=
-  rfl
+  hostEnvironment_lookup .inputDataSize
 
 @[simp] theorem hostContext_inputDataWordBE? :
     hostContext[HostFunction.inputDataWordBE?.index]? =
       some (HostFunction.functionType .inputDataWordBE?) :=
-  rfl
+  hostContext_lookup .inputDataWordBE?
 
 @[simp] theorem hostEnvironment_inputDataWordBE? :
     hostEnvironment[HostFunction.inputDataWordBE?.index]? =
       some (.hostFunction .inputDataWordBE?) :=
-  rfl
+  hostEnvironment_lookup .inputDataWordBE?
 
 @[simp] theorem hostContext_length : hostContext.length = 9 :=
-  rfl
+  hostContext_length_all.trans HostFunction.all_length
 
 @[simp] theorem hostEnvironment_length : hostEnvironment.length = 9 :=
-  rfl
+  hostEnvironment_length_all.trans HostFunction.all_length
 
 namespace Program
 
