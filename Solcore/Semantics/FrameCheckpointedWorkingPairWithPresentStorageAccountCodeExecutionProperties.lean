@@ -56,6 +56,21 @@ abbrev CodeRunContext
       some (code.runWithStorage context fuel) := by
   simp [runCodeWithStorage?, WorldState.code?, accountPresent, codePresent]
 
+/-- Optional selection fails exactly when the working WorldState has no code. -/
+@[simp] theorem runCodeWithStorage?_eq_none_iff
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : CodeRunContext RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat) :
+    context.runCodeWithStorage? codeAddress fuel = none ↔
+      context.context.values.working.1.code? codeAddress = none := by
+  unfold runCodeWithStorage?
+  cases selected :
+      context.context.values.working.1.code? codeAddress with
+  | none => simp only [Option.map_none]
+  | some code => simp only [Option.map_some, reduceCtorEq]
+
 /-- A selected run identifies its checked code and inherits exact fuel accounting. -/
 theorem runCodeWithStorage?_some_fuelSound
     {RollbackState : Type u}
@@ -79,6 +94,27 @@ theorem runCodeWithStorage?_some_fuelSound
       have resultEq := Option.some.inj executed
       subst result
       exact ⟨code, rfl, code.runWithStorage_fuelSound context fuel⟩
+
+/-- Successful selection is exactly selected-code handled fuel evidence. -/
+theorem runCodeWithStorage?_eq_some_iff_fuelSound
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : CodeRunContext RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (result : HostDriverResult (CodeRunContext RollbackState TraceState)) :
+    context.runCodeWithStorage? codeAddress fuel = some result ↔
+      ∃ code,
+        context.context.values.working.1.code? codeAddress = some code ∧
+          HostStorageDriver.FuelSound result fuel context
+            (Core.State.initial code.program.body Core.hostEnvironment) := by
+  constructor
+  · exact runCodeWithStorage?_some_fuelSound context codeAddress fuel result
+  · rintro ⟨code, selected, sound⟩
+    unfold runCodeWithStorage?
+    rw [selected]
+    exact congrArg some
+      ((code.runWithStorage_eq_iff_fuelSound context fuel result).2 sound)
 
 /-- A selected run identifies the checked result type it preserves. -/
 theorem runCodeWithStorage?_some_hasType
