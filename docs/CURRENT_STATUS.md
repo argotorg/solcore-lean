@@ -334,6 +334,14 @@ uniqueness interfaces. Same-fuel evidence always names one exact full driver
 result; done and raw-fault evidence agrees across larger budgets, while
 out-of-fuel remains budget-relative.
 
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) completes the
+syntax-independent invocation-value observation. One immutable
+`ExecutionInputs` value now carries the selected code Address and a
+caller-supplied Word through handled execution, fuel evidence, selected
+completion, parent-indexed continuation construction, and resolution folding.
+The Word has no balance, transfer, ABI, caller-identity, or source-syntax
+meaning.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -353,6 +361,7 @@ out-of-fuel remains budget-relative.
 | Retained storage-selector observation | Complete | Append-only `unit -> word` capability at index 2, exact context identity, lossless widening, driver proofs, and distinct code/storage regressions complete | Not published |
 | Address-selected handled execution exact specification | Complete | Successful execution iff selected-code fuel evidence; optional failure iff working-WorldState code lookup failure; selected out-of-fuel remains an attempted execution | Not published |
 | Handled-execution relational metatheory | Complete | Core and handled path composition, direct relational type safety, same-fuel result uniqueness, and terminal-only cross-fuel uniqueness complete; out-of-fuel remains budget-relative | Not published |
+| End-to-end invocation-value observation | Complete | Immutable execution input, append-only `unit -> word` capability, exact handler/driver laws, selected and parent-indexed preservation, fuel boundaries, value-derived storage use, and frozen-Wire rejection complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2301,18 +2310,35 @@ semantic-kernel, and independent audits pass. Rollback application, parent
 execution, transaction finalization, parser work, and public formats remain
 outside this slice.
 
-## Active end-to-end call-value observation
+## Completed end-to-end call-value observation
 
-[ADR-0131](adr/0131-end-to-end-call-value-observation.md) is the active
-runtime-semantics slice. It places the existing code selector and a new
-caller-supplied invocation-value Word in one immutable input for a handled
-run, outside the mutable storage context.
+[ADR-0131](adr/0131-end-to-end-call-value-observation.md) places the existing
+code selector and a caller-supplied invocation-value Word in one immutable
+`ExecutionInputs` value outside the mutable storage context. The same input is
+used by checked-code lookup, every request-handler recursion, fuel evidence,
+selected completion, and parent-indexed continuation construction.
 
-Internal Core will receive an append-only `callValue : unit -> word`
-capability. The exact input must survive request suspension, recursive driving,
-fuel evidence, selected execution, and parent-indexed completion. The Word is
-only an explicit run input: no balance debit, credit, transfer, affordability,
-caller identity, ABI meaning, parser rule, or public format is implied.
+Core appends `callValue : unit -> word` at index 4 without moving the four
+existing capabilities. The request machine, progress, typing, preservation,
+runner, and checked no-fault paths are complete. The exact handler and driver
+laws return the supplied Word without changing mutable storage context and
+resume with the saved continuation, local Store, and remaining fuel. Frozen
+Wire v1 and v2 explicitly reject the internal host value.
+
+Runtime coverage keeps storage address, code address, and call value distinct.
+The direct observation stops at fuel 4, completes at fuel 5, and is stable at
+fuel 32. A second checked program observes the value, writes that exact Word to
+working storage, observes it again, and returns two equal Words. Its completed
+parent-indexed context reaches the ADR-0129 fold, which recovers both the
+value-derived storage entry and terminal bytes while preserving ADR-0125's
+three optional boundaries.
+
+The 643-job build, complete executable test suite, metadata verification, and
+semantic-kernel policy checks pass. No old bare-address driver seam or
+temporary migration name remains. No balance, funding, transfer, caller
+identity, ABI, parser, Surface, Oracle, schema, profile, or public-format
+meaning was added. Parser and parser-proof work remains paused while concrete
+syntax may change.
 
 ## Meaning of completion
 

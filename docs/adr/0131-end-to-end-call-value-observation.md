@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose one caller-supplied invocation-value word to internal Core code
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -215,28 +215,74 @@ This ADR does not define:
   public runtime request, Wire tag, Oracle command, or serialization; or
 - a generic contract-input carrier with fields that have no current consumer.
 
-## Implementation sequence
+## Implemented sequence
 
-Keep every green commit at roughly 300 changed lines or fewer:
+The work was completed in bounded commits in this order:
 
-1. record and activate this exact internal contract;
-2. add `ExecutionInputs` and a temporary parallel input-aware handler/driver
-   seam without a zero or optional default;
-3. migrate handler and driver fuel/proof consumers to the explicit input;
-4. migrate selected execution, completion, and parent-continuation definitions
-   and proofs in separate green commits;
-5. migrate runtime and compile consumers in bounded file groups;
-6. remove the old bare-address seam;
-7. append the Core capability/request and close machine and safety files in one
-   bounded exhaustive-case commit;
-8. add the exact handler/driver laws and low-level regressions;
-9. add observe-write-observe runtime and parent-fold regressions;
-10. run trust, axiom, dependency, build, test, metadata, kernel, compatibility,
-   and independent audits; and
-11. synchronize completion evidence in current-facing internal documents.
+1. recorded and activated this exact internal contract;
+2. introduced `ExecutionInputs` and an explicit input-aware handler/driver
+   migration seam without a zero or optional default;
+3. migrated handler, driver, fuel, and proof consumers to the immutable input;
+4. migrated selected execution, completion, parent continuation, runtime, and
+   compile consumers;
+5. removed the old bare-address seam and all temporary migration names;
+6. promoted the input-aware modules and operations to their canonical names;
+7. appended the Core capability and request and closed every machine, progress,
+   typing, preservation, runner, and no-fault branch;
+8. added exact handler and driver laws plus the low-level Core regressions;
+9. added direct observation, observe-write-observe, parent completion, and
+   resolution-fold regressions; and
+10. ran repository validation and synchronized the completion record.
 
-Temporary migration names must be removed before completion. No transitional
-API may manufacture a zero, absent, or otherwise default call value.
+No completed API manufactures a zero, absent, or otherwise default call value.
+
+## Implementation record
+
+`HostStorageDriver.ExecutionInputs` is now the canonical immutable input to one
+handled run. Its exact value is threaded through request handling, recursive
+driving, handled-step and fuel evidence, checked-code selection, completed
+continuation construction, and parent-indexed continuation construction. Code
+lookup uses `inputs.codeAddress`; `.codeAddress` and `.callValue` requests use
+the two corresponding projections. The mutable storage context contains
+neither field.
+
+Core appends `HostFunction.callValue` at index 4 with type `unit -> word` and
+the matching first-order `HostRequest.callValue`. Host-context and environment
+lengths are 5. Application, request emission, invalid argument handling,
+response injection, resumption, progress, transition preservation, state
+typing, runner correspondence, and checked-program no-fault coverage all
+include the new constructor. Frozen Wire v1 and v2 continue to reject the
+internal host value.
+
+The storage handler returns `inputs.callValue` exactly and leaves its complete
+mutable context unchanged. Its suspension law preserves the saved Core
+continuation and local Store. The driver law resumes that exact Word with the
+exact remaining fuel and the same immutable input.
+
+The end-to-end fixture uses distinct nonzero storage address, code address, and
+call value observations. Direct call-value execution stops at the request with
+fuel 4, completes with the supplied Word at fuel 5, and has the same completed
+result and context at fuel 32. The observe-write-observe program writes the
+observed Word, observes the same Word again, completes as a pair of equal
+values at fuel 30, and remains identical at fuel 32. The value-dependent
+parent-indexed completion reaches ADR-0129's fold, which recovers both the
+written call value and the designated terminal bytes without flattening any
+ADR-0125 optional boundary.
+
+## Acceptance evidence
+
+- the full build completed successfully with 643 jobs;
+- the complete executable test suite passed;
+- metadata verification and semantic-kernel policy checks passed;
+- focused Core regressions cover acceptance, ill-typed and raw-machine
+  rejection, exact emission and resumption, append-only layout, fuel 4/5, and
+  frozen Wire v1/v2 rejection;
+- end-to-end regressions cover three distinct observations, context identity,
+  a value-derived storage write, larger-fuel stability, parent-indexed
+  completion, and the exact resolution-fold result; and
+- consistency inspection found no old bare-address driver API, temporary
+  migration name, default call value, parser change, public-format change, or
+  root README change in the completed slice.
 
 ## Consequences
 
