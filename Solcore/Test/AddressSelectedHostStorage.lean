@@ -841,6 +841,41 @@ private theorem callerAddress_handling_context_independent
         ⟨.callerAddress, continuation, store⟩).1 := by
   simp
 
+private theorem callerAddress_runWithStorage_preserves_context
+    (context : HostStorageDriver.Context Nat (List Nat))
+    (inputs : HostStorageDriver.ExecutionInputs) :
+    (callerAddressCode.runWithStorage context inputs 5).context = context := by
+  unfold CheckedHostCoreProgram.runWithStorage
+  change
+    (HostStorageDriver.run context inputs 5
+      (State.initial callerAddressProgram.body hostEnvironment)).context = context
+  have suspended :
+      hostRun 5 (State.initial callerAddressProgram.body hostEnvironment) =
+        .suspended ⟨.callerAddress, [], []⟩ 0 := by
+    decide
+  rw [HostStorageDriver.run_of_suspended_callerAddress
+    context inputs 5 0 _ [] [] suspended]
+  change
+    (HostStorageDriver.run context inputs 0
+      (State.final (.word (addressToWord inputs.callerAddress)))).context = context
+  have completed :
+      hostRun 0
+          (State.final (.word (addressToWord inputs.callerAddress))) =
+        .done (.word (addressToWord inputs.callerAddress)) [] := by
+    rfl
+  rw [HostStorageDriver.run_of_done context inputs 0
+    (State.final (.word (addressToWord inputs.callerAddress)))
+    (.word (addressToWord inputs.callerAddress)) [] completed]
+
+/-- Changing only the caller changes no part of the completed driver context. -/
+private theorem callerAddress_run_context_independent
+    (context : HostStorageDriver.Context Nat (List Nat)) :
+    (callerAddressCode.runWithStorage context executionInputs 5).context =
+      (callerAddressCode.runWithStorage context alternateCallerInputs 5).context :=
+  (callerAddress_runWithStorage_preserves_context context executionInputs).trans
+    (callerAddress_runWithStorage_preserves_context
+      context alternateCallerInputs).symm
+
 /-- The value-derived write and both observations survive larger fuel. -/
 private theorem observeCallValueWriteObserveProgram_done_stable
     {context : HostStorageDriver.Context Nat (List Nat)}
