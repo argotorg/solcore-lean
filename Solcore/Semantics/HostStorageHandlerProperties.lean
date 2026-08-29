@@ -155,6 +155,57 @@ universe u v
   exact handleSuspension_store codeAddress context
     ⟨Core.HostRequest.storageAddress, continuation, store⟩
 
+/-- A code-selector observation leaves the complete context unchanged. -/
+@[simp] theorem handleSuspension_codeAddress_context
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (codeAddress : Address)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension codeAddress context
+      ⟨.codeAddress, continuation, store⟩).1 = context := by
+  rw [handleSuspension_codeAddress]
+
+/-- A code-selector observation resumes Core with its exact widened Word. -/
+@[simp] theorem handleSuspension_codeAddress_control
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (codeAddress : Address)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension codeAddress context
+      ⟨.codeAddress, continuation, store⟩).2.control =
+        .ret (.word (addressToWord codeAddress)) := by
+  rw [handleSuspension_codeAddress]
+
+/-- A code-selector observation preserves the saved Core continuation. -/
+@[simp] theorem handleSuspension_codeAddress_continuation
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (codeAddress : Address)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension codeAddress context
+      ⟨.codeAddress, continuation, store⟩).2.continuation = continuation := by
+  exact handleSuspension_continuation codeAddress context
+    ⟨Core.HostRequest.codeAddress, continuation, store⟩
+
+/-- A code-selector observation preserves the exact Core-local store. -/
+@[simp] theorem handleSuspension_codeAddress_store
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (codeAddress : Address)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension codeAddress context
+      ⟨.codeAddress, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store codeAddress context
+    ⟨Core.HostRequest.codeAddress, continuation, store⟩
+
 /-- The widened handler response narrows back to the retained selector. -/
 @[simp] theorem wordToAddress?_handler_storageAddress
     {RollbackState : Type u}
@@ -167,6 +218,17 @@ universe u v
     wordToAddress? (addressToWord context.context.storageAddress) =
       some context.context.storageAddress
   exact wordToAddress?_addressToWord context.context.storageAddress
+
+/-- The widened handler response narrows back to the static code selector. -/
+@[simp] theorem wordToAddress?_handler_codeAddress
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (codeAddress : Address)
+    (context : Context RollbackState TraceState) :
+    wordToAddress? ((handler codeAddress).handle context .codeAddress).2 =
+      some codeAddress := by
+  change wordToAddress? (addressToWord codeAddress) = some codeAddress
+  exact wordToAddress?_addressToWord codeAddress
 
 /-- Reading the slot updated by the dependent handler observes its new value. -/
 @[simp] theorem handler_storageWrite_readStorage_same
