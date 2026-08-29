@@ -169,9 +169,11 @@ theorem HostRuntimeValueHasType.function_shape
 @[simp] theorem hostEnvironment_hasTypes
     (world : StoreTyping)
     (definitions : DataEnvironment := []) :
-    HostRuntimeEnvironmentHasTypes world hostEnvironment hostContext definitions :=
+  HostRuntimeEnvironmentHasTypes world hostEnvironment hostContext definitions :=
   .cons .hostFunction
-    (.cons .hostFunction (.cons .hostFunction (.cons .hostFunction .nil)))
+    (.cons .hostFunction
+      (.cons .hostFunction
+        (.cons .hostFunction (.cons .hostFunction .nil))))
 
 mutual
 

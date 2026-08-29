@@ -26,6 +26,7 @@ def handleRequest
   | .storageAddress =>
       (context, addressToWord context.context.storageAddress)
   | .codeAddress => (context, addressToWord inputs.codeAddress)
+  | .callValue => (context, inputs.callValue)
 
 /-- Current combined handler indexed by the complete run-fixed input. -/
 def handler

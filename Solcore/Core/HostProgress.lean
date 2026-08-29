@@ -74,6 +74,22 @@ theorem typed_codeAddress_emits
   cases unitTyping
   exact ⟨⟨.codeAddress, continuation, store⟩, .codeAddress⟩
 
+/-- A well-typed call-value observation emits its argument-free request. -/
+theorem typed_callValue_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.callValue.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .callValue :: continuation, store⟩
+        suspension := by
+  have unitTyping :
+      HostRuntimeValueHasType world value .unit definitions := by
+    simpa using valueTyping
+  cases unitTyping
+  exact ⟨⟨.callValue, continuation, store⟩, .callValue⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -90,6 +106,7 @@ theorem typed_hostApplication_emits
   | storageWrite => exact typed_storageWrite_emits valueTyping
   | storageAddress => exact typed_storageAddress_emits valueTyping
   | codeAddress => exact typed_codeAddress_emits valueTyping
+  | callValue => exact typed_callValue_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}
