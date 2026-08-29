@@ -192,4 +192,85 @@ theorem hostRun_outOfFuel_sound
           obtain ⟨path, ready⟩ := ih result
           exact ⟨.cons (hostAdvance_next_iff.mp advanced) path, ready⟩
 
+theorem hostRun_done_complete_of_steps
+    {steps fuel : Nat}
+    {start finish : State}
+    {value : Value}
+    (path : HostSteps steps start finish)
+    (terminal : hostAdvance finish = .done value)
+    (enough : steps ≤ fuel) :
+    hostRun fuel start = .done value finish.store := by
+  induction path generalizing fuel with
+  | refl => simp [hostRun, terminal]
+  | @cons steps start next finish transition path ih =>
+      cases fuel with
+      | zero => omega
+      | succ fuel =>
+          rw [hostRun, hostAdvance_next_iff.mpr transition]
+          exact ih terminal (by omega)
+
+theorem hostRun_done_complete
+    {steps fuel : Nat}
+    {start : State}
+    {value : Value}
+    {store : Store}
+    (path : HostSteps steps start (State.final value store))
+    (enough : steps ≤ fuel) :
+    hostRun fuel start = .done value store := by
+  exact hostRun_done_complete_of_steps path
+    (hostAdvance_done_iff.mpr ⟨store, rfl⟩) enough
+
+theorem hostRun_fault_complete_of_steps
+    {steps fuel : Nat}
+    {start faultState : State}
+    {error : MachineFault}
+    (path : HostSteps steps start faultState)
+    (terminal : hostAdvance faultState = .fault error)
+    (enough : steps ≤ fuel) :
+    hostRun fuel start = .fault error faultState := by
+  induction path generalizing fuel with
+  | refl => simp [hostRun, terminal]
+  | @cons steps start next finish transition path ih =>
+      cases fuel with
+      | zero => omega
+      | succ fuel =>
+          rw [hostRun, hostAdvance_next_iff.mpr transition]
+          exact ih terminal (by omega)
+
+theorem hostRun_suspended_complete_of_steps
+    {steps fuel remainingFuel : Nat}
+    {start requestState : State}
+    {suspension : HostSuspension}
+    (path : HostSteps steps start requestState)
+    (emission : HostRequestEmission requestState suspension)
+    (accounting : steps + remainingFuel + 1 = fuel) :
+    hostRun fuel start = .suspended suspension remainingFuel := by
+  induction path generalizing fuel with
+  | refl =>
+      subst fuel
+      simp [hostAdvance_suspended_iff.mpr emission]
+  | @cons steps start next finish transition path ih =>
+      cases fuel with
+      | zero => omega
+      | succ fuel =>
+          rw [hostRun, hostAdvance_next_iff.mpr transition]
+          exact ih emission (by omega)
+
+theorem hostRun_outOfFuel_complete
+    {fuel : Nat}
+    {start exhausted : State}
+    (path : HostSteps fuel start exhausted)
+    (ready :
+      (∃ next, HostTransition exhausted next) ∨
+        ∃ suspension, HostRequestEmission exhausted suspension) :
+    hostRun fuel start = .outOfFuel exhausted := by
+  induction path with
+  | refl =>
+      rcases ready with ⟨next, transition⟩ | ⟨suspension, emission⟩
+      · simp [hostRun, hostAdvance_next_iff.mpr transition]
+      · simp [hostAdvance_suspended_iff.mpr emission]
+  | @cons steps start next finish transition path ih =>
+      rw [hostRun, hostAdvance_next_iff.mpr transition]
+      exact ih ready
+
 end Solcore.Core
