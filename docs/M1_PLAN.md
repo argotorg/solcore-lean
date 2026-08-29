@@ -157,11 +157,12 @@ These results remain regression obligations for every extension.
 | 104 | Retained storage-selector observation | Complete | Returns the existing storage selector as a lossless Word at index 2, with exact handler-context identity and no current, self, code, caller, or other call-frame identity |
 | 105 | Address-selected handled execution exact specification | Complete | Characterizes `some` by selected-code fuel evidence and `none` by code lookup failure without changing execution |
 | 106 | Handled-execution relational metatheory | Complete | Composes handled paths, proves direct type safety and fixed-fuel uniqueness, and compares only terminal results across budgets |
-| 107 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 108 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 109 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 110 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 111 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 107 | Completed handled execution to frame continuation | Complete | Adapts only normal completion through a caller-owned outcome policy while preserving code absence and selected exhaustion as distinct results |
+| 108 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 109 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 110 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 111 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 112 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
