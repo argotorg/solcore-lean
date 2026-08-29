@@ -253,6 +253,20 @@ private def assertMixedOutOfFuelAt
       throw (IO.userError
         s!"fuel {fuel} crossed the measured boundary: {reprStr result.outcome}")
 
+private def assertCompletedWriteResult
+    (result :
+      HostDriverResult
+        (FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat)))
+    (program : Program)
+    (localStore : Store)
+    (label : String) : IO Unit := do
+  assertTrue (result.outcome == .done (.word newValue) localStore)
+    s!"{label} lost the latest value or Core-local store"
+  assertTrue (selectedStorageHas result.context newValue)
+    s!"{label} did not retain the latest selected-storage write"
+  assertTrue (preservedOutsideSelectedStorage result.context program)
+    s!"{label} changed a retained frame observation"
+
 def testAddressSelectedHostStorage : IO Unit := do
   assertTrue updateProgram.checkHost
     "the host checker rejected the read/write/read program"
@@ -269,35 +283,37 @@ def testAddressSelectedHostStorage : IO Unit := do
       assertMixedOutOfFuelAt context 22 newValue .afterWrite
       assertMixedOutOfFuelAt context 27 newValue .beforeFinalRead
 
-      match context.runCodeWithStorage? codeAddress completionFuel with
-      | none =>
+      match context.runCodeWithStorage? codeAddress completionFuel,
+          context.runCodeWithStorage? codeAddress 64 with
+      | none, _ =>
           throw (IO.userError "the working code Account was not selected")
-      | some result =>
-          assertTrue
-            (result.outcome == .done (.word newValue) [.bool true])
-            "the read/write/read program lost its value or Core-local cell"
-          assertTrue (selectedStorageHas result.context newValue)
-            "the selected working storage was not updated exactly"
-          assertTrue
-            (preservedOutsideSelectedStorage result.context updateProgram)
-            "the run changed code, another Account, checkpoint, effects, or selector"
+      | _, none =>
+          throw (IO.userError "additional fuel lost the selected code Account")
+      | some result, some largerResult =>
+          assertCompletedWriteResult result updateProgram [.bool true]
+            "fuel 28 read/write/read"
+          assertCompletedWriteResult largerResult updateProgram [.bool true]
+            "fuel 64 read/write/read"
+          assertTrue (largerResult.outcome == result.outcome)
+            "additional fuel changed the completed read/write/read outcome"
 
   match (baseContextFor repeatedWriteCode).withPresentStorageAccount? with
   | none =>
       throw (IO.userError "the repeated-write storage Account was absent")
   | some context =>
-      match context.runCodeWithStorage? codeAddress 64 with
-      | none =>
+      match context.runCodeWithStorage? codeAddress 64,
+          context.runCodeWithStorage? codeAddress 96 with
+      | none, _ =>
           throw (IO.userError "the repeated-write code was not selected")
-      | some result =>
-          assertTrue (result.outcome == .done (.word newValue) [])
-            "repeated writes did not return their latest value"
-          assertTrue (selectedStorageHas result.context newValue)
-            "the second handled write did not overwrite the first"
-          assertTrue
-            (preservedOutsideSelectedStorage
-              result.context repeatedWriteProgram)
-            "repeated writes changed retained frame data"
+      | _, none =>
+          throw (IO.userError "additional fuel lost the repeated-write code")
+      | some result, some largerResult =>
+          assertCompletedWriteResult result repeatedWriteProgram []
+            "fuel 64 repeated-write"
+          assertCompletedWriteResult largerResult repeatedWriteProgram []
+            "fuel 96 repeated-write"
+          assertTrue (largerResult.outcome == result.outcome)
+            "additional fuel changed the completed repeated-write outcome"
 
   match (baseContextFor zeroWriteCode).withPresentStorageAccount? with
   | none =>

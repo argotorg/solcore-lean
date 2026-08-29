@@ -133,4 +133,74 @@ private theorem compileTimeSelectedInvariantRegression
       FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_workingCode?
         context codeAddress fuel result executed codeAddress⟩
 
+/-- The specialized driver exposes the generic executable/specification iff. -/
+private theorem compileTimeStorageDriverCompletenessRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : State)
+    (result :
+      HostDriverResult
+        (HostStorageDriver.Context RollbackState TraceState)) :
+    HostStorageDriver.run context fuel state = result ↔
+      HostStorageDriver.FuelSound result fuel context state :=
+  HostStorageDriver.run_eq_iff_fuelSound context fuel state result
+
+/-- Checked execution exposes the same exact executable/specification iff. -/
+private theorem compileTimeCheckedCompletenessRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (code : CheckedHostCoreProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (fuel : Nat)
+    (result :
+      HostDriverResult
+        (HostStorageDriver.Context RollbackState TraceState)) :
+    code.runWithStorage context fuel = result ↔
+      HostStorageDriver.FuelSound result fuel context
+        (State.initial code.program.body hostEnvironment) :=
+  CheckedHostCoreProgram.runWithStorage_eq_iff_fuelSound
+    code context fuel result
+
+/-- Checked done stability retains the exact full driver result. -/
+private theorem compileTimeCheckedDoneStabilityRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (code : CheckedHostCoreProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    {fuel largerFuel : Nat}
+    {finalContext :
+      HostStorageDriver.Context RollbackState TraceState}
+    {value : Value}
+    {store : Store}
+    (execution :
+      code.runWithStorage context fuel =
+        ⟨finalContext, .done value store⟩)
+    (more : fuel ≤ largerFuel) :
+    code.runWithStorage context largerFuel =
+      ⟨finalContext, .done value store⟩ :=
+  CheckedHostCoreProgram.runWithStorage_done_stable
+    code context execution more
+
+/-- Address-selected done stability retains the exact optional full result. -/
+private theorem compileTimeSelectedDoneStabilityRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    {fuel largerFuel : Nat}
+    {finalContext :
+      HostStorageDriver.Context RollbackState TraceState}
+    {value : Value}
+    {store : Store}
+    (execution :
+      context.runCodeWithStorage? codeAddress fuel =
+        some ⟨finalContext, .done value store⟩)
+    (more : fuel ≤ largerFuel) :
+    context.runCodeWithStorage? codeAddress largerFuel =
+      some ⟨finalContext, .done value store⟩ :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
+    context codeAddress execution more
+
 end Tests
