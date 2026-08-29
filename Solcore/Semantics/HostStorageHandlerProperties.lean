@@ -1,7 +1,9 @@
 import Solcore.Semantics.HostDriverProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageReadWriteProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWritePresenceProperties
 import Solcore.Semantics.HostStorageHandler
 
-/-! Exact read behavior and safety of the combined storage handler. -/
+/-! Exact read/write behavior and safety of the combined storage handler. -/
 
 set_option autoImplicit false
 
@@ -21,6 +23,32 @@ universe u v
       ⟨.storageRead slot, continuation, store⟩).1 = context := by
   rw [handleSuspension_storageRead]
 
+/-- A handled write returns exactly the existing total-write context. -/
+@[simp] theorem handleSuspension_storageWrite_context
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot value : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageWrite slot value, continuation, store⟩).1 =
+        context.writeStorage slot value := by
+  rw [handleSuspension_storageWrite]
+
+/-- A handled write resumes Core with the dependent Unit response. -/
+@[simp] theorem handleSuspension_storageWrite_control
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot value : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageWrite slot value, continuation, store⟩).2.control =
+        .ret .unit := by
+  rw [handleSuspension_storageWrite]
+
 /-- Handling any storage request preserves the saved Core continuation. -/
 @[simp] theorem handleSuspension_continuation
     {RollbackState : Type u}
@@ -39,6 +67,62 @@ universe u v
     (suspension : Core.HostSuspension) :
     (handleSuspension context suspension).2.store = suspension.store := by
   simp [handleSuspension, HostHandler.handleSuspension]
+
+/-- The write branch preserves the exact saved Core continuation. -/
+@[simp] theorem handleSuspension_storageWrite_continuation
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot value : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageWrite slot value, continuation, store⟩).2.continuation =
+        continuation := by
+  exact handleSuspension_continuation context
+    ⟨Core.HostRequest.storageWrite slot value, continuation, store⟩
+
+/-- The write branch preserves the exact Core-local store. -/
+@[simp] theorem handleSuspension_storageWrite_store
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot value : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageWrite slot value, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store context
+    ⟨Core.HostRequest.storageWrite slot value, continuation, store⟩
+
+/-- Reading the slot updated by the dependent handler observes its new value. -/
+@[simp] theorem handler_storageWrite_readStorage_same
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot value : Core.Word) :
+    ((handler.handle context (.storageWrite slot value)).1).readStorage slot =
+      value := by
+  change (context.writeStorage slot value).readStorage slot = value
+  exact
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.readStorage_writeStorage_same
+      context slot value
+
+/-- A zero write through the handler removes the selected sparse entry. -/
+@[simp] theorem handler_storageWrite_zero_storageValue?
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot : Core.Word) :
+    ((handler.handle context
+      (.storageWrite slot Core.Word.zero)).1).storageAccount.storageValue?
+        slot = none := by
+  change
+    (context.writeStorage slot Core.Word.zero).storageAccount.storageValue?
+      slot = none
+  exact
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.storageValue?_writeStorage_zero
+      context slot
 
 /-- The dependent response supplied by the storage handler resumes safely. -/
 theorem handleSuspension_state_hasType

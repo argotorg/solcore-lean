@@ -1,4 +1,6 @@
 import Solcore.Semantics.CheckedHostCoreProgramProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteCodeProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteProjectionProperties
 import Solcore.Semantics.HostStorageDriver
 import Solcore.Semantics.HostStorageHandlerProperties
 
@@ -71,6 +73,80 @@ theorem run_of_suspended
     HostDriver.run_of_suspended
       (@handler RollbackState TraceState)
       context fuel remainingFuel state suspension execution
+
+/-- A combined handled run retains the selected storage Address. -/
+@[simp] theorem run_storageAddress
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State) :
+    (run context fuel state).context.context.storageAddress =
+      context.context.storageAddress := by
+  simpa only [run] using
+    HostDriver.run_observe
+      (@handler RollbackState TraceState)
+      (fun current => current.context.storageAddress)
+      (by
+        intro current request
+        cases request <;> simp [handler, handleRequest])
+      context fuel state
+
+/-- A combined handled run retains the complete checkpoint. -/
+@[simp] theorem run_checkpoint
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State) :
+    (run context fuel state).context.context.values.checkpoint =
+      context.context.values.checkpoint := by
+  simpa only [run] using
+    HostDriver.run_observe
+      (@handler RollbackState TraceState)
+      (fun current => current.context.values.checkpoint)
+      (by
+        intro current request
+        cases request <;> simp [handler, handleRequest])
+      context fuel state
+
+/-- A combined handled run retains the complete working effect journal. -/
+@[simp] theorem run_workingEffects
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State) :
+    (run context fuel state).context.context.values.working.2 =
+      context.context.values.working.2 := by
+  simpa only [run] using
+    HostDriver.run_observe
+      (@handler RollbackState TraceState)
+      (fun current => current.context.values.working.2)
+      (by
+        intro current request
+        cases request <;> simp [handler, handleRequest])
+      context fuel state
+
+/-- A combined handled run retains checked code at every working Address. -/
+@[simp] theorem run_workingCode?
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State)
+    (codeAddress : Address) :
+    (run context fuel state).context.context.values.working.1.code?
+        codeAddress =
+      context.context.values.working.1.code? codeAddress := by
+  simpa only [run] using
+    HostDriver.run_observe
+      (@handler RollbackState TraceState)
+      (fun current => current.context.values.working.1.code? codeAddress)
+      (by
+        intro current request
+        cases request <;> simp [handler, handleRequest])
+      context fuel state
 
 /-- A typed start produces only typed combined-driver outcomes. -/
 theorem run_hasType
