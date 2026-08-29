@@ -138,6 +138,7 @@ private def changingHandler : Solcore.Semantics.HostHandler Nat where
     | .storageAddress => (context + 1, Core.returned)
     | .codeAddress => (context + 1, Core.returned)
     | .callValue => (context + 1, Core.returned)
+    | .callerAddress => (context + 1, Core.returned)
 
 private theorem handled :
     changingHandler.handleSuspension 0 Core.suspension =

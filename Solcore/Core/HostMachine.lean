@@ -13,6 +13,7 @@ inductive HostRequest where
   | storageAddress
   | codeAddress
   | callValue
+  | callerAddress
   deriving Repr, BEq, DecidableEq
 
 namespace HostRequest
@@ -24,6 +25,7 @@ def Response : HostRequest → Type
   | .storageAddress => Word
   | .codeAddress => Word
   | .callValue => Word
+  | .callerAddress => Word
 
 /-- Core type injected when a request is resumed. -/
 def responseType : HostRequest → Ty
@@ -32,6 +34,7 @@ def responseType : HostRequest → Ty
   | .storageAddress => .word
   | .codeAddress => .word
   | .callValue => .word
+  | .callerAddress => .word
 
 /-- Convert an indexed host response back into a Core runtime value. -/
 def responseValue
@@ -43,6 +46,7 @@ def responseValue
   | .storageAddress => .word response
   | .codeAddress => .word response
   | .callValue => .word response
+  | .callerAddress => .word response
 
 @[simp] theorem responseType_storageRead (slot : Word) :
     responseType (.storageRead slot) = .word :=
@@ -84,6 +88,14 @@ def responseValue
 
 @[simp] theorem responseValue_callValue (response : Word) :
     responseValue .callValue response = .word response :=
+  rfl
+
+@[simp] theorem responseType_callerAddress :
+    responseType .callerAddress = .word :=
+  rfl
+
+@[simp] theorem responseValue_callerAddress (response : Word) :
+    responseValue .callerAddress response = .word response :=
   rfl
 
 @[simp] theorem responseValue_type
@@ -170,6 +182,14 @@ def resume
     (continuation : List Frame)
     (store : Store) :
     (HostSuspension.mk .callValue continuation store).resume response =
+      ⟨.ret (.word response), continuation, store⟩ :=
+  rfl
+
+@[simp] theorem resume_callerAddress
+    (response : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk .callerAddress continuation store).resume response =
       ⟨.ret (.word response), continuation, store⟩ :=
   rfl
 
@@ -264,6 +284,15 @@ def hostAdvance (state : State) : HostAdvanceResult :=
                 store := state.store
               }
           | actual => .fault (.invalidHostArgument .callValue actual)
+      | .callerAddress =>
+          match argument with
+          | .unit =>
+              .suspended {
+                request := .callerAddress
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .callerAddress actual)
   | _, _ => .ofAdvance (advance state)
 
 @[simp] theorem hostAdvance_begin_storageRead
@@ -437,6 +466,41 @@ def hostAdvance (state : State) : HostAdvanceResult :=
     hostAdvance
         ⟨.ret actual, .hostApply .callValue :: continuation, store⟩ =
       .fault (.invalidHostArgument .callValue actual) := by
+  cases actual with
+  | unit => exact (notUnit rfl).elim
+  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+      constructed =>
+      rfl
+
+@[simp] theorem hostAdvance_begin_callerAddress
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .callerAddress),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .callerAddress :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_callerAddress
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret .unit, .hostApply .callerAddress :: continuation, store⟩ =
+      .suspended ⟨.callerAddress, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_callerAddress_argument
+    (actual : Value)
+    (notUnit : actual ≠ .unit)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .callerAddress :: continuation, store⟩ =
+      .fault (.invalidHostArgument .callerAddress actual) := by
   cases actual with
   | unit => exact (notUnit rfl).elim
   | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |

@@ -221,6 +221,7 @@ theorem HostRequest.responseValue_hasType
   | storageAddress => exact .word
   | codeAddress => exact .word
   | callValue => exact .word
+  | callerAddress => exact .word
 
 theorem HostSuspensionHasType.resume {definitions : DataEnvironment}
     {suspension : HostSuspension} {resultType : Ty}

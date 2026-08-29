@@ -63,6 +63,12 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
       HostRequestEmission
         ⟨.ret .unit, .hostApply .callValue :: continuation, store⟩
         ⟨.callValue, continuation, store⟩
+  | callerAddress
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret .unit, .hostApply .callerAddress :: continuation, store⟩
+        ⟨.callerAddress, continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -109,11 +115,16 @@ theorem hostRequestEmission_iff
                   ⟨.ret .unit,
                     .hostApply .codeAddress :: continuation, store⟩ ∧
                 suspension = ⟨.codeAddress, continuation, store⟩) ∨
-              ∃ continuation store,
-                state =
-                  ⟨.ret .unit,
-                    .hostApply .callValue :: continuation, store⟩ ∧
-                suspension = ⟨.callValue, continuation, store⟩ := by
+              (∃ continuation store,
+                  state =
+                    ⟨.ret .unit,
+                      .hostApply .callValue :: continuation, store⟩ ∧
+                  suspension = ⟨.callValue, continuation, store⟩) ∨
+                ∃ continuation store,
+                  state =
+                    ⟨.ret .unit,
+                      .hostApply .callerAddress :: continuation, store⟩ ∧
+                  suspension = ⟨.callerAddress, continuation, store⟩ := by
   constructor
   · intro emission
     cases emission with
@@ -121,9 +132,13 @@ theorem hostRequestEmission_iff
     | storageWrite => exact .inr (.inl ⟨_, _, _, _, rfl, rfl⟩)
     | storageAddress => exact .inr (.inr (.inl ⟨_, _, rfl, rfl⟩))
     | codeAddress => exact .inr (.inr (.inr (.inl ⟨_, _, rfl, rfl⟩)))
-    | callValue => exact .inr (.inr (.inr (.inr ⟨_, _, rfl, rfl⟩)))
+    | callValue =>
+        exact .inr (.inr (.inr (.inr (.inl ⟨_, _, rfl, rfl⟩))))
+    | callerAddress =>
+        exact .inr (.inr (.inr (.inr (.inr ⟨_, _, rfl, rfl⟩))))
   · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
         ⟨slot, value, continuation, store, rfl, rfl⟩ |
+        ⟨continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩)
@@ -132,6 +147,7 @@ theorem hostRequestEmission_iff
     · exact .storageAddress
     · exact .codeAddress
     · exact .callValue
+    · exact .callerAddress
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -190,6 +206,8 @@ theorem hostAdvance_next_iff
               | codeAddress =>
                   cases value <;> simp [hostAdvance] at advanced
               | callValue =>
+                  cases value <;> simp [hostAdvance] at advanced
+              | callerAddress =>
                   cases value <;> simp [hostAdvance] at advanced
   · intro step
     cases step with
@@ -259,6 +277,14 @@ theorem hostAdvance_suspended_iff
                   | unit =>
                       cases advanced
                       exact .callValue
+                  | bool | word | hostFunction | pair | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | callerAddress =>
+                  cases value with
+                  | unit =>
+                      cases advanced
+                      exact .callerAddress
                   | bool | word | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced

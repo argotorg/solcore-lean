@@ -116,6 +116,7 @@ inductive HostFunction where
   | storageAddress
   | codeAddress
   | callValue
+  | callerAddress
   deriving Repr, BEq, DecidableEq
 
 namespace HostFunction
@@ -126,6 +127,7 @@ def parameterType : HostFunction → Ty
   | .storageAddress => .unit
   | .codeAddress => .unit
   | .callValue => .unit
+  | .callerAddress => .unit
 
 def resultType : HostFunction → Ty
   | .storageRead => .word
@@ -133,6 +135,7 @@ def resultType : HostFunction → Ty
   | .storageAddress => .word
   | .codeAddress => .word
   | .callValue => .word
+  | .callerAddress => .word
 
 @[simp] def functionType (function : HostFunction) : Ty :=
   .function function.parameterType function.resultType
@@ -177,6 +180,14 @@ def resultType : HostFunction → Ty
     resultType .callValue = .word :=
   rfl
 
+@[simp] theorem parameterType_callerAddress :
+    parameterType .callerAddress = .unit :=
+  rfl
+
+@[simp] theorem resultType_callerAddress :
+    resultType .callerAddress = .word :=
+  rfl
+
 /-- Stable position in the append-only host capability context. -/
 def index : HostFunction → Nat
   | .storageRead => 0
@@ -184,6 +195,7 @@ def index : HostFunction → Nat
   | .storageAddress => 2
   | .codeAddress => 3
   | .callValue => 4
+  | .callerAddress => 5
 
 @[simp] theorem index_storageRead : index .storageRead = 0 :=
   rfl
@@ -198,6 +210,9 @@ def index : HostFunction → Nat
   rfl
 
 @[simp] theorem index_callValue : index .callValue = 4 :=
+  rfl
+
+@[simp] theorem index_callerAddress : index .callerAddress = 5 :=
   rfl
 
 end HostFunction

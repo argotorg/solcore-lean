@@ -12,13 +12,14 @@ def hostContext : Context :=
     HostFunction.functionType .storageWrite,
     HostFunction.functionType .storageAddress,
     HostFunction.functionType .codeAddress,
-    HostFunction.functionType .callValue]
+    HostFunction.functionType .callValue,
+    HostFunction.functionType .callerAddress]
 
 /-- Runtime values corresponding positionally to `hostContext`. -/
 def hostEnvironment : Environment :=
   [.hostFunction .storageRead, .hostFunction .storageWrite,
     .hostFunction .storageAddress, .hostFunction .codeAddress,
-    .hostFunction .callValue]
+    .hostFunction .callValue, .hostFunction .callerAddress]
 
 @[simp] theorem hostContext_storageRead :
     hostContext[HostFunction.storageRead.index]? =
@@ -70,10 +71,20 @@ def hostEnvironment : Environment :=
       some (.hostFunction .callValue) :=
   rfl
 
-@[simp] theorem hostContext_length : hostContext.length = 5 :=
+@[simp] theorem hostContext_callerAddress :
+    hostContext[HostFunction.callerAddress.index]? =
+      some (HostFunction.functionType .callerAddress) :=
   rfl
 
-@[simp] theorem hostEnvironment_length : hostEnvironment.length = 5 :=
+@[simp] theorem hostEnvironment_callerAddress :
+    hostEnvironment[HostFunction.callerAddress.index]? =
+      some (.hostFunction .callerAddress) :=
+  rfl
+
+@[simp] theorem hostContext_length : hostContext.length = 6 :=
+  rfl
+
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 6 :=
   rfl
 
 namespace Program

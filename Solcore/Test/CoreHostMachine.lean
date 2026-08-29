@@ -27,6 +27,7 @@ private def responseFor : (request : HostRequest) → request.Response
   | .storageAddress => response
   | .codeAddress => response
   | .callValue => response
+  | .callerAddress => response
 
 private def storageReadProgram : Program := {
   resultType := .word
@@ -152,7 +153,7 @@ private theorem illTypedCallValueProgram_host_rejected :
 private def unboundHostIndexProgram : Program := {
   resultType := .word
   body :=
-    .apply (.var (HostFunction.callValue.index + 1)) .unit
+    .apply (.var (HostFunction.callerAddress.index + 1)) .unit
 }
 
 private theorem unboundHostIndexProgram_host_rejected :
@@ -204,7 +205,8 @@ private theorem compileTimeHostCapabilityIndexes :
       HostFunction.storageWrite.index = 1 ∧
       HostFunction.storageAddress.index = 2 ∧
       HostFunction.codeAddress.index = 3 ∧
-      HostFunction.callValue.index = 4 := by
+      HostFunction.callValue.index = 4 ∧
+      HostFunction.callerAddress.index = 5 := by
   decide
 
 private theorem compileTimeAddressContextIndexRegression :
@@ -238,7 +240,7 @@ private theorem compileTimeCallValueEnvironmentIndexRegression :
   hostEnvironment_callValue
 
 private theorem compileTimeHostCapabilityLengths :
-    hostContext.length = 5 ∧ hostEnvironment.length = 5 :=
+    hostContext.length = 6 ∧ hostEnvironment.length = 6 :=
   ⟨hostContext_length, hostEnvironment_length⟩
 
 private def beginState : State :=
@@ -582,7 +584,8 @@ def testCoreHostMachine : IO Unit := do
       HostFunction.storageAddress.index == 2 &&
       HostFunction.codeAddress.index == 3 &&
       HostFunction.callValue.index == 4 &&
-      hostContext.length == 5 && hostEnvironment.length == 5)
+      HostFunction.callerAddress.index == 5 &&
+      hostContext.length == 6 && hostEnvironment.length == 6)
     "the append-only host capability layout changed"
   assertTrue
     (hostContext[HostFunction.storageAddress.index]? ==
