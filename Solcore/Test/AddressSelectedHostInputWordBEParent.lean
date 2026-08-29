@@ -104,7 +104,7 @@ private def missingCodeInitialization :
   workingRollback := 201
 }
 
-private inductive TrapReason where
+private inductive InputWordBETrapReason where
   | invalidDoneInputs
   deriving Repr, BEq, DecidableEq
 
@@ -114,7 +114,7 @@ private def incompleteTerminal : Bytes := [0xc5, 0xd6].toByteArray
 private def doneOutcomeFor
     (expectedPair expectedStored : Word) (terminal : Bytes)
     (context : HostStorageDriver.Context Nat (FrameTrace Nat))
-    (value : Value) (store : Store) : FrameOutcome TrapReason :=
+    (value : Value) (store : Store) : FrameOutcome InputWordBETrapReason :=
   match value, store with
   | .pair (.word first) (.word second), [] =>
       if first = expectedPair ∧ second = expectedPair ∧
@@ -140,7 +140,8 @@ private def codeProgramIs (state : WorldState) : Bool :=
 
 private def foldResult
     (continuation :
-      ParentIndexedFrameContinuationContext Nat Nat TrapReason parentWorking) :
+      ParentIndexedFrameContinuationContext Nat Nat InputWordBETrapReason
+        parentWorking) :
     Option Word × Bytes :=
   continuation.foldResolutionWithTrapRollback
     (fun values data =>
@@ -150,7 +151,8 @@ private def foldResult
 
 private def continuationIdentity
     (continuation :
-      ParentIndexedFrameContinuationContext Nat Nat TrapReason parentWorking)
+      ParentIndexedFrameContinuationContext Nat Nat InputWordBETrapReason
+        parentWorking)
     (expectedStored : Word) : Bool :=
   (continuation.stateCheckpoint.account? codeAddress).isNone &&
     (storageValueAt? continuation.stateCheckpoint storageAddress targetSlot).isNone &&
@@ -164,7 +166,8 @@ private def continuationIdentity
 
 private theorem continuation_parent_index_exact
     (continuation :
-      ParentIndexedFrameContinuationContext Nat Nat TrapReason parentWorking) :
+      ParentIndexedFrameContinuationContext Nat Nat InputWordBETrapReason
+        parentWorking) :
     (continuation.stateCheckpoint, continuation.effectCheckpoint) =
       parentWorking :=
   continuation.checkpoint_eq_parentWorking
@@ -173,10 +176,11 @@ private theorem continuation_parent_index_exact
 private theorem parentCompletion_done_stable
     (inputs : HostStorageDriver.ExecutionInputs)
     (doneOutcome : HostStorageDriver.Context Nat (FrameTrace Nat) →
-      Value → Store → FrameOutcome TrapReason)
+      Value → Store → FrameOutcome InputWordBETrapReason)
     {fuel largerFuel : Nat}
     {continuation :
-      ParentIndexedFrameContinuationContext Nat Nat TrapReason parentWorking}
+      ParentIndexedFrameContinuationContext Nat Nat InputWordBETrapReason
+        parentWorking}
     (completed :
       initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
@@ -202,7 +206,7 @@ private def oneStepBeforeResult (expected : Word) (state : State) : Bool :=
 private def assertMissingLayers
     (inputs : HostStorageDriver.ExecutionInputs)
     (doneOutcome : HostStorageDriver.Context Nat (FrameTrace Nat) →
-      Value → Store → FrameOutcome TrapReason)
+      Value → Store → FrameOutcome InputWordBETrapReason)
     (fuel : Nat) (label : String) : IO Unit := do
   match missingStorageInitialization
       |>.runCodeWithStorageParentIndexedContinuationContext?
@@ -218,7 +222,7 @@ private def assertMissingLayers
 private def assertCompletion
     (inputs : HostStorageDriver.ExecutionInputs)
     (doneOutcome : HostStorageDriver.Context Nat (FrameTrace Nat) →
-      Value → Store → FrameOutcome TrapReason)
+      Value → Store → FrameOutcome InputWordBETrapReason)
     (fuel largerFuel : Nat) (expectedStored : Word) (terminal : Bytes)
     (label : String) : IO Unit := do
   match
