@@ -28,6 +28,7 @@ private def responseFor : (request : HostRequest) → request.Response
   | .codeAddress => response
   | .callValue => response
   | .callerAddress => response
+  | .inputDataByte? _ => some response
 
 private def storageReadProgram : Program := {
   resultType := .word
@@ -172,10 +173,36 @@ private theorem illTypedCallerAddressProgram_host_rejected :
     illTypedCallerAddressProgram.checkHost = false := by
   decide
 
-private def unboundHostIndexProgram : Program := {
-  resultType := .word
+private def inputOffset : Word := ⟨1, by decide⟩
+
+private def inputDataByteProgram : Program := {
+  resultType := .sum .unit .word
   body :=
-    .apply (.var (HostFunction.callerAddress.index + 1)) .unit
+    .apply (.var HostFunction.inputDataByte?.index) (.word inputOffset)
+}
+
+private theorem inputDataByteProgram_host_checked :
+    inputDataByteProgram.checkHost = true := by
+  decide
+
+private theorem inputDataByteProgram_closed_rejected :
+    inputDataByteProgram.check = false := by
+  decide
+
+private def illTypedInputDataByteProgram : Program := {
+  resultType := .sum .unit .word
+  body :=
+    .apply (.var HostFunction.inputDataByte?.index) (.bool true)
+}
+
+private theorem illTypedInputDataByteProgram_host_rejected :
+    illTypedInputDataByteProgram.checkHost = false := by
+  decide
+
+private def unboundHostIndexProgram : Program := {
+  resultType := .sum .unit .word
+  body :=
+    .apply (.var (HostFunction.inputDataByte?.index + 1)) (.word inputOffset)
 }
 
 private theorem unboundHostIndexProgram_host_rejected :
@@ -193,6 +220,9 @@ private def checkedCallValueProgram : CheckedHostCoreProgram :=
 
 private def checkedCallerAddressProgram : CheckedHostCoreProgram :=
   ⟨callerAddressProgram, callerAddressProgram_host_checked⟩
+
+private def checkedInputDataByteProgram : CheckedHostCoreProgram :=
+  ⟨inputDataByteProgram, inputDataByteProgram_host_checked⟩
 
 private theorem compileTimeAdmissionRegression :
     CheckedHostCoreProgram.ofProgram? storageReadProgram =
@@ -231,7 +261,8 @@ private theorem compileTimeHostCapabilityIndexes :
       HostFunction.storageAddress.index = 2 ∧
       HostFunction.codeAddress.index = 3 ∧
       HostFunction.callValue.index = 4 ∧
-      HostFunction.callerAddress.index = 5 := by
+      HostFunction.callerAddress.index = 5 ∧
+      HostFunction.inputDataByte?.index = 6 := by
   decide
 
 private theorem compileTimeAddressContextIndexRegression :
@@ -274,9 +305,23 @@ private theorem compileTimeCallerAddressEnvironmentIndexRegression :
       some (.hostFunction .callerAddress) :=
   hostEnvironment_callerAddress
 
+private theorem compileTimeInputDataByteContextIndexRegression :
+    hostContext[HostFunction.inputDataByte?.index]? =
+      some (HostFunction.functionType .inputDataByte?) :=
+  hostContext_inputDataByte?
+
+private theorem compileTimeInputDataByteEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.inputDataByte?.index]? =
+      some (.hostFunction .inputDataByte?) :=
+  hostEnvironment_inputDataByte?
+
 private theorem compileTimeHostCapabilityLengths :
-    hostContext.length = 6 ∧ hostEnvironment.length = 6 :=
+    hostContext.length = 7 ∧ hostEnvironment.length = 7 :=
   ⟨hostContext_length, hostEnvironment_length⟩
+
+private theorem compileTimeFirstUnboundHostIndex :
+    hostContext[7]? = none ∧ hostEnvironment[7]? = none := by
+  decide
 
 private def beginState : State :=
   ⟨.ret (.hostFunction .storageRead),
@@ -336,6 +381,12 @@ private def callerAddressRequestState : State :=
 private def callerAddressSuspension : HostSuspension :=
   ⟨.callerAddress, [], []⟩
 
+private def inputDataByteRequestState : State :=
+  ⟨.ret (.word inputOffset), [.hostApply .inputDataByte?], []⟩
+
+private def inputDataByteSuspension : HostSuspension :=
+  ⟨.inputDataByte? inputOffset, [], []⟩
+
 private theorem compileTimeBeginCorrespondenceRegression :
     HostTransition beginState argumentState := by
   apply hostAdvance_next_iff.mp
@@ -381,6 +432,11 @@ private theorem compileTimeCallerAddressEmissionRegression :
   apply hostAdvance_suspended_iff.mp
   exact hostAdvance_suspend_callerAddress [] []
 
+private theorem compileTimeInputDataByteEmissionRegression :
+    HostRequestEmission inputDataByteRequestState inputDataByteSuspension := by
+  apply hostAdvance_suspended_iff.mp
+  exact hostAdvance_suspend_inputDataByte? inputOffset [] []
+
 private theorem compileTimeTransitionDeterminismRegression
     {next : State}
     (step : HostTransition beginState next) :
@@ -411,6 +467,9 @@ private def retainedCallValueSuspension : HostSuspension :=
 
 private def retainedCallerAddressSuspension : HostSuspension :=
   ⟨.callerAddress, retainedContinuation, retainedStore⟩
+
+private def retainedInputDataByteSuspension : HostSuspension :=
+  ⟨.inputDataByte? inputOffset, retainedContinuation, retainedStore⟩
 
 private theorem compileTimeResumeRegression :
     retainedSuspension.resume response =
@@ -443,6 +502,19 @@ private theorem compileTimeCallerAddressResumeRegression :
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
   HostSuspension.resume_callerAddress
     response retainedContinuation retainedStore
+
+private theorem compileTimeInputDataByteResumeNoneRegression :
+    retainedInputDataByteSuspension.resume none =
+      ⟨.ret (.inLeft .word .unit), retainedContinuation, retainedStore⟩ :=
+  HostSuspension.resume_inputDataByte?_none
+    inputOffset retainedContinuation retainedStore
+
+private theorem compileTimeInputDataByteResumeSomeRegression :
+    retainedInputDataByteSuspension.resume (some response) =
+      ⟨.ret (.inRight .unit (.word response)),
+        retainedContinuation, retainedStore⟩ :=
+  HostSuspension.resume_inputDataByte?_some
+    inputOffset response retainedContinuation retainedStore
 
 private theorem compileTimeSuspensionTypingRegression :
     HostSuspensionHasType requestSuspension .word [] := by
@@ -510,6 +582,12 @@ private theorem compileTimeCheckedCallerAddressNeverFaults
   CheckedHostCoreProgram.runStateful_ne_fault
     checkedCallerAddressProgram fuel error faultState
 
+private theorem compileTimeCheckedInputDataByteNeverFaults
+    (fuel : Nat) (error : MachineFault) (faultState : State) :
+    checkedInputDataByteProgram.runStateful fuel ≠ .fault error faultState :=
+  CheckedHostCoreProgram.runStateful_ne_fault
+    checkedInputDataByteProgram fuel error faultState
+
 private theorem compileTimeWireV1RejectionRegression :
     Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead) = none :=
   rfl
@@ -564,6 +642,16 @@ private theorem compileTimeCallerAddressWireV1RejectionRegression :
 private theorem compileTimeCallerAddressWireV2RejectionRegression :
     Solcore.Core.Wire.V2.Value.ofCore?
       (.hostFunction .callerAddress) = none :=
+  rfl
+
+private theorem compileTimeInputDataByteWireV1RejectionRegression :
+    Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .inputDataByte?) = none :=
+  rfl
+
+private theorem compileTimeInputDataByteWireV2RejectionRegression :
+    Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .inputDataByte?) = none :=
   rfl
 
 private def cellStorageReadProgram : Program := {
@@ -627,8 +715,16 @@ def testCoreHostMachine : IO Unit := do
     "the closed checker accepted the caller-address capability"
   assertTrue (!illTypedCallerAddressProgram.checkHost)
     "the host checker accepted a non-Unit caller-address argument"
+  assertTrue inputDataByteProgram.checkHost
+    "the host checker rejected optional input-byte observation"
+  assertTrue (!inputDataByteProgram.check)
+    "the closed checker accepted the optional input-byte capability"
+  assertTrue (!illTypedInputDataByteProgram.checkHost)
+    "the host checker accepted a non-Word input-byte offset"
   assertTrue (!unboundHostIndexProgram.checkHost)
     "the host checker accepted the first unbound capability index"
+  assertTrue (hostContext[7]?.isNone && hostEnvironment[7]?.isNone)
+    "host index seven is no longer the first unbound position"
   assertTrue
     (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
     "checked host admission retained a program rejected by the host checker"
@@ -662,7 +758,8 @@ def testCoreHostMachine : IO Unit := do
       HostFunction.codeAddress.index == 3 &&
       HostFunction.callValue.index == 4 &&
       HostFunction.callerAddress.index == 5 &&
-      hostContext.length == 6 && hostEnvironment.length == 6)
+      HostFunction.inputDataByte?.index == 6 &&
+      hostContext.length == 7 && hostEnvironment.length == 7)
     "the append-only host capability layout changed"
   assertTrue
     (hostContext[HostFunction.storageAddress.index]? ==
@@ -688,6 +785,12 @@ def testCoreHostMachine : IO Unit := do
       hostEnvironment[HostFunction.callerAddress.index]? ==
         some (.hostFunction .callerAddress))
     "the caller-address capability is absent from its appended position"
+  assertTrue
+    (hostContext[HostFunction.inputDataByte?.index]? ==
+        some (HostFunction.functionType .inputDataByte?) &&
+      hostEnvironment[HostFunction.inputDataByte?.index]? ==
+        some (.hostFunction .inputDataByte?))
+    "the optional input-byte capability is absent from index six"
 
   assertTrue (hostAdvance beginState == .next argumentState)
     "host application did not begin by evaluating its argument"
@@ -744,6 +847,15 @@ def testCoreHostMachine : IO Unit := do
         ⟨.ret (.bool true), [.hostApply .callerAddress], []⟩ ==
       .fault (.invalidHostArgument .callerAddress (.bool true)))
     "a non-Unit caller-address argument did not retain the raw machine fault"
+  assertTrue
+    (hostAdvance inputDataByteRequestState ==
+      .suspended inputDataByteSuspension)
+    "a Word offset did not emit the exact optional input-byte request"
+  assertTrue
+    (hostAdvance
+        ⟨.ret (.bool true), [.hostApply .inputDataByte?], []⟩ ==
+      .fault (.invalidHostArgument .inputDataByte? (.bool true)))
+    "a non-Word input-byte offset did not retain the raw machine fault"
 
   assertTrue
     (retainedSuspension.resume response ==
@@ -766,6 +878,15 @@ def testCoreHostMachine : IO Unit := do
     (retainedCallerAddressSuspension.resume response ==
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩)
     "caller-address resume changed the returned Word, continuation, or store"
+  assertTrue
+    (retainedInputDataByteSuspension.resume none ==
+      ⟨.ret (.inLeft .word .unit), retainedContinuation, retainedStore⟩)
+    "an absent input byte lost its branch, continuation, or Core-local store"
+  assertTrue
+    (retainedInputDataByteSuspension.resume (some response) ==
+      ⟨.ret (.inRight .unit (.word response)),
+        retainedContinuation, retainedStore⟩)
+    "a present input byte lost its value, continuation, or Core-local store"
 
   assertTrue
     (checkedStorageReadProgram.runStateful 4 == .outOfFuel requestState)
@@ -810,6 +931,14 @@ def testCoreHostMachine : IO Unit := do
     (callerAddressProgram.runHostStateful 5 ==
       .suspended callerAddressSuspension 0)
     "caller-address execution changed its exact request budget"
+  assertTrue
+    (inputDataByteProgram.runHostStateful 4 ==
+      .outOfFuel inputDataByteRequestState)
+    "input-byte execution moved its pre-request fuel boundary"
+  assertTrue
+    (inputDataByteProgram.runHostStateful 5 ==
+      .suspended inputDataByteSuspension 0)
+    "input-byte execution changed its exact request budget"
 
   match cellStorageReadProgram.runHostStateful 32 with
   | .suspended suspension remainingFuel =>
@@ -877,5 +1006,13 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .callerAddress)).isNone
     "Core wire v2 encoded the caller-address host value"
+  assertTrue
+    (Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .inputDataByte?)).isNone
+    "Core wire v1 encoded the optional input-byte host value"
+  assertTrue
+    (Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .inputDataByte?)).isNone
+    "Core wire v2 encoded the optional input-byte host value"
 
 end Tests
