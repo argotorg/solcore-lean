@@ -18,12 +18,14 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 private def codeAddress : Address := ⟨0x10, by decide⟩
 private def storageAddress : Address := ⟨0x20, by decide⟩
 private def absentAddress : Address := ⟨0x30, by decide⟩
+private def callerAddress : Address := ⟨0x40, by decide⟩
 private def suppliedCallValue : Word := ⟨0x73, by decide⟩
 
 private def inputsFor
     (address : Address) : HostStorageDriver.ExecutionInputs := {
   codeAddress := address
   callValue := suppliedCallValue
+  callerAddress := callerAddress
 }
 
 private def slotA : Word := ⟨0x41, by decide⟩

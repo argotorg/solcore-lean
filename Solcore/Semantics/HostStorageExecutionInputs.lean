@@ -10,5 +10,6 @@ namespace Solcore.Semantics.HostStorageDriver
 structure ExecutionInputs where
   codeAddress : Address
   callValue : Core.Word
+  callerAddress : Address
 
 end Solcore.Semantics.HostStorageDriver
