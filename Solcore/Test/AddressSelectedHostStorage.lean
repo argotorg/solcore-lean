@@ -19,6 +19,7 @@ private def codeAddress : Address := ⟨0x10, by decide⟩
 private def storageAddress : Address := ⟨0x20, by decide⟩
 private def otherAddress : Address := ⟨0x30, by decide⟩
 private def callerAddress : Address := ⟨0x40, by decide⟩
+private def alternateCallerAddress : Address := ⟨0x45, by decide⟩
 private def maximumAddress : Address := ⟨addressModulus - 1, by decide⟩
 private def suppliedCallValue : Word := ⟨0x73, by decide⟩
 
@@ -32,8 +33,13 @@ private def inputsFor
 private def executionInputs : HostStorageDriver.ExecutionInputs :=
   inputsFor codeAddress
 
+private def alternateCallerInputs : HostStorageDriver.ExecutionInputs :=
+  { executionInputs with callerAddress := alternateCallerAddress }
+
 private def expectedStorageAddressWord : Word := ⟨0x20, by decide⟩
 private def expectedCodeAddressWord : Word := ⟨0x10, by decide⟩
+private def expectedCallerAddressWord : Word := ⟨0x40, by decide⟩
+private def expectedAlternateCallerAddressWord : Word := ⟨0x45, by decide⟩
 private def expectedMaximumAddressWord : Word :=
   ⟨addressModulus - 1, by decide⟩
 
@@ -173,6 +179,18 @@ private theorem callValueProgram_host_checked :
 private def callValueCode : CheckedHostCoreProgram :=
   ⟨callValueProgram, callValueProgram_host_checked⟩
 
+private def callerAddressProgram : Program := {
+  resultType := .word
+  body := .apply (.var HostFunction.callerAddress.index) .unit
+}
+
+private theorem callerAddressProgram_host_checked :
+    callerAddressProgram.checkHost = true := by
+  decide
+
+private def callerAddressCode : CheckedHostCoreProgram :=
+  ⟨callerAddressProgram, callerAddressProgram_host_checked⟩
+
 /-- Observe the selector, write its storage, then observe it again. -/
 private def observeWriteObserveProgram : Program := {
   resultType := .product .word .word
@@ -256,7 +274,36 @@ private def observeCallValueWriteObserveCode : CheckedHostCoreProgram :=
 private def expectedCallValuePair : Value :=
   .pair (.word suppliedCallValue) (.word suppliedCallValue)
 
+/-- Observe the caller, write its widened Word, then observe it again. -/
+private def observeCallerWriteObserveProgram : Program := {
+  resultType := .product .word .word
+  body :=
+    .letE
+      (.apply (.var HostFunction.callerAddress.index) .unit)
+      (.letE
+        (.apply
+          (.var (HostFunction.storageWrite.index + 1))
+          (.pair (.word targetSlot) (.var 0)))
+        (.letE
+          (.apply
+            (.var (HostFunction.callerAddress.index + 2))
+            .unit)
+          (.pair (.var 2) (.var 0))))
+}
+
+private theorem observeCallerWriteObserveProgram_host_checked :
+    observeCallerWriteObserveProgram.checkHost = true := by
+  decide
+
+private def observeCallerWriteObserveCode : CheckedHostCoreProgram :=
+  ⟨observeCallerWriteObserveProgram,
+    observeCallerWriteObserveProgram_host_checked⟩
+
+private def expectedCallerAddressPair : Value :=
+  .pair (.word expectedCallerAddressWord) (.word expectedCallerAddressWord)
+
 private def callValueFrameData : Bytes := [0xd5, 0xe6].toByteArray
+private def callerFrameData : Bytes := [0xd7, 0xe8].toByteArray
 
 private def codeAccountFor (code : CheckedHostCoreProgram) : Account :=
   Account.empty
@@ -374,6 +421,41 @@ private def callValueFoldResult
     (fun _ data => (none, data))
     (fun _ _ => (none, ByteArray.empty))
 
+private def callerParentWorking :
+    WorldState × FrameEffectJournal Nat (FrameTrace Nat) :=
+  (checkpointWorld, ⟨101, FrameTrace.empty⟩)
+
+private def callerInitialization :
+    ParentIndexedFrameInitialization Nat Nat callerParentWorking := {
+  initialWorld := workingWorldFor observeCallerWriteObserveCode
+  workingRollback := 201
+}
+
+private def callerDoneOutcome
+    (context : HostStorageDriver.Context Nat (FrameTrace Nat))
+    (value : Value)
+    (store : Store) : FrameOutcome FrameAdapterTrapReason :=
+  match value, store with
+  | .pair (.word first) (.word second), [] =>
+      if first = expectedCallerAddressWord ∧
+          second = expectedCallerAddressWord ∧
+          context.readStorage targetSlot = expectedCallerAddressWord then
+        .returned callerFrameData
+      else
+        .trapped .invalidDoneInputs
+  | _, _ => .trapped .invalidDoneInputs
+
+private def callerFoldResult
+    (continuation :
+      ParentIndexedFrameContinuationContext
+        Nat Nat FrameAdapterTrapReason callerParentWorking) :
+    Option Word × Bytes :=
+  continuation.foldResolutionWithTrapRollback
+    (fun values data =>
+      (storageValueAt? values.1 storageAddress targetSlot, data))
+    (fun _ data => (none, data))
+    (fun _ _ => (none, ByteArray.empty))
+
 private def codeProgramIs
     (state : WorldState) (address : Address) (program : Program) : Bool :=
   match state.code? address with
@@ -424,6 +506,13 @@ private def selectedTargetMissing
     context.storageAccount.storageRead selectorSlot == targetSlot &&
     context.storageAccount.storageRead retainedSlot == retainedValue
 
+private def accountAbsentAt
+    (context :
+      FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat))
+    (address : Address) : Bool :=
+  (context.context.values.working.1.account? address).isNone &&
+    (context.context.values.checkpoint.state.account? address).isNone
+
 private def storageAddressRequestReady (state : State) : Bool :=
   match hostAdvance state with
   | .suspended suspension => suspension.request == .storageAddress
@@ -439,6 +528,11 @@ private def callValueRequestReady (state : State) : Bool :=
   | .suspended suspension => suspension.request == .callValue
   | _ => false
 
+private def callerAddressRequestReady (state : State) : Bool :=
+  match hostAdvance state with
+  | .suspended suspension => suspension.request == .callerAddress
+  | _ => false
+
 private def oneStepBeforeStorageAddressPair (state : State) : Bool :=
   match hostAdvance state with
   | .next next => next == State.final expectedStorageAddressPair
@@ -452,6 +546,11 @@ private def oneStepBeforeCodeAddressPair (state : State) : Bool :=
 private def oneStepBeforeCallValuePair (state : State) : Bool :=
   match hostAdvance state with
   | .next next => next == State.final expectedCallValuePair
+  | _ => false
+
+private def oneStepBeforeCallerAddressPair (state : State) : Bool :=
+  match hostAdvance state with
+  | .next next => next == State.final expectedCallerAddressPair
   | _ => false
 
 private def assertFixtureContext
@@ -714,6 +813,34 @@ private theorem callValueProgram_done_stable
     FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
       context executionInputs execution (by decide)⟩
 
+/-- The widened caller and terminal context survive larger fuel. -/
+private theorem callerAddressProgram_done_stable
+    {context : HostStorageDriver.Context Nat (List Nat)}
+    (selected :
+      (baseContextFor callerAddressCode).withPresentStorageAccount? =
+        some context)
+    {finalContext : HostStorageDriver.Context Nat (List Nat)}
+    (execution :
+      context.runCodeWithStorage? executionInputs 5 =
+        some ⟨finalContext, .done (.word expectedCallerAddressWord) []⟩) :
+    (baseContextFor callerAddressCode).withPresentStorageAccount? =
+        some context ∧
+      context.runCodeWithStorage? executionInputs 32 =
+        some ⟨finalContext, .done (.word expectedCallerAddressWord) []⟩ := by
+  exact ⟨selected,
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
+      context executionInputs execution (by decide)⟩
+
+/-- Caller variation changes the response but preserves the exact host context. -/
+private theorem callerAddress_handling_context_independent
+    (context : HostStorageDriver.Context Nat (List Nat))
+    (continuation : List Frame) (store : Store) :
+    (HostStorageDriver.handleSuspension executionInputs context
+        ⟨.callerAddress, continuation, store⟩).1 =
+      (HostStorageDriver.handleSuspension alternateCallerInputs context
+        ⟨.callerAddress, continuation, store⟩).1 := by
+  simp
+
 /-- The value-derived write and both observations survive larger fuel. -/
 private theorem observeCallValueWriteObserveProgram_done_stable
     {context : HostStorageDriver.Context Nat (List Nat)}
@@ -729,6 +856,24 @@ private theorem observeCallValueWriteObserveProgram_done_stable
         some context ∧
       context.runCodeWithStorage? executionInputs 32 =
         some ⟨finalContext, .done expectedCallValuePair []⟩ := by
+  exact ⟨selected,
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
+      context executionInputs execution (by decide)⟩
+
+/-- The caller-derived write and both observations survive larger fuel. -/
+private theorem observeCallerWriteObserveProgram_done_stable
+    {context : HostStorageDriver.Context Nat (List Nat)}
+    (selected :
+      (baseContextFor observeCallerWriteObserveCode).withPresentStorageAccount? =
+        some context)
+    {finalContext : HostStorageDriver.Context Nat (List Nat)}
+    (execution :
+      context.runCodeWithStorage? executionInputs 30 =
+        some ⟨finalContext, .done expectedCallerAddressPair []⟩) :
+    (baseContextFor observeCallerWriteObserveCode).withPresentStorageAccount? =
+        some context ∧
+      context.runCodeWithStorage? executionInputs 32 =
+        some ⟨finalContext, .done expectedCallerAddressPair []⟩ := by
   exact ⟨selected,
     FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
       context executionInputs execution (by decide)⟩
@@ -749,6 +894,21 @@ private theorem callValueParentCompletion_done_stable
   callValueInitialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
     storageAddress executionInputs callValueDoneOutcome completed (by decide)
 
+/-- Caller-derived parent completion retains its exact context at fuel 32. -/
+private theorem callerParentCompletion_done_stable
+    {continuation :
+      ParentIndexedFrameContinuationContext
+        Nat Nat FrameAdapterTrapReason callerParentWorking}
+    (completed :
+      callerInitialization.runCodeWithStorageParentIndexedContinuationContext?
+          storageAddress executionInputs 30 callerDoneOutcome =
+        some (some (some continuation))) :
+    callerInitialization.runCodeWithStorageParentIndexedContinuationContext?
+        storageAddress executionInputs 32 callerDoneOutcome =
+      some (some (some continuation)) :=
+  callerInitialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
+    storageAddress executionInputs callerDoneOutcome completed (by decide)
+
 def testAddressSelectedHostStorage : IO Unit := do
   assertTrue updateProgram.checkHost
     "the host checker rejected the read/write/read program"
@@ -762,18 +922,31 @@ def testAddressSelectedHostStorage : IO Unit := do
     "the host checker rejected the code-address program"
   assertTrue callValueProgram.checkHost
     "the host checker rejected the call-value program"
+  assertTrue callerAddressProgram.checkHost
+    "the host checker rejected the caller-address program"
   assertTrue observeWriteObserveProgram.checkHost
     "the host checker rejected observe/write/observe"
   assertTrue observeCodeWriteObserveCodeProgram.checkHost
     "the host checker rejected code-observe/write/code-observe"
   assertTrue observeCallValueWriteObserveProgram.checkHost
     "the host checker rejected call-value/write/call-value"
+  assertTrue observeCallerWriteObserveProgram.checkHost
+    "the host checker rejected caller/write/caller"
   assertTrue (codeAddress != storageAddress)
     "the address fixture did not separate code and storage"
   assertTrue
     (suppliedCallValue != expectedCodeAddressWord &&
       suppliedCallValue != expectedStorageAddressWord)
     "the call-value fixture did not separate all three observations"
+  assertTrue
+    (expectedCallerAddressWord != expectedCodeAddressWord &&
+      expectedCallerAddressWord != expectedStorageAddressWord &&
+      expectedCallerAddressWord != suppliedCallValue)
+    "the caller fixture did not separate every runtime role"
+  assertTrue (addressToWord callerAddress == expectedCallerAddressWord)
+    "the caller Address did not widen exactly"
+  assertTrue (wordToAddress? expectedCallerAddressWord == some callerAddress)
+    "the widened caller Address did not narrow exactly"
   assertTrue (addressToWord storageAddress == expectedStorageAddressWord)
     "the retained nontrivial Address did not widen exactly"
   assertTrue (addressToWord codeAddress == expectedCodeAddressWord)
@@ -896,6 +1069,52 @@ def testAddressSelectedHostStorage : IO Unit := do
       | _, none =>
           throw (IO.userError "fuel 32 lost the call-value code")
 
+  match (baseContextFor callerAddressCode).withPresentStorageAccount? with
+  | none =>
+      throw (IO.userError "the caller-address storage Account was absent")
+  | some context =>
+      assertTrue (accountAbsentAt context callerAddress)
+        "the caller unexpectedly required an Account"
+      match context.runCodeWithStorage? executionInputs 4 with
+      | some { context := resultContext, outcome := .outOfFuel state } =>
+          assertTrue (callerAddressRequestReady state)
+            "fuel 4 did not stop at the caller-address request"
+          assertFixtureContext resultContext callerAddressProgram oldValue
+            "fuel 4 caller-address observation"
+      | some result =>
+          throw (IO.userError
+            s!"fuel 4 crossed the caller boundary: {reprStr result.outcome}")
+      | none => throw (IO.userError "fuel 4 lost the caller-address code")
+
+      match context.runCodeWithStorage? executionInputs 5,
+          context.runCodeWithStorage? executionInputs 32,
+          context.runCodeWithStorage? alternateCallerInputs 5 with
+      | some result, some largerResult, some alternateResult =>
+          assertTrue
+            (result.outcome == .done (.word expectedCallerAddressWord) [])
+            "fuel 5 returned the wrong caller Address"
+          assertTrue (largerResult.outcome == result.outcome)
+            "additional fuel changed caller-address observation"
+          assertTrue
+            (alternateResult.outcome ==
+              .done (.word expectedAlternateCallerAddressWord) [])
+            "varying only callerAddress returned the wrong result"
+          assertTrue (alternateResult.outcome != result.outcome)
+            "varying callerAddress did not change the result"
+          assertFixtureContext result.context callerAddressProgram oldValue
+            "fuel 5 caller-address observation"
+          assertFixtureContext largerResult.context callerAddressProgram oldValue
+            "fuel 32 caller-address observation"
+          assertFixtureContext alternateResult.context callerAddressProgram oldValue
+            "alternate caller-address observation"
+          assertTrue
+            (accountAbsentAt result.context callerAddress &&
+              accountAbsentAt alternateResult.context alternateCallerAddress)
+            "caller observation created an Account"
+      | none, _, _ => throw (IO.userError "fuel 5 lost caller-address code")
+      | _, none, _ => throw (IO.userError "fuel 32 lost caller-address code")
+      | _, _, none => throw (IO.userError "alternate caller lost code")
+
   match
       (baseContextFor observeCodeWriteObserveCode).withPresentStorageAccount?
       with
@@ -1004,6 +1223,45 @@ def testAddressSelectedHostStorage : IO Unit := do
       | _, none =>
           throw (IO.userError "fuel 32 lost call-value/write/call-value code")
 
+  match (baseContextFor observeCallerWriteObserveCode).withPresentStorageAccount? with
+  | none => throw (IO.userError "the caller/write/caller Account was absent")
+  | some context =>
+      match context.runCodeWithStorage? executionInputs 23 with
+      | some { context := resultContext, outcome := .outOfFuel state } =>
+          assertTrue (callerAddressRequestReady state)
+            "fuel 23 did not stop at the second caller request"
+          assertFixtureContext resultContext observeCallerWriteObserveProgram
+            expectedCallerAddressWord "fuel 23 caller/write/caller"
+      | some result =>
+          throw (IO.userError
+            s!"fuel 23 crossed the second caller request: {reprStr result.outcome}")
+      | none => throw (IO.userError "fuel 23 lost caller/write/caller code")
+
+      match context.runCodeWithStorage? executionInputs 29 with
+      | some { context := resultContext, outcome := .outOfFuel state } =>
+          assertTrue (oneStepBeforeCallerAddressPair state)
+            "fuel 29 did not stop before the caller pair"
+          assertFixtureContext resultContext observeCallerWriteObserveProgram
+            expectedCallerAddressWord "fuel 29 caller/write/caller"
+      | some result =>
+          throw (IO.userError
+            s!"fuel 29 crossed caller completion: {reprStr result.outcome}")
+      | none => throw (IO.userError "fuel 29 lost caller/write/caller code")
+
+      match context.runCodeWithStorage? executionInputs 30,
+          context.runCodeWithStorage? executionInputs 32 with
+      | some result, some largerResult =>
+          assertTrue (result.outcome == .done expectedCallerAddressPair [])
+            "fuel 30 returned unequal caller addresses"
+          assertTrue (largerResult.outcome == result.outcome)
+            "additional fuel changed caller/write/caller"
+          assertFixtureContext result.context observeCallerWriteObserveProgram
+            expectedCallerAddressWord "fuel 30 caller/write/caller"
+          assertFixtureContext largerResult.context observeCallerWriteObserveProgram
+            expectedCallerAddressWord "fuel 32 caller/write/caller"
+      | none, _ => throw (IO.userError "fuel 30 lost caller/write/caller code")
+      | _, none => throw (IO.userError "fuel 32 lost caller/write/caller code")
+
   match
       callValueInitialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress executionInputs observeWriteObserveCompletionFuel
@@ -1022,6 +1280,22 @@ def testAddressSelectedHostStorage : IO Unit := do
   | _, _ =>
       throw (IO.userError
         "call-value execution did not reach parent-indexed completion")
+
+  match
+      callerInitialization.runCodeWithStorageParentIndexedContinuationContext?
+          storageAddress executionInputs 30 callerDoneOutcome,
+      callerInitialization.runCodeWithStorageParentIndexedContinuationContext?
+          storageAddress executionInputs 32 callerDoneOutcome with
+  | some (some (some continuation)), some (some (some largerContinuation)) =>
+      assertTrue
+        (callerFoldResult continuation ==
+          (some expectedCallerAddressWord, callerFrameData))
+        "parent fold lost caller-derived storage or terminal bytes"
+      assertTrue (callerFoldResult largerContinuation == callerFoldResult continuation)
+        "fuel 32 changed the caller-derived parent fold"
+  | _, _ =>
+      throw (IO.userError
+        "caller execution did not reach parent-indexed completion")
 
   match (baseContextFor observeWriteObserveCode).withPresentStorageAccount? with
   | none =>
