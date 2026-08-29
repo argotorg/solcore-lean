@@ -29,23 +29,23 @@ private example
     (parentContinuation :
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking) :
-    (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+    (initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome = none ↔
         initialization.initialWorld.account? storageAddress = none) ∧
-      (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      (initialization.runCodeWithStorageParentIndexedContinuationContext?
             storageAddress inputs fuel doneOutcome = some none ↔
         ∃ context,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
           context.context.values.working.1.code? inputs.codeAddress = none) ∧
-      (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      (initialization.runCodeWithStorageParentIndexedContinuationContext?
             storageAddress inputs fuel doneOutcome = some (some none) ↔
         ∃ context resultContext exhausted,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
           context.runCodeWithStorage? inputs fuel =
             some ⟨resultContext, .outOfFuel exhausted⟩) ∧
-      (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      (initialization.runCodeWithStorageParentIndexedContinuationContext?
             storageAddress inputs fuel doneOutcome =
           some (some (some parentContinuation)) ↔
         ∃ context continuation,
@@ -58,13 +58,13 @@ private example
               parentWorking initialization.workingRollback
               initialization.initialTraceExtension continuation.result) := by
   exact
-    ⟨initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_none_iff
+    ⟨initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_none_iff
         storageAddress inputs fuel doneOutcome,
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_none_iff
+      initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_none_iff
         storageAddress inputs fuel doneOutcome,
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_some_none_iff
+      initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_none_iff
         storageAddress inputs fuel doneOutcome,
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_some_some_iff
+      initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_some_iff
         storageAddress inputs fuel doneOutcome parentContinuation⟩
 
 /-- Whole-context equality transports resolution and continuation unchanged. -/
@@ -85,7 +85,7 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking)
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)))
     (next :
@@ -109,7 +109,7 @@ private example
           onReturned onReverted =
         continuation.resolve.continue? onReturned onReverted := by
   obtain ⟨context, continuation, refined, lowerCompleted, coherent⟩ :=
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_toFrameContinuationContext
+    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_toFrameContinuationContext
       storageAddress inputs fuel doneOutcome parentContinuation completed
   exact ⟨context, continuation, refined, lowerCompleted, coherent,
     congrArg FrameContinuationContext.resolve coherent,
@@ -194,15 +194,15 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking}
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)))
     (more : fuel ≤ largerFuel) :
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+    initialization.runCodeWithStorageParentIndexedContinuationContext?
         storageAddress inputs largerFuel doneOutcome =
       some (some (some parentContinuation)) := by
   exact
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_stable
+    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
       storageAddress inputs doneOutcome completed more
 
 end Tests

@@ -11,7 +11,7 @@ namespace Solcore.Semantics.ParentIndexedFrameInitialization
 universe u v w
 
 @[simp] theorem
-    runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_none_iff
+    runCodeWithStorageParentIndexedContinuationContext?_eq_none_iff
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
@@ -23,23 +23,23 @@ universe u v w
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
         Core.Value → Core.Store → FrameOutcome TrapReason) :
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+    initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome = none ↔
       initialization.initialWorld.account? storageAddress = none := by
   cases observed : initialization.initialWorld.account? storageAddress with
   | none =>
-      unfold runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      unfold runCodeWithStorageParentIndexedContinuationContext?
       rw [toCheckpointedWorkingPairWithPresentStorageAccount?_of_absent
         initialization storageAddress observed]
       simp only [Option.map_none]
   | some account =>
-      unfold runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      unfold runCodeWithStorageParentIndexedContinuationContext?
       rw [toCheckpointedWorkingPairWithPresentStorageAccount?_of_present
         initialization storageAddress account observed]
       simp only [Option.map_some, Option.some_ne_none]
 
 theorem
-    runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_none_iff
+    runCodeWithStorageParentIndexedContinuationContext?_eq_some_none_iff
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
@@ -51,13 +51,13 @@ theorem
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
         Core.Value → Core.Store → FrameOutcome TrapReason) :
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+    initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome = some none ↔
       ∃ context,
         initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
             storageAddress = some context ∧
         context.context.values.working.1.code? inputs.codeAddress = none := by
-  unfold runCodeWithStorageParentIndexedContinuationContextWithInputs?
+  unfold runCodeWithStorageParentIndexedContinuationContext?
   constructor
   · intro observed
     rw [Option.map_eq_some_iff] at observed
@@ -76,7 +76,7 @@ theorem
     rfl
 
 theorem
-    runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_some_none_iff
+    runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_none_iff
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
@@ -88,14 +88,14 @@ theorem
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
         Core.Value → Core.Store → FrameOutcome TrapReason) :
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+    initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome = some (some none) ↔
       ∃ context resultContext exhausted,
         initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
             storageAddress = some context ∧
         context.runCodeWithStorage? inputs fuel =
           some ⟨resultContext, .outOfFuel exhausted⟩ := by
-  unfold runCodeWithStorageParentIndexedContinuationContextWithInputs?
+  unfold runCodeWithStorageParentIndexedContinuationContext?
   constructor
   · intro observed
     rw [Option.map_eq_some_iff] at observed
@@ -120,7 +120,7 @@ theorem
     rfl
 
 theorem
-    runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_some_some_iff
+    runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_some_iff
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
@@ -135,7 +135,7 @@ theorem
     (parentContinuation :
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking) :
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+    initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)) ↔
       ∃ context continuation,
@@ -147,7 +147,7 @@ theorem
           ParentIndexedFrameContinuationContext.fromTraceExtension
             parentWorking initialization.workingRollback
             initialization.initialTraceExtension continuation.result := by
-  unfold runCodeWithStorageParentIndexedContinuationContextWithInputs?
+  unfold runCodeWithStorageParentIndexedContinuationContext?
   constructor
   · intro observed
     rw [Option.map_eq_some_iff] at observed

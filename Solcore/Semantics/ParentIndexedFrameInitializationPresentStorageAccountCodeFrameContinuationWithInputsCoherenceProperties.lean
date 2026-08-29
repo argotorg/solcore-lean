@@ -87,7 +87,7 @@ private theorem completedContinuationWithInputs_eq_parentIndexed
       | fault error faultState => simp at resultCompleted
 
 theorem
-    runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_toFrameContinuationContext
+    runCodeWithStorageParentIndexedContinuationContext?_some_some_some_toFrameContinuationContext
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
@@ -103,7 +103,7 @@ theorem
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking)
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation))) :
     ∃ context continuation,
@@ -112,7 +112,7 @@ theorem
       context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some (some continuation) ∧
       parentContinuation.toFrameContinuationContext = continuation := by
-  unfold runCodeWithStorageParentIndexedContinuationContextWithInputs?
+  unfold runCodeWithStorageParentIndexedContinuationContext?
     at completed
   rw [Option.map_eq_some_iff] at completed
   obtain ⟨context, refined, selected⟩ := completed
@@ -131,7 +131,7 @@ theorem
       lowerCompleted⟩
 
 theorem
-    runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_stable
+    runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
@@ -147,15 +147,15 @@ theorem
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking}
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)))
     (more : fuel ≤ largerFuel) :
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+    initialization.runCodeWithStorageParentIndexedContinuationContext?
         storageAddress inputs largerFuel doneOutcome =
       some (some (some parentContinuation)) := by
   rw [
-    runCodeWithStorageParentIndexedContinuationContextWithInputs?_eq_some_some_some_iff]
+    runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_some_iff]
     at completed ⊢
   obtain ⟨context, continuation, refined, lowerCompleted, parentEq⟩ :=
     completed

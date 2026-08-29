@@ -11,7 +11,7 @@ namespace Solcore.Semantics.ParentIndexedFrameInitialization
 universe u v w
 
 /-- Lift the same input through storage selection, execution, and completion. -/
-def runCodeWithStorageParentIndexedContinuationContextWithInputs?
+def runCodeWithStorageParentIndexedContinuationContext?
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}

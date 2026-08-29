@@ -135,7 +135,7 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking)
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation))) :
     ∃ context continuation,
@@ -147,7 +147,7 @@ private example
       (parentContinuation.resolveWithTrapRollback).1 =
         continuation.resolve := by
   obtain ⟨context, continuation, refined, lowerCompleted, coherent⟩ :=
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_toFrameContinuationContext
+    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_toFrameContinuationContext
       storageAddress inputs fuel doneOutcome parentContinuation completed
   exact ⟨context, continuation, refined, lowerCompleted, coherent, by
     simpa only [
@@ -171,19 +171,19 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking}
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)))
     (more : fuel ≤ largerFuel) :
     ∃ largerContinuation,
-      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs largerFuel doneOutcome =
         some (some (some largerContinuation)) ∧
       largerContinuation.resolveWithTrapRollback =
         parentContinuation.resolveWithTrapRollback := by
   refine ⟨parentContinuation, ?_, rfl⟩
   exact
-    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_stable
+    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
       storageAddress inputs doneOutcome completed more
 
 end Tests
