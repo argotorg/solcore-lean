@@ -250,7 +250,7 @@ private theorem illTypedInputDataWordBEProgram_host_rejected :
 private def unboundHostIndexProgram : Program := {
   resultType := .sum .unit .word
   body :=
-    .apply (.var (HostFunction.inputDataWordBE?.index + 1)) (.word inputOffset)
+    .apply (.var HostFunction.all.length) (.word inputOffset)
 }
 
 private theorem unboundHostIndexProgram_host_rejected :
@@ -320,6 +320,15 @@ private theorem compileTimeHostCapabilityIndexes :
       HostFunction.inputDataSize.index = 7 ∧
       HostFunction.inputDataWordBE?.index = 8 := by
   decide
+
+private theorem compileTimeHostCapabilityRegistry :
+    HostFunction.all.Nodup ∧
+      (∀ function : HostFunction,
+        HostFunction.all[function.index]? = some function) ∧
+      HostFunction.all.map HostFunction.index =
+        List.range HostFunction.all.length :=
+  ⟨HostFunction.all_nodup, HostFunction.getElem?_all_index,
+    HostFunction.all_indices⟩
 
 private theorem compileTimeAddressContextIndexRegression :
     hostContext[HostFunction.storageAddress.index]? =
@@ -392,11 +401,13 @@ private theorem compileTimeInputDataWordBEEnvironmentIndexRegression :
   hostEnvironment_inputDataWordBE?
 
 private theorem compileTimeHostCapabilityLengths :
-    hostContext.length = 9 ∧ hostEnvironment.length = 9 :=
-  ⟨hostContext_length, hostEnvironment_length⟩
+    HostFunction.all.length = 9 ∧
+      hostContext.length = 9 ∧ hostEnvironment.length = 9 :=
+  ⟨HostFunction.all_length, hostContext_length, hostEnvironment_length⟩
 
 private theorem compileTimeFirstUnboundHostIndex :
-    hostContext[9]? = none ∧ hostEnvironment[9]? = none := by
+    hostContext[HostFunction.all.length]? = none ∧
+      hostEnvironment[HostFunction.all.length]? = none := by
   decide
 
 private def beginState : State :=
@@ -900,7 +911,9 @@ def testCoreHostMachine : IO Unit := do
     "the host checker accepted a non-Word input-word offset"
   assertTrue (!unboundHostIndexProgram.checkHost)
     "the host checker accepted the first unbound capability index"
-  assertTrue (hostContext[9]?.isNone && hostEnvironment[9]?.isNone)
+  assertTrue
+    (hostContext[HostFunction.all.length]?.isNone &&
+      hostEnvironment[HostFunction.all.length]?.isNone)
     "host index nine is no longer the first unbound position"
   assertTrue
     (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
@@ -929,7 +942,14 @@ def testCoreHostMachine : IO Unit := do
       some (.hostFunction .storageWrite))
     "the storage-write value is absent from the host environment"
   assertTrue
-    (HostFunction.storageRead.index == 0 &&
+    (HostFunction.all ==
+        [.storageRead, .storageWrite, .storageAddress, .codeAddress,
+          .callValue, .callerAddress, .inputDataByte?, .inputDataSize,
+          .inputDataWordBE?] &&
+      HostFunction.all.all (fun function =>
+        HostFunction.all[function.index]? == some function) &&
+      decide HostFunction.all.Nodup &&
+      HostFunction.storageRead.index == 0 &&
       HostFunction.storageWrite.index == 1 &&
       HostFunction.storageAddress.index == 2 &&
       HostFunction.codeAddress.index == 3 &&
@@ -938,6 +958,7 @@ def testCoreHostMachine : IO Unit := do
       HostFunction.inputDataByte?.index == 6 &&
       HostFunction.inputDataSize.index == 7 &&
       HostFunction.inputDataWordBE?.index == 8 &&
+      HostFunction.all.length == 9 &&
       hostContext.length == 9 && hostEnvironment.length == 9)
     "the append-only host capability layout changed"
   assertTrue

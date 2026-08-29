@@ -221,6 +221,21 @@ def resultType : HostFunction → Ty
     resultType .inputDataWordBE? = .sum .unit .word :=
   rfl
 
+/-- Canonical append-only order of internal host capabilities. -/
+def all : List HostFunction :=
+  [.storageRead, .storageWrite, .storageAddress, .codeAddress,
+    .callValue, .callerAddress, .inputDataByte?, .inputDataSize,
+    .inputDataWordBE?]
+
+@[simp] theorem all_length : all.length = 9 :=
+  rfl
+
+theorem mem_all (function : HostFunction) : function ∈ all := by
+  cases function <;> simp [all]
+
+theorem all_nodup : all.Nodup := by
+  decide
+
 /-- Stable position in the append-only host capability context. -/
 def index : HostFunction → Nat
   | .storageRead => 0
@@ -259,6 +274,54 @@ def index : HostFunction → Nat
 
 @[simp] theorem index_inputDataWordBE? : index .inputDataWordBE? = 8 :=
   rfl
+
+@[simp] theorem getElem?_all_index (function : HostFunction) :
+    all[function.index]? = some function := by
+  cases function <;> rfl
+
+theorem all_indices :
+    all.map index = List.range all.length := by
+  rfl
+
+theorem index_injective : Function.Injective index := by
+  intro left right equalIndex
+  have leftLookup := getElem?_all_index left
+  have rightLookup := getElem?_all_index right
+  rw [equalIndex] at leftLookup
+  exact Option.some.inj (leftLookup.symm.trans rightLookup)
+
+theorem index_lt_all_length (function : HostFunction) :
+    function.index < all.length :=
+  (List.getElem?_eq_some_iff.mp (getElem?_all_index function)).1
+
+theorem exists_index_iff (position : Nat) :
+    (∃ function : HostFunction, function.index = position) ↔
+      position < all.length := by
+  constructor
+  · rintro ⟨function, rfl⟩
+    exact index_lt_all_length function
+  · intro bound
+    have represented : position ∈ all.map index := by
+      rw [all_indices]
+      exact List.mem_range.mpr bound
+    obtain ⟨function, _member, equality⟩ := List.mem_map.mp represented
+    exact ⟨function, equality⟩
+
+theorem getElem?_all_iff {position : Nat} {function : HostFunction} :
+    all[position]? = some function ↔ function.index = position := by
+  constructor
+  · intro lookup
+    have bound := (List.getElem?_eq_some_iff.mp lookup).1
+    obtain ⟨candidate, candidateIndex⟩ :=
+      (exists_index_iff position).mpr bound
+    have candidateLookup := getElem?_all_index candidate
+    rw [candidateIndex] at candidateLookup
+    have equalFunction : function = candidate :=
+      Option.some.inj (lookup.symm.trans candidateLookup)
+    simpa [equalFunction] using candidateIndex
+  · intro equality
+    subst position
+    exact getElem?_all_index function
 
 end HostFunction
 
