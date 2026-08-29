@@ -21,10 +21,11 @@ address-selected entry point exact: successful execution is equivalent to
 selected-code fuel evidence, while `none` is equivalent to the existing code
 lookup returning `none`. Concrete grammar and parser proof work stays paused
 until source syntax stabilizes.
-[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) is the active
-proof slice: it makes handled paths compositional and directly type-safe, then
-adds fixed-fuel result uniqueness and terminal-only cross-fuel stability without
-claiming that out-of-fuel is stable or that checked host code always terminates.
+[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) completes the
+follow-on proof slice: handled paths are compositional and directly type-safe.
+All fuel-sound results are unique at one budget; done and raw-fault results are
+also unique across budgets. It does not claim that out-of-fuel is stable or that
+checked host code always terminates.
 
 ## Completed foundation
 
@@ -151,11 +152,12 @@ These results remain regression obligations for every extension.
 | 103 | Handled-execution completeness and terminal fuel stability | Complete | Makes the generic handled-step relation executable in both directions and proves exact done/fault stability under additional fuel |
 | 104 | Retained storage-selector observation | Complete | Returns the existing storage selector as a lossless Word at index 2, with exact handler-context identity and no current, self, code, caller, or other call-frame identity |
 | 105 | Address-selected handled execution exact specification | Complete | Characterizes `some` by selected-code fuel evidence and `none` by code lookup failure without changing execution |
-| 106 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 107 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 108 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 109 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 110 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 106 | Handled-execution relational metatheory | Complete | Composes handled paths, proves direct type safety and fixed-fuel uniqueness, and compares only terminal results across budgets |
+| 107 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 108 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 109 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 110 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 111 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1741,6 +1743,21 @@ returning `none`; a selected run that exhausts fuel remains `some`.
 The slice adds two proofs and direct compile-time consumers only. It changes no
 runner, lookup, request, address role, lifecycle decision, parser, or public
 format. Full validation and independent P0-P3 audits pass.
+
+## Completed handled-execution relational metatheory
+
+[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) makes ordinary
+host paths and context-threading handled paths compositional. The handled
+relation now preserves Core typing directly, including across dependent
+request responses. At one exact fuel budget, two sound witnesses identify the
+same complete result.
+
+Done and raw-fault witnesses remain valid with more fuel and agree exactly
+across any two sufficient budgets, including their final handler contexts.
+Out-of-fuel remains deliberately budget-relative: the regression fixture stops
+after its context-changing request at fuel 1 and completes at fuel 3. Full
+validation and independent P0-P3 audits pass; no runtime or public format
+changed.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

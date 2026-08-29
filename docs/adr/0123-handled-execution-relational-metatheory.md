@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: composition, type safety, and result uniqueness for handled execution relations
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -26,7 +26,7 @@ lifecycle meaning.
 
 ## Decision
 
-Publish a compact relational metatheory at the existing generic boundaries.
+Expose a compact named relational metatheory at the existing generic boundaries.
 It has four parts:
 
 1. composition of ordinary Core host paths and handled paths;
@@ -72,7 +72,7 @@ suffix. Handler updates remain in order and are never commuted or erased.
 
 ## Relational type safety
 
-Publish direct preservation:
+Expose direct preservation:
 
 ```lean
 theorem HostDriver.HandledSteps.preserve
@@ -111,7 +111,7 @@ alter the typing argument.
 
 ## Fuel-sound result uniqueness
 
-For one exact budget, publish:
+For one exact budget, expose:
 
 ```lean
 theorem HostDriverResult.FuelSoundWith.result_unique
@@ -139,7 +139,7 @@ remains valid under a larger budget. The exact final context, value, local
 store, fault, and fault state remain unchanged.
 
 Using monotonicity and same-fuel uniqueness at the maximum of two budgets,
-publish exact cross-budget terminal uniqueness:
+expose exact cross-budget terminal uniqueness:
 
 ```lean
 theorem HostDriverResult.FuelSoundWith.done_result_unique ...
@@ -218,12 +218,59 @@ Keep every green commit below roughly 300 changed lines:
 6. run full validation and independent audit, then synchronize acceptance
    evidence and current-facing internal documents.
 
+## Implementation record
+
+`Core.HostSteps.trans` composes host-aware Core paths in execution order.
+`HostDriver.HandledSteps.trans` lifts composition through arbitrary dependent
+handlers. Its `.core`/`.handle` case joins the left Core path to the next
+request prefix; its `.handle` case joins only the handled suffix. The exact
+middle state and context remain indices of both paths, and the join adds no
+extra request cost.
+
+`HandledSteps.preserve` now follows typing through each Core prefix, typed
+request emission, exact dependent response, and handled suffix.
+`FuelSoundWith.hasType` lifts that proof to done, out-of-fuel, and impossible
+typed-fault outcomes without replaying the witness through the executor.
+
+`FuelSoundWith.result_unique` reuses ADR-0120 completeness to make all results
+unique at one exact fuel. `done_mono` and `fault_mono` widen only their stored
+path bound. `done_result_unique` and `fault_result_unique` raise two witnesses
+to a common maximum budget, then compare their complete results. Final handler
+context, Core value/store, error, and fault state all remain part of equality.
+No out-of-fuel monotonicity theorem was added.
+
+## Regression record
+
+The existing context-changing handler now supplies one connected regression
+story. Two nonempty Core paths compose in order. A handled request changes the
+Nat context from zero to one, then composes with two more Core transitions.
+The same typed storage-read path directly exercises handled preservation and
+fuel-evidence outcome typing.
+
+Further consumers exercise same-fuel result uniqueness, done and fault
+monotonicity, and exact cross-budget terminal-result uniqueness. A concrete run
+of the composed request fixture is out of fuel at budget 1 and done at budget 3,
+preventing terminal monotonicity from being generalized to out-of-fuel.
+
+## Acceptance evidence
+
+- the full build completed successfully with 619 build jobs;
+- `lake test` completed successfully with 1,126 jobs;
+- all four changed Lean modules passed trust-zero with warnings as errors;
+- workspace metadata and semantic-kernel policy checks passed;
+- printed axioms contain only existing standard `propext` and `Quot.sound`
+  dependencies, with no custom axiom, `Classical.choice`, or `sorryAx`;
+- independent proof and final audits found no P0, P1, P2, or P3 issue;
+- every commit stayed below 300 changed lines; and
+- the root README, parser-facing code, runtime behavior, and public formats
+  remained unchanged.
+
 ## Consequences
 
-Handled execution witnesses become compositional, directly type-safe, and
-functional at a fixed fuel budget. Terminal relational evidence also becomes
-independent of which sufficient budget produced it, including the exact final
-handler context.
+Handled paths are compositional and directly type-safe. Fuel-sound result
+witnesses are functional at a fixed fuel budget. Terminal relational evidence
+is independent of which sufficient budget produced it, including the exact
+final handler context.
 
 Later normalization, lifecycle, and contract-entry work can consume these
 properties without unfolding the relation or detouring through ad hoc executor

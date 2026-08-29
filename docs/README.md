@@ -59,6 +59,12 @@ completes the optional address-selected entry point without changing execution.
 `none` is exactly failure of the existing code lookup. A selected out-of-fuel
 run remains `some`.
 
+[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) completes the
+proof interface around handled paths. Paths can be joined and remain type-safe.
+At the same fuel, sound evidence always identifies the same full result. Done
+and raw-fault results also agree across sufficient budgets, but out-of-fuel may
+change when the budget changes.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
@@ -626,6 +632,13 @@ replay the same optional result, while optional failure says only that the
 working WorldState has no selected code. No runtime operation or public format
 changes.
 
+The completed
+[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) adds generic
+path composition and direct relational type preservation. Sound results are
+unique for one budget; done and raw-fault evidence identifies the same exact
+result across sufficient budgets. The final context remains part of that
+result, while out-of-fuel is intentionally excluded from cross-budget claims.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -895,6 +908,9 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
   fixes exact successful and failed specifications for address-selected
   handled execution without changing runtime behavior.
+- [ADR-0123](adr/0123-handled-execution-relational-metatheory.md)
+  fixes handled-path composition, direct type safety, and terminal result
+  uniqueness while keeping out-of-fuel budget-relative.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

@@ -328,6 +328,12 @@ result is now equivalent to exact selected-code fuel evidence, while `none` is
 equivalent to the existing code lookup returning `none`. Parser work remains
 paused while source syntax may still change.
 
+[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) completes the
+generic handled relation's composition, direct type safety, and result
+uniqueness interfaces. Same-fuel evidence always names one exact full driver
+result; done and raw-fault evidence agrees across larger budgets, while
+out-of-fuel remains budget-relative.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -346,6 +352,7 @@ paused while source syntax may still change.
 | Handled-execution completeness and terminal fuel stability | Complete | Core and generic relational replay, executable-result iff, exact final context, and done/fault larger-fuel stability complete; out-of-fuel stability is intentionally excluded | Not published |
 | Retained storage-selector observation | Complete | Append-only `unit -> word` capability at index 2, exact context identity, lossless widening, driver proofs, and distinct code/storage regressions complete | Not published |
 | Address-selected handled execution exact specification | Complete | Successful execution iff selected-code fuel evidence; optional failure iff working-WorldState code lookup failure; selected out-of-fuel remains an attempted execution | Not published |
+| Handled-execution relational metatheory | Complete | Core and handled path composition, direct relational type safety, same-fuel result uniqueness, and terminal-only cross-fuel uniqueness complete; out-of-fuel remains budget-relative | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2157,7 +2164,7 @@ address roles, parser, public formats, and frame lifecycle do not change. Full
 build, test, trust-zero, metadata, and semantic-kernel checks passed; independent
 audits found no P0-P3 issue.
 
-## Active handled-execution relational metatheory
+## Completed handled-execution relational metatheory
 
 [ADR-0123](adr/0123-handled-execution-relational-metatheory.md) adds the missing
 generic proof interfaces around the handled relation: path composition, direct
@@ -2166,7 +2173,8 @@ for done and raw-fault evidence.
 
 This proof-only slice keeps exact handler contexts and explicitly excludes
 cross-fuel out-of-fuel stability, normalization, lifecycle interpretation, and
-all parser or public-format changes.
+all parser or public-format changes. Full build, test, trust-zero, metadata, and
+semantic-kernel checks passed; independent audits found no P0-P3 issue.
 
 ## Meaning of completion
 

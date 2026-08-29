@@ -758,6 +758,15 @@ selection happens before execution, an out-of-fuel outcome after successful
 selection remains `some`, not a lookup failure. This is a proof interface only:
 the lookup, driver, handler, address roles, and lifecycle remain unchanged.
 
+ADR-0123 makes the generic relation usable without first converting every proof
+back into an executable equality. Ordinary host paths and context-threading
+handled paths compose, and handled paths preserve Core typing across dependent
+responses. Sound evidence at one fuel identifies one exact full driver result.
+Done and raw-fault evidence agrees across sufficient budgets, including the
+exact final handler context; out-of-fuel does not, because another budget may
+continue the same state and handle more requests. No new execution or lifecycle
+layer is introduced.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations
