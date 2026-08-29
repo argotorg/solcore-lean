@@ -406,7 +406,7 @@ private def assertMixedOutOfFuelAt
     (fuel : Nat)
     (expectedValue : Word)
     (boundary : MixedBoundary) : IO Unit := do
-  match context.runCodeWithStorageWithInputs? executionInputs fuel with
+  match context.runCodeWithStorage? executionInputs fuel with
   | none =>
       throw (IO.userError s!"fuel {fuel} lost the selected code")
   | some { context := resultContext, outcome := .outOfFuel state } =>
@@ -535,17 +535,17 @@ private theorem updateProgram_done_stable
     {finalContext :
       FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat)}
     (execution :
-      context.runCodeWithStorageWithInputs? executionInputs completionFuel =
+      context.runCodeWithStorage? executionInputs completionFuel =
         some ⟨finalContext,
           .done (.word newValue) [.bool true]⟩)
     (written : finalContext.storageAccount.storageRead targetSlot = newValue) :
     (baseContextFor updateCode).withPresentStorageAccount? = some context ∧
-      context.runCodeWithStorageWithInputs? executionInputs 64 =
+      context.runCodeWithStorage? executionInputs 64 =
         some ⟨finalContext,
           .done (.word newValue) [.bool true]⟩ ∧
       finalContext.storageAccount.storageRead targetSlot = newValue := by
   exact ⟨selected,
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_done_stable
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
       context executionInputs execution (by decide),
     written⟩
 
@@ -574,15 +574,15 @@ private theorem observeWriteObserveProgram_done_stable
     {finalContext :
       FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat)}
     (execution :
-      context.runCodeWithStorageWithInputs? executionInputs
+      context.runCodeWithStorage? executionInputs
           observeWriteObserveCompletionFuel =
         some ⟨finalContext, .done expectedStorageAddressPair []⟩) :
     (baseContextFor observeWriteObserveCode).withPresentStorageAccount? =
         some context ∧
-      context.runCodeWithStorageWithInputs? executionInputs 64 =
+      context.runCodeWithStorage? executionInputs 64 =
         some ⟨finalContext, .done expectedStorageAddressPair []⟩ := by
   exact ⟨selected,
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_done_stable
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
       context executionInputs execution (by decide)⟩
 
 /-- The selected code observation retains its exact result with more fuel. -/
@@ -593,15 +593,15 @@ private theorem codeAddressProgram_done_stable
         some context)
     {finalContext : HostStorageDriver.Context Nat (List Nat)}
     (execution :
-      context.runCodeWithStorageWithInputs? executionInputs
+      context.runCodeWithStorage? executionInputs
           codeAddressCompletionFuel =
         some ⟨finalContext, .done (.word expectedCodeAddressWord) []⟩) :
     (baseContextFor codeAddressCode).withPresentStorageAccount? =
         some context ∧
-      context.runCodeWithStorageWithInputs? executionInputs 32 =
+      context.runCodeWithStorage? executionInputs 32 =
         some ⟨finalContext, .done (.word expectedCodeAddressWord) []⟩ := by
   exact ⟨selected,
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_done_stable
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
       context executionInputs execution (by decide)⟩
 
 def testAddressSelectedHostStorage : IO Unit := do
@@ -639,7 +639,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the storage-address Account was absent")
   | some context =>
-      match context.runCodeWithStorageWithInputs? executionInputs 4 with
+      match context.runCodeWithStorage? executionInputs 4 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (storageAddressRequestReady state)
             "fuel 4 did not stop at the storage-address request"
@@ -651,9 +651,9 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 4 lost the storage-address code")
 
-      match context.runCodeWithStorageWithInputs?
+      match context.runCodeWithStorage?
           executionInputs storageAddressCompletionFuel,
-          context.runCodeWithStorageWithInputs? executionInputs 32 with
+          context.runCodeWithStorage? executionInputs 32 with
       | some result, some largerResult =>
           assertTrue
             (result.outcome == .done (.word expectedStorageAddressWord) [])
@@ -676,7 +676,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the code-address storage Account was absent")
   | some context =>
-      match context.runCodeWithStorageWithInputs? executionInputs 4 with
+      match context.runCodeWithStorage? executionInputs 4 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (codeAddressRequestReady state)
             "fuel 4 did not stop at the code-address request"
@@ -688,9 +688,9 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 4 lost the code-address code")
 
-      match context.runCodeWithStorageWithInputs?
+      match context.runCodeWithStorage?
           executionInputs codeAddressCompletionFuel,
-          context.runCodeWithStorageWithInputs? executionInputs 32 with
+          context.runCodeWithStorage? executionInputs 32 with
       | some result, some largerResult =>
           assertTrue
             (result.outcome == .done (.word expectedCodeAddressWord) [])
@@ -716,7 +716,7 @@ def testAddressSelectedHostStorage : IO Unit := do
       throw (IO.userError
         "the code-observe/write/code-observe storage Account was absent")
   | some context =>
-      match context.runCodeWithStorageWithInputs? executionInputs
+      match context.runCodeWithStorage? executionInputs
           observeWriteObserveSecondRequestFuel with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (codeAddressRequestReady state)
@@ -731,7 +731,7 @@ def testAddressSelectedHostStorage : IO Unit := do
           throw (IO.userError
             "fuel 23 lost code-observe/write/code-observe code")
 
-      match context.runCodeWithStorageWithInputs? executionInputs 29 with
+      match context.runCodeWithStorage? executionInputs 29 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (oneStepBeforeCodeAddressPair state)
             "fuel 29 did not stop one step before the code-address pair"
@@ -745,9 +745,9 @@ def testAddressSelectedHostStorage : IO Unit := do
           throw (IO.userError
             "fuel 29 lost code-observe/write/code-observe code")
 
-      match context.runCodeWithStorageWithInputs? executionInputs
+      match context.runCodeWithStorage? executionInputs
           observeWriteObserveCompletionFuel,
-          context.runCodeWithStorageWithInputs? executionInputs 64 with
+          context.runCodeWithStorage? executionInputs 64 with
       | some result, some largerResult =>
           assertTrue (result.outcome == .done expectedCodeAddressPair [])
             "fuel 30 returned unequal code selectors"
@@ -770,7 +770,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the observe/write/observe storage Account was absent")
   | some context =>
-      match context.runCodeWithStorageWithInputs? executionInputs
+      match context.runCodeWithStorage? executionInputs
           observeWriteObserveSecondRequestFuel with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (storageAddressRequestReady state)
@@ -783,7 +783,7 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 23 lost observe/write/observe code")
 
-      match context.runCodeWithStorageWithInputs? executionInputs 29 with
+      match context.runCodeWithStorage? executionInputs 29 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (oneStepBeforeStorageAddressPair state)
             "fuel 29 did not stop one step before the result pair"
@@ -795,9 +795,9 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 29 lost observe/write/observe code")
 
-      match context.runCodeWithStorageWithInputs? executionInputs
+      match context.runCodeWithStorage? executionInputs
           observeWriteObserveCompletionFuel,
-          context.runCodeWithStorageWithInputs? executionInputs 64 with
+          context.runCodeWithStorage? executionInputs 64 with
       | some result, some largerResult =>
           assertTrue (result.outcome == .done expectedStorageAddressPair [])
             "fuel 30 returned unequal storage selectors"
@@ -822,8 +822,8 @@ def testAddressSelectedHostStorage : IO Unit := do
       assertMixedOutOfFuelAt context 27 newValue .beforeFinalRead
       assertFrameContinuationAdapter context
 
-      match context.runCodeWithStorageWithInputs? executionInputs completionFuel,
-          context.runCodeWithStorageWithInputs? executionInputs 64 with
+      match context.runCodeWithStorage? executionInputs completionFuel,
+          context.runCodeWithStorage? executionInputs 64 with
       | none, _ =>
           throw (IO.userError "the working code Account was not selected")
       | _, none =>
@@ -840,8 +840,8 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the repeated-write storage Account was absent")
   | some context =>
-      match context.runCodeWithStorageWithInputs? executionInputs 64,
-          context.runCodeWithStorageWithInputs? executionInputs 96 with
+      match context.runCodeWithStorage? executionInputs 64,
+          context.runCodeWithStorage? executionInputs 96 with
       | none, _ =>
           throw (IO.userError "the repeated-write code was not selected")
       | _, none =>
@@ -858,7 +858,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the zero-write storage Account was absent")
   | some context =>
-      match context.runCodeWithStorageWithInputs? executionInputs 15 with
+      match context.runCodeWithStorage? executionInputs 15 with
       | some { context := resultContext, outcome := .outOfFuel _ } =>
           assertTrue (selectedTargetMissing resultContext)
             "fuel 15 lost the handled sparse-zero update"
@@ -868,7 +868,7 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "the zero boundary lost the selected code")
 
-      match context.runCodeWithStorageWithInputs?
+      match context.runCodeWithStorage?
           executionInputs zeroCompletionFuel with
       | none =>
           throw (IO.userError "the sparse-zero code Account was not selected")

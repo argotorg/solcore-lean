@@ -12,7 +12,7 @@ universe u v
 namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
 
 /-- Select and run code using the same immutable code selector and call input. -/
-def runCodeWithStorageWithInputs?
+def runCodeWithStorage?
     {RollbackState : Type u} {TraceState : Type v}
     (context :
       FrameCheckpointedWorkingPairWithPresentStorageAccount

@@ -23,7 +23,7 @@ def runCodeWithStorageContinuationContextWithInputs?
     Option
       (Option
         (FrameContinuationContext RollbackState TraceState TrapReason)) :=
-  (context.runCodeWithStorageWithInputs? inputs fuel).map fun result =>
+  (context.runCodeWithStorage? inputs fuel).map fun result =>
     result.toFrameContinuationContext?
       (fun current => current.context.values) doneOutcome
 

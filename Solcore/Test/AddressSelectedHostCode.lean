@@ -110,9 +110,9 @@ private theorem compileTimeNoFaultRegression
     (resultContext : HostStorageDriver.Context Nat (List Nat))
     (error : MachineFault)
     (faultState : State) :
-    context.runCodeWithStorageWithInputs? inputs fuel ≠
+    context.runCodeWithStorage? inputs fuel ≠
       some ⟨resultContext, .fault error faultState⟩ :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_ne_some_fault
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_ne_some_fault
     context inputs fuel resultContext error faultState
 
 private theorem compileTimeAbsentBranchRegression
@@ -121,8 +121,8 @@ private theorem compileTimeAbsentBranchRegression
     (fuel : Nat)
     (absent :
       context.context.values.working.1.account? inputs.codeAddress = none) :
-    context.runCodeWithStorageWithInputs? inputs fuel = none :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_of_absent
+    context.runCodeWithStorage? inputs fuel = none :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_of_absent
     context inputs fuel absent
 
 private theorem compileTimeNoCodeBranchRegression
@@ -133,8 +133,8 @@ private theorem compileTimeNoCodeBranchRegression
     (present :
       context.context.values.working.1.account? inputs.codeAddress = some account)
     (withoutCode : account.code? = none) :
-    context.runCodeWithStorageWithInputs? inputs fuel = none :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_of_account_without_code
+    context.runCodeWithStorage? inputs fuel = none :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_of_account_without_code
     context inputs account fuel present withoutCode
 
 private theorem compileTimePresentBranchRegression
@@ -146,9 +146,9 @@ private theorem compileTimePresentBranchRegression
     (accountPresent :
       context.context.values.working.1.account? inputs.codeAddress = some account)
     (codePresent : account.code? = some code) :
-    context.runCodeWithStorageWithInputs? inputs fuel =
+    context.runCodeWithStorage? inputs fuel =
       some (code.runWithStorage context inputs fuel) :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_of_present
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_of_present
     context inputs account code fuel accountPresent codePresent
 
 private theorem compileTimeRemainingFuelRegression
@@ -230,15 +230,15 @@ def testAddressSelectedHostCode : IO Unit := do
       throw (IO.userError "the working storage Account did not refine")
   | some context =>
       assertTrue
-        (context.runCodeWithStorageWithInputs?
+        (context.runCodeWithStorage?
           (inputsFor absentAddress) 12).isNone
         "an absent code Account unexpectedly executed"
       assertTrue
-        (context.runCodeWithStorageWithInputs?
+        (context.runCodeWithStorage?
           (inputsFor storageAddress) 12).isNone
         "the storage Account was incorrectly used as a code fallback"
 
-      match context.runCodeWithStorageWithInputs?
+      match context.runCodeWithStorage?
           (inputsFor codeAddress) 11 with
       | some result =>
           assertTrue (returnedContextLooksUnchanged result.context)
@@ -258,7 +258,7 @@ def testAddressSelectedHostCode : IO Unit := do
       | none =>
           throw (IO.userError "the working code Account was not selected")
 
-      match context.runCodeWithStorageWithInputs?
+      match context.runCodeWithStorage?
           (inputsFor codeAddress) 12 with
       | some result =>
           assertTrue
@@ -271,7 +271,7 @@ def testAddressSelectedHostCode : IO Unit := do
 
       let updatedContext :=
         context.writeStorage slotB alternateFinalValue
-      match updatedContext.runCodeWithStorageWithInputs?
+      match updatedContext.runCodeWithStorage?
           (inputsFor codeAddress) 12 with
       | some result =>
           assertTrue

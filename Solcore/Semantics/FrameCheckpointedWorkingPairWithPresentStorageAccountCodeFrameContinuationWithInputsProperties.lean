@@ -92,7 +92,7 @@ namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
           inputs fuel doneOutcome = none ↔
       context.context.values.working.1.code? inputs.codeAddress = none := by
   unfold runCodeWithStorageContinuationContextWithInputs?
-  unfold runCodeWithStorageWithInputs?
+  unfold runCodeWithStorage?
   cases selected :
       context.context.values.working.1.code? inputs.codeAddress with
   | none => simp only [Option.map_none]
@@ -110,10 +110,10 @@ theorem
     context.runCodeWithStorageContinuationContextWithInputs?
           inputs fuel doneOutcome = some none ↔
       ∃ resultContext exhausted,
-        context.runCodeWithStorageWithInputs? inputs fuel =
+        context.runCodeWithStorage? inputs fuel =
           some ⟨resultContext, .outOfFuel exhausted⟩ := by
   unfold runCodeWithStorageContinuationContextWithInputs?
-  cases execution : context.runCodeWithStorageWithInputs? inputs fuel with
+  cases execution : context.runCodeWithStorage? inputs fuel with
   | none => simp
   | some result =>
       cases result with
@@ -123,7 +123,7 @@ theorem
           | outOfFuel exhausted => simp
           | fault error faultState =>
               exact False.elim
-                (runCodeWithStorageWithInputs?_ne_some_fault
+                (runCodeWithStorage?_ne_some_fault
                   context inputs fuel resultContext error faultState execution)
 
 theorem
@@ -151,14 +151,14 @@ theorem
       cases outcome with
       | done value store =>
           have stable :=
-            runCodeWithStorageWithInputs?_some_done_stable
+            runCodeWithStorage?_some_done_stable
               context inputs execution more
           rw [stable]
           exact congrArg some resultCompleted
       | outOfFuel exhausted => simp at resultCompleted
       | fault error faultState =>
           exact False.elim
-            (runCodeWithStorageWithInputs?_ne_some_fault
+            (runCodeWithStorage?_ne_some_fault
               context inputs fuel resultContext error faultState execution)
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount

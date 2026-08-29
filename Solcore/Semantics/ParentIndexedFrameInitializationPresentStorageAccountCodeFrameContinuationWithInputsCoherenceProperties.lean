@@ -60,11 +60,11 @@ private theorem completedContinuationWithInputs_eq_parentIndexed
             simpa only [HostDriverResult.toFrameContinuationContext?_done,
               Option.some.injEq] using resultCompleted
           have checkpointPreserved :=
-            FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_checkpoint
+            FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_checkpoint
               context inputs fuel
               (HostDriverResult.mk finalContext (.done value store)) execution
           have effectsPreserved :=
-            FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_workingEffects
+            FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_workingEffects
               context inputs fuel
               (HostDriverResult.mk finalContext (.done value store)) execution
           have finalCheckpoint :

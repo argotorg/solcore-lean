@@ -17,17 +17,17 @@ abbrev InputCodeRunContext
     (RollbackState : Type u) (TraceState : Type v) :=
   HostStorageDriver.Context RollbackState TraceState
 
-@[simp] theorem runCodeWithStorageWithInputs?_of_absent
+@[simp] theorem runCodeWithStorage?_of_absent
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (absent :
       context.context.values.working.1.account? inputs.codeAddress = none) :
-    context.runCodeWithStorageWithInputs? inputs fuel = none := by
-  simp [runCodeWithStorageWithInputs?, WorldState.code?, absent]
+    context.runCodeWithStorage? inputs fuel = none := by
+  simp [runCodeWithStorage?, WorldState.code?, absent]
 
-@[simp] theorem runCodeWithStorageWithInputs?_of_account_without_code
+@[simp] theorem runCodeWithStorage?_of_account_without_code
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
@@ -37,10 +37,10 @@ abbrev InputCodeRunContext
       context.context.values.working.1.account? inputs.codeAddress =
         some account)
     (withoutCode : account.code? = none) :
-    context.runCodeWithStorageWithInputs? inputs fuel = none := by
-  simp [runCodeWithStorageWithInputs?, WorldState.code?, present, withoutCode]
+    context.runCodeWithStorage? inputs fuel = none := by
+  simp [runCodeWithStorage?, WorldState.code?, present, withoutCode]
 
-@[simp] theorem runCodeWithStorageWithInputs?_of_present
+@[simp] theorem runCodeWithStorage?_of_present
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
@@ -51,37 +51,37 @@ abbrev InputCodeRunContext
       context.context.values.working.1.account? inputs.codeAddress =
         some account)
     (codePresent : account.code? = some code) :
-    context.runCodeWithStorageWithInputs? inputs fuel =
+    context.runCodeWithStorage? inputs fuel =
       some (code.runWithStorage context inputs fuel) := by
-  simp [runCodeWithStorageWithInputs?, WorldState.code?,
+  simp [runCodeWithStorage?, WorldState.code?,
     accountPresent, codePresent]
 
-@[simp] theorem runCodeWithStorageWithInputs?_eq_none_iff
+@[simp] theorem runCodeWithStorage?_eq_none_iff
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    context.runCodeWithStorageWithInputs? inputs fuel = none ↔
+    context.runCodeWithStorage? inputs fuel = none ↔
       context.context.values.working.1.code? inputs.codeAddress = none := by
-  unfold runCodeWithStorageWithInputs?
+  unfold runCodeWithStorage?
   cases selected :
       context.context.values.working.1.code? inputs.codeAddress with
   | none => simp only [Option.map_none]
   | some code => simp only [Option.map_some, reduceCtorEq]
 
-theorem runCodeWithStorageWithInputs?_some_fuelSound
+theorem runCodeWithStorage?_some_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result : HostDriverResult (InputCodeRunContext RollbackState TraceState))
     (executed :
-      context.runCodeWithStorageWithInputs? inputs fuel = some result) :
+      context.runCodeWithStorage? inputs fuel = some result) :
     ∃ code,
       context.context.values.working.1.code? inputs.codeAddress = some code ∧
         HostStorageDriver.FuelSound result inputs fuel context
           (Core.State.initial code.program.body Core.hostEnvironment) := by
-  unfold runCodeWithStorageWithInputs? at executed
+  unfold runCodeWithStorage? at executed
   cases selected :
       context.context.values.working.1.code? inputs.codeAddress with
   | none => simp [selected] at executed
@@ -92,40 +92,40 @@ theorem runCodeWithStorageWithInputs?_some_fuelSound
       exact ⟨code, rfl,
         code.runWithStorage_fuelSound context inputs fuel⟩
 
-theorem runCodeWithStorageWithInputs?_eq_some_iff_fuelSound
+theorem runCodeWithStorage?_eq_some_iff_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result : HostDriverResult (InputCodeRunContext RollbackState TraceState)) :
-    context.runCodeWithStorageWithInputs? inputs fuel = some result ↔
+    context.runCodeWithStorage? inputs fuel = some result ↔
       ∃ code,
         context.context.values.working.1.code? inputs.codeAddress = some code ∧
           HostStorageDriver.FuelSound result inputs fuel context
             (Core.State.initial code.program.body Core.hostEnvironment) := by
   constructor
-  · exact runCodeWithStorageWithInputs?_some_fuelSound
+  · exact runCodeWithStorage?_some_fuelSound
       context inputs fuel result
   · rintro ⟨code, selected, sound⟩
-    unfold runCodeWithStorageWithInputs?
+    unfold runCodeWithStorage?
     rw [selected]
     exact congrArg some
       ((code.runWithStorage_eq_iff_fuelSound
         context inputs fuel result).2 sound)
 
-theorem runCodeWithStorageWithInputs?_some_hasType
+theorem runCodeWithStorage?_some_hasType
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result : HostDriverResult (InputCodeRunContext RollbackState TraceState))
     (executed :
-      context.runCodeWithStorageWithInputs? inputs fuel = some result) :
+      context.runCodeWithStorage? inputs fuel = some result) :
     ∃ code,
       context.context.values.working.1.code? inputs.codeAddress = some code ∧
         result.outcome.HasType
           code.program.resultType code.program.dataDefinitions := by
-  unfold runCodeWithStorageWithInputs? at executed
+  unfold runCodeWithStorage? at executed
   cases selected :
       context.context.values.working.1.code? inputs.codeAddress with
   | none => simp [selected] at executed
@@ -136,7 +136,7 @@ theorem runCodeWithStorageWithInputs?_some_hasType
       exact ⟨code, rfl,
         code.runWithStorage_hasType context inputs fuel⟩
 
-theorem runCodeWithStorageWithInputs?_ne_some_fault
+theorem runCodeWithStorage?_ne_some_fault
     {RollbackState : Type u} {TraceState : Type v}
     (context : InputCodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
@@ -144,9 +144,9 @@ theorem runCodeWithStorageWithInputs?_ne_some_fault
     (resultContext : InputCodeRunContext RollbackState TraceState)
     (error : Core.MachineFault)
     (faultState : Core.State) :
-    context.runCodeWithStorageWithInputs? inputs fuel ≠
+    context.runCodeWithStorage? inputs fuel ≠
       some ⟨resultContext, .fault error faultState⟩ := by
-  unfold runCodeWithStorageWithInputs?
+  unfold runCodeWithStorage?
   cases selected :
       context.context.values.working.1.code? inputs.codeAddress with
   | none => simp

@@ -43,7 +43,7 @@ private example
         ∃ context resultContext exhausted,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
-          context.runCodeWithStorageWithInputs? inputs fuel =
+          context.runCodeWithStorage? inputs fuel =
             some ⟨resultContext, .outOfFuel exhausted⟩) ∧
       (initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
             storageAddress inputs fuel doneOutcome =
