@@ -41,6 +41,50 @@ private theorem compileTimeWriteResumeRegression
       HostStorageDriver.handleSuspension_storageWrite_store
         context slot value continuation store⟩
 
+/-- The selector handler exposes its exact lossless, context-preserving response. -/
+private theorem compileTimeStorageAddressResumeRegression
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (continuation : List Frame) (store : Store) :
+    (HostStorageDriver.handleSuspension context
+        ⟨.storageAddress, continuation, store⟩).1 = context ∧
+      (HostStorageDriver.handleSuspension context
+        ⟨.storageAddress, continuation, store⟩).2.control =
+          .ret (.word (addressToWord context.context.storageAddress)) ∧
+      (HostStorageDriver.handleSuspension context
+        ⟨.storageAddress, continuation, store⟩).2.continuation = continuation ∧
+      (HostStorageDriver.handleSuspension context
+        ⟨.storageAddress, continuation, store⟩).2.store = store ∧
+      wordToAddress?
+          (HostStorageDriver.handler.handle context .storageAddress).2 =
+        some context.context.storageAddress := by
+  exact
+    ⟨HostStorageDriver.handleSuspension_storageAddress_context
+        context continuation store,
+      HostStorageDriver.handleSuspension_storageAddress_control
+        context continuation store,
+      HostStorageDriver.handleSuspension_storageAddress_continuation
+        context continuation store,
+      HostStorageDriver.handleSuspension_storageAddress_store
+        context continuation store,
+      HostStorageDriver.wordToAddress?_handler_storageAddress context⟩
+
+/-- The public selector rule reuses Core's exact remaining fuel. -/
+private theorem compileTimeStorageAddressRemainingFuelRegression
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (fuel remainingFuel : Nat) (state : State)
+    (continuation : List Frame) (store : Store)
+    (execution :
+      hostRun fuel state =
+        .suspended ⟨.storageAddress, continuation, store⟩ remainingFuel) :
+    HostStorageDriver.run context fuel state =
+      HostStorageDriver.run context remainingFuel
+        ⟨.ret (.word (addressToWord context.context.storageAddress)),
+          continuation, store⟩ :=
+  HostStorageDriver.run_of_suspended_storageAddress
+    context fuel remainingFuel state continuation store execution
+
 /-- Public handler observations fix read-after-write and sparse zero deletion. -/
 private theorem compileTimeWriteObservationRegression
     {RollbackState : Type u}
