@@ -127,6 +127,94 @@ private theorem compileTimeSelectedEvidenceRegression
       FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_fuelSound
         context codeAddress fuel result executed⟩
 
+/-- The public selected entry point exposes its complete successful specification. -/
+private theorem compileTimeSelectedCompletenessRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (result :
+      HostDriverResult (HostStorageDriver.Context RollbackState TraceState)) :
+    context.runCodeWithStorage? codeAddress fuel = some result ↔
+      ∃ code,
+        context.context.values.working.1.code? codeAddress = some code ∧
+          HostStorageDriver.FuelSound result fuel context
+            (State.initial code.program.body hostEnvironment) :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_eq_some_iff_fuelSound
+    context codeAddress fuel result
+
+/-- The forward iff direction recovers the selected code and exact fuel evidence. -/
+private theorem compileTimeSelectedCompletenessForwardRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (result :
+      HostDriverResult (HostStorageDriver.Context RollbackState TraceState))
+    (executed :
+      context.runCodeWithStorage? codeAddress fuel = some result) :
+    ∃ code,
+      context.context.values.working.1.code? codeAddress = some code ∧
+        HostStorageDriver.FuelSound result fuel context
+          (State.initial code.program.body hostEnvironment) :=
+  (compileTimeSelectedCompletenessRegression
+    context codeAddress fuel result).mp executed
+
+/-- Selected-code fuel evidence replays to the exact optional execution result. -/
+private theorem compileTimeSelectedCompletenessReplayRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (result :
+      HostDriverResult (HostStorageDriver.Context RollbackState TraceState))
+    (code : CheckedHostCoreProgram)
+    (selected :
+      context.context.values.working.1.code? codeAddress = some code)
+    (sound :
+      HostStorageDriver.FuelSound result fuel context
+        (State.initial code.program.body hostEnvironment)) :
+    context.runCodeWithStorage? codeAddress fuel = some result :=
+  (compileTimeSelectedCompletenessRegression
+    context codeAddress fuel result).mpr ⟨code, selected, sound⟩
+
+/-- Optional failure is exactly failure of the existing code lookup. -/
+private theorem compileTimeSelectedNoneCompletenessRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat) :
+    context.runCodeWithStorage? codeAddress fuel = none ↔
+      context.context.values.working.1.code? codeAddress = none :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_eq_none_iff
+    context codeAddress fuel
+
+/-- A selected exhausted run remains an attempted execution, never `none`. -/
+private theorem compileTimeSelectedOutOfFuelIsSomeRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (code : CheckedHostCoreProgram)
+    (selected :
+      context.context.values.working.1.code? codeAddress = some code)
+    (finalContext : HostStorageDriver.Context RollbackState TraceState)
+    (state : State)
+    (exhausted :
+      code.runWithStorage context fuel =
+        ⟨finalContext, .outOfFuel state⟩) :
+    context.runCodeWithStorage? codeAddress fuel =
+      some ⟨finalContext, .outOfFuel state⟩ := by
+  unfold FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?
+  rw [selected]
+  simp only [Option.map_some]
+  exact congrArg some exhausted
+
 /-- A selected checked run cannot expose the raw driver fault branch. -/
 private theorem compileTimeSelectedNoFaultRegression
     {RollbackState : Type u}
