@@ -65,6 +65,12 @@ At the same fuel, sound evidence always identifies the same full result. Done
 and raw-fault results also agree across sufficient budgets, but out-of-fuel may
 change when the budget changes.
 
+[ADR-0126](adr/0126-selected-code-address-observation.md) is the active runtime
+slice. It exposes the existing code selector as an internal Unit-to-Word host
+observation and uses the same Address for selected lookup and handler
+execution. This adds no caller, current-contract, call-frame, ABI, or source
+syntax meaning.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

@@ -750,6 +750,14 @@ The capability remains internal: Wire and runtime-publication formats still
 reject host values, and Oracle, Surface, Parser, and public runtime schemas are
 unchanged.
 
+ADR-0126 specifies the next observation from an existing input rather than
+inventing a call-frame role. The selected `codeAddress` becomes a static
+parameter of the combined handler and is returned by a fourth internal
+`unit -> word` capability. The high-level selected runner uses that same
+Address for checked-code lookup and handler execution, so observation cannot
+drift from selection. It remains distinct from the storage selector and does
+not imply current-contract, caller, callee, or authority identity.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

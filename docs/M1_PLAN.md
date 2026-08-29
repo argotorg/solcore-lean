@@ -34,6 +34,10 @@ nested options so code absence and selected out-of-fuel cannot be confused.
 the parent-indexed lift. It also preserves storage-Account absence and
 constructs the existing proof-bearing parent continuation only after normal
 selected completion.
+[ADR-0126](adr/0126-selected-code-address-observation.md) is the active
+code-selector observation. It appends `codeAddress : unit -> word` without
+moving the three existing capabilities, and requires one Address to drive both
+selected lookup and the handler response.
 
 ## Completed foundation
 
@@ -163,11 +167,12 @@ These results remain regression obligations for every extension.
 | 106 | Handled-execution relational metatheory | Complete | Composes handled paths, proves direct type safety and fixed-fuel uniqueness, and compares only terminal results across budgets |
 | 107 | Completed handled execution to frame continuation | Complete | Adapts only normal completion through a caller-owned outcome policy while preserving code absence and selected exhaustion as distinct results |
 | 108 | Parent-indexed selected execution continuation | Complete | Preserves storage absence, code absence, selected exhaustion, and completion while refining only completion to the existing parent-indexed context |
-| 109 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 110 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 111 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 112 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 113 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 109 | Selected code-address observation | In progress | Returns the existing code selector as a lossless Word at index 3 and keeps it distinct from the storage selector |
+| 110 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 111 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 112 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 113 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 114 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1806,6 +1811,18 @@ All six public laws have direct compile consumers. The full 627-job build and
 1,142-job test suite, strict trust-zero compilation, metadata checks, and
 semantic-kernel policy checks pass. Independent final audits found no P0-P3
 issue.
+
+## Active selected code-address observation
+
+[ADR-0126](adr/0126-selected-code-address-observation.md) appends a fourth
+internal host capability. `codeAddress : unit -> word` observes the Address
+already supplied to select checked code; the high-level selected runner keeps
+one argument for both lookup and handler execution.
+
+The selector is a static run parameter rather than a duplicate field in the
+mutable storage context. It is not a current contract, `self`, callee, caller,
+authority, or storage selector. Core sees only Unit and Word, and frozen Wire
+formats continue to reject host functions.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
