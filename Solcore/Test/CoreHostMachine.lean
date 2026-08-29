@@ -51,6 +51,35 @@ private theorem illTypedStorageReadProgram_host_rejected :
 private def checkedStorageReadProgram : CheckedHostCoreProgram :=
   ⟨storageReadProgram, storageReadProgram_host_checked⟩
 
+private def storageWriteProgram : Program := {
+  resultType := .unit
+  body :=
+    .apply (.var HostFunction.storageWrite.index)
+      (.pair (.word slot) (.word response))
+}
+
+private theorem storageWriteProgram_host_checked :
+    storageWriteProgram.checkHost = true := by
+  decide
+
+private theorem storageWriteProgram_closed_rejected :
+    storageWriteProgram.check = false := by
+  decide
+
+private def illTypedStorageWriteProgram : Program := {
+  resultType := .unit
+  body :=
+    .apply (.var HostFunction.storageWrite.index)
+      (.pair (.word slot) (.bool true))
+}
+
+private theorem illTypedStorageWriteProgram_host_rejected :
+    illTypedStorageWriteProgram.checkHost = false := by
+  decide
+
+private def checkedStorageWriteProgram : CheckedHostCoreProgram :=
+  ⟨storageWriteProgram, storageWriteProgram_host_checked⟩
+
 private theorem compileTimeAdmissionRegression :
     CheckedHostCoreProgram.ofProgram? storageReadProgram =
       some checkedStorageReadProgram := by
@@ -72,6 +101,16 @@ private theorem compileTimeHostEnvironmentIndexRegression :
       some (.hostFunction .storageRead) :=
   hostEnvironment_storageRead
 
+private theorem compileTimeWriteContextIndexRegression :
+    hostContext[HostFunction.storageWrite.index]? =
+      some (HostFunction.functionType .storageWrite) :=
+  hostContext_storageWrite
+
+private theorem compileTimeWriteEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.storageWrite.index]? =
+      some (.hostFunction .storageWrite) :=
+  hostEnvironment_storageWrite
+
 private def beginState : State :=
   ⟨.ret (.hostFunction .storageRead),
     [.applyArgument (.word slot) hostEnvironment], []⟩
@@ -85,6 +124,13 @@ private def requestState : State :=
 private def requestSuspension : HostSuspension :=
   ⟨.storageRead slot, [], []⟩
 
+private def writeRequestState : State :=
+  ⟨.ret (.pair (.word slot) (.word response)),
+    [.hostApply .storageWrite], []⟩
+
+private def writeSuspension : HostSuspension :=
+  ⟨.storageWrite slot response, [], []⟩
+
 private theorem compileTimeBeginCorrespondenceRegression :
     HostTransition beginState argumentState := by
   apply hostAdvance_next_iff.mp
@@ -94,6 +140,11 @@ private theorem compileTimeRequestCorrespondenceRegression :
     HostRequestEmission requestState requestSuspension := by
   apply hostAdvance_suspended_iff.mp
   exact hostAdvance_suspend_storageRead slot [] []
+
+private theorem compileTimeWriteCorrespondenceRegression :
+    HostRequestEmission writeRequestState writeSuspension := by
+  apply hostAdvance_suspended_iff.mp
+  exact hostAdvance_suspend_storageWrite slot response [] []
 
 private theorem compileTimeTransitionDeterminismRegression
     {next : State}
@@ -123,6 +174,10 @@ private theorem compileTimeResumeRegression :
   HostSuspension.resume_storageRead
     slot response retainedContinuation retainedStore
 
+private theorem compileTimeWriteResumeRegression :
+    writeSuspension.resume () = State.final .unit [] :=
+  HostSuspension.resume_storageWrite slot response () [] []
+
 private theorem compileTimeSuspensionTypingRegression :
     HostSuspensionHasType requestSuspension .word [] := by
   apply CheckedHostCoreProgram.runStateful_suspended_hasType
@@ -139,12 +194,26 @@ private theorem compileTimeCheckedRunNeverFaults
   CheckedHostCoreProgram.runStateful_ne_fault
     checkedStorageReadProgram fuel error faultState
 
+private theorem compileTimeCheckedWriteNeverFaults
+    (fuel : Nat) (error : MachineFault) (faultState : State) :
+    checkedStorageWriteProgram.runStateful fuel ≠ .fault error faultState :=
+  CheckedHostCoreProgram.runStateful_ne_fault
+    checkedStorageWriteProgram fuel error faultState
+
 private theorem compileTimeWireV1RejectionRegression :
     Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead) = none :=
   rfl
 
 private theorem compileTimeWireV2RejectionRegression :
     Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageRead) = none :=
+  rfl
+
+private theorem compileTimeWriteWireV1RejectionRegression :
+    Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageWrite) = none :=
+  rfl
+
+private theorem compileTimeWriteWireV2RejectionRegression :
+    Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageWrite) = none :=
   rfl
 
 private def cellStorageReadProgram : Program := {
@@ -178,6 +247,12 @@ def testCoreHostMachine : IO Unit := do
     "the closed checker accepted a program with an unbound host capability"
   assertTrue (!illTypedStorageReadProgram.checkHost)
     "the host checker accepted a storage read with a Boolean argument"
+  assertTrue storageWriteProgram.checkHost
+    "the host checker rejected a storage-write program"
+  assertTrue (!storageWriteProgram.check)
+    "the closed checker accepted a storage-write capability"
+  assertTrue (!illTypedStorageWriteProgram.checkHost)
+    "the host checker accepted an invalid storage-write pair"
   assertTrue
     (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
     "checked host admission retained a program rejected by the host checker"
@@ -196,6 +271,14 @@ def testCoreHostMachine : IO Unit := do
     (hostEnvironment[HostFunction.storageRead.index]? ==
       some (.hostFunction .storageRead))
     "the storage-read value moved in the host environment"
+  assertTrue
+    (hostContext[HostFunction.storageWrite.index]? ==
+      some (HostFunction.functionType .storageWrite))
+    "the storage-write type is absent from the host context"
+  assertTrue
+    (hostEnvironment[HostFunction.storageWrite.index]? ==
+      some (.hostFunction .storageWrite))
+    "the storage-write value is absent from the host environment"
 
   assertTrue (hostAdvance beginState == .next argumentState)
     "host application did not begin by evaluating its argument"
@@ -207,11 +290,22 @@ def testCoreHostMachine : IO Unit := do
     (hostAdvance invalidState ==
       .fault (.invalidHostArgument .storageRead (.bool true)))
     "a non-Word storage slot did not retain the raw machine fault"
+  assertTrue (hostAdvance writeRequestState == .suspended writeSuspension)
+    "a Word pair did not emit the expected storage write"
+  let invalidWriteState : State :=
+    ⟨.ret (.pair (.word slot) (.bool true)), [.hostApply .storageWrite], []⟩
+  assertTrue
+    (hostAdvance invalidWriteState ==
+      .fault (.invalidHostArgument .storageWrite
+        (.pair (.word slot) (.bool true))))
+    "a malformed storage-write pair did not fault"
 
   assertTrue
     (retainedSuspension.resume response ==
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩)
     "resume changed the continuation or Core-local store"
+  assertTrue (writeSuspension.resume () == State.final .unit [])
+    "storage-write resume did not inject Unit"
 
   assertTrue
     (checkedStorageReadProgram.runStateful 4 == .outOfFuel requestState)
@@ -267,5 +361,11 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageRead)).isNone
     "Core wire v2 encoded an internal host value"
+  assertTrue
+    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageWrite)).isNone
+    "Core wire v1 encoded the storage-write host value"
+  assertTrue
+    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageWrite)).isNone
+    "Core wire v2 encoded the storage-write host value"
 
 end Tests
