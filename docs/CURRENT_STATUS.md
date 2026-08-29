@@ -2265,6 +2265,18 @@ law reports exactly `[propext]`; the 632-job build, 1,152-job test suite,
 trust-zero, metadata, semantic-kernel, and independent audits pass. Parser work
 and every public format remain unchanged.
 
+## Active parent-indexed trap-aware resolution fold
+
+[ADR-0129](adr/0129-parent-indexed-trap-aware-resolution-fold.md) adds one pure,
+total fold over a completed parent-indexed context. Three caller-owned
+functions receive the exact return, revert, or trap values already fixed by
+ADR-0127, and a fourth law must reconstruct the complete ADR-0127 view.
+
+The fold returns an arbitrary caller-selected type and introduces no optional
+failure of its own. It does not apply rollback, mutate or resume a parent,
+deliver bytes, classify traps, or define transaction finalization. Parser work
+and public formats remain unchanged.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable

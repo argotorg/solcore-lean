@@ -780,6 +780,11 @@ one naturality law moves heterogeneous trap-reason mapping through the first
 component while proving that the rollback-selection component is unchanged.
 Identity and heterogeneous composition normalize through the same rule.
 
+ADR-0129 is the active pure elimination boundary. A total generic fold selects
+one caller-owned function for return, revert, or trap and supplies the exact
+values fixed by ADR-0127. The returned value has caller-selected type; the fold
+does not mutate a parent or interpret rollback, bytes, or traps.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

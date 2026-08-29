@@ -44,6 +44,9 @@ opt-in trap rollback without claiming parent resumption or transaction commit.
 [ADR-0128](adr/0128-parent-indexed-resolution-view-trap-reason-mapping-naturality.md)
 completes the proof-only naturality slice for that view. It maps only trapped
 reasons and preserves the exact rollback-selection component.
+[ADR-0129](adr/0129-parent-indexed-trap-aware-resolution-fold.md) is the active
+pure fold over the same completed context. Caller-owned functions receive one
+exact return, revert, or trap branch without parent or transaction execution.
 
 ## Completed foundation
 
@@ -176,11 +179,12 @@ These results remain regression obligations for every extension.
 | 109 | Selected code-address observation | Complete | Returns the existing code selector as a lossless Word at index 3, uses it for both lookup and execution, and keeps it distinct from the storage selector |
 | 110 | Parent-indexed resolution view | Complete | Pairs total return/revert/trap resolution with opt-in trap rollback selection without applying either result |
 | 111 | Resolution-view trap-reason mapping naturality | Complete | Maps only the total-resolution component and preserves exact optional rollback selection without adding an operation |
-| 112 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 113 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 114 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 115 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 116 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 112 | Parent-indexed trap-aware resolution fold | In progress | Selects one pure caller-owned function for each resolved branch without applying the supplied values |
+| 113 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 114 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 115 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 116 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 117 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1866,6 +1870,17 @@ operation. Its regressions cover direct use, identity, heterogeneous
 composition, bytes-aware continuation invariance, and simp critical-pair
 convergence. The 632-job build, 1,152-job test suite, trust-zero checks,
 metadata, kernel policy, and independent audits pass.
+
+## Active parent-indexed trap-aware resolution fold
+
+[ADR-0129](adr/0129-parent-indexed-trap-aware-resolution-fold.md) replaces the
+manual coordination of ADR-0127's two observations with one total, generic
+fold. Return and revert callbacks receive exact resolved pairs and bytes; the
+trap callback receives the exact parent rollback pair and reason.
+
+The caller chooses the result type, including whether it is optional. The fold
+itself applies no rollback, executes no callback policy beyond branch
+selection, resumes no parent, and defines no transaction boundary.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
