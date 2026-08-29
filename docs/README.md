@@ -133,6 +133,13 @@ This is not an input-size API, a multi-byte or Word loader, an endianness or
 padding rule, ABI calldata, source
 syntax, Wire encoding, or a published runtime interface.
 
+[ADR-0134](adr/0134-run-fixed-input-size-observation.md) is the active runtime
+slice. It converts the retained exact input length to `sizeWord` without
+truncation and exposes it through internal `inputDataSize : unit -> word` at
+index 7. Optional byte lookup is present exactly below that size and absent at
+or above it. This does not define ABI calldata, multi-byte decoding,
+nested-call input derivation, source syntax, Wire encoding, or publication.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

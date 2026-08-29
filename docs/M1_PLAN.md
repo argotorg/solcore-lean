@@ -67,9 +67,16 @@ identity, authentication, origin, current/callee identity, or nested-call rule.
 bounded optional input-byte observation. One bounded `InputData` value is part
 of the immutable run input, and internal Core observes one optional byte
 through `inputDataByte? : word -> sum unit word` at index 6. The Unit branch
-means an absent index; the Word branch includes a present zero byte. Size,
-wider loads,
-endianness, padding, ABI, calldata, syntax, and publication remain separate.
+means an absent index; the Word branch includes a present zero byte. ADR-0133
+itself leaves size, wider loads, endianness, padding, ABI, calldata, syntax,
+and publication separate.
+
+[ADR-0134](adr/0134-run-fixed-input-size-observation.md) is the active slice.
+It derives the exact input length as `sizeWord` from ADR-0133's strict bound
+and exposes it through internal `inputDataSize : unit -> word` at index 7.
+The byte lookup is present exactly below that size and absent at or above it.
+ABI, calldata, multi-byte loads, nested-call derivation, syntax, and
+publication remain separate.
 
 ## Completed foundation
 
@@ -207,11 +214,12 @@ These results remain regression obligations for every extension.
 | 114 | End-to-end call-value observation | Complete | Carries one explicit run-fixed Word through the internal Core request, handled execution, selected completion, and parent-indexed continuation; the value-derived result reaches the existing resolution fold without a balance-transfer claim |
 | 115 | Run-fixed caller-address observation | Complete | Carries one explicit caller-supplied Address through `ExecutionInputs` and exposes its exact lossless Word at Core host index 5 without broader caller semantics |
 | 116 | Bounded optional input-byte observation | Complete | Carries one bounded run-fixed `InputData` value and exposes one present byte or explicit absence at Core host index 6 |
-| 117 | Further contract-entry input roles | Planned | Add current, callee, size, wider data loads, or kind only when an identified Core consumer and lifetime rule exist |
-| 118 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 119 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 120 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 121 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 117 | Run-fixed input-size observation | Active | Derive the exact bounded input length as a Word, expose it at Core host index 7, and prove its boundary agrees with optional byte lookup |
+| 118 | Further contract-entry input roles | Planned | Add current, callee, wider data loads, or kind only when an identified Core consumer and lifetime rule exist |
+| 119 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 120 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 121 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 122 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.

@@ -819,9 +819,17 @@ storage.
 Internal Core receives append-only
 `inputDataByte? : word -> sum unit word` at index 6. The result uses Unit for an
 absent index and Word for a present byte, so a present input byte whose value is
-zero cannot be mistaken for absence. The slice deliberately adds no size
-observation, multi-byte or Word load, endianness, padding, ABI, calldata,
-parser, Wire, or public-runtime rule.
+zero cannot be mistaken for absence. ADR-0133 itself adds no size observation,
+multi-byte or Word load, endianness, padding, ABI, calldata, parser, Wire, or
+public-runtime rule.
+
+ADR-0134 defines the active exact-size observation over that same immutable
+input. `InputData.sizeWord` uses the retained strict bound to represent the
+natural byte length without truncation, and internal
+`inputDataSize : unit -> word` is appended at index 7. Exact coherence makes
+`inputDataByte?` present precisely below `sizeWord` and absent at or above it.
+This adds no ABI or calldata meaning, multi-byte decoding, nested-call input
+derivation, parser dependency, Wire tag, or public interface.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

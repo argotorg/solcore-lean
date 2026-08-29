@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose the exact size of the bounded immutable input to internal Core code
-- Implementation: Not started
+- Implementation: In progress
 
 ## Context
 
