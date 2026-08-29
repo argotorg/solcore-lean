@@ -38,7 +38,7 @@ selected completion.
 code-selector observation. It appends `codeAddress : unit -> word` without
 moving the three existing capabilities, and uses one Address for both selected
 lookup and the handler response.
-[ADR-0127](adr/0127-parent-indexed-resolution-view.md) is the active
+[ADR-0127](adr/0127-parent-indexed-resolution-view.md) completes the
 frame-local composition. It pairs existing total resolution with existing
 opt-in trap rollback without claiming parent resumption or transaction commit.
 
@@ -171,7 +171,7 @@ These results remain regression obligations for every extension.
 | 107 | Completed handled execution to frame continuation | Complete | Adapts only normal completion through a caller-owned outcome policy while preserving code absence and selected exhaustion as distinct results |
 | 108 | Parent-indexed selected execution continuation | Complete | Preserves storage absence, code absence, selected exhaustion, and completion while refining only completion to the existing parent-indexed context |
 | 109 | Selected code-address observation | Complete | Returns the existing code selector as a lossless Word at index 3, uses it for both lookup and execution, and keeps it distinct from the storage selector |
-| 110 | Parent-indexed resolution view | In progress | Pairs total return/revert/trap resolution with opt-in trap rollback selection without applying either result |
+| 110 | Parent-indexed resolution view | Complete | Pairs total return/revert/trap resolution with opt-in trap rollback selection without applying either result |
 | 111 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
 | 112 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 113 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1835,7 +1835,7 @@ address `0x10` from storage address `0x20`, stop at fuel 4, complete at fuel 5,
 and retain the same completed result at fuel 32. Full build, test, strict
 compilation, metadata, and kernel checks pass.
 
-## Active parent-indexed resolution view
+## Completed parent-indexed resolution view
 
 [ADR-0127](adr/0127-parent-indexed-resolution-view.md) pairs the existing total
 resolution of a completed parent-indexed frame with its existing opt-in trap
@@ -1845,8 +1845,10 @@ rollback pair.
 
 This is a value-level view only. It does not apply rollback, execute or resume
 a parent, select callbacks across ADR-0125's optional layers, or define a root
-frame or transaction checkpoint. The exact equations and compile consumers are
-the active implementation slice.
+frame or transaction checkpoint. Four non-simp laws use only `[propext]` and
+compile consumers cover exact callbacks, trap rollback, parent-context
+coherence, and larger-fuel completion. The 630-job build, 1,148-job test suite,
+strict compilation, metadata, kernel-policy, and independent audits pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

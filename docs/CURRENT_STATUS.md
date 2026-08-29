@@ -2231,7 +2231,7 @@ found no correctness gap.
 This slice introduces no caller, current-contract, authority, call frame, ABI,
 or source-syntax meaning. Parser work remains paused.
 
-## Active parent-indexed resolution view
+## Completed parent-indexed resolution view
 
 [ADR-0127](adr/0127-parent-indexed-resolution-view.md) combines two existing
 observations of a completed parent-indexed frame: total return/revert/trap
@@ -2239,8 +2239,17 @@ resolution and the opt-in rollback pair selected only for a trap.
 
 The operation is a pure read-only pairing. It does not apply rollback, resume a
 parent, deliver bytes, flatten ADR-0125's optional boundaries, or define
-transaction commit. Exact branch equations and compile consumers are the
-active implementation work.
+transaction commit. Four exact non-simp laws cover return, revert, trap, and
+successful rollback selection; all report only `[propext]`.
+
+Compile consumers pass return and revert through existing bytes-aware
+callbacks, keep trap callback rejection separate from exact rollback
+selection, transport ADR-0125 whole-context coherence through the first
+component, and preserve the exact three-layer optional result under additional
+fuel. The 630-job build, 1,148-job test suite, trust-zero warning checks,
+metadata and semantic-kernel checks, and independent P0-P3 audits pass. No new
+runtime fixture was needed because the view only pairs already tested
+operations.
 
 ## Meaning of completion
 

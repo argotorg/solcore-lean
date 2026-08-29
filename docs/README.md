@@ -73,10 +73,11 @@ handler execution. Exact safety, fuel, recovery, and stability laws are
 covered without adding caller, current-contract, call-frame, ABI, or source
 syntax meaning.
 
-[ADR-0127](adr/0127-parent-indexed-resolution-view.md) is the active
-frame-resolution slice. It pairs the existing total resolution with the
-existing opt-in trap rollback selection, without applying rollback, resuming a
-parent, flattening execution failures, or defining transaction commit.
+[ADR-0127](adr/0127-parent-indexed-resolution-view.md) completes the
+parent-indexed resolution view. It pairs the existing total resolution with
+the existing opt-in trap rollback selection. Exact branch laws and compile
+consumers preserve all selected-execution boundaries without applying
+rollback, resuming a parent, or defining transaction commit.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

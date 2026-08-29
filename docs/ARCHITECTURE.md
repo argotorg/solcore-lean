@@ -770,6 +770,11 @@ the optional rollback pair already selected for traps. It is a read-only view:
 the generic resolver remains reason-only on trap, no rollback is applied, and
 no parent machine or transaction boundary is introduced.
 
+Four exact branch laws characterize return, revert, trap, and successful
+rollback selection. Compile consumers connect the first component to existing
+bytes-aware callbacks and preserve ADR-0125's whole-context and fuel-stability
+boundaries. The view introduces no new execution path or runtime fixture.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

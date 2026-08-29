@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: combine completed-frame resolution with opt-in trap rollback
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -200,9 +200,9 @@ This ADR does not define:
 - caller, current address, call value, calldata, or call kind; or
 - source syntax, gas, EVM revision behavior, or publication.
 
-## Implementation sequence
+## Implemented sequence
 
-Keep each green commit below roughly 300 changed lines:
+The work was completed in this order:
 
 1. record and activate the exact frame-local view;
 2. add the pure pairing operation and Semantics export;
@@ -211,6 +211,39 @@ Keep each green commit below roughly 300 changed lines:
    completion interfaces; and
 5. run full validation and independent audit, then synchronize acceptance
    evidence and current-facing internal documents.
+
+## Implementation record
+
+`ParentIndexedFrameResolutionView.lean` defines only the read-only pair
+`(context.resolve, context.trapRollback?)` and exports it through the internal
+Semantics facade. It adds no carrier, branch calculation, mutation, or policy.
+
+`ParentIndexedFrameResolutionViewProperties.lean` publishes exactly the four
+specified non-simp laws. Return and revert reuse the existing parent-indexed
+resolver laws; trap combines the existing reason-only resolution with the
+existing exact rollback selector. The inverse law proves that a value appears
+in the second component exactly on the trapped branch and fixes the complete
+selected pair.
+
+The compile-only consumer applies all four laws directly. It routes return and
+revert bytes through the existing callbacks, checks trap callback rejection
+and rollback selection together, transports ADR-0125 whole-context coherence
+through the first component, and keeps all three selected-execution optional
+layers under additional fuel.
+
+## Acceptance evidence
+
+- the full build completed 630 jobs;
+- the complete test suite completed 1,148 jobs and all runtime checks passed;
+- every changed Lean module compiled with trust zero and warnings as errors;
+- metadata and semantic-kernel policy checks passed;
+- all four public laws report exactly `[propext]`;
+- no new simplification rule, unchecked declaration, runtime branch, or public
+  format was added; and
+- independent production and regression audits found no P0-P3 issue.
+
+The parser, Surface, Core, host protocol, WorldState, execution, fuel, ABI,
+Oracle, Wire formats, schemas, profiles, and root README did not change.
 
 ## Consequences
 
