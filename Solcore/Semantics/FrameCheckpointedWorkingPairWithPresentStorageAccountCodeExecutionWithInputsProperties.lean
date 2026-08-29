@@ -52,7 +52,7 @@ abbrev InputCodeRunContext
         some account)
     (codePresent : account.code? = some code) :
     context.runCodeWithStorageWithInputs? inputs fuel =
-      some (code.runWithStorageInputs context inputs fuel) := by
+      some (code.runWithStorage context inputs fuel) := by
   simp [runCodeWithStorageWithInputs?, WorldState.code?,
     accountPresent, codePresent]
 
@@ -90,7 +90,7 @@ theorem runCodeWithStorageWithInputs?_some_fuelSound
       have resultEq := Option.some.inj executed
       subst result
       exact ⟨code, rfl,
-        code.runWithStorageInputs_fuelSound context inputs fuel⟩
+        code.runWithStorage_fuelSound context inputs fuel⟩
 
 theorem runCodeWithStorageWithInputs?_eq_some_iff_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
@@ -110,7 +110,7 @@ theorem runCodeWithStorageWithInputs?_eq_some_iff_fuelSound
     unfold runCodeWithStorageWithInputs?
     rw [selected]
     exact congrArg some
-      ((code.runWithStorageInputs_eq_iff_fuelSound
+      ((code.runWithStorage_eq_iff_fuelSound
         context inputs fuel result).2 sound)
 
 theorem runCodeWithStorageWithInputs?_some_hasType
@@ -134,7 +134,7 @@ theorem runCodeWithStorageWithInputs?_some_hasType
       have resultEq := Option.some.inj executed
       subst result
       exact ⟨code, rfl,
-        code.runWithStorageInputs_hasType context inputs fuel⟩
+        code.runWithStorage_hasType context inputs fuel⟩
 
 theorem runCodeWithStorageWithInputs?_ne_some_fault
     {RollbackState : Type u} {TraceState : Type v}
@@ -155,7 +155,7 @@ theorem runCodeWithStorageWithInputs?_ne_some_fault
       intro same
       have resultEq := Option.some.inj same
       have outcomeEq := congrArg HostDriverResult.outcome resultEq
-      exact code.runWithStorageInputs_ne_fault context inputs fuel
+      exact code.runWithStorage_ne_fault context inputs fuel
         error faultState outcomeEq
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount

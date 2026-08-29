@@ -59,20 +59,20 @@ theorem prependRequest
 
 end FuelSound
 
-theorem runWithInputs_fuelSound
+theorem run_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
     (inputs : ExecutionInputs)
     (fuel : Nat)
     (state : Core.State) :
-    FuelSound (runWithInputs context inputs fuel state) inputs
+    FuelSound (run context inputs fuel state) inputs
       fuel context state := by
-  simpa only [runWithInputs, FuelSound] using
+  simpa only [run, FuelSound] using
     HostDriver.run_fuelSound
       (@handler RollbackState TraceState inputs)
       context fuel state
 
-theorem runWithInputs_eq_of_fuelSound
+theorem run_eq_of_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
     (inputs : ExecutionInputs)
@@ -80,27 +80,27 @@ theorem runWithInputs_eq_of_fuelSound
     (state : Core.State)
     (result : HostDriverResult (Context RollbackState TraceState))
     (sound : FuelSound result inputs fuel context state) :
-    runWithInputs context inputs fuel state = result := by
-  simpa only [runWithInputs, FuelSound] using
+    run context inputs fuel state = result := by
+  simpa only [run, FuelSound] using
     HostDriver.run_eq_of_fuelSoundWith
       (@handler RollbackState TraceState inputs)
       context fuel state result sound
 
-theorem runWithInputs_eq_iff_fuelSound
+theorem run_eq_iff_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
     (inputs : ExecutionInputs)
     (fuel : Nat)
     (state : Core.State)
     (result : HostDriverResult (Context RollbackState TraceState)) :
-    runWithInputs context inputs fuel state = result ↔
+    run context inputs fuel state = result ↔
       FuelSound result inputs fuel context state := by
-  simpa only [runWithInputs, FuelSound] using
+  simpa only [run, FuelSound] using
     HostDriver.run_eq_iff_fuelSoundWith
       (@handler RollbackState TraceState inputs)
       context fuel state result
 
-theorem runWithInputs_done_stable
+theorem run_done_stable
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
     (inputs : ExecutionInputs)
@@ -109,12 +109,12 @@ theorem runWithInputs_done_stable
     {finalContext : Context RollbackState TraceState}
     {value : Core.Value} {store : Core.Store}
     (execution :
-      runWithInputs context inputs fuel state =
+      run context inputs fuel state =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    runWithInputs context inputs largerFuel state =
+    run context inputs largerFuel state =
       ⟨finalContext, .done value store⟩ := by
-  simpa only [runWithInputs] using
+  simpa only [run] using
     HostDriver.run_done_stable
       (@handler RollbackState TraceState inputs)
       execution more
@@ -123,18 +123,18 @@ end HostStorageDriver
 
 namespace CheckedHostCoreProgram
 
-theorem runWithStorageInputs_fuelSound
+theorem runWithStorage_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
     HostStorageDriver.FuelSound
-      (code.runWithStorageInputs context inputs fuel) inputs fuel context
+      (code.runWithStorage context inputs fuel) inputs fuel context
       (Core.State.initial code.program.body Core.hostEnvironment) := by
-  exact HostStorageDriver.runWithInputs_fuelSound context inputs fuel _
+  exact HostStorageDriver.run_fuelSound context inputs fuel _
 
-theorem runWithStorageInputs_eq_iff_fuelSound
+theorem runWithStorage_eq_iff_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
@@ -142,14 +142,14 @@ theorem runWithStorageInputs_eq_iff_fuelSound
     (fuel : Nat)
     (result :
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState)) :
-    code.runWithStorageInputs context inputs fuel = result ↔
+    code.runWithStorage context inputs fuel = result ↔
       HostStorageDriver.FuelSound result inputs fuel context
         (Core.State.initial code.program.body Core.hostEnvironment) := by
-  simpa only [runWithStorageInputs] using
-    HostStorageDriver.runWithInputs_eq_iff_fuelSound context inputs fuel
+  simpa only [runWithStorage] using
+    HostStorageDriver.run_eq_iff_fuelSound context inputs fuel
       (Core.State.initial code.program.body Core.hostEnvironment) result
 
-theorem runWithStorageInputs_done_stable
+theorem runWithStorage_done_stable
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
@@ -158,13 +158,13 @@ theorem runWithStorageInputs_done_stable
     {finalContext : HostStorageDriver.Context RollbackState TraceState}
     {value : Core.Value} {store : Core.Store}
     (execution :
-      code.runWithStorageInputs context inputs fuel =
+      code.runWithStorage context inputs fuel =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    code.runWithStorageInputs context inputs largerFuel =
+    code.runWithStorage context inputs largerFuel =
       ⟨finalContext, .done value store⟩ := by
-  simpa only [runWithStorageInputs] using
-    HostStorageDriver.runWithInputs_done_stable context inputs
+  simpa only [runWithStorage] using
+    HostStorageDriver.run_done_stable context inputs
       (Core.State.initial code.program.body Core.hostEnvironment)
       execution more
 

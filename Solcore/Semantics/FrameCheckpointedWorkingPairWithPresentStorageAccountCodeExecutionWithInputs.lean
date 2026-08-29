@@ -23,7 +23,7 @@ def runCodeWithStorageWithInputs?
       (HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :=
   (context.context.values.working.1.code? inputs.codeAddress).map fun code =>
-    code.runWithStorageInputs context inputs fuel
+    code.runWithStorage context inputs fuel
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount
 

@@ -100,11 +100,11 @@ private theorem compileTimeStorageAddressRemainingFuelRegression
     (execution :
       hostRun fuel state =
         .suspended ⟨.storageAddress, continuation, store⟩ remainingFuel) :
-    HostStorageDriver.runWithInputs context inputs fuel state =
-      HostStorageDriver.runWithInputs context inputs remainingFuel
+    HostStorageDriver.run context inputs fuel state =
+      HostStorageDriver.run context inputs remainingFuel
         ⟨.ret (.word (addressToWord context.context.storageAddress)),
           continuation, store⟩ :=
-  HostStorageDriver.runWithInputs_of_suspended_storageAddress
+  HostStorageDriver.run_of_suspended_storageAddress
     context inputs fuel remainingFuel state continuation store execution
 
 /-- The code-selector handler exposes its exact lossless response and state. -/
@@ -147,10 +147,10 @@ private theorem compileTimeCodeAddressRemainingFuelRegression
     (execution :
       hostRun fuel state =
         .suspended ⟨.codeAddress, continuation, store⟩ remainingFuel) :
-    HostStorageDriver.runWithInputs context inputs fuel state =
-      HostStorageDriver.runWithInputs context inputs remainingFuel
+    HostStorageDriver.run context inputs fuel state =
+      HostStorageDriver.run context inputs remainingFuel
         ⟨.ret (.word (addressToWord inputs.codeAddress)), continuation, store⟩ :=
-  HostStorageDriver.runWithInputs_of_suspended_codeAddress
+  HostStorageDriver.run_of_suspended_codeAddress
     context inputs fuel remainingFuel state continuation store execution
 
 /-- Public handler observations fix read-after-write and sparse zero deletion. -/
@@ -275,7 +275,7 @@ private theorem compileTimeSelectedOutOfFuelIsSomeRegression
     (finalContext : HostStorageDriver.Context RollbackState TraceState)
     (state : State)
     (exhausted :
-      code.runWithStorageInputs context inputs fuel =
+      code.runWithStorage context inputs fuel =
         ⟨finalContext, .outOfFuel state⟩) :
     context.runCodeWithStorageWithInputs? inputs fuel =
       some ⟨finalContext, .outOfFuel state⟩ := by
@@ -345,9 +345,9 @@ private theorem compileTimeStorageDriverCompletenessRegression
     (result :
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
-    HostStorageDriver.runWithInputs context inputs fuel state = result ↔
+    HostStorageDriver.run context inputs fuel state = result ↔
       HostStorageDriver.FuelSound result inputs fuel context state :=
-  HostStorageDriver.runWithInputs_eq_iff_fuelSound
+  HostStorageDriver.run_eq_iff_fuelSound
     context inputs fuel state result
 
 /-- Combined storage done stability retains the exact full driver result. -/
@@ -363,12 +363,12 @@ private theorem compileTimeStorageDriverDoneStabilityRegression
     {value : Value}
     {store : Store}
     (execution :
-      HostStorageDriver.runWithInputs context inputs fuel state =
+      HostStorageDriver.run context inputs fuel state =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    HostStorageDriver.runWithInputs context inputs largerFuel state =
+    HostStorageDriver.run context inputs largerFuel state =
       ⟨finalContext, .done value store⟩ :=
-  HostStorageDriver.runWithInputs_done_stable
+  HostStorageDriver.run_done_stable
     context inputs state execution more
 
 /-- Checked execution exposes the same exact executable/specification iff. -/
@@ -382,10 +382,10 @@ private theorem compileTimeCheckedCompletenessRegression
     (result :
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
-    code.runWithStorageInputs context inputs fuel = result ↔
+    code.runWithStorage context inputs fuel = result ↔
       HostStorageDriver.FuelSound result inputs fuel context
         (State.initial code.program.body hostEnvironment) :=
-  CheckedHostCoreProgram.runWithStorageInputs_eq_iff_fuelSound
+  CheckedHostCoreProgram.runWithStorage_eq_iff_fuelSound
     code context inputs fuel result
 
 /-- Checked done stability retains the exact full driver result. -/
@@ -401,12 +401,12 @@ private theorem compileTimeCheckedDoneStabilityRegression
     {value : Value}
     {store : Store}
     (execution :
-      code.runWithStorageInputs context inputs fuel =
+      code.runWithStorage context inputs fuel =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    code.runWithStorageInputs context inputs largerFuel =
+    code.runWithStorage context inputs largerFuel =
       ⟨finalContext, .done value store⟩ :=
-  CheckedHostCoreProgram.runWithStorageInputs_done_stable
+  CheckedHostCoreProgram.runWithStorage_done_stable
     code context inputs execution more
 
 /-- Address-selected done stability retains the exact optional full result. -/
@@ -544,12 +544,12 @@ private theorem compileTimeCheckedFrameContinuationRegression
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason) :
-    (code.runWithStorageInputs context inputs fuel).toFrameContinuationContext?
+    (code.runWithStorage context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome = none ↔
       ∃ finalContext exhausted,
-        code.runWithStorageInputs context inputs fuel =
+        code.runWithStorage context inputs fuel =
           ⟨finalContext, .outOfFuel exhausted⟩ :=
-  code.runWithStorageInputs_toFrameContinuationContext?_eq_none_iff
+  code.runWithStorage_toFrameContinuationContext?_eq_none_iff
     context inputs fuel doneOutcome
 
 private theorem compileTimeCheckedFrameContinuationStabilityRegression
@@ -566,14 +566,14 @@ private theorem compileTimeCheckedFrameContinuationStabilityRegression
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      (code.runWithStorageInputs context inputs fuel).toFrameContinuationContext?
+      (code.runWithStorage context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome =
         some continuation)
     (more : fuel ≤ largerFuel) :
-    (code.runWithStorageInputs context inputs largerFuel).toFrameContinuationContext?
+    (code.runWithStorage context inputs largerFuel).toFrameContinuationContext?
         (fun current => current.context.values) doneOutcome =
       some continuation :=
-  code.runWithStorageInputs_toFrameContinuationContext?_some_stable
+  code.runWithStorage_toFrameContinuationContext?_some_stable
     context inputs doneOutcome completed more
 
 /-- Selected adaptation keeps code absence distinct from selected exhaustion. -/

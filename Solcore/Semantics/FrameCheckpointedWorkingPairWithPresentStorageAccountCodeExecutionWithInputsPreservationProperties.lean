@@ -31,8 +31,8 @@ theorem runCodeWithStorageWithInputs?_some_workingCode?
       rw [selected] at executed
       have resultEq := Option.some.inj executed
       subst result
-      simpa only [CheckedHostCoreProgram.runWithStorageInputs] using
-        HostStorageDriver.runWithInputs_workingCode?
+      simpa only [CheckedHostCoreProgram.runWithStorage] using
+        HostStorageDriver.run_workingCode?
           context inputs fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
           observedAddress
@@ -54,8 +54,8 @@ theorem runCodeWithStorageWithInputs?_some_storageAddress
       rw [selected] at executed
       have resultEq := Option.some.inj executed
       subst result
-      simpa only [CheckedHostCoreProgram.runWithStorageInputs] using
-        HostStorageDriver.runWithInputs_storageAddress context inputs fuel
+      simpa only [CheckedHostCoreProgram.runWithStorage] using
+        HostStorageDriver.run_storageAddress context inputs fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
 
 theorem runCodeWithStorageWithInputs?_some_checkpoint
@@ -76,8 +76,8 @@ theorem runCodeWithStorageWithInputs?_some_checkpoint
       rw [selected] at executed
       have resultEq := Option.some.inj executed
       subst result
-      simpa only [CheckedHostCoreProgram.runWithStorageInputs] using
-        HostStorageDriver.runWithInputs_checkpoint context inputs fuel
+      simpa only [CheckedHostCoreProgram.runWithStorage] using
+        HostStorageDriver.run_checkpoint context inputs fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
 
 theorem runCodeWithStorageWithInputs?_some_workingEffects
@@ -98,8 +98,8 @@ theorem runCodeWithStorageWithInputs?_some_workingEffects
       rw [selected] at executed
       have resultEq := Option.some.inj executed
       subst result
-      simpa only [CheckedHostCoreProgram.runWithStorageInputs] using
-        HostStorageDriver.runWithInputs_workingEffects context inputs fuel
+      simpa only [CheckedHostCoreProgram.runWithStorage] using
+        HostStorageDriver.run_workingEffects context inputs fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
 
 theorem runCodeWithStorageWithInputs?_some_workingAccount?_of_ne_storageAddress
@@ -122,8 +122,8 @@ theorem runCodeWithStorageWithInputs?_some_workingAccount?_of_ne_storageAddress
       rw [selected] at executed
       have resultEq := Option.some.inj executed
       subst result
-      simpa only [CheckedHostCoreProgram.runWithStorageInputs] using
-        HostStorageDriver.runWithInputs_workingAccount?_of_ne_storageAddress
+      simpa only [CheckedHostCoreProgram.runWithStorage] using
+        HostStorageDriver.run_workingAccount?_of_ne_storageAddress
           context inputs fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
           observedAddress different
@@ -151,7 +151,7 @@ theorem runCodeWithStorageWithInputs?_some_done_stable
       rw [selected] at execution
       simp only [Option.map_some] at execution ⊢
       exact congrArg some
-        (code.runWithStorageInputs_done_stable context inputs
+        (code.runWithStorage_done_stable context inputs
           (Option.some.inj execution) more)
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount

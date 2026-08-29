@@ -11,7 +11,7 @@ universe u v
 
 namespace HostStorageDriver
 
-theorem runWithInputs_hasType
+theorem run_hasType
     {RollbackState : Type u} {TraceState : Type v}
     {definitions : Core.DataEnvironment} {resultType : Core.Ty}
     (context : Context RollbackState TraceState)
@@ -19,14 +19,14 @@ theorem runWithInputs_hasType
     (fuel : Nat)
     (state : Core.State)
     (stateTyping : Core.HostStateHasType state resultType definitions) :
-    (runWithInputs context inputs fuel state).outcome.HasType
+    (run context inputs fuel state).outcome.HasType
       resultType definitions := by
-  simpa only [runWithInputs] using
+  simpa only [run] using
     HostDriver.run_hasType
       (@handler RollbackState TraceState inputs)
       context fuel state stateTyping
 
-theorem runWithInputs_ne_fault
+theorem run_ne_fault
     {RollbackState : Type u} {TraceState : Type v}
     {definitions : Core.DataEnvironment} {resultType : Core.Ty}
     (context : Context RollbackState TraceState)
@@ -35,9 +35,9 @@ theorem runWithInputs_ne_fault
     (state faultState : Core.State)
     (error : Core.MachineFault)
     (stateTyping : Core.HostStateHasType state resultType definitions) :
-    (runWithInputs context inputs fuel state).outcome ≠
+    (run context inputs fuel state).outcome ≠
       .fault error faultState := by
-  simpa only [runWithInputs] using
+  simpa only [run] using
     HostDriver.run_ne_fault
       (@handler RollbackState TraceState inputs)
       context fuel state faultState error stateTyping
@@ -46,18 +46,18 @@ end HostStorageDriver
 
 namespace CheckedHostCoreProgram
 
-theorem runWithStorageInputs_hasType
+theorem runWithStorage_hasType
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    (code.runWithStorageInputs context inputs fuel).outcome.HasType
+    (code.runWithStorage context inputs fuel).outcome.HasType
       code.program.resultType code.program.dataDefinitions := by
-  exact HostStorageDriver.runWithInputs_hasType
+  exact HostStorageDriver.run_hasType
     context inputs fuel _ code.initialState_hasType
 
-theorem runWithStorageInputs_ne_fault
+theorem runWithStorage_ne_fault
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
@@ -65,40 +65,40 @@ theorem runWithStorageInputs_ne_fault
     (fuel : Nat)
     (error : Core.MachineFault)
     (faultState : Core.State) :
-    (code.runWithStorageInputs context inputs fuel).outcome ≠
+    (code.runWithStorage context inputs fuel).outcome ≠
       .fault error faultState := by
-  exact HostStorageDriver.runWithInputs_ne_fault
+  exact HostStorageDriver.run_ne_fault
     context inputs fuel _ faultState error code.initialState_hasType
 
-theorem runWithStorageInputs_done_hasType
+theorem runWithStorage_done_hasType
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     {fuel : Nat} {value : Core.Value} {store : Core.Store}
     (result :
-      (code.runWithStorageInputs context inputs fuel).outcome =
+      (code.runWithStorage context inputs fuel).outcome =
         .done value store) :
     ∃ world,
       Core.StoreHasTypes world store ∧
         Core.HostRuntimeValueHasType world value code.program.resultType
           code.program.dataDefinitions := by
-  have typing := code.runWithStorageInputs_hasType context inputs fuel
+  have typing := code.runWithStorage_hasType context inputs fuel
   rw [result] at typing
   exact typing
 
-theorem runWithStorageInputs_outOfFuel_hasType
+theorem runWithStorage_outOfFuel_hasType
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     {fuel : Nat} {state : Core.State}
     (result :
-      (code.runWithStorageInputs context inputs fuel).outcome =
+      (code.runWithStorage context inputs fuel).outcome =
         .outOfFuel state) :
     Core.HostStateHasType state code.program.resultType
       code.program.dataDefinitions := by
-  have typing := code.runWithStorageInputs_hasType context inputs fuel
+  have typing := code.runWithStorage_hasType context inputs fuel
   rw [result] at typing
   exact typing
 

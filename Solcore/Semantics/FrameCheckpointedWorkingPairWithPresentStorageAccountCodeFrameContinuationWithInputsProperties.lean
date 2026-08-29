@@ -13,7 +13,7 @@ universe u v w
 
 namespace CheckedHostCoreProgram
 
-theorem runWithStorageInputs_toFrameContinuationContext?_eq_none_iff
+theorem runWithStorage_toFrameContinuationContext?_eq_none_iff
     {RollbackState : Type u} {TraceState : Type v} {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
@@ -22,24 +22,24 @@ theorem runWithStorageInputs_toFrameContinuationContext?_eq_none_iff
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Core.Value → Core.Store → FrameOutcome TrapReason) :
-    (code.runWithStorageInputs context inputs fuel).toFrameContinuationContext?
+    (code.runWithStorage context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome = none ↔
       ∃ finalContext exhausted,
-        code.runWithStorageInputs context inputs fuel =
+        code.runWithStorage context inputs fuel =
           ⟨finalContext, .outOfFuel exhausted⟩ := by
-  cases execution : code.runWithStorageInputs context inputs fuel with
+  cases execution : code.runWithStorage context inputs fuel with
   | mk finalContext outcome =>
       cases outcome with
       | done value store => simp
       | outOfFuel exhausted => simp
       | fault error faultState =>
           have contradiction :=
-            code.runWithStorageInputs_ne_fault
+            code.runWithStorage_ne_fault
               context inputs fuel error faultState
           rw [execution] at contradiction
           simp at contradiction
 
-theorem runWithStorageInputs_toFrameContinuationContext?_some_stable
+theorem runWithStorage_toFrameContinuationContext?_some_stable
     {RollbackState : Type u} {TraceState : Type v} {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
@@ -51,19 +51,19 @@ theorem runWithStorageInputs_toFrameContinuationContext?_some_stable
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      (code.runWithStorageInputs context inputs fuel).toFrameContinuationContext?
+      (code.runWithStorage context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome =
         some continuation)
     (more : fuel ≤ largerFuel) :
-    (code.runWithStorageInputs context inputs largerFuel).toFrameContinuationContext?
+    (code.runWithStorage context inputs largerFuel).toFrameContinuationContext?
         (fun current => current.context.values) doneOutcome =
       some continuation := by
-  cases execution : code.runWithStorageInputs context inputs fuel with
+  cases execution : code.runWithStorage context inputs fuel with
   | mk finalContext outcome =>
       cases outcome with
       | done value store =>
           have stable :=
-            code.runWithStorageInputs_done_stable
+            code.runWithStorage_done_stable
               context inputs execution more
           rw [stable]
           rw [execution] at completed

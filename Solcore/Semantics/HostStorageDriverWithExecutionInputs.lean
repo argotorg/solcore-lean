@@ -13,7 +13,7 @@ universe u v
 namespace HostStorageDriver
 
 /-- Run the current handler using one immutable execution input. -/
-def runWithInputs
+def run
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
     (inputs : ExecutionInputs)
@@ -27,7 +27,7 @@ end HostStorageDriver
 namespace CheckedHostCoreProgram
 
 /-- Start checked code with one immutable execution input. -/
-def runWithStorageInputs
+def runWithStorage
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
@@ -35,7 +35,7 @@ def runWithStorageInputs
     (fuel : Nat) :
     HostDriverResult
       (HostStorageDriver.Context RollbackState TraceState) :=
-  HostStorageDriver.runWithInputs context inputs fuel
+  HostStorageDriver.run context inputs fuel
     (Core.State.initial code.program.body Core.hostEnvironment)
 
 end CheckedHostCoreProgram

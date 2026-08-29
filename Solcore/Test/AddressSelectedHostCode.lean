@@ -147,7 +147,7 @@ private theorem compileTimePresentBranchRegression
       context.context.values.working.1.account? inputs.codeAddress = some account)
     (codePresent : account.code? = some code) :
     context.runCodeWithStorageWithInputs? inputs fuel =
-      some (code.runWithStorageInputs context inputs fuel) :=
+      some (code.runWithStorage context inputs fuel) :=
   FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_of_present
     context inputs account code fuel accountPresent codePresent
 
@@ -159,13 +159,13 @@ private theorem compileTimeRemainingFuelRegression
     (suspension : HostSuspension)
     (execution :
       hostRun fuel state = .suspended suspension remainingFuel) :
-    HostStorageDriver.runWithInputs context inputs fuel state =
-      HostStorageDriver.runWithInputs
+    HostStorageDriver.run context inputs fuel state =
+      HostStorageDriver.run
         (HostStorageDriver.handleSuspension
           inputs context suspension).1 inputs remainingFuel
         (HostStorageDriver.handleSuspension
           inputs context suspension).2 :=
-  HostStorageDriver.runWithInputs_of_suspended
+  HostStorageDriver.run_of_suspended
     context inputs fuel remainingFuel state suspension execution
 
 private theorem compileTimeFuelSoundRegression
@@ -174,18 +174,18 @@ private theorem compileTimeFuelSoundRegression
     (fuel : Nat)
     (state : State) :
     HostStorageDriver.FuelSound
-      (HostStorageDriver.runWithInputs context inputs fuel state)
+      (HostStorageDriver.run context inputs fuel state)
       inputs fuel context state :=
-  HostStorageDriver.runWithInputs_fuelSound context inputs fuel state
+  HostStorageDriver.run_fuelSound context inputs fuel state
 
 private theorem compileTimeCheckedTypingRegression
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context Nat (List Nat))
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    (code.runWithStorageInputs context inputs fuel).outcome.HasType
+    (code.runWithStorage context inputs fuel).outcome.HasType
       code.program.resultType code.program.dataDefinitions :=
-  code.runWithStorageInputs_hasType context inputs fuel
+  code.runWithStorage_hasType context inputs fuel
 
 private theorem compileTimeCheckedNoFaultRegression
     (code : CheckedHostCoreProgram)
@@ -194,9 +194,9 @@ private theorem compileTimeCheckedNoFaultRegression
     (fuel : Nat)
     (error : MachineFault)
     (faultState : State) :
-    (code.runWithStorageInputs context inputs fuel).outcome ≠
+    (code.runWithStorage context inputs fuel).outcome ≠
       .fault error faultState :=
-  code.runWithStorageInputs_ne_fault context inputs fuel error faultState
+  code.runWithStorage_ne_fault context inputs fuel error faultState
 
 private theorem compileTimeCheckedFuelSoundRegression
     (code : CheckedHostCoreProgram)
@@ -204,9 +204,9 @@ private theorem compileTimeCheckedFuelSoundRegression
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
     HostStorageDriver.FuelSound
-      (code.runWithStorageInputs context inputs fuel) inputs
+      (code.runWithStorage context inputs fuel) inputs
       fuel context (State.initial code.program.body hostEnvironment) :=
-  code.runWithStorageInputs_fuelSound context inputs fuel
+  code.runWithStorage_fuelSound context inputs fuel
 
 private def returnedContextLooksUnchanged
     (context : HostStorageDriver.Context Nat (List Nat)) :
@@ -281,7 +281,7 @@ def testAddressSelectedHostCode : IO Unit := do
           throw (IO.userError "a storage update erased selected host code")
 
       let cellResult :=
-        cellDependentReadCode.runWithStorageInputs
+        cellDependentReadCode.runWithStorage
           context (inputsFor codeAddress) 64
       assertTrue
         (cellResult.outcome == .done (.word finalValue) [.bool true])
