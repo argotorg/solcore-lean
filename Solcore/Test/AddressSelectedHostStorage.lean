@@ -474,14 +474,14 @@ private def assertTrappedFrameResolution
 /-- Exercise all three optional layers without duplicating the storage fixture. -/
 private def assertFrameContinuationAdapter
     (context : HostStorageDriver.Context Nat (List Nat)) : IO Unit := do
-  match context.runCodeWithStorageContinuationContextWithInputs?
+  match context.runCodeWithStorageContinuationContext?
       (inputsFor maximumAddress) completionFuel returnedDoneOutcome with
   | none => pure ()
   | some _ =>
       throw (IO.userError
         "missing code did not remain an outer continuation failure")
 
-  match context.runCodeWithStorageContinuationContextWithInputs?
+  match context.runCodeWithStorageContinuationContext?
       executionInputs 22 returnedDoneOutcome with
   | some none => pure ()
   | none =>
@@ -491,13 +491,13 @@ private def assertFrameContinuationAdapter
       throw (IO.userError
         "fuel 22 constructed a continuation before completion")
 
-  match context.runCodeWithStorageContinuationContextWithInputs?
+  match context.runCodeWithStorageContinuationContext?
         executionInputs completionFuel returnedDoneOutcome,
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
         executionInputs completionFuel revertedDoneOutcome,
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
         executionInputs completionFuel trappedDoneOutcome,
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
         executionInputs 64 returnedDoneOutcome with
   | some (some returned), some (some reverted), some (some trapped),
       some (some largerReturned) =>
@@ -555,13 +555,13 @@ private theorem updateProgram_frameContinuation_done_stable
     {continuation :
       FrameContinuationContext Nat (List Nat) FrameAdapterTrapReason}
     (completed :
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
         executionInputs completionFuel returnedDoneOutcome =
           some (some continuation)) :
-    context.runCodeWithStorageContinuationContextWithInputs?
+    context.runCodeWithStorageContinuationContext?
       executionInputs 64 returnedDoneOutcome = some (some continuation) := by
   exact
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_some_some_stable
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_some_some_stable
       context executionInputs returnedDoneOutcome completed (by decide)
 
 /-- The selected public stability theorem applies to the mixed fixture. -/

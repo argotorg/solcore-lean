@@ -587,18 +587,18 @@ private theorem compileTimeSelectedFrameContinuationBoundaryRegression
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason) :
-    (context.runCodeWithStorageContinuationContextWithInputs?
+    (context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = none ↔
         context.context.values.working.1.code? inputs.codeAddress = none) ∧
-      (context.runCodeWithStorageContinuationContextWithInputs?
+      (context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some none ↔
         ∃ resultContext exhausted,
           context.runCodeWithStorage? inputs fuel =
             some ⟨resultContext, .outOfFuel exhausted⟩) := by
   exact
-    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_none_iff
+    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_none_iff
         context inputs fuel doneOutcome,
-      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_some_none_iff
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
         context inputs fuel doneOutcome⟩
 
 /-- A nested selected completion retains the exact continuation at larger fuel. -/
@@ -615,12 +615,12 @@ private theorem compileTimeSelectedFrameContinuationStabilityRegression
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
         inputs fuel doneOutcome = some (some continuation))
     (more : fuel ≤ largerFuel) :
-    context.runCodeWithStorageContinuationContextWithInputs?
+    context.runCodeWithStorageContinuationContext?
       inputs largerFuel doneOutcome = some (some continuation) :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_some_some_stable
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_some_some_stable
     context inputs doneOutcome completed more
 
 end Tests

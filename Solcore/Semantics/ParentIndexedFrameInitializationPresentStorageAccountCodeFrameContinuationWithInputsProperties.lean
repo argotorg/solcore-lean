@@ -64,11 +64,11 @@ theorem
     obtain ⟨context, refined, selected⟩ := observed
     have lowerNone := Option.map_eq_none_iff.mp selected
     exact ⟨context, refined,
-      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_none_iff
+      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_none_iff
         context inputs fuel doneOutcome).mp lowerNone⟩
   · rintro ⟨context, refined, codeAbsent⟩
     have selected :=
-      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_none_iff
+      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_none_iff
         context inputs fuel doneOutcome).mpr codeAbsent
     rw [refined]
     simp only [Option.map_some]
@@ -106,12 +106,12 @@ theorem
       simpa only [Option.map_eq_none_iff] using built
     subst completion
     obtain ⟨resultContext, exhausted, exactRun⟩ :=
-      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_some_none_iff
+      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
         context inputs fuel doneOutcome).mp ran
     exact ⟨context, resultContext, exhausted, refined, exactRun⟩
   · rintro ⟨context, resultContext, exhausted, refined, exactRun⟩
     have selected :=
-      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_some_none_iff
+      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
         context inputs fuel doneOutcome).mpr
           ⟨resultContext, exhausted, exactRun⟩
     rw [refined]
@@ -141,7 +141,7 @@ theorem
       ∃ context continuation,
         initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
             storageAddress = some context ∧
-        context.runCodeWithStorageContinuationContextWithInputs?
+        context.runCodeWithStorageContinuationContext?
             inputs fuel doneOutcome = some (some continuation) ∧
         parentContinuation =
           ParentIndexedFrameContinuationContext.fromTraceExtension

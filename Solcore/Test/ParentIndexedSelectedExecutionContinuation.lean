@@ -51,7 +51,7 @@ private example
         ∃ context continuation,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
-          context.runCodeWithStorageContinuationContextWithInputs?
+          context.runCodeWithStorageContinuationContext?
               inputs fuel doneOutcome = some (some continuation) ∧
           parentContinuation =
             ParentIndexedFrameContinuationContext.fromTraceExtension
@@ -98,7 +98,7 @@ private example
     ∃ context continuation,
       initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
           storageAddress = some context ∧
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some (some continuation) ∧
       parentContinuation.toFrameContinuationContext = continuation ∧
       parentContinuation.toFrameContinuationContext.resolve =

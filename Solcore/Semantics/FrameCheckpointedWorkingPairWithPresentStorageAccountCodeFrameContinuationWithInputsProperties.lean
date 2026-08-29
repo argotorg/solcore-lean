@@ -80,7 +80,7 @@ end CheckedHostCoreProgram
 namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
 
 @[simp] theorem
-    runCodeWithStorageContinuationContextWithInputs?_eq_none_iff
+    runCodeWithStorageContinuationContext?_eq_none_iff
     {RollbackState : Type u} {TraceState : Type v} {TrapReason : Type w}
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
@@ -88,10 +88,10 @@ namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Core.Value → Core.Store → FrameOutcome TrapReason) :
-    context.runCodeWithStorageContinuationContextWithInputs?
+    context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = none ↔
       context.context.values.working.1.code? inputs.codeAddress = none := by
-  unfold runCodeWithStorageContinuationContextWithInputs?
+  unfold runCodeWithStorageContinuationContext?
   unfold runCodeWithStorage?
   cases selected :
       context.context.values.working.1.code? inputs.codeAddress with
@@ -99,7 +99,7 @@ namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
   | some code => simp only [Option.map_some, reduceCtorEq]
 
 theorem
-    runCodeWithStorageContinuationContextWithInputs?_eq_some_none_iff
+    runCodeWithStorageContinuationContext?_eq_some_none_iff
     {RollbackState : Type u} {TraceState : Type v} {TrapReason : Type w}
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
@@ -107,12 +107,12 @@ theorem
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Core.Value → Core.Store → FrameOutcome TrapReason) :
-    context.runCodeWithStorageContinuationContextWithInputs?
+    context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some none ↔
       ∃ resultContext exhausted,
         context.runCodeWithStorage? inputs fuel =
           some ⟨resultContext, .outOfFuel exhausted⟩ := by
-  unfold runCodeWithStorageContinuationContextWithInputs?
+  unfold runCodeWithStorageContinuationContext?
   cases execution : context.runCodeWithStorage? inputs fuel with
   | none => simp
   | some result =>
@@ -127,7 +127,7 @@ theorem
                   context inputs fuel resultContext error faultState execution)
 
 theorem
-    runCodeWithStorageContinuationContextWithInputs?_some_some_stable
+    runCodeWithStorageContinuationContext?_some_some_stable
     {RollbackState : Type u} {TraceState : Type v} {TrapReason : Type w}
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
@@ -138,12 +138,12 @@ theorem
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some (some continuation))
     (more : fuel ≤ largerFuel) :
-    context.runCodeWithStorageContinuationContextWithInputs?
+    context.runCodeWithStorageContinuationContext?
         inputs largerFuel doneOutcome = some (some continuation) := by
-  unfold runCodeWithStorageContinuationContextWithInputs? at completed ⊢
+  unfold runCodeWithStorageContinuationContext? at completed ⊢
   rw [Option.map_eq_some_iff] at completed
   obtain ⟨result, execution, resultCompleted⟩ := completed
   cases result with

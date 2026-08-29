@@ -12,7 +12,7 @@ universe u v w
 namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
 
 /-- Preserve selection and completion as separate optional boundaries. -/
-def runCodeWithStorageContinuationContextWithInputs?
+def runCodeWithStorageContinuationContext?
     {RollbackState : Type u} {TraceState : Type v} {TrapReason : Type w}
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)

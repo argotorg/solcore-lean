@@ -30,7 +30,7 @@ def runCodeWithStorageParentIndexedContinuationContextWithInputs?
             RollbackState Event TrapReason parentWorking))) :=
   (initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
       storageAddress).map fun context =>
-    (context.runCodeWithStorageContinuationContextWithInputs?
+    (context.runCodeWithStorageContinuationContext?
       inputs fuel doneOutcome).map fun completed =>
         completed.map fun continuation =>
           ParentIndexedFrameContinuationContext.fromTraceExtension

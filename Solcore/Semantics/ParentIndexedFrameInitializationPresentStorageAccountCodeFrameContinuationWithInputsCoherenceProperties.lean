@@ -29,7 +29,7 @@ private theorem completedContinuationWithInputs_eq_parentIndexed
     (continuation :
       FrameContinuationContext RollbackState (FrameTrace Event) TrapReason)
     (completed :
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some (some continuation)) :
     (ParentIndexedFrameContinuationContext.fromTraceExtension
       parentWorking initialization.workingRollback
@@ -45,7 +45,7 @@ private theorem completedContinuationWithInputs_eq_parentIndexed
     · have exactContext := Option.some.inj refined
       subst context
       rfl
-  unfold FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?
+  unfold FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?
     at completed
   rw [Option.map_eq_some_iff] at completed
   obtain ⟨result, execution, resultCompleted⟩ := completed
@@ -109,7 +109,7 @@ theorem
     ∃ context continuation,
       initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
           storageAddress = some context ∧
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some (some continuation) ∧
       parentContinuation.toFrameContinuationContext = continuation := by
   unfold runCodeWithStorageParentIndexedContinuationContextWithInputs?
@@ -121,7 +121,7 @@ theorem
   rw [Option.map_eq_some_iff] at parentBuilt
   obtain ⟨continuation, continuationEq, parentEq⟩ := parentBuilt
   have lowerCompleted :
-      context.runCodeWithStorageContinuationContextWithInputs?
+      context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some (some continuation) := by
     rw [ran, continuationEq]
   subst parentContinuation
@@ -160,7 +160,7 @@ theorem
   obtain ⟨context, continuation, refined, lowerCompleted, parentEq⟩ :=
     completed
   exact ⟨context, continuation, refined,
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_some_some_stable
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_some_some_stable
       context inputs doneOutcome lowerCompleted more,
     parentEq⟩
 
