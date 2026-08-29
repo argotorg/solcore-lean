@@ -122,6 +122,22 @@ theorem typed_inputDataByte?_emits
   obtain ⟨offset, rfl⟩ := wordTyping.word_shape
   exact ⟨⟨.inputDataByte? offset, continuation, store⟩, .inputDataByte?⟩
 
+/-- A well-typed input-size observation emits its argument-free request. -/
+theorem typed_inputDataSize_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.inputDataSize.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .inputDataSize :: continuation, store⟩
+        suspension := by
+  have unitTyping :
+      HostRuntimeValueHasType world value .unit definitions := by
+    simpa using valueTyping
+  cases unitTyping
+  exact ⟨⟨.inputDataSize, continuation, store⟩, .inputDataSize⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -141,6 +157,7 @@ theorem typed_hostApplication_emits
   | callValue => exact typed_callValue_emits valueTyping
   | callerAddress => exact typed_callerAddress_emits valueTyping
   | inputDataByte? => exact typed_inputDataByte?_emits valueTyping
+  | inputDataSize => exact typed_inputDataSize_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}

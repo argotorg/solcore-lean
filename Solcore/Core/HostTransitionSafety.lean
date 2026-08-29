@@ -101,6 +101,15 @@ theorem hostRequestEmission_hasType
               | hostApply =>
                   cases valueTyping with
                   | word => exact .intro store restTyping
+  | inputDataSize =>
+      cases stateTyping with
+      | ret store valueTyping continuationTyping =>
+          cases continuationTyping with
+          | cons frameTyping restTyping =>
+              cases frameTyping with
+              | hostApply =>
+                  cases valueTyping
+                  exact .intro store restTyping
 
 theorem hostAdvance_next_preserves_state_type
     {definitions : DataEnvironment}
