@@ -147,6 +147,25 @@ private theorem compileTimeStorageDriverCompletenessRegression
       HostStorageDriver.FuelSound result fuel context state :=
   HostStorageDriver.run_eq_iff_fuelSound context fuel state result
 
+/-- Combined storage done stability retains the exact full driver result. -/
+private theorem compileTimeStorageDriverDoneStabilityRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    {fuel largerFuel : Nat}
+    (state : State)
+    {finalContext :
+      HostStorageDriver.Context RollbackState TraceState}
+    {value : Value}
+    {store : Store}
+    (execution :
+      HostStorageDriver.run context fuel state =
+        ⟨finalContext, .done value store⟩)
+    (more : fuel ≤ largerFuel) :
+    HostStorageDriver.run context largerFuel state =
+      ⟨finalContext, .done value store⟩ :=
+  HostStorageDriver.run_done_stable context state execution more
+
 /-- Checked execution exposes the same exact executable/specification iff. -/
 private theorem compileTimeCheckedCompletenessRegression
     {RollbackState : Type u}
