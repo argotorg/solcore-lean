@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: relational completeness of Core host execution and the generic handled driver
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -205,18 +205,74 @@ This ADR does not add:
   return bytes; or
 - a claim that out-of-fuel results are stable under additional fuel.
 
-## Implementation sequence
+## Implementation record
 
-Keep every green commit around 300 changed lines or less:
+The implementation follows the planned proof boundary without changing the
+runner, handler, handled-step relation, or fuel rules.
 
-1. record this proof boundary and its non-goals;
-2. add Core done/fault replay;
-3. add Core suspension/out-of-fuel replay;
-4. add generic handled done/fault/exhaustion replay and the iff theorem;
-5. add generic and combined-storage terminal fuel stability;
-6. add checked/address-selected theorem-use and executable regressions; and
-7. run full validation and independent audit, then record acceptance evidence
-   and synchronize current-facing internal documentation.
+Core now publishes:
+
+- `hostRun_done_complete_of_steps` and the final-state convenience theorem
+  `hostRun_done_complete`;
+- `hostRun_fault_complete_of_steps`;
+- `hostRun_suspended_complete_of_steps`; and
+- `hostRun_outOfFuel_complete` for both an ordinary transition and a request
+  waiting at the exhausted state.
+
+The generic driver publishes outcome-specific `run_done_complete`,
+`run_fault_complete`, and `run_outOfFuel_complete` replay. These support
+`run_eq_of_fuelSoundWith` and the public
+`run_eq_iff_fuelSoundWith`. The result is two-way: an execution constructs its
+relational evidence, and valid evidence reconstructs the identical executable
+result.
+
+“Identical” includes the exact final handler context. A handled path records
+each dependent response and context update; replay does not replace the final
+context with the initial context or assume that a request is read-only. A
+minimal regression uses a handler that increments a `Nat` context and proves
+that one handled request returns context `1`, starting from `0`, through both
+directions of the public iff theorem.
+
+`HostDriver.run_done_stable` and `HostDriver.run_fault_stable` replay terminal
+evidence at a larger budget. Combined storage exposes the corresponding
+`run_done_stable` and checked `runWithStorage_done_stable` theorems, while
+address-selected execution exposes
+`runCodeWithStorage?_some_done_stable`. These specializations retain the exact
+post-write context, selected result, Core store, and value.
+
+There is deliberately no out-of-fuel stability theorem. Exhaustion records a
+state that is ready for its next paid transition or request emission; adding
+fuel may perform that work, handle requests, update context, or reach a
+terminal result.
+
+## Regression record
+
+Compile regressions consume every Core replay theorem directly. They exercise
+both out-of-fuel readiness branches, replay a raw Core fault, use generic fault
+completeness and stability, and run the public fuel-soundness iff in both
+directions. The changing-handler regression also evaluates the larger-fuel
+result and checks its context and outcome independently.
+
+Storage regressions consume the combined, checked, and address-selected
+stability theorems. The ADR-0119 read/write/read execution remains complete at
+fuel 28 and produces the same final value, Core-local store, and updated host
+context with additional fuel. Repeated writes retain the second value. The
+fuel 21, 22, and 27 observations remain intentional intermediate
+out-of-fuel results rather than stable terminal outcomes.
+
+## Acceptance evidence
+
+- the full project build completed successfully with 619 build jobs;
+- `lake test` completed successfully with 1,126 jobs;
+- every changed Lean module passed trust-zero with warnings treated as errors;
+- workspace metadata and the semantic-kernel policy were verified; and
+- an independent final audit found no P0, P1, P2, or P3 issue.
+
+The audit covered both out-of-fuel readiness forms, a handled-prefix
+out-of-fuel path after a context update, same- and larger-fuel terminal replay,
+and direct consumers of the combined, checked, and address-selected public
+stability theorems. The root README and all parser-facing code remained
+unchanged.
 
 ## Consequences
 

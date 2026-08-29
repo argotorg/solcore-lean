@@ -717,6 +717,21 @@ The returned context is the latest working state, not a committed transaction
 result. ABI, source syntax, gas, authorization, calls, transaction atomicity,
 and rollback policy remain separate decisions.
 
+ADR-0120 closes the proof boundary around this execution model. The generic
+handled-step relation can be reconstructed from every executable driver result,
+and any valid relational witness replays to the exact result. Replay follows
+each ordinary Core segment, request emission, dependent handler response, and
+context update; it never assumes that a handler leaves its context unchanged.
+
+A done result or raw fault is stable when more Core fuel is supplied. This is
+full-result stability, so it retains the exact final context as well as the
+value, local store, fault, or fault state. The combined storage driver and its
+checked and successful address-selected done entry points expose the same exact
+final-context guarantee, including contexts changed by writes. Out-of-fuel has
+no stability theorem because a larger budget can continue execution and apply
+more effects. These additions are proofs and regressions only: the driver,
+runtime behavior, and read/write request kinds are unchanged.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

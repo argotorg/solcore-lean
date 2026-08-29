@@ -35,6 +35,14 @@ unpublished: frozen Wire formats reject the host values, and source syntax,
 ABI, gas, calls, authorization, transaction commit, and rollback remain future
 work.
 
+[ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
+completes the proof interface for this driver without changing its behavior.
+Executable results and the readable handled-step relation now determine one
+another. Done and fault results are unchanged when more fuel is supplied; the
+storage, checked, and successful address-selected done interfaces retain the
+exact final context. Out-of-fuel is deliberately not called stable because more
+fuel can continue the run. No host request kind or runtime API behavior changed.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
@@ -577,6 +585,14 @@ every request; a handled write updates only the working context and survives a
 later out-of-fuel result. Code, checkpoint, effects, the storage selector, and
 non-selected Accounts are preserved. No commit or rollback behavior is implied.
 
+The completed
+[ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md) makes
+the generic handled relation executable in both directions and proves that
+done and fault results retain their exact final context under additional fuel.
+The combined storage, checked, and successful address-selected done APIs reuse
+that guarantee. There is intentionally no corresponding out-of-fuel stability
+claim, and the slice adds no runtime behavior or request constructor.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -837,6 +853,9 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0119](adr/0119-storage-write-capability-and-driver.md)
   fixes typed storage writes, request-generic handled execution, and the
   combined address-selected working-storage driver.
+- [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
+  fixes two-way handled execution and done/fault stability under additional
+  fuel without changing runtime behavior.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

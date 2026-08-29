@@ -7,10 +7,11 @@ Core remains frozen while the internal Core grows additively.
 ADR-0119 completes the first address-selected execution path that can both
 read and update working contract storage under one typed, fuel-preserving
 driver. [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
-is now active and closes the generic runner's reverse correctness and terminal
-fuel-stability boundary without adding runtime behavior. Further contract-entry
-inputs follow only after that proof interface is complete. Concrete grammar and
-parser proof work stays paused until source syntax stabilizes.
+now completes the proof boundary around that driver: its handled-step relation
+and executable result determine each other, and completed or faulted runs remain
+identical when given more fuel. Selecting the next contract-entry input is the
+next planned step. Concrete grammar and parser proof work stays paused until
+source syntax stabilizes.
 
 ## Completed foundation
 
@@ -134,8 +135,8 @@ These results remain regression obligations for every extension.
 | 100 | Working-storage read handler | Complete foundation | Interprets reads through the proven-present Account; its laws are reused by the combined handler |
 | 101 | Address-selected host-code driver | Complete foundation | Establishes separate code/storage selection and exact remaining-fuel reuse; its read-specific API is superseded by ADR-0119 |
 | 102 | Typed storage-write and combined storage driver | Complete | Appends `(word × word) -> unit`, uses a generic driver and combined handler, and proves address-selected safety, fuel, and context invariants |
-| 103 | Handled-execution completeness and terminal fuel stability | Active | Makes the generic handled-step relation executable in both directions before adding another input role |
-| 104 | Further contract-entry input roles | Planned after ADR-0120 | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 103 | Handled-execution completeness and terminal fuel stability | Complete | Makes the generic handled-step relation executable in both directions and proves exact done/fault stability under additional fuel |
+| 104 | Further contract-entry input roles | Planned; next selection | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
 | 105 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 106 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 107 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -1673,6 +1674,27 @@ value, selected working-storage update, zero deletion, unrelated Accounts,
 checkpoint, effects, address selection, and Core-local store. Transaction
 commit/rollback, nested invocation, further entry inputs, ABI, source syntax,
 and publication remain later decisions.
+
+## Completed handled-execution completeness and terminal fuel stability
+
+[ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
+closes the reverse proof direction for host execution. A generic
+`HostDriver` result produces its handled-step and fuel evidence, and valid
+evidence replays to that exact executable result. The relation is therefore a
+two-way executable specification, including handlers that update their context.
+
+Supplying more fuel preserves a completed result or a raw fault, including the
+exact final context rather than only its value. The combined storage driver,
+checked storage execution, and successful address-selected execution inherit
+this guarantee; writes already recorded in the final working context remain
+exactly the same. Out-of-fuel is intentionally different: additional fuel can
+continue the run, so no out-of-fuel stability theorem is provided.
+
+The mixed read/write/read and repeated-write regressions exercise the same
+programs at larger budgets and retain their values, local stores, selected
+storage updates, and every exposed frame projection. ADR-0120 adds proofs and
+regressions only. It changes neither runtime execution nor the existing read
+and write request kinds.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

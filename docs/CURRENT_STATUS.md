@@ -311,9 +311,11 @@ storage-write capability, the request-generic driver, and the combined
 address-selected storage API. Checked code can now read, update, and reread its
 selected working storage under one exact fuel budget. Parser work remains
 paused. [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
-is the active proof slice: it will make the handled-step/fuel relation complete
-for the executable driver and prove terminal results stable under added fuel
-before any new contract-entry input is introduced.
+completes the handled-step/fuel relation for the executable driver and proves
+done and raw-fault results stable under added fuel. Relational replay preserves
+the exact final handler context, including storage updates. Out-of-fuel is
+intentionally not stable. The next syntax-independent semantic slice will be
+selected separately.
 
 ## Implementation status
 
@@ -330,6 +332,7 @@ before any new contract-entry input is introduced.
 | Typed Core storage-read suspension | Complete foundation | Typed request/resume, exact boundary fuel, finite-run typing, and no-fault safety proved | Not published |
 | Address-selected host-code driver | Complete foundation | Separate code/storage selection and exact handled-step fuel accounting; its read-specific API is superseded by ADR-0119 | Not published |
 | Typed storage-write and combined storage driver | Complete | Append-only write capability, generic driver, combined read/write handler, address-selected API, safety, fuel, invariants, and regressions complete | Not published |
+| Handled-execution completeness and terminal fuel stability | Complete | Core and generic relational replay, executable-result iff, exact final context, and done/fault larger-fuel stability complete; out-of-fuel stability is intentionally excluded | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2083,6 +2086,30 @@ checks that writing zero removes the sparse entry. Code, unrelated Accounts,
 checkpoint state, effect journals, selector, and Core-local store remain
 observable and preserved. Commit/rollback, transaction visibility, nested
 calls, ABI behavior, and source syntax remain later decisions.
+
+## Completed handled-execution completeness and fuel stability
+
+[ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
+turns the generic handled-step relation into a two-way executable
+specification. Core paths now replay exact completion, raw fault, suspension,
+and exhaustion results. At the generic driver boundary,
+`run_eq_iff_fuelSoundWith` states that executable results are exactly the
+fuel-sound relational results.
+
+Replay retains the relation's exact final handler context rather than assuming
+that requests preserve context. Regressions use a handler that changes context
+and exercise both directions of the iff theorem. The combined-storage,
+checked-program, and address-selected stability laws likewise preserve the
+post-write context when more fuel is supplied.
+
+Done and raw-fault results are stable under additional fuel. Out-of-fuel is
+not: more fuel may perform the pending transition or request, update storage,
+or terminate. Full build validation completed with 619 jobs, `lake test`
+completed with 1,126 jobs, and every changed Lean module passed trust-zero
+with warnings treated as errors. Metadata and semantic-kernel policy checks
+passed, and an independent final audit found no P0-P3 issue. No parser,
+Surface, ABI, call-input, or lifecycle meaning changed. The next semantic
+slice will be selected separately.
 
 ## Meaning of completion
 
