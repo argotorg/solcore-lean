@@ -342,11 +342,11 @@ completion, parent-indexed continuation construction, and resolution folding.
 The Word has no balance, transfer, ABI, caller-identity, or source-syntax
 meaning.
 
-[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) is the active
-syntax-independent slice. It appends one caller-supplied Address to
-`ExecutionInputs` for one driver invocation and exposes its lossless Word
-through internal `callerAddress : unit -> word` at index 5. This weak input
-role does not identify an Account or parent frame and defines no
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) completes the
+run-fixed caller-address observation. One explicitly supplied Address is now
+carried through the same immutable `ExecutionInputs` and exposed as a lossless
+Word through internal `callerAddress : unit -> word` at index 5. This weak
+input role does not identify an Account or parent frame and defines no
 authentication, origin, current/callee identity, or nested-call derivation.
 
 ## Implementation status
@@ -369,7 +369,7 @@ authentication, origin, current/callee identity, or nested-call derivation.
 | Address-selected handled execution exact specification | Complete | Successful execution iff selected-code fuel evidence; optional failure iff working-WorldState code lookup failure; selected out-of-fuel remains an attempted execution | Not published |
 | Handled-execution relational metatheory | Complete | Core and handled path composition, direct relational type safety, same-fuel result uniqueness, and terminal-only cross-fuel uniqueness complete; out-of-fuel remains budget-relative | Not published |
 | End-to-end invocation-value observation | Complete | Immutable execution input, append-only `unit -> word` capability, exact handler/driver laws, selected and parent-indexed preservation, fuel boundaries, value-derived storage use, and frozen-Wire rejection complete | Not published |
-| Run-fixed caller-address observation | Active | ADR-0132 fixes the weak one-driver-invocation role; implementation, proofs, and regressions are in progress | Not published |
+| Run-fixed caller-address observation | Complete | Explicit immutable input, append-only `unit -> word` capability, exact handler/driver laws, absent-Account behavior, caller-derived storage and parent-fold regressions, fuel boundaries, and frozen-Wire rejection complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2347,6 +2347,40 @@ temporary migration name remains. No balance, funding, transfer, caller
 identity, ABI, parser, Surface, Oracle, schema, profile, or public-format
 meaning was added. Parser and parser-proof work remains paused while concrete
 syntax may change.
+
+## Completed run-fixed caller-address observation
+
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) appends one
+explicit caller-supplied Address to the immutable `ExecutionInputs` used for a
+single handled run. The same record reaches request handling, recursive fuel
+evidence, selected completion, and parent-indexed continuation construction;
+code selection remains exclusively `inputs.codeAddress`.
+
+Core appends `callerAddress : unit -> word` at index 5, preserving indexes 0
+through 4 and making 6 the first unbound host index. Its request-machine,
+typing, progress, preservation, runner, checked no-fault, exact handler, strict
+Address recovery, and recursive-driver laws are complete. The handler performs
+no Account lookup and does not change mutable context. Frozen Wire v1 and v2
+explicitly reject the internal value.
+
+The direct fixture stops at fuel 4, completes with the exact widened caller
+Address at fuel 5, and is stable at fuel 32 despite the caller Account being
+absent. Changing only callerAddress changes only the returned Word while the
+same code selector, storage selector, call value, and retained context remain
+unchanged.
+
+The caller-observe/write/caller-observe fixture stops at its second request at
+fuel 23, is one Core step before its pair at fuel 29, completes at fuel 30, and
+is stable at fuel 32. It writes the caller-derived Word to working storage and
+returns the same Word on both sides of the mutation. Parent-indexed completion
+then reaches ADR-0129's fold, which recovers that storage entry and the exact
+terminal bytes without flattening ADR-0125's optional boundaries.
+
+The 643-job build, complete 1,174-job test suite, metadata verification, and
+semantic-kernel policy checks pass. No caller Account requirement, provenance,
+authentication, origin, call kind, nested invocation, balance/value-transfer
+rule, ABI, parser, Surface, Oracle, schema, profile, Wire tag, or public-format
+meaning was added. Parser and parser-proof work remains paused.
 
 ## Meaning of completion
 

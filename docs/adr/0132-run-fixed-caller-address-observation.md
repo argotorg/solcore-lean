@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose one explicitly supplied run-fixed Address to internal Core code
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -174,7 +174,8 @@ Low-level Core tests must cover:
 - host-check acceptance of `callerAddress Unit` and closed-check rejection;
 - static rejection and exact raw fault for a non-Unit argument;
 - exact request emission, response injection, continuation, and Store reuse;
-- request-ready exhaustion at measured fuel 4 and completion at fuel 5; and
+- request-ready exhaustion at raw-Core fuel 4, request suspension at raw-Core
+  fuel 5, and handled completion at fuel 5; and
 - direct rejection of `.hostFunction .callerAddress` by Wire v1 and v2.
 
 End-to-end regressions must:
@@ -235,29 +236,85 @@ This ADR does not define or prove:
 - a public representation, compatibility promise, parser change, or Oracle
   behavior.
 
-## Implementation sequence
+## Implemented sequence
 
-Keep each green commit at roughly 300 changed lines or fewer:
+The work was completed in bounded commits in this order:
 
-1. record and activate this exact weak contract;
-2. append the input field and projection law, then migrate explicit record
-   constructions without a default;
-3. append the Core capability and request, add the handler branch, and close
-   machine, correspondence, progress, typing, preservation, runner,
-   request-exhaustive, and no-fault cases;
-4. add exact suspension laws, strict recovery, and the driver
-   request-resumption law;
-5. repair custom test handlers and compile consumers;
-6. add focused Core admission, fault, layout, fuel, and Wire regressions;
-7. add direct selected-execution, absent-caller-Account, role-separation, and
-   larger-fuel regressions;
-8. add observe-write-observe, parent-continuation, and fold regressions;
-9. run trust, axiom, dependency, build, test, metadata, kernel, compatibility,
-   and independent audits; and
-10. synchronize completion evidence in current-facing internal documents.
+1. recorded and activated this exact weak contract;
+2. appended the required `callerAddress` field and projection law to
+   `ExecutionInputs`, then migrated every explicit construction without a
+   default or inference from another role;
+3. appended the Core capability and request and closed the exhaustive machine,
+   correspondence, progress, typing, preservation, runner, and checked
+   no-fault cases;
+4. added the exact handler, suspension, strict-recovery, and recursive-driver
+   laws;
+5. repaired request-exhaustive custom handlers and added focused Core
+   admission, raw-fault, layout, fuel, resumption, and Wire regressions;
+6. added direct selected execution, absent-Account, caller-only variation,
+   observe-write-observe, parent completion, and resolution-fold regressions;
+   and
+7. ran repository validation and synchronized the completion record.
 
-Temporary migration names must be removed before completion. No transitional
-API may infer `callerAddress` from another field or manufacture a default.
+No completed API infers `callerAddress` from another field or manufactures a
+zero, absent, optional, or otherwise default caller Address.
+
+## Implementation record
+
+`HostStorageDriver.ExecutionInputs` now contains the selected code Address,
+invocation-value Word, and caller-supplied Address. The exact record is passed
+unchanged through request handling, recursive driving, handled-step and fuel
+evidence, selected execution, completion, and parent-indexed continuation
+construction. Checked-code lookup still uses only `inputs.codeAddress`.
+
+Core appends `HostFunction.callerAddress : unit -> word` at index 5 without
+moving indexes 0 through 4. The matching request, response, application,
+emission, invalid-argument fault, resumption, progress, transition, state
+typing, runner, and checked no-fault branches are complete. Host-context and
+host-environment lengths are 6. Frozen Wire v1 and v2 explicitly reject the
+internal host-function value.
+
+The storage handler returns `addressToWord inputs.callerAddress` exactly. It
+performs no Account or code lookup, leaves the complete mutable context
+unchanged, and preserves the saved continuation and Core-local Store. Strict
+narrowing recovers exactly `some inputs.callerAddress`. The recursive driver
+law retains the same complete input and exact remaining fuel.
+
+The end-to-end fixture uses caller Address `0x40`, distinct storage and code
+Addresses, and a numerically distinct call-value Word. Direct observation
+stops at the request with fuel 4, completes with the exact widened Word at fuel
+5, and is identical at fuel 32. Both checkpoint and working WorldState omit an
+Account at the caller Address, and observation does not create one.
+
+A second input changes only `callerAddress`, retaining the same code selector,
+storage selector, and call value. Only the returned caller Word changes. Exact
+handler and completed-driver theorems show that the complete host context is
+independent of that field, and the retained fixture observations remain
+unchanged.
+
+The caller-observe/write/caller-observe program stops at the second caller
+request with fuel 23, stops one Core step before its result pair with fuel 29,
+completes with two equal widened caller Words at fuel 30, and remains identical
+at fuel 32. Its storage write stores that exact caller-derived Word. The
+completed parent-indexed context preserves all three ADR-0125 optional layers
+and reaches ADR-0129's fold, which recovers both the caller-derived storage
+entry and designated terminal bytes.
+
+## Acceptance evidence
+
+- the full build completed successfully with 643 jobs;
+- the complete 1,174-job executable test suite passed;
+- metadata verification and semantic-kernel policy checks passed;
+- focused Core regressions cover append-only indexes and tables, checked and
+  closed admission, exact request and resumption, the invalid-argument fault,
+  fuel 4/5, first-unbound index 6, and frozen Wire v1/v2 rejection;
+- end-to-end regressions cover fuel 4/5/23/29/30/32, exact widening, caller
+  Account absence, caller-only input variation, context preservation,
+  caller-derived storage mutation, terminal stability, parent-indexed
+  completion, and the exact ADR-0129 fold result; and
+- consistency inspection found no default caller Address, inferred caller
+  role, caller Account dependency, Wire tag, parser change, public-format
+  change, or root README change in the completed slice.
 
 ## Consequences
 
