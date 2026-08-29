@@ -85,10 +85,10 @@ trap reason maps only the resolution component and leaves the exact optional
 rollback pair unchanged; identity, composition, and continuation consumers
 verify the simplifier boundary.
 
-[ADR-0129](adr/0129-parent-indexed-trap-aware-resolution-fold.md) is the active
-frame-local fold. It lets caller-owned functions consume return, revert, and
-trap values without applying rollback, resuming a parent, or defining a
-transaction boundary.
+[ADR-0129](adr/0129-parent-indexed-trap-aware-resolution-fold.md) completes the
+frame-local fold. Caller-owned functions consume exact return, revert, and trap
+values, and a coherence law reconstructs the full ADR-0127 view without
+applying rollback, resuming a parent, or defining a transaction boundary.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

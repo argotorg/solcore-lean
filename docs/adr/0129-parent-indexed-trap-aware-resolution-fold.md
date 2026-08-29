@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: caller-owned elimination of all three parent-indexed frame outcomes
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -241,9 +241,9 @@ This ADR does not define or claim:
 - parser, Surface, ABI, Wire, Oracle, schema, profile, EVM revision, or public
   format behavior.
 
-## Implementation sequence
+## Implemented sequence
 
-Keep each green commit below roughly 300 changed lines:
+The work was completed in this order:
 
 1. record the exact fold contract;
 2. activate it in the current-facing internal roadmap;
@@ -253,6 +253,40 @@ Keep each green commit below roughly 300 changed lines:
 6. add compile consumers through the public laws and ADR-0125 producer;
 7. run full validation and independent audit; and
 8. synchronize completion evidence in current-facing internal documents.
+
+## Implementation record
+
+`ParentIndexedFrameResolutionFold.lean` adds the single total fold and one
+Semantics-facade import. It matches only the original completed outcome and
+returns the selected caller function's arbitrary `Next` value. It adds no
+result carrier, optional layer, fallback case, or runtime transition.
+
+`ParentIndexedFrameResolutionFoldProperties.lean` publishes exactly the three
+branch equations and the ADR-0127 reconstruction law. Return uses the terminal
+working pair. Revert and trap use the indexed parent state and rollback with
+the accumulated working trace. All four laws are non-simp.
+
+The definition-only runtime module executes all three branches with distinct
+parent and working state, rollback values, parent-plus-nested trace, bytes,
+reason, and callback markers. The compile-only module applies every public law,
+shows that `Next := Option Marker` preserves the trap callback's `some`, and
+transports ADR-0125 completion and larger-fuel stability without adding a
+wrapper over its three optional layers.
+
+## Acceptance evidence
+
+- the full build completed 636 jobs;
+- the complete test suite completed 1,160 jobs and all runtime checks passed;
+- every changed Lean module compiled with trust zero and warnings as errors;
+- metadata and semantic-kernel policy checks passed;
+- the operation and all four laws report exactly `[propext]`;
+- declaration and simplification inventories found one operation, four
+  non-simp laws, and no unchecked declaration; and
+- independent specification, runtime, and implementation audits found no
+  P0-P3 issue.
+
+No Core execution, parser, Surface, ABI, Oracle, Wire format, schema, profile,
+or root README changed.
 
 ## Consequences
 

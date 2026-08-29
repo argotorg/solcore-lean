@@ -2265,7 +2265,7 @@ law reports exactly `[propext]`; the 632-job build, 1,152-job test suite,
 trust-zero, metadata, semantic-kernel, and independent audits pass. Parser work
 and every public format remain unchanged.
 
-## Active parent-indexed trap-aware resolution fold
+## Completed parent-indexed trap-aware resolution fold
 
 [ADR-0129](adr/0129-parent-indexed-trap-aware-resolution-fold.md) adds one pure,
 total fold over a completed parent-indexed context. Three caller-owned
@@ -2274,8 +2274,17 @@ ADR-0127, and a fourth law must reconstruct the complete ADR-0127 view.
 
 The fold returns an arbitrary caller-selected type and introduces no optional
 failure of its own. It does not apply rollback, mutate or resume a parent,
-deliver bytes, classify traps, or define transaction finalization. Parser work
-and public formats remain unchanged.
+deliver bytes beyond the pure callback argument, classify traps, or define
+transaction finalization.
+
+Four exact non-simp laws cover every branch and reconstruct the ADR-0127 view;
+all report only `[propext]`. Three definition-only runtime assertions inspect
+distinct state, rollback, trace, bytes, reason, and branch markers. Six compile
+consumers apply every law, preserve an optional trap callback result, and carry
+ADR-0125 completion and larger-fuel stability without flattening its nested
+options. The 636-job build, 1,160-job test suite, trust-zero, metadata,
+semantic-kernel, and independent audits pass. Parser work and public formats
+remain unchanged.
 
 ## Meaning of completion
 
