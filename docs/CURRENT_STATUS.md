@@ -2251,6 +2251,17 @@ metadata and semantic-kernel checks, and independent P0-P3 audits pass. No new
 runtime fixture was needed because the view only pairs already tested
 operations.
 
+## Active resolution-view trap-reason mapping naturality
+
+[ADR-0128](adr/0128-parent-indexed-resolution-view-trap-reason-mapping-naturality.md)
+adds no operation. Its single proof obligation states that mapping a completed
+parent-indexed context's trap-reason type maps the ordinary resolution result
+and preserves the optional exact rollback pair unchanged.
+
+The active regressions cover direct theorem use, identity and heterogeneous
+composition, simplifier convergence, and the existing bytes-aware continuation
+invariance. Parser work and every public format remain unchanged.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable
