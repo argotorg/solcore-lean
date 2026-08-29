@@ -107,6 +107,52 @@ private theorem compileTimeStorageAddressRemainingFuelRegression
   HostStorageDriver.run_of_suspended_storageAddress
     context codeAddress fuel remainingFuel state continuation store execution
 
+/-- The code-selector handler exposes its exact lossless response and state. -/
+private theorem compileTimeCodeAddressResumeRegression
+    {RollbackState : Type u} {TraceState : Type v}
+    (codeAddress : Address)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (continuation : List Frame) (store : Store) :
+    (HostStorageDriver.handleSuspension codeAddress context
+        ⟨.codeAddress, continuation, store⟩).1 = context ∧
+      (HostStorageDriver.handleSuspension codeAddress context
+        ⟨.codeAddress, continuation, store⟩).2.control =
+          .ret (.word (addressToWord codeAddress)) ∧
+      (HostStorageDriver.handleSuspension codeAddress context
+        ⟨.codeAddress, continuation, store⟩).2.continuation = continuation ∧
+      (HostStorageDriver.handleSuspension codeAddress context
+        ⟨.codeAddress, continuation, store⟩).2.store = store ∧
+      wordToAddress?
+          ((HostStorageDriver.handler codeAddress).handle
+            context .codeAddress).2 = some codeAddress := by
+  exact
+    ⟨HostStorageDriver.handleSuspension_codeAddress_context
+        codeAddress context continuation store,
+      HostStorageDriver.handleSuspension_codeAddress_control
+        codeAddress context continuation store,
+      HostStorageDriver.handleSuspension_codeAddress_continuation
+        codeAddress context continuation store,
+      HostStorageDriver.handleSuspension_codeAddress_store
+        codeAddress context continuation store,
+      HostStorageDriver.wordToAddress?_handler_codeAddress
+        codeAddress context⟩
+
+/-- The public code-selector rule reuses Core's exact remaining fuel. -/
+private theorem compileTimeCodeAddressRemainingFuelRegression
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel remainingFuel : Nat) (state : State)
+    (continuation : List Frame) (store : Store)
+    (execution :
+      hostRun fuel state =
+        .suspended ⟨.codeAddress, continuation, store⟩ remainingFuel) :
+    HostStorageDriver.run context codeAddress fuel state =
+      HostStorageDriver.run context codeAddress remainingFuel
+        ⟨.ret (.word (addressToWord codeAddress)), continuation, store⟩ :=
+  HostStorageDriver.run_of_suspended_codeAddress
+    context codeAddress fuel remainingFuel state continuation store execution
+
 /-- Public handler observations fix read-after-write and sparse zero deletion. -/
 private theorem compileTimeWriteObservationRegression
     {RollbackState : Type u}
