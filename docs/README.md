@@ -28,14 +28,15 @@ selected by `codeAddress` from a working WorldState. Core supplies typed
 runtime-only storage read and write capabilities, plus a read-only observation
 of the retained storage selector and a separate observation of the selected
 code selector. The same immutable execution input also supplies a
-caller-chosen invocation-value Word and an explicitly supplied caller Address
-through internal `callValue` and `callerAddress : unit -> word` capabilities.
-The latter is the sixth host entry at index 5 and losslessly widens the Address.
-Each request suspends with its exact
-continuation, local cell store, and remaining fuel. A generic host driver
+caller-chosen invocation-value Word, an explicitly supplied caller Address,
+and bounded input bytes. Internal `callValue` and
+`callerAddress : unit -> word` expose the first two values;
+`inputDataByte? : word -> sum unit word` at index 6 distinguishes an absent
+offset from every present byte, including zero. Each request suspends with its
+exact continuation, local cell store, and remaining fuel. A generic host driver
 delegates requests to a combined handler over the Account selected by a
 separate `storageAddress`; the code and storage roles are never equated.
-Reads and all four observations leave the complete host context unchanged,
+Reads and all five observations leave the complete host context unchanged,
 while writes update the returned working context and resume with Unit. Caller
 observation requires no caller Account. This boundary is proved and tested but
 unpublished: frozen Wire
@@ -121,12 +122,15 @@ fold. Frozen Wire rejects the internal value. The feature does not authenticate
 anyone, identify a parent or origin, define current/callee identity, relate the
 caller to `callValue`, or specify caller derivation for nested calls.
 
-[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) is the active
-runtime slice. A bounded `InputData` value remains fixed for one handled run,
-and internal Core can request one byte by Word index through append-only
+[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) completes
+the bounded optional input-byte observation. A bounded `InputData` value remains
+fixed for one handled run, and internal Core requests one byte by Word index
+through append-only
 `inputDataByte? : word -> sum unit word` at index 6. The result distinguishes an
-absent index from a present zero byte. This is not yet an input-size API, a
-multi-byte or Word loader, an endianness or padding rule, ABI calldata, source
+absent index from a present zero byte. Tests cover exact bounds, input-only
+variation, byte-derived storage, parent completion, and the resolution fold.
+This is not an input-size API, a multi-byte or Word loader, an endianness or
+padding rule, ABI calldata, source
 syntax, Wire encoding, or a published runtime interface.
 
 First-order local cells from

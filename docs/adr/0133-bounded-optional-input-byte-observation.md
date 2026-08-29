@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose one indexed byte from an explicitly bounded immutable input
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 

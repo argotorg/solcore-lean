@@ -349,13 +349,14 @@ Word through internal `callerAddress : unit -> word` at index 5. This weak
 input role does not identify an Account or parent frame and defines no
 authentication, origin, current/callee identity, or nested-call derivation.
 
-[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) is the active
-slice. It adds one bounded, run-fixed `InputData` value and an internal
-`inputDataByte? : word -> sum unit word` capability at append-only index 6. An
-in-bounds index returns a Word for the selected byte, including byte zero; an
+[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) completes the
+bounded optional input-byte observation. One bounded, run-fixed `InputData`
+value is now part of the immutable run input, and internal Core exposes
+`inputDataByte? : word -> sum unit word` at append-only index 6. An in-bounds
+index returns a Word for the selected byte, including byte zero; an
 out-of-bounds index returns the distinct Unit branch. It does not define an
-input-size query, multi-byte load, endianness or padding policy, ABI or calldata
-meaning, source syntax, or a published format.
+input-size query, multi-byte load, endianness or padding policy, ABI or
+calldata meaning, source syntax, or a published format.
 
 ## Implementation status
 
@@ -378,7 +379,7 @@ meaning, source syntax, or a published format.
 | Handled-execution relational metatheory | Complete | Core and handled path composition, direct relational type safety, same-fuel result uniqueness, and terminal-only cross-fuel uniqueness complete; out-of-fuel remains budget-relative | Not published |
 | End-to-end invocation-value observation | Complete | Immutable execution input, append-only `unit -> word` capability, exact handler/driver laws, selected and parent-indexed preservation, fuel boundaries, value-derived storage use, and frozen-Wire rejection complete | Not published |
 | Run-fixed caller-address observation | Complete | Explicit immutable input, append-only `unit -> word` capability, exact handler/driver laws, absent-Account behavior, caller-derived storage and parent-fold regressions, fuel boundaries, and frozen-Wire rejection complete | Not published |
-| Bounded optional input-byte observation | Active | ADR-0133 specifies bounded run-fixed input and an append-only `word -> sum unit word` capability whose Unit and Word branches distinguish absence from a present zero byte | Not published |
+| Bounded optional input-byte observation | Complete | Bounded indexing and exact widening, optional response injection, request/resume safety, full context identity, input-only variation, byte-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
