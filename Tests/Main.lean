@@ -94,6 +94,8 @@ import Solcore.Test.FrameTracePrefix
 import Solcore.Test.FrameOutcome
 import Solcore.Test.FrameOutcomeTrapReasonMap
 import Solcore.Test.HostDriverCompleteness
+import Solcore.Test.HostDriverResumption
+import Solcore.Test.HostStorageDriverResumption
 import Solcore.Test.HostStorageInputData
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameCheckpointSnapshot
@@ -5019,6 +5021,8 @@ def run : IO Unit := do
   testParentIndexedFrameResolutionFold
   testParentIndexedFrameTrapRollback
   testParentIndexedFrameTrapPropagationPayload
+  testHostDriverResumption
+  testHostStorageDriverResumption
   testHostStorageInputData
   testRuntimeScalars
   testWorldState
