@@ -30,6 +30,10 @@ checked host code always terminates.
 the first lifecycle connection. It adapts only normal handled completion
 through a caller-owned policy, preserves terminal frame values, and retains
 nested options so code absence and selected out-of-fuel cannot be confused.
+[ADR-0125](adr/0125-parent-indexed-selected-execution-continuation.md) is the
+active parent-indexed lift. It also preserves storage-Account absence and
+constructs the existing proof-bearing parent continuation only after normal
+selected completion.
 
 ## Completed foundation
 
@@ -158,11 +162,12 @@ These results remain regression obligations for every extension.
 | 105 | Address-selected handled execution exact specification | Complete | Characterizes `some` by selected-code fuel evidence and `none` by code lookup failure without changing execution |
 | 106 | Handled-execution relational metatheory | Complete | Composes handled paths, proves direct type safety and fixed-fuel uniqueness, and compares only terminal results across budgets |
 | 107 | Completed handled execution to frame continuation | Complete | Adapts only normal completion through a caller-owned outcome policy while preserving code absence and selected exhaustion as distinct results |
-| 108 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 109 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 110 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 111 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 112 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 108 | Parent-indexed selected execution continuation | In progress | Preserves storage absence, code absence, selected exhaustion, and completion while refining only completion to the existing parent-indexed context |
+| 109 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 110 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 111 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 112 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 113 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1783,6 +1788,19 @@ resolution after a real storage update. It also fixes outer failure, fuel-22
 inner exhaustion, and fuel-28-to-64 completed stability. Full validation and
 independent P0-P3 audits pass. ABI encoding, normalization, parent delivery,
 scheduling, transaction disposition, and source syntax remain later work.
+
+## Active parent-indexed selected execution continuation
+
+[ADR-0125](adr/0125-parent-indexed-selected-execution-continuation.md) lifts
+the completed storage execution path from a parent-indexed initialization.
+Three nested optional boundaries keep storage absence, code absence, selected
+out-of-fuel, and completion separate. Completion reconstructs the existing
+parent-indexed context and proves that forgetting its relationship evidence
+recovers the exact ADR-0124 continuation.
+
+The slice reuses existing return, revert, trap rollback, and trap propagation
+consumers. It adds no parent machine, callback delivery, scheduler, stack,
+transaction policy, ABI, host input, or syntax.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
