@@ -46,7 +46,7 @@ def handler
     HostHandler (Context RollbackState TraceState) where
   handle := handleRequest codeAddress
 
-/-- Handle one storage suspension and resume its saved Core continuation. -/
+/-- Handle one supported host suspension and resume its saved Core continuation. -/
 def handleSuspension
     {RollbackState : Type u}
     {TraceState : Type v}

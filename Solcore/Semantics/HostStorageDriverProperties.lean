@@ -60,7 +60,7 @@ namespace HostStorageDriver
       (@handler RollbackState TraceState codeAddress)
       context fuel state faultState error execution
 
-/-- A storage request resumes with exactly Core's returned remaining fuel. -/
+/-- A supported host request resumes with exactly Core's returned remaining fuel. -/
 theorem run_of_suspended
     {RollbackState : Type u}
     {TraceState : Type v}

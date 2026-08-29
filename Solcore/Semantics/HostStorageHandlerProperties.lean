@@ -4,7 +4,7 @@ import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountSt
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWritePresenceProperties
 import Solcore.Semantics.HostStorageHandler
 
-/-! Exact read/write behavior and safety of the combined storage handler. -/
+/-! Exact behavior and safety of the combined supported-host handler. -/
 
 set_option autoImplicit false
 
