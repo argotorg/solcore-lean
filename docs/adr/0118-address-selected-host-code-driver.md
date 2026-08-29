@@ -4,6 +4,13 @@
 - Decision date: 2026-08-29
 - Scope: Account code migration, handled host execution, and fuel preservation
 - Implementation: Complete
+- Current API: Superseded by ADR-0119's combined storage driver
+
+This ADR remains the accepted historical boundary that introduced stored
+host-aware code, repeated handled reads, and exact remaining-fuel threading.
+Its read-specific entry points and read-only context theorem are not current
+APIs: ADR-0119 replaced them with a handler that must accept both reads and
+writes.
 
 ## Context
 
@@ -148,18 +155,20 @@ Tests cover:
 
 ## Implementation record
 
-Account and WorldState now retain and select `CheckedHostCoreProgram`. The raw
-WorldState runner stops at the first Core boundary, while the read-specific
-driver repeatedly handles storage requests and returns only done, out-of-fuel,
-or raw fault outcomes. Checked and address-selected runs prove the fault branch
-unreachable.
+At this boundary, Account and WorldState were migrated to retain and select
+`CheckedHostCoreProgram`. That carrier and its exact pure-to-host promotion
+remain current. The raw WorldState runner stopped at the first Core boundary,
+while the then-current read-specific driver repeatedly handled storage-read
+requests and returned only done, out-of-fuel, or raw fault outcomes. Checked
+and address-selected runs proved the fault branch unreachable.
 
 The driver threads the complete proven-present context and recurses on the
 exact remaining fuel. A handled-step relation accounts for Core transition
 segments and request emissions: completion uses no more than the supplied
-budget, and exhaustion uses it exactly. The read-only APIs are named
-`runWithStorageReads` and `runCodeWithStorageReads?`; their context-equality
-theorems do not claim that a future write-capable driver is immutable.
+budget, and exhaustion uses it exactly. The historical read-only APIs were
+named `runWithStorageReads` and `runCodeWithStorageReads?`. Their
+context-equality theorem was valid only because every handled request was a
+read; it was never part of the generic result contract.
 
 Regressions separate code, working storage, and checkpoint Accounts; execute
 two dependent reads at exact fuel 11/12 boundaries; finish from a resumed final
@@ -170,11 +179,20 @@ build, test, trust-zero, metadata, and kernel-policy checks pass, as do three
 independent P0-P3 audits. Every implementation commit remains below 300 changed
 lines.
 
+ADR-0119 subsequently added storage writes and retired those read-specific
+modules and names. Current checked execution uses
+`CheckedHostCoreProgram.runWithStorage`; current address-selected execution
+uses `runCodeWithStorage?`; and both are backed by `HostStorageDriver`. The
+generic outcome and exact fuel model introduced here were retained. The
+complete-context equality theorem was deliberately removed because a handled
+write updates the selected working Account. Refer to ADR-0119 for the current
+handler equations, invariants, proofs, regressions, and validation record.
+
 ## Consequences
 
-Stored code can now use the typed Core host protocol without hiding WorldState
-inside Core. The context-threading result protocol and remaining-fuel pattern
-can be reused by a later write-capable driver.
+Stored code gained the typed Core host protocol without hiding WorldState
+inside Core. ADR-0119 has now reused the context-threading result protocol and
+remaining-fuel pattern for the combined read/write driver anticipated here.
 
 This decision does not define contract arguments, caller or callee identity,
 call depth, nested invocation, rollback ownership, transaction atomicity, ABI

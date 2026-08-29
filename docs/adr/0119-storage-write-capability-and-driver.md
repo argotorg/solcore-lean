@@ -1,9 +1,9 @@
 # ADR-0119: Typed storage-write capability and generic storage driver
 
-- Status: Proposed
+- Status: Accepted
 - Decision date: 2026-08-29
 - Scope: Core storage-write requests, generic handled execution, and working-state updates
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -116,10 +116,10 @@ semantics.
 The concrete storage handler has two transparent branches:
 
 ```lean
-handleStorageRequest context (.storageRead slot) =
+HostStorageDriver.handleRequest context (.storageRead slot) =
   (context, context.readStorage slot)
 
-handleStorageRequest context (.storageWrite slot value) =
+HostStorageDriver.handleRequest context (.storageWrite slot value) =
   (context.writeStorage slot value, ())
 ```
 
@@ -234,13 +234,16 @@ Tests cover:
 - distinct code and storage addresses;
 - preservation of checkpoint, effect journal, and Core-local cells;
 - mixed repeated reads and writes under one fixed budget;
-- fuel immediately before and at both request boundaries;
+- the read/write/read boundaries at fuel 21, 22, 27, and 28;
+- sparse-zero execution immediately before and at completion at fuel 15/16;
 - completion observed with zero fuel after the final resume;
 - direct use of public typing, no-fault, context-update, and fuel theorems; and
 - continued Wire v1/v2 rejection of both host function values.
 
-Full build, test, trust-zero, metadata, kernel-policy, dependency, and P0-P3
-audit checks remain required before acceptance.
+The executable regressions and public proof-interface regressions are part of
+the acceptance evidence below. Repository-wide build, test, metadata, and
+kernel-policy gates remain the final integration check after documentation-only
+changes.
 
 ## Dependency boundary
 
@@ -263,30 +266,63 @@ This ADR also does not define static-call restrictions, authorization, gas or
 refunds, atomicity, nested calls, reentrancy, logs, self-destruction, balance
 or nonce updates, creation, ABI encoding, return bytes, or source syntax.
 
-## Staged implementation plan
+## Implementation record
 
-Keep each green commit around 300 changed lines or less:
+The implementation followed the staged boundary above in small green commits.
+The final code is split by responsibility rather than collected in one storage
+runtime module:
 
-1. accept this ADR and update only targeted internal status documentation;
-2. extract the generic handler, driver, handled-step relation, and fuel proof
-   while the request universe is still read-only;
-3. add product inversion and prepare exhaustive host safety proofs;
-4. atomically add the Core write capability, request, machine branch, required
-   exhaustiveness repairs, concrete write-handler branch, and combined checked
-   API so no green revision admits writes but routes them through a read-only
-   driver;
-5. add exact handler context, continuation, store, typing, and no-fault laws;
-6. replace the address-selected read API and add selection, context-threading,
-   safety, and fuel properties;
-7. add executable and direct-proof regressions in groups below 300 lines; and
-8. run the complete validation and independent audit, then record acceptance
-   and implementation evidence in this ADR.
+- `Solcore.Core.Syntax`, `Host`, and `HostMachine` define the append-only
+  capability, fixed tables, dependent request response, suspension, and exact
+  machine branch. The accompanying host safety, progress, transition, and
+  runner-property modules cover both request constructors exhaustively.
+- `Solcore.Semantics.HostDriver`, `HostDriverProperties`, and
+  `HostDriverFuelProperties` contain the Account-independent handler loop,
+  outcome typing, no-fault result, handled-step relation, and fuel proof.
+- `HostStorageHandler` and `HostStorageHandlerProperties` interpret reads and
+  writes through the proven-present working Account. A write returns exactly
+  `context.writeStorage slot value`, resumes Core with Unit, and preserves the
+  saved continuation and Core-local store. Public laws also expose same-slot
+  read-after-write and sparse zero deletion.
+- `HostStorageDriver`, `HostStorageDriverProperties`, and
+  `HostStorageDriverFuelProperties` specialize the generic loop without adding
+  a whole-run context-equality claim. They publish the checked entry point
+  `CheckedHostCoreProgram.runWithStorage` together with typing, no-fault,
+  invariant, and fuel-soundness results.
+- `FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution` and its
+  properties publish `runCodeWithStorage?`. The adapter keeps the absent,
+  no-code, and selected-code branches explicit and returns evidence for result
+  typing and fuel accounting.
 
-If an estimated slice grows beyond the limit, split preparatory definitions
-from properties only where every intermediate revision still builds and keeps
-the checked execution path total. The capability constructor and all
-exhaustive request handling needed for that total path remain one atomic green
-change.
+The combined whole-run proofs retain the storage address, checkpoint, working
+effect journal, checked code at every working address, and every non-selected
+working Account. They intentionally do not retain the old read-only theorem
+that equated the complete final context with the initial context.
+
+`AddressSelectedHostStorage` exercises the complete path. Its measured
+read/write/read program allocates a Boolean Core cell, reads a selector, writes
+the selected slot, and reads it back. Fuel 21 stops immediately before the
+write emission with the old context; fuel 22 has handled the write and stops at
+the resumed Unit state with the new context; fuel 27 stops immediately before
+the final read emission; fuel 28 completes with the new Word and the unchanged
+`[true]` Core-local store. These boundaries follow directly from the rule that
+ordinary steps and request emissions cost one unit while handling, resumption,
+and terminal observation cost zero.
+
+The sparse-zero regression stops at fuel 15 after the zero update is already
+visible and completes at the minimum fuel 16 by reading zero. A separate
+repeated-write program performs two writes under one budget and confirms that
+the second value wins without changing code, checkpoint data, effects,
+unrelated slots, or another working Account. `AddressSelectedHostStorageProperties`
+also consumes the public handler, selection, typing, no-fault, invariant, and
+fuel theorems directly so the executable tests are not the only evidence.
+
+Focused module builds and trust-zero checks passed during implementation. An
+independent fuel audit reconstructed the de Bruijn programs, confirmed both
+host checks, reproduced the 21/22/27/28 and 15/16 boundaries, and left no
+tracked audit artifact. The repository-wide integration gates are rerun after
+this documentation synchronization; this record does not expand the feature
+into ABI, call, or transaction-lifecycle semantics.
 
 ## Consequences
 
