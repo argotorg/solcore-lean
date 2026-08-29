@@ -1,5 +1,5 @@
 import Solcore.Semantics.FrameResolutionResultContinuationProperties
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
+import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationWithInputsCoherenceProperties
 import Solcore.Semantics.ParentIndexedFrameResolutionViewProperties
 
 /-! Compile-only consumers of the parent-indexed resolution view. -/
@@ -125,7 +125,8 @@ private example
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
     (initialization :
       ParentIndexedFrameInitialization RollbackState Event parentWorking)
-    (storageAddress codeAddress : Address)
+    (storageAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
@@ -134,20 +135,20 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking)
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContext?
-          storageAddress codeAddress fuel doneOutcome =
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+          storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation))) :
     ∃ context continuation,
       initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
           storageAddress = some context ∧
-      context.runCodeWithStorageContinuationContext?
-          codeAddress fuel doneOutcome = some (some continuation) ∧
+      context.runCodeWithStorageContinuationContextWithInputs?
+          inputs fuel doneOutcome = some (some continuation) ∧
       parentContinuation.toFrameContinuationContext = continuation ∧
       (parentContinuation.resolveWithTrapRollback).1 =
         continuation.resolve := by
   obtain ⟨context, continuation, refined, lowerCompleted, coherent⟩ :=
-    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_toFrameContinuationContext
-      storageAddress codeAddress fuel doneOutcome parentContinuation completed
+    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_toFrameContinuationContext
+      storageAddress inputs fuel doneOutcome parentContinuation completed
   exact ⟨context, continuation, refined, lowerCompleted, coherent, by
     simpa only [
       ParentIndexedFrameContinuationContext.resolveWithTrapRollback] using
@@ -160,7 +161,8 @@ private example
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
     (initialization :
       ParentIndexedFrameInitialization RollbackState Event parentWorking)
-    (storageAddress codeAddress : Address)
+    (storageAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (doneOutcome :
       HostStorageDriver.Context RollbackState (FrameTrace Event) →
         Solcore.Core.Value → Solcore.Core.Store → FrameOutcome TrapReason)
@@ -169,19 +171,19 @@ private example
       ParentIndexedFrameContinuationContext
         RollbackState Event TrapReason parentWorking}
     (completed :
-      initialization.runCodeWithStorageParentIndexedContinuationContext?
-          storageAddress codeAddress fuel doneOutcome =
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+          storageAddress inputs fuel doneOutcome =
         some (some (some parentContinuation)))
     (more : fuel ≤ largerFuel) :
     ∃ largerContinuation,
-      initialization.runCodeWithStorageParentIndexedContinuationContext?
-          storageAddress codeAddress largerFuel doneOutcome =
+      initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?
+          storageAddress inputs largerFuel doneOutcome =
         some (some (some largerContinuation)) ∧
       largerContinuation.resolveWithTrapRollback =
         parentContinuation.resolveWithTrapRollback := by
   refine ⟨parentContinuation, ?_, rfl⟩
   exact
-    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
-      storageAddress codeAddress doneOutcome completed more
+    initialization.runCodeWithStorageParentIndexedContinuationContextWithInputs?_some_some_some_stable
+      storageAddress inputs doneOutcome completed more
 
 end Tests
