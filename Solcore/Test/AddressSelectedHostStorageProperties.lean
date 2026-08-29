@@ -1,5 +1,7 @@
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationWithInputsProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
 import Solcore.Semantics.HostStorageHandlerProperties
+import Solcore.Semantics.HostStorageHandlerWithExecutionInputsProperties
 
 /-! Compile-time use of the public storage-driver proof interface. -/
 
@@ -33,143 +35,143 @@ private def trappedFrameOutcome
 private theorem compileTimeWriteResumeRegression
     {RollbackState : Type u}
     {TraceState : Type v}
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (slot value : Word)
     (continuation : List Frame)
     (store : Store) :
-    (HostStorageDriver.handleSuspension codeAddress context
+    (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.storageWrite slot value, continuation, store⟩).1 =
           context.writeStorage slot value ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
           ⟨.storageWrite slot value, continuation, store⟩).2.control =
         .ret .unit ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
           ⟨.storageWrite slot value, continuation, store⟩).2.continuation =
         continuation ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
           ⟨.storageWrite slot value, continuation, store⟩).2.store = store := by
   exact
-    ⟨HostStorageDriver.handleSuspension_storageWrite_context
-        codeAddress context slot value continuation store,
-      HostStorageDriver.handleSuspension_storageWrite_control
-        codeAddress context slot value continuation store,
-      HostStorageDriver.handleSuspension_storageWrite_continuation
-        codeAddress context slot value continuation store,
-      HostStorageDriver.handleSuspension_storageWrite_store
-        codeAddress context slot value continuation store⟩
+    ⟨HostStorageDriver.handleSuspensionWithInputs_storageWrite_context
+        inputs context slot value continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_storageWrite_control
+        inputs context slot value continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_storageWrite_continuation
+        inputs context slot value continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_storageWrite_store
+        inputs context slot value continuation store⟩
 
 /-- The selector handler exposes its exact lossless, context-preserving response. -/
 private theorem compileTimeStorageAddressResumeRegression
     {RollbackState : Type u} {TraceState : Type v}
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (continuation : List Frame) (store : Store) :
-    (HostStorageDriver.handleSuspension codeAddress context
+    (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.storageAddress, continuation, store⟩).1 = context ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.storageAddress, continuation, store⟩).2.control =
           .ret (.word (addressToWord context.context.storageAddress)) ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.storageAddress, continuation, store⟩).2.continuation = continuation ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.storageAddress, continuation, store⟩).2.store = store ∧
       wordToAddress?
-          ((HostStorageDriver.handler codeAddress).handle
+          ((HostStorageDriver.handlerWithInputs inputs).handle
             context .storageAddress).2 =
         some context.context.storageAddress := by
   exact
-    ⟨HostStorageDriver.handleSuspension_storageAddress_context
-        codeAddress context continuation store,
-      HostStorageDriver.handleSuspension_storageAddress_control
-        codeAddress context continuation store,
-      HostStorageDriver.handleSuspension_storageAddress_continuation
-        codeAddress context continuation store,
-      HostStorageDriver.handleSuspension_storageAddress_store
-        codeAddress context continuation store,
-      HostStorageDriver.wordToAddress?_handler_storageAddress
-        codeAddress context⟩
+    ⟨HostStorageDriver.handleSuspensionWithInputs_storageAddress_context
+        inputs context continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_storageAddress_control
+        inputs context continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_storageAddress_continuation
+        inputs context continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_storageAddress_store
+        inputs context continuation store,
+      HostStorageDriver.wordToAddress?_handlerWithInputs_storageAddress
+        inputs context⟩
 
 /-- The public selector rule reuses Core's exact remaining fuel. -/
 private theorem compileTimeStorageAddressRemainingFuelRegression
     {RollbackState : Type u} {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel remainingFuel : Nat) (state : State)
     (continuation : List Frame) (store : Store)
     (execution :
       hostRun fuel state =
         .suspended ⟨.storageAddress, continuation, store⟩ remainingFuel) :
-    HostStorageDriver.run context codeAddress fuel state =
-      HostStorageDriver.run context codeAddress remainingFuel
+    HostStorageDriver.runWithInputs context inputs fuel state =
+      HostStorageDriver.runWithInputs context inputs remainingFuel
         ⟨.ret (.word (addressToWord context.context.storageAddress)),
           continuation, store⟩ :=
-  HostStorageDriver.run_of_suspended_storageAddress
-    context codeAddress fuel remainingFuel state continuation store execution
+  HostStorageDriver.runWithInputs_of_suspended_storageAddress
+    context inputs fuel remainingFuel state continuation store execution
 
 /-- The code-selector handler exposes its exact lossless response and state. -/
 private theorem compileTimeCodeAddressResumeRegression
     {RollbackState : Type u} {TraceState : Type v}
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (continuation : List Frame) (store : Store) :
-    (HostStorageDriver.handleSuspension codeAddress context
+    (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.codeAddress, continuation, store⟩).1 = context ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.codeAddress, continuation, store⟩).2.control =
-          .ret (.word (addressToWord codeAddress)) ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+          .ret (.word (addressToWord inputs.codeAddress)) ∧
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.codeAddress, continuation, store⟩).2.continuation = continuation ∧
-      (HostStorageDriver.handleSuspension codeAddress context
+      (HostStorageDriver.handleSuspensionWithInputs inputs context
         ⟨.codeAddress, continuation, store⟩).2.store = store ∧
       wordToAddress?
-          ((HostStorageDriver.handler codeAddress).handle
-            context .codeAddress).2 = some codeAddress := by
+          ((HostStorageDriver.handlerWithInputs inputs).handle
+            context .codeAddress).2 = some inputs.codeAddress := by
   exact
-    ⟨HostStorageDriver.handleSuspension_codeAddress_context
-        codeAddress context continuation store,
-      HostStorageDriver.handleSuspension_codeAddress_control
-        codeAddress context continuation store,
-      HostStorageDriver.handleSuspension_codeAddress_continuation
-        codeAddress context continuation store,
-      HostStorageDriver.handleSuspension_codeAddress_store
-        codeAddress context continuation store,
-      HostStorageDriver.wordToAddress?_handler_codeAddress
-        codeAddress context⟩
+    ⟨HostStorageDriver.handleSuspensionWithInputs_codeAddress_context
+        inputs context continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_codeAddress_control
+        inputs context continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_codeAddress_continuation
+        inputs context continuation store,
+      HostStorageDriver.handleSuspensionWithInputs_codeAddress_store
+        inputs context continuation store,
+      HostStorageDriver.wordToAddress?_handlerWithInputs_codeAddress
+        inputs context⟩
 
 /-- The public code-selector rule reuses Core's exact remaining fuel. -/
 private theorem compileTimeCodeAddressRemainingFuelRegression
     {RollbackState : Type u} {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel remainingFuel : Nat) (state : State)
     (continuation : List Frame) (store : Store)
     (execution :
       hostRun fuel state =
         .suspended ⟨.codeAddress, continuation, store⟩ remainingFuel) :
-    HostStorageDriver.run context codeAddress fuel state =
-      HostStorageDriver.run context codeAddress remainingFuel
-        ⟨.ret (.word (addressToWord codeAddress)), continuation, store⟩ :=
-  HostStorageDriver.run_of_suspended_codeAddress
-    context codeAddress fuel remainingFuel state continuation store execution
+    HostStorageDriver.runWithInputs context inputs fuel state =
+      HostStorageDriver.runWithInputs context inputs remainingFuel
+        ⟨.ret (.word (addressToWord inputs.codeAddress)), continuation, store⟩ :=
+  HostStorageDriver.runWithInputs_of_suspended_codeAddress
+    context inputs fuel remainingFuel state continuation store execution
 
 /-- Public handler observations fix read-after-write and sparse zero deletion. -/
 private theorem compileTimeWriteObservationRegression
     {RollbackState : Type u}
     {TraceState : Type v}
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (slot value : Word) :
-    (((HostStorageDriver.handler codeAddress).handle context
+    (((HostStorageDriver.handlerWithInputs inputs).handle context
       (.storageWrite slot value)).1).readStorage slot = value ∧
-      (((HostStorageDriver.handler codeAddress).handle context
+      (((HostStorageDriver.handlerWithInputs inputs).handle context
         (.storageWrite slot Word.zero)).1).storageAccount.storageValue?
           slot = none := by
   exact
-    ⟨HostStorageDriver.handler_storageWrite_readStorage_same
-        codeAddress context slot value,
-      HostStorageDriver.handler_storageWrite_zero_storageValue?
-        codeAddress context slot⟩
+    ⟨HostStorageDriver.handlerWithInputs_storageWrite_readStorage_same
+        inputs context slot value,
+      HostStorageDriver.handlerWithInputs_storageWrite_zero_storageValue?
+        inputs context slot⟩
 
 /-- A successful selected run exposes both typing and exact fuel evidence. -/
 private theorem compileTimeSelectedEvidenceRegression
