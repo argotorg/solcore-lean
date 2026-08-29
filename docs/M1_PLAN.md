@@ -6,9 +6,11 @@ Core remains frozen while the internal Core grows additively.
 
 ADR-0119 completes the first address-selected execution path that can both
 read and update working contract storage under one typed, fuel-preserving
-driver. The next planned decision is which additional contract-entry input or
-state-lifecycle boundary Core execution needs. Concrete grammar and parser
-proof work stays paused until source syntax stabilizes.
+driver. [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
+is now active and closes the generic runner's reverse correctness and terminal
+fuel-stability boundary without adding runtime behavior. Further contract-entry
+inputs follow only after that proof interface is complete. Concrete grammar and
+parser proof work stays paused until source syntax stabilizes.
 
 ## Completed foundation
 
@@ -132,11 +134,12 @@ These results remain regression obligations for every extension.
 | 100 | Working-storage read handler | Complete foundation | Interprets reads through the proven-present Account; its laws are reused by the combined handler |
 | 101 | Address-selected host-code driver | Complete foundation | Establishes separate code/storage selection and exact remaining-fuel reuse; its read-specific API is superseded by ADR-0119 |
 | 102 | Typed storage-write and combined storage driver | Complete | Appends `(word × word) -> unit`, uses a generic driver and combined handler, and proves address-selected safety, fuel, and context invariants |
-| 103 | Further contract-entry input roles | Next planned decision | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 104 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 105 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 106 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 107 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 103 | Handled-execution completeness and terminal fuel stability | Active | Makes the generic handled-step relation executable in both directions before adding another input role |
+| 104 | Further contract-entry input roles | Planned after ADR-0120 | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 105 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 106 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 107 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 108 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.

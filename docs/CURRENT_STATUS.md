@@ -310,8 +310,10 @@ fuel-preserving address-selected handled reads; implementation is complete.
 storage-write capability, the request-generic driver, and the combined
 address-selected storage API. Checked code can now read, update, and reread its
 selected working storage under one exact fuel budget. Parser work remains
-paused; the next semantics decision concerns contract-entry inputs and state
-lifecycle rather than concrete source syntax.
+paused. [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
+is the active proof slice: it will make the handled-step/fuel relation complete
+for the executable driver and prove terminal results stable under added fuel
+before any new contract-entry input is introduced.
 
 ## Implementation status
 
