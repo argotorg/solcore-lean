@@ -2,7 +2,7 @@ import Solcore.Semantics.CheckedHostCoreProgramExecution
 import Solcore.Semantics.HostDriver
 import Solcore.Semantics.HostStorageHandler
 
-/-! Explicit-input migration seam for combined handled storage execution. -/
+/-! Canonical driver for storage-backed host execution. -/
 
 set_option autoImplicit false
 

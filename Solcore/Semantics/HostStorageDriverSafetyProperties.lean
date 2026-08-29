@@ -1,7 +1,7 @@
 import Solcore.Semantics.CheckedHostCoreProgramProperties
 import Solcore.Semantics.HostStorageDriverProperties
 
-/-! Type and fault safety for the explicit-input storage driver seam. -/
+/-! Type and fault safety for the canonical storage host driver. -/
 
 set_option autoImplicit false
 

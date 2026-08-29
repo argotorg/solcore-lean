@@ -5,7 +5,7 @@ import Solcore.Semantics.HostDriver
 import Solcore.Semantics.HostStorageContext
 import Solcore.Semantics.HostStorageExecutionInputs
 
-/-! Explicit-input migration seam for combined storage request handling. -/
+/-! Canonical host handler for storage and immutable execution inputs. -/
 
 set_option autoImplicit false
 
@@ -13,7 +13,7 @@ namespace Solcore.Semantics.HostStorageDriver
 
 universe u v
 
-/-- Handle one current request using the code selector in the run-fixed input. -/
+/-- Handle one host request using storage state or the run-fixed input. -/
 def handleRequest
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)

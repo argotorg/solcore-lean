@@ -5,7 +5,7 @@ import Solcore.Semantics.HostDriverProperties
 import Solcore.Semantics.HostStorageExecutionInputsProperties
 import Solcore.Semantics.HostStorageHandler
 
-/-! Exact current-request laws for the explicit-input storage handler seam. -/
+/-! Exact request laws for the canonical storage host handler. -/
 
 set_option autoImplicit false
 

@@ -5,7 +5,7 @@ import Solcore.Semantics.HostDriverProperties
 import Solcore.Semantics.HostStorageDriver
 import Solcore.Semantics.HostStorageHandlerProperties
 
-/-! Execution and preservation laws for the explicit-input driver seam. -/
+/-! Execution and preservation laws for the canonical storage host driver. -/
 
 set_option autoImplicit false
 
