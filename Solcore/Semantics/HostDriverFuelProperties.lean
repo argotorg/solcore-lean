@@ -37,6 +37,41 @@ inductive HandledSteps
       HandledSteps handler (prefixSteps + 1 + suffixSteps)
         context start finalContext finish
 
+/-- Handled paths compose while retaining the exact intermediate context. -/
+theorem HandledSteps.trans
+    {Context : Type u}
+    {handler : HostHandler Context}
+    {leftSteps rightSteps : Nat}
+    {startContext middleContext finalContext : Context}
+    {start middle finish : Core.State}
+    (left :
+      HandledSteps handler leftSteps
+        startContext start middleContext middle)
+    (right :
+      HandledSteps handler rightSteps
+        middleContext middle finalContext finish) :
+    HandledSteps handler (leftSteps + rightSteps)
+      startContext start finalContext finish := by
+  induction left with
+  | core leftPath =>
+      cases right with
+      | core rightPath =>
+          exact .core (leftPath.trans rightPath)
+      | @handle prefixSteps suffixSteps context nextContext finalContext
+          start requestState resumed finish suspension prefixPath emission
+          handled suffix =>
+          have combinedPrefix := leftPath.trans prefixPath
+          have combined :=
+            HandledSteps.handle combinedPrefix emission handled suffix
+          simpa [Nat.add_assoc] using combined
+  | @handle prefixSteps suffixSteps context nextContext middleContext
+      start requestState resumed middle suspension prefixPath emission
+      handled suffix suffixIH =>
+      have combinedSuffix := suffixIH right
+      have combined :=
+        HandledSteps.handle prefixPath emission handled combinedSuffix
+      simpa [Nat.add_assoc] using combined
+
 end HostDriver
 
 namespace HostDriverResult

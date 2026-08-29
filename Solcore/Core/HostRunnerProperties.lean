@@ -15,6 +15,20 @@ inductive HostSteps : Nat → State → State → Prop where
       HostSteps steps next finish →
       HostSteps (steps + 1) start finish
 
+/-- Host-aware Core paths compose in execution order. -/
+theorem HostSteps.trans
+    {leftSteps rightSteps : Nat}
+    {start middle finish : State}
+    (left : HostSteps leftSteps start middle)
+    (right : HostSteps rightSteps middle finish) :
+    HostSteps (leftSteps + rightSteps) start finish := by
+  induction left with
+  | refl => simpa using right
+  | cons transition tail tailIH =>
+      have combined := tailIH right
+      have prefixed := HostSteps.cons transition combined
+      simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using prefixed
+
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_done_iff
     {result : AdvanceResult}
     {value : Value} :
