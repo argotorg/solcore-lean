@@ -230,6 +230,35 @@ theorem runCodeWithStorage?_some_workingAccount?_of_ne_storageAddress
           (Core.State.initial code.program.body Core.hostEnvironment)
           observedAddress different
 
+/-- A selected completed run is unchanged when supplied more fuel. -/
+theorem runCodeWithStorage?_some_done_stable
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : CodeRunContext RollbackState TraceState)
+    (codeAddress : Address)
+    {fuel largerFuel : Nat}
+    {resultContext : CodeRunContext RollbackState TraceState}
+    {value : Core.Value}
+    {store : Core.Store}
+    (execution :
+      context.runCodeWithStorage? codeAddress fuel =
+        some ⟨resultContext, .done value store⟩)
+    (more : fuel ≤ largerFuel) :
+    context.runCodeWithStorage? codeAddress largerFuel =
+      some ⟨resultContext, .done value store⟩ := by
+  unfold runCodeWithStorage? at execution ⊢
+  cases selected :
+      context.context.values.working.1.code? codeAddress with
+  | none =>
+      rw [selected] at execution
+      simp at execution
+  | some code =>
+      rw [selected] at execution
+      simp only [Option.map_some] at execution ⊢
+      exact congrArg some
+        (code.runWithStorage_done_stable context
+          (Option.some.inj execution) more)
+
 /-- Address-selected checked host execution cannot return a driver fault. -/
 theorem runCodeWithStorage?_ne_some_fault
     {RollbackState : Type u}
