@@ -1,5 +1,6 @@
 import Solcore.Semantics.CheckedHostCoreProgramProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteCodeProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteIsolationProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteProjectionProperties
 import Solcore.Semantics.HostStorageDriver
 import Solcore.Semantics.HostStorageHandlerProperties
@@ -147,6 +148,50 @@ theorem run_of_suspended
         intro current request
         cases request <;> simp [handler, handleRequest])
       context fuel state
+
+/-- A combined run preserves every non-selected working Account. -/
+@[simp] theorem run_workingAccount?_of_ne_storageAddress
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State)
+    (observedAddress : Address)
+    (different : observedAddress ≠ context.context.storageAddress) :
+    (run context fuel state).context.context.values.working.1.account?
+        observedAddress =
+      context.context.values.working.1.account? observedAddress := by
+  have preserved :
+      (if observedAddress =
+          (run context fuel state).context.context.storageAddress then
+        none
+      else
+        (run context fuel state).context.context.values.working.1.account?
+          observedAddress) =
+      (if observedAddress = context.context.storageAddress then
+        none
+      else
+        context.context.values.working.1.account? observedAddress) := by
+    simpa only [run] using
+      HostDriver.run_observe
+        (@handler RollbackState TraceState)
+        (fun current =>
+          if observedAddress = current.context.storageAddress then
+            none
+          else
+            current.context.values.working.1.account? observedAddress)
+        (by
+          intro current request
+          cases request with
+          | storageRead slot =>
+              simp [handler, handleRequest]
+          | storageWrite slot value =>
+              by_cases same :
+                  observedAddress = current.context.storageAddress
+              · simp [handler, handleRequest, same]
+              · simp [handler, handleRequest, same])
+        context fuel state
+  simpa only [run_storageAddress, if_neg different] using preserved
 
 /-- A typed start produces only typed combined-driver outcomes. -/
 theorem run_hasType
