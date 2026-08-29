@@ -21,7 +21,10 @@ universe u v
     (execution : Core.hostRun fuel state = .done value store) :
     runWithInputs context inputs fuel state =
       ⟨context, .done value store⟩ := by
-  exact run_of_done context inputs.codeAddress fuel state value store execution
+  simpa only [runWithInputs] using
+    HostDriver.run_of_done
+      (@handlerWithInputs RollbackState TraceState inputs)
+      context fuel state value store execution
 
 @[simp] theorem runWithInputs_of_outOfFuel
     {RollbackState : Type u} {TraceState : Type v}
@@ -32,7 +35,10 @@ universe u v
     (execution : Core.hostRun fuel state = .outOfFuel exhausted) :
     runWithInputs context inputs fuel state =
       ⟨context, .outOfFuel exhausted⟩ := by
-  exact run_of_outOfFuel context inputs.codeAddress fuel state exhausted execution
+  simpa only [runWithInputs] using
+    HostDriver.run_of_outOfFuel
+      (@handlerWithInputs RollbackState TraceState inputs)
+      context fuel state exhausted execution
 
 @[simp] theorem runWithInputs_of_fault
     {RollbackState : Type u} {TraceState : Type v}
@@ -44,7 +50,10 @@ universe u v
     (execution : Core.hostRun fuel state = .fault error faultState) :
     runWithInputs context inputs fuel state =
       ⟨context, .fault error faultState⟩ := by
-  exact run_of_fault context inputs.codeAddress fuel state faultState error execution
+  simpa only [runWithInputs] using
+    HostDriver.run_of_fault
+      (@handlerWithInputs RollbackState TraceState inputs)
+      context fuel state faultState error execution
 
 /-- Every suspension resumes under the same immutable input. -/
 theorem runWithInputs_of_suspended
@@ -61,8 +70,10 @@ theorem runWithInputs_of_suspended
         (handleSuspensionWithInputs inputs context suspension).1 inputs
         remainingFuel
         (handleSuspensionWithInputs inputs context suspension).2 := by
-  exact run_of_suspended context inputs.codeAddress fuel remainingFuel
-    state suspension execution
+  simpa only [runWithInputs, handleSuspensionWithInputs] using
+    HostDriver.run_of_suspended
+      (@handlerWithInputs RollbackState TraceState inputs)
+      context fuel remainingFuel state suspension execution
 
 theorem runWithInputs_of_suspended_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
@@ -79,8 +90,17 @@ theorem runWithInputs_of_suspended_storageAddress
       runWithInputs context inputs remainingFuel
         ⟨.ret (.word (addressToWord context.context.storageAddress)),
           continuation, store⟩ := by
-  exact run_of_suspended_storageAddress context inputs.codeAddress fuel
-    remainingFuel state continuation store execution
+  calc
+    runWithInputs context inputs fuel state =
+        runWithInputs
+          (handleSuspensionWithInputs inputs context
+            ⟨.storageAddress, continuation, store⟩).1
+          inputs remainingFuel
+          (handleSuspensionWithInputs inputs context
+            ⟨.storageAddress, continuation, store⟩).2 :=
+      runWithInputs_of_suspended context inputs fuel remainingFuel state _
+        execution
+    _ = _ := by rw [handleSuspensionWithInputs_storageAddress]
 
 theorem runWithInputs_of_suspended_codeAddress
     {RollbackState : Type u} {TraceState : Type v}
@@ -96,8 +116,17 @@ theorem runWithInputs_of_suspended_codeAddress
     runWithInputs context inputs fuel state =
       runWithInputs context inputs remainingFuel
         ⟨.ret (.word (addressToWord inputs.codeAddress)), continuation, store⟩ := by
-  exact run_of_suspended_codeAddress context inputs.codeAddress fuel
-    remainingFuel state continuation store execution
+  calc
+    runWithInputs context inputs fuel state =
+        runWithInputs
+          (handleSuspensionWithInputs inputs context
+            ⟨.codeAddress, continuation, store⟩).1
+          inputs remainingFuel
+          (handleSuspensionWithInputs inputs context
+            ⟨.codeAddress, continuation, store⟩).2 :=
+      runWithInputs_of_suspended context inputs fuel remainingFuel state _
+        execution
+    _ = _ := by rw [handleSuspensionWithInputs_codeAddress]
 
 @[simp] theorem runWithInputs_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
