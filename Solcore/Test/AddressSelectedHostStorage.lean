@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
 
 /-! End-to-end regressions for address-selected storage read/write execution. -/
 
@@ -195,6 +195,42 @@ private def checkpointEffects : FrameEffectJournal Nat (List Nat) :=
 private def workingEffects : FrameEffectJournal Nat (List Nat) :=
   ⟨201, [202, 203]⟩
 
+private inductive FrameAdapterTrapReason where
+  | invalidDoneInputs
+  | policyTrap
+  deriving Repr, BEq, DecidableEq
+
+private def frameReturnData : Bytes := [0xa1, 0xb2].toByteArray
+private def frameRevertData : Bytes := [0xc1, 0xd2].toByteArray
+
+/--
+Classify completion as a return only when the terminal handler context, Core
+value, and Core-local store are all the measured post-write values.
+-/
+private def returnedDoneOutcome
+    (context : HostStorageDriver.Context Nat (List Nat))
+    (value : Value)
+    (store : Store) : FrameOutcome FrameAdapterTrapReason :=
+  match value, store with
+  | .word returned, [.bool true] =>
+      if returned = newValue ∧ context.readStorage targetSlot = newValue then
+        .returned frameReturnData
+      else
+        .trapped .invalidDoneInputs
+  | _, _ => .trapped .invalidDoneInputs
+
+private def revertedDoneOutcome
+    (_ : HostStorageDriver.Context Nat (List Nat))
+    (_ : Value)
+    (_ : Store) : FrameOutcome FrameAdapterTrapReason :=
+  .reverted frameRevertData
+
+private def trappedDoneOutcome
+    (_ : HostStorageDriver.Context Nat (List Nat))
+    (_ : Value)
+    (_ : Store) : FrameOutcome FrameAdapterTrapReason :=
+  .trapped .policyTrap
+
 private def baseContextFor (code : CheckedHostCoreProgram) :
     FrameCheckpointedWorkingPairWithStorageAddress Nat (List Nat) :=
   ⟨storageAddress,
@@ -322,6 +358,94 @@ private def assertMixedOutOfFuelAt
       throw (IO.userError
         s!"fuel {fuel} crossed the measured boundary: {reprStr result.outcome}")
 
+private def assertReturnedFrameResolution
+    (continuation :
+      FrameContinuationContext Nat (List Nat) FrameAdapterTrapReason)
+    (label : String) : IO Unit := do
+  match continuation.resolve with
+  | .returned state effects data =>
+      assertTrue
+        (storageValueAt? state storageAddress targetSlot == some newValue)
+        s!"{label} did not resolve the post-write working state"
+      assertTrue (effects.rollback == workingEffects.rollback)
+        s!"{label} did not retain the working rollback value"
+      assertTrue (effects.trace == workingEffects.trace)
+        s!"{label} did not retain the working trace"
+      assertTrue (data == frameReturnData)
+        s!"{label} returned the wrong frame data"
+  | _ =>
+      throw (IO.userError
+        s!"{label} did not resolve as a returned frame")
+
+private def assertRevertedFrameResolution
+    (continuation :
+      FrameContinuationContext Nat (List Nat) FrameAdapterTrapReason) :
+    IO Unit := do
+  match continuation.resolve with
+  | .reverted state effects data =>
+      assertTrue
+        (storageValueAt? state storageAddress checkpointStorageSlot ==
+          some checkpointStorageValue)
+        "revert did not resolve the checkpoint WorldState"
+      assertTrue
+        (storageValueAt? state storageAddress targetSlot).isNone
+        "revert leaked the speculative working-storage write"
+      assertTrue (effects.rollback == checkpointEffects.rollback)
+        "revert did not restore the checkpoint rollback value"
+      assertTrue (effects.trace == workingEffects.trace)
+        "revert did not retain the working trace"
+      assertTrue (data == frameRevertData)
+        "revert resolved the wrong frame data"
+  | _ =>
+      throw (IO.userError "the revert policy did not resolve as reverted")
+
+private def assertTrappedFrameResolution
+    (continuation :
+      FrameContinuationContext Nat (List Nat) FrameAdapterTrapReason) :
+    IO Unit := do
+  match continuation.resolve with
+  | .trapped .policyTrap => pure ()
+  | _ =>
+      throw (IO.userError "the trap policy did not retain its exact reason")
+
+/-- Exercise all three optional layers without duplicating the storage fixture. -/
+private def assertFrameContinuationAdapter
+    (context : HostStorageDriver.Context Nat (List Nat)) : IO Unit := do
+  match context.runCodeWithStorageContinuationContext?
+      maximumAddress completionFuel returnedDoneOutcome with
+  | none => pure ()
+  | some _ =>
+      throw (IO.userError
+        "missing code did not remain an outer continuation failure")
+
+  match context.runCodeWithStorageContinuationContext?
+      codeAddress 22 returnedDoneOutcome with
+  | some none => pure ()
+  | none =>
+      throw (IO.userError
+        "fuel 22 confused selected exhaustion with missing code")
+  | some (some _) =>
+      throw (IO.userError
+        "fuel 22 constructed a continuation before completion")
+
+  match context.runCodeWithStorageContinuationContext?
+        codeAddress completionFuel returnedDoneOutcome,
+      context.runCodeWithStorageContinuationContext?
+        codeAddress completionFuel revertedDoneOutcome,
+      context.runCodeWithStorageContinuationContext?
+        codeAddress completionFuel trappedDoneOutcome,
+      context.runCodeWithStorageContinuationContext?
+        codeAddress 64 returnedDoneOutcome with
+  | some (some returned), some (some reverted), some (some trapped),
+      some (some largerReturned) =>
+      assertReturnedFrameResolution returned "fuel 28 frame adapter"
+      assertRevertedFrameResolution reverted
+      assertTrappedFrameResolution trapped
+      assertReturnedFrameResolution largerReturned "fuel 64 frame adapter"
+  | _, _, _, _ =>
+      throw (IO.userError
+        "completed selected execution did not construct every continuation")
+
 private def assertCompletedWriteResult
     (result :
       HostDriverResult
@@ -361,6 +485,21 @@ private theorem updateProgram_done_stable
     FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
       context codeAddress execution (by decide),
     written⟩
+
+/-- The exact nested continuation produced at fuel 28 survives fuel 64. -/
+private theorem updateProgram_frameContinuation_done_stable
+    {context : HostStorageDriver.Context Nat (List Nat)}
+    {continuation :
+      FrameContinuationContext Nat (List Nat) FrameAdapterTrapReason}
+    (completed :
+      context.runCodeWithStorageContinuationContext?
+        codeAddress completionFuel returnedDoneOutcome =
+          some (some continuation)) :
+    context.runCodeWithStorageContinuationContext?
+      codeAddress 64 returnedDoneOutcome = some (some continuation) := by
+  exact
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_some_some_stable
+      context codeAddress returnedDoneOutcome completed (by decide)
 
 /-- The selected public stability theorem applies to the mixed fixture. -/
 private theorem observeWriteObserveProgram_done_stable
@@ -496,6 +635,7 @@ def testAddressSelectedHostStorage : IO Unit := do
       assertMixedOutOfFuelAt context 21 oldValue .beforeWrite
       assertMixedOutOfFuelAt context 22 newValue .afterWrite
       assertMixedOutOfFuelAt context 27 newValue .beforeFinalRead
+      assertFrameContinuationAdapter context
 
       match context.runCodeWithStorage? codeAddress completionFuel,
           context.runCodeWithStorage? codeAddress 64 with
