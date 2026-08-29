@@ -16,7 +16,7 @@ abbrev HandledStepsWithInputs
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs) :=
   HostDriver.HandledSteps
-    (@handlerWithInputs RollbackState TraceState inputs)
+    (@handler RollbackState TraceState inputs)
 
 /-- Fuel soundness indexed by one exact immutable input. -/
 def FuelSoundWithInputs
@@ -27,7 +27,7 @@ def FuelSoundWithInputs
     (startContext : Context RollbackState TraceState)
     (start : Core.State) : Prop :=
   result.FuelSoundWith
-    (@handlerWithInputs RollbackState TraceState inputs)
+    (@handler RollbackState TraceState inputs)
     fuel startContext start
 
 namespace FuelSoundWithInputs
@@ -44,7 +44,7 @@ theorem prependRequest
     (prefixPath : Core.HostSteps prefixSteps start requestState)
     (emission : Core.HostRequestEmission requestState suspension)
     (handled :
-      handleSuspensionWithInputs inputs context suspension =
+      handleSuspension inputs context suspension =
         (nextContext, resumed))
     (accounting : prefixSteps + remainingFuel + 1 = fuel)
     (suffixSound :
@@ -54,7 +54,7 @@ theorem prependRequest
       result inputs fuel context start := by
   apply HostDriverResult.FuelSoundWith.prependRequest
     prefixPath emission (accounting := accounting)
-  · simpa only [handleSuspensionWithInputs] using handled
+  · simpa only [handleSuspension] using handled
   · exact suffixSound
 
 end FuelSoundWithInputs
@@ -69,7 +69,7 @@ theorem runWithInputs_fuelSound
       fuel context state := by
   simpa only [runWithInputs, FuelSoundWithInputs] using
     HostDriver.run_fuelSound
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state
 
 theorem runWithInputs_eq_of_fuelSound
@@ -83,7 +83,7 @@ theorem runWithInputs_eq_of_fuelSound
     runWithInputs context inputs fuel state = result := by
   simpa only [runWithInputs, FuelSoundWithInputs] using
     HostDriver.run_eq_of_fuelSoundWith
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state result sound
 
 theorem runWithInputs_eq_iff_fuelSound
@@ -97,7 +97,7 @@ theorem runWithInputs_eq_iff_fuelSound
       FuelSoundWithInputs result inputs fuel context state := by
   simpa only [runWithInputs, FuelSoundWithInputs] using
     HostDriver.run_eq_iff_fuelSoundWith
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state result
 
 theorem runWithInputs_done_stable
@@ -116,7 +116,7 @@ theorem runWithInputs_done_stable
       ⟨finalContext, .done value store⟩ := by
   simpa only [runWithInputs] using
     HostDriver.run_done_stable
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       execution more
 
 end HostStorageDriver

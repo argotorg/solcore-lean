@@ -20,7 +20,7 @@ def runWithInputs
     (fuel : Nat)
     (state : Core.State) :
     HostDriverResult (Context RollbackState TraceState) :=
-  HostDriver.run (handlerWithInputs inputs) context fuel state
+  HostDriver.run (handler inputs) context fuel state
 
 end HostStorageDriver
 

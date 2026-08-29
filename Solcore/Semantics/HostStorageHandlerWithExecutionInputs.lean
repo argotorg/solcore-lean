@@ -14,7 +14,7 @@ namespace Solcore.Semantics.HostStorageDriver
 universe u v
 
 /-- Handle one current request using the code selector in the run-fixed input. -/
-def handleRequestWithInputs
+def handleRequest
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
     (context : Context RollbackState TraceState)
@@ -28,19 +28,19 @@ def handleRequestWithInputs
   | .codeAddress => (context, addressToWord inputs.codeAddress)
 
 /-- Current combined handler indexed by the complete run-fixed input. -/
-def handlerWithInputs
+def handler
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs) :
     HostHandler (Context RollbackState TraceState) where
-  handle := handleRequestWithInputs inputs
+  handle := handleRequest inputs
 
 /-- Handle one suspension using the complete run-fixed input. -/
-def handleSuspensionWithInputs
+def handleSuspension
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
     (context : Context RollbackState TraceState)
     (suspension : Core.HostSuspension) :
     Context RollbackState TraceState × Core.State :=
-  (handlerWithInputs inputs).handleSuspension context suspension
+  (handler inputs).handleSuspension context suspension
 
 end Solcore.Semantics.HostStorageDriver

@@ -23,7 +23,7 @@ theorem runWithInputs_hasType
       resultType definitions := by
   simpa only [runWithInputs] using
     HostDriver.run_hasType
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state stateTyping
 
 theorem runWithInputs_ne_fault
@@ -39,7 +39,7 @@ theorem runWithInputs_ne_fault
       .fault error faultState := by
   simpa only [runWithInputs] using
     HostDriver.run_ne_fault
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state faultState error stateTyping
 
 end HostStorageDriver

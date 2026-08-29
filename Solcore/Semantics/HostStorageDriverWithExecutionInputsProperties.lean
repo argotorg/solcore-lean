@@ -26,7 +26,7 @@ universe u v
       ⟨context, .done value store⟩ := by
   simpa only [runWithInputs] using
     HostDriver.run_of_done
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state value store execution
 
 @[simp] theorem runWithInputs_of_outOfFuel
@@ -40,7 +40,7 @@ universe u v
       ⟨context, .outOfFuel exhausted⟩ := by
   simpa only [runWithInputs] using
     HostDriver.run_of_outOfFuel
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state exhausted execution
 
 @[simp] theorem runWithInputs_of_fault
@@ -55,7 +55,7 @@ universe u v
       ⟨context, .fault error faultState⟩ := by
   simpa only [runWithInputs] using
     HostDriver.run_of_fault
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel state faultState error execution
 
 /-- Every suspension resumes under the same immutable input. -/
@@ -70,12 +70,12 @@ theorem runWithInputs_of_suspended
       Core.hostRun fuel state = .suspended suspension remainingFuel) :
     runWithInputs context inputs fuel state =
       runWithInputs
-        (handleSuspensionWithInputs inputs context suspension).1 inputs
+        (handleSuspension inputs context suspension).1 inputs
         remainingFuel
-        (handleSuspensionWithInputs inputs context suspension).2 := by
-  simpa only [runWithInputs, handleSuspensionWithInputs] using
+        (handleSuspension inputs context suspension).2 := by
+  simpa only [runWithInputs, handleSuspension] using
     HostDriver.run_of_suspended
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       context fuel remainingFuel state suspension execution
 
 theorem runWithInputs_of_suspended_storageAddress
@@ -96,14 +96,14 @@ theorem runWithInputs_of_suspended_storageAddress
   calc
     runWithInputs context inputs fuel state =
         runWithInputs
-          (handleSuspensionWithInputs inputs context
+          (handleSuspension inputs context
             ⟨.storageAddress, continuation, store⟩).1
           inputs remainingFuel
-          (handleSuspensionWithInputs inputs context
+          (handleSuspension inputs context
             ⟨.storageAddress, continuation, store⟩).2 :=
       runWithInputs_of_suspended context inputs fuel remainingFuel state _
         execution
-    _ = _ := by rw [handleSuspensionWithInputs_storageAddress]
+    _ = _ := by rw [handleSuspension_storageAddress]
 
 theorem runWithInputs_of_suspended_codeAddress
     {RollbackState : Type u} {TraceState : Type v}
@@ -122,14 +122,14 @@ theorem runWithInputs_of_suspended_codeAddress
   calc
     runWithInputs context inputs fuel state =
         runWithInputs
-          (handleSuspensionWithInputs inputs context
+          (handleSuspension inputs context
             ⟨.codeAddress, continuation, store⟩).1
           inputs remainingFuel
-          (handleSuspensionWithInputs inputs context
+          (handleSuspension inputs context
             ⟨.codeAddress, continuation, store⟩).2 :=
       runWithInputs_of_suspended context inputs fuel remainingFuel state _
         execution
-    _ = _ := by rw [handleSuspensionWithInputs_codeAddress]
+    _ = _ := by rw [handleSuspension_codeAddress]
 
 @[simp] theorem runWithInputs_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
@@ -141,12 +141,12 @@ theorem runWithInputs_of_suspended_codeAddress
       context.context.storageAddress := by
   simpa only [runWithInputs] using
     HostDriver.run_observe
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       (fun current => current.context.storageAddress)
       (by
         intro current request
         cases request <;>
-          simp [handlerWithInputs, handleRequestWithInputs])
+          simp [handler, handleRequest])
       context fuel state
 
 @[simp] theorem runWithInputs_checkpoint
@@ -159,12 +159,12 @@ theorem runWithInputs_of_suspended_codeAddress
       context.context.values.checkpoint := by
   simpa only [runWithInputs] using
     HostDriver.run_observe
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       (fun current => current.context.values.checkpoint)
       (by
         intro current request
         cases request <;>
-          simp [handlerWithInputs, handleRequestWithInputs])
+          simp [handler, handleRequest])
       context fuel state
 
 @[simp] theorem runWithInputs_workingEffects
@@ -177,12 +177,12 @@ theorem runWithInputs_of_suspended_codeAddress
       context.context.values.working.2 := by
   simpa only [runWithInputs] using
     HostDriver.run_observe
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       (fun current => current.context.values.working.2)
       (by
         intro current request
         cases request <;>
-          simp [handlerWithInputs, handleRequestWithInputs])
+          simp [handler, handleRequest])
       context fuel state
 
 @[simp] theorem runWithInputs_workingCode?
@@ -197,13 +197,13 @@ theorem runWithInputs_of_suspended_codeAddress
       context.context.values.working.1.code? observedAddress := by
   simpa only [runWithInputs] using
     HostDriver.run_observe
-      (@handlerWithInputs RollbackState TraceState inputs)
+      (@handler RollbackState TraceState inputs)
       (fun current =>
         current.context.values.working.1.code? observedAddress)
       (by
         intro current request
         cases request <;>
-          simp [handlerWithInputs, handleRequestWithInputs])
+          simp [handler, handleRequest])
       context fuel state
 
 @[simp] theorem runWithInputs_workingAccount?_of_ne_storageAddress
@@ -229,7 +229,7 @@ theorem runWithInputs_of_suspended_codeAddress
         else context.context.values.working.1.account? observedAddress) := by
     simpa only [runWithInputs] using
       HostDriver.run_observe
-        (@handlerWithInputs RollbackState TraceState inputs)
+        (@handler RollbackState TraceState inputs)
         (fun current =>
           if observedAddress = current.context.storageAddress
             then none
@@ -238,16 +238,16 @@ theorem runWithInputs_of_suspended_codeAddress
           intro current request
           cases request with
           | storageRead slot =>
-              simp [handlerWithInputs, handleRequestWithInputs]
+              simp [handler, handleRequest]
           | storageWrite slot value =>
               by_cases same :
                   observedAddress = current.context.storageAddress
-              · simp [handlerWithInputs, handleRequestWithInputs, same]
-              · simp [handlerWithInputs, handleRequestWithInputs, same]
+              · simp [handler, handleRequest, same]
+              · simp [handler, handleRequest, same]
           | storageAddress =>
-              simp [handlerWithInputs, handleRequestWithInputs]
+              simp [handler, handleRequest]
           | codeAddress =>
-              simp [handlerWithInputs, handleRequestWithInputs])
+              simp [handler, handleRequest])
         context fuel state
   simpa only [runWithInputs_storageAddress, if_neg different] using preserved
 
