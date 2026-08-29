@@ -775,9 +775,10 @@ rollback selection. Compile consumers connect the first component to existing
 bytes-aware callbacks and preserve ADR-0125's whole-context and fuel-stability
 boundaries. The view introduces no new execution path or runtime fixture.
 
-ADR-0128 is the active algebraic closure for that view. It adds no operation;
+ADR-0128 completes the algebraic closure for that view. It adds no operation;
 one naturality law moves heterogeneous trap-reason mapping through the first
 component while proving that the rollback-selection component is unchanged.
+Identity and heterogeneous composition normalize through the same rule.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

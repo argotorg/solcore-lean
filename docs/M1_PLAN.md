@@ -42,7 +42,7 @@ lookup and the handler response.
 frame-local composition. It pairs existing total resolution with existing
 opt-in trap rollback without claiming parent resumption or transaction commit.
 [ADR-0128](adr/0128-parent-indexed-resolution-view-trap-reason-mapping-naturality.md)
-is the active proof-only naturality slice for that view. It maps only trapped
+completes the proof-only naturality slice for that view. It maps only trapped
 reasons and preserves the exact rollback-selection component.
 
 ## Completed foundation
@@ -175,7 +175,7 @@ These results remain regression obligations for every extension.
 | 108 | Parent-indexed selected execution continuation | Complete | Preserves storage absence, code absence, selected exhaustion, and completion while refining only completion to the existing parent-indexed context |
 | 109 | Selected code-address observation | Complete | Returns the existing code selector as a lossless Word at index 3, uses it for both lookup and execution, and keeps it distinct from the storage selector |
 | 110 | Parent-indexed resolution view | Complete | Pairs total return/revert/trap resolution with opt-in trap rollback selection without applying either result |
-| 111 | Resolution-view trap-reason mapping naturality | In progress | Maps only the total-resolution component and preserves exact optional rollback selection without adding an operation |
+| 111 | Resolution-view trap-reason mapping naturality | Complete | Maps only the total-resolution component and preserves exact optional rollback selection without adding an operation |
 | 112 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
 | 113 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 114 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1854,7 +1854,7 @@ compile consumers cover exact callbacks, trap rollback, parent-context
 coherence, and larger-fuel completion. The 630-job build, 1,148-job test suite,
 strict compilation, metadata, kernel-policy, and independent audits pass.
 
-## Active resolution-view trap-reason mapping naturality
+## Completed resolution-view trap-reason mapping naturality
 
 [ADR-0128](adr/0128-parent-indexed-resolution-view-trap-reason-mapping-naturality.md)
 closes the mapping algebra opened by ADR-0127. Mapping a parent-indexed
@@ -1864,7 +1864,8 @@ leaving the exact optional rollback pair unchanged.
 This is one proof-only simplification law with no new mapper or runtime
 operation. Its regressions cover direct use, identity, heterogeneous
 composition, bytes-aware continuation invariance, and simp critical-pair
-convergence.
+convergence. The 632-job build, 1,152-job test suite, trust-zero checks,
+metadata, kernel policy, and independent audits pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

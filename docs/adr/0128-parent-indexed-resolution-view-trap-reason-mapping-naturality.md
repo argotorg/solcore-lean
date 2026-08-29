@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: prove that reason mapping commutes with the parent-indexed resolution view
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -155,9 +155,9 @@ This ADR adds no:
 - parser, source syntax, ABI, gas, Wire, Oracle, schema, profile, or public
   format change.
 
-## Implementation sequence
+## Implemented sequence
 
-Keep every green commit below roughly 300 changed lines:
+The work was completed in this order:
 
 1. record and activate the exact proof-only contract;
 2. add the single naturality theorem and Semantics export;
@@ -165,6 +165,34 @@ Keep every green commit below roughly 300 changed lines:
    and
 4. run full validation and independent audit, then synchronize completion
    evidence in current-facing internal documents.
+
+## Implementation record
+
+`ParentIndexedFrameResolutionViewTrapReasonMapProperties.lean` publishes the
+single specified simp theorem and one Semantics-facade import. Its first
+component proof directly reuses ordinary frame-resolution naturality. Its
+second component inspects the three existing outcome constructors and proves
+that optional rollback selection is exactly unchanged.
+
+The compile-only consumer applies the whole-product theorem directly, checks
+identity and two-stage heterogeneous composition, and combines it with the
+existing bytes-aware continuation mapping law. The last example observes the
+callback result and rollback component together, preventing either projection
+from silently drifting.
+
+## Acceptance evidence
+
+- the full build completed 632 jobs;
+- the complete test suite completed 1,152 jobs and all runtime checks passed;
+- every changed Lean module compiled with trust zero and warnings as errors;
+- metadata and semantic-kernel policy checks passed;
+- the only new public theorem reports exactly `[propext]`;
+- declaration and simplification inventories found exactly one new simp law
+  and no runtime definition or unchecked declaration; and
+- independent specification and implementation audits found no P0-P3 issue.
+
+No Core execution, parser, Surface, ABI, Oracle, Wire format, schema, profile,
+or root README changed.
 
 ## Consequences
 

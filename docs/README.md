@@ -80,9 +80,10 @@ consumers preserve all selected-execution boundaries without applying
 rollback, resuming a parent, or defining transaction commit.
 
 [ADR-0128](adr/0128-parent-indexed-resolution-view-trap-reason-mapping-naturality.md)
-is the active proof-only slice. It proves that mapping a completed frame's trap
-reason maps only the resolution component and leaves the exact optional
-rollback pair unchanged.
+completes the proof-only mapping naturality slice. Mapping a completed frame's
+trap reason maps only the resolution component and leaves the exact optional
+rollback pair unchanged; identity, composition, and continuation consumers
+verify the simplifier boundary.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
