@@ -22,12 +22,17 @@ private def callerAddress : Address := ⟨0x40, by decide⟩
 private def alternateCallerAddress : Address := ⟨0x45, by decide⟩
 private def maximumAddress : Address := ⟨addressModulus - 1, by decide⟩
 private def suppliedCallValue : Word := ⟨0x73, by decide⟩
+private def inputData : HostStorageDriver.InputData := {
+  bytes := [0x12, 0x00, 0xff].toByteArray
+  size_lt_wordModulus := by decide
+}
 
 private def inputsFor
     (address : Address) : HostStorageDriver.ExecutionInputs := {
   codeAddress := address
   callValue := suppliedCallValue
   callerAddress := callerAddress
+  inputData := inputData
 }
 
 private def executionInputs : HostStorageDriver.ExecutionInputs :=

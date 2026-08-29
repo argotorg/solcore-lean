@@ -1,4 +1,5 @@
 import Solcore.Semantics.AddressWordBridge
+import Solcore.Semantics.HostStorageInputData
 
 /-! Immutable inputs shared by one combined handled storage execution. -/
 
@@ -11,5 +12,6 @@ structure ExecutionInputs where
   codeAddress : Address
   callValue : Core.Word
   callerAddress : Address
+  inputData : InputData
 
 end Solcore.Semantics.HostStorageDriver
