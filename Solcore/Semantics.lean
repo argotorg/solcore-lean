@@ -81,7 +81,6 @@ import Solcore.Semantics.HostDriverFuelProperties
 import Solcore.Semantics.HostDriverCompletenessProperties
 import Solcore.Semantics.HostDriverFrameContinuation
 import Solcore.Semantics.HostDriverFrameContinuationProperties
-import Solcore.Semantics.HostStorageHandler
 import Solcore.Semantics.HostStorageHandlerWithExecutionInputs
 import Solcore.Semantics.HostStorageHandlerWithExecutionInputsProperties
 import Solcore.Semantics.HostStorageDriverWithExecutionInputs
