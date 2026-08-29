@@ -342,6 +342,13 @@ completion, parent-indexed continuation construction, and resolution folding.
 The Word has no balance, transfer, ABI, caller-identity, or source-syntax
 meaning.
 
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) is the active
+syntax-independent slice. It appends one caller-supplied Address to
+`ExecutionInputs` for one driver invocation and exposes its lossless Word
+through internal `callerAddress : unit -> word` at index 5. This weak input
+role does not identify an Account or parent frame and defines no
+authentication, origin, current/callee identity, or nested-call derivation.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -362,6 +369,7 @@ meaning.
 | Address-selected handled execution exact specification | Complete | Successful execution iff selected-code fuel evidence; optional failure iff working-WorldState code lookup failure; selected out-of-fuel remains an attempted execution | Not published |
 | Handled-execution relational metatheory | Complete | Core and handled path composition, direct relational type safety, same-fuel result uniqueness, and terminal-only cross-fuel uniqueness complete; out-of-fuel remains budget-relative | Not published |
 | End-to-end invocation-value observation | Complete | Immutable execution input, append-only `unit -> word` capability, exact handler/driver laws, selected and parent-indexed preservation, fuel boundaries, value-derived storage use, and frozen-Wire rejection complete | Not published |
+| Run-fixed caller-address observation | Active | ADR-0132 fixes the weak one-driver-invocation role; implementation, proofs, and regressions are in progress | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |

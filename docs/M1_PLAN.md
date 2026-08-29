@@ -57,6 +57,11 @@ fuel evidence, selected completion, and parent-indexed continuation
 construction. Its value-derived result reaches the existing resolution fold.
 The Word is observable by internal Core code without defining a balance
 transfer.
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) is the active next
+slice. It appends one caller-supplied Address to the same immutable input for
+one driver invocation and exposes it through internal
+`callerAddress : unit -> word` at index 5. It defines no Account or parent
+identity, authentication, origin, current/callee identity, or nested-call rule.
 
 ## Completed foundation
 
@@ -192,11 +197,12 @@ These results remain regression obligations for every extension.
 | 112 | Parent-indexed trap-aware resolution fold | Complete | Selects one pure caller-owned function for each resolved branch without applying the supplied values |
 | 113 | Resolution-fold trap-reason mapping naturality | Complete | Moves heterogeneous reason mapping through the existing fold without adding execution |
 | 114 | End-to-end call-value observation | Complete | Carries one explicit run-fixed Word through the internal Core request, handled execution, selected completion, and parent-indexed continuation; the value-derived result reaches the existing resolution fold without a balance-transfer claim |
-| 115 | Further contract-entry input roles | Planned | Add caller, callee, data, or kind only when an identified Core consumer and lifetime rule exist |
-| 116 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 117 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 118 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 119 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 115 | Run-fixed caller-address observation | Active | Append one explicit caller-supplied Address to `ExecutionInputs` and expose its lossless Word at Core host index 5 without broader caller semantics |
+| 116 | Further contract-entry input roles | Planned | Add current, callee, data, or kind only when an identified Core consumer and lifetime rule exist |
+| 117 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 118 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 119 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 120 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.

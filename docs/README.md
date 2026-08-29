@@ -109,6 +109,12 @@ tests cover exact fuel boundaries, an observe-write-observe program, and
 larger-fuel stability. Frozen Wire v1 and v2 reject the host value. Balance
 transfer, caller identity, ABI, and public formats remain separate.
 
+[ADR-0132](adr/0132-run-fixed-caller-address-observation.md) is now the active
+slice. It adds one caller-supplied Address to the immutable execution input for
+one driver invocation and reserves `callerAddress : unit -> word` at index 5.
+It does not select an Account or parent, authenticate anyone, define origin or
+current/callee identity, or specify caller derivation for nested calls.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

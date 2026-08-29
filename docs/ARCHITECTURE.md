@@ -802,6 +802,14 @@ working state and terminal bytes into the existing resolution fold. The
 capability remains internal, frozen Wire v1 and v2 reject its host value, and
 the Word does not mean that any balance transfer occurred.
 
+ADR-0132 accepts one equally narrow extension as the active slice.
+`callerAddress : Address` is appended to `ExecutionInputs` and remains fixed
+for one driver invocation. Internal Core will observe its lossless Word through
+append-only `callerAddress : unit -> word` at index 5 without changing the
+mutable host context. The supplied Address does not select or require an
+Account, identify a parent frame, authenticate a principal, define origin or
+current/callee identity, or determine how a nested call supplies its caller.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to
