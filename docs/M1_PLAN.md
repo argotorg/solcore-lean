@@ -21,6 +21,10 @@ address-selected entry point exact: successful execution is equivalent to
 selected-code fuel evidence, while `none` is equivalent to the existing code
 lookup returning `none`. Concrete grammar and parser proof work stays paused
 until source syntax stabilizes.
+[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) is the active
+proof slice: it makes handled paths compositional and directly type-safe, then
+adds fixed-fuel result uniqueness and terminal-only cross-fuel stability without
+claiming that out-of-fuel is stable or that checked host code always terminates.
 
 ## Completed foundation
 

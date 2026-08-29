@@ -2157,6 +2157,17 @@ address roles, parser, public formats, and frame lifecycle do not change. Full
 build, test, trust-zero, metadata, and semantic-kernel checks passed; independent
 audits found no P0-P3 issue.
 
+## Active handled-execution relational metatheory
+
+[ADR-0123](adr/0123-handled-execution-relational-metatheory.md) adds the missing
+generic proof interfaces around the handled relation: path composition, direct
+type preservation, same-fuel result uniqueness, and larger-fuel stability only
+for done and raw-fault evidence.
+
+This proof-only slice keeps exact handler contexts and explicitly excludes
+cross-fuel out-of-fuel stability, normalization, lifecycle interpretation, and
+all parser or public-format changes.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable
