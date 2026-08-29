@@ -758,6 +758,12 @@ Address for checked-code lookup and handler execution, so observation cannot
 drift from selection. It remains distinct from the storage selector and does
 not imply current-contract, caller, callee, or authority identity.
 
+The implementation keeps that selector out of mutable WorldState. It is fixed
+for one handled run, indexes the run's fuel evidence, and is threaded through
+the existing continuation layers without changing their public optional
+shapes. Focused tests distinguish code and storage selectors and verify exact
+fuel boundaries, strict Address recovery, and completed-result stability.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

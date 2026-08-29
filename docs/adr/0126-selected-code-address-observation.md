@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose the existing code selector to host-aware Core execution
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -234,19 +234,56 @@ The selector does not grant storage authority or prove that the code Account
 remains present after arbitrary future mutations. It is fixed only for the
 specific handled run parameterized by it.
 
-## Implementation sequence
+## Implemented sequence
 
-Keep each green commit below roughly 300 changed lines:
+The work was completed in this order:
 
-1. record and activate this exact selector observation;
-2. parameterize the storage handler and driver, preserving existing behavior;
-3. append the Core capability, request, machine, and safety branches;
-4. lift fuel soundness, completeness, and stability through the selector;
-5. update selected execution and continuation proofs without changing their
+1. recorded and activated the exact selector observation;
+2. parameterized the storage handler and driver while preserving behavior;
+3. appended the Core capability, request, machine, and safety branches;
+4. lifted fuel soundness, completeness, and stability through the selector;
+5. updated selected execution and continuation proofs without changing their
    high-level optional shapes;
-6. add Core, handler, selected runtime, and compile-only regressions; and
-7. run full validation and independent audit, then synchronize acceptance
+6. added Core, handler, selected runtime, and compile-only regressions; and
+7. ran full validation and independent audit, then synchronized acceptance
    evidence and current-facing internal documents.
+
+## Implementation record
+
+The combined storage runner now receives one explicit code selector. The
+address-selected entry point passes the same value to both checked-code lookup
+and the handler, while its public argument and nested optional result shapes
+remain unchanged.
+
+Core appends `codeAddress` as capability index 3 and as a first-order host
+request. Its Unit argument, Word response, suspension, resumption, progress,
+preservation, and checked no-fault path use the same machinery as the existing
+host capabilities. Frozen Wire v1 and v2 still reject all internal host values.
+
+Semantics returns `addressToWord codeAddress` without changing the handler
+context. Public laws expose the exact resumed control, continuation, local
+store, strict Address recovery, remaining fuel, fuel specification, and
+completed-result stability.
+
+Focused regressions separate code address `0x10` from storage address `0x20`.
+They stop exactly before the request at fuel 4, complete at fuel 5, reject the
+storage selector as the result, and retain the same completed context, value,
+and local store at fuel 32.
+
+## Acceptance evidence
+
+- the full build completed 627 jobs;
+- the complete test suite completed 1,142 jobs and all runtime checks passed;
+- all changed Lean modules compiled with trust zero and warnings as errors;
+- metadata and semantic-kernel policy checks passed;
+- the public selector laws use only the repository's permitted logical
+  foundations; and
+- independent implementation and regression audits found no correctness gap.
+
+The parser, Surface, ABI, Oracle, public formats, and root README did not
+change. Implementation was split into small green commits; the one larger
+cross-layer signature migration changed every caller atomically so no
+temporary default selector entered the semantics.
 
 ## Consequences
 

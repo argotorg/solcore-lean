@@ -2211,16 +2211,25 @@ through resolution and continuation. The full 627-job build and 1,142-job test
 suite pass, as do trust-zero, warning, metadata, and semantic-kernel checks.
 Independent final audits found no P0-P3 issue.
 
-## Active selected code-address observation
+## Completed selected code-address observation
 
 [ADR-0126](adr/0126-selected-code-address-observation.md) adds an internal
 `codeAddress : unit -> word` capability at index 3. The selected entry point
-will use the same Address both to look up checked code and to parameterize the
+uses the same Address both to look up checked code and to parameterize the
 handler response, while keeping it distinct from the retained storage
 selector.
 
-This active slice introduces no caller, current-contract, authority, call
-frame, ABI, or source-syntax meaning. Parser work remains paused.
+The exact Core request, response, suspension, resumption, progress,
+preservation, and no-fault path are complete. Handler laws cover context
+identity, continuation and local-store preservation, and strict Address
+recovery. Driver and selected-execution laws cover exact remaining-fuel reuse
+and completed-result stability. Runtime checks separate code address `0x10`
+from storage address `0x20` and verify the fuel-4/fuel-5 boundary. Full build,
+test, strict compilation, metadata, and kernel checks pass; independent audits
+found no correctness gap.
+
+This slice introduces no caller, current-contract, authority, call frame, ABI,
+or source-syntax meaning. Parser work remains paused.
 
 ## Meaning of completion
 

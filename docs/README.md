@@ -26,12 +26,13 @@ Semantic Core and explicit runtime semantics.
 The current internal contract boundary can execute checker-accepted Core code
 selected by `codeAddress` from a working WorldState. Core supplies typed
 runtime-only storage read and write capabilities, plus a read-only observation
-of the retained storage selector. Each request suspends with its exact
+of the retained storage selector and a separate observation of the selected
+code selector. Each request suspends with its exact
 continuation, local cell store, and remaining fuel. A generic host driver
 delegates requests to a combined handler over the Account selected by a
 separate `storageAddress`; the code and storage roles are never equated.
-Reads and selector observation leave the host context unchanged, while writes
-update the returned working context and resume with Unit. This boundary is
+Reads and both selector observations leave the host context unchanged, while
+writes update the returned working context and resume with Unit. This boundary is
 proved and tested but unpublished: frozen Wire formats reject the host values,
 and source syntax, ABI, gas, calls, authorization, transaction commit, and
 rollback remain future work.
@@ -65,10 +66,11 @@ At the same fuel, sound evidence always identifies the same full result. Done
 and raw-fault results also agree across sufficient budgets, but out-of-fuel may
 change when the budget changes.
 
-[ADR-0126](adr/0126-selected-code-address-observation.md) is the active runtime
-slice. It exposes the existing code selector as an internal Unit-to-Word host
-observation and uses the same Address for selected lookup and handler
-execution. This adds no caller, current-contract, call-frame, ABI, or source
+[ADR-0126](adr/0126-selected-code-address-observation.md) completes the selected
+code-address observation. It exposes the existing code selector as an internal
+Unit-to-Word host capability and uses the same Address for selected lookup and
+handler execution. Exact safety, fuel, recovery, and stability laws are
+covered without adding caller, current-contract, call-frame, ABI, or source
 syntax meaning.
 
 First-order local cells from
