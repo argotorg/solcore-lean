@@ -1,6 +1,4 @@
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationWithInputsProperties
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
-import Solcore.Semantics.HostStorageHandlerProperties
 import Solcore.Semantics.HostStorageHandlerWithExecutionInputsProperties
 
 /-! Compile-time use of the public storage-driver proof interface. -/
@@ -541,18 +539,18 @@ private theorem compileTimeCheckedFrameContinuationRegression
     {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason) :
-    (code.runWithStorage context codeAddress fuel).toFrameContinuationContext?
+    (code.runWithStorageInputs context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome = none ↔
       ∃ finalContext exhausted,
-        code.runWithStorage context codeAddress fuel =
+        code.runWithStorageInputs context inputs fuel =
           ⟨finalContext, .outOfFuel exhausted⟩ :=
-  code.runWithStorage_toFrameContinuationContext?_eq_none_iff
-    context codeAddress fuel doneOutcome
+  code.runWithStorageInputs_toFrameContinuationContext?_eq_none_iff
+    context inputs fuel doneOutcome
 
 private theorem compileTimeCheckedFrameContinuationStabilityRegression
     {RollbackState : Type u}
@@ -560,7 +558,7 @@ private theorem compileTimeCheckedFrameContinuationStabilityRegression
     {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason)
@@ -568,15 +566,15 @@ private theorem compileTimeCheckedFrameContinuationStabilityRegression
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      (code.runWithStorage context codeAddress fuel).toFrameContinuationContext?
+      (code.runWithStorageInputs context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome =
         some continuation)
     (more : fuel ≤ largerFuel) :
-    (code.runWithStorage context codeAddress largerFuel).toFrameContinuationContext?
+    (code.runWithStorageInputs context inputs largerFuel).toFrameContinuationContext?
         (fun current => current.context.values) doneOutcome =
       some continuation :=
-  code.runWithStorage_toFrameContinuationContext?_some_stable
-    context codeAddress doneOutcome completed more
+  code.runWithStorageInputs_toFrameContinuationContext?_some_stable
+    context inputs doneOutcome completed more
 
 /-- Selected adaptation keeps code absence distinct from selected exhaustion. -/
 private theorem compileTimeSelectedFrameContinuationBoundaryRegression
@@ -584,24 +582,24 @@ private theorem compileTimeSelectedFrameContinuationBoundaryRegression
     {TraceState : Type v}
     {TrapReason : Type w}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason) :
-    (context.runCodeWithStorageContinuationContext?
-          codeAddress fuel doneOutcome = none ↔
-        context.context.values.working.1.code? codeAddress = none) ∧
-      (context.runCodeWithStorageContinuationContext?
-          codeAddress fuel doneOutcome = some none ↔
+    (context.runCodeWithStorageContinuationContextWithInputs?
+          inputs fuel doneOutcome = none ↔
+        context.context.values.working.1.code? inputs.codeAddress = none) ∧
+      (context.runCodeWithStorageContinuationContextWithInputs?
+          inputs fuel doneOutcome = some none ↔
         ∃ resultContext exhausted,
-          context.runCodeWithStorage? codeAddress fuel =
+          context.runCodeWithStorageWithInputs? inputs fuel =
             some ⟨resultContext, .outOfFuel exhausted⟩) := by
   exact
-    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_none_iff
-        context codeAddress fuel doneOutcome,
-      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
-        context codeAddress fuel doneOutcome⟩
+    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_none_iff
+        context inputs fuel doneOutcome,
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_eq_some_none_iff
+        context inputs fuel doneOutcome⟩
 
 /-- A nested selected completion retains the exact continuation at larger fuel. -/
 private theorem compileTimeSelectedFrameContinuationStabilityRegression
@@ -609,7 +607,7 @@ private theorem compileTimeSelectedFrameContinuationStabilityRegression
     {TraceState : Type v}
     {TrapReason : Type w}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason)
@@ -617,12 +615,12 @@ private theorem compileTimeSelectedFrameContinuationStabilityRegression
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      context.runCodeWithStorageContinuationContext?
-        codeAddress fuel doneOutcome = some (some continuation))
+      context.runCodeWithStorageContinuationContextWithInputs?
+        inputs fuel doneOutcome = some (some continuation))
     (more : fuel ≤ largerFuel) :
-    context.runCodeWithStorageContinuationContext?
-      codeAddress largerFuel doneOutcome = some (some continuation) :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_some_some_stable
-    context codeAddress doneOutcome completed more
+    context.runCodeWithStorageContinuationContextWithInputs?
+      inputs largerFuel doneOutcome = some (some continuation) :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_some_some_stable
+    context inputs doneOutcome completed more
 
 end Tests
