@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: observe one exact 32-byte big-endian word from bounded immutable input
-- Implementation: Not started
+- Implementation: In progress
 
 ## Context
 

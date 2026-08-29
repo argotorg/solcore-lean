@@ -831,6 +831,16 @@ natural byte length without truncation, and internal
 This adds no ABI or calldata meaning, multi-byte decoding, nested-call input
 derivation, parser dependency, Wire tag, or public interface.
 
+ADR-0135 is active over the same immutable input. Semantics will expose
+`InputData.wordBE?` only for a complete 32-byte window, decoded with the
+existing big-endian Word codec; incomplete windows are absent without padding
+or offset wrap. Core will own only the optional
+`inputDataWordBE? : word -> sum unit word` capability at append-only index 8,
+with table length 9 and first-unbound index 9. Handler context identity,
+safety, direct, storage, parent, fuel, and frozen-Wire boundaries remain proof
+obligations; ABI, calldata, memory, nested calls, parser work, and publication
+remain outside the slice.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

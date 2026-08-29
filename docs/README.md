@@ -141,6 +141,15 @@ exactly below that size and absent at or above it. This does not define ABI
 calldata, multi-byte decoding,
 nested-call input derivation, source syntax, Wire encoding, or publication.
 
+[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) is the active
+internal slice. It accepts only a complete 32-byte input window, decodes it
+with the existing big-endian Word codec, and represents an incomplete window
+as absence without padding or offset wrap. The planned
+`inputDataWordBE? : word -> sum unit word` capability appends at index 8, with
+host-table length 9 and first-unbound index 9. ABI, calldata, partial loads,
+memory, nested calls, parser work, Wire encoding, and publication remain out
+of scope.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

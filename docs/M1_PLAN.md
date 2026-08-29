@@ -78,6 +78,13 @@ run-fixed input-size observation. It derives the exact input length as
 that size and absent at or above it. ABI, calldata, multi-byte loads,
 nested-call derivation, syntax, and publication remain separate.
 
+[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) is active. It
+adds a strict optional 32-byte big-endian window over the same run-fixed input.
+Only a complete window decodes; incomplete windows return absence without
+padding or Word-offset wrap. The internal host capability appends at index 8,
+with table length 9 and first-unbound index 9. ABI, calldata, memory, nested
+input derivation, syntax, and publication stay separate.
+
 ## Completed foundation
 
 The current Core already has:
@@ -215,11 +222,12 @@ These results remain regression obligations for every extension.
 | 115 | Run-fixed caller-address observation | Complete | Carries one explicit caller-supplied Address through `ExecutionInputs` and exposes its exact lossless Word at Core host index 5 without broader caller semantics |
 | 116 | Bounded optional input-byte observation | Complete | Carries one bounded run-fixed `InputData` value and exposes one present byte or explicit absence at Core host index 6 |
 | 117 | Run-fixed input-size observation | Complete | Derives the exact bounded input length as a Word, exposes it at Core host index 7, and proves its boundary agrees with optional byte lookup |
-| 118 | Further contract-entry input roles | Planned | Add current, callee, wider data loads, or kind only when an identified Core consumer and lifetime rule exist |
-| 119 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 120 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 121 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 122 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 118 | Strict optional input-word BE observation | In progress | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
+| 119 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
+| 120 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 121 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 122 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 123 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2012,6 +2020,20 @@ trust-zero over all 21 changed Lean roots, metadata, semantic-kernel, axiom,
 compatibility, and independent audits. Multi-byte interpretation, ABI and
 calldata meaning, nested-input derivation, syntax, and publication remain
 separate future decisions.
+
+## Active strict optional input-word BE observation
+
+[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) accepts
+`InputData.wordBE?` as a strict full-window operation over the existing bounded
+input. It extracts `[offset, offset + 32)` with natural-number bounds and uses
+the canonical big-endian Word decoder. A complete all-zero window returns
+`some Word.zero`; an incomplete window returns `none` without padding.
+
+Implementation will append
+`inputDataWordBE? : word -> sum unit word` at index 8, extend both host tables
+to length 9, and close exact codec, handler/context, safety, direct, storage,
+parent, measured-fuel, and frozen-Wire obligations. ABI, calldata, partial
+loads, memory, nested calls, parser work, and publication are non-goals.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
