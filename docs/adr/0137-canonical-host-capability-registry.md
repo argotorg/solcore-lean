@@ -1,8 +1,9 @@
 # ADR-0137: Canonical host capability registry
 
-- Status: Proposed
+- Status: Accepted
 - Decision date: 2026-08-29
 - Scope: one canonical ordering for the existing internal Core host capabilities
+- Implementation: In progress
 
 ## Context
 

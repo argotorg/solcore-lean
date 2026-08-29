@@ -383,6 +383,13 @@ identity only for results produced by an actual run, not for a forged exhausted
 result whose retained state may already be terminal. Typed arbitrary results
 remain typed after resumption and cannot expose a raw machine fault.
 
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) is active. It
+replaces repeated copies of the existing host-capability order with one
+canonical registry, then derives the type table, value table, and runtime
+typing proof from it. The nine capabilities retain indexes 0 through 8, both
+tables retain length 9, and index 9 remains first unbound. Runtime behavior and
+public formats do not change. Parser and syntax proofs remain paused.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -408,6 +415,7 @@ remain typed after resumption and cannot expose a raw machine fault.
 | Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
+| Canonical host capability registry | In progress | Normalize the existing nine-entry order into one registry, derive both host tables and their safety proof, and preserve all numeric and named compatibility facts | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2529,6 +2537,19 @@ only `propext` and `Quot.sound`. The independent completion audit found no
 P0-P3 issue. No gas model, persistence, different-handler or changed-input
 resumption, nested call, transaction, parser, Wire, or public interface is
 introduced.
+
+## Active canonical host capability registry
+
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) normalizes the
+existing nine internal host capabilities around one explicit ordered registry.
+The type table, runtime-value table, and their safety proof will be derived from
+that registry instead of maintaining the same order three times.
+
+This is a table and proof normalization only. Indexes 0 through 8, table length
+9, first-unbound index 9, named lookup theorems, checked execution, fuel,
+faults, and Store effects remain unchanged. It adds no capability and publishes
+no registry or ABI. Parser and syntax proofs remain paused under the
+semantics-first plan.
 
 ## Meaning of completion
 

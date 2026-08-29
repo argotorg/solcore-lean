@@ -855,6 +855,14 @@ preserve checkpoint, effects, and unrelated Account across exhaustion. This
 adds no gas, persistence, handler/input replacement, call lifecycle, or public
 format.
 
+ADR-0137 is active as a structural normalization of the host boundary. One
+explicit registry will own the existing capability order; host types, runtime
+values, and their typing proof will be derived from it. The numeric index
+function remains an independent explicit declaration, with proofs tying it to
+the registry. All nine positions 0 through 8, length 9, first-unbound index 9,
+runtime behavior, and public boundaries remain unchanged. Parser and syntax
+proofs remain paused.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

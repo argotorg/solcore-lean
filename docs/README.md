@@ -163,6 +163,13 @@ the exact same `ExecutionInputs`, retaining completed writes and unrelated
 context. Typed results remain safe. This adds no gas model, persistence, nested
 call lifecycle, syntax, Wire encoding, or public interface.
 
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) is the active
+internal normalization. It gives the existing nine host capabilities one
+canonical order and derives the type table, value table, and safety proof from
+it. Indexes 0 through 8, table length 9, first-unbound index 9, runtime behavior,
+and public formats stay unchanged. No new capability is published, and parser
+and syntax proofs remain paused.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

@@ -93,6 +93,11 @@ remain terminal. Sequential addition is required for arbitrary result values;
 zero is an identity only for actual run results, not arbitrary forged
 `outOfFuel` values.
 
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) is active. It makes
+the existing nine-capability order canonical without adding a capability or
+changing execution. Indexes 0 through 8, table length 9, first-unbound index 9,
+and all public boundaries remain fixed. Parser and syntax proofs remain paused.
+
 ## Completed foundation
 
 The current Core already has:
@@ -232,11 +237,12 @@ These results remain regression obligations for every extension.
 | 117 | Run-fixed input-size observation | Complete | Derives the exact bounded input length as a Word, exposes it at Core host index 7, and proves its boundary agrees with optional byte lookup |
 | 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
 | 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
-| 120 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
-| 121 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 122 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 123 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 124 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 120 | Canonical host capability registry | In progress | Derives both nine-entry host tables and their safety proof from one order while preserving indexes, behavior, and compatibility theorems |
+| 121 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
+| 122 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 123 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 124 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 125 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2082,6 +2088,20 @@ trust-zero and warning-as-error checks, metadata, semantic-kernel, diff, axiom,
 and independent audits pass; the audit found no P0-P3 issue. Gas, persistence,
 handler/input replacement, nested calls, transactions, syntax, and publication
 are excluded.
+
+## Active canonical host capability registry
+
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) replaces three
+hand-maintained copies of the host-capability order with one explicit registry.
+Both fixed tables become maps over that registry, and one list induction will
+provide their runtime typing proof. Generic laws will tie registry position to
+the independently explicit numeric index.
+
+The migration preserves all nine current capabilities at indexes 0 through 8,
+both table lengths at 9, index 9 as first unbound, named lookup and simplifier
+facts, and every checked runtime result. It changes no request, response, fuel,
+fault, Store effect, Wire or Oracle format, source form, or ABI. Parser and
+syntax proofs remain paused while syntax-independent semantics is completed.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
