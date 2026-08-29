@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationWithInputsCoherenceProperties
+import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
 import Solcore.Semantics.ParentIndexedFrameResolutionFoldProperties
 
 /-! Compile-only consumers of parent-indexed resolution-fold laws. -/

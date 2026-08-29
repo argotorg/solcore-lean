@@ -1,6 +1,6 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionWithInputs
-import Solcore.Semantics.HostStorageDriverWithExecutionInputsFuelProperties
-import Solcore.Semantics.HostStorageDriverWithExecutionInputsSafetyProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
+import Solcore.Semantics.HostStorageDriverFuelProperties
+import Solcore.Semantics.HostStorageDriverSafetyProperties
 import Solcore.Semantics.WorldStateCodeProperties
 
 /-! Selection, fuel, and safety laws for explicit-input selected execution. -/
@@ -13,13 +13,13 @@ universe u v
 
 namespace FrameCheckpointedWorkingPairWithPresentStorageAccount
 
-abbrev InputCodeRunContext
+abbrev CodeRunContext
     (RollbackState : Type u) (TraceState : Type v) :=
   HostStorageDriver.Context RollbackState TraceState
 
 @[simp] theorem runCodeWithStorage?_of_absent
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (absent :
@@ -29,7 +29,7 @@ abbrev InputCodeRunContext
 
 @[simp] theorem runCodeWithStorage?_of_account_without_code
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (account : Account)
     (fuel : Nat)
@@ -42,7 +42,7 @@ abbrev InputCodeRunContext
 
 @[simp] theorem runCodeWithStorage?_of_present
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (account : Account)
     (code : CheckedHostCoreProgram)
@@ -58,7 +58,7 @@ abbrev InputCodeRunContext
 
 @[simp] theorem runCodeWithStorage?_eq_none_iff
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
     context.runCodeWithStorage? inputs fuel = none ↔
@@ -71,10 +71,10 @@ abbrev InputCodeRunContext
 
 theorem runCodeWithStorage?_some_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
-    (result : HostDriverResult (InputCodeRunContext RollbackState TraceState))
+    (result : HostDriverResult (CodeRunContext RollbackState TraceState))
     (executed :
       context.runCodeWithStorage? inputs fuel = some result) :
     ∃ code,
@@ -94,10 +94,10 @@ theorem runCodeWithStorage?_some_fuelSound
 
 theorem runCodeWithStorage?_eq_some_iff_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
-    (result : HostDriverResult (InputCodeRunContext RollbackState TraceState)) :
+    (result : HostDriverResult (CodeRunContext RollbackState TraceState)) :
     context.runCodeWithStorage? inputs fuel = some result ↔
       ∃ code,
         context.context.values.working.1.code? inputs.codeAddress = some code ∧
@@ -115,10 +115,10 @@ theorem runCodeWithStorage?_eq_some_iff_fuelSound
 
 theorem runCodeWithStorage?_some_hasType
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
-    (result : HostDriverResult (InputCodeRunContext RollbackState TraceState))
+    (result : HostDriverResult (CodeRunContext RollbackState TraceState))
     (executed :
       context.runCodeWithStorage? inputs fuel = some result) :
     ∃ code,
@@ -138,10 +138,10 @@ theorem runCodeWithStorage?_some_hasType
 
 theorem runCodeWithStorage?_ne_some_fault
     {RollbackState : Type u} {TraceState : Type v}
-    (context : InputCodeRunContext RollbackState TraceState)
+    (context : CodeRunContext RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
-    (resultContext : InputCodeRunContext RollbackState TraceState)
+    (resultContext : CodeRunContext RollbackState TraceState)
     (error : Core.MachineFault)
     (faultState : Core.State) :
     context.runCodeWithStorage? inputs fuel ≠

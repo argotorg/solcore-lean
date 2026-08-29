@@ -1,6 +1,6 @@
 import Solcore.Semantics.CheckedHostCoreProgramExecution
 import Solcore.Semantics.HostDriver
-import Solcore.Semantics.HostStorageHandlerWithExecutionInputs
+import Solcore.Semantics.HostStorageHandler
 
 /-! Explicit-input migration seam for combined handled storage execution. -/
 

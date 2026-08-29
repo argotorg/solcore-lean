@@ -1,4 +1,4 @@
-import Solcore.Semantics.HostStorageDriverWithExecutionInputs
+import Solcore.Semantics.HostStorageDriver
 import Solcore.Semantics.WorldStateCode
 
 /-! Address-selected handled execution with one immutable execution input. -/

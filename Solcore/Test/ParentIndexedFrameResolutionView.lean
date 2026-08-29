@@ -1,5 +1,5 @@
 import Solcore.Semantics.FrameResolutionResultContinuationProperties
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationWithInputsCoherenceProperties
+import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
 import Solcore.Semantics.ParentIndexedFrameResolutionViewProperties
 
 /-! Compile-only consumers of the parent-indexed resolution view. -/

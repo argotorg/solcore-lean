@@ -1,6 +1,6 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionWithInputsProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWrite
-import Solcore.Semantics.HostStorageDriverWithExecutionInputsFuelProperties
+import Solcore.Semantics.HostStorageDriverFuelProperties
 
 /-! End-to-end regressions for address-selected handled host execution. -/
 

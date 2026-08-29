@@ -1,5 +1,5 @@
 import Solcore.Semantics.CheckedHostCoreProgramProperties
-import Solcore.Semantics.HostStorageDriverWithExecutionInputsProperties
+import Solcore.Semantics.HostStorageDriverProperties
 
 /-! Type and fault safety for the explicit-input storage driver seam. -/
 

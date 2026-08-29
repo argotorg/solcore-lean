@@ -1,6 +1,6 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionWithInputs
-import Solcore.Semantics.HostStorageDriverWithExecutionInputsFuelProperties
-import Solcore.Semantics.HostStorageDriverWithExecutionInputsProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
+import Solcore.Semantics.HostStorageDriverFuelProperties
+import Solcore.Semantics.HostStorageDriverProperties
 
 /-! Preservation and stability laws for explicit-input selected execution. -/
 

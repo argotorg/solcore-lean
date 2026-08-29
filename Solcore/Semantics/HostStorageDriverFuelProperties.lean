@@ -1,5 +1,5 @@
 import Solcore.Semantics.HostDriverCompletenessProperties
-import Solcore.Semantics.HostStorageDriverWithExecutionInputsProperties
+import Solcore.Semantics.HostStorageDriverProperties
 
 /-! Whole-run fuel accounting indexed by immutable execution inputs. -/
 

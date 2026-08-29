@@ -1,5 +1,5 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationWithInputsProperties
-import Solcore.Semantics.HostStorageHandlerWithExecutionInputsProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
+import Solcore.Semantics.HostStorageHandlerProperties
 
 /-! Compile-time use of the public storage-driver proof interface. -/
 

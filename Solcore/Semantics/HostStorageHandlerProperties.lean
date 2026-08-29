@@ -3,7 +3,7 @@ import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountSt
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWritePresenceProperties
 import Solcore.Semantics.HostDriverProperties
 import Solcore.Semantics.HostStorageExecutionInputsProperties
-import Solcore.Semantics.HostStorageHandlerWithExecutionInputs
+import Solcore.Semantics.HostStorageHandler
 
 /-! Exact current-request laws for the explicit-input storage handler seam. -/
 

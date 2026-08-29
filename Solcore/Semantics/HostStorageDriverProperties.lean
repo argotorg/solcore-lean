@@ -2,8 +2,8 @@ import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountSt
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteIsolationProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteProjectionProperties
 import Solcore.Semantics.HostDriverProperties
-import Solcore.Semantics.HostStorageDriverWithExecutionInputs
-import Solcore.Semantics.HostStorageHandlerWithExecutionInputsProperties
+import Solcore.Semantics.HostStorageDriver
+import Solcore.Semantics.HostStorageHandlerProperties
 
 /-! Execution and preservation laws for the explicit-input driver seam. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionWithInputs
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
 import Solcore.Semantics.HostDriverFrameContinuation
 
 /-! Frame-continuation construction with one immutable execution input. -/

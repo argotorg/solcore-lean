@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationWithInputsProperties
+import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationProperties
 import Solcore.Semantics.ParentIndexedFrameInitializationProperties
 
 /-! Coherence and stability for parent-indexed explicit-input execution. -/
@@ -9,7 +9,7 @@ namespace Solcore.Semantics.ParentIndexedFrameInitialization
 
 universe u v w
 
-private theorem completedContinuationWithInputs_eq_parentIndexed
+private theorem completedContinuation_eq_parentIndexed
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
       WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
@@ -126,7 +126,7 @@ theorem
     rw [ran, continuationEq]
   subst parentContinuation
   exact ⟨context, continuation, refined, lowerCompleted,
-    completedContinuationWithInputs_eq_parentIndexed initialization
+    completedContinuation_eq_parentIndexed initialization
       storageAddress inputs context refined fuel doneOutcome continuation
       lowerCompleted⟩
 
