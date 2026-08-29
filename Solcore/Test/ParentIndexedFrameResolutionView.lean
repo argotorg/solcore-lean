@@ -1,0 +1,189 @@
+import Solcore.Semantics.FrameResolutionResultContinuationProperties
+import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
+import Solcore.Semantics.ParentIndexedFrameResolutionViewProperties
+
+/-! Compile-only consumers of the parent-indexed resolution view. -/
+
+set_option autoImplicit false
+
+namespace Tests
+
+open Solcore.Semantics
+
+universe u v w x
+
+/-- Returned resolution selects the returned callback and no trap rollback. -/
+private example
+    {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
+    {Next : Type x}
+    {parentWorking :
+      WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
+    (context : ParentIndexedFrameContinuationContext
+      RollbackState Event TrapReason parentWorking)
+    (data : Bytes)
+    (outcomeEq : context.result.outcome =
+      FrameOutcome.returned (TrapReason := TrapReason) data)
+    (onReturned onReverted :
+      (WorldState ×
+        FrameEffectJournal RollbackState (FrameTrace Event)) →
+          Bytes → Option Next) :
+    (context.resolveWithTrapRollback).1.continue?
+          onReturned onReverted =
+        onReturned
+          (context.result.working, context.effectWorking) data ∧
+      (context.resolveWithTrapRollback).2 = none ∧
+      FrameTrace.IsPrefixOf
+        parentWorking.2.trace context.effectWorking.trace := by
+  have branch := context.resolveWithTrapRollback_returned data outcomeEq
+  constructor
+  · simp only [branch.1, FrameResolutionResult.continue?_returned]
+  · constructor
+    · simp only [branch.1]
+    · exact branch.2
+
+/-- Reverted resolution selects the reverted callback and no trap rollback. -/
+private example
+    {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
+    {Next : Type x}
+    {parentWorking :
+      WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
+    (context : ParentIndexedFrameContinuationContext
+      RollbackState Event TrapReason parentWorking)
+    (data : Bytes)
+    (outcomeEq : context.result.outcome =
+      FrameOutcome.reverted (TrapReason := TrapReason) data)
+    (onReturned onReverted :
+      (WorldState ×
+        FrameEffectJournal RollbackState (FrameTrace Event)) →
+          Bytes → Option Next) :
+    (context.resolveWithTrapRollback).1.continue?
+          onReturned onReverted =
+        onReverted
+          (parentWorking.1,
+            ⟨parentWorking.2.rollback, context.effectWorking.trace⟩) data ∧
+      (context.resolveWithTrapRollback).2 = none ∧
+      FrameTrace.IsPrefixOf
+        parentWorking.2.trace context.effectWorking.trace := by
+  have branch := context.resolveWithTrapRollback_reverted data outcomeEq
+  constructor
+  · simp only [branch.1, FrameResolutionResult.continue?_reverted]
+  · constructor
+    · simp only [branch.1]
+    · exact branch.2
+
+/-- Trap rejects both callbacks while selecting the exact parent rollback. -/
+private example
+    {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
+    {Next : Type x}
+    {parentWorking :
+      WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
+    (context : ParentIndexedFrameContinuationContext
+      RollbackState Event TrapReason parentWorking)
+    (reason : TrapReason)
+    (outcomeEq : context.result.outcome = FrameOutcome.trapped reason)
+    (onReturned onReverted :
+      (WorldState ×
+        FrameEffectJournal RollbackState (FrameTrace Event)) →
+          Bytes → Option Next) :
+    (context.resolveWithTrapRollback).1.continue?
+          onReturned onReverted = none ∧
+      (context.resolveWithTrapRollback).2 =
+        some
+          (parentWorking.1,
+            ⟨parentWorking.2.rollback, context.effectWorking.trace⟩) ∧
+      FrameTrace.IsPrefixOf
+        parentWorking.2.trace context.effectWorking.trace := by
+  have branch := context.resolveWithTrapRollback_trapped reason outcomeEq
+  constructor
+  · simp only [branch.1, FrameResolutionResult.continue?_trapped]
+  · constructor
+    · simp only [branch.1]
+    · exact branch.2
+
+/-- The public inverse law recovers exactly the trapped rollback selection. -/
+private example
+    {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
+    {parentWorking :
+      WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
+    (context : ParentIndexedFrameContinuationContext
+      RollbackState Event TrapReason parentWorking)
+    (values :
+      WorldState × FrameEffectJournal RollbackState (FrameTrace Event)) :
+    (context.resolveWithTrapRollback).2 = some values ↔
+      ∃ reason,
+        context.result.outcome = FrameOutcome.trapped reason ∧
+          values =
+            (parentWorking.1,
+              ⟨parentWorking.2.rollback,
+                context.effectWorking.trace⟩) := by
+  exact context.resolveWithTrapRollback_snd_eq_some_iff values
+
+/-- ADR-0125 whole-context construction equality transports through the view. -/
+private example
+    {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
+    {parentWorking :
+      WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
+    (initialization :
+      ParentIndexedFrameInitialization RollbackState Event parentWorking)
+    (storageAddress codeAddress : Address)
+    (fuel : Nat)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState (FrameTrace Event) →
+        Solcore.Core.Value → Solcore.Core.Store → FrameOutcome TrapReason)
+    (parentContinuation :
+      ParentIndexedFrameContinuationContext
+        RollbackState Event TrapReason parentWorking)
+    (completed :
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
+          storageAddress codeAddress fuel doneOutcome =
+        some (some (some parentContinuation))) :
+    ∃ context continuation,
+      initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+          storageAddress = some context ∧
+      context.runCodeWithStorageContinuationContext?
+          codeAddress fuel doneOutcome = some (some continuation) ∧
+      parentContinuation.resolveWithTrapRollback =
+        (ParentIndexedFrameContinuationContext.fromTraceExtension
+          parentWorking initialization.workingRollback
+          initialization.initialTraceExtension
+          continuation.result).resolveWithTrapRollback := by
+  rw [
+    initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_some_iff
+      storageAddress codeAddress fuel doneOutcome parentContinuation] at completed
+  obtain ⟨context, continuation, refined, lowerCompleted, parentEq⟩ :=
+    completed
+  exact ⟨context, continuation, refined, lowerCompleted,
+    congrArg (fun current => current.resolveWithTrapRollback) parentEq⟩
+
+/-- Additional fuel preserves the completed optional boundary and exact view. -/
+private example
+    {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
+    {parentWorking :
+      WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
+    (initialization :
+      ParentIndexedFrameInitialization RollbackState Event parentWorking)
+    (storageAddress codeAddress : Address)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState (FrameTrace Event) →
+        Solcore.Core.Value → Solcore.Core.Store → FrameOutcome TrapReason)
+    {fuel largerFuel : Nat}
+    {parentContinuation :
+      ParentIndexedFrameContinuationContext
+        RollbackState Event TrapReason parentWorking}
+    (completed :
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
+          storageAddress codeAddress fuel doneOutcome =
+        some (some (some parentContinuation)))
+    (more : fuel ≤ largerFuel) :
+    ∃ largerContinuation,
+      initialization.runCodeWithStorageParentIndexedContinuationContext?
+          storageAddress codeAddress largerFuel doneOutcome =
+        some (some (some largerContinuation)) ∧
+      largerContinuation.resolveWithTrapRollback =
+        parentContinuation.resolveWithTrapRollback := by
+  refine ⟨parentContinuation, ?_, rfl⟩
+  exact
+    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_stable
+      storageAddress codeAddress doneOutcome completed more
+
+end Tests
