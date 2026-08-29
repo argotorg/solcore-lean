@@ -19,6 +19,13 @@ namespace InputData
       size_lt_wordModulus :=
   rfl
 
+/-- Every position in the bounded byte sequence has an exact Core Word index. -/
+theorem exists_word_offset_of_lt_size
+    (input : InputData) (index : Nat)
+    (inBounds : index < input.bytes.size) :
+    ∃ offset : Core.Word, offset.val = index :=
+  ⟨⟨index, Nat.lt_trans inBounds input.size_lt_wordModulus⟩, rfl⟩
+
 theorem byte?_eq_some_iff
     (input : InputData) (offset result : Core.Word) :
     input.byte? offset = some result ↔
