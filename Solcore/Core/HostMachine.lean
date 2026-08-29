@@ -9,6 +9,7 @@ namespace Solcore.Core
 
 inductive HostRequest where
   | storageRead (slot : Word)
+  | storageWrite (slot value : Word)
   deriving Repr, BEq, DecidableEq
 
 namespace HostRequest
@@ -16,10 +17,12 @@ namespace HostRequest
 /-- The host-language response required by a particular request. -/
 def Response : HostRequest → Type
   | .storageRead _ => Word
+  | .storageWrite _ _ => Unit
 
 /-- Core type injected when a request is resumed. -/
 def responseType : HostRequest → Ty
   | .storageRead _ => .word
+  | .storageWrite _ _ => .unit
 
 /-- Convert an indexed host response back into a Core runtime value. -/
 def responseValue
@@ -27,6 +30,7 @@ def responseValue
     (response : request.Response) : Value :=
   match request with
   | .storageRead _ => .word response
+  | .storageWrite _ _ => .unit
 
 @[simp] theorem responseType_storageRead (slot : Word) :
     responseType (.storageRead slot) = .word :=
@@ -36,12 +40,21 @@ def responseValue
     responseValue (.storageRead slot) response = .word response :=
   rfl
 
+@[simp] theorem responseType_storageWrite (slot value : Word) :
+    responseType (.storageWrite slot value) = .unit :=
+  rfl
+
+@[simp] theorem responseValue_storageWrite
+    (slot value : Word)
+    (response : Unit) :
+    responseValue (.storageWrite slot value) response = .unit :=
+  rfl
+
 @[simp] theorem responseValue_type
     (request : HostRequest)
     (response : request.Response) :
     (request.responseValue response).type = request.responseType := by
-  cases request
-  rfl
+  cases request <;> rfl
 
 end HostRequest
 
@@ -88,6 +101,16 @@ def resume
     (store : Store) :
     (HostSuspension.mk (.storageRead slot) continuation store).resume response =
       ⟨.ret (.word response), continuation, store⟩ :=
+  rfl
+
+@[simp] theorem resume_storageWrite
+    (slot value : Word)
+    (response : Unit)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk (.storageWrite slot value) continuation store).resume
+        response =
+      ⟨.ret .unit, continuation, store⟩ :=
   rfl
 
 end HostSuspension
@@ -142,6 +165,12 @@ def hostAdvance (state : State) : HostAdvanceResult :=
             continuation
             store := state.store
           }
+      | .storageWrite, .pair (.word slot) (.word value) =>
+          .suspended {
+            request := .storageWrite slot value
+            continuation
+            store := state.store
+          }
       | function, actual => .fault (.invalidHostArgument function actual)
   | _, _ => .ofAdvance (advance state)
 
@@ -175,6 +204,41 @@ def hostAdvance (state : State) : HostAdvanceResult :=
     hostAdvance
         ⟨.ret actual, .hostApply .storageRead :: continuation, store⟩ =
       .fault (.invalidHostArgument .storageRead actual) := by
+  cases actual <;> simp_all [hostAdvance]
+
+@[simp] theorem hostAdvance_begin_storageWrite
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .storageWrite),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .storageWrite :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_storageWrite
+    (slot value : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.pair (.word slot) (.word value)),
+          .hostApply .storageWrite :: continuation, store⟩ =
+      .suspended ⟨.storageWrite slot value, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_storageWrite_argument
+    (actual : Value)
+    (notWordPair :
+      ∀ slot value,
+        actual ≠ .pair (.word slot) (.word value))
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .storageWrite :: continuation, store⟩ =
+      .fault (.invalidHostArgument .storageWrite actual) := by
   cases actual <;> simp_all [hostAdvance]
 
 end Solcore.Core

@@ -112,15 +112,18 @@ end Ty
 /-- Runtime functions supplied by a host rather than constructed by Core syntax. -/
 inductive HostFunction where
   | storageRead
+  | storageWrite
   deriving Repr, BEq, DecidableEq
 
 namespace HostFunction
 
 def parameterType : HostFunction → Ty
   | .storageRead => .word
+  | .storageWrite => .product .word .word
 
 def resultType : HostFunction → Ty
   | .storageRead => .word
+  | .storageWrite => .unit
 
 @[simp] def functionType (function : HostFunction) : Ty :=
   .function function.parameterType function.resultType
@@ -133,9 +136,24 @@ def resultType : HostFunction → Ty
     resultType .storageRead = .word :=
   rfl
 
+@[simp] theorem parameterType_storageWrite :
+    parameterType .storageWrite = .product .word .word :=
+  rfl
+
+@[simp] theorem resultType_storageWrite :
+    resultType .storageWrite = .unit :=
+  rfl
+
 /-- Stable position in the append-only host capability context. -/
 def index : HostFunction → Nat
   | .storageRead => 0
+  | .storageWrite => 1
+
+@[simp] theorem index_storageRead : index .storageRead = 0 :=
+  rfl
+
+@[simp] theorem index_storageWrite : index .storageWrite = 1 :=
+  rfl
 
 end HostFunction
 

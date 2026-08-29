@@ -21,6 +21,10 @@ private def slot : Word := ⟨0x11, by decide⟩
 private def response : Word := ⟨0xaa, by decide⟩
 private def secondSlot : Word := ⟨0x22, by decide⟩
 
+private def responseFor : (request : HostRequest) → request.Response
+  | .storageRead _ => response
+  | .storageWrite _ _ => ()
+
 private def storageReadProgram : Program := {
   resultType := .word
   body := .apply (.var HostFunction.storageRead.index) (.word slot)
@@ -239,14 +243,15 @@ def testCoreHostMachine : IO Unit := do
   | .suspended first remainingFuel =>
       assertTrue (first.request == .storageRead slot)
         "the repeated-read program emitted the wrong first request"
-      match hostRun remainingFuel (first.resume response) with
+      match hostRun remainingFuel (first.resume (responseFor first.request)) with
       | .suspended second secondRemainingFuel =>
           assertTrue (second.request == .storageRead secondSlot)
             "the repeated-read program emitted the wrong second request"
           assertTrue (decide (secondRemainingFuel < remainingFuel))
             "resuming a request failed to preserve decreasing fuel"
           assertTrue
-            (hostRun secondRemainingFuel (second.resume response) ==
+            (hostRun secondRemainingFuel
+                (second.resume (responseFor second.request)) ==
               .done (.word response) [])
             "the second response did not complete the repeated-read program"
       | result =>

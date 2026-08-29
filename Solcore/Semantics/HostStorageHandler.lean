@@ -1,4 +1,5 @@
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageRead
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWrite
 import Solcore.Semantics.HostDriver
 
 /-! Combined interpretation of Core storage requests through working storage. -/
@@ -30,6 +31,7 @@ def handleRequest
     Context RollbackState TraceState × request.Response :=
   match request with
   | .storageRead slot => (context, context.readStorage slot)
+  | .storageWrite slot value => (context.writeStorage slot value, ())
 
 /-- The total dependent handler used by combined storage execution. -/
 def handler
@@ -67,6 +69,28 @@ def handleSuspension
         ⟨.storageRead slot, continuation, store⟩ =
       (context,
         ⟨.ret (.word (context.readStorage slot)), continuation, store⟩) :=
+  rfl
+
+@[simp] theorem handleRequest_storageWrite
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot value : Core.Word) :
+    handleRequest context (.storageWrite slot value) =
+      (context.writeStorage slot value, ()) :=
+  rfl
+
+@[simp] theorem handleSuspension_storageWrite
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (slot value : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension context
+        ⟨.storageWrite slot value, continuation, store⟩ =
+      (context.writeStorage slot value,
+        ⟨.ret .unit, continuation, store⟩) :=
   rfl
 
 end HostStorageDriver

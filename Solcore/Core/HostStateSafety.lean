@@ -215,8 +215,9 @@ theorem HostRequest.responseValue_hasType
     (world : StoreTyping) (definitions : DataEnvironment := []) :
     HostRuntimeValueHasType world (request.responseValue response)
       request.responseType definitions := by
-  cases request
-  exact .word
+  cases request with
+  | storageRead => exact .word
+  | storageWrite => exact .unit
 
 theorem HostSuspensionHasType.resume {definitions : DataEnvironment}
     {suspension : HostSuspension} {resultType : Ty}

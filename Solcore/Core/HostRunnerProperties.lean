@@ -48,8 +48,17 @@ theorem hostAdvance_done_iff
                   exact advance_done_iff.mp
                     (by simpa [hostAdvance] using advanced)
             case hostApply function =>
-              cases function
-              cases returned <;> simp [hostAdvance] at advanced
+              cases function with
+              | storageRead =>
+                  cases returned <;> simp [hostAdvance] at advanced
+              | storageWrite =>
+                  cases returned with
+                  | pair left right =>
+                      cases left <;> cases right <;>
+                        simp [hostAdvance] at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩
     simp [hostAdvance, State.final, advance]
 

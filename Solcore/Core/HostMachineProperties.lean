@@ -37,6 +37,14 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
       HostRequestEmission
         ⟨.ret (.word slot), .hostApply .storageRead :: continuation, store⟩
         ⟨.storageRead slot, continuation, store⟩
+  | storageWrite
+      {slot value : Word}
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret (.pair (.word slot) (.word value)),
+          .hostApply .storageWrite :: continuation, store⟩
+        ⟨.storageWrite slot value, continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -63,16 +71,25 @@ theorem hostRequestEmission_iff
     {state : State}
     {suspension : HostSuspension} :
     HostRequestEmission state suspension ↔
-      ∃ slot continuation store,
-        state =
-          ⟨.ret (.word slot), .hostApply .storageRead :: continuation, store⟩ ∧
-        suspension = ⟨.storageRead slot, continuation, store⟩ := by
+      (∃ slot continuation store,
+          state =
+            ⟨.ret (.word slot),
+              .hostApply .storageRead :: continuation, store⟩ ∧
+          suspension = ⟨.storageRead slot, continuation, store⟩) ∨
+        ∃ slot value continuation store,
+          state =
+            ⟨.ret (.pair (.word slot) (.word value)),
+              .hostApply .storageWrite :: continuation, store⟩ ∧
+          suspension = ⟨.storageWrite slot value, continuation, store⟩ := by
   constructor
   · intro emission
-    cases emission
-    exact ⟨_, _, _, rfl, rfl⟩
-  · rintro ⟨slot, continuation, store, rfl, rfl⟩
-    exact .storageRead
+    cases emission with
+    | storageRead => exact .inl ⟨_, _, _, rfl, rfl⟩
+    | storageWrite => exact .inr ⟨_, _, _, _, rfl, rfl⟩
+  · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
+        ⟨slot, value, continuation, store, rfl, rfl⟩)
+    · exact .storageRead
+    · exact .storageWrite
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -115,8 +132,17 @@ theorem hostAdvance_next_iff
                   exact .core
                     (advance_next_iff.mp (by simpa [hostAdvance] using advanced))
             case hostApply function =>
-              cases function
-              cases value <;> simp [hostAdvance] at advanced
+              cases function with
+              | storageRead =>
+                  cases value <;> simp [hostAdvance] at advanced
+              | storageWrite =>
+                  cases value with
+                  | pair left right =>
+                      cases left <;> cases right <;>
+                        simp [hostAdvance] at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp [hostAdvance] at advanced
   · intro step
     cases step with
     | beginApplication => rfl
@@ -143,18 +169,29 @@ theorem hostAdvance_suspended_iff
             case applyArgument argument environment =>
               cases value <;> simp at advanced
             case hostApply function =>
-              cases function
-              cases value with
-              | word slot =>
-                  injection advanced with suspensionEquality
-                  cases suspensionEquality
-                  exact .storageRead
-              | unit | bool | hostFunction | pair | closure | inLeft | inRight |
-                  cellRef | constructed =>
-                  simp at advanced
+              cases function with
+              | storageRead =>
+                  cases value with
+                  | word slot =>
+                      injection advanced with suspensionEquality
+                      cases suspensionEquality
+                      exact .storageRead
+                  | unit | bool | hostFunction | pair | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | storageWrite =>
+                  cases value with
+                  | pair left right =>
+                      cases left <;> cases right <;>
+                        simp at advanced
+                      case word.word slot value =>
+                        cases advanced
+                        exact .storageWrite
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
   · intro emission
-    cases emission
-    rfl
+    cases emission <;> rfl
 
 theorem hostTransition_deterministic
     {state left right : State}

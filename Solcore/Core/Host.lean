@@ -8,11 +8,12 @@ namespace Solcore.Core
 
 /-- Append-only types supplied to a host-aware Core program. -/
 def hostContext : Context :=
-  [HostFunction.functionType .storageRead]
+  [HostFunction.functionType .storageRead,
+    HostFunction.functionType .storageWrite]
 
 /-- Runtime values corresponding positionally to `hostContext`. -/
 def hostEnvironment : Environment :=
-  [.hostFunction .storageRead]
+  [.hostFunction .storageRead, .hostFunction .storageWrite]
 
 @[simp] theorem hostContext_storageRead :
     hostContext[HostFunction.storageRead.index]? =
@@ -24,10 +25,20 @@ def hostEnvironment : Environment :=
       some (.hostFunction .storageRead) :=
   rfl
 
-@[simp] theorem hostContext_length : hostContext.length = 1 :=
+@[simp] theorem hostContext_storageWrite :
+    hostContext[HostFunction.storageWrite.index]? =
+      some (HostFunction.functionType .storageWrite) :=
   rfl
 
-@[simp] theorem hostEnvironment_length : hostEnvironment.length = 1 :=
+@[simp] theorem hostEnvironment_storageWrite :
+    hostEnvironment[HostFunction.storageWrite.index]? =
+      some (.hostFunction .storageWrite) :=
+  rfl
+
+@[simp] theorem hostContext_length : hostContext.length = 2 :=
+  rfl
+
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 2 :=
   rfl
 
 namespace Program

@@ -23,6 +23,25 @@ theorem typed_storageRead_emits
   obtain ⟨slot, rfl⟩ := wordTyping.word_shape
   exact ⟨⟨.storageRead slot, continuation, store⟩, .storageRead⟩
 
+/-- A well-typed storage-write argument emits the corresponding request. -/
+theorem typed_storageWrite_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.storageWrite.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .storageWrite :: continuation, store⟩
+        suspension := by
+  have pairTyping :
+      HostRuntimeValueHasType world value
+        (.product .word .word) definitions := by
+    simpa using valueTyping
+  obtain ⟨slot, writtenValue, rfl⟩ := pairTyping.wordPair_shape
+  exact
+    ⟨⟨.storageWrite slot writtenValue, continuation, store⟩,
+      .storageWrite⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -34,8 +53,9 @@ theorem typed_hostApplication_emits
       HostRequestEmission
         ⟨.ret value, .hostApply function :: continuation, store⟩
         suspension := by
-  cases function
-  exact typed_storageRead_emits valueTyping
+  cases function with
+  | storageRead => exact typed_storageRead_emits valueTyping
+  | storageWrite => exact typed_storageWrite_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}
