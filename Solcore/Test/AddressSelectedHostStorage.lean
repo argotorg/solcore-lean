@@ -21,6 +21,7 @@ private def selectorSlot : Word := ⟨0x41, by decide⟩
 private def targetSlot : Word := ⟨0x42, by decide⟩
 private def retainedSlot : Word := ⟨0x43, by decide⟩
 private def oldValue : Word := ⟨0x51, by decide⟩
+private def intermediateValue : Word := ⟨0x54, by decide⟩
 private def newValue : Word := ⟨0x52, by decide⟩
 private def retainedValue : Word := ⟨0x53, by decide⟩
 
@@ -66,6 +67,32 @@ private theorem updateProgram_host_checked :
 
 private def updateCode : CheckedHostCoreProgram :=
   ⟨updateProgram, updateProgram_host_checked⟩
+
+/-- Repeated writes share the one budget and the latest value wins. -/
+private def repeatedWriteProgram : Program := {
+  resultType := .word
+  body :=
+    .letE
+      (.apply (.var HostFunction.storageRead.index) (.word selectorSlot))
+      (.letE
+        (.apply
+          (.var (HostFunction.storageWrite.index + 1))
+          (.pair (.var 0) (.word intermediateValue)))
+        (.letE
+          (.apply
+            (.var (HostFunction.storageWrite.index + 2))
+            (.pair (.var 1) (.word newValue)))
+          (.apply
+            (.var (HostFunction.storageRead.index + 3))
+            (.var 2))))
+}
+
+private theorem repeatedWriteProgram_host_checked :
+    repeatedWriteProgram.checkHost = true := by
+  decide
+
+private def repeatedWriteCode : CheckedHostCoreProgram :=
+  ⟨repeatedWriteProgram, repeatedWriteProgram_host_checked⟩
 
 private def zeroWriteProgram : Program :=
   {
@@ -229,6 +256,8 @@ private def assertMixedOutOfFuelAt
 def testAddressSelectedHostStorage : IO Unit := do
   assertTrue updateProgram.checkHost
     "the host checker rejected the read/write/read program"
+  assertTrue repeatedWriteProgram.checkHost
+    "the host checker rejected repeated writes"
   assertTrue zeroWriteProgram.checkHost
     "the host checker rejected the sparse-zero program"
 
@@ -252,6 +281,23 @@ def testAddressSelectedHostStorage : IO Unit := do
           assertTrue
             (preservedOutsideSelectedStorage result.context updateProgram)
             "the run changed code, another Account, checkpoint, effects, or selector"
+
+  match (baseContextFor repeatedWriteCode).withPresentStorageAccount? with
+  | none =>
+      throw (IO.userError "the repeated-write storage Account was absent")
+  | some context =>
+      match context.runCodeWithStorage? codeAddress 64 with
+      | none =>
+          throw (IO.userError "the repeated-write code was not selected")
+      | some result =>
+          assertTrue (result.outcome == .done (.word newValue) [])
+            "repeated writes did not return their latest value"
+          assertTrue (selectedStorageHas result.context newValue)
+            "the second handled write did not overwrite the first"
+          assertTrue
+            (preservedOutsideSelectedStorage
+              result.context repeatedWriteProgram)
+            "repeated writes changed retained frame data"
 
   match (baseContextFor zeroWriteCode).withPresentStorageAccount? with
   | none =>
