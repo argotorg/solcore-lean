@@ -127,6 +127,28 @@ private theorem illTypedCodeAddressProgram_host_rejected :
     illTypedCodeAddressProgram.checkHost = false := by
   decide
 
+private def callValueProgram : Program := {
+  resultType := .word
+  body := .apply (.var HostFunction.callValue.index) .unit
+}
+
+private theorem callValueProgram_host_checked :
+    callValueProgram.checkHost = true := by
+  decide
+
+private theorem callValueProgram_closed_rejected :
+    callValueProgram.check = false := by
+  decide
+
+private def illTypedCallValueProgram : Program := {
+  resultType := .word
+  body := .apply (.var HostFunction.callValue.index) (.bool true)
+}
+
+private theorem illTypedCallValueProgram_host_rejected :
+    illTypedCallValueProgram.checkHost = false := by
+  decide
+
 private def unboundHostIndexProgram : Program := {
   resultType := .word
   body :=
@@ -142,6 +164,9 @@ private def checkedStorageAddressProgram : CheckedHostCoreProgram :=
 
 private def checkedCodeAddressProgram : CheckedHostCoreProgram :=
   ⟨codeAddressProgram, codeAddressProgram_host_checked⟩
+
+private def checkedCallValueProgram : CheckedHostCoreProgram :=
+  ⟨callValueProgram, callValueProgram_host_checked⟩
 
 private theorem compileTimeAdmissionRegression :
     CheckedHostCoreProgram.ofProgram? storageReadProgram =
@@ -202,6 +227,16 @@ private theorem compileTimeCodeAddressEnvironmentIndexRegression :
       some (.hostFunction .codeAddress) :=
   hostEnvironment_codeAddress
 
+private theorem compileTimeCallValueContextIndexRegression :
+    hostContext[HostFunction.callValue.index]? =
+      some (HostFunction.functionType .callValue) :=
+  hostContext_callValue
+
+private theorem compileTimeCallValueEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.callValue.index]? =
+      some (.hostFunction .callValue) :=
+  hostEnvironment_callValue
+
 private theorem compileTimeHostCapabilityLengths :
     hostContext.length = 5 ∧ hostEnvironment.length = 5 :=
   ⟨hostContext_length, hostEnvironment_length⟩
@@ -252,6 +287,12 @@ private def codeAddressRequestState : State :=
 private def codeAddressSuspension : HostSuspension :=
   ⟨.codeAddress, [], []⟩
 
+private def callValueRequestState : State :=
+  ⟨.ret .unit, [.hostApply .callValue], []⟩
+
+private def callValueSuspension : HostSuspension :=
+  ⟨.callValue, [], []⟩
+
 private theorem compileTimeBeginCorrespondenceRegression :
     HostTransition beginState argumentState := by
   apply hostAdvance_next_iff.mp
@@ -287,6 +328,11 @@ private theorem compileTimeCodeAddressEmissionRegression :
   apply hostAdvance_suspended_iff.mp
   exact hostAdvance_suspend_codeAddress [] []
 
+private theorem compileTimeCallValueEmissionRegression :
+    HostRequestEmission callValueRequestState callValueSuspension := by
+  apply hostAdvance_suspended_iff.mp
+  exact hostAdvance_suspend_callValue [] []
+
 private theorem compileTimeTransitionDeterminismRegression
     {next : State}
     (step : HostTransition beginState next) :
@@ -312,6 +358,9 @@ private def retainedSuspension : HostSuspension :=
 private def retainedCodeAddressSuspension : HostSuspension :=
   ⟨.codeAddress, retainedContinuation, retainedStore⟩
 
+private def retainedCallValueSuspension : HostSuspension :=
+  ⟨.callValue, retainedContinuation, retainedStore⟩
+
 private theorem compileTimeResumeRegression :
     retainedSuspension.resume response =
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
@@ -330,6 +379,12 @@ private theorem compileTimeCodeAddressResumeRegression :
     retainedCodeAddressSuspension.resume response =
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
   HostSuspension.resume_codeAddress
+    response retainedContinuation retainedStore
+
+private theorem compileTimeCallValueResumeRegression :
+    retainedCallValueSuspension.resume response =
+      ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
+  HostSuspension.resume_callValue
     response retainedContinuation retainedStore
 
 private theorem compileTimeSuspensionTypingRegression :
@@ -386,6 +441,12 @@ private theorem compileTimeCheckedCodeAddressNeverFaults
   CheckedHostCoreProgram.runStateful_ne_fault
     checkedCodeAddressProgram fuel error faultState
 
+private theorem compileTimeCheckedCallValueNeverFaults
+    (fuel : Nat) (error : MachineFault) (faultState : State) :
+    checkedCallValueProgram.runStateful fuel ≠ .fault error faultState :=
+  CheckedHostCoreProgram.runStateful_ne_fault
+    checkedCallValueProgram fuel error faultState
+
 private theorem compileTimeWireV1RejectionRegression :
     Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead) = none :=
   rfl
@@ -420,6 +481,16 @@ private theorem compileTimeCodeAddressWireV1RejectionRegression :
 private theorem compileTimeCodeAddressWireV2RejectionRegression :
     Solcore.Core.Wire.V2.Value.ofCore?
       (.hostFunction .codeAddress) = none :=
+  rfl
+
+private theorem compileTimeCallValueWireV1RejectionRegression :
+    Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .callValue) = none :=
+  rfl
+
+private theorem compileTimeCallValueWireV2RejectionRegression :
+    Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .callValue) = none :=
   rfl
 
 private def cellStorageReadProgram : Program := {
@@ -471,6 +542,12 @@ def testCoreHostMachine : IO Unit := do
     "the closed checker accepted the code-address capability"
   assertTrue (!illTypedCodeAddressProgram.checkHost)
     "the host checker accepted a non-Unit code-address argument"
+  assertTrue callValueProgram.checkHost
+    "the host checker rejected call-value observation"
+  assertTrue (!callValueProgram.check)
+    "the closed checker accepted the call-value capability"
+  assertTrue (!illTypedCallValueProgram.checkHost)
+    "the host checker accepted a non-Unit call-value argument"
   assertTrue (!unboundHostIndexProgram.checkHost)
     "the host checker accepted the first unbound capability index"
   assertTrue
@@ -519,6 +596,12 @@ def testCoreHostMachine : IO Unit := do
       hostEnvironment[HostFunction.codeAddress.index]? ==
         some (.hostFunction .codeAddress))
     "the code-address capability is absent from its fixed position"
+  assertTrue
+    (hostContext[HostFunction.callValue.index]? ==
+        some (HostFunction.functionType .callValue) &&
+      hostEnvironment[HostFunction.callValue.index]? ==
+        some (.hostFunction .callValue))
+    "the call-value capability is absent from its appended position"
 
   assertTrue (hostAdvance beginState == .next argumentState)
     "host application did not begin by evaluating its argument"
@@ -559,6 +642,14 @@ def testCoreHostMachine : IO Unit := do
         ⟨.ret (.bool true), [.hostApply .codeAddress], []⟩ ==
       .fault (.invalidHostArgument .codeAddress (.bool true)))
     "a non-Unit code-address argument did not fault"
+  assertTrue
+    (hostAdvance callValueRequestState == .suspended callValueSuspension)
+    "Unit did not emit the call-value request"
+  assertTrue
+    (hostAdvance
+        ⟨.ret (.bool true), [.hostApply .callValue], []⟩ ==
+      .fault (.invalidHostArgument .callValue (.bool true)))
+    "a non-Unit call-value argument did not fault"
 
   assertTrue
     (retainedSuspension.resume response ==
@@ -573,6 +664,10 @@ def testCoreHostMachine : IO Unit := do
     (retainedCodeAddressSuspension.resume response ==
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩)
     "code-address resume changed the returned Word, continuation, or store"
+  assertTrue
+    (retainedCallValueSuspension.resume response ==
+      ⟨.ret (.word response), retainedContinuation, retainedStore⟩)
+    "call-value resume changed the returned Word, continuation, or store"
 
   assertTrue
     (checkedStorageReadProgram.runStateful 4 == .outOfFuel requestState)
@@ -601,6 +696,14 @@ def testCoreHostMachine : IO Unit := do
     (codeAddressProgram.runHostStateful 5 ==
       .suspended codeAddressSuspension 0)
     "code-address execution changed its exact request budget"
+  assertTrue
+    (callValueProgram.runHostStateful 4 ==
+      .outOfFuel callValueRequestState)
+    "call-value execution moved its pre-request fuel boundary"
+  assertTrue
+    (callValueProgram.runHostStateful 5 ==
+      .suspended callValueSuspension 0)
+    "call-value execution changed its exact request budget"
 
   match cellStorageReadProgram.runHostStateful 32 with
   | .suspended suspension remainingFuel =>
@@ -656,5 +759,11 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .codeAddress)).isNone
     "Core wire v2 encoded the code-address host value"
+  assertTrue
+    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .callValue)).isNone
+    "Core wire v1 encoded the call-value host value"
+  assertTrue
+    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .callValue)).isNone
+    "Core wire v2 encoded the call-value host value"
 
 end Tests
