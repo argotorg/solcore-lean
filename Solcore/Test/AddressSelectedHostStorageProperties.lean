@@ -178,110 +178,110 @@ private theorem compileTimeSelectedEvidenceRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result :
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState))
     (executed :
-      context.runCodeWithStorage? codeAddress fuel = some result) :
+      context.runCodeWithStorageWithInputs? inputs fuel = some result) :
     (∃ code,
-      context.context.values.working.1.code? codeAddress = some code ∧
+      context.context.values.working.1.code? inputs.codeAddress = some code ∧
         result.outcome.HasType
           code.program.resultType code.program.dataDefinitions) ∧
     (∃ code,
-      context.context.values.working.1.code? codeAddress = some code ∧
-        HostStorageDriver.FuelSound result codeAddress fuel context
+      context.context.values.working.1.code? inputs.codeAddress = some code ∧
+        HostStorageDriver.FuelSoundWithInputs result inputs fuel context
           (State.initial code.program.body hostEnvironment)) := by
   exact
-    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_hasType
-        context codeAddress fuel result executed,
-      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_fuelSound
-        context codeAddress fuel result executed⟩
+    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_hasType
+        context inputs fuel result executed,
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_fuelSound
+        context inputs fuel result executed⟩
 
 /-- The public selected entry point exposes its complete successful specification. -/
 private theorem compileTimeSelectedCompletenessRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result :
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState)) :
-    context.runCodeWithStorage? codeAddress fuel = some result ↔
+    context.runCodeWithStorageWithInputs? inputs fuel = some result ↔
       ∃ code,
-        context.context.values.working.1.code? codeAddress = some code ∧
-          HostStorageDriver.FuelSound result codeAddress fuel context
+        context.context.values.working.1.code? inputs.codeAddress = some code ∧
+          HostStorageDriver.FuelSoundWithInputs result inputs fuel context
             (State.initial code.program.body hostEnvironment) :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_eq_some_iff_fuelSound
-    context codeAddress fuel result
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_eq_some_iff_fuelSound
+    context inputs fuel result
 
 /-- The forward iff direction recovers the selected code and exact fuel evidence. -/
 private theorem compileTimeSelectedCompletenessForwardRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result :
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState))
     (executed :
-      context.runCodeWithStorage? codeAddress fuel = some result) :
+      context.runCodeWithStorageWithInputs? inputs fuel = some result) :
     ∃ code,
-      context.context.values.working.1.code? codeAddress = some code ∧
-        HostStorageDriver.FuelSound result codeAddress fuel context
+      context.context.values.working.1.code? inputs.codeAddress = some code ∧
+        HostStorageDriver.FuelSoundWithInputs result inputs fuel context
           (State.initial code.program.body hostEnvironment) :=
   (compileTimeSelectedCompletenessRegression
-    context codeAddress fuel result).mp executed
+    context inputs fuel result).mp executed
 
 /-- Selected-code fuel evidence replays to the exact optional execution result. -/
 private theorem compileTimeSelectedCompletenessReplayRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result :
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState))
     (code : CheckedHostCoreProgram)
     (selected :
-      context.context.values.working.1.code? codeAddress = some code)
+      context.context.values.working.1.code? inputs.codeAddress = some code)
     (sound :
-      HostStorageDriver.FuelSound result codeAddress fuel context
+      HostStorageDriver.FuelSoundWithInputs result inputs fuel context
         (State.initial code.program.body hostEnvironment)) :
-    context.runCodeWithStorage? codeAddress fuel = some result :=
+    context.runCodeWithStorageWithInputs? inputs fuel = some result :=
   (compileTimeSelectedCompletenessRegression
-    context codeAddress fuel result).mpr ⟨code, selected, sound⟩
+    context inputs fuel result).mpr ⟨code, selected, sound⟩
 
 /-- Optional failure is exactly failure of the existing code lookup. -/
 private theorem compileTimeSelectedNoneCompletenessRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    context.runCodeWithStorage? codeAddress fuel = none ↔
-      context.context.values.working.1.code? codeAddress = none :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_eq_none_iff
-    context codeAddress fuel
+    context.runCodeWithStorageWithInputs? inputs fuel = none ↔
+      context.context.values.working.1.code? inputs.codeAddress = none :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_eq_none_iff
+    context inputs fuel
 
 /-- A selected exhausted run remains an attempted execution, never `none`. -/
 private theorem compileTimeSelectedOutOfFuelIsSomeRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (code : CheckedHostCoreProgram)
     (selected :
-      context.context.values.working.1.code? codeAddress = some code)
+      context.context.values.working.1.code? inputs.codeAddress = some code)
     (finalContext : HostStorageDriver.Context RollbackState TraceState)
     (state : State)
     (exhausted :
-      code.runWithStorage context codeAddress fuel =
+      code.runWithStorageInputs context inputs fuel =
         ⟨finalContext, .outOfFuel state⟩) :
-    context.runCodeWithStorage? codeAddress fuel =
+    context.runCodeWithStorageWithInputs? inputs fuel =
       some ⟨finalContext, .outOfFuel state⟩ := by
-  unfold FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?
+  unfold FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?
   rw [selected]
   simp only [Option.map_some]
   exact congrArg some exhausted
@@ -291,28 +291,28 @@ private theorem compileTimeSelectedNoFaultRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (resultContext :
       HostStorageDriver.Context RollbackState TraceState)
     (error : MachineFault)
     (faultState : State) :
-    context.runCodeWithStorage? codeAddress fuel ≠
+    context.runCodeWithStorageWithInputs? inputs fuel ≠
       some ⟨resultContext, .fault error faultState⟩ :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_ne_some_fault
-    context codeAddress fuel resultContext error faultState
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_ne_some_fault
+    context inputs fuel resultContext error faultState
 
 /-- Public selected-run laws retain every frame projection outside storage. -/
 private theorem compileTimeSelectedInvariantRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result :
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState))
     (executed :
-      context.runCodeWithStorage? codeAddress fuel = some result)
+      context.runCodeWithStorageWithInputs? inputs fuel = some result)
     (otherAddress : Address)
     (different : otherAddress ≠ context.context.storageAddress) :
     result.context.context.storageAddress = context.context.storageAddress ∧
@@ -322,42 +322,42 @@ private theorem compileTimeSelectedInvariantRegression
         context.context.values.working.2 ∧
       result.context.context.values.working.1.account? otherAddress =
         context.context.values.working.1.account? otherAddress ∧
-      result.context.context.values.working.1.code? codeAddress =
-        context.context.values.working.1.code? codeAddress := by
+      result.context.context.values.working.1.code? inputs.codeAddress =
+        context.context.values.working.1.code? inputs.codeAddress := by
   exact
-    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_storageAddress
-        context codeAddress fuel result executed,
-      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_checkpoint
-        context codeAddress fuel result executed,
-      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_workingEffects
-        context codeAddress fuel result executed,
-      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_workingAccount?_of_ne_storageAddress
-        context codeAddress fuel result executed otherAddress different,
-      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_workingCode?
-        context codeAddress fuel result executed codeAddress⟩
+    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_storageAddress
+        context inputs fuel result executed,
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_checkpoint
+        context inputs fuel result executed,
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_workingEffects
+        context inputs fuel result executed,
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_workingAccount?_of_ne_storageAddress
+        context inputs fuel result executed otherAddress different,
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_workingCode?
+        context inputs fuel result executed inputs.codeAddress⟩
 
 /-- The specialized driver exposes the generic executable/specification iff. -/
 private theorem compileTimeStorageDriverCompletenessRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (state : State)
     (result :
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
-    HostStorageDriver.run context codeAddress fuel state = result ↔
-      HostStorageDriver.FuelSound result codeAddress fuel context state :=
-  HostStorageDriver.run_eq_iff_fuelSound
-    context codeAddress fuel state result
+    HostStorageDriver.runWithInputs context inputs fuel state = result ↔
+      HostStorageDriver.FuelSoundWithInputs result inputs fuel context state :=
+  HostStorageDriver.runWithInputs_eq_iff_fuelSound
+    context inputs fuel state result
 
 /-- Combined storage done stability retains the exact full driver result. -/
 private theorem compileTimeStorageDriverDoneStabilityRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     {fuel largerFuel : Nat}
     (state : State)
     {finalContext :
@@ -365,13 +365,13 @@ private theorem compileTimeStorageDriverDoneStabilityRegression
     {value : Value}
     {store : Store}
     (execution :
-      HostStorageDriver.run context codeAddress fuel state =
+      HostStorageDriver.runWithInputs context inputs fuel state =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    HostStorageDriver.run context codeAddress largerFuel state =
+    HostStorageDriver.runWithInputs context inputs largerFuel state =
       ⟨finalContext, .done value store⟩ :=
-  HostStorageDriver.run_done_stable
-    context codeAddress state execution more
+  HostStorageDriver.runWithInputs_done_stable
+    context inputs state execution more
 
 /-- Checked execution exposes the same exact executable/specification iff. -/
 private theorem compileTimeCheckedCompletenessRegression
@@ -379,16 +379,16 @@ private theorem compileTimeCheckedCompletenessRegression
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (result :
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
-    code.runWithStorage context codeAddress fuel = result ↔
-      HostStorageDriver.FuelSound result codeAddress fuel context
+    code.runWithStorageInputs context inputs fuel = result ↔
+      HostStorageDriver.FuelSoundWithInputs result inputs fuel context
         (State.initial code.program.body hostEnvironment) :=
-  CheckedHostCoreProgram.runWithStorage_eq_iff_fuelSound
-    code context codeAddress fuel result
+  CheckedHostCoreProgram.runWithStorageInputs_eq_iff_fuelSound
+    code context inputs fuel result
 
 /-- Checked done stability retains the exact full driver result. -/
 private theorem compileTimeCheckedDoneStabilityRegression
@@ -396,40 +396,40 @@ private theorem compileTimeCheckedDoneStabilityRegression
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     {fuel largerFuel : Nat}
     {finalContext :
       HostStorageDriver.Context RollbackState TraceState}
     {value : Value}
     {store : Store}
     (execution :
-      code.runWithStorage context codeAddress fuel =
+      code.runWithStorageInputs context inputs fuel =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    code.runWithStorage context codeAddress largerFuel =
+    code.runWithStorageInputs context inputs largerFuel =
       ⟨finalContext, .done value store⟩ :=
-  CheckedHostCoreProgram.runWithStorage_done_stable
-    code context codeAddress execution more
+  CheckedHostCoreProgram.runWithStorageInputs_done_stable
+    code context inputs execution more
 
 /-- Address-selected done stability retains the exact optional full result. -/
 private theorem compileTimeSelectedDoneStabilityRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     {fuel largerFuel : Nat}
     {finalContext :
       HostStorageDriver.Context RollbackState TraceState}
     {value : Value}
     {store : Store}
     (execution :
-      context.runCodeWithStorage? codeAddress fuel =
+      context.runCodeWithStorageWithInputs? inputs fuel =
         some ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    context.runCodeWithStorage? codeAddress largerFuel =
+    context.runCodeWithStorageWithInputs? inputs largerFuel =
       some ⟨finalContext, .done value store⟩ :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
-    context codeAddress execution more
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_done_stable
+    context inputs execution more
 
 /-- The generic adapter distinguishes completion from exhaustion and raw faults. -/
 private theorem compileTimeFrameContinuationBranchRegression
