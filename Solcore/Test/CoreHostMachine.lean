@@ -24,6 +24,7 @@ private def secondSlot : Word := ⟨0x22, by decide⟩
 private def responseFor : (request : HostRequest) → request.Response
   | .storageRead _ => response
   | .storageWrite _ _ => ()
+  | .storageAddress => response
 
 private def storageReadProgram : Program := {
   resultType := .word

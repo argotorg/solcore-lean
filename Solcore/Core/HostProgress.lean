@@ -42,6 +42,22 @@ theorem typed_storageWrite_emits
     ⟨⟨.storageWrite slot writtenValue, continuation, store⟩,
       .storageWrite⟩
 
+/-- A well-typed storage-address observation emits its argument-free request. -/
+theorem typed_storageAddress_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.storageAddress.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .storageAddress :: continuation, store⟩
+        suspension := by
+  have unitTyping :
+      HostRuntimeValueHasType world value .unit definitions := by
+    simpa using valueTyping
+  cases unitTyping
+  exact ⟨⟨.storageAddress, continuation, store⟩, .storageAddress⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -56,6 +72,7 @@ theorem typed_hostApplication_emits
   cases function with
   | storageRead => exact typed_storageRead_emits valueTyping
   | storageWrite => exact typed_storageWrite_emits valueTyping
+  | storageAddress => exact typed_storageAddress_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}

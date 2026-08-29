@@ -113,6 +113,7 @@ end Ty
 inductive HostFunction where
   | storageRead
   | storageWrite
+  | storageAddress
   deriving Repr, BEq, DecidableEq
 
 namespace HostFunction
@@ -120,10 +121,12 @@ namespace HostFunction
 def parameterType : HostFunction → Ty
   | .storageRead => .word
   | .storageWrite => .product .word .word
+  | .storageAddress => .unit
 
 def resultType : HostFunction → Ty
   | .storageRead => .word
   | .storageWrite => .unit
+  | .storageAddress => .word
 
 @[simp] def functionType (function : HostFunction) : Ty :=
   .function function.parameterType function.resultType
@@ -144,15 +147,27 @@ def resultType : HostFunction → Ty
     resultType .storageWrite = .unit :=
   rfl
 
+@[simp] theorem parameterType_storageAddress :
+    parameterType .storageAddress = .unit :=
+  rfl
+
+@[simp] theorem resultType_storageAddress :
+    resultType .storageAddress = .word :=
+  rfl
+
 /-- Stable position in the append-only host capability context. -/
 def index : HostFunction → Nat
   | .storageRead => 0
   | .storageWrite => 1
+  | .storageAddress => 2
 
 @[simp] theorem index_storageRead : index .storageRead = 0 :=
   rfl
 
 @[simp] theorem index_storageWrite : index .storageWrite = 1 :=
+  rfl
+
+@[simp] theorem index_storageAddress : index .storageAddress = 2 :=
   rfl
 
 end HostFunction

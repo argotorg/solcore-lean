@@ -45,6 +45,12 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
         ⟨.ret (.pair (.word slot) (.word value)),
           .hostApply .storageWrite :: continuation, store⟩
         ⟨.storageWrite slot value, continuation, store⟩
+  | storageAddress
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret .unit, .hostApply .storageAddress :: continuation, store⟩
+        ⟨.storageAddress, continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -76,20 +82,28 @@ theorem hostRequestEmission_iff
             ⟨.ret (.word slot),
               .hostApply .storageRead :: continuation, store⟩ ∧
           suspension = ⟨.storageRead slot, continuation, store⟩) ∨
-        ∃ slot value continuation store,
-          state =
-            ⟨.ret (.pair (.word slot) (.word value)),
-              .hostApply .storageWrite :: continuation, store⟩ ∧
-          suspension = ⟨.storageWrite slot value, continuation, store⟩ := by
+        (∃ slot value continuation store,
+            state =
+              ⟨.ret (.pair (.word slot) (.word value)),
+                .hostApply .storageWrite :: continuation, store⟩ ∧
+            suspension = ⟨.storageWrite slot value, continuation, store⟩) ∨
+          ∃ continuation store,
+            state =
+              ⟨.ret .unit,
+                .hostApply .storageAddress :: continuation, store⟩ ∧
+            suspension = ⟨.storageAddress, continuation, store⟩ := by
   constructor
   · intro emission
     cases emission with
     | storageRead => exact .inl ⟨_, _, _, rfl, rfl⟩
-    | storageWrite => exact .inr ⟨_, _, _, _, rfl, rfl⟩
+    | storageWrite => exact .inr (.inl ⟨_, _, _, _, rfl, rfl⟩)
+    | storageAddress => exact .inr (.inr ⟨_, _, rfl, rfl⟩)
   · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
-        ⟨slot, value, continuation, store, rfl, rfl⟩)
+        ⟨slot, value, continuation, store, rfl, rfl⟩ |
+        ⟨continuation, store, rfl, rfl⟩)
     · exact .storageRead
     · exact .storageWrite
+    · exact .storageAddress
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -143,6 +157,8 @@ theorem hostAdvance_next_iff
                   | unit | bool | word | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
+              | storageAddress =>
+                  cases value <;> simp [hostAdvance] at advanced
   · intro step
     cases step with
     | beginApplication => rfl
@@ -188,6 +204,14 @@ theorem hostAdvance_suspended_iff
                         cases advanced
                         exact .storageWrite
                   | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | storageAddress =>
+                  cases value with
+                  | unit =>
+                      cases advanced
+                      exact .storageAddress
+                  | bool | word | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
   · intro emission

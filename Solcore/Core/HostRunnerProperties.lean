@@ -59,6 +59,8 @@ theorem hostAdvance_done_iff
                   | unit | bool | word | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
+              | storageAddress =>
+                  cases returned <;> simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩
     simp [hostAdvance, State.final, advance]
 

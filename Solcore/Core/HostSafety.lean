@@ -131,6 +131,14 @@ theorem HostRuntimeValueHasType.word_shape
   cases typing with
   | word => exact ⟨_, rfl⟩
 
+theorem HostRuntimeValueHasType.unit_shape
+    {definitions : DataEnvironment}
+    {world : StoreTyping} {value : Value}
+    (typing : HostRuntimeValueHasType world value .unit definitions) :
+    value = .unit := by
+  cases typing
+  rfl
+
 /-- A value typed as a pair of Words has exactly two Word components. -/
 theorem HostRuntimeValueHasType.wordPair_shape
     {definitions : DataEnvironment}
@@ -162,7 +170,7 @@ theorem HostRuntimeValueHasType.function_shape
     (world : StoreTyping)
     (definitions : DataEnvironment := []) :
     HostRuntimeEnvironmentHasTypes world hostEnvironment hostContext definitions :=
-  .cons .hostFunction (.cons .hostFunction .nil)
+  .cons .hostFunction (.cons .hostFunction (.cons .hostFunction .nil))
 
 mutual
 

@@ -189,7 +189,9 @@ theorem run_of_suspended
               by_cases same :
                   observedAddress = current.context.storageAddress
               · simp [handler, handleRequest, same]
-              · simp [handler, handleRequest, same])
+              · simp [handler, handleRequest, same]
+          | storageAddress =>
+              simp [handler, handleRequest])
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved
 

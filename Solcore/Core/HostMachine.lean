@@ -10,6 +10,7 @@ namespace Solcore.Core
 inductive HostRequest where
   | storageRead (slot : Word)
   | storageWrite (slot value : Word)
+  | storageAddress
   deriving Repr, BEq, DecidableEq
 
 namespace HostRequest
@@ -18,11 +19,13 @@ namespace HostRequest
 def Response : HostRequest → Type
   | .storageRead _ => Word
   | .storageWrite _ _ => Unit
+  | .storageAddress => Word
 
 /-- Core type injected when a request is resumed. -/
 def responseType : HostRequest → Ty
   | .storageRead _ => .word
   | .storageWrite _ _ => .unit
+  | .storageAddress => .word
 
 /-- Convert an indexed host response back into a Core runtime value. -/
 def responseValue
@@ -31,6 +34,7 @@ def responseValue
   match request with
   | .storageRead _ => .word response
   | .storageWrite _ _ => .unit
+  | .storageAddress => .word response
 
 @[simp] theorem responseType_storageRead (slot : Word) :
     responseType (.storageRead slot) = .word :=
@@ -48,6 +52,14 @@ def responseValue
     (slot value : Word)
     (response : Unit) :
     responseValue (.storageWrite slot value) response = .unit :=
+  rfl
+
+@[simp] theorem responseType_storageAddress :
+    responseType .storageAddress = .word :=
+  rfl
+
+@[simp] theorem responseValue_storageAddress (response : Word) :
+    responseValue .storageAddress response = .word response :=
   rfl
 
 @[simp] theorem responseValue_type
@@ -113,6 +125,14 @@ def resume
       ⟨.ret .unit, continuation, store⟩ :=
   rfl
 
+@[simp] theorem resume_storageAddress
+    (response : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk .storageAddress continuation store).resume response =
+      ⟨.ret (.word response), continuation, store⟩ :=
+  rfl
+
 end HostSuspension
 
 /-- One executable step at the Core/host boundary. -/
@@ -158,20 +178,34 @@ def hostAdvance (state : State) : HostAdvanceResult :=
         store := state.store
       }
   | .ret argument, .hostApply function :: continuation =>
-      match function, argument with
-      | .storageRead, .word slot =>
-          .suspended {
-            request := .storageRead slot
-            continuation
-            store := state.store
-          }
-      | .storageWrite, .pair (.word slot) (.word value) =>
-          .suspended {
-            request := .storageWrite slot value
-            continuation
-            store := state.store
-          }
-      | function, actual => .fault (.invalidHostArgument function actual)
+      match function with
+      | .storageRead =>
+          match argument with
+          | .word slot =>
+              .suspended {
+                request := .storageRead slot
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .storageRead actual)
+      | .storageWrite =>
+          match argument with
+          | .pair (.word slot) (.word value) =>
+              .suspended {
+                request := .storageWrite slot value
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .storageWrite actual)
+      | .storageAddress =>
+          match argument with
+          | .unit =>
+              .suspended {
+                request := .storageAddress
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .storageAddress actual)
   | _, _ => .ofAdvance (advance state)
 
 @[simp] theorem hostAdvance_begin_storageRead
@@ -239,6 +273,46 @@ def hostAdvance (state : State) : HostAdvanceResult :=
     hostAdvance
         ⟨.ret actual, .hostApply .storageWrite :: continuation, store⟩ =
       .fault (.invalidHostArgument .storageWrite actual) := by
-  cases actual <;> simp_all [hostAdvance]
+  cases actual with
+  | pair left right =>
+      cases left <;> cases right <;> simp_all [hostAdvance]
+  | unit | bool | word | hostFunction | closure | inLeft | inRight | cellRef |
+      constructed =>
+      rfl
+
+@[simp] theorem hostAdvance_begin_storageAddress
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .storageAddress),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .storageAddress :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_storageAddress
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret .unit, .hostApply .storageAddress :: continuation, store⟩ =
+      .suspended ⟨.storageAddress, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_storageAddress_argument
+    (actual : Value)
+    (notUnit : actual ≠ .unit)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .storageAddress :: continuation, store⟩ =
+      .fault (.invalidHostArgument .storageAddress actual) := by
+  cases actual with
+  | unit => exact (notUnit rfl).elim
+  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+      constructed =>
+      rfl
 
 end Solcore.Core
