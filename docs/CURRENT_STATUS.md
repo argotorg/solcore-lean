@@ -358,11 +358,12 @@ out-of-bounds index returns the distinct Unit branch. It does not define an
 input-size query, multi-byte load, endianness or padding policy, ABI or
 calldata meaning, source syntax, or a published format.
 
-[ADR-0134](adr/0134-run-fixed-input-size-observation.md) is the active slice.
-It derives the exact `sizeWord` from the same bounded `InputData` and appends
-internal `inputDataSize : unit -> word` at index 7. The size agrees exactly
-with the present and absent boundary of `inputDataByte?`; it adds no ABI,
-calldata, multi-byte decoding, nested-call, parser, or publication rule.
+[ADR-0134](adr/0134-run-fixed-input-size-observation.md) completes exact
+run-fixed input-size observation. It derives `sizeWord` from the same bounded
+`InputData` and appends internal `inputDataSize : unit -> word` at index 7. The
+size agrees exactly with the present and absent boundary of `inputDataByte?`;
+it adds no ABI, calldata, multi-byte decoding, nested-call, parser, or
+publication rule.
 
 ## Implementation status
 
@@ -386,7 +387,7 @@ calldata, multi-byte decoding, nested-call, parser, or publication rule.
 | End-to-end invocation-value observation | Complete | Immutable execution input, append-only `unit -> word` capability, exact handler/driver laws, selected and parent-indexed preservation, fuel boundaries, value-derived storage use, and frozen-Wire rejection complete | Not published |
 | Run-fixed caller-address observation | Complete | Explicit immutable input, append-only `unit -> word` capability, exact handler/driver laws, absent-Account behavior, caller-derived storage and parent-fold regressions, fuel boundaries, and frozen-Wire rejection complete | Not published |
 | Bounded optional input-byte observation | Complete | Bounded indexing and exact widening, optional response injection, request/resume safety, full context identity, input-only variation, byte-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
-| Run-fixed input-size observation | Active | ADR-0134 derives one exact Word from the retained input bound, appends `unit -> word` at index 7, and requires exact coherence with the optional-byte boundary | Not published |
+| Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |

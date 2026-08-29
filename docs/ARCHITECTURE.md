@@ -823,8 +823,8 @@ zero cannot be mistaken for absence. ADR-0133 itself adds no size observation,
 multi-byte or Word load, endianness, padding, ABI, calldata, parser, Wire, or
 public-runtime rule.
 
-ADR-0134 defines the active exact-size observation over that same immutable
-input. `InputData.sizeWord` uses the retained strict bound to represent the
+ADR-0134 completes exact-size observation over that same immutable input.
+`InputData.sizeWord` uses the retained strict bound to represent the
 natural byte length without truncation, and internal
 `inputDataSize : unit -> word` is appended at index 7. Exact coherence makes
 `inputDataByte?` present precisely below `sizeWord` and absent at or above it.

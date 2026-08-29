@@ -36,7 +36,7 @@ offset from every present byte, including zero. Each request suspends with its
 exact continuation, local cell store, and remaining fuel. A generic host driver
 delegates requests to a combined handler over the Account selected by a
 separate `storageAddress`; the code and storage roles are never equated.
-Reads and all five observations leave the complete host context unchanged,
+Reads and all six observations leave the complete host context unchanged,
 while writes update the returned working context and resume with Unit. Caller
 observation requires no caller Account. This boundary is proved and tested but
 unpublished: frozen Wire
@@ -133,11 +133,12 @@ This is not an input-size API, a multi-byte or Word loader, an endianness or
 padding rule, ABI calldata, source
 syntax, Wire encoding, or a published runtime interface.
 
-[ADR-0134](adr/0134-run-fixed-input-size-observation.md) is the active runtime
-slice. It converts the retained exact input length to `sizeWord` without
-truncation and exposes it through internal `inputDataSize : unit -> word` at
-index 7. Optional byte lookup is present exactly below that size and absent at
-or above it. This does not define ABI calldata, multi-byte decoding,
+[ADR-0134](adr/0134-run-fixed-input-size-observation.md) completes exact
+run-fixed input-size observation. It converts the retained input length to
+`sizeWord` without truncation and exposes it through internal
+`inputDataSize : unit -> word` at index 7. Optional byte lookup is present
+exactly below that size and absent at or above it. This does not define ABI
+calldata, multi-byte decoding,
 nested-call input derivation, source syntax, Wire encoding, or publication.
 
 First-order local cells from
