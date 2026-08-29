@@ -2,6 +2,7 @@ import Solcore.Semantics.AddressWordBridge
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageRead
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWrite
 import Solcore.Semantics.HostDriver
+import Solcore.Semantics.HostStorageContext
 
 /-! Combined interpretation of supported Core host requests during storage execution. -/
 
@@ -12,13 +13,6 @@ namespace Solcore.Semantics
 universe u v
 
 namespace HostStorageDriver
-
-/-- The proven-present working-storage context threaded by the storage driver. -/
-abbrev Context
-    (RollbackState : Type u)
-    (TraceState : Type v) :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount
-    RollbackState TraceState
 
 /--
 Interpret one supported host request and return the next context together with
