@@ -345,12 +345,17 @@ issue.
 
 ### Contract runtime
 
-The future runtime will make all external state explicit: storage, balances,
-call frames, transaction inputs, logs, created contracts, and rollback state.
-That world state is distinct from the Core-local cell store. The local store
-uses transient locations for one Core execution; it does not define contract
-storage keys, persistence, transaction boundaries, or rollback. Neither layer
-may obtain meaning from compiler output or hidden host state.
+Contract runtime semantics are being built as explicit, independent layers.
+The current internal path can select checked Core code from a working
+WorldState and read or update one separately selected working-storage Account.
+Balances, calls, transaction inputs, logs, created contracts, authorization,
+commit, and rollback remain outside that execution path.
+
+WorldState is distinct from the Core-local cell store. Local cells use
+transient locations owned by one Core execution; storage requests use 256-bit
+slots in the selected Account. A storage write changes the returned working
+context but does not by itself commit a transaction or modify the checkpoint.
+Neither layer obtains meaning from compiler output or hidden host state.
 
 ADR-0052 fixes the first contract-frame halt carrier before that state exists.
 A frame returns bytes, reverts with bytes, or traps with a reason whose type is
@@ -679,25 +684,38 @@ Completed ADR-0116 established optional closed checked code and exact WorldState
 Address selection. ADR-0118 later supersedes that Account carrier with
 host-checked code; the pure carrier and its completion theorem remain separate.
 
-Completed ADR-0117 adds the host boundary without adding Core expression
-syntax. A fixed typed context supplies a runtime-only storage-read function.
-Applying it produces a first-order suspension that owns the remaining CEK
-continuation and Core-local store; a typed Word response resumes that state.
-Pure closed-program completion remains unchanged. Every finite run from a
-well-typed host state has a typed done, out-of-fuel, or suspended result and
-cannot machine-fault.
+Completed ADR-0117 established the first typed Core host suspension with
+storage read. ADR-0119 extends that same runtime-only capability table without
+adding Core expression syntax:
 
-Concrete WorldState handling stays outside Core. The Semantics handler reads
-through a proven-present working Account, leaves that context unchanged, and
-resumes the exact continuation and local store.
+- `storageRead : word -> word` returns a Word;
+- `storageWrite : (word × word) -> unit` receives slot and value as one product;
+- dependent `HostRequest.Response` selects Word for a read and Unit for a write;
+- resumption preserves the saved CEK continuation and Core-local store.
 
-Completed ADR-0118 connects that handler to Account code selection. The driver
-selects host-checked code from the working WorldState by an explicit code
-address, reads through the separately retained storage address, and resumes
-with exactly the fuel left by Core. A handled-step relation accounts for every
-Core segment and request emission. Read-only checked execution returns a typed
-done or out-of-fuel outcome and cannot fault; it does not define an ABI, frame
-outcome, caller identity, nested call, or storage write.
+Core owns request typing, suspension, resumption, machine safety, and fuelled
+execution. It does not import Account, WorldState, Address, or frame semantics.
+The frozen Core Wire v1/v2 formats reject both internal host-function values.
+
+ADR-0118's read-only loop is now a historical foundation. ADR-0119 separates a
+request-generic `HostDriver` from the combined storage handler. A read returns
+the current working-storage value without changing the context. A write uses
+the existing proven-present total writer, immediately updates the returned
+working context, and resumes Core with Unit. Checked runs remain typed and
+cannot expose a machine fault.
+
+Address-selected execution keeps two roles explicit: `codeAddress` selects
+checked code from the working WorldState, while `storageAddress` selects the
+Account used by reads and writes. Handling preserves checked code, checkpoint,
+working effects, the storage selector, and every non-selected working Account.
+
+Every ordinary Core step and request emission costs one unit of Core fuel.
+Handling, working-state update, and response injection cost no additional Core
+fuel, and execution resumes with exactly the remaining budget. Therefore an
+out-of-fuel result can legitimately contain an already-applied working write.
+The returned context is the latest working state, not a committed transaction
+result. ABI, source syntax, gas, authorization, calls, transaction atomicity,
+and rollback policy remain separate decisions.
 
 ### Observation
 

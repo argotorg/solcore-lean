@@ -151,12 +151,12 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Present working storage Account optional/total re-refinement coherence | Complete | ADR-0114 equates optional write plus canonical Account refinement with the total writer | None |
 | Parent-indexed initialization present storage Account refinement | Complete | ADR-0115 checks initial Account presence and returns the existing proven-present carrier used by total storage operations | None |
 | Address-selected closed Core code | Complete historical foundation | ADR-0116's pure carrier and completion theorems remain; ADR-0118 supersedes its Account association and selected runner | None |
-| Typed Core storage-read suspension | Complete | ADR-0117 provides typed admission, request/step correspondence, exact CEK suspension and fuel accounting, typed finite results, no-fault safety, repeated-resume tests, and a proven-present Account read handler without importing WorldState into Core | None |
-| Address-selected host-code driver | Complete | ADR-0118 stores host-checked code, promotes closed checked code unchanged, handles dependent working-storage reads with exact remaining fuel, proves handled-step accounting and no-fault safety, and keeps code/storage addresses separate | None |
+| Typed Core storage requests | Complete | Internal and unpublished. ADR-0117 and ADR-0119 provide runtime-only `word -> word` reads and `(word × word) -> unit` writes, request-indexed responses, exact suspension/resumption, preservation, progress, no-fault safety, fuel accounting, and frozen-Wire rejection without importing WorldState into Core | None |
+| Generic and address-selected working-storage driver | Complete | Internal and unpublished. ADR-0118's read loop is the historical foundation; ADR-0119 supplies the request-generic driver, combined read/write handler, exact remaining-fuel reuse, selected-code safety, and separate code/storage addresses. Writes update only the returned working context; commit and rollback are not implied | None |
 | Contract entry | Planned | return, payability, fallback, constructor rules | Low |
-| Extended contract runtime state | Planned | Storage/frame carriers and address-selected handled storage reads are complete; writes from Core, balances, transactions, authority, and lifetime remain undecided | None |
+| Extended contract runtime state | Active | Storage/frame carriers and address-selected handled storage reads and writes are complete internal foundations. Balances, transactions, authority, Account lifetime, commit, and rollback remain undecided | None |
 | Nested invocation and transaction rollback | Planned | Frame-level state/effect resolution is complete; checkpoint creation time, ownership/lifetime, active-frame transitions, scheduling, diagnostics, and transaction atomicity remain undecided | None |
-| Storage | Blocked | storage-layout ADR | Low |
+| Source storage layout and declaration mapping | Blocked | A layout/elaboration ADR is still required; this is separate from the completed internal Core slot read/write runtime | Low |
 | External calls and creation | Planned | host transition and call-depth rules | None |
 | Logs and canonical observations | Planned | value schemas and normalization | None |
 | ABI support rule | Planned | complete metadata/signature/decode/encode path | Medium |

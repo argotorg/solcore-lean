@@ -21,7 +21,21 @@ explain what the implementation means, what is proved, and what remains.
 Concrete Solcore syntax may change substantially. The published parsers remain
 available as versioned reference implementations, but new grammar-dependent
 proof work is paused. Active work is directed toward a syntax-independent
-Semantic Core and explicit runtime semantics. First-order local cells from
+Semantic Core and explicit runtime semantics.
+
+The current internal contract boundary can execute checker-accepted Core code
+selected by `codeAddress` from a working WorldState. Core supplies typed
+runtime-only storage read and write capabilities; each request suspends with
+its exact continuation, local cell store, and remaining fuel. A generic host
+driver delegates requests to a combined handler over the Account selected by a
+separate `storageAddress`; the two address roles are never equated.
+Reads leave the host context unchanged, while writes update the returned
+working context and resume with Unit. This boundary is proved and tested but
+unpublished: frozen Wire formats reject the host values, and source syntax,
+ABI, gas, calls, authorization, transaction commit, and rollback remain future
+work.
+
+First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
 complete internal slices. The derived boolean and word conversions from
@@ -549,14 +563,19 @@ The completed
 closed Core code to Account state and establishes the pure selection foundation
 later superseded at the Account boundary by ADR-0118.
 
-The completed
-[ADR-0117](adr/0117-typed-core-storage-read-suspension.md) adds a typed
-storage-read request, resumable Core state, and a proven-present Account handler.
+The completed [ADR-0117](adr/0117-typed-core-storage-read-suspension.md)
+established typed storage-read suspension and resumption. The completed
+[ADR-0118](adr/0118-address-selected-host-code-driver.md) connected that
+read-only foundation to independently selected code and storage addresses.
 
 The completed
-[ADR-0118](adr/0118-address-selected-host-code-driver.md) stores host-checked
-code, selects code and working storage independently, and handles repeated reads
-without replenishing fuel or losing the Core-local store.
+[ADR-0119](adr/0119-storage-write-capability-and-driver.md) supersedes the
+read-only execution API with a request-generic driver and combined storage
+handler. Core now exposes typed read and write requests with Word and Unit
+responses respectively. The driver reuses the exact remaining fuel across
+every request; a handled write updates only the working context and survives a
+later out-of-fuel result. Code, checkpoint, effects, the storage selector, and
+non-selected Accounts are preserved. No commit or rollback behavior is implied.
 
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
@@ -815,6 +834,9 @@ The [ADR directory](adr/) contains durable decisions and rationale.
   fixes typed storage-read requests, CEK suspension, and resumable host execution.
 - [ADR-0118](adr/0118-address-selected-host-code-driver.md)
   fixes Account host-code migration and fuel-preserving handled execution.
+- [ADR-0119](adr/0119-storage-write-capability-and-driver.md)
+  fixes typed storage writes, request-generic handled execution, and the
+  combined address-selected working-storage driver.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.
