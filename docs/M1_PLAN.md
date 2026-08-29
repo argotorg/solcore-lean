@@ -10,12 +10,12 @@ driver. [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md
 now completes the proof boundary around that driver: its handled-step relation
 and executable result determine each other, and completed or faulted runs remain
 identical when given more fuel.
-[ADR-0121](adr/0121-retained-storage-address-observation.md) is now the active
-slice. It exposes the storage selector already retained by the driver as a
-lossless Core Word observation, without treating it as a current, self, code,
-or caller address. Further contract-entry inputs remain a later selection.
-Concrete grammar and parser proof work stays paused until source syntax
-stabilizes.
+[ADR-0121](adr/0121-retained-storage-address-observation.md) now completes the
+retained storage-selector observation. The append-only `unit -> word`
+capability at index 2 returns the existing selector losslessly and leaves its
+handler context unchanged, without treating it as a current, self, code, or
+caller address. The next semantic slice will be selected separately. Concrete
+grammar and parser proof work stays paused until source syntax stabilizes.
 
 ## Completed foundation
 
@@ -140,7 +140,7 @@ These results remain regression obligations for every extension.
 | 101 | Address-selected host-code driver | Complete foundation | Establishes separate code/storage selection and exact remaining-fuel reuse; its read-specific API is superseded by ADR-0119 |
 | 102 | Typed storage-write and combined storage driver | Complete | Appends `(word × word) -> unit`, uses a generic driver and combined handler, and proves address-selected safety, fuel, and context invariants |
 | 103 | Handled-execution completeness and terminal fuel stability | Complete | Makes the generic handled-step relation executable in both directions and proves exact done/fault stability under additional fuel |
-| 104 | Retained storage-selector observation | Active | Returns the existing storage selector as a lossless Word without assigning current, self, code, caller, or other call-frame identity |
+| 104 | Retained storage-selector observation | Complete | Returns the existing storage selector as a lossless Word at index 2, with exact handler-context identity and no current, self, code, caller, or other call-frame identity |
 | 105 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
 | 106 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 107 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -1701,19 +1701,23 @@ storage updates, and every exposed frame projection. ADR-0120 adds proofs and
 regressions only. It changes neither runtime execution nor the existing read
 and write request kinds.
 
-## Active retained storage-selector observation
+## Completed retained storage-selector observation
 
-[ADR-0121](adr/0121-retained-storage-address-observation.md) is the active
-implementation slice. The combined driver already retains one storage selector
-used by every working-storage read and write. This slice lets checked Core code
-observe that same selector through its existing lossless Address-to-Word bridge;
-the handler returns the Word and leaves its complete context unchanged.
+[ADR-0121](adr/0121-retained-storage-address-observation.md) appends
+`storageAddress : unit -> word` at index 2. The combined driver already retains
+one selector for every working-storage read and write; the new handler returns
+that same selector through the lossless Address-to-Word bridge and leaves its
+exact context unchanged.
 
-This is an observation of an existing role, not a new contract-entry input.
-The selector is not defined as `codeAddress`, a current or self address, a
-caller, or any other call-frame identity. Further entry inputs, call lifecycle,
-ABI, source syntax, and parser proofs remain outside this slice. Parser work
-stays paused while syntax remains unstable.
+Address-selected coverage keeps `codeAddress` distinct and observes the same
+selector before and after a real storage write. The completed result and its
+post-write context remain exact with more fuel through ADR-0120; out-of-fuel is
+not stable. Full validation and an independent P0-P3 audit passed.
+
+This remains an observation of an existing role, not a new contract-entry
+identity. The next semantic slice will be selected separately. Further inputs,
+call lifecycle, ABI, source syntax, and parser proofs remain outside this slice;
+parser work stays paused while syntax remains unstable.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -732,6 +732,24 @@ no stability theorem because a larger budget can continue execution and apply
 more effects. These additions are proofs and regressions only: the driver,
 runtime behavior, and read/write request kinds are unchanged.
 
+ADR-0121 adds one read-only observation to that existing driver. The append-only
+Core capability table now ends with `storageAddress : unit -> word` at index 2;
+the established storage read and write capabilities remain at indexes 0 and 1.
+Core still knows only Unit and Word. The combined Semantics handler losslessly
+widens the retained 160-bit Address to a 256-bit Word and returns it without
+changing the handler context. This request is read-only, but the driver as a
+whole is not: later or earlier storage-write requests may still update its
+returned working context.
+
+The observed value means only “the retained selector used for working storage.”
+It is not defined as the code address, current contract, `self`, caller, owner,
+origin, or an authorized principal. Those roles may differ and require their
+own lifetime and authority decisions. Additional fuel can still move an
+out-of-fuel execution forward, so ADR-0121 adds no out-of-fuel stability claim.
+The capability remains internal: Wire and runtime-publication formats still
+reject host values, and Oracle, Surface, Parser, and public runtime schemas are
+unchanged.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

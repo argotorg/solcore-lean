@@ -25,15 +25,16 @@ Semantic Core and explicit runtime semantics.
 
 The current internal contract boundary can execute checker-accepted Core code
 selected by `codeAddress` from a working WorldState. Core supplies typed
-runtime-only storage read and write capabilities; each request suspends with
-its exact continuation, local cell store, and remaining fuel. A generic host
-driver delegates requests to a combined handler over the Account selected by a
-separate `storageAddress`; the two address roles are never equated.
-Reads leave the host context unchanged, while writes update the returned
-working context and resume with Unit. This boundary is proved and tested but
-unpublished: frozen Wire formats reject the host values, and source syntax,
-ABI, gas, calls, authorization, transaction commit, and rollback remain future
-work.
+runtime-only storage read and write capabilities, plus a read-only observation
+of the retained storage selector. Each request suspends with its exact
+continuation, local cell store, and remaining fuel. A generic host driver
+delegates requests to a combined handler over the Account selected by a
+separate `storageAddress`; the code and storage roles are never equated.
+Reads and selector observation leave the host context unchanged, while writes
+update the returned working context and resume with Unit. This boundary is
+proved and tested but unpublished: frozen Wire formats reject the host values,
+and source syntax, ABI, gas, calls, authorization, transaction commit, and
+rollback remain future work.
 
 [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
 completes the proof interface for this driver without changing its behavior.
@@ -42,6 +43,15 @@ another. Done and fault results are unchanged when more fuel is supplied; the
 storage, checked, and successful address-selected done interfaces retain the
 exact final context. Out-of-fuel is deliberately not called stable because more
 fuel can continue the run. No host request kind or runtime API behavior changed.
+
+[ADR-0121](adr/0121-retained-storage-address-observation.md) appends the internal
+`storageAddress : unit -> word` capability at index 2 without moving storage
+read or write. Semantics losslessly widens the retained Address and returns it
+without changing the request's context. The result names only the working
+storage selector—not the code address, current contract, `self`, caller, or an
+authority identity—and the driver can still process writes in the same run.
+Out-of-fuel remains non-stable, and Wire, Oracle, Surface, Parser, and public
+runtime schemas are unchanged.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
@@ -593,6 +603,16 @@ The combined storage, checked, and successful address-selected done APIs reuse
 that guarantee. There is intentionally no corresponding out-of-fuel stability
 claim, and the slice adds no runtime behavior or request constructor.
 
+The completed [ADR-0121](adr/0121-retained-storage-address-observation.md)
+exposes the already-retained working-storage selector to Core as an internal
+Unit-to-Word host capability. It is appended at index 2, leaving read and write
+at indexes 0 and 1. The Semantics handler performs the lossless Address widening
+and does not change context for this observation; this does not make the whole
+driver read-only because storage writes remain available. The returned selector
+is not the code address, current contract, `self`, caller, or an authority
+identity. No public schema is changed, and out-of-fuel is still intentionally
+non-stable.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -856,6 +876,9 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
   fixes two-way handled execution and done/fault stability under additional
   fuel without changing runtime behavior.
+- [ADR-0121](adr/0121-retained-storage-address-observation.md)
+  fixes the internal retained storage-selector observation without assigning
+  code-address, current-contract, caller, `self`, or authority meaning to it.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

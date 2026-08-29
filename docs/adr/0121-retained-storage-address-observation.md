@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: expose the retained working-storage selector to host-aware Core code
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -220,18 +220,89 @@ publish the returned context. Writes performed by other requests remain
 speculative working-state updates until a later lifecycle decision says
 otherwise.
 
-## Implementation sequence
+## Implementation record
 
-Keep each commit around 300 changed lines or fewer and leave every revision
-green:
+The implementation follows the existing host boundary rather than adding a
+parallel environment mechanism. `HostFunction.storageAddress` and
+`HostRequest.storageAddress` are now the third constructors. The fixed
+capability indices are read 0, write 1, and storage address 2; both host tables
+have length 3. The existing read and write positions and types did not move.
 
-1. record this decision and mark the slice active in internal documentation;
-2. append the Core capability, tables, request, and executable machine branch;
-3. complete Core correspondence, safety, progress, replay, and focused tests;
-4. add the concrete handler branch and exact semantic laws;
-5. add distinct-address, mixed-run, fuel, stability, and Wire regressions; and
-6. run trust-zero, full build and tests, metadata and kernel checks, then record
-   independent audit and completion evidence.
+Core publishes the new contract through
+`HostFunction.parameterType_storageAddress`,
+`HostFunction.resultType_storageAddress`, `HostFunction.index_storageAddress`,
+`hostContext_storageAddress`, and `hostEnvironment_storageAddress`. The request
+and machine boundary is exposed by `HostRequest.responseType_storageAddress`,
+`HostRequest.responseValue_storageAddress`, `HostSuspension.resume_storageAddress`,
+`hostAdvance_begin_storageAddress`, `hostAdvance_suspend_storageAddress`, and
+`hostAdvance_invalid_storageAddress_argument`. Progress, preservation,
+request correspondence, runner replay, and checked-program no-fault proofs now
+cover all three constructors.
+
+The concrete semantic equation is exactly:
+
+```lean
+HostStorageDriver.handleRequest context .storageAddress =
+  (context, addressToWord context.context.storageAddress)
+```
+
+`HostStorageDriver.handleRequest_storageAddress` and
+`HostStorageDriver.handleSuspension_storageAddress` expose that equation.
+`handleSuspension_storageAddress_context` proves exact context identity;
+the corresponding `control`, `continuation`, and `store` laws expose the
+widened Word and retained CEK data. `wordToAddress?_handler_storageAddress`
+reuses the lossless bridge to recover the exact retained Address.
+
+`HostStorageDriver.run_of_suspended_storageAddress` connects the request to the
+combined driver without changing remaining fuel. Existing public results such
+as `HostStorageDriver.run_storageAddress`,
+`HostDriver.run_eq_iff_fuelSoundWith`, `HostDriver.run_done_stable`, and
+`runCodeWithStorage?_some_done_stable` apply without a new driver or relation.
+No out-of-fuel stability theorem was added.
+
+## Regression record
+
+The Core regressions fix indices 0, 1, and 2, all table entries, Unit argument
+typing, exact request and Word resumption, invalid raw arguments, and checked
+no-fault execution. The minimal observation is request-ready out of fuel at
+fuel 4 and done at fuel 5. Frozen Wire v1 and v2 both continue to reject
+`.hostFunction .storageAddress`.
+
+The address-selected fixture deliberately uses different values for
+`codeAddress` and `storageAddress`. The minimal program returns
+`addressToWord storageAddress`, never the code Address, and a larger run keeps
+the same outcome and every observable context projection.
+
+A second program observes the selector, writes `targetSlot`, and observes the
+selector again in the same run. Its de Bruijn indices account for both local
+binders. Fuel 23 stops at the second address request after the write; fuel 29
+stops one Core step before constructing the final pair; fuel 30 completes with
+two equal widened selector Words. Fuel 64 returns the same outcome and retains
+the exact selected write, checkpoint, effect journal, code, unrelated Account,
+and other selected-storage observations. A fixture-specific theorem consumes
+`runCodeWithStorage?_some_done_stable` for that exact completed context.
+
+Runtime checks also cover a nontrivial retained Address and the maximum
+160-bit Address. Both widen to the exact expected Word and narrow back without
+loss. Existing read/write/read, repeated-write, sparse-zero, and deliberate
+out-of-fuel regressions remain unchanged.
+
+## Acceptance evidence
+
+- the full build completed successfully with 619 build jobs;
+- `lake test` completed successfully with 1,126 jobs;
+- all 16 changed Lean modules passed trust-zero with warnings as errors;
+- workspace metadata and the semantic-kernel policy were verified;
+- an independent final audit found no P0, P1, P2, or P3 issue;
+- every implementation and documentation commit stayed below 300 changed
+  lines; and
+- the root README and all parser-facing code remained unchanged.
+
+The acceptance audit also confirmed exact context identity for the observation,
+lossless Address widening, distinct code and storage roles, handled-write
+retention, the fuel 4/5/23/29/30/64 boundaries, frozen Wire rejection, and the
+intentional absence of an out-of-fuel stability claim. Oracle, Surface,
+Parser, schemas, profiles, and published formats remain unchanged.
 
 ## Consequences
 
