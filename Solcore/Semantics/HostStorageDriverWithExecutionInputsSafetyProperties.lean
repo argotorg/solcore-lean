@@ -1,3 +1,4 @@
+import Solcore.Semantics.CheckedHostCoreProgramProperties
 import Solcore.Semantics.HostStorageDriverWithExecutionInputsProperties
 
 /-! Type and fault safety for the explicit-input storage driver seam. -/
@@ -20,7 +21,10 @@ theorem runWithInputs_hasType
     (stateTyping : Core.HostStateHasType state resultType definitions) :
     (runWithInputs context inputs fuel state).outcome.HasType
       resultType definitions := by
-  exact run_hasType context inputs.codeAddress fuel state stateTyping
+  simpa only [runWithInputs] using
+    HostDriver.run_hasType
+      (@handlerWithInputs RollbackState TraceState inputs)
+      context fuel state stateTyping
 
 theorem runWithInputs_ne_fault
     {RollbackState : Type u} {TraceState : Type v}
@@ -33,8 +37,10 @@ theorem runWithInputs_ne_fault
     (stateTyping : Core.HostStateHasType state resultType definitions) :
     (runWithInputs context inputs fuel state).outcome ≠
       .fault error faultState := by
-  exact run_ne_fault context inputs.codeAddress fuel state faultState error
-    stateTyping
+  simpa only [runWithInputs] using
+    HostDriver.run_ne_fault
+      (@handlerWithInputs RollbackState TraceState inputs)
+      context fuel state faultState error stateTyping
 
 end HostStorageDriver
 
@@ -48,7 +54,8 @@ theorem runWithStorageInputs_hasType
     (fuel : Nat) :
     (code.runWithStorageInputs context inputs fuel).outcome.HasType
       code.program.resultType code.program.dataDefinitions := by
-  exact code.runWithStorage_hasType context inputs.codeAddress fuel
+  exact HostStorageDriver.runWithInputs_hasType
+    context inputs fuel _ code.initialState_hasType
 
 theorem runWithStorageInputs_ne_fault
     {RollbackState : Type u} {TraceState : Type v}
@@ -60,8 +67,8 @@ theorem runWithStorageInputs_ne_fault
     (faultState : Core.State) :
     (code.runWithStorageInputs context inputs fuel).outcome ≠
       .fault error faultState := by
-  exact code.runWithStorage_ne_fault context inputs.codeAddress fuel
-    error faultState
+  exact HostStorageDriver.runWithInputs_ne_fault
+    context inputs fuel _ faultState error code.initialState_hasType
 
 theorem runWithStorageInputs_done_hasType
     {RollbackState : Type u} {TraceState : Type v}
@@ -76,7 +83,9 @@ theorem runWithStorageInputs_done_hasType
       Core.StoreHasTypes world store ∧
         Core.HostRuntimeValueHasType world value code.program.resultType
           code.program.dataDefinitions := by
-  exact code.runWithStorage_done_hasType context inputs.codeAddress result
+  have typing := code.runWithStorageInputs_hasType context inputs fuel
+  rw [result] at typing
+  exact typing
 
 theorem runWithStorageInputs_outOfFuel_hasType
     {RollbackState : Type u} {TraceState : Type v}
@@ -89,7 +98,9 @@ theorem runWithStorageInputs_outOfFuel_hasType
         .outOfFuel state) :
     Core.HostStateHasType state code.program.resultType
       code.program.dataDefinitions := by
-  exact code.runWithStorage_outOfFuel_hasType context inputs.codeAddress result
+  have typing := code.runWithStorageInputs_hasType context inputs fuel
+  rw [result] at typing
+  exact typing
 
 end CheckedHostCoreProgram
 
