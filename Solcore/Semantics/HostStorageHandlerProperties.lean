@@ -193,6 +193,26 @@ theorem handleSuspension_inputDataByte?_some
   rw [handleSuspension_inputDataByte?, present]
   rfl
 
+@[simp] theorem handleRequest_inputDataSize
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState) :
+    handleRequest inputs context .inputDataSize =
+      (context, inputs.inputData.sizeWord) :=
+  rfl
+
+@[simp] theorem handleSuspension_inputDataSize
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension inputs context
+        ⟨.inputDataSize, continuation, store⟩ =
+      (context,
+        ⟨.ret (.word inputs.inputData.sizeWord), continuation, store⟩) :=
+  rfl
+
 @[simp] theorem handleSuspension_storageRead_context
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
@@ -496,6 +516,55 @@ theorem handleSuspension_inputDataByte?_control_some
     (continuation : List Core.Frame) (store : Core.Store) :
     (handleSuspension inputs context
       ⟨.inputDataByte? offset, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store inputs context _
+
+@[simp] theorem handleSuspension_inputDataSize_context
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataSize, continuation, store⟩).1 = context := by
+  rw [handleSuspension_inputDataSize]
+
+theorem handleSuspension_inputDataSize_context_independent
+    {RollbackState : Type u} {TraceState : Type v}
+    (leftInputs rightInputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension leftInputs context
+        ⟨.inputDataSize, continuation, store⟩).1 =
+      (handleSuspension rightInputs context
+        ⟨.inputDataSize, continuation, store⟩).1 := by
+  simp
+
+@[simp] theorem handleSuspension_inputDataSize_control
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataSize, continuation, store⟩).2.control =
+        .ret (.word inputs.inputData.sizeWord) := by
+  rw [handleSuspension_inputDataSize]
+
+@[simp] theorem handleSuspension_inputDataSize_continuation
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataSize, continuation, store⟩).2.continuation =
+        continuation := by
+  exact handleSuspension_continuation inputs context _
+
+@[simp] theorem handleSuspension_inputDataSize_store
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataSize, continuation, store⟩).2.store = store := by
   exact handleSuspension_store inputs context _
 
 @[simp] theorem wordToAddress?_handler_storageAddress

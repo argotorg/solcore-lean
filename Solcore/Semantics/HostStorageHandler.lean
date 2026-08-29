@@ -29,6 +29,7 @@ def handleRequest
   | .callValue => (context, inputs.callValue)
   | .callerAddress => (context, addressToWord inputs.callerAddress)
   | .inputDataByte? offset => (context, inputs.inputData.byte? offset)
+  | .inputDataSize => (context, inputs.inputData.sizeWord)
 
 /-- Current combined handler indexed by the complete run-fixed input. -/
 def handler

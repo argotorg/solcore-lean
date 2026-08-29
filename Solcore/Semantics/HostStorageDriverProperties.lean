@@ -249,6 +249,31 @@ theorem run_of_suspended_inputDataByte?_some
     offset continuation store execution, present]
   rfl
 
+theorem run_of_suspended_inputDataSize
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended ⟨.inputDataSize, continuation, store⟩ remainingFuel) :
+    run context inputs fuel state =
+      run context inputs remainingFuel
+        ⟨.ret (.word inputs.inputData.sizeWord), continuation, store⟩ := by
+  calc
+    run context inputs fuel state =
+        run
+          (handleSuspension inputs context
+            ⟨.inputDataSize, continuation, store⟩).1
+          inputs remainingFuel
+          (handleSuspension inputs context
+            ⟨.inputDataSize, continuation, store⟩).2 :=
+      run_of_suspended context inputs fuel remainingFuel state _ execution
+    _ = _ := by rw [handleSuspension_inputDataSize]
+
 @[simp] theorem run_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
@@ -371,6 +396,8 @@ theorem run_of_suspended_inputDataByte?_some
           | callerAddress =>
               simp [handler, handleRequest]
           | inputDataByte? offset =>
+              simp [handler, handleRequest]
+          | inputDataSize =>
               simp [handler, handleRequest])
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved
