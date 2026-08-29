@@ -25,6 +25,14 @@ def byte? (input : InputData) (offset : Core.Word) : Option Core.Word :=
       some ⟨byte.toNat,
         Nat.lt_trans byte.toFin.isLt (by decide)⟩
 
+/-- Decode one complete 32-byte big-endian window at an exact natural offset. -/
+def wordBE? (input : InputData) (offset : Core.Word) : Option Core.Word :=
+  if offset.val + 32 ≤ input.bytes.size then
+    decodeWordBytesBE?
+      (input.bytes.extract offset.val (offset.val + 32))
+  else
+    none
+
 end InputData
 
 end Solcore.Semantics.HostStorageDriver

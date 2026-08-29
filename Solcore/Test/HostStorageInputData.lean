@@ -38,6 +38,38 @@ private def zeroTailInput : InputData := {
   size_lt_wordModulus := by decide
 }
 
+private def shortWordInput : InputData := {
+  bytes := (List.replicate 31 (0xa5 : UInt8)).toByteArray
+  size_lt_wordModulus := by decide
+}
+
+private def exactWordInput : InputData := {
+  bytes := ((List.range 32).map UInt8.ofNat).toByteArray
+  size_lt_wordModulus := by decide
+}
+
+private def slidingWordInput : InputData := {
+  bytes := ((List.range 34).map UInt8.ofNat).toByteArray
+  size_lt_wordModulus := by decide
+}
+
+private def zeroWordInput : InputData := {
+  bytes := (List.replicate 32 (0 : UInt8)).toByteArray
+  size_lt_wordModulus := by decide
+}
+
+private def sequentialWord0 : Word :=
+  ⟨0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f,
+    by decide⟩
+
+private def sequentialWord1 : Word :=
+  ⟨0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20,
+    by decide⟩
+
+private def sequentialWord2 : Word :=
+  ⟨0x02030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021,
+    by decide⟩
+
 /-- An exact natural index beyond machine-word range whose low bits name byte two. -/
 private def beyondMachineIndex : Word :=
   ⟨2 ^ 64 + 2, by decide⟩
@@ -47,6 +79,12 @@ private theorem observed_byte_lt_256
     (read : representativeInput.byte? offset = some result) :
     result.val < 256 :=
   InputData.byte?_result_lt_256 representativeInput offset result read
+
+private def allWordBytesCoherent
+    (input : InputData) (offset expected : Word) : Bool :=
+  (List.range 32).all fun index =>
+    input.byte? (word (offset.val + index)) ==
+      some ((word index).byteAt expected)
 
 def testHostStorageInputData : IO Unit := do
   assertTrue (emptyInput.sizeWord == word 0)
@@ -90,6 +128,35 @@ def testHostStorageInputData : IO Unit := do
     "a present zero byte must produce some zero"
   assertTrue (presentZero != none)
     "a present zero byte must remain distinct from an absent byte"
+  assertTrue (emptyInput.wordBE? (word 0) == none)
+    "empty input must not contain a complete Word window"
+  assertTrue (singletonInput.wordBE? (word 0) == none)
+    "a one-byte input must not be padded into a Word"
+  assertTrue (shortWordInput.wordBE? (word 0) == none)
+    "a 31-byte input must not be padded into a Word"
+  assertTrue (exactWordInput.wordBE? (word 0) == some sequentialWord0)
+    "an exact 32-byte input must decode as the known big-endian Word"
+  assertTrue (slidingWordInput.wordBE? (word 0) == some sequentialWord0)
+    "the first complete window must decode exactly"
+  assertTrue (slidingWordInput.wordBE? (word 1) == some sequentialWord1)
+    "a middle complete window must decode exactly"
+  assertTrue (slidingWordInput.wordBE? (word 2) == some sequentialWord2)
+    "the final complete window must decode exactly"
+  assertTrue (slidingWordInput.wordBE? (word 3) == none)
+    "the partial window immediately after the final complete one must fail"
+  assertTrue (slidingWordInput.wordBE? Word.maximum == none)
+    "the maximum Core Word offset must fail without wrapping"
+  assertTrue (slidingWordInput.wordBE? beyondMachineIndex == none)
+    "large exact natural offsets must not narrow to machine width"
+  assertTrue (zeroWordInput.wordBE? (word 0) == some Word.zero)
+    "32 zero bytes must remain present as some zero"
+  assertTrue (zeroWordInput.wordBE? (word 0) != none)
+    "a zero Word must remain distinct from an absent window"
+  assertTrue
+    (slidingWordInput.bytes.extract 1 33 == encodeWordBytesBE sequentialWord1)
+    "encoding a loaded Word must recover its exact selected window"
+  assertTrue (allWordBytesCoherent slidingWordInput (word 1) sequentialWord1)
+    "all 32 selected bytes must agree with big-endian Word.byteAt"
   match representativeInput.byte? (word 3) with
   | none =>
       throw (IO.userError "the final representative byte unexpectedly disappeared")
