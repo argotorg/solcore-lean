@@ -72,6 +72,36 @@ theorem HandledSteps.trans
         HandledSteps.handle prefixPath emission handled combinedSuffix
       simpa [Nat.add_assoc] using combined
 
+/-- A typed Core state remains typed across every handled request boundary. -/
+theorem HandledSteps.preserve
+    {Context : Type u}
+    {handler : HostHandler Context}
+    {steps : Nat}
+    {startContext finalContext : Context}
+    {start finish : Core.State}
+    {resultType : Core.Ty}
+    {definitions : Core.DataEnvironment}
+    (path :
+      HandledSteps handler steps
+        startContext start finalContext finish)
+    (typing :
+      Core.HostStateHasType start resultType definitions) :
+    Core.HostStateHasType finish resultType definitions := by
+  induction path with
+  | core corePath =>
+      exact corePath.preserve typing
+  | @handle prefixSteps suffixSteps context nextContext finalContext
+      start requestState resumed finish suspension prefixPath emission
+      handled suffix suffixIH =>
+      have requestStateTyping := prefixPath.preserve typing
+      have suspensionTyping :=
+        Core.hostRequestEmission_hasType requestStateTyping emission
+      have resumedTyping :=
+        handler.handleSuspension_state_hasType
+          context suspension suspensionTyping
+      rw [handled] at resumedTyping
+      exact suffixIH resumedTyping
+
 end HostDriver
 
 namespace HostDriverResult
@@ -164,6 +194,44 @@ theorem prependRequest
           obtain ⟨suffixSteps, suffixBound, suffix, terminal⟩ := suffixSound
           exact ⟨prefixSteps + 1 + suffixSteps, by omega,
             .handle prefixPath emission handled suffix, terminal⟩
+
+/-- Fuel-sound relational evidence directly preserves outcome typing. -/
+theorem hasType
+    {Context : Type u}
+    {result : HostDriverResult Context}
+    {handler : HostHandler Context}
+    {fuel : Nat}
+    {startContext : Context}
+    {start : Core.State}
+    {resultType : Core.Ty}
+    {definitions : Core.DataEnvironment}
+    (sound :
+      result.FuelSoundWith handler fuel startContext start)
+    (typing :
+      Core.HostStateHasType start resultType definitions) :
+    result.outcome.HasType resultType definitions := by
+  cases result with
+  | mk finalContext outcome =>
+      cases outcome with
+      | done value store =>
+          change ∃ spent, spent ≤ fuel ∧ _ at sound
+          change ∃ world,
+            Core.StoreHasTypes world store ∧
+              Core.HostRuntimeValueHasType
+                world value resultType definitions
+          obtain ⟨spent, bound, path⟩ := sound
+          exact (path.preserve typing).final_components
+      | outOfFuel exhausted =>
+          change HostDriver.HandledSteps handler fuel startContext start
+              finalContext exhausted ∧ _ at sound
+          change Core.HostStateHasType exhausted resultType definitions
+          exact sound.1.preserve typing
+      | fault error faultState =>
+          change ∃ spent, spent ≤ fuel ∧ _ ∧ _ at sound
+          change False
+          obtain ⟨spent, bound, path, terminal⟩ := sound
+          exact Core.well_typed_host_state_never_faults
+            (path.preserve typing) terminal
 
 end FuelSoundWith
 
