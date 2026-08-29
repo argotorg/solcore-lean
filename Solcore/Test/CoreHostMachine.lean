@@ -30,6 +30,7 @@ private def responseFor : (request : HostRequest) → request.Response
   | .callerAddress => response
   | .inputDataByte? _ => some response
   | .inputDataSize => response
+  | .inputDataWordBE? _ => some response
 
 private def storageReadProgram : Program := {
   resultType := .word
@@ -222,10 +223,34 @@ private theorem illTypedInputDataSizeProgram_host_rejected :
     illTypedInputDataSizeProgram.checkHost = false := by
   decide
 
-private def unboundHostIndexProgram : Program := {
-  resultType := .word
+private def inputDataWordBEProgram : Program := {
+  resultType := .sum .unit .word
   body :=
-    .apply (.var (HostFunction.inputDataSize.index + 1)) .unit
+    .apply (.var HostFunction.inputDataWordBE?.index) (.word inputOffset)
+}
+
+private theorem inputDataWordBEProgram_host_checked :
+    inputDataWordBEProgram.checkHost = true := by
+  decide
+
+private theorem inputDataWordBEProgram_closed_rejected :
+    inputDataWordBEProgram.check = false := by
+  decide
+
+private def illTypedInputDataWordBEProgram : Program := {
+  resultType := .sum .unit .word
+  body :=
+    .apply (.var HostFunction.inputDataWordBE?.index) (.bool true)
+}
+
+private theorem illTypedInputDataWordBEProgram_host_rejected :
+    illTypedInputDataWordBEProgram.checkHost = false := by
+  decide
+
+private def unboundHostIndexProgram : Program := {
+  resultType := .sum .unit .word
+  body :=
+    .apply (.var (HostFunction.inputDataWordBE?.index + 1)) (.word inputOffset)
 }
 
 private theorem unboundHostIndexProgram_host_rejected :
@@ -249,6 +274,9 @@ private def checkedInputDataByteProgram : CheckedHostCoreProgram :=
 
 private def checkedInputDataSizeProgram : CheckedHostCoreProgram :=
   ⟨inputDataSizeProgram, inputDataSizeProgram_host_checked⟩
+
+private def checkedInputDataWordBEProgram : CheckedHostCoreProgram :=
+  ⟨inputDataWordBEProgram, inputDataWordBEProgram_host_checked⟩
 
 private theorem compileTimeAdmissionRegression :
     CheckedHostCoreProgram.ofProgram? storageReadProgram =
@@ -289,7 +317,8 @@ private theorem compileTimeHostCapabilityIndexes :
       HostFunction.callValue.index = 4 ∧
       HostFunction.callerAddress.index = 5 ∧
       HostFunction.inputDataByte?.index = 6 ∧
-      HostFunction.inputDataSize.index = 7 := by
+      HostFunction.inputDataSize.index = 7 ∧
+      HostFunction.inputDataWordBE?.index = 8 := by
   decide
 
 private theorem compileTimeAddressContextIndexRegression :
@@ -352,12 +381,22 @@ private theorem compileTimeInputDataSizeEnvironmentIndexRegression :
       some (.hostFunction .inputDataSize) :=
   hostEnvironment_inputDataSize
 
+private theorem compileTimeInputDataWordBEContextIndexRegression :
+    hostContext[HostFunction.inputDataWordBE?.index]? =
+      some (HostFunction.functionType .inputDataWordBE?) :=
+  hostContext_inputDataWordBE?
+
+private theorem compileTimeInputDataWordBEEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.inputDataWordBE?.index]? =
+      some (.hostFunction .inputDataWordBE?) :=
+  hostEnvironment_inputDataWordBE?
+
 private theorem compileTimeHostCapabilityLengths :
-    hostContext.length = 8 ∧ hostEnvironment.length = 8 :=
+    hostContext.length = 9 ∧ hostEnvironment.length = 9 :=
   ⟨hostContext_length, hostEnvironment_length⟩
 
 private theorem compileTimeFirstUnboundHostIndex :
-    hostContext[8]? = none ∧ hostEnvironment[8]? = none := by
+    hostContext[9]? = none ∧ hostEnvironment[9]? = none := by
   decide
 
 private def beginState : State :=
@@ -430,6 +469,12 @@ private def inputDataSizeRequestState : State :=
 private def inputDataSizeSuspension : HostSuspension :=
   ⟨.inputDataSize, [], []⟩
 
+private def inputDataWordBERequestState : State :=
+  ⟨.ret (.word inputOffset), [.hostApply .inputDataWordBE?], []⟩
+
+private def inputDataWordBESuspension : HostSuspension :=
+  ⟨.inputDataWordBE? inputOffset, [], []⟩
+
 private theorem compileTimeBeginCorrespondenceRegression :
     HostTransition beginState argumentState := by
   apply hostAdvance_next_iff.mp
@@ -485,6 +530,11 @@ private theorem compileTimeInputDataSizeEmissionRegression :
   apply hostAdvance_suspended_iff.mp
   exact hostAdvance_suspend_inputDataSize [] []
 
+private theorem compileTimeInputDataWordBEEmissionRegression :
+    HostRequestEmission inputDataWordBERequestState inputDataWordBESuspension := by
+  apply hostAdvance_suspended_iff.mp
+  exact hostAdvance_suspend_inputDataWordBE? inputOffset [] []
+
 private theorem compileTimeTransitionDeterminismRegression
     {next : State}
     (step : HostTransition beginState next) :
@@ -521,6 +571,19 @@ private def retainedInputDataByteSuspension : HostSuspension :=
 
 private def retainedInputDataSizeSuspension : HostSuspension :=
   ⟨.inputDataSize, retainedContinuation, retainedStore⟩
+
+private def retainedInputDataWordBESuspension : HostSuspension :=
+  ⟨.inputDataWordBE? inputOffset, retainedContinuation, retainedStore⟩
+
+private theorem compileTimeInputDataWordBEResponseNoneRegression :
+    HostRequest.responseValue (.inputDataWordBE? inputOffset) none =
+      .inLeft .word .unit :=
+  HostRequest.responseValue_inputDataWordBE?_none inputOffset
+
+private theorem compileTimeInputDataWordBEResponseSomeRegression :
+    HostRequest.responseValue (.inputDataWordBE? inputOffset) (some response) =
+      .inRight .unit (.word response) :=
+  HostRequest.responseValue_inputDataWordBE?_some inputOffset response
 
 private theorem compileTimeResumeRegression :
     retainedSuspension.resume response =
@@ -572,6 +635,19 @@ private theorem compileTimeInputDataSizeResumeRegression :
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
   HostSuspension.resume_inputDataSize
     response retainedContinuation retainedStore
+
+private theorem compileTimeInputDataWordBEResumeNoneRegression :
+    retainedInputDataWordBESuspension.resume none =
+      ⟨.ret (.inLeft .word .unit), retainedContinuation, retainedStore⟩ :=
+  HostSuspension.resume_inputDataWordBE?_none
+    inputOffset retainedContinuation retainedStore
+
+private theorem compileTimeInputDataWordBEResumeSomeRegression :
+    retainedInputDataWordBESuspension.resume (some response) =
+      ⟨.ret (.inRight .unit (.word response)),
+        retainedContinuation, retainedStore⟩ :=
+  HostSuspension.resume_inputDataWordBE?_some
+    inputOffset response retainedContinuation retainedStore
 
 private theorem compileTimeSuspensionTypingRegression :
     HostSuspensionHasType requestSuspension .word [] := by
@@ -651,6 +727,12 @@ private theorem compileTimeCheckedInputDataSizeNeverFaults
   CheckedHostCoreProgram.runStateful_ne_fault
     checkedInputDataSizeProgram fuel error faultState
 
+private theorem compileTimeCheckedInputDataWordBENeverFaults
+    (fuel : Nat) (error : MachineFault) (faultState : State) :
+    checkedInputDataWordBEProgram.runStateful fuel ≠ .fault error faultState :=
+  CheckedHostCoreProgram.runStateful_ne_fault
+    checkedInputDataWordBEProgram fuel error faultState
+
 private theorem compileTimeWireV1RejectionRegression :
     Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead) = none :=
   rfl
@@ -727,6 +809,16 @@ private theorem compileTimeInputDataSizeWireV2RejectionRegression :
       (.hostFunction .inputDataSize) = none :=
   rfl
 
+private theorem compileTimeInputDataWordBEWireV1RejectionRegression :
+    Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .inputDataWordBE?) = none :=
+  rfl
+
+private theorem compileTimeInputDataWordBEWireV2RejectionRegression :
+    Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .inputDataWordBE?) = none :=
+  rfl
+
 private def cellStorageReadProgram : Program := {
   resultType := .word
   body :=
@@ -800,10 +892,16 @@ def testCoreHostMachine : IO Unit := do
     "the closed checker accepted the input-size capability"
   assertTrue (!illTypedInputDataSizeProgram.checkHost)
     "the host checker accepted a non-Unit input-size argument"
+  assertTrue inputDataWordBEProgram.checkHost
+    "the host checker rejected strict optional input-word observation"
+  assertTrue (!inputDataWordBEProgram.check)
+    "the closed checker accepted the optional input-word capability"
+  assertTrue (!illTypedInputDataWordBEProgram.checkHost)
+    "the host checker accepted a non-Word input-word offset"
   assertTrue (!unboundHostIndexProgram.checkHost)
     "the host checker accepted the first unbound capability index"
-  assertTrue (hostContext[8]?.isNone && hostEnvironment[8]?.isNone)
-    "host index eight is no longer the first unbound position"
+  assertTrue (hostContext[9]?.isNone && hostEnvironment[9]?.isNone)
+    "host index nine is no longer the first unbound position"
   assertTrue
     (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
     "checked host admission retained a program rejected by the host checker"
@@ -839,7 +937,8 @@ def testCoreHostMachine : IO Unit := do
       HostFunction.callerAddress.index == 5 &&
       HostFunction.inputDataByte?.index == 6 &&
       HostFunction.inputDataSize.index == 7 &&
-      hostContext.length == 8 && hostEnvironment.length == 8)
+      HostFunction.inputDataWordBE?.index == 8 &&
+      hostContext.length == 9 && hostEnvironment.length == 9)
     "the append-only host capability layout changed"
   assertTrue
     (hostContext[HostFunction.storageAddress.index]? ==
@@ -877,6 +976,12 @@ def testCoreHostMachine : IO Unit := do
       hostEnvironment[HostFunction.inputDataSize.index]? ==
         some (.hostFunction .inputDataSize))
     "the input-size capability is absent from index seven"
+  assertTrue
+    (hostContext[HostFunction.inputDataWordBE?.index]? ==
+        some (HostFunction.functionType .inputDataWordBE?) &&
+      hostEnvironment[HostFunction.inputDataWordBE?.index]? ==
+        some (.hostFunction .inputDataWordBE?))
+    "the optional input-word capability is absent from index eight"
 
   assertTrue (hostAdvance beginState == .next argumentState)
     "host application did not begin by evaluating its argument"
@@ -951,6 +1056,15 @@ def testCoreHostMachine : IO Unit := do
         ⟨.ret (.bool true), [.hostApply .inputDataSize], []⟩ ==
       .fault (.invalidHostArgument .inputDataSize (.bool true)))
     "a non-Unit input-size argument did not retain the raw machine fault"
+  assertTrue
+    (hostAdvance inputDataWordBERequestState ==
+      .suspended inputDataWordBESuspension)
+    "a Word offset did not emit the strict optional input-word request"
+  assertTrue
+    (hostAdvance
+        ⟨.ret (.bool true), [.hostApply .inputDataWordBE?], []⟩ ==
+      .fault (.invalidHostArgument .inputDataWordBE? (.bool true)))
+    "a non-Word input-word offset did not retain the raw machine fault"
 
   assertTrue
     (retainedSuspension.resume response ==
@@ -986,6 +1100,15 @@ def testCoreHostMachine : IO Unit := do
     (retainedInputDataSizeSuspension.resume response ==
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩)
     "input-size resume changed the Word, continuation, or Core-local store"
+  assertTrue
+    (retainedInputDataWordBESuspension.resume none ==
+      ⟨.ret (.inLeft .word .unit), retainedContinuation, retainedStore⟩)
+    "an absent input word lost its branch, continuation, or Core-local store"
+  assertTrue
+    (retainedInputDataWordBESuspension.resume (some response) ==
+      ⟨.ret (.inRight .unit (.word response)),
+        retainedContinuation, retainedStore⟩)
+    "a present input word lost its value, continuation, or Core-local store"
 
   assertTrue
     (checkedStorageReadProgram.runStateful 4 == .outOfFuel requestState)
@@ -1046,6 +1169,14 @@ def testCoreHostMachine : IO Unit := do
     (inputDataSizeProgram.runHostStateful 5 ==
       .suspended inputDataSizeSuspension 0)
     "input-size execution changed its exact request budget"
+  assertTrue
+    (inputDataWordBEProgram.runHostStateful 4 ==
+      .outOfFuel inputDataWordBERequestState)
+    "input-word execution moved its pre-request fuel boundary"
+  assertTrue
+    (inputDataWordBEProgram.runHostStateful 5 ==
+      .suspended inputDataWordBESuspension 0)
+    "input-word execution changed its exact request budget"
 
   match cellStorageReadProgram.runHostStateful 32 with
   | .suspended suspension remainingFuel =>
@@ -1129,5 +1260,13 @@ def testCoreHostMachine : IO Unit := do
     (Solcore.Core.Wire.V2.Value.ofCore?
       (.hostFunction .inputDataSize)).isNone
     "Core wire v2 encoded the input-size host value"
+  assertTrue
+    (Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .inputDataWordBE?)).isNone
+    "Core wire v1 encoded the optional input-word host value"
+  assertTrue
+    (Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .inputDataWordBE?)).isNone
+    "Core wire v2 encoded the optional input-word host value"
 
 end Tests
