@@ -330,6 +330,17 @@ private theorem compileTimeHostCapabilityRegistry :
   ⟨HostFunction.all_nodup, HostFunction.getElem?_all_index,
     HostFunction.all_indices⟩
 
+private theorem compileTimeHostCapabilityIndexRange (position : Nat) :
+    (∃ function : HostFunction, function.index = position) ↔
+      position < HostFunction.all.length :=
+  HostFunction.exists_index_iff position
+
+private theorem compileTimeHostCapabilityExactLookup
+    {position : Nat} {function : HostFunction} :
+    HostFunction.all[position]? = some function ↔
+      function.index = position :=
+  HostFunction.getElem?_all_iff
+
 private theorem compileTimeGenericHostTableLookups :
     ∀ function : HostFunction,
       hostContext[function.index]? = some function.functionType ∧
