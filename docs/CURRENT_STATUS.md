@@ -365,13 +365,13 @@ size agrees exactly with the present and absent boundary of `inputDataByte?`;
 it adds no ABI, calldata, multi-byte decoding, nested-call, parser, or
 publication rule.
 
-[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) is active. It
-defines `InputData.wordBE?` as an exact optional 32-byte big-endian window:
-only a full window decodes, while an incomplete window is absent without
-padding or offset wrap. Internal `inputDataWordBE? : word -> sum unit word`
-will append at index 8, making both host tables length 9 and index 9 first
-unbound. ABI, calldata, partial loads, nested calls, syntax, and publication
-remain outside this slice.
+[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) completes the
+strict optional input-word observation. `InputData.wordBE?` decodes an exact
+32-byte big-endian window using natural-number bounds; an incomplete window is
+absent without padding or offset wrap. Internal
+`inputDataWordBE? : word -> sum unit word` is appended at index 8, making both
+host tables length 9 and index 9 first unbound. ABI, calldata, partial loads,
+nested calls, syntax, and publication remain outside this slice.
 
 ## Implementation status
 
@@ -396,7 +396,7 @@ remain outside this slice.
 | Run-fixed caller-address observation | Complete | Explicit immutable input, append-only `unit -> word` capability, exact handler/driver laws, absent-Account behavior, caller-derived storage and parent-fold regressions, fuel boundaries, and frozen-Wire rejection complete | Not published |
 | Bounded optional input-byte observation | Complete | Bounded indexing and exact widening, optional response injection, request/resume safety, full context identity, input-only variation, byte-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
-| Strict optional input-word BE observation | In progress | Exact full-window semantics are accepted; codec coherence, append-only index-8 capability, handler/driver safety, direct, storage, parent, fuel, and frozen-Wire regressions are being implemented | Not published |
+| Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2463,21 +2463,37 @@ semantic-kernel, axiom, dependency, compatibility, and independent P0-P3
 audits pass. No multi-byte load, ABI, calldata, nested-input rule, parser,
 public format, or root README change was added.
 
-## Active strict optional input-word BE observation
+## Completed strict optional input-word BE observation
 
-[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) fixes the next
-internal slice. `InputData.wordBE?` will decode the exact byte window
-`[offset, offset + 32)` with the existing big-endian Word codec only when all
-32 bytes exist. An incomplete window returns `none`; no offset arithmetic
-wraps and no zero padding is introduced.
+[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) completes
+`InputData.wordBE?` over the existing bounded input. It decodes the exact
+natural-number window `[offset, offset + 32)` with the canonical big-endian
+Word codec only when all 32 bytes exist. A complete zero window returns
+`some Word.zero`; an incomplete window returns `none`, with neither padding
+nor Word-offset wrap. Exact codec and all 32 per-byte coherence laws are
+proved.
 
-The planned Core capability is
-`inputDataWordBE? : word -> sum unit word` at append-only index 8, with host
-tables of length 9 and first-unbound index 9. Implementation must cover exact
-codec and byte coherence, read-only handler context identity, safety, direct
-and storage execution, parent completion, measured fuel, and frozen-Wire
-rejection. ABI, calldata, partial loads, memory, nested calls, parser work, and
-publication remain separate.
+Core appends `inputDataWordBE? : word -> sum unit word` at index 8, with host
+tables of length 9 and first-unbound index 9. Its `Option Word` response and
+all Core emission, resumption, fault, progress, typing, preservation, runner,
+and checked no-fault obligations are complete. The read-only handler returns
+the exact input-derived result while preserving the whole mutable context,
+continuation, and Core-local Store.
+
+Direct regressions cover present nonzero, present zero, and absent windows.
+The observe-write-observe storage program measures fuel 23/31/32 and remains
+complete at 64. Parent execution measures present-window fuel 29/30 and
+absent-window fuel 11/12; all three optional layers, the resolution fold,
+terminal bytes, and completed-result stability at fuel 64 are retained.
+Frozen Wire v1 and v2 reject the internal value.
+
+The 655-job build and 1,198-job test run pass. All 21 changed Lean roots pass
+trust-zero with warnings as errors; metadata, semantic-kernel, and diff checks
+pass. Axiom reports use `propext` and `Quot.sound`, with
+`Classical.choice` additionally present only in per-byte coherence through the
+existing codec proof path. There is no custom axiom or `sorry`. ABI, calldata,
+partial loads, memory, nested calls, parser work, and publication remain
+separate. The independent completion audit found no P0-P3 issue.
 
 ## Meaning of completion
 

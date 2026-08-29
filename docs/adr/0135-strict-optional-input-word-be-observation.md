@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: observe one exact 32-byte big-endian word from bounded immutable input
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -287,9 +287,50 @@ Every commit must stay green and contain at most 300 changed lines:
 Temporary migration helpers and transitional APIs must be removed before
 completion.
 
+## Implementation record
+
+`InputData.wordBE?` now checks the exact natural-number bound
+`offset.val + 32 <= input.bytes.size`, extracts that complete half-open
+window, and decodes it with the canonical big-endian Word codec. Offset
+arithmetic never wraps, incomplete windows are absent rather than padded, and
+a complete all-zero window remains the distinct result `some Word.zero`.
+Exact window, codec, and all 32 per-byte coherence laws are proved.
+
+Core appends `inputDataWordBE? : word -> sum unit word` at index 8. Both host
+tables have length 9 and index 9 is first unbound. The request carries an exact
+Word offset and receives `Option Word`; emission, both response branches,
+resumption, raw faults, progress, typing, preservation, runner
+correspondence, and checked-program no-fault safety are complete.
+
+The canonical handler returns
+`(context, inputs.inputData.wordBE? offset)` and preserves the complete mutable
+context, saved continuation, and Core-local Store. Direct execution covers a
+present nonzero word, a present zero word, and an absent window. The
+observe-write-observe storage program completes at fuel 32, is exhausted at
+31, reaches its request-ready boundary at 23, and remains stable at fuel 64.
+
+Parent-indexed execution completes a present window at fuel 30 after its fuel
+29 exhaustion boundary. The shorter absent branch completes at fuel 12 after
+its fuel 11 exhaustion boundary. Its regressions preserve all three optional
+layers, recover the exact result through the ADR-0129 fold, preserve terminal
+bytes, and confirm completed-result stability at fuel 64. Frozen Wire v1 and
+v2 continue to reject the internal host value.
+
+## Acceptance evidence
+
+- `lake build` completed successfully with 655 jobs;
+- `lake test` completed successfully with 1,198 jobs;
+- all 21 changed Lean roots passed with `--trust=0` and warnings as errors;
+- metadata, semantic-kernel, and diff checks passed;
+- axiom reports use the existing `propext` and `Quot.sound`; the per-byte
+  coherence theorem additionally uses `Classical.choice` through the existing
+  codec proof path; and
+- no custom axiom or `sorry` remains; the independent audit found no P0-P3
+  issue.
+
 ## Consequences
 
-Internal checked Core code will be able to observe one exact Word from the
+Internal checked Core code can observe one exact Word from the
 same bounded run-fixed bytes used by the completed byte and size observations.
 The operation preserves absence, exact natural offsets, and the repository's
 existing big-endian Word representation without publishing calldata or ABI

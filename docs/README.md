@@ -141,14 +141,16 @@ exactly below that size and absent at or above it. This does not define ABI
 calldata, multi-byte decoding,
 nested-call input derivation, source syntax, Wire encoding, or publication.
 
-[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) is the active
-internal slice. It accepts only a complete 32-byte input window, decodes it
-with the existing big-endian Word codec, and represents an incomplete window
-as absence without padding or offset wrap. The planned
+[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) completes the
+strict optional input-word slice. It accepts only a complete 32-byte input
+window, decodes it with the existing big-endian Word codec, and represents an
+incomplete window as absence without padding or offset wrap. The
 `inputDataWordBE? : word -> sum unit word` capability appends at index 8, with
-host-table length 9 and first-unbound index 9. ABI, calldata, partial loads,
-memory, nested calls, parser work, Wire encoding, and publication remain out
-of scope.
+host-table length 9 and first-unbound index 9. Optional-response safety,
+handler context identity, direct present/zero/absent behavior, storage and
+parent fuel boundaries, the parent fold, terminal bytes, and frozen-Wire
+rejection are proved and tested. ABI, calldata, partial loads, memory, nested
+calls, parser work, Wire encoding, and publication remain out of scope.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

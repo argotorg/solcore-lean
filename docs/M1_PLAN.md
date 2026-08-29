@@ -78,8 +78,8 @@ run-fixed input-size observation. It derives the exact input length as
 that size and absent at or above it. ABI, calldata, multi-byte loads,
 nested-call derivation, syntax, and publication remain separate.
 
-[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) is active. It
-adds a strict optional 32-byte big-endian window over the same run-fixed input.
+[ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) is complete.
+It adds a strict optional 32-byte big-endian window over the same run-fixed input.
 Only a complete window decodes; incomplete windows return absence without
 padding or Word-offset wrap. The internal host capability appends at index 8,
 with table length 9 and first-unbound index 9. ABI, calldata, memory, nested
@@ -222,7 +222,7 @@ These results remain regression obligations for every extension.
 | 115 | Run-fixed caller-address observation | Complete | Carries one explicit caller-supplied Address through `ExecutionInputs` and exposes its exact lossless Word at Core host index 5 without broader caller semantics |
 | 116 | Bounded optional input-byte observation | Complete | Carries one bounded run-fixed `InputData` value and exposes one present byte or explicit absence at Core host index 6 |
 | 117 | Run-fixed input-size observation | Complete | Derives the exact bounded input length as a Word, exposes it at Core host index 7, and proves its boundary agrees with optional byte lookup |
-| 118 | Strict optional input-word BE observation | In progress | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
+| 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
 | 119 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
 | 120 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 121 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -2021,7 +2021,7 @@ compatibility, and independent audits. Multi-byte interpretation, ABI and
 calldata meaning, nested-input derivation, syntax, and publication remain
 separate future decisions.
 
-## Active strict optional input-word BE observation
+## Completed strict optional input-word BE observation
 
 [ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) accepts
 `InputData.wordBE?` as a strict full-window operation over the existing bounded
@@ -2029,11 +2029,25 @@ input. It extracts `[offset, offset + 32)` with natural-number bounds and uses
 the canonical big-endian Word decoder. A complete all-zero window returns
 `some Word.zero`; an incomplete window returns `none` without padding.
 
-Implementation will append
-`inputDataWordBE? : word -> sum unit word` at index 8, extend both host tables
-to length 9, and close exact codec, handler/context, safety, direct, storage,
-parent, measured-fuel, and frozen-Wire obligations. ABI, calldata, partial
-loads, memory, nested calls, parser work, and publication are non-goals.
+Core appends `inputDataWordBE? : word -> sum unit word` at index 8, extending
+both host tables to length 9 and leaving index 9 first unbound. Its
+`Option Word` response and Core safety boundary are complete. The handler
+preserves its whole mutable context while returning the exact input-derived
+result.
+
+Direct regressions cover present nonzero, present zero, and absent windows.
+The observe-write-observe storage path measures fuel 23/31/32 and is stable at
+64. Parent regressions measure present fuel 29/30 and absent fuel 11/12 while
+preserving the three optional layers, resolution fold result, terminal bytes,
+and completion at fuel 64. Frozen Wire rejects the internal capability.
+
+The 655-job build, 1,198-job test run, trust-zero and warning-as-error checks
+for all 21 changed Lean roots, metadata, semantic-kernel, and diff checks pass.
+Axiom reports contain `propext` and `Quot.sound`; only the per-byte coherence
+proof additionally contains `Classical.choice` through the existing codec
+proof path. No custom axiom or `sorry` remains. ABI, calldata, partial loads,
+memory, nested calls, parser work, and publication remain outside this
+completed slice. The independent completion audit found no P0-P3 issue.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
