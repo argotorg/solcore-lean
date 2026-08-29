@@ -53,6 +53,12 @@ authority identity—and the driver can still process writes in the same run.
 Out-of-fuel remains non-stable, and Wire, Oracle, Surface, Parser, and public
 runtime schemas are unchanged.
 
+[ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
+completes the optional address-selected entry point without changing execution.
+`some result` occurs exactly when matching selected-code fuel evidence exists;
+`none` is exactly failure of the existing code lookup. A selected out-of-fuel
+run remains `some`.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
@@ -613,6 +619,13 @@ is not the code address, current contract, `self`, caller, or an authority
 identity. No public schema is changed, and out-of-fuel is still intentionally
 non-stable.
 
+The completed
+[ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
+makes `runCodeWithStorage?` exact in both directions. Selected fuel evidence can
+replay the same optional result, while optional failure says only that the
+working WorldState has no selected code. No runtime operation or public format
+changes.
+
 The completed tenth slice, [ADR-0028](adr/0028-core-vnext-word-comparison-flags.md),
 derives canonical word-valued equality and unsigned greater-than flags from
 the existing boolean comparisons. It preserves left-to-right evaluation and
@@ -879,6 +892,9 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0121](adr/0121-retained-storage-address-observation.md)
   fixes the internal retained storage-selector observation without assigning
   code-address, current-contract, caller, `self`, or authority meaning to it.
+- [ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
+  fixes exact successful and failed specifications for address-selected
+  handled execution without changing runtime behavior.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

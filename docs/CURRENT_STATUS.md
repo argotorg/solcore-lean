@@ -320,8 +320,13 @@ intentionally not stable.
 syntax-independent slice. A `unit -> word` capability at index 2 exposes only
 the storage selector already retained by the combined driver. Its handler
 returns the lossless Word without changing its context; it adds no current,
-self, code, or caller-address identity. The next semantic slice will be selected
-separately, and parser work remains paused while source syntax may still change.
+self, code, or caller-address identity.
+
+[ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
+completes the optional address-selected execution specification. A successful
+result is now equivalent to exact selected-code fuel evidence, while `none` is
+equivalent to the existing code lookup returning `none`. Parser work remains
+paused while source syntax may still change.
 
 ## Implementation status
 
@@ -340,6 +345,7 @@ separately, and parser work remains paused while source syntax may still change.
 | Typed storage-write and combined storage driver | Complete | Append-only write capability, generic driver, combined read/write handler, address-selected API, safety, fuel, invariants, and regressions complete | Not published |
 | Handled-execution completeness and terminal fuel stability | Complete | Core and generic relational replay, executable-result iff, exact final context, and done/fault larger-fuel stability complete; out-of-fuel stability is intentionally excluded | Not published |
 | Retained storage-selector observation | Complete | Append-only `unit -> word` capability at index 2, exact context identity, lossless widening, driver proofs, and distinct code/storage regressions complete | Not published |
+| Address-selected handled execution exact specification | Complete | Successful execution iff selected-code fuel evidence; optional failure iff working-WorldState code lookup failure; selected out-of-fuel remains an attempted execution | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2133,21 +2139,23 @@ terminal fuel stability from ADR-0120; out-of-fuel remains intentionally
 unstable.
 
 Full build, test, trust-zero, metadata, and semantic-kernel checks passed. An
-independent final audit found no P0-P3 issue. The next semantic slice will be
-selected separately; parser and parser-proof work remains paused.
+independent final audit found no P0-P3 issue. ADR-0122 then completes the
+optional selected-execution proof boundary below; parser and parser-proof work
+remains paused.
 
-## Active address-selected execution completeness
+## Completed address-selected execution completeness
 
 [ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
-closes the only remaining one-way specification at the current highest-level
-handled execution entry point. It will characterize `some result` exactly by
-the selected checked code and its fuel-indexed handled-step evidence, and
-characterize `none` exactly by failure of the existing working-WorldState code
-lookup.
+closes the current entry point's remaining reverse direction. `some result` is
+equivalent to the selected checked code and its fuel-indexed handled-step
+evidence. `none` is equivalent to failure of the existing working-WorldState
+code lookup.
 
 This is a proof-only boundary. A selected out-of-fuel run remains `some`; it is
 not confused with code-selection failure. The executable driver, code lookup,
-address roles, parser, public formats, and frame lifecycle do not change.
+address roles, parser, public formats, and frame lifecycle do not change. Full
+build, test, trust-zero, metadata, and semantic-kernel checks passed; independent
+audits found no P0-P3 issue.
 
 ## Meaning of completion
 

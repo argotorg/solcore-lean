@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: complete the executable specification of address-selected handled Core execution
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -163,6 +163,48 @@ Keep each green commit below roughly 300 changed lines:
 3. add direct forward- and reverse-direction compile regressions; and
 4. run full validation and an independent audit, then record acceptance and
    synchronize internal status documents.
+
+## Implementation record
+
+`runCodeWithStorage?_eq_none_iff` now reduces optional failure to the exact
+working-WorldState `code?` lookup used by the executor. The proof inspects that
+single lookup and does not reopen Account representation. An absent Account and
+a present Account without code therefore remain intentionally indistinguishable
+at this API.
+
+`runCodeWithStorage?_eq_some_iff_fuelSound` now completes the successful branch.
+Its forward direction reuses the existing selected fuel-soundness result. Its
+reverse direction rewrites the exact selected code, applies
+`CheckedHostCoreProgram.runWithStorage_eq_iff_fuelSound`, and lifts the exact
+driver equality through `some`. The final handler context and outcome stay in
+the `HostDriverResult`; no context-preservation assumption is introduced.
+
+The definition of `runCodeWithStorage?`, code lookup, checked runner, generic
+driver, storage handler, and fuel relation are unchanged.
+
+## Regression record
+
+Compile-time regressions consume the public successful iff as a theorem value,
+use `.mp` to recover the selected code and fuel evidence, and use `.mpr` to
+replay evidence to the exact optional result. A separate consumer exercises the
+failure iff. Another consumer fixes the important boundary case: once code was
+selected, an out-of-fuel driver outcome is wrapped in `some` and cannot be
+mistaken for selection failure.
+
+Existing runtime fixtures continue to cover absent Accounts, Accounts without
+code, selected execution, working-storage updates, and exact fuel boundaries.
+No duplicate runtime program was added for this proof-only slice.
+
+## Acceptance evidence
+
+- the full build completed successfully with 619 build jobs;
+- `lake test` completed successfully with 1,126 jobs;
+- both changed Lean modules passed trust-zero with warnings as errors;
+- workspace metadata and semantic-kernel policy checks passed;
+- two independent proof and final audits found no P0, P1, P2, or P3 issue;
+- every commit stayed below 300 changed lines; and
+- the root README, parser-facing code, runtime behavior, and public formats
+  remained unchanged.
 
 ## Consequences
 

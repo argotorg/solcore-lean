@@ -750,6 +750,14 @@ The capability remains internal: Wire and runtime-publication formats still
 reject host values, and Oracle, Surface, Parser, and public runtime schemas are
 unchanged.
 
+ADR-0122 completes the optional selection boundary above that driver. A
+successful address-selected result is equivalent to the exact selected checked
+code and its fuel-indexed handled-step evidence; the evidence also replays to
+the same result. Optional failure is exactly `WorldState.code? = none`. Because
+selection happens before execution, an out-of-fuel outcome after successful
+selection remains `some`, not a lookup failure. This is a proof interface only:
+the lookup, driver, handler, address roles, and lifecycle remain unchanged.
+
 ### Observation
 
 Observations are canonical, versioned semantic results. Contract observations

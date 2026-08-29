@@ -16,7 +16,7 @@ capability at index 2 returns the existing selector losslessly and leaves its
 handler context unchanged, without treating it as a current, self, code, or
 caller address.
 [ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
-is the active proof-only slice. It makes both optional branches of the current
+completes the proof-only boundary. It makes both optional branches of the current
 address-selected entry point exact: successful execution is equivalent to
 selected-code fuel evidence, while `none` is equivalent to the existing code
 lookup returning `none`. Concrete grammar and parser proof work stays paused
@@ -146,11 +146,12 @@ These results remain regression obligations for every extension.
 | 102 | Typed storage-write and combined storage driver | Complete | Appends `(word × word) -> unit`, uses a generic driver and combined handler, and proves address-selected safety, fuel, and context invariants |
 | 103 | Handled-execution completeness and terminal fuel stability | Complete | Makes the generic handled-step relation executable in both directions and proves exact done/fault stability under additional fuel |
 | 104 | Retained storage-selector observation | Complete | Returns the existing storage selector as a lossless Word at index 2, with exact handler-context identity and no current, self, code, caller, or other call-frame identity |
-| 105 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 106 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 107 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 108 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 109 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 105 | Address-selected handled execution exact specification | Complete | Characterizes `some` by selected-code fuel evidence and `none` by code lookup failure without changing execution |
+| 106 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 107 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 108 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 109 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 110 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1720,9 +1721,22 @@ post-write context remain exact with more fuel through ADR-0120; out-of-fuel is
 not stable. Full validation and an independent P0-P3 audit passed.
 
 This remains an observation of an existing role, not a new contract-entry
-identity. The next semantic slice will be selected separately. Further inputs,
-call lifecycle, ABI, source syntax, and parser proofs remain outside this slice;
-parser work stays paused while syntax remains unstable.
+identity. ADR-0122 next completes the optional selected-execution proof
+boundary. Further inputs, call lifecycle, ABI, source syntax, and parser proofs
+remain outside this slice; parser work stays paused while syntax remains
+unstable.
+
+## Completed address-selected handled execution exact specification
+
+[ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
+completes both optional branches of `runCodeWithStorage?`. A successful result
+is equivalent to exact selected-code fuel evidence and can be reconstructed
+from that evidence. Failure is equivalent to the working-WorldState code lookup
+returning `none`; a selected run that exhausts fuel remains `some`.
+
+The slice adds two proofs and direct compile-time consumers only. It changes no
+runner, lookup, request, address role, lifecycle decision, parser, or public
+format. Full validation and independent P0-P3 audits pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
