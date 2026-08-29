@@ -106,6 +106,22 @@ theorem typed_callerAddress_emits
   cases unitTyping
   exact ⟨⟨.callerAddress, continuation, store⟩, .callerAddress⟩
 
+/-- A well-typed input-data byte offset emits its optional read request. -/
+theorem typed_inputDataByte?_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.inputDataByte?.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .inputDataByte? :: continuation, store⟩
+        suspension := by
+  have wordTyping :
+      HostRuntimeValueHasType world value .word definitions := by
+    simpa using valueTyping
+  obtain ⟨offset, rfl⟩ := wordTyping.word_shape
+  exact ⟨⟨.inputDataByte? offset, continuation, store⟩, .inputDataByte?⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -124,6 +140,7 @@ theorem typed_hostApplication_emits
   | codeAddress => exact typed_codeAddress_emits valueTyping
   | callValue => exact typed_callValue_emits valueTyping
   | callerAddress => exact typed_callerAddress_emits valueTyping
+  | inputDataByte? => exact typed_inputDataByte?_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}

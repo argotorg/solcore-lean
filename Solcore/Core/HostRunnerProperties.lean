@@ -81,6 +81,8 @@ theorem hostAdvance_done_iff
                   cases returned <;> simp [hostAdvance] at advanced
               | callerAddress =>
                   cases returned <;> simp [hostAdvance] at advanced
+              | inputDataByte? =>
+                  cases returned <;> simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩
     simp [hostAdvance, State.final, advance]
 

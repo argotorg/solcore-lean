@@ -69,6 +69,13 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
       HostRequestEmission
         ⟨.ret .unit, .hostApply .callerAddress :: continuation, store⟩
         ⟨.callerAddress, continuation, store⟩
+  | inputDataByte?
+      {offset : Word}
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret (.word offset), .hostApply .inputDataByte? :: continuation, store⟩
+        ⟨.inputDataByte? offset, continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -120,11 +127,17 @@ theorem hostRequestEmission_iff
                     ⟨.ret .unit,
                       .hostApply .callValue :: continuation, store⟩ ∧
                   suspension = ⟨.callValue, continuation, store⟩) ∨
-                ∃ continuation store,
-                  state =
-                    ⟨.ret .unit,
-                      .hostApply .callerAddress :: continuation, store⟩ ∧
-                  suspension = ⟨.callerAddress, continuation, store⟩ := by
+                (∃ continuation store,
+                    state =
+                      ⟨.ret .unit,
+                        .hostApply .callerAddress :: continuation, store⟩ ∧
+                    suspension = ⟨.callerAddress, continuation, store⟩) ∨
+                  ∃ offset continuation store,
+                    state =
+                      ⟨.ret (.word offset),
+                        .hostApply .inputDataByte? :: continuation, store⟩ ∧
+                    suspension =
+                      ⟨.inputDataByte? offset, continuation, store⟩ := by
   constructor
   · intro emission
     cases emission with
@@ -135,19 +148,23 @@ theorem hostRequestEmission_iff
     | callValue =>
         exact .inr (.inr (.inr (.inr (.inl ⟨_, _, rfl, rfl⟩))))
     | callerAddress =>
-        exact .inr (.inr (.inr (.inr (.inr ⟨_, _, rfl, rfl⟩))))
+        exact .inr (.inr (.inr (.inr (.inr (.inl ⟨_, _, rfl, rfl⟩)))))
+    | inputDataByte? =>
+        exact .inr (.inr (.inr (.inr (.inr (.inr ⟨_, _, _, rfl, rfl⟩)))))
   · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
         ⟨slot, value, continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
-        ⟨continuation, store, rfl, rfl⟩)
+        ⟨continuation, store, rfl, rfl⟩ |
+        ⟨offset, continuation, store, rfl, rfl⟩)
     · exact .storageRead
     · exact .storageWrite
     · exact .storageAddress
     · exact .codeAddress
     · exact .callValue
     · exact .callerAddress
+    · exact .inputDataByte?
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -208,6 +225,8 @@ theorem hostAdvance_next_iff
               | callValue =>
                   cases value <;> simp [hostAdvance] at advanced
               | callerAddress =>
+                  cases value <;> simp [hostAdvance] at advanced
+              | inputDataByte? =>
                   cases value <;> simp [hostAdvance] at advanced
   · intro step
     cases step with
@@ -286,6 +305,15 @@ theorem hostAdvance_suspended_iff
                       cases advanced
                       exact .callerAddress
                   | bool | word | hostFunction | pair | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | inputDataByte? =>
+                  cases value with
+                  | word offset =>
+                      injection advanced with suspensionEquality
+                      cases suspensionEquality
+                      exact .inputDataByte?
+                  | unit | bool | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
   · intro emission
