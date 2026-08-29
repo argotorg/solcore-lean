@@ -19,7 +19,7 @@ def runWithInputs
     (fuel : Nat)
     (state : Core.State) :
     HostDriverResult (Context RollbackState TraceState) :=
-  run context inputs.codeAddress fuel state
+  HostDriver.run (handlerWithInputs inputs) context fuel state
 
 end HostStorageDriver
 
@@ -34,7 +34,8 @@ def runWithStorageInputs
     (fuel : Nat) :
     HostDriverResult
       (HostStorageDriver.Context RollbackState TraceState) :=
-  code.runWithStorage context inputs.codeAddress fuel
+  HostStorageDriver.runWithInputs context inputs fuel
+    (Core.State.initial code.program.body Core.hostEnvironment)
 
 end CheckedHostCoreProgram
 

@@ -16,14 +16,19 @@ def handleRequestWithInputs
     (context : Context RollbackState TraceState)
     (request : Core.HostRequest) :
     Context RollbackState TraceState × request.Response :=
-  handleRequest inputs.codeAddress context request
+  match request with
+  | .storageRead slot => (context, context.readStorage slot)
+  | .storageWrite slot value => (context.writeStorage slot value, ())
+  | .storageAddress =>
+      (context, addressToWord context.context.storageAddress)
+  | .codeAddress => (context, addressToWord inputs.codeAddress)
 
 /-- Current combined handler indexed by the complete run-fixed input. -/
 def handlerWithInputs
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs) :
-    HostHandler (Context RollbackState TraceState) :=
-  handler inputs.codeAddress
+    HostHandler (Context RollbackState TraceState) where
+  handle := handleRequestWithInputs inputs
 
 /-- Handle one suspension using the complete run-fixed input. -/
 def handleSuspensionWithInputs
@@ -32,6 +37,6 @@ def handleSuspensionWithInputs
     (context : Context RollbackState TraceState)
     (suspension : Core.HostSuspension) :
     Context RollbackState TraceState × Core.State :=
-  handleSuspension inputs.codeAddress context suspension
+  (handlerWithInputs inputs).handleSuspension context suspension
 
 end Solcore.Semantics.HostStorageDriver
