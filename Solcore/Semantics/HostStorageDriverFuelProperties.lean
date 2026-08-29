@@ -1,4 +1,5 @@
 import Solcore.Semantics.HostDriverCompletenessProperties
+import Solcore.Semantics.HostDriverResumptionProperties
 import Solcore.Semantics.HostStorageDriverProperties
 
 /-! Whole-run fuel accounting indexed by immutable execution inputs. -/
@@ -100,6 +101,37 @@ theorem run_eq_iff_fuelSound
       (@handler RollbackState TraceState inputs)
       context fuel state result
 
+/-- Exhausted storage execution resumes under the exact same immutable input. -/
+theorem run_additional_of_outOfFuel
+    {RollbackState : Type u} {TraceState : Type v}
+    (context nextContext : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel additional : Nat)
+    (state exhausted : Core.State)
+    (execution :
+      run context inputs fuel state =
+        ⟨nextContext, .outOfFuel exhausted⟩) :
+    run context inputs (fuel + additional) state =
+      run nextContext inputs additional exhausted := by
+  simpa only [run] using
+    HostDriver.run_additional_of_outOfFuel
+      (@handler RollbackState TraceState inputs) execution
+
+/-- Split storage execution agrees with one summed-budget run. -/
+theorem resumeWithFuel_run
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel additional : Nat)
+    (state : Core.State) :
+    (run context inputs fuel state).resumeWithFuel
+        (@handler RollbackState TraceState inputs) additional =
+      run context inputs (fuel + additional) state := by
+  simpa only [run] using
+    HostDriverResult.resumeWithFuel_run
+      (@handler RollbackState TraceState inputs)
+      context fuel additional state
+
 theorem run_done_stable
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
@@ -167,6 +199,21 @@ theorem runWithStorage_done_stable
     HostStorageDriver.run_done_stable context inputs
       (Core.State.initial code.program.body Core.hostEnvironment)
       execution more
+
+/-- Checked storage execution has the same exact split-fuel law. -/
+theorem runWithStorage_resumeWithFuel
+    {RollbackState : Type u} {TraceState : Type v}
+    (code : CheckedHostCoreProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (fuel additional : Nat) :
+    (code.runWithStorage context inputs fuel).resumeWithFuel
+        (@HostStorageDriver.handler RollbackState TraceState inputs)
+        additional =
+      code.runWithStorage context inputs (fuel + additional) := by
+  simpa only [runWithStorage] using
+    HostStorageDriver.resumeWithFuel_run context inputs fuel additional
+      (Core.State.initial code.program.body Core.hostEnvironment)
 
 end CheckedHostCoreProgram
 
