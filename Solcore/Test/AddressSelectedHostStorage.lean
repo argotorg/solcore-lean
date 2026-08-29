@@ -267,6 +267,32 @@ private def assertCompletedWriteResult
   assertTrue (preservedOutsideSelectedStorage result.context program)
     s!"{label} changed a retained frame observation"
 
+/--
+The public selected-run stability theorem applies to the concrete
+read/write/read fixture and retains its exact post-write context.
+-/
+private theorem updateProgram_done_stable
+    {context :
+      FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat)}
+    (selected :
+      (baseContextFor updateCode).withPresentStorageAccount? = some context)
+    {finalContext :
+      FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat)}
+    (execution :
+      context.runCodeWithStorage? codeAddress completionFuel =
+        some ⟨finalContext,
+          .done (.word newValue) [.bool true]⟩)
+    (written : finalContext.storageAccount.storageRead targetSlot = newValue) :
+    (baseContextFor updateCode).withPresentStorageAccount? = some context ∧
+      context.runCodeWithStorage? codeAddress 64 =
+        some ⟨finalContext,
+          .done (.word newValue) [.bool true]⟩ ∧
+      finalContext.storageAccount.storageRead targetSlot = newValue := by
+  exact ⟨selected,
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
+      context codeAddress execution (by decide),
+    written⟩
+
 def testAddressSelectedHostStorage : IO Unit := do
   assertTrue updateProgram.checkHost
     "the host checker rejected the read/write/read program"

@@ -30,6 +30,29 @@ private theorem resumed :
     suspension.resume returned = finalState := by
   rfl
 
+private def transitionRequestState : Solcore.Core.State :=
+  ⟨.ret (.word slot),
+    [.hostApply .storageRead, .letBody .unit []], []⟩
+
+private def transitionSuspension : Solcore.Core.HostSuspension :=
+  ⟨.storageRead slot, [.letBody .unit []], []⟩
+
+private def resumedTransitionState : Solcore.Core.State :=
+  transitionSuspension.resume returned
+
+private def afterResumedTransition : Solcore.Core.State :=
+  ⟨.eval .unit [.word returned], [], []⟩
+
+private theorem transition_request_emission :
+    Solcore.Core.HostRequestEmission
+      transitionRequestState transitionSuspension := by
+  exact .storageRead
+
+private theorem resumed_transition_ready :
+    Solcore.Core.HostTransition
+      resumedTransitionState afterResumedTransition := by
+  exact .core .bindLet
+
 private theorem done_replay_of_steps :
     Solcore.Core.hostRun 0 finalState = .done (.word returned) [] := by
   apply Solcore.Core.hostRun_done_complete_of_steps
@@ -131,6 +154,12 @@ private theorem done_stable :
   exact Solcore.Semantics.HostDriver.run_done_stable changingHandler
     done_complete_exact_context (by omega)
 
+private theorem done_stable_same_fuel :
+    Solcore.Semantics.HostDriver.run changingHandler 0 1 Core.requestState =
+      expected := by
+  exact Solcore.Semantics.HostDriver.run_done_stable changingHandler
+    done_complete_exact_context (Nat.le_refl 1)
+
 private theorem done_runtime :
     (Solcore.Semantics.HostDriver.run
       changingHandler 0 8 Core.requestState).context = 1 := by
@@ -140,6 +169,37 @@ private theorem done_outcome_runtime :
     (Solcore.Semantics.HostDriver.run
       changingHandler 0 8 Core.requestState).outcome =
         .done (.word Core.returned) [] := by
+  native_decide
+
+private theorem handled_before_transition :
+    changingHandler.handleSuspension 0 Core.transitionSuspension =
+      (1, Core.resumedTransitionState) := by
+  rfl
+
+private theorem one_request_outOfFuel_path :
+    Solcore.Semantics.HostDriver.HandledSteps changingHandler 1
+      0 Core.transitionRequestState 1 Core.resumedTransitionState := by
+  exact .handle
+    (Solcore.Core.HostSteps.refl (state := Core.transitionRequestState))
+    Core.transition_request_emission handled_before_transition
+    (.core
+      (Solcore.Core.HostSteps.refl (state := Core.resumedTransitionState)))
+
+private theorem outOfFuel_complete_after_context_update :
+    Solcore.Semantics.HostDriver.run
+      changingHandler 0 1 Core.transitionRequestState =
+        ⟨1, .outOfFuel Core.resumedTransitionState⟩ := by
+  apply Solcore.Semantics.HostDriver.run_outOfFuel_complete
+    changingHandler one_request_outOfFuel_path
+  exact .inl
+    ⟨Core.afterResumedTransition, Core.resumed_transition_ready⟩
+
+private theorem outOfFuel_after_context_update_runtime :
+    (Solcore.Semantics.HostDriver.run
+      changingHandler 0 1 Core.transitionRequestState).context = 1 ∧
+    (Solcore.Semantics.HostDriver.run
+      changingHandler 0 1 Core.transitionRequestState).outcome =
+        .outOfFuel Core.resumedTransitionState := by
   native_decide
 
 private theorem fault_complete :
