@@ -53,7 +53,7 @@ abbrev CodeRunContext
       context.context.values.working.1.account? codeAddress = some account)
     (codePresent : account.code? = some code) :
     context.runCodeWithStorage? codeAddress fuel =
-      some (code.runWithStorage context fuel) := by
+      some (code.runWithStorage context codeAddress fuel) := by
   simp [runCodeWithStorage?, WorldState.code?, accountPresent, codePresent]
 
 /-- Optional selection fails exactly when the working WorldState has no code. -/
@@ -83,7 +83,7 @@ theorem runCodeWithStorage?_some_fuelSound
       context.runCodeWithStorage? codeAddress fuel = some result) :
     ∃ code,
       context.context.values.working.1.code? codeAddress = some code ∧
-        HostStorageDriver.FuelSound result fuel context
+        HostStorageDriver.FuelSound result codeAddress fuel context
           (Core.State.initial code.program.body Core.hostEnvironment) := by
   unfold runCodeWithStorage? at executed
   cases selected :
@@ -93,7 +93,8 @@ theorem runCodeWithStorage?_some_fuelSound
       rw [selected] at executed
       have resultEq := Option.some.inj executed
       subst result
-      exact ⟨code, rfl, code.runWithStorage_fuelSound context fuel⟩
+      exact ⟨code, rfl,
+        code.runWithStorage_fuelSound context codeAddress fuel⟩
 
 /-- Successful selection is exactly selected-code handled fuel evidence. -/
 theorem runCodeWithStorage?_eq_some_iff_fuelSound
@@ -106,7 +107,7 @@ theorem runCodeWithStorage?_eq_some_iff_fuelSound
     context.runCodeWithStorage? codeAddress fuel = some result ↔
       ∃ code,
         context.context.values.working.1.code? codeAddress = some code ∧
-          HostStorageDriver.FuelSound result fuel context
+          HostStorageDriver.FuelSound result codeAddress fuel context
             (Core.State.initial code.program.body Core.hostEnvironment) := by
   constructor
   · exact runCodeWithStorage?_some_fuelSound context codeAddress fuel result
@@ -114,7 +115,8 @@ theorem runCodeWithStorage?_eq_some_iff_fuelSound
     unfold runCodeWithStorage?
     rw [selected]
     exact congrArg some
-      ((code.runWithStorage_eq_iff_fuelSound context fuel result).2 sound)
+      ((code.runWithStorage_eq_iff_fuelSound
+        context codeAddress fuel result).2 sound)
 
 /-- A selected run identifies the checked result type it preserves. -/
 theorem runCodeWithStorage?_some_hasType
@@ -138,7 +140,8 @@ theorem runCodeWithStorage?_some_hasType
       rw [selected] at executed
       have resultEq := Option.some.inj executed
       subst result
-      exact ⟨code, rfl, code.runWithStorage_hasType context fuel⟩
+      exact ⟨code, rfl,
+        code.runWithStorage_hasType context codeAddress fuel⟩
 
 /-- A selected combined run preserves checked code at every working Address. -/
 theorem runCodeWithStorage?_some_workingCode?
@@ -163,7 +166,7 @@ theorem runCodeWithStorage?_some_workingCode?
       subst result
       simpa only [CheckedHostCoreProgram.runWithStorage] using
         HostStorageDriver.run_workingCode?
-          context fuel
+          context codeAddress fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
           observedAddress
 
@@ -187,7 +190,7 @@ theorem runCodeWithStorage?_some_storageAddress
       have resultEq := Option.some.inj executed
       subst result
       simpa only [CheckedHostCoreProgram.runWithStorage] using
-        HostStorageDriver.run_storageAddress context fuel
+        HostStorageDriver.run_storageAddress context codeAddress fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
 
 /-- A selected combined run retains the complete checkpoint. -/
@@ -211,7 +214,7 @@ theorem runCodeWithStorage?_some_checkpoint
       have resultEq := Option.some.inj executed
       subst result
       simpa only [CheckedHostCoreProgram.runWithStorage] using
-        HostStorageDriver.run_checkpoint context fuel
+        HostStorageDriver.run_checkpoint context codeAddress fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
 
 /-- A selected combined run retains the complete working effect journal. -/
@@ -235,7 +238,7 @@ theorem runCodeWithStorage?_some_workingEffects
       have resultEq := Option.some.inj executed
       subst result
       simpa only [CheckedHostCoreProgram.runWithStorage] using
-        HostStorageDriver.run_workingEffects context fuel
+        HostStorageDriver.run_workingEffects context codeAddress fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
 
 /-- A selected combined run preserves every non-storage working Account. -/
@@ -262,7 +265,7 @@ theorem runCodeWithStorage?_some_workingAccount?_of_ne_storageAddress
       subst result
       simpa only [CheckedHostCoreProgram.runWithStorage] using
         HostStorageDriver.run_workingAccount?_of_ne_storageAddress
-          context fuel
+          context codeAddress fuel
           (Core.State.initial code.program.body Core.hostEnvironment)
           observedAddress different
 
@@ -292,7 +295,7 @@ theorem runCodeWithStorage?_some_done_stable
       rw [selected] at execution
       simp only [Option.map_some] at execution ⊢
       exact congrArg some
-        (code.runWithStorage_done_stable context
+        (code.runWithStorage_done_stable context codeAddress
           (Option.some.inj execution) more)
 
 /-- Address-selected checked host execution cannot return a driver fault. -/
@@ -315,7 +318,7 @@ theorem runCodeWithStorage?_ne_some_fault
       intro same
       have resultEq := Option.some.inj same
       have outcomeEq := congrArg HostDriverResult.outcome resultEq
-      exact code.runWithStorage_ne_fault context fuel error faultState
+      exact code.runWithStorage_ne_fault context codeAddress fuel error faultState
         outcomeEq
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount

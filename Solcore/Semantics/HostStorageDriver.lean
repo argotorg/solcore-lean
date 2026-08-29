@@ -16,10 +16,11 @@ def run
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (state : Core.State) :
     HostDriverResult (Context RollbackState TraceState) :=
-  HostDriver.run handler context fuel state
+  HostDriver.run (handler codeAddress) context fuel state
 
 end HostStorageDriver
 
@@ -31,10 +32,11 @@ def runWithStorage
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat) :
     HostDriverResult
       (HostStorageDriver.Context RollbackState TraceState) :=
-  HostStorageDriver.run context fuel
+  HostStorageDriver.run context codeAddress fuel
     (Core.State.initial code.program.body Core.hostEnvironment)
 
 end CheckedHostCoreProgram

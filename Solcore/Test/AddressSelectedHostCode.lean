@@ -139,59 +139,66 @@ private theorem compileTimePresentBranchRegression
       context.context.values.working.1.account? address = some account)
     (codePresent : account.code? = some code) :
     context.runCodeWithStorage? address fuel =
-      some (code.runWithStorage context fuel) :=
+      some (code.runWithStorage context address fuel) :=
   FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_of_present
     context address account code fuel accountPresent codePresent
 
 private theorem compileTimeRemainingFuelRegression
     (context : HostStorageDriver.Context Nat (List Nat))
+    (codeAddress : Address)
     (fuel remainingFuel : Nat)
     (state : State)
     (suspension : HostSuspension)
     (execution :
       hostRun fuel state = .suspended suspension remainingFuel) :
-    HostStorageDriver.run context fuel state =
+    HostStorageDriver.run context codeAddress fuel state =
       HostStorageDriver.run
-        (HostStorageDriver.handleSuspension context suspension).1
-        remainingFuel
-        (HostStorageDriver.handleSuspension context suspension).2 :=
+        (HostStorageDriver.handleSuspension
+          codeAddress context suspension).1 codeAddress remainingFuel
+        (HostStorageDriver.handleSuspension
+          codeAddress context suspension).2 :=
   HostStorageDriver.run_of_suspended
-    context fuel remainingFuel state suspension execution
+    context codeAddress fuel remainingFuel state suspension execution
 
 private theorem compileTimeFuelSoundRegression
     (context : HostStorageDriver.Context Nat (List Nat))
+    (codeAddress : Address)
     (fuel : Nat)
     (state : State) :
     HostStorageDriver.FuelSound
-      (HostStorageDriver.run context fuel state) fuel context state :=
-  HostStorageDriver.run_fuelSound context fuel state
+      (HostStorageDriver.run context codeAddress fuel state)
+      codeAddress fuel context state :=
+  HostStorageDriver.run_fuelSound context codeAddress fuel state
 
 private theorem compileTimeCheckedTypingRegression
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context Nat (List Nat))
+    (codeAddress : Address)
     (fuel : Nat) :
-    (code.runWithStorage context fuel).outcome.HasType
+    (code.runWithStorage context codeAddress fuel).outcome.HasType
       code.program.resultType code.program.dataDefinitions :=
-  code.runWithStorage_hasType context fuel
+  code.runWithStorage_hasType context codeAddress fuel
 
 private theorem compileTimeCheckedNoFaultRegression
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context Nat (List Nat))
+    (codeAddress : Address)
     (fuel : Nat)
     (error : MachineFault)
     (faultState : State) :
-    (code.runWithStorage context fuel).outcome ≠
+    (code.runWithStorage context codeAddress fuel).outcome ≠
       .fault error faultState :=
-  code.runWithStorage_ne_fault context fuel error faultState
+  code.runWithStorage_ne_fault context codeAddress fuel error faultState
 
 private theorem compileTimeCheckedFuelSoundRegression
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context Nat (List Nat))
+    (codeAddress : Address)
     (fuel : Nat) :
     HostStorageDriver.FuelSound
-      (code.runWithStorage context fuel)
+      (code.runWithStorage context codeAddress fuel) codeAddress
       fuel context (State.initial code.program.body hostEnvironment) :=
-  code.runWithStorage_fuelSound context fuel
+  code.runWithStorage_fuelSound context codeAddress fuel
 
 private def returnedContextLooksUnchanged
     (context : HostStorageDriver.Context Nat (List Nat)) :
@@ -258,7 +265,8 @@ def testAddressSelectedHostCode : IO Unit := do
       | none =>
           throw (IO.userError "a storage update erased selected host code")
 
-      let cellResult := cellDependentReadCode.runWithStorage context 64
+      let cellResult :=
+        cellDependentReadCode.runWithStorage context codeAddress 64
       assertTrue
         (cellResult.outcome == .done (.word finalValue) [.bool true])
         "handled reads lost the Core-local cell store"

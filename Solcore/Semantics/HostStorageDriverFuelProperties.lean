@@ -14,20 +14,22 @@ namespace HostStorageDriver
 /-- Transition segments specialized to the combined storage handler. -/
 abbrev HandledSteps
     {RollbackState : Type u}
-    {TraceState : Type v} :=
+    {TraceState : Type v}
+    (codeAddress : Address) :=
   HostDriver.HandledSteps
-    (@handler RollbackState TraceState)
+    (@handler RollbackState TraceState codeAddress)
 
 /-- Generic fuel soundness specialized without occupying the global dot API. -/
 def FuelSound
     {RollbackState : Type u}
     {TraceState : Type v}
     (result : HostDriverResult (Context RollbackState TraceState))
+    (codeAddress : Address)
     (fuel : Nat)
     (startContext : Context RollbackState TraceState)
     (start : Core.State) : Prop :=
   result.FuelSoundWith
-    (@handler RollbackState TraceState)
+    (@handler RollbackState TraceState codeAddress)
     fuel startContext start
 
 namespace FuelSound
@@ -36,6 +38,7 @@ namespace FuelSound
 theorem prependRequest
     {RollbackState : Type u}
     {TraceState : Type v}
+    {codeAddress : Address}
     {result : HostDriverResult (Context RollbackState TraceState)}
     {fuel remainingFuel prefixSteps : Nat}
     {context nextContext : Context RollbackState TraceState}
@@ -44,12 +47,12 @@ theorem prependRequest
     (prefixPath : Core.HostSteps prefixSteps start requestState)
     (emission : Core.HostRequestEmission requestState suspension)
     (handled :
-      handleSuspension context suspension = (nextContext, resumed))
+      handleSuspension codeAddress context suspension = (nextContext, resumed))
     (accounting : prefixSteps + remainingFuel + 1 = fuel)
     (suffixSound :
       HostStorageDriver.FuelSound
-        result remainingFuel nextContext resumed) :
-    HostStorageDriver.FuelSound result fuel context start := by
+        result codeAddress remainingFuel nextContext resumed) :
+    HostStorageDriver.FuelSound result codeAddress fuel context start := by
   apply HostDriverResult.FuelSoundWith.prependRequest
     prefixPath emission (accounting := accounting)
   · simpa only [handleSuspension] using handled
@@ -62,12 +65,14 @@ theorem run_fuelSound
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (state : Core.State) :
-    FuelSound (run context fuel state) fuel context state := by
+    FuelSound (run context codeAddress fuel state) codeAddress
+      fuel context state := by
   simpa only [run, FuelSound] using
     HostDriver.run_fuelSound
-      (@handler RollbackState TraceState)
+      (@handler RollbackState TraceState codeAddress)
       context fuel state
 
 /-- Fuel evidence for the combined handler determines its executable result. -/
@@ -75,14 +80,15 @@ theorem run_eq_of_fuelSound
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (state : Core.State)
     (result : HostDriverResult (Context RollbackState TraceState))
-    (sound : FuelSound result fuel context state) :
-    run context fuel state = result := by
+    (sound : FuelSound result codeAddress fuel context state) :
+    run context codeAddress fuel state = result := by
   simpa only [run, FuelSound] using
     HostDriver.run_eq_of_fuelSoundWith
-      (@handler RollbackState TraceState)
+      (@handler RollbackState TraceState codeAddress)
       context fuel state result sound
 
 /-- Combined storage execution is exactly its handled fuel specification. -/
@@ -90,14 +96,15 @@ theorem run_eq_iff_fuelSound
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (state : Core.State)
     (result : HostDriverResult (Context RollbackState TraceState)) :
-    run context fuel state = result ↔
-      FuelSound result fuel context state := by
+    run context codeAddress fuel state = result ↔
+      FuelSound result codeAddress fuel context state := by
   simpa only [run, FuelSound] using
     HostDriver.run_eq_iff_fuelSoundWith
-      (@handler RollbackState TraceState)
+      (@handler RollbackState TraceState codeAddress)
       context fuel state result
 
 /-- A completed combined-storage result is stable under additional fuel. -/
@@ -105,20 +112,21 @@ theorem run_done_stable
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : Context RollbackState TraceState)
+    (codeAddress : Address)
     {fuel largerFuel : Nat}
     (state : Core.State)
     {finalContext : Context RollbackState TraceState}
     {value : Core.Value}
     {store : Core.Store}
     (execution :
-      run context fuel state =
+      run context codeAddress fuel state =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    run context largerFuel state =
+    run context codeAddress largerFuel state =
       ⟨finalContext, .done value store⟩ := by
   simpa only [run] using
     HostDriver.run_done_stable
-      (@handler RollbackState TraceState)
+      (@handler RollbackState TraceState codeAddress)
       execution more
 
 end HostStorageDriver
@@ -131,12 +139,13 @@ theorem runWithStorage_fuelSound
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat) :
     HostStorageDriver.FuelSound
-      (code.runWithStorage context fuel)
+      (code.runWithStorage context codeAddress fuel) codeAddress
       fuel context
       (Core.State.initial code.program.body Core.hostEnvironment) := by
-  exact HostStorageDriver.run_fuelSound context fuel _
+  exact HostStorageDriver.run_fuelSound context codeAddress fuel _
 
 /-- Checked combined execution is exactly its handled fuel specification. -/
 theorem runWithStorage_eq_iff_fuelSound
@@ -144,17 +153,18 @@ theorem runWithStorage_eq_iff_fuelSound
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (result :
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
-    code.runWithStorage context fuel = result ↔
+    code.runWithStorage context codeAddress fuel = result ↔
       HostStorageDriver.FuelSound
-        result fuel context
+        result codeAddress fuel context
         (Core.State.initial code.program.body Core.hostEnvironment) := by
   simpa only [runWithStorage] using
     HostStorageDriver.run_eq_iff_fuelSound
-      context fuel
+      context codeAddress fuel
       (Core.State.initial code.program.body Core.hostEnvironment)
       result
 
@@ -164,20 +174,21 @@ theorem runWithStorage_done_stable
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     {fuel largerFuel : Nat}
     {finalContext :
       HostStorageDriver.Context RollbackState TraceState}
     {value : Core.Value}
     {store : Core.Store}
     (execution :
-      code.runWithStorage context fuel =
+      code.runWithStorage context codeAddress fuel =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    code.runWithStorage context largerFuel =
+    code.runWithStorage context codeAddress largerFuel =
       ⟨finalContext, .done value store⟩ := by
   simpa only [runWithStorage] using
     HostStorageDriver.run_done_stable
-      context
+      context codeAddress
       (Core.State.initial code.program.body Core.hostEnvironment)
       execution more
 

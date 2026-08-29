@@ -33,91 +33,97 @@ private def trappedFrameOutcome
 private theorem compileTimeWriteResumeRegression
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (slot value : Word)
     (continuation : List Frame)
     (store : Store) :
-    (HostStorageDriver.handleSuspension context
+    (HostStorageDriver.handleSuspension codeAddress context
         ⟨.storageWrite slot value, continuation, store⟩).1 =
           context.writeStorage slot value ∧
-      (HostStorageDriver.handleSuspension context
+      (HostStorageDriver.handleSuspension codeAddress context
           ⟨.storageWrite slot value, continuation, store⟩).2.control =
         .ret .unit ∧
-      (HostStorageDriver.handleSuspension context
+      (HostStorageDriver.handleSuspension codeAddress context
           ⟨.storageWrite slot value, continuation, store⟩).2.continuation =
         continuation ∧
-      (HostStorageDriver.handleSuspension context
+      (HostStorageDriver.handleSuspension codeAddress context
           ⟨.storageWrite slot value, continuation, store⟩).2.store = store := by
   exact
     ⟨HostStorageDriver.handleSuspension_storageWrite_context
-        context slot value continuation store,
+        codeAddress context slot value continuation store,
       HostStorageDriver.handleSuspension_storageWrite_control
-        context slot value continuation store,
+        codeAddress context slot value continuation store,
       HostStorageDriver.handleSuspension_storageWrite_continuation
-        context slot value continuation store,
+        codeAddress context slot value continuation store,
       HostStorageDriver.handleSuspension_storageWrite_store
-        context slot value continuation store⟩
+        codeAddress context slot value continuation store⟩
 
 /-- The selector handler exposes its exact lossless, context-preserving response. -/
 private theorem compileTimeStorageAddressResumeRegression
     {RollbackState : Type u} {TraceState : Type v}
+    (codeAddress : Address)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (continuation : List Frame) (store : Store) :
-    (HostStorageDriver.handleSuspension context
+    (HostStorageDriver.handleSuspension codeAddress context
         ⟨.storageAddress, continuation, store⟩).1 = context ∧
-      (HostStorageDriver.handleSuspension context
+      (HostStorageDriver.handleSuspension codeAddress context
         ⟨.storageAddress, continuation, store⟩).2.control =
           .ret (.word (addressToWord context.context.storageAddress)) ∧
-      (HostStorageDriver.handleSuspension context
+      (HostStorageDriver.handleSuspension codeAddress context
         ⟨.storageAddress, continuation, store⟩).2.continuation = continuation ∧
-      (HostStorageDriver.handleSuspension context
+      (HostStorageDriver.handleSuspension codeAddress context
         ⟨.storageAddress, continuation, store⟩).2.store = store ∧
       wordToAddress?
-          (HostStorageDriver.handler.handle context .storageAddress).2 =
+          ((HostStorageDriver.handler codeAddress).handle
+            context .storageAddress).2 =
         some context.context.storageAddress := by
   exact
     ⟨HostStorageDriver.handleSuspension_storageAddress_context
-        context continuation store,
+        codeAddress context continuation store,
       HostStorageDriver.handleSuspension_storageAddress_control
-        context continuation store,
+        codeAddress context continuation store,
       HostStorageDriver.handleSuspension_storageAddress_continuation
-        context continuation store,
+        codeAddress context continuation store,
       HostStorageDriver.handleSuspension_storageAddress_store
-        context continuation store,
-      HostStorageDriver.wordToAddress?_handler_storageAddress context⟩
+        codeAddress context continuation store,
+      HostStorageDriver.wordToAddress?_handler_storageAddress
+        codeAddress context⟩
 
 /-- The public selector rule reuses Core's exact remaining fuel. -/
 private theorem compileTimeStorageAddressRemainingFuelRegression
     {RollbackState : Type u} {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel remainingFuel : Nat) (state : State)
     (continuation : List Frame) (store : Store)
     (execution :
       hostRun fuel state =
         .suspended ⟨.storageAddress, continuation, store⟩ remainingFuel) :
-    HostStorageDriver.run context fuel state =
-      HostStorageDriver.run context remainingFuel
+    HostStorageDriver.run context codeAddress fuel state =
+      HostStorageDriver.run context codeAddress remainingFuel
         ⟨.ret (.word (addressToWord context.context.storageAddress)),
           continuation, store⟩ :=
   HostStorageDriver.run_of_suspended_storageAddress
-    context fuel remainingFuel state continuation store execution
+    context codeAddress fuel remainingFuel state continuation store execution
 
 /-- Public handler observations fix read-after-write and sparse zero deletion. -/
 private theorem compileTimeWriteObservationRegression
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (slot value : Word) :
-    ((HostStorageDriver.handler.handle context
+    (((HostStorageDriver.handler codeAddress).handle context
       (.storageWrite slot value)).1).readStorage slot = value ∧
-      ((HostStorageDriver.handler.handle context
+      (((HostStorageDriver.handler codeAddress).handle context
         (.storageWrite slot Word.zero)).1).storageAccount.storageValue?
           slot = none := by
   exact
     ⟨HostStorageDriver.handler_storageWrite_readStorage_same
-        context slot value,
+        codeAddress context slot value,
       HostStorageDriver.handler_storageWrite_zero_storageValue?
-        context slot⟩
+        codeAddress context slot⟩
 
 /-- A successful selected run exposes both typing and exact fuel evidence. -/
 private theorem compileTimeSelectedEvidenceRegression
@@ -136,7 +142,7 @@ private theorem compileTimeSelectedEvidenceRegression
           code.program.resultType code.program.dataDefinitions) ∧
     (∃ code,
       context.context.values.working.1.code? codeAddress = some code ∧
-        HostStorageDriver.FuelSound result fuel context
+        HostStorageDriver.FuelSound result codeAddress fuel context
           (State.initial code.program.body hostEnvironment)) := by
   exact
     ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_hasType
@@ -156,7 +162,7 @@ private theorem compileTimeSelectedCompletenessRegression
     context.runCodeWithStorage? codeAddress fuel = some result ↔
       ∃ code,
         context.context.values.working.1.code? codeAddress = some code ∧
-          HostStorageDriver.FuelSound result fuel context
+          HostStorageDriver.FuelSound result codeAddress fuel context
             (State.initial code.program.body hostEnvironment) :=
   FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_eq_some_iff_fuelSound
     context codeAddress fuel result
@@ -174,7 +180,7 @@ private theorem compileTimeSelectedCompletenessForwardRegression
       context.runCodeWithStorage? codeAddress fuel = some result) :
     ∃ code,
       context.context.values.working.1.code? codeAddress = some code ∧
-        HostStorageDriver.FuelSound result fuel context
+        HostStorageDriver.FuelSound result codeAddress fuel context
           (State.initial code.program.body hostEnvironment) :=
   (compileTimeSelectedCompletenessRegression
     context codeAddress fuel result).mp executed
@@ -192,7 +198,7 @@ private theorem compileTimeSelectedCompletenessReplayRegression
     (selected :
       context.context.values.working.1.code? codeAddress = some code)
     (sound :
-      HostStorageDriver.FuelSound result fuel context
+      HostStorageDriver.FuelSound result codeAddress fuel context
         (State.initial code.program.body hostEnvironment)) :
     context.runCodeWithStorage? codeAddress fuel = some result :=
   (compileTimeSelectedCompletenessRegression
@@ -223,7 +229,7 @@ private theorem compileTimeSelectedOutOfFuelIsSomeRegression
     (finalContext : HostStorageDriver.Context RollbackState TraceState)
     (state : State)
     (exhausted :
-      code.runWithStorage context fuel =
+      code.runWithStorage context codeAddress fuel =
         ⟨finalContext, .outOfFuel state⟩) :
     context.runCodeWithStorage? codeAddress fuel =
       some ⟨finalContext, .outOfFuel state⟩ := by
@@ -287,20 +293,23 @@ private theorem compileTimeStorageDriverCompletenessRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (state : State)
     (result :
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
-    HostStorageDriver.run context fuel state = result ↔
-      HostStorageDriver.FuelSound result fuel context state :=
-  HostStorageDriver.run_eq_iff_fuelSound context fuel state result
+    HostStorageDriver.run context codeAddress fuel state = result ↔
+      HostStorageDriver.FuelSound result codeAddress fuel context state :=
+  HostStorageDriver.run_eq_iff_fuelSound
+    context codeAddress fuel state result
 
 /-- Combined storage done stability retains the exact full driver result. -/
 private theorem compileTimeStorageDriverDoneStabilityRegression
     {RollbackState : Type u}
     {TraceState : Type v}
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     {fuel largerFuel : Nat}
     (state : State)
     {finalContext :
@@ -308,12 +317,13 @@ private theorem compileTimeStorageDriverDoneStabilityRegression
     {value : Value}
     {store : Store}
     (execution :
-      HostStorageDriver.run context fuel state =
+      HostStorageDriver.run context codeAddress fuel state =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    HostStorageDriver.run context largerFuel state =
+    HostStorageDriver.run context codeAddress largerFuel state =
       ⟨finalContext, .done value store⟩ :=
-  HostStorageDriver.run_done_stable context state execution more
+  HostStorageDriver.run_done_stable
+    context codeAddress state execution more
 
 /-- Checked execution exposes the same exact executable/specification iff. -/
 private theorem compileTimeCheckedCompletenessRegression
@@ -321,15 +331,16 @@ private theorem compileTimeCheckedCompletenessRegression
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (result :
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
-    code.runWithStorage context fuel = result ↔
-      HostStorageDriver.FuelSound result fuel context
+    code.runWithStorage context codeAddress fuel = result ↔
+      HostStorageDriver.FuelSound result codeAddress fuel context
         (State.initial code.program.body hostEnvironment) :=
   CheckedHostCoreProgram.runWithStorage_eq_iff_fuelSound
-    code context fuel result
+    code context codeAddress fuel result
 
 /-- Checked done stability retains the exact full driver result. -/
 private theorem compileTimeCheckedDoneStabilityRegression
@@ -337,19 +348,20 @@ private theorem compileTimeCheckedDoneStabilityRegression
     {TraceState : Type v}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     {fuel largerFuel : Nat}
     {finalContext :
       HostStorageDriver.Context RollbackState TraceState}
     {value : Value}
     {store : Store}
     (execution :
-      code.runWithStorage context fuel =
+      code.runWithStorage context codeAddress fuel =
         ⟨finalContext, .done value store⟩)
     (more : fuel ≤ largerFuel) :
-    code.runWithStorage context largerFuel =
+    code.runWithStorage context codeAddress largerFuel =
       ⟨finalContext, .done value store⟩ :=
   CheckedHostCoreProgram.runWithStorage_done_stable
-    code context execution more
+    code context codeAddress execution more
 
 /-- Address-selected done stability retains the exact optional full result. -/
 private theorem compileTimeSelectedDoneStabilityRegression
@@ -481,17 +493,18 @@ private theorem compileTimeCheckedFrameContinuationRegression
     {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason) :
-    (code.runWithStorage context fuel).toFrameContinuationContext?
+    (code.runWithStorage context codeAddress fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome = none ↔
       ∃ finalContext exhausted,
-        code.runWithStorage context fuel =
+        code.runWithStorage context codeAddress fuel =
           ⟨finalContext, .outOfFuel exhausted⟩ :=
   code.runWithStorage_toFrameContinuationContext?_eq_none_iff
-    context fuel doneOutcome
+    context codeAddress fuel doneOutcome
 
 private theorem compileTimeCheckedFrameContinuationStabilityRegression
     {RollbackState : Type u}
@@ -499,6 +512,7 @@ private theorem compileTimeCheckedFrameContinuationStabilityRegression
     {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Value → Store → FrameOutcome TrapReason)
@@ -506,15 +520,15 @@ private theorem compileTimeCheckedFrameContinuationStabilityRegression
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      (code.runWithStorage context fuel).toFrameContinuationContext?
+      (code.runWithStorage context codeAddress fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome =
         some continuation)
     (more : fuel ≤ largerFuel) :
-    (code.runWithStorage context largerFuel).toFrameContinuationContext?
+    (code.runWithStorage context codeAddress largerFuel).toFrameContinuationContext?
         (fun current => current.context.values) doneOutcome =
       some continuation :=
   code.runWithStorage_toFrameContinuationContext?_some_stable
-    context doneOutcome completed more
+    context codeAddress doneOutcome completed more
 
 /-- Selected adaptation keeps code absence distinct from selected exhaustion. -/
 private theorem compileTimeSelectedFrameContinuationBoundaryRegression

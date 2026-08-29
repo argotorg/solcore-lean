@@ -16,11 +16,12 @@ universe u v
 @[simp] theorem handleSuspension_storageRead_context
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot : Core.Word)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageRead slot, continuation, store⟩).1 = context := by
   rw [handleSuspension_storageRead]
 
@@ -28,11 +29,12 @@ universe u v
 @[simp] theorem handleSuspension_storageWrite_context
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot value : Core.Word)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageWrite slot value, continuation, store⟩).1 =
         context.writeStorage slot value := by
   rw [handleSuspension_storageWrite]
@@ -41,11 +43,12 @@ universe u v
 @[simp] theorem handleSuspension_storageWrite_control
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot value : Core.Word)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageWrite slot value, continuation, store⟩).2.control =
         .ret .unit := by
   rw [handleSuspension_storageWrite]
@@ -54,9 +57,10 @@ universe u v
 @[simp] theorem handleSuspension_continuation
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (suspension : Core.HostSuspension) :
-    (handleSuspension context suspension).2.continuation =
+    (handleSuspension codeAddress context suspension).2.continuation =
       suspension.continuation := by
   simp [handleSuspension, HostHandler.handleSuspension]
 
@@ -64,46 +68,50 @@ universe u v
 @[simp] theorem handleSuspension_store
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (suspension : Core.HostSuspension) :
-    (handleSuspension context suspension).2.store = suspension.store := by
+    (handleSuspension codeAddress context suspension).2.store = suspension.store := by
   simp [handleSuspension, HostHandler.handleSuspension]
 
 /-- The write branch preserves the exact saved Core continuation. -/
 @[simp] theorem handleSuspension_storageWrite_continuation
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot value : Core.Word)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageWrite slot value, continuation, store⟩).2.continuation =
         continuation := by
-  exact handleSuspension_continuation context
+  exact handleSuspension_continuation codeAddress context
     ⟨Core.HostRequest.storageWrite slot value, continuation, store⟩
 
 /-- The write branch preserves the exact Core-local store. -/
 @[simp] theorem handleSuspension_storageWrite_store
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot value : Core.Word)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageWrite slot value, continuation, store⟩).2.store = store := by
-  exact handleSuspension_store context
+  exact handleSuspension_store codeAddress context
     ⟨Core.HostRequest.storageWrite slot value, continuation, store⟩
 
 /-- A handled selector observation leaves the complete context unchanged. -/
 @[simp] theorem handleSuspension_storageAddress_context
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageAddress, continuation, store⟩).1 = context := by
   rw [handleSuspension_storageAddress]
 
@@ -111,10 +119,11 @@ universe u v
 @[simp] theorem handleSuspension_storageAddress_control
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageAddress, continuation, store⟩).2.control =
         .ret (.word (addressToWord context.context.storageAddress)) := by
   rw [handleSuspension_storageAddress]
@@ -123,33 +132,36 @@ universe u v
 @[simp] theorem handleSuspension_storageAddress_continuation
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageAddress, continuation, store⟩).2.continuation =
         continuation := by
-  exact handleSuspension_continuation context
+  exact handleSuspension_continuation codeAddress context
     ⟨Core.HostRequest.storageAddress, continuation, store⟩
 
 /-- A selector observation preserves the exact Core-local store. -/
 @[simp] theorem handleSuspension_storageAddress_store
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    (handleSuspension context
+    (handleSuspension codeAddress context
       ⟨.storageAddress, continuation, store⟩).2.store = store := by
-  exact handleSuspension_store context
+  exact handleSuspension_store codeAddress context
     ⟨Core.HostRequest.storageAddress, continuation, store⟩
 
 /-- The widened handler response narrows back to the retained selector. -/
 @[simp] theorem wordToAddress?_handler_storageAddress
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState) :
-    wordToAddress? (handler.handle context .storageAddress).2 =
+    wordToAddress? ((handler codeAddress).handle context .storageAddress).2 =
       some context.context.storageAddress := by
   change
     wordToAddress? (addressToWord context.context.storageAddress) =
@@ -160,9 +172,11 @@ universe u v
 @[simp] theorem handler_storageWrite_readStorage_same
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot value : Core.Word) :
-    ((handler.handle context (.storageWrite slot value)).1).readStorage slot =
+    (((handler codeAddress).handle context
+      (.storageWrite slot value)).1).readStorage slot =
       value := by
   change (context.writeStorage slot value).readStorage slot = value
   exact
@@ -173,9 +187,10 @@ universe u v
 @[simp] theorem handler_storageWrite_zero_storageValue?
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot : Core.Word) :
-    ((handler.handle context
+    (((handler codeAddress).handle context
       (.storageWrite slot Core.Word.zero)).1).storageAccount.storageValue?
         slot = none := by
   change
@@ -191,15 +206,16 @@ theorem handleSuspension_state_hasType
     {TraceState : Type v}
     {definitions : Core.DataEnvironment}
     {resultType : Core.Ty}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (suspension : Core.HostSuspension)
     (typing :
       Core.HostSuspensionHasType suspension resultType definitions) :
     Core.HostStateHasType
-      (handleSuspension context suspension).2
+      (handleSuspension codeAddress context suspension).2
       resultType definitions := by
   simpa only [handleSuspension] using
     HostHandler.handleSuspension_state_hasType
-      handler context suspension typing
+      (handler codeAddress) context suspension typing
 
 end Solcore.Semantics.HostStorageDriver

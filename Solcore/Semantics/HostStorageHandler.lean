@@ -27,6 +27,7 @@ response indexed by that exact request.
 def handleRequest
     {RollbackState : Type u}
     {TraceState : Type v}
+    (_codeAddress : Address)
     (context : Context RollbackState TraceState)
     (request : Core.HostRequest) :
     Context RollbackState TraceState × request.Response :=
@@ -39,36 +40,40 @@ def handleRequest
 /-- The total dependent handler used by combined storage execution. -/
 def handler
     {RollbackState : Type u}
-    {TraceState : Type v} :
+    {TraceState : Type v}
+    (codeAddress : Address) :
     HostHandler (Context RollbackState TraceState) where
-  handle := handleRequest
+  handle := handleRequest codeAddress
 
 /-- Handle one storage suspension and resume its saved Core continuation. -/
 def handleSuspension
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (suspension : Core.HostSuspension) :
     Context RollbackState TraceState × Core.State :=
-  handler.handleSuspension context suspension
+  (handler codeAddress).handleSuspension context suspension
 
 @[simp] theorem handleRequest_storageRead
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot : Core.Word) :
-    handleRequest context (.storageRead slot) =
+    handleRequest codeAddress context (.storageRead slot) =
       (context, context.readStorage slot) :=
   rfl
 
 @[simp] theorem handleSuspension_storageRead
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot : Core.Word)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    handleSuspension context
+    handleSuspension codeAddress context
         ⟨.storageRead slot, continuation, store⟩ =
       (context,
         ⟨.ret (.word (context.readStorage slot)), continuation, store⟩) :=
@@ -77,20 +82,22 @@ def handleSuspension
 @[simp] theorem handleRequest_storageWrite
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot value : Core.Word) :
-    handleRequest context (.storageWrite slot value) =
+    handleRequest codeAddress context (.storageWrite slot value) =
       (context.writeStorage slot value, ()) :=
   rfl
 
 @[simp] theorem handleSuspension_storageWrite
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (slot value : Core.Word)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    handleSuspension context
+    handleSuspension codeAddress context
         ⟨.storageWrite slot value, continuation, store⟩ =
       (context.writeStorage slot value,
         ⟨.ret .unit, continuation, store⟩) :=
@@ -99,18 +106,20 @@ def handleSuspension
 @[simp] theorem handleRequest_storageAddress
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState) :
-    handleRequest context .storageAddress =
+    handleRequest codeAddress context .storageAddress =
       (context, addressToWord context.context.storageAddress) :=
   rfl
 
 @[simp] theorem handleSuspension_storageAddress
     {RollbackState : Type u}
     {TraceState : Type v}
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (continuation : List Core.Frame)
     (store : Core.Store) :
-    handleSuspension context
+    handleSuspension codeAddress context
         ⟨.storageAddress, continuation, store⟩ =
       (context,
         ⟨.ret (.word (addressToWord context.context.storageAddress)),

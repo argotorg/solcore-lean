@@ -19,23 +19,25 @@ theorem runWithStorage_toFrameContinuationContext?_eq_none_iff
     {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (fuel : Nat)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Core.Value → Core.Store → FrameOutcome TrapReason) :
-    (code.runWithStorage context fuel).toFrameContinuationContext?
+    (code.runWithStorage context codeAddress fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome = none ↔
       ∃ finalContext exhausted,
-        code.runWithStorage context fuel =
+        code.runWithStorage context codeAddress fuel =
           ⟨finalContext, .outOfFuel exhausted⟩ := by
-  cases execution : code.runWithStorage context fuel with
+  cases execution : code.runWithStorage context codeAddress fuel with
   | mk finalContext outcome =>
       cases outcome with
       | done value store => simp
       | outOfFuel exhausted => simp
       | fault error faultState =>
           have contradiction :=
-            code.runWithStorage_ne_fault context fuel error faultState
+            code.runWithStorage_ne_fault
+              context codeAddress fuel error faultState
           rw [execution] at contradiction
           simp at contradiction
 
@@ -46,6 +48,7 @@ theorem runWithStorage_toFrameContinuationContext?_some_stable
     {TrapReason : Type w}
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
     (doneOutcome :
       HostStorageDriver.Context RollbackState TraceState →
         Core.Value → Core.Store → FrameOutcome TrapReason)
@@ -53,19 +56,20 @@ theorem runWithStorage_toFrameContinuationContext?_some_stable
     {continuation :
       FrameContinuationContext RollbackState TraceState TrapReason}
     (completed :
-      (code.runWithStorage context fuel).toFrameContinuationContext?
+      (code.runWithStorage context codeAddress fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome =
         some continuation)
     (more : fuel ≤ largerFuel) :
-    (code.runWithStorage context largerFuel).toFrameContinuationContext?
+    (code.runWithStorage context codeAddress largerFuel).toFrameContinuationContext?
         (fun current => current.context.values) doneOutcome =
       some continuation := by
-  cases execution : code.runWithStorage context fuel with
+  cases execution : code.runWithStorage context codeAddress fuel with
   | mk finalContext outcome =>
       cases outcome with
       | done value store =>
           have stable :=
-            code.runWithStorage_done_stable context execution more
+            code.runWithStorage_done_stable
+              context codeAddress execution more
           rw [stable]
           rw [execution] at completed
           exact completed
