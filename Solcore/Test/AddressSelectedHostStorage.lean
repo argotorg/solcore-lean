@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationWithInputsProperties
 
 /-! End-to-end regressions for address-selected storage read/write execution. -/
 
@@ -17,6 +17,16 @@ private def codeAddress : Address := ⟨0x10, by decide⟩
 private def storageAddress : Address := ⟨0x20, by decide⟩
 private def otherAddress : Address := ⟨0x30, by decide⟩
 private def maximumAddress : Address := ⟨addressModulus - 1, by decide⟩
+private def suppliedCallValue : Word := ⟨0x73, by decide⟩
+
+private def inputsFor
+    (address : Address) : HostStorageDriver.ExecutionInputs := {
+  codeAddress := address
+  callValue := suppliedCallValue
+}
+
+private def executionInputs : HostStorageDriver.ExecutionInputs :=
+  inputsFor codeAddress
 
 private def expectedStorageAddressWord : Word := ⟨0x20, by decide⟩
 private def expectedCodeAddressWord : Word := ⟨0x10, by decide⟩
@@ -396,7 +406,7 @@ private def assertMixedOutOfFuelAt
     (fuel : Nat)
     (expectedValue : Word)
     (boundary : MixedBoundary) : IO Unit := do
-  match context.runCodeWithStorage? codeAddress fuel with
+  match context.runCodeWithStorageWithInputs? executionInputs fuel with
   | none =>
       throw (IO.userError s!"fuel {fuel} lost the selected code")
   | some { context := resultContext, outcome := .outOfFuel state } =>
@@ -464,15 +474,15 @@ private def assertTrappedFrameResolution
 /-- Exercise all three optional layers without duplicating the storage fixture. -/
 private def assertFrameContinuationAdapter
     (context : HostStorageDriver.Context Nat (List Nat)) : IO Unit := do
-  match context.runCodeWithStorageContinuationContext?
-      maximumAddress completionFuel returnedDoneOutcome with
+  match context.runCodeWithStorageContinuationContextWithInputs?
+      (inputsFor maximumAddress) completionFuel returnedDoneOutcome with
   | none => pure ()
   | some _ =>
       throw (IO.userError
         "missing code did not remain an outer continuation failure")
 
-  match context.runCodeWithStorageContinuationContext?
-      codeAddress 22 returnedDoneOutcome with
+  match context.runCodeWithStorageContinuationContextWithInputs?
+      executionInputs 22 returnedDoneOutcome with
   | some none => pure ()
   | none =>
       throw (IO.userError
@@ -481,14 +491,14 @@ private def assertFrameContinuationAdapter
       throw (IO.userError
         "fuel 22 constructed a continuation before completion")
 
-  match context.runCodeWithStorageContinuationContext?
-        codeAddress completionFuel returnedDoneOutcome,
-      context.runCodeWithStorageContinuationContext?
-        codeAddress completionFuel revertedDoneOutcome,
-      context.runCodeWithStorageContinuationContext?
-        codeAddress completionFuel trappedDoneOutcome,
-      context.runCodeWithStorageContinuationContext?
-        codeAddress 64 returnedDoneOutcome with
+  match context.runCodeWithStorageContinuationContextWithInputs?
+        executionInputs completionFuel returnedDoneOutcome,
+      context.runCodeWithStorageContinuationContextWithInputs?
+        executionInputs completionFuel revertedDoneOutcome,
+      context.runCodeWithStorageContinuationContextWithInputs?
+        executionInputs completionFuel trappedDoneOutcome,
+      context.runCodeWithStorageContinuationContextWithInputs?
+        executionInputs 64 returnedDoneOutcome with
   | some (some returned), some (some reverted), some (some trapped),
       some (some largerReturned) =>
       assertReturnedFrameResolution returned "fuel 28 frame adapter"
@@ -525,18 +535,18 @@ private theorem updateProgram_done_stable
     {finalContext :
       FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat)}
     (execution :
-      context.runCodeWithStorage? codeAddress completionFuel =
+      context.runCodeWithStorageWithInputs? executionInputs completionFuel =
         some ⟨finalContext,
           .done (.word newValue) [.bool true]⟩)
     (written : finalContext.storageAccount.storageRead targetSlot = newValue) :
     (baseContextFor updateCode).withPresentStorageAccount? = some context ∧
-      context.runCodeWithStorage? codeAddress 64 =
+      context.runCodeWithStorageWithInputs? executionInputs 64 =
         some ⟨finalContext,
           .done (.word newValue) [.bool true]⟩ ∧
       finalContext.storageAccount.storageRead targetSlot = newValue := by
   exact ⟨selected,
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
-      context codeAddress execution (by decide),
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_done_stable
+      context executionInputs execution (by decide),
     written⟩
 
 /-- The exact nested continuation produced at fuel 28 survives fuel 64. -/
@@ -545,14 +555,14 @@ private theorem updateProgram_frameContinuation_done_stable
     {continuation :
       FrameContinuationContext Nat (List Nat) FrameAdapterTrapReason}
     (completed :
-      context.runCodeWithStorageContinuationContext?
-        codeAddress completionFuel returnedDoneOutcome =
+      context.runCodeWithStorageContinuationContextWithInputs?
+        executionInputs completionFuel returnedDoneOutcome =
           some (some continuation)) :
-    context.runCodeWithStorageContinuationContext?
-      codeAddress 64 returnedDoneOutcome = some (some continuation) := by
+    context.runCodeWithStorageContinuationContextWithInputs?
+      executionInputs 64 returnedDoneOutcome = some (some continuation) := by
   exact
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_some_some_stable
-      context codeAddress returnedDoneOutcome completed (by decide)
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContextWithInputs?_some_some_stable
+      context executionInputs returnedDoneOutcome completed (by decide)
 
 /-- The selected public stability theorem applies to the mixed fixture. -/
 private theorem observeWriteObserveProgram_done_stable
@@ -564,16 +574,16 @@ private theorem observeWriteObserveProgram_done_stable
     {finalContext :
       FrameCheckpointedWorkingPairWithPresentStorageAccount Nat (List Nat)}
     (execution :
-      context.runCodeWithStorage? codeAddress
+      context.runCodeWithStorageWithInputs? executionInputs
           observeWriteObserveCompletionFuel =
         some ⟨finalContext, .done expectedStorageAddressPair []⟩) :
     (baseContextFor observeWriteObserveCode).withPresentStorageAccount? =
         some context ∧
-      context.runCodeWithStorage? codeAddress 64 =
+      context.runCodeWithStorageWithInputs? executionInputs 64 =
         some ⟨finalContext, .done expectedStorageAddressPair []⟩ := by
   exact ⟨selected,
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
-      context codeAddress execution (by decide)⟩
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_done_stable
+      context executionInputs execution (by decide)⟩
 
 /-- The selected code observation retains its exact result with more fuel. -/
 private theorem codeAddressProgram_done_stable
@@ -583,15 +593,16 @@ private theorem codeAddressProgram_done_stable
         some context)
     {finalContext : HostStorageDriver.Context Nat (List Nat)}
     (execution :
-      context.runCodeWithStorage? codeAddress codeAddressCompletionFuel =
+      context.runCodeWithStorageWithInputs? executionInputs
+          codeAddressCompletionFuel =
         some ⟨finalContext, .done (.word expectedCodeAddressWord) []⟩) :
     (baseContextFor codeAddressCode).withPresentStorageAccount? =
         some context ∧
-      context.runCodeWithStorage? codeAddress 32 =
+      context.runCodeWithStorageWithInputs? executionInputs 32 =
         some ⟨finalContext, .done (.word expectedCodeAddressWord) []⟩ := by
   exact ⟨selected,
-    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
-      context codeAddress execution (by decide)⟩
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_done_stable
+      context executionInputs execution (by decide)⟩
 
 def testAddressSelectedHostStorage : IO Unit := do
   assertTrue updateProgram.checkHost
@@ -628,7 +639,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the storage-address Account was absent")
   | some context =>
-      match context.runCodeWithStorage? codeAddress 4 with
+      match context.runCodeWithStorageWithInputs? executionInputs 4 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (storageAddressRequestReady state)
             "fuel 4 did not stop at the storage-address request"
@@ -640,8 +651,9 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 4 lost the storage-address code")
 
-      match context.runCodeWithStorage? codeAddress storageAddressCompletionFuel,
-          context.runCodeWithStorage? codeAddress 32 with
+      match context.runCodeWithStorageWithInputs?
+          executionInputs storageAddressCompletionFuel,
+          context.runCodeWithStorageWithInputs? executionInputs 32 with
       | some result, some largerResult =>
           assertTrue
             (result.outcome == .done (.word expectedStorageAddressWord) [])
@@ -664,7 +676,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the code-address storage Account was absent")
   | some context =>
-      match context.runCodeWithStorage? codeAddress 4 with
+      match context.runCodeWithStorageWithInputs? executionInputs 4 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (codeAddressRequestReady state)
             "fuel 4 did not stop at the code-address request"
@@ -676,8 +688,9 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 4 lost the code-address code")
 
-      match context.runCodeWithStorage? codeAddress codeAddressCompletionFuel,
-          context.runCodeWithStorage? codeAddress 32 with
+      match context.runCodeWithStorageWithInputs?
+          executionInputs codeAddressCompletionFuel,
+          context.runCodeWithStorageWithInputs? executionInputs 32 with
       | some result, some largerResult =>
           assertTrue
             (result.outcome == .done (.word expectedCodeAddressWord) [])
@@ -703,7 +716,7 @@ def testAddressSelectedHostStorage : IO Unit := do
       throw (IO.userError
         "the code-observe/write/code-observe storage Account was absent")
   | some context =>
-      match context.runCodeWithStorage? codeAddress
+      match context.runCodeWithStorageWithInputs? executionInputs
           observeWriteObserveSecondRequestFuel with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (codeAddressRequestReady state)
@@ -718,7 +731,7 @@ def testAddressSelectedHostStorage : IO Unit := do
           throw (IO.userError
             "fuel 23 lost code-observe/write/code-observe code")
 
-      match context.runCodeWithStorage? codeAddress 29 with
+      match context.runCodeWithStorageWithInputs? executionInputs 29 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (oneStepBeforeCodeAddressPair state)
             "fuel 29 did not stop one step before the code-address pair"
@@ -732,9 +745,9 @@ def testAddressSelectedHostStorage : IO Unit := do
           throw (IO.userError
             "fuel 29 lost code-observe/write/code-observe code")
 
-      match context.runCodeWithStorage? codeAddress
+      match context.runCodeWithStorageWithInputs? executionInputs
           observeWriteObserveCompletionFuel,
-          context.runCodeWithStorage? codeAddress 64 with
+          context.runCodeWithStorageWithInputs? executionInputs 64 with
       | some result, some largerResult =>
           assertTrue (result.outcome == .done expectedCodeAddressPair [])
             "fuel 30 returned unequal code selectors"
@@ -757,7 +770,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the observe/write/observe storage Account was absent")
   | some context =>
-      match context.runCodeWithStorage? codeAddress
+      match context.runCodeWithStorageWithInputs? executionInputs
           observeWriteObserveSecondRequestFuel with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (storageAddressRequestReady state)
@@ -770,7 +783,7 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 23 lost observe/write/observe code")
 
-      match context.runCodeWithStorage? codeAddress 29 with
+      match context.runCodeWithStorageWithInputs? executionInputs 29 with
       | some { context := resultContext, outcome := .outOfFuel state } =>
           assertTrue (oneStepBeforeStorageAddressPair state)
             "fuel 29 did not stop one step before the result pair"
@@ -782,9 +795,9 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "fuel 29 lost observe/write/observe code")
 
-      match context.runCodeWithStorage? codeAddress
+      match context.runCodeWithStorageWithInputs? executionInputs
           observeWriteObserveCompletionFuel,
-          context.runCodeWithStorage? codeAddress 64 with
+          context.runCodeWithStorageWithInputs? executionInputs 64 with
       | some result, some largerResult =>
           assertTrue (result.outcome == .done expectedStorageAddressPair [])
             "fuel 30 returned unequal storage selectors"
@@ -809,8 +822,8 @@ def testAddressSelectedHostStorage : IO Unit := do
       assertMixedOutOfFuelAt context 27 newValue .beforeFinalRead
       assertFrameContinuationAdapter context
 
-      match context.runCodeWithStorage? codeAddress completionFuel,
-          context.runCodeWithStorage? codeAddress 64 with
+      match context.runCodeWithStorageWithInputs? executionInputs completionFuel,
+          context.runCodeWithStorageWithInputs? executionInputs 64 with
       | none, _ =>
           throw (IO.userError "the working code Account was not selected")
       | _, none =>
@@ -827,8 +840,8 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the repeated-write storage Account was absent")
   | some context =>
-      match context.runCodeWithStorage? codeAddress 64,
-          context.runCodeWithStorage? codeAddress 96 with
+      match context.runCodeWithStorageWithInputs? executionInputs 64,
+          context.runCodeWithStorageWithInputs? executionInputs 96 with
       | none, _ =>
           throw (IO.userError "the repeated-write code was not selected")
       | _, none =>
@@ -845,7 +858,7 @@ def testAddressSelectedHostStorage : IO Unit := do
   | none =>
       throw (IO.userError "the zero-write storage Account was absent")
   | some context =>
-      match context.runCodeWithStorage? codeAddress 15 with
+      match context.runCodeWithStorageWithInputs? executionInputs 15 with
       | some { context := resultContext, outcome := .outOfFuel _ } =>
           assertTrue (selectedTargetMissing resultContext)
             "fuel 15 lost the handled sparse-zero update"
@@ -855,7 +868,8 @@ def testAddressSelectedHostStorage : IO Unit := do
       | none =>
           throw (IO.userError "the zero boundary lost the selected code")
 
-      match context.runCodeWithStorage? codeAddress zeroCompletionFuel with
+      match context.runCodeWithStorageWithInputs?
+          executionInputs zeroCompletionFuel with
       | none =>
           throw (IO.userError "the sparse-zero code Account was not selected")
       | some result =>
