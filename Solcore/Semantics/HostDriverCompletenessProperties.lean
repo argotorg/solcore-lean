@@ -230,4 +230,117 @@ theorem run_fault_stable
 
 end HostDriver
 
+namespace HostDriverResult.FuelSoundWith
+
+/-- Two fuel-sound witnesses for one exact budget determine the same result. -/
+theorem result_unique
+    {Context : Type u}
+    {handler : HostHandler Context}
+    {fuel : Nat}
+    {startContext : Context}
+    {start : Core.State}
+    {left right : HostDriverResult Context}
+    (leftSound :
+      left.FuelSoundWith handler fuel startContext start)
+    (rightSound :
+      right.FuelSoundWith handler fuel startContext start) :
+    left = right := by
+  exact
+    (HostDriver.run_eq_of_fuelSoundWith
+      handler startContext fuel start left leftSound).symm.trans
+    (HostDriver.run_eq_of_fuelSoundWith
+      handler startContext fuel start right rightSound)
+
+/-- Done evidence remains valid when its fuel allowance is increased. -/
+theorem done_mono
+    {Context : Type u}
+    {handler : HostHandler Context}
+    {fuel largerFuel : Nat}
+    {startContext finalContext : Context}
+    {start : Core.State}
+    {value : Core.Value}
+    {store : Core.Store}
+    (sound :
+      (⟨finalContext, .done value store⟩ :
+        HostDriverResult Context).FuelSoundWith
+          handler fuel startContext start)
+    (more : fuel ≤ largerFuel) :
+    (⟨finalContext, .done value store⟩ :
+      HostDriverResult Context).FuelSoundWith
+        handler largerFuel startContext start := by
+  change ∃ spent, spent ≤ fuel ∧ _ at sound
+  change ∃ spent, spent ≤ largerFuel ∧ _
+  obtain ⟨spent, bound, path⟩ := sound
+  exact ⟨spent, Nat.le_trans bound more, path⟩
+
+/-- Raw-fault evidence remains valid when its fuel allowance is increased. -/
+theorem fault_mono
+    {Context : Type u}
+    {handler : HostHandler Context}
+    {fuel largerFuel : Nat}
+    {startContext finalContext : Context}
+    {start faultState : Core.State}
+    {error : Core.MachineFault}
+    (sound :
+      (⟨finalContext, .fault error faultState⟩ :
+        HostDriverResult Context).FuelSoundWith
+          handler fuel startContext start)
+    (more : fuel ≤ largerFuel) :
+    (⟨finalContext, .fault error faultState⟩ :
+      HostDriverResult Context).FuelSoundWith
+        handler largerFuel startContext start := by
+  change ∃ spent, spent ≤ fuel ∧ _ ∧ _ at sound
+  change ∃ spent, spent ≤ largerFuel ∧ _ ∧ _
+  obtain ⟨spent, bound, path, terminal⟩ := sound
+  exact ⟨spent, Nat.le_trans bound more, path, terminal⟩
+
+/-- Done witnesses at any two budgets retain the exact same complete result. -/
+theorem done_result_unique
+    {Context : Type u}
+    {handler : HostHandler Context}
+    {leftFuel rightFuel : Nat}
+    {startContext leftContext rightContext : Context}
+    {start : Core.State}
+    {leftValue rightValue : Core.Value}
+    {leftStore rightStore : Core.Store}
+    (leftSound :
+      (⟨leftContext, .done leftValue leftStore⟩ :
+        HostDriverResult Context).FuelSoundWith
+          handler leftFuel startContext start)
+    (rightSound :
+      (⟨rightContext, .done rightValue rightStore⟩ :
+        HostDriverResult Context).FuelSoundWith
+          handler rightFuel startContext start) :
+    (⟨leftContext, .done leftValue leftStore⟩ :
+      HostDriverResult Context) =
+      ⟨rightContext, .done rightValue rightStore⟩ := by
+  exact result_unique
+    (done_mono leftSound (Nat.le_max_left leftFuel rightFuel))
+    (done_mono rightSound (Nat.le_max_right leftFuel rightFuel))
+
+/-- Fault witnesses at any two budgets retain the exact same complete result. -/
+theorem fault_result_unique
+    {Context : Type u}
+    {handler : HostHandler Context}
+    {leftFuel rightFuel : Nat}
+    {startContext leftContext rightContext : Context}
+    {start leftFaultState rightFaultState : Core.State}
+    {leftError rightError : Core.MachineFault}
+    (leftSound :
+      (⟨leftContext, .fault leftError leftFaultState⟩ :
+        HostDriverResult Context).FuelSoundWith
+          handler leftFuel startContext start)
+    (rightSound :
+      (⟨rightContext, .fault rightError rightFaultState⟩ :
+        HostDriverResult Context).FuelSoundWith
+          handler rightFuel startContext start) :
+    (⟨leftContext, .fault leftError leftFaultState⟩ :
+      HostDriverResult Context) =
+      ⟨rightContext, .fault rightError rightFaultState⟩ := by
+  exact result_unique
+    (fault_mono leftSound (Nat.le_max_left leftFuel rightFuel))
+    (fault_mono rightSound (Nat.le_max_right leftFuel rightFuel))
+
+end HostDriverResult.FuelSoundWith
+
 end Solcore.Semantics
