@@ -99,6 +99,26 @@ universe u v
           continuation, store⟩) :=
   rfl
 
+@[simp] theorem handleRequest_callValue
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState) :
+    handleRequest inputs context .callValue =
+      (context, inputs.callValue) :=
+  rfl
+
+@[simp] theorem handleSuspension_callValue
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension inputs context
+        ⟨.callValue, continuation, store⟩ =
+      (context,
+        ⟨.ret (.word inputs.callValue), continuation, store⟩) :=
+  rfl
+
 @[simp] theorem handleSuspension_storageRead_context
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
@@ -244,6 +264,44 @@ universe u v
     (continuation : List Core.Frame) (store : Core.Store) :
     (handleSuspension inputs context
       ⟨.codeAddress, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store inputs context _
+
+@[simp] theorem handleSuspension_callValue_context
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.callValue, continuation, store⟩).1 = context := by
+  rw [handleSuspension_callValue]
+
+@[simp] theorem handleSuspension_callValue_control
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.callValue, continuation, store⟩).2.control =
+        .ret (.word inputs.callValue) := by
+  rw [handleSuspension_callValue]
+
+@[simp] theorem handleSuspension_callValue_continuation
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.callValue, continuation, store⟩).2.continuation =
+        continuation := by
+  exact handleSuspension_continuation inputs context _
+
+@[simp] theorem handleSuspension_callValue_store
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.callValue, continuation, store⟩).2.store = store := by
   exact handleSuspension_store inputs context _
 
 @[simp] theorem wordToAddress?_handler_storageAddress

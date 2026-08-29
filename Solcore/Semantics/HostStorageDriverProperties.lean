@@ -131,6 +131,31 @@ theorem run_of_suspended_codeAddress
         execution
     _ = _ := by rw [handleSuspension_codeAddress]
 
+theorem run_of_suspended_callValue
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended ⟨.callValue, continuation, store⟩ remainingFuel) :
+    run context inputs fuel state =
+      run context inputs remainingFuel
+        ⟨.ret (.word inputs.callValue), continuation, store⟩ := by
+  calc
+    run context inputs fuel state =
+        run
+          (handleSuspension inputs context
+            ⟨.callValue, continuation, store⟩).1
+          inputs remainingFuel
+          (handleSuspension inputs context
+            ⟨.callValue, continuation, store⟩).2 :=
+      run_of_suspended context inputs fuel remainingFuel state _ execution
+    _ = _ := by rw [handleSuspension_callValue]
+
 @[simp] theorem run_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
