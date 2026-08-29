@@ -1,6 +1,6 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionWithInputsProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWrite
-import Solcore.Semantics.HostStorageDriverFuelProperties
+import Solcore.Semantics.HostStorageDriverWithExecutionInputsFuelProperties
 
 /-! End-to-end regressions for address-selected handled host execution. -/
 
@@ -18,6 +18,13 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 private def codeAddress : Address := ⟨0x10, by decide⟩
 private def storageAddress : Address := ⟨0x20, by decide⟩
 private def absentAddress : Address := ⟨0x30, by decide⟩
+private def suppliedCallValue : Word := ⟨0x73, by decide⟩
+
+private def inputsFor
+    (address : Address) : HostStorageDriver.ExecutionInputs := {
+  codeAddress := address
+  callValue := suppliedCallValue
+}
 
 private def slotA : Word := ⟨0x41, by decide⟩
 private def slotB : Word := ⟨0x42, by decide⟩
@@ -98,107 +105,108 @@ private def baseContext :
 
 private theorem compileTimeNoFaultRegression
     (context : HostStorageDriver.Context Nat (List Nat))
-    (address : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (resultContext : HostStorageDriver.Context Nat (List Nat))
     (error : MachineFault)
     (faultState : State) :
-    context.runCodeWithStorage? address fuel ≠
+    context.runCodeWithStorageWithInputs? inputs fuel ≠
       some ⟨resultContext, .fault error faultState⟩ :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_ne_some_fault
-    context address fuel resultContext error faultState
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_ne_some_fault
+    context inputs fuel resultContext error faultState
 
 private theorem compileTimeAbsentBranchRegression
     (context : HostStorageDriver.Context Nat (List Nat))
-    (address : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
-    (absent : context.context.values.working.1.account? address = none) :
-    context.runCodeWithStorage? address fuel = none :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_of_absent
-    context address fuel absent
+    (absent :
+      context.context.values.working.1.account? inputs.codeAddress = none) :
+    context.runCodeWithStorageWithInputs? inputs fuel = none :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_of_absent
+    context inputs fuel absent
 
 private theorem compileTimeNoCodeBranchRegression
     (context : HostStorageDriver.Context Nat (List Nat))
-    (address : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (account : Account)
     (fuel : Nat)
     (present :
-      context.context.values.working.1.account? address = some account)
+      context.context.values.working.1.account? inputs.codeAddress = some account)
     (withoutCode : account.code? = none) :
-    context.runCodeWithStorage? address fuel = none :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_of_account_without_code
-    context address account fuel present withoutCode
+    context.runCodeWithStorageWithInputs? inputs fuel = none :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_of_account_without_code
+    context inputs account fuel present withoutCode
 
 private theorem compileTimePresentBranchRegression
     (context : HostStorageDriver.Context Nat (List Nat))
-    (address : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (account : Account)
     (code : CheckedHostCoreProgram)
     (fuel : Nat)
     (accountPresent :
-      context.context.values.working.1.account? address = some account)
+      context.context.values.working.1.account? inputs.codeAddress = some account)
     (codePresent : account.code? = some code) :
-    context.runCodeWithStorage? address fuel =
-      some (code.runWithStorage context address fuel) :=
-  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_of_present
-    context address account code fuel accountPresent codePresent
+    context.runCodeWithStorageWithInputs? inputs fuel =
+      some (code.runWithStorageInputs context inputs fuel) :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_of_present
+    context inputs account code fuel accountPresent codePresent
 
 private theorem compileTimeRemainingFuelRegression
     (context : HostStorageDriver.Context Nat (List Nat))
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel remainingFuel : Nat)
     (state : State)
     (suspension : HostSuspension)
     (execution :
       hostRun fuel state = .suspended suspension remainingFuel) :
-    HostStorageDriver.run context codeAddress fuel state =
-      HostStorageDriver.run
-        (HostStorageDriver.handleSuspension
-          codeAddress context suspension).1 codeAddress remainingFuel
-        (HostStorageDriver.handleSuspension
-          codeAddress context suspension).2 :=
-  HostStorageDriver.run_of_suspended
-    context codeAddress fuel remainingFuel state suspension execution
+    HostStorageDriver.runWithInputs context inputs fuel state =
+      HostStorageDriver.runWithInputs
+        (HostStorageDriver.handleSuspensionWithInputs
+          inputs context suspension).1 inputs remainingFuel
+        (HostStorageDriver.handleSuspensionWithInputs
+          inputs context suspension).2 :=
+  HostStorageDriver.runWithInputs_of_suspended
+    context inputs fuel remainingFuel state suspension execution
 
 private theorem compileTimeFuelSoundRegression
     (context : HostStorageDriver.Context Nat (List Nat))
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (state : State) :
-    HostStorageDriver.FuelSound
-      (HostStorageDriver.run context codeAddress fuel state)
-      codeAddress fuel context state :=
-  HostStorageDriver.run_fuelSound context codeAddress fuel state
+    HostStorageDriver.FuelSoundWithInputs
+      (HostStorageDriver.runWithInputs context inputs fuel state)
+      inputs fuel context state :=
+  HostStorageDriver.runWithInputs_fuelSound context inputs fuel state
 
 private theorem compileTimeCheckedTypingRegression
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context Nat (List Nat))
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    (code.runWithStorage context codeAddress fuel).outcome.HasType
+    (code.runWithStorageInputs context inputs fuel).outcome.HasType
       code.program.resultType code.program.dataDefinitions :=
-  code.runWithStorage_hasType context codeAddress fuel
+  code.runWithStorageInputs_hasType context inputs fuel
 
 private theorem compileTimeCheckedNoFaultRegression
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context Nat (List Nat))
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (error : MachineFault)
     (faultState : State) :
-    (code.runWithStorage context codeAddress fuel).outcome ≠
+    (code.runWithStorageInputs context inputs fuel).outcome ≠
       .fault error faultState :=
-  code.runWithStorage_ne_fault context codeAddress fuel error faultState
+  code.runWithStorageInputs_ne_fault context inputs fuel error faultState
 
 private theorem compileTimeCheckedFuelSoundRegression
     (code : CheckedHostCoreProgram)
     (context : HostStorageDriver.Context Nat (List Nat))
-    (codeAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    HostStorageDriver.FuelSound
-      (code.runWithStorage context codeAddress fuel) codeAddress
+    HostStorageDriver.FuelSoundWithInputs
+      (code.runWithStorageInputs context inputs fuel) inputs
       fuel context (State.initial code.program.body hostEnvironment) :=
-  code.runWithStorage_fuelSound context codeAddress fuel
+  code.runWithStorageInputs_fuelSound context inputs fuel
 
 private def returnedContextLooksUnchanged
     (context : HostStorageDriver.Context Nat (List Nat)) :
@@ -221,12 +229,17 @@ def testAddressSelectedHostCode : IO Unit := do
   | none =>
       throw (IO.userError "the working storage Account did not refine")
   | some context =>
-      assertTrue (context.runCodeWithStorage? absentAddress 12).isNone
+      assertTrue
+        (context.runCodeWithStorageWithInputs?
+          (inputsFor absentAddress) 12).isNone
         "an absent code Account unexpectedly executed"
-      assertTrue (context.runCodeWithStorage? storageAddress 12).isNone
+      assertTrue
+        (context.runCodeWithStorageWithInputs?
+          (inputsFor storageAddress) 12).isNone
         "the storage Account was incorrectly used as a code fallback"
 
-      match context.runCodeWithStorage? codeAddress 11 with
+      match context.runCodeWithStorageWithInputs?
+          (inputsFor codeAddress) 11 with
       | some result =>
           assertTrue (returnedContextLooksUnchanged result.context)
             "an out-of-fuel run changed the read-only host context"
@@ -245,7 +258,8 @@ def testAddressSelectedHostCode : IO Unit := do
       | none =>
           throw (IO.userError "the working code Account was not selected")
 
-      match context.runCodeWithStorage? codeAddress 12 with
+      match context.runCodeWithStorageWithInputs?
+          (inputsFor codeAddress) 12 with
       | some result =>
           assertTrue
             (result.outcome == .done (.word finalValue) [])
@@ -257,7 +271,8 @@ def testAddressSelectedHostCode : IO Unit := do
 
       let updatedContext :=
         context.writeStorage slotB alternateFinalValue
-      match updatedContext.runCodeWithStorage? codeAddress 12 with
+      match updatedContext.runCodeWithStorageWithInputs?
+          (inputsFor codeAddress) 12 with
       | some result =>
           assertTrue
             (result.outcome == .done (.word alternateFinalValue) [])
@@ -266,7 +281,8 @@ def testAddressSelectedHostCode : IO Unit := do
           throw (IO.userError "a storage update erased selected host code")
 
       let cellResult :=
-        cellDependentReadCode.runWithStorage context codeAddress 64
+        cellDependentReadCode.runWithStorageInputs
+          context (inputsFor codeAddress) 64
       assertTrue
         (cellResult.outcome == .done (.word finalValue) [.bool true])
         "handled reads lost the Core-local cell store"
