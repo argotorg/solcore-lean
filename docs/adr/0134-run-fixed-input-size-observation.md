@@ -259,6 +259,45 @@ Keep each green commit at roughly 300 changed lines or fewer:
 Temporary migration names must be removed before completion. No transitional
 API may cache, infer, truncate, or manufacture an input size.
 
+## Implementation record
+
+`InputData.sizeWord` now constructs a Core Word directly from the exact natural
+byte length and the retained strict bound. It performs no machine-size
+conversion or modular reduction. The proved boundary laws characterize byte
+presence exactly below `sizeWord`, absence at or above it, and absence at the
+size itself.
+
+Core appends `inputDataSize : unit -> word` at index 7, making both host tables
+length 8 and index 8 the first unbound position. The request has a total Word
+response. Exact emission, raw invalid-argument faults, response injection,
+resumption, progress, typing, preservation, runner correspondence, and checked
+no-fault safety are complete. Frozen Wire v1 and v2 reject the internal host
+value.
+
+The canonical handler returns `(context, inputs.inputData.sizeWord)`. It
+preserves the complete mutable context, saved continuation, and Core-local
+Store, while the recursive driver resumes with the same immutable input and
+remaining fuel. Direct selected execution returns exact zero and nonzero
+sizes, changing only the result when only input data changes.
+
+Runtime regressions cover fuel 4/5 and larger-fuel stability. A second checked
+program observes size, writes that Word to storage, and observes size again at
+the measured 23/29/30/32 boundaries. Parent-indexed execution preserves the
+storage-absence, code-absence, exhaustion, and completion options before the
+ADR-0129 fold recovers the exact size-derived storage entry and terminal bytes.
+
+## Acceptance evidence
+
+- the full build completed successfully with 652 jobs;
+- the complete 1,192-job test target and executable suite passed;
+- all 21 changed Lean roots passed with `--trust=0` and warnings as errors;
+- metadata verification and semantic-kernel policy checks passed;
+- key axiom reports contain only the existing `propext` and `Quot.sound`;
+- independent full-contract and completion audits found no remaining P0-P3
+  issue; and
+- no parser, Surface, Oracle, schema, profile, Wire tag, public format, or root
+  README changed.
+
 ## Consequences
 
 Internal checked Core code can observe the exact length of the same bounded

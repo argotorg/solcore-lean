@@ -1994,6 +1994,25 @@ Input size, wider loads, endianness, padding, ABI and calldata meaning,
 nested-input derivation, source syntax, and publication remain separate future
 decisions.
 
+## Completed run-fixed input-size observation
+
+[ADR-0134](adr/0134-run-fixed-input-size-observation.md) derives exact
+`InputData.sizeWord` from the retained strict bound and appends internal
+`inputDataSize : unit -> word` at index 7. Exact byte-boundary coherence,
+Core request and safety proofs, handler and driver context identity, and frozen
+Wire rejection are complete.
+
+Direct selected execution covers zero and nonzero sizes, input-only variation,
+and fuel 4/5. Size-derived storage and parent-indexed completion cover measured
+23/29/30/32 boundaries, all three option layers, larger-fuel stability, and
+ADR-0129 fold consumption of the stored size and terminal bytes.
+
+The full 652-job build and 1,192-job executable test suite pass together with
+trust-zero over all 21 changed Lean roots, metadata, semantic-kernel, axiom,
+compatibility, and independent audits. Multi-byte interpretation, ABI and
+calldata meaning, nested-input derivation, syntax, and publication remain
+separate future decisions.
+
 ## Completed Core vNext slice: derived-builder renaming laws
 
 [ADR-0032](adr/0032-core-vnext-derived-builder-renaming-laws.md) backfills

@@ -2428,6 +2428,32 @@ axiom, dependency, compatibility, and independent P0-P3 audits pass. No input
 size, multi-byte load, endianness, padding, ABI, calldata, nested-input rule,
 parser, public format, or root README change was added.
 
+## Completed run-fixed input-size observation
+
+[ADR-0134](adr/0134-run-fixed-input-size-observation.md) derives the exact
+`sizeWord` from the strict bound already carried by `InputData`. Its natural
+value is definitionally the byte length, without truncation or modular
+reduction. Byte lookup is proved present exactly below that size and absent at
+or above it.
+
+Core appends `inputDataSize : unit -> word` at index 7. Both host tables have
+length 8 and index 8 is the first unbound position. The total Word response,
+raw fault, request/resume, progress, typing, preservation, runner, checked
+no-fault, handler, and recursive-driver laws are complete. The full mutable
+context, continuation, and Core-local Store are preserved.
+
+Tests cover exact empty and nonempty sizes, input-only variation, fuel 4/5,
+size-derived storage at 23/29/30/32, larger-fuel stability, selected-code
+failure, all three parent option boundaries, and ADR-0129 fold recovery of the
+stored size and terminal bytes. Frozen Wire v1 and v2 continue to reject the
+internal value.
+
+The 652-job build and complete 1,192-job executable test suite pass. All 21
+changed Lean roots pass trust-zero with warnings as errors; metadata,
+semantic-kernel, axiom, dependency, compatibility, and independent P0-P3
+audits pass. No multi-byte load, ABI, calldata, nested-input rule, parser,
+public format, or root README change was added.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable
