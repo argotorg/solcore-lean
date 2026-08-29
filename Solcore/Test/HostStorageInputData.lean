@@ -28,6 +28,16 @@ private def representativeInput : InputData := {
   size_lt_wordModulus := by decide
 }
 
+private def singletonInput : InputData := {
+  bytes := [0x7f].toByteArray
+  size_lt_wordModulus := by decide
+}
+
+private def zeroTailInput : InputData := {
+  bytes := [0x11, 0x00].toByteArray
+  size_lt_wordModulus := by decide
+}
+
 /-- An exact natural index beyond machine-word range whose low bits name byte two. -/
 private def beyondMachineIndex : Word :=
   ⟨2 ^ 64 + 2, by decide⟩
@@ -39,6 +49,16 @@ private theorem observed_byte_lt_256
   InputData.byte?_result_lt_256 representativeInput offset result read
 
 def testHostStorageInputData : IO Unit := do
+  assertTrue (emptyInput.sizeWord == word 0)
+    "empty input must have exact size zero"
+  assertTrue (representativeInput.sizeWord == word 4)
+    "the nonempty input size must be represented exactly"
+  assertTrue (singletonInput.sizeWord == word 1)
+    "a one-byte input must have exact size one"
+  assertTrue (zeroTailInput.byte? (word 1) == some Word.zero)
+    "a zero byte immediately below the size boundary must remain present"
+  assertTrue (zeroTailInput.byte? zeroTailInput.sizeWord == none)
+    "the exact size boundary must be absent"
   assertTrue (emptyInput.byte? (word 0) == none)
     "empty input must have no byte at offset zero"
   assertTrue (representativeInput.byte? (word 0) == some (word 0x12))
@@ -53,6 +73,18 @@ def testHostStorageInputData : IO Unit := do
     "the maximum Core Word offset must be absent"
   assertTrue (representativeInput.byte? beyondMachineIndex == none)
     "input indexing must not narrow a large natural offset to machine width"
+  assertTrue
+    ((representativeInput.byte? (word 3)).isSome ==
+      decide ((word 3).val < representativeInput.sizeWord.val))
+    "the final byte must agree with the exact observed size"
+  assertTrue
+    ((representativeInput.byte? (word 4)).isSome ==
+      decide ((word 4).val < representativeInput.sizeWord.val))
+    "the first absent byte must agree with the exact observed size"
+  assertTrue
+    ((representativeInput.byte? Word.maximum).isSome ==
+      decide (Word.maximum.val < representativeInput.sizeWord.val))
+    "the maximum Word boundary must agree with the exact observed size"
   let presentZero := representativeInput.byte? (word 1)
   assertTrue (presentZero == some Word.zero)
     "a present zero byte must produce some zero"

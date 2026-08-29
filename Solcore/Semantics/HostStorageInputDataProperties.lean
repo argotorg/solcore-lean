@@ -26,6 +26,16 @@ theorem exists_word_offset_of_lt_size
     ∃ offset : Core.Word, offset.val = index :=
   ⟨⟨index, Nat.lt_trans inBounds input.size_lt_wordModulus⟩, rfl⟩
 
+@[simp] theorem sizeWord_val (input : InputData) :
+    input.sizeWord.val = input.bytes.size :=
+  rfl
+
+@[simp] theorem mk_sizeWord
+    (bytes : Bytes) (size_lt_wordModulus : bytes.size < Core.wordModulus) :
+    (InputData.mk bytes size_lt_wordModulus).sizeWord =
+      ⟨bytes.size, size_lt_wordModulus⟩ :=
+  rfl
+
 theorem byte?_eq_some_iff
     (input : InputData) (offset result : Core.Word) :
     input.byte? offset = some result ↔
@@ -103,6 +113,39 @@ theorem byte?_eq_some_of_lt_size
   refine ⟨result, ?_, rfl⟩
   exact (byte?_eq_some_iff input offset result).2
     ⟨byte, lookup, rfl⟩
+
+theorem exists_byte?_eq_some_iff_lt_sizeWord
+    (input : InputData) (offset : Core.Word) :
+    (∃ result, input.byte? offset = some result) ↔
+      offset.val < input.sizeWord.val := by
+  constructor
+  · rintro ⟨result, present⟩
+    obtain ⟨byte, lookup, _⟩ :=
+      (byte?_eq_some_iff input offset result).1 present
+    have inBounds : offset.val < input.bytes.data.size :=
+      (Array.getElem?_eq_some_iff.mp lookup).1
+    simpa only [sizeWord_val, ByteArray.size_data] using inBounds
+  · intro inBounds
+    obtain ⟨result, present, _⟩ :=
+      byte?_eq_some_of_lt_size input offset (by simpa using inBounds)
+    exact ⟨result, present⟩
+
+theorem byte?_eq_none_iff_sizeWord_le
+    (input : InputData) (offset : Core.Word) :
+    input.byte? offset = none ↔ input.sizeWord.val ≤ offset.val := by
+  constructor
+  · intro absent
+    exact Nat.le_of_not_gt fun inBounds => by
+      obtain ⟨result, present⟩ :=
+        (exists_byte?_eq_some_iff_lt_sizeWord input offset).2 inBounds
+      rw [present] at absent
+      cases absent
+  · intro outOfBounds
+    exact byte?_eq_none_of_size_le input offset (by simpa using outOfBounds)
+
+@[simp] theorem byte?_sizeWord (input : InputData) :
+    input.byte? input.sizeWord = none :=
+  (byte?_eq_none_iff_sizeWord_le input input.sizeWord).2 (Nat.le_refl _)
 
 end InputData
 

@@ -13,6 +13,10 @@ structure InputData where
 
 namespace InputData
 
+/-- Exact byte length, represented without truncation as a Core Word. -/
+def sizeWord (input : InputData) : Core.Word :=
+  ⟨input.bytes.size, input.size_lt_wordModulus⟩
+
 /-- Read one byte at the exact natural index represented by `offset`. -/
 def byte? (input : InputData) (offset : Core.Word) : Option Core.Word :=
   match input.bytes.data[offset.val]? with
