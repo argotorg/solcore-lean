@@ -242,8 +242,7 @@ Tests cover:
 
 The executable regressions and public proof-interface regressions are part of
 the acceptance evidence below. Repository-wide build, test, metadata, and
-kernel-policy gates remain the final integration check after documentation-only
-changes.
+kernel-policy gates all pass on the accepted revision.
 
 ## Dependency boundary
 
@@ -320,9 +319,10 @@ fuel theorems directly so the executable tests are not the only evidence.
 Focused module builds and trust-zero checks passed during implementation. An
 independent fuel audit reconstructed the de Bruijn programs, confirmed both
 host checks, reproduced the 21/22/27/28 and 15/16 boundaries, and left no
-tracked audit artifact. The repository-wide integration gates are rerun after
-this documentation synchronization; this record does not expand the feature
-into ABI, call, or transaction-lifecycle semantics.
+tracked audit artifact. The final 617-job build and 1122-job test suite pass,
+as do metadata verification and the semantic-kernel policy check. No P0 or P1
+implementation gap remains in the independent acceptance audit. This record
+does not expand the feature into ABI, call, or transaction-lifecycle semantics.
 
 ## Consequences
 
