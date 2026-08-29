@@ -174,11 +174,18 @@ fuel 4, complete with the exact supplied call-value Word at fuel 5, and retain
 the identical complete result and mutable context with larger fuel. At least
 one checked program must feed the observed Word into an existing Core or
 storage consumer so the capability is not tested only as an isolated marker.
+An observe-write-observe fixture must read the call value on both sides of a
+storage write, obtain the same Word twice, and verify that the written storage
+value is that Word.
 
 Compile consumers must apply the input-indexed fuel and selected-execution laws
 directly, preserve all ADR-0125 optional boundaries, reach the parent-indexed
-completed context, and retain completed larger-fuel stability. Tests must
-distinguish the three static/storage observations numerically.
+completed context, consume that exact context through ADR-0129's fold, and
+retain completed larger-fuel stability. The completed fixture must make its
+outcome depend on the supplied call value, so the parent fold checks the same
+value-derived working storage and terminal bytes rather than an unrelated
+context. Tests must distinguish the three static/storage observations
+numerically.
 
 ## Dependency and publication boundary
 
@@ -215,15 +222,18 @@ Keep every green commit at roughly 300 changed lines or fewer:
 1. record and activate this exact internal contract;
 2. add `ExecutionInputs` and a temporary parallel input-aware handler/driver
    seam without a zero or optional default;
-3. migrate fuel, selection, completion, and parent-continuation APIs and their
-   consumers to the explicit input;
-4. remove the old bare-address seam;
-5. append the Core capability/request and close all machine and safety cases;
-6. add the exact handler/driver laws and low-level regressions;
-7. add end-to-end runtime and parent-boundary regressions;
-8. run trust, axiom, dependency, build, test, metadata, kernel, compatibility,
+3. migrate handler and driver fuel/proof consumers to the explicit input;
+4. migrate selected execution, completion, and parent-continuation definitions
+   and proofs in separate green commits;
+5. migrate runtime and compile consumers in bounded file groups;
+6. remove the old bare-address seam;
+7. append the Core capability/request and close machine and safety files in one
+   bounded exhaustive-case commit;
+8. add the exact handler/driver laws and low-level regressions;
+9. add observe-write-observe runtime and parent-fold regressions;
+10. run trust, axiom, dependency, build, test, metadata, kernel, compatibility,
    and independent audits; and
-9. synchronize completion evidence in current-facing internal documents.
+11. synchronize completion evidence in current-facing internal documents.
 
 Temporary migration names must be removed before completion. No transitional
 API may manufacture a zero, absent, or otherwise default call value.
