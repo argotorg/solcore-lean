@@ -104,6 +104,28 @@ private theorem illTypedStorageAddressProgram_host_rejected :
     illTypedStorageAddressProgram.checkHost = false := by
   decide
 
+private def codeAddressProgram : Program := {
+  resultType := .word
+  body := .apply (.var HostFunction.codeAddress.index) .unit
+}
+
+private theorem codeAddressProgram_host_checked :
+    codeAddressProgram.checkHost = true := by
+  decide
+
+private theorem codeAddressProgram_closed_rejected :
+    codeAddressProgram.check = false := by
+  decide
+
+private def illTypedCodeAddressProgram : Program := {
+  resultType := .word
+  body := .apply (.var HostFunction.codeAddress.index) (.bool true)
+}
+
+private theorem illTypedCodeAddressProgram_host_rejected :
+    illTypedCodeAddressProgram.checkHost = false := by
+  decide
+
 private def unboundHostIndexProgram : Program := {
   resultType := .word
   body :=
@@ -116,6 +138,9 @@ private theorem unboundHostIndexProgram_host_rejected :
 
 private def checkedStorageAddressProgram : CheckedHostCoreProgram :=
   ⟨storageAddressProgram, storageAddressProgram_host_checked⟩
+
+private def checkedCodeAddressProgram : CheckedHostCoreProgram :=
+  ⟨codeAddressProgram, codeAddressProgram_host_checked⟩
 
 private theorem compileTimeAdmissionRegression :
     CheckedHostCoreProgram.ofProgram? storageReadProgram =
@@ -151,7 +176,8 @@ private theorem compileTimeWriteEnvironmentIndexRegression :
 private theorem compileTimeHostCapabilityIndexes :
     HostFunction.storageRead.index = 0 ∧
       HostFunction.storageWrite.index = 1 ∧
-      HostFunction.storageAddress.index = 2 := by
+      HostFunction.storageAddress.index = 2 ∧
+      HostFunction.codeAddress.index = 3 := by
   decide
 
 private theorem compileTimeAddressContextIndexRegression :
@@ -163,6 +189,16 @@ private theorem compileTimeAddressEnvironmentIndexRegression :
     hostEnvironment[HostFunction.storageAddress.index]? =
       some (.hostFunction .storageAddress) :=
   hostEnvironment_storageAddress
+
+private theorem compileTimeCodeAddressContextIndexRegression :
+    hostContext[HostFunction.codeAddress.index]? =
+      some (HostFunction.functionType .codeAddress) :=
+  hostContext_codeAddress
+
+private theorem compileTimeCodeAddressEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.codeAddress.index]? =
+      some (.hostFunction .codeAddress) :=
+  hostEnvironment_codeAddress
 
 private theorem compileTimeHostCapabilityLengths :
     hostContext.length = 4 ∧ hostEnvironment.length = 4 :=
@@ -201,6 +237,19 @@ private def addressRequestState : State :=
 private def addressSuspension : HostSuspension :=
   ⟨.storageAddress, [], []⟩
 
+private def codeAddressBeginState : State :=
+  ⟨.ret (.hostFunction .codeAddress),
+    [.applyArgument .unit hostEnvironment], []⟩
+
+private def codeAddressArgumentState : State :=
+  ⟨.eval .unit hostEnvironment, [.hostApply .codeAddress], []⟩
+
+private def codeAddressRequestState : State :=
+  ⟨.ret .unit, [.hostApply .codeAddress], []⟩
+
+private def codeAddressSuspension : HostSuspension :=
+  ⟨.codeAddress, [], []⟩
+
 private theorem compileTimeBeginCorrespondenceRegression :
     HostTransition beginState argumentState := by
   apply hostAdvance_next_iff.mp
@@ -226,6 +275,16 @@ private theorem compileTimeAddressEmissionRegression :
   apply hostAdvance_suspended_iff.mp
   exact hostAdvance_suspend_storageAddress [] []
 
+private theorem compileTimeCodeAddressBeginRegression :
+    HostTransition codeAddressBeginState codeAddressArgumentState := by
+  apply hostAdvance_next_iff.mp
+  exact hostAdvance_begin_codeAddress .unit hostEnvironment [] []
+
+private theorem compileTimeCodeAddressEmissionRegression :
+    HostRequestEmission codeAddressRequestState codeAddressSuspension := by
+  apply hostAdvance_suspended_iff.mp
+  exact hostAdvance_suspend_codeAddress [] []
+
 private theorem compileTimeTransitionDeterminismRegression
     {next : State}
     (step : HostTransition beginState next) :
@@ -248,6 +307,9 @@ private def retainedStore : Store :=
 private def retainedSuspension : HostSuspension :=
   ⟨.storageRead slot, retainedContinuation, retainedStore⟩
 
+private def retainedCodeAddressSuspension : HostSuspension :=
+  ⟨.codeAddress, retainedContinuation, retainedStore⟩
+
 private theorem compileTimeResumeRegression :
     retainedSuspension.resume response =
       ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
@@ -261,6 +323,12 @@ private theorem compileTimeWriteResumeRegression :
 private theorem compileTimeAddressResumeRegression :
     addressSuspension.resume response = State.final (.word response) [] :=
   HostSuspension.resume_storageAddress response [] []
+
+private theorem compileTimeCodeAddressResumeRegression :
+    retainedCodeAddressSuspension.resume response =
+      ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
+  HostSuspension.resume_codeAddress
+    response retainedContinuation retainedStore
 
 private theorem compileTimeSuspensionTypingRegression :
     HostSuspensionHasType requestSuspension .word [] := by
@@ -300,6 +368,22 @@ private theorem compileTimeCheckedAddressNeverFaults
   CheckedHostCoreProgram.runStateful_ne_fault
     checkedStorageAddressProgram fuel error faultState
 
+private theorem compileTimeCodeAddressSuspensionTypingRegression :
+    HostSuspensionHasType codeAddressSuspension .word [] := by
+  apply CheckedHostCoreProgram.runStateful_suspended_hasType
+    (fuel := 5) (remainingFuel := 0) checkedCodeAddressProgram
+  decide
+
+private theorem compileTimeCodeAddressTypedResumeRegression :
+    HostStateHasType (codeAddressSuspension.resume response) .word [] :=
+  compileTimeCodeAddressSuspensionTypingRegression.resume response
+
+private theorem compileTimeCheckedCodeAddressNeverFaults
+    (fuel : Nat) (error : MachineFault) (faultState : State) :
+    checkedCodeAddressProgram.runStateful fuel ≠ .fault error faultState :=
+  CheckedHostCoreProgram.runStateful_ne_fault
+    checkedCodeAddressProgram fuel error faultState
+
 private theorem compileTimeWireV1RejectionRegression :
     Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead) = none :=
   rfl
@@ -324,6 +408,16 @@ private theorem compileTimeAddressWireV1RejectionRegression :
 private theorem compileTimeAddressWireV2RejectionRegression :
     Solcore.Core.Wire.V2.Value.ofCore?
       (.hostFunction .storageAddress) = none :=
+  rfl
+
+private theorem compileTimeCodeAddressWireV1RejectionRegression :
+    Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .codeAddress) = none :=
+  rfl
+
+private theorem compileTimeCodeAddressWireV2RejectionRegression :
+    Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .codeAddress) = none :=
   rfl
 
 private def cellStorageReadProgram : Program := {
@@ -369,6 +463,12 @@ def testCoreHostMachine : IO Unit := do
     "the closed checker accepted the storage-address capability"
   assertTrue (!illTypedStorageAddressProgram.checkHost)
     "the host checker accepted a non-Unit storage-address argument"
+  assertTrue codeAddressProgram.checkHost
+    "the host checker rejected code-address observation"
+  assertTrue (!codeAddressProgram.check)
+    "the closed checker accepted the code-address capability"
+  assertTrue (!illTypedCodeAddressProgram.checkHost)
+    "the host checker accepted a non-Unit code-address argument"
   assertTrue (!unboundHostIndexProgram.checkHost)
     "the host checker accepted the first unbound capability index"
   assertTrue
@@ -410,6 +510,12 @@ def testCoreHostMachine : IO Unit := do
       hostEnvironment[HostFunction.storageAddress.index]? ==
         some (.hostFunction .storageAddress))
     "the storage-address capability is absent from its fixed position"
+  assertTrue
+    (hostContext[HostFunction.codeAddress.index]? ==
+        some (HostFunction.functionType .codeAddress) &&
+      hostEnvironment[HostFunction.codeAddress.index]? ==
+        some (.hostFunction .codeAddress))
+    "the code-address capability is absent from its fixed position"
 
   assertTrue (hostAdvance beginState == .next argumentState)
     "host application did not begin by evaluating its argument"
@@ -440,6 +546,16 @@ def testCoreHostMachine : IO Unit := do
         ⟨.ret (.bool true), [.hostApply .storageAddress], []⟩ ==
       .fault (.invalidHostArgument .storageAddress (.bool true)))
     "a non-Unit storage-address argument did not fault"
+  assertTrue (hostAdvance codeAddressBeginState == .next codeAddressArgumentState)
+    "code-address application did not evaluate Unit"
+  assertTrue
+    (hostAdvance codeAddressRequestState == .suspended codeAddressSuspension)
+    "Unit did not emit the code-address request"
+  assertTrue
+    (hostAdvance
+        ⟨.ret (.bool true), [.hostApply .codeAddress], []⟩ ==
+      .fault (.invalidHostArgument .codeAddress (.bool true)))
+    "a non-Unit code-address argument did not fault"
 
   assertTrue
     (retainedSuspension.resume response ==
@@ -450,6 +566,10 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (addressSuspension.resume response == State.final (.word response) [])
     "storage-address resume did not inject the returned Word"
+  assertTrue
+    (retainedCodeAddressSuspension.resume response ==
+      ⟨.ret (.word response), retainedContinuation, retainedStore⟩)
+    "code-address resume changed the returned Word, continuation, or store"
 
   assertTrue
     (checkedStorageReadProgram.runStateful 4 == .outOfFuel requestState)
@@ -470,6 +590,14 @@ def testCoreHostMachine : IO Unit := do
     (storageAddressProgram.runHostStateful 5 ==
       .suspended addressSuspension 0)
     "storage-address execution changed its exact request budget"
+  assertTrue
+    (codeAddressProgram.runHostStateful 4 ==
+      .outOfFuel codeAddressRequestState)
+    "code-address execution moved its pre-request fuel boundary"
+  assertTrue
+    (codeAddressProgram.runHostStateful 5 ==
+      .suspended codeAddressSuspension 0)
+    "code-address execution changed its exact request budget"
 
   match cellStorageReadProgram.runHostStateful 32 with
   | .suspended suspension remainingFuel =>
@@ -519,5 +647,11 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageWrite)).isNone
     "Core wire v2 encoded the storage-write host value"
+  assertTrue
+    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .codeAddress)).isNone
+    "Core wire v1 encoded the code-address host value"
+  assertTrue
+    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .codeAddress)).isNone
+    "Core wire v2 encoded the code-address host value"
 
 end Tests
