@@ -80,6 +80,30 @@ theorem runCodeWithStorage?_some_fuelSound
       subst result
       exact ⟨code, rfl, code.runWithStorage_fuelSound context fuel⟩
 
+/-- A selected run identifies the checked result type it preserves. -/
+theorem runCodeWithStorage?_some_hasType
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : CodeRunContext RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (result : HostDriverResult (CodeRunContext RollbackState TraceState))
+    (executed :
+      context.runCodeWithStorage? codeAddress fuel = some result) :
+    ∃ code,
+      context.context.values.working.1.code? codeAddress = some code ∧
+        result.outcome.HasType
+          code.program.resultType code.program.dataDefinitions := by
+  unfold runCodeWithStorage? at executed
+  cases selected :
+      context.context.values.working.1.code? codeAddress with
+  | none => simp [selected] at executed
+  | some code =>
+      rw [selected] at executed
+      have resultEq := Option.some.inj executed
+      subst result
+      exact ⟨code, rfl, code.runWithStorage_hasType context fuel⟩
+
 /-- A selected combined run preserves checked code at every working Address. -/
 theorem runCodeWithStorage?_some_workingCode?
     {RollbackState : Type u}
