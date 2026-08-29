@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: connect completed handled Core results to existing frame lifecycle inputs
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -224,6 +224,66 @@ Keep every green commit below roughly 300 changed lines:
 5. add returned/reverted/trapped and fuel-boundary runtime regressions; and
 6. run full validation and independent audit, then synchronize acceptance
    evidence and current-facing internal documents.
+
+## Implementation record
+
+`HostDriverResult.toFrameContinuationContext?` now accepts any handler-context
+projection and completion policy. It constructs a continuation only from
+`.done`, using the exact terminal handler context, Core value, and Core-local
+store. Out-of-fuel and raw-fault results reduce to `none`; neither is assigned
+a frame outcome.
+
+Ten generic laws fix all three driver branches, the checkpoint state,
+checkpoint effects, working effects, working WorldState and outcome, and the
+exact returned, reverted, and trapped resolutions. Returned resolution uses
+the terminal working pair. Reverted resolution uses checkpoint state and
+rollback together with the terminal working trace. A policy-selected trap
+retains only its exact reason.
+
+The checked-storage specialization proves that a missing continuation is
+exactly an out-of-fuel run. Its raw-fault case is eliminated by the existing
+checked no-fault theorem. A completed continuation is unchanged at every
+larger fuel budget because the complete terminal driver result is unchanged.
+
+`runCodeWithStorageContinuationContext?` lifts the current address-selected
+entry point with `Option.map`. Its nested options preserve code absence,
+selected exhaustion, and completed continuation as three separate observable
+results. Named laws cover outer failure, exact inner exhaustion, and exact
+larger-fuel stability after completion.
+
+## Regression record
+
+Direct proof consumers exercise every generic branch and projection, all three
+resolution policies, the checked exhaustion equivalence, and checked and
+selected completion stability. They also consume both optional-boundary laws
+instead of relying only on reduction.
+
+The existing address-selected read/write/read fixture supplies the runtime
+story without a second model. At fuel 22 the storage write is already present
+but the selected run yields `some none`. At fuel 28 it completes with
+`.word newValue` and local store `[.bool true]`; at fuel 64 the completed
+continuation is exactly stable. An address without code remains outer `none`.
+
+The return policy succeeds only after observing the terminal storage update,
+the exact Core value, and the exact local store. Returned resolution retains
+that working update and working effects. Reverted resolution restores the
+checkpoint WorldState and rollback while retaining the working trace. A
+separate completion policy selects a trap and its exact reason is retained.
+No test converts exhaustion or a raw fault into a trap.
+
+## Acceptance evidence
+
+- the full build completed successfully with 623 build jobs;
+- the full test build completed successfully with 1,134 jobs and all runtime
+  checks passed;
+- all seven changed Lean modules passed trust-zero with warnings as errors;
+- workspace metadata and semantic-kernel policy checks passed;
+- printed axioms contain only existing standard `propext` and `Quot.sound`
+  dependencies, with no custom axiom, `Classical.choice`, or `sorryAx`;
+- independent production and cross-audits found no P0, P1, P2, or P3 issue;
+- every commit stayed below 300 changed lines; and
+- the root README, parser-facing code, Core execution, and public formats
+  remained unchanged.
 
 ## Consequences
 

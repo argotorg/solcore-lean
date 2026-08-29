@@ -26,10 +26,10 @@ follow-on proof slice: handled paths are compositional and directly type-safe.
 All fuel-sound results are unique at one budget; done and raw-fault results are
 also unique across budgets. It does not claim that out-of-fuel is stable or that
 checked host code always terminates.
-[ADR-0124](adr/0124-completed-handled-execution-frame-continuation.md) is the
-active lifecycle connection. It adapts only normal handled completion through
-a caller-owned policy, preserves terminal frame values, and retains nested
-options so code absence and selected out-of-fuel cannot be confused.
+[ADR-0124](adr/0124-completed-handled-execution-frame-continuation.md) completes
+the first lifecycle connection. It adapts only normal handled completion
+through a caller-owned policy, preserves terminal frame values, and retains
+nested options so code absence and selected out-of-fuel cannot be confused.
 
 ## Completed foundation
 
@@ -1762,6 +1762,26 @@ Out-of-fuel remains deliberately budget-relative: the regression fixture stops
 after its context-changing request at fuel 1 and completes at fuel 3. Full
 validation and independent P0-P3 audits pass; no runtime or public format
 changed.
+
+## Completed handled execution to frame continuation
+
+[ADR-0124](adr/0124-completed-handled-execution-frame-continuation.md) connects
+normal address-selected handled completion to the existing frame continuation
+and resolution model. The caller supplies both the terminal frame-value
+projection and the policy that interprets the final Core value and local store
+as returned, reverted, or trapped.
+
+Code absence, selected out-of-fuel, and completion remain distinct nested
+options. Out-of-fuel and raw faults receive no implicit trap meaning. Exact
+laws retain terminal checkpoint and working values, resolve all three
+caller-selected outcomes, sharpen checked inner failure to out-of-fuel, and
+keep completed continuations unchanged under additional fuel.
+
+The existing read/write/read fixture exercises return, revert, and policy trap
+resolution after a real storage update. It also fixes outer failure, fuel-22
+inner exhaustion, and fuel-28-to-64 completed stability. Full validation and
+independent P0-P3 audits pass. ABI encoding, normalization, parent delivery,
+scheduling, transaction disposition, and source syntax remain later work.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

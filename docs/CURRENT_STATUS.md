@@ -2176,7 +2176,7 @@ cross-fuel out-of-fuel stability, normalization, lifecycle interpretation, and
 all parser or public-format changes. Full build, test, trust-zero, metadata, and
 semantic-kernel checks passed; independent audits found no P0-P3 issue.
 
-## Active completed-execution frame continuation
+## Completed handled-execution frame continuation
 
 [ADR-0124](adr/0124-completed-handled-execution-frame-continuation.md) connects
 only normal handled completion to the existing frame continuation model through
@@ -2186,6 +2186,13 @@ terminal context, Core value, and local store.
 The address-selected lift keeps nested options: code-selection failure,
 selected out-of-fuel, and completed continuation remain distinct. Out-of-fuel
 and raw faults are not converted to frame traps.
+
+Runtime coverage resolves the completed read/write/read fixture through
+caller-selected return, revert, and trap policies. It checks terminal working
+storage, checkpoint rollback, retained working trace, exact Core-local store,
+and completion stability from fuel 28 to 64. Full build, test, trust-zero,
+metadata, and semantic-kernel checks passed; independent audits found no
+P0-P3 issue.
 
 ## Meaning of completion
 
