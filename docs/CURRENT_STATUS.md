@@ -373,14 +373,15 @@ absent without padding or offset wrap. Internal
 host tables length 9 and index 9 first unbound. ABI, calldata, partial loads,
 nested calls, syntax, and publication remain outside this slice.
 
-[ADR-0136](adr/0136-resumable-handled-fuel-slices.md) is active. It resumes an
+[ADR-0136](adr/0136-resumable-handled-fuel-slices.md) is complete. It resumes an
 actual `outOfFuel` result from its retained handler context and exact Core state
-with additional fuel. Under the same handler, split execution must equal one
+with additional fuel. Under the same handler, split execution equals one
 run with the summed budget; the storage specialization also keeps the exact
 same `ExecutionInputs`. Completed and faulted results remain terminal. The
 addition law covers arbitrary result values, but zero fuel is claimed as an
 identity only for results produced by an actual run, not for a forged exhausted
-result whose retained state may already be terminal.
+result whose retained state may already be terminal. Typed arbitrary results
+remain typed after resumption and cannot expose a raw machine fault.
 
 ## Implementation status
 
@@ -406,7 +407,7 @@ result whose retained state may already be terminal.
 | Bounded optional input-byte observation | Complete | Bounded indexing and exact widening, optional response injection, request/resume safety, full context identity, input-only variation, byte-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
-| Resumable handled fuel slices | In progress | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, and exact same-`ExecutionInputs` storage specialization are being implemented | Not published |
+| Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2505,21 +2506,29 @@ existing codec proof path. There is no custom axiom or `sorry`. ABI, calldata,
 partial loads, memory, nested calls, parser work, and publication remain
 separate. The independent completion audit found no P0-P3 issue.
 
-## Active resumable handled fuel slices
+## Completed resumable handled fuel slices
 
 [ADR-0136](adr/0136-resumable-handled-fuel-slices.md) fixes a total result
 consumer that runs again only when a handled execution exhausted its budget.
 It resumes from the exact returned context and Core state with an additional
-finite budget. With the same handler, this split run must equal a single run
-using `fuel + additional`; a completed or faulted result is returned unchanged.
+finite budget. With the same handler, this split run equals a single run using
+`fuel + additional`; a completed or faulted result is returned unchanged.
 
-Implementation must prove the stronger sequential-addition law for arbitrary
-result values, plus zero-additional identity for actual run results. It does
-not claim zero identity for an arbitrary forged `outOfFuel` value, because its
-stored state may already be terminal. The storage theorem must reuse the exact
+Sequential addition holds for arbitrary result values, while zero-additional
+identity is deliberately limited to actual run results. Typed results remain
+typed and cannot resume to a raw fault. The storage theorem reuses the exact
 same immutable `ExecutionInputs` while threading the retained mutable context.
-No gas model, persistence, different-handler or changed-input resumption,
-nested call, transaction, parser, Wire, or public interface is introduced.
+Its regression retains a pre-exhaustion storage write, matches a one-shot run,
+and preserves the checkpoint, effects, and unrelated Account; a separate
+fixture shows why changed inputs are outside the theorem.
+
+The 659-job build, 1,206-job test executable build, full test run, trust-zero
+and warning-as-error checks for all seven changed Lean roots, metadata,
+semantic-kernel, and diff checks pass. The eight main theorem axiom reports use
+only `propext` and `Quot.sound`. The independent completion audit found no
+P0-P3 issue. No gas model, persistence, different-handler or changed-input
+resumption, nested call, transaction, parser, Wire, or public interface is
+introduced.
 
 ## Meaning of completion
 

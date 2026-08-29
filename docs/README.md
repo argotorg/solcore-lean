@@ -152,14 +152,15 @@ parent fuel boundaries, the parent fold, terminal bytes, and frozen-Wire
 rejection are proved and tested. ABI, calldata, partial loads, memory, nested
 calls, parser work, Wire encoding, and publication remain out of scope.
 
-[ADR-0136](adr/0136-resumable-handled-fuel-slices.md) is the active internal
-slice. It resumes an exhausted handled run from its exact returned context and
-Core state with more fuel. Under the same handler, splitting a budget must
-produce the same result as one run with the summed budget; completed and
+[ADR-0136](adr/0136-resumable-handled-fuel-slices.md) completes resumable
+handled fuel slices. It resumes an exhausted run from its exact returned
+context and Core state with more fuel. Under the same handler, splitting a
+budget produces the same result as one run with the summed budget; completed and
 faulted results remain unchanged. Sequential additions cover arbitrary result
 values, while zero is an identity only for actual run results because a forged
 exhausted value may already contain a terminal state. Storage resumption keeps
-the exact same `ExecutionInputs`. This adds no gas model, persistence, nested
+the exact same `ExecutionInputs`, retaining completed writes and unrelated
+context. Typed results remain safe. This adds no gas model, persistence, nested
 call lifecycle, syntax, Wire encoding, or public interface.
 
 First-order local cells from

@@ -85,10 +85,10 @@ padding or Word-offset wrap. The internal host capability appends at index 8,
 with table length 9 and first-unbound index 9. ABI, calldata, memory, nested
 input derivation, syntax, and publication stay separate.
 
-[ADR-0136](adr/0136-resumable-handled-fuel-slices.md) is active. It makes an
+[ADR-0136](adr/0136-resumable-handled-fuel-slices.md) is complete. It makes an
 exhausted handled run resumable from its exact returned context and Core state.
 Using the same handler and, for storage execution, the same `ExecutionInputs`,
-a split budget must agree with one run using the summed budget. Done and fault
+a split budget agrees with one run using the summed budget. Done and fault
 remain terminal. Sequential addition is required for arbitrary result values;
 zero is an identity only for actual run results, not arbitrary forged
 `outOfFuel` values.
@@ -231,7 +231,7 @@ These results remain regression obligations for every extension.
 | 116 | Bounded optional input-byte observation | Complete | Carries one bounded run-fixed `InputData` value and exposes one present byte or explicit absence at Core host index 6 |
 | 117 | Run-fixed input-size observation | Complete | Derives the exact bounded input length as a Word, exposes it at Core host index 7, and proves its boundary agrees with optional byte lookup |
 | 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
-| 119 | Resumable handled fuel slices | In progress | Resumes retained exhaustion under the same handler and exact inputs, and proves split fuel equals one summed budget without replay |
+| 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
 | 120 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
 | 121 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 122 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -2058,7 +2058,7 @@ proof path. No custom axiom or `sorry` remains. ABI, calldata, partial loads,
 memory, nested calls, parser work, and publication remain outside this
 completed slice. The independent completion audit found no P0-P3 issue.
 
-## Active resumable handled fuel slices
+## Completed resumable handled fuel slices
 
 [ADR-0136](adr/0136-resumable-handled-fuel-slices.md) adds a total
 `resumeWithFuel` consumer above the existing handled driver. Only an
@@ -2066,14 +2066,22 @@ completed slice. The independent completion audit found no P0-P3 issue.
 and Core state. A `done` or `fault` result remains byte-for-byte unchanged.
 
 The central law equates a same-handler split run with one run using
-`fuel + additional`. Sequential additions must associate for every result
-value, while zero-additional identity is deliberately limited to actual run
+`fuel + additional`. Sequential additions associate for every result value,
+while zero-additional identity is deliberately limited to actual run
 results: a forged exhausted value can contain a state that zero fuel already
-recognizes as terminal. The storage specialization must keep the exact same
-`ExecutionInputs` on both sides. Generic and storage regressions, fuel
-accounting, trust, dependency, compatibility, and independent audits remain
-implementation obligations. Gas, persistence, handler/input replacement,
-nested calls, transactions, syntax, and publication are excluded.
+recognizes as terminal. Resumption preserves the type of any typed result and
+cannot expose a raw machine fault. The storage specialization keeps the exact
+same `ExecutionInputs` on both sides.
+
+Generic regressions cover request-ready, fault, exhausted, completed, and
+terminal cases. The storage regression retains a write across exhaustion,
+matches the one-shot run, preserves checkpoint/effects/unrelated Account, and
+uses a separate changed-input fixture to make the theorem boundary visible.
+The 659-job build, 1,206-job test executable build, full test run, seven-root
+trust-zero and warning-as-error checks, metadata, semantic-kernel, diff, axiom,
+and independent audits pass; the audit found no P0-P3 issue. Gas, persistence,
+handler/input replacement, nested calls, transactions, syntax, and publication
+are excluded.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

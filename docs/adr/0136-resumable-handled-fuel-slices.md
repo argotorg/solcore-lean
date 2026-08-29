@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: resume an exhausted handled Core run with an additional finite budget
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -14,10 +14,11 @@ remaining Core fuel. Its executable result is equivalent to the existing
 original run receives a larger budget.
 
 An exhausted result retains both the latest handler context and the exact Core
-state that is ready for another transition or request. The repository proves
-that this state is reached by exactly the supplied budget, but does not yet
-connect two ordinary uses of the driver: running with `fuel`, then continuing
-an exhaustion with `additional`, and running once with `fuel + additional`.
+state that is ready for another transition or request. Before this ADR, the
+repository proved that this state was reached by exactly the supplied budget,
+but did not connect two ordinary uses of the driver: running with `fuel`, then
+continuing an exhaustion with `additional`, and running once with
+`fuel + additional`.
 
 This missing law matters to internal bounded executors. Without it, a caller
 can safely inspect exhaustion, but has no proved way to divide one execution
@@ -243,23 +244,27 @@ This ADR does not define or prove:
 - stability of an out-of-fuel result under a larger budget; or
 - any source, parser, ABI, Wire, Oracle, or public-format behavior.
 
-## Implementation sequence
+## Implementation and validation
 
-Every commit must remain green and contain at most 300 changed lines:
+The total `resumeWithFuel` operation and its constructor equations are
+implemented above the generic handled driver. The proved interface includes
+exact one-shot/split coherence, sequential addition, actual-run zero identity,
+and exact terminal behavior. It also proves that resuming any typed result
+preserves its type and cannot expose a raw machine fault. The storage
+specialization uses the same `ExecutionInputs` on both sides.
 
-1. add this ADR and activate it in the internal status documents separately;
-2. add `resumeWithFuel` and its exact constructor equations;
-3. prove exhaustion-prefix composition and the generic one-shot/split law;
-4. prove zero and sequential-addition algebra over actual runs and the safe
-   stronger arbitrary-result law where applicable;
-5. add the exact same-input storage specialization;
-6. add generic and storage executable regressions and register them;
-7. run trust, axiom, dependency, build, test, metadata, kernel, compatibility,
-   and independent audits; and
-8. synchronize completion evidence without changing the root README.
+Executable regressions cover request-ready exhaustion, repeated exhaustion,
+completion, unchecked raw fault, terminal identity, and exact one-shot/split
+results. The storage regression writes before exhaustion, retains that write
+when resumed with the same inputs, matches the one-shot result, and separately
+demonstrates that changing an input can change an input-sensitive suffix. It
+also checks the checkpoint, effects, and unrelated Account are preserved.
 
-Temporary proof helpers and test-only production APIs must be removed before
-completion.
+The 659-job build, 1,206-job test executable build, and full test run pass. All
+seven changed Lean roots pass trust-zero with warnings as errors. Metadata,
+semantic-kernel, and diff checks pass. The eight main theorem axiom reports use
+only `propext` and `Quot.sound`; there is no custom axiom or `sorry`. The
+independent completion audit found no P0-P3 issue.
 
 ## Consequences
 
