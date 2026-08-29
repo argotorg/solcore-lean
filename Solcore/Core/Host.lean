@@ -10,12 +10,13 @@ namespace Solcore.Core
 def hostContext : Context :=
   [HostFunction.functionType .storageRead,
     HostFunction.functionType .storageWrite,
-    HostFunction.functionType .storageAddress]
+    HostFunction.functionType .storageAddress,
+    HostFunction.functionType .codeAddress]
 
 /-- Runtime values corresponding positionally to `hostContext`. -/
 def hostEnvironment : Environment :=
   [.hostFunction .storageRead, .hostFunction .storageWrite,
-    .hostFunction .storageAddress]
+    .hostFunction .storageAddress, .hostFunction .codeAddress]
 
 @[simp] theorem hostContext_storageRead :
     hostContext[HostFunction.storageRead.index]? =
@@ -47,10 +48,20 @@ def hostEnvironment : Environment :=
       some (.hostFunction .storageAddress) :=
   rfl
 
-@[simp] theorem hostContext_length : hostContext.length = 3 :=
+@[simp] theorem hostContext_codeAddress :
+    hostContext[HostFunction.codeAddress.index]? =
+      some (HostFunction.functionType .codeAddress) :=
   rfl
 
-@[simp] theorem hostEnvironment_length : hostEnvironment.length = 3 :=
+@[simp] theorem hostEnvironment_codeAddress :
+    hostEnvironment[HostFunction.codeAddress.index]? =
+      some (.hostFunction .codeAddress) :=
+  rfl
+
+@[simp] theorem hostContext_length : hostContext.length = 4 :=
+  rfl
+
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 4 :=
   rfl
 
 namespace Program

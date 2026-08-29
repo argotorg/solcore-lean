@@ -170,7 +170,8 @@ theorem HostRuntimeValueHasType.function_shape
     (world : StoreTyping)
     (definitions : DataEnvironment := []) :
     HostRuntimeEnvironmentHasTypes world hostEnvironment hostContext definitions :=
-  .cons .hostFunction (.cons .hostFunction (.cons .hostFunction .nil))
+  .cons .hostFunction
+    (.cons .hostFunction (.cons .hostFunction (.cons .hostFunction .nil)))
 
 mutual
 

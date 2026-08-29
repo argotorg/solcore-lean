@@ -219,6 +219,7 @@ theorem HostRequest.responseValue_hasType
   | storageRead => exact .word
   | storageWrite => exact .unit
   | storageAddress => exact .word
+  | codeAddress => exact .word
 
 theorem HostSuspensionHasType.resume {definitions : DataEnvironment}
     {suspension : HostSuspension} {resultType : Ty}

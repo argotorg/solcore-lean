@@ -75,6 +75,8 @@ theorem hostAdvance_done_iff
                       simp [hostAdvance] at advanced
               | storageAddress =>
                   cases returned <;> simp [hostAdvance] at advanced
+              | codeAddress =>
+                  cases returned <;> simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩
     simp [hostAdvance, State.final, advance]
 

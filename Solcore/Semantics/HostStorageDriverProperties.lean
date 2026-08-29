@@ -231,6 +231,8 @@ theorem run_of_suspended_storageAddress
               · simp [handler, handleRequest, same]
               · simp [handler, handleRequest, same]
           | storageAddress =>
+              simp [handler, handleRequest]
+          | codeAddress =>
               simp [handler, handleRequest])
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved

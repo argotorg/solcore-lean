@@ -3,7 +3,7 @@ import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountSt
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWrite
 import Solcore.Semantics.HostDriver
 
-/-! Combined interpretation of Core storage requests through working storage. -/
+/-! Combined interpretation of supported Core host requests during storage execution. -/
 
 set_option autoImplicit false
 
@@ -21,13 +21,13 @@ abbrev Context
     RollbackState TraceState
 
 /--
-Interpret one storage request and return the next context together with the
-response indexed by that exact request.
+Interpret one supported host request and return the next context together with
+the response indexed by that exact request.
 -/
 def handleRequest
     {RollbackState : Type u}
     {TraceState : Type v}
-    (_codeAddress : Address)
+    (codeAddress : Address)
     (context : Context RollbackState TraceState)
     (request : Core.HostRequest) :
     Context RollbackState TraceState × request.Response :=
@@ -36,6 +36,7 @@ def handleRequest
   | .storageWrite slot value => (context.writeStorage slot value, ())
   | .storageAddress =>
       (context, addressToWord context.context.storageAddress)
+  | .codeAddress => (context, addressToWord codeAddress)
 
 /-- The total dependent handler used by combined storage execution. -/
 def handler
@@ -124,6 +125,28 @@ def handleSuspension
       (context,
         ⟨.ret (.word (addressToWord context.context.storageAddress)),
           continuation, store⟩) :=
+  rfl
+
+@[simp] theorem handleRequest_codeAddress
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (codeAddress : Address)
+    (context : Context RollbackState TraceState) :
+    handleRequest codeAddress context .codeAddress =
+      (context, addressToWord codeAddress) :=
+  rfl
+
+@[simp] theorem handleSuspension_codeAddress
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (codeAddress : Address)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension codeAddress context
+        ⟨.codeAddress, continuation, store⟩ =
+      (context,
+        ⟨.ret (.word (addressToWord codeAddress)), continuation, store⟩) :=
   rfl
 
 end HostStorageDriver
