@@ -136,7 +136,15 @@ theorem runWithInputs_of_suspended_codeAddress
     (state : Core.State) :
     (runWithInputs context inputs fuel state).context.context.storageAddress =
       context.context.storageAddress := by
-  exact run_storageAddress context inputs.codeAddress fuel state
+  simpa only [runWithInputs] using
+    HostDriver.run_observe
+      (@handlerWithInputs RollbackState TraceState inputs)
+      (fun current => current.context.storageAddress)
+      (by
+        intro current request
+        cases request <;>
+          simp [handlerWithInputs, handleRequestWithInputs])
+      context fuel state
 
 @[simp] theorem runWithInputs_checkpoint
     {RollbackState : Type u} {TraceState : Type v}
@@ -146,7 +154,15 @@ theorem runWithInputs_of_suspended_codeAddress
     (state : Core.State) :
     (runWithInputs context inputs fuel state).context.context.values.checkpoint =
       context.context.values.checkpoint := by
-  exact run_checkpoint context inputs.codeAddress fuel state
+  simpa only [runWithInputs] using
+    HostDriver.run_observe
+      (@handlerWithInputs RollbackState TraceState inputs)
+      (fun current => current.context.values.checkpoint)
+      (by
+        intro current request
+        cases request <;>
+          simp [handlerWithInputs, handleRequestWithInputs])
+      context fuel state
 
 @[simp] theorem runWithInputs_workingEffects
     {RollbackState : Type u} {TraceState : Type v}
@@ -156,7 +172,15 @@ theorem runWithInputs_of_suspended_codeAddress
     (state : Core.State) :
     (runWithInputs context inputs fuel state).context.context.values.working.2 =
       context.context.values.working.2 := by
-  exact run_workingEffects context inputs.codeAddress fuel state
+  simpa only [runWithInputs] using
+    HostDriver.run_observe
+      (@handlerWithInputs RollbackState TraceState inputs)
+      (fun current => current.context.values.working.2)
+      (by
+        intro current request
+        cases request <;>
+          simp [handlerWithInputs, handleRequestWithInputs])
+      context fuel state
 
 @[simp] theorem runWithInputs_workingCode?
     {RollbackState : Type u} {TraceState : Type v}
@@ -168,7 +192,16 @@ theorem runWithInputs_of_suspended_codeAddress
     (runWithInputs context inputs fuel state).context.context.values.working.1.code?
         observedAddress =
       context.context.values.working.1.code? observedAddress := by
-  exact run_workingCode? context inputs.codeAddress fuel state observedAddress
+  simpa only [runWithInputs] using
+    HostDriver.run_observe
+      (@handlerWithInputs RollbackState TraceState inputs)
+      (fun current =>
+        current.context.values.working.1.code? observedAddress)
+      (by
+        intro current request
+        cases request <;>
+          simp [handlerWithInputs, handleRequestWithInputs])
+      context fuel state
 
 @[simp] theorem runWithInputs_workingAccount?_of_ne_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
@@ -181,7 +214,38 @@ theorem runWithInputs_of_suspended_codeAddress
     (runWithInputs context inputs fuel state).context.context.values.working.1.account?
         observedAddress =
       context.context.values.working.1.account? observedAddress := by
-  exact run_workingAccount?_of_ne_storageAddress context inputs.codeAddress
-    fuel state observedAddress different
+  have preserved :
+      (if observedAddress =
+          (runWithInputs context inputs fuel state).context.context.storageAddress
+        then none
+        else
+          (runWithInputs context inputs fuel state).context.context.values.working.1.account?
+            observedAddress) =
+      (if observedAddress = context.context.storageAddress
+        then none
+        else context.context.values.working.1.account? observedAddress) := by
+    simpa only [runWithInputs] using
+      HostDriver.run_observe
+        (@handlerWithInputs RollbackState TraceState inputs)
+        (fun current =>
+          if observedAddress = current.context.storageAddress
+            then none
+            else current.context.values.working.1.account? observedAddress)
+        (by
+          intro current request
+          cases request with
+          | storageRead slot =>
+              simp [handlerWithInputs, handleRequestWithInputs]
+          | storageWrite slot value =>
+              by_cases same :
+                  observedAddress = current.context.storageAddress
+              · simp [handlerWithInputs, handleRequestWithInputs, same]
+              · simp [handlerWithInputs, handleRequestWithInputs, same]
+          | storageAddress =>
+              simp [handlerWithInputs, handleRequestWithInputs]
+          | codeAddress =>
+              simp [handlerWithInputs, handleRequestWithInputs])
+        context fuel state
+  simpa only [runWithInputs_storageAddress, if_neg different] using preserved
 
 end Solcore.Semantics.HostStorageDriver
