@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
+import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
 import Solcore.Semantics.HostStorageHandlerProperties
 
 /-! Compile-time use of the public storage-driver proof interface. -/
@@ -10,7 +10,24 @@ namespace Tests
 open Solcore.Core
 open Solcore.Semantics
 
-universe u v
+universe u v w x
+
+private def frameContinuationData : Bytes := [0xa1, 0xb2].toByteArray
+
+private def returnedFrameOutcome
+    {Context : Type x}
+    (_ : Context) (_ : Value) (_ : Store) : FrameOutcome Unit :=
+  .returned frameContinuationData
+
+private def revertedFrameOutcome
+    {Context : Type x}
+    (_ : Context) (_ : Value) (_ : Store) : FrameOutcome Unit :=
+  .reverted frameContinuationData
+
+private def trappedFrameOutcome
+    {Context : Type x}
+    (_ : Context) (_ : Value) (_ : Store) : FrameOutcome Unit :=
+  .trapped ()
 
 /-- The public handler API exposes the exact write update and resumed Core state. -/
 private theorem compileTimeWriteResumeRegression
@@ -353,5 +370,197 @@ private theorem compileTimeSelectedDoneStabilityRegression
       some ⟨finalContext, .done value store⟩ :=
   FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
     context codeAddress execution more
+
+/-- The generic adapter distinguishes completion from exhaustion and raw faults. -/
+private theorem compileTimeFrameContinuationBranchRegression
+    {Context : Type x}
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context)
+    (value : Value)
+    (store : Store)
+    (state : State)
+    (error : MachineFault)
+    (values :
+      Context → FrameCheckpointedWorkingPair RollbackState TraceState) :
+    (HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values returnedFrameOutcome =
+        some (FrameContinuationContext.fromCheckpointedWorkingPair
+          (values context) (returnedFrameOutcome context value store)) ∧
+      (HostDriverResult.mk context (.outOfFuel state)).toFrameContinuationContext?
+          values returnedFrameOutcome = none ∧
+      (HostDriverResult.mk context (.fault error state)).toFrameContinuationContext?
+          values returnedFrameOutcome = none := by
+  exact
+    ⟨HostDriverResult.toFrameContinuationContext?_done
+        context value store values returnedFrameOutcome,
+      HostDriverResult.toFrameContinuationContext?_outOfFuel
+        context state values returnedFrameOutcome,
+      HostDriverResult.toFrameContinuationContext?_fault
+        context error state values returnedFrameOutcome⟩
+
+/-- Completion retains every terminal checkpoint, working, and outcome input. -/
+private theorem compileTimeFrameContinuationProjectionRegression
+    {Context : Type x}
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context)
+    (value : Value)
+    (store : Store)
+    (values :
+      Context → FrameCheckpointedWorkingPair RollbackState TraceState) :
+    Option.map FrameContinuationContext.stateCheckpoint
+        ((HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values returnedFrameOutcome) =
+        some (values context).checkpoint.state ∧
+      Option.map FrameContinuationContext.effectCheckpoint
+        ((HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values returnedFrameOutcome) =
+        some (values context).checkpoint.effects ∧
+      Option.map FrameContinuationContext.effectWorking
+        ((HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values returnedFrameOutcome) =
+        some (values context).working.2 ∧
+      Option.map FrameContinuationContext.result
+        ((HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values returnedFrameOutcome) =
+        some ⟨(values context).working.1,
+          returnedFrameOutcome context value store⟩ := by
+  exact
+    ⟨HostDriverResult.stateCheckpoint_toFrameContinuationContext?_done
+        context value store values returnedFrameOutcome,
+      HostDriverResult.effectCheckpoint_toFrameContinuationContext?_done
+        context value store values returnedFrameOutcome,
+      HostDriverResult.effectWorking_toFrameContinuationContext?_done
+        context value store values returnedFrameOutcome,
+      HostDriverResult.result_toFrameContinuationContext?_done
+        context value store values returnedFrameOutcome⟩
+
+/-- Return, revert, and policy-selected trap resolution remain branch exact. -/
+private theorem compileTimeFrameContinuationResolutionRegression
+    {Context : Type x}
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context)
+    (value : Value)
+    (store : Store)
+    (values :
+      Context → FrameCheckpointedWorkingPair RollbackState TraceState) :
+    Option.map FrameContinuationContext.resolve
+        ((HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values returnedFrameOutcome) =
+        some (FrameResolutionResult.returned
+          (values context).working.1 (values context).working.2
+          frameContinuationData) ∧
+      Option.map FrameContinuationContext.resolve
+        ((HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values revertedFrameOutcome) =
+        some (FrameResolutionResult.reverted
+          (values context).checkpoint.state
+          ⟨(values context).checkpoint.effects.rollback,
+            (values context).working.2.trace⟩
+          frameContinuationData) ∧
+      Option.map FrameContinuationContext.resolve
+        ((HostDriverResult.mk context (.done value store)).toFrameContinuationContext?
+          values trappedFrameOutcome) =
+        some (FrameResolutionResult.trapped ()) := by
+  exact
+    ⟨HostDriverResult.resolve_toFrameContinuationContext?_done_returned
+        context value store values returnedFrameOutcome
+        frameContinuationData rfl,
+      HostDriverResult.resolve_toFrameContinuationContext?_done_reverted
+        context value store values revertedFrameOutcome
+        frameContinuationData rfl,
+      HostDriverResult.resolve_toFrameContinuationContext?_done_trapped
+        context value store values trappedFrameOutcome () rfl⟩
+
+/-- Checked adaptation exposes exhaustion exactly and preserves completed output. -/
+private theorem compileTimeCheckedFrameContinuationRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    {TrapReason : Type w}
+    (code : CheckedHostCoreProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (fuel : Nat)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState TraceState →
+        Value → Store → FrameOutcome TrapReason) :
+    (code.runWithStorage context fuel).toFrameContinuationContext?
+          (fun current => current.context.values) doneOutcome = none ↔
+      ∃ finalContext exhausted,
+        code.runWithStorage context fuel =
+          ⟨finalContext, .outOfFuel exhausted⟩ :=
+  code.runWithStorage_toFrameContinuationContext?_eq_none_iff
+    context fuel doneOutcome
+
+private theorem compileTimeCheckedFrameContinuationStabilityRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    {TrapReason : Type w}
+    (code : CheckedHostCoreProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState TraceState →
+        Value → Store → FrameOutcome TrapReason)
+    {fuel largerFuel : Nat}
+    {continuation :
+      FrameContinuationContext RollbackState TraceState TrapReason}
+    (completed :
+      (code.runWithStorage context fuel).toFrameContinuationContext?
+          (fun current => current.context.values) doneOutcome =
+        some continuation)
+    (more : fuel ≤ largerFuel) :
+    (code.runWithStorage context largerFuel).toFrameContinuationContext?
+        (fun current => current.context.values) doneOutcome =
+      some continuation :=
+  code.runWithStorage_toFrameContinuationContext?_some_stable
+    context doneOutcome completed more
+
+/-- Selected adaptation keeps code absence distinct from selected exhaustion. -/
+private theorem compileTimeSelectedFrameContinuationBoundaryRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    {TrapReason : Type w}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (fuel : Nat)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState TraceState →
+        Value → Store → FrameOutcome TrapReason) :
+    (context.runCodeWithStorageContinuationContext?
+          codeAddress fuel doneOutcome = none ↔
+        context.context.values.working.1.code? codeAddress = none) ∧
+      (context.runCodeWithStorageContinuationContext?
+          codeAddress fuel doneOutcome = some none ↔
+        ∃ resultContext exhausted,
+          context.runCodeWithStorage? codeAddress fuel =
+            some ⟨resultContext, .outOfFuel exhausted⟩) := by
+  exact
+    ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_none_iff
+        context codeAddress fuel doneOutcome,
+      FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
+        context codeAddress fuel doneOutcome⟩
+
+/-- A nested selected completion retains the exact continuation at larger fuel. -/
+private theorem compileTimeSelectedFrameContinuationStabilityRegression
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    {TrapReason : Type w}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (codeAddress : Address)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState TraceState →
+        Value → Store → FrameOutcome TrapReason)
+    {fuel largerFuel : Nat}
+    {continuation :
+      FrameContinuationContext RollbackState TraceState TrapReason}
+    (completed :
+      context.runCodeWithStorageContinuationContext?
+        codeAddress fuel doneOutcome = some (some continuation))
+    (more : fuel ≤ largerFuel) :
+    context.runCodeWithStorageContinuationContext?
+      codeAddress largerFuel doneOutcome = some (some continuation) :=
+  FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_some_some_stable
+    context codeAddress doneOutcome completed more
 
 end Tests
