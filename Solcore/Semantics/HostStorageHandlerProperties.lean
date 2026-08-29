@@ -140,6 +140,59 @@ universe u v
           continuation, store⟩) :=
   rfl
 
+@[simp] theorem handleRequest_inputDataByte?
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word) :
+    handleRequest inputs context (.inputDataByte? offset) =
+      (context, inputs.inputData.byte? offset) :=
+  rfl
+
+@[simp] theorem handleSuspension_inputDataByte?
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension inputs context
+        ⟨.inputDataByte? offset, continuation, store⟩ =
+      (context,
+        (Core.HostSuspension.mk (.inputDataByte? offset) continuation store).resume
+          (inputs.inputData.byte? offset)) :=
+  rfl
+
+theorem handleSuspension_inputDataByte?_none
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (absent : inputs.inputData.byte? offset = none) :
+    handleSuspension inputs context
+        ⟨.inputDataByte? offset, continuation, store⟩ =
+      (context,
+        ⟨.ret (.inLeft .word .unit), continuation, store⟩) := by
+  rw [handleSuspension_inputDataByte?, absent]
+  rfl
+
+theorem handleSuspension_inputDataByte?_some
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset byte : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (present : inputs.inputData.byte? offset = some byte) :
+    handleSuspension inputs context
+        ⟨.inputDataByte? offset, continuation, store⟩ =
+      (context,
+        ⟨.ret (.inRight .unit (.word byte)), continuation, store⟩) := by
+  rw [handleSuspension_inputDataByte?, present]
+  rfl
+
 @[simp] theorem handleSuspension_storageRead_context
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
@@ -361,6 +414,88 @@ universe u v
     (continuation : List Core.Frame) (store : Core.Store) :
     (handleSuspension inputs context
       ⟨.callerAddress, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store inputs context _
+
+@[simp] theorem handleSuspension_inputDataByte?_context
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataByte? offset, continuation, store⟩).1 = context := by
+  rw [handleSuspension_inputDataByte?]
+
+theorem handleSuspension_inputDataByte?_context_independent
+    {RollbackState : Type u} {TraceState : Type v}
+    (leftInputs rightInputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension leftInputs context
+        ⟨.inputDataByte? offset, continuation, store⟩).1 =
+      (handleSuspension rightInputs context
+        ⟨.inputDataByte? offset, continuation, store⟩).1 := by
+  simp
+
+@[simp] theorem handleSuspension_inputDataByte?_control
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+  (handleSuspension inputs context
+      ⟨.inputDataByte? offset, continuation, store⟩).2.control =
+        .ret ((Core.HostRequest.inputDataByte? offset).responseValue
+          (inputs.inputData.byte? offset)) := by
+  rw [handleSuspension_inputDataByte?]
+  rfl
+
+theorem handleSuspension_inputDataByte?_control_none
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store)
+    (absent : inputs.inputData.byte? offset = none) :
+    (handleSuspension inputs context
+      ⟨.inputDataByte? offset, continuation, store⟩).2.control =
+        .ret (.inLeft .word .unit) := by
+  rw [handleSuspension_inputDataByte?_none inputs context offset continuation store
+    absent]
+
+theorem handleSuspension_inputDataByte?_control_some
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset byte : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store)
+    (present : inputs.inputData.byte? offset = some byte) :
+    (handleSuspension inputs context
+      ⟨.inputDataByte? offset, continuation, store⟩).2.control =
+        .ret (.inRight .unit (.word byte)) := by
+  rw [handleSuspension_inputDataByte?_some inputs context offset byte continuation
+    store present]
+
+@[simp] theorem handleSuspension_inputDataByte?_continuation
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataByte? offset, continuation, store⟩).2.continuation =
+        continuation := by
+  exact handleSuspension_continuation inputs context _
+
+@[simp] theorem handleSuspension_inputDataByte?_store
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataByte? offset, continuation, store⟩).2.store = store := by
   exact handleSuspension_store inputs context _
 
 @[simp] theorem wordToAddress?_handler_storageAddress
