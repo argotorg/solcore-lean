@@ -118,7 +118,7 @@ private example
                 context.effectWorking.trace⟩) := by
   exact context.resolveWithTrapRollback_snd_eq_some_iff values
 
-/-- ADR-0125 whole-context construction equality transports through the view. -/
+/-- ADR-0125 whole-context coherence transports through the first component. -/
 private example
     {RollbackState : Type u} {Event : Type v} {TrapReason : Type w}
     {parentWorking :
@@ -142,18 +142,16 @@ private example
           storageAddress = some context ∧
       context.runCodeWithStorageContinuationContext?
           codeAddress fuel doneOutcome = some (some continuation) ∧
-      parentContinuation.resolveWithTrapRollback =
-        (ParentIndexedFrameContinuationContext.fromTraceExtension
-          parentWorking initialization.workingRollback
-          initialization.initialTraceExtension
-          continuation.result).resolveWithTrapRollback := by
-  rw [
-    initialization.runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_some_iff
-      storageAddress codeAddress fuel doneOutcome parentContinuation] at completed
-  obtain ⟨context, continuation, refined, lowerCompleted, parentEq⟩ :=
-    completed
-  exact ⟨context, continuation, refined, lowerCompleted,
-    congrArg (fun current => current.resolveWithTrapRollback) parentEq⟩
+      parentContinuation.toFrameContinuationContext = continuation ∧
+      (parentContinuation.resolveWithTrapRollback).1 =
+        continuation.resolve := by
+  obtain ⟨context, continuation, refined, lowerCompleted, coherent⟩ :=
+    initialization.runCodeWithStorageParentIndexedContinuationContext?_some_some_some_toFrameContinuationContext
+      storageAddress codeAddress fuel doneOutcome parentContinuation completed
+  exact ⟨context, continuation, refined, lowerCompleted, coherent, by
+    simpa only [
+      ParentIndexedFrameContinuationContext.resolveWithTrapRollback] using
+      congrArg FrameContinuationContext.resolve coherent⟩
 
 /-- Additional fuel preserves the completed optional boundary and exact view. -/
 private example

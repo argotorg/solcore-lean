@@ -158,7 +158,8 @@ Add compile-only consumers that:
 - recover the exact parent rollback pair from the trapped component;
 - show together that a trap rejects both returned/reverted callbacks in the
   first component while selecting the exact rollback in the second;
-- transport ADR-0125 whole-context completion equality through the new view;
+- transport ADR-0125 whole-context completion equality through the first
+  resolution component of the new view;
   and
 - transport ADR-0125 completed larger-fuel stability without changing any
   optional boundary.
