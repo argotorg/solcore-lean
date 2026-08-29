@@ -2136,6 +2136,19 @@ Full build, test, trust-zero, metadata, and semantic-kernel checks passed. An
 independent final audit found no P0-P3 issue. The next semantic slice will be
 selected separately; parser and parser-proof work remains paused.
 
+## Active address-selected execution completeness
+
+[ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
+closes the only remaining one-way specification at the current highest-level
+handled execution entry point. It will characterize `some result` exactly by
+the selected checked code and its fuel-indexed handled-step evidence, and
+characterize `none` exactly by failure of the existing working-WorldState code
+lookup.
+
+This is a proof-only boundary. A selected out-of-fuel run remains `some`; it is
+not confused with code-selection failure. The executable driver, code lookup,
+address roles, parser, public formats, and frame lifecycle do not change.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable

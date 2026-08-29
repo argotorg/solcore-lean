@@ -14,8 +14,13 @@ identical when given more fuel.
 retained storage-selector observation. The append-only `unit -> word`
 capability at index 2 returns the existing selector losslessly and leaves its
 handler context unchanged, without treating it as a current, self, code, or
-caller address. The next semantic slice will be selected separately. Concrete
-grammar and parser proof work stays paused until source syntax stabilizes.
+caller address.
+[ADR-0122](adr/0122-address-selected-handled-execution-exact-specification.md)
+is the active proof-only slice. It makes both optional branches of the current
+address-selected entry point exact: successful execution is equivalent to
+selected-code fuel evidence, while `none` is equivalent to the existing code
+lookup returning `none`. Concrete grammar and parser proof work stays paused
+until source syntax stabilizes.
 
 ## Completed foundation
 
