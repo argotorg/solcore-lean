@@ -1,4 +1,4 @@
-import Solcore.Semantics.HostDriverFuelProperties
+import Solcore.Semantics.HostDriverCompletenessProperties
 import Solcore.Semantics.HostStorageDriverProperties
 
 /-! Whole-run fuel accounting for combined handled storage execution. -/
@@ -70,6 +70,57 @@ theorem run_fuelSound
       (@handler RollbackState TraceState)
       context fuel state
 
+/-- Fuel evidence for the combined handler determines its executable result. -/
+theorem run_eq_of_fuelSound
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State)
+    (result : HostDriverResult (Context RollbackState TraceState))
+    (sound : FuelSound result fuel context state) :
+    run context fuel state = result := by
+  simpa only [run, FuelSound] using
+    HostDriver.run_eq_of_fuelSoundWith
+      (@handler RollbackState TraceState)
+      context fuel state result sound
+
+/-- Combined storage execution is exactly its handled fuel specification. -/
+theorem run_eq_iff_fuelSound
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel : Nat)
+    (state : Core.State)
+    (result : HostDriverResult (Context RollbackState TraceState)) :
+    run context fuel state = result ↔
+      FuelSound result fuel context state := by
+  simpa only [run, FuelSound] using
+    HostDriver.run_eq_iff_fuelSoundWith
+      (@handler RollbackState TraceState)
+      context fuel state result
+
+/-- A completed combined-storage result is stable under additional fuel. -/
+theorem run_done_stable
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    {fuel largerFuel : Nat}
+    (state : Core.State)
+    {finalContext : Context RollbackState TraceState}
+    {value : Core.Value}
+    {store : Core.Store}
+    (execution :
+      run context fuel state =
+        ⟨finalContext, .done value store⟩)
+    (more : fuel ≤ largerFuel) :
+    run context largerFuel state =
+      ⟨finalContext, .done value store⟩ := by
+  simpa only [run] using
+    HostDriver.run_done_stable
+      (@handler RollbackState TraceState)
+      execution more
+
 end HostStorageDriver
 
 namespace CheckedHostCoreProgram
@@ -86,6 +137,49 @@ theorem runWithStorage_fuelSound
       fuel context
       (Core.State.initial code.program.body Core.hostEnvironment) := by
   exact HostStorageDriver.run_fuelSound context fuel _
+
+/-- Checked combined execution is exactly its handled fuel specification. -/
+theorem runWithStorage_eq_iff_fuelSound
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (code : CheckedHostCoreProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (fuel : Nat)
+    (result :
+      HostDriverResult
+        (HostStorageDriver.Context RollbackState TraceState)) :
+    code.runWithStorage context fuel = result ↔
+      HostStorageDriver.FuelSound
+        result fuel context
+        (Core.State.initial code.program.body Core.hostEnvironment) := by
+  simpa only [runWithStorage] using
+    HostStorageDriver.run_eq_iff_fuelSound
+      context fuel
+      (Core.State.initial code.program.body Core.hostEnvironment)
+      result
+
+/-- A checked completed result is unchanged when supplied more fuel. -/
+theorem runWithStorage_done_stable
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (code : CheckedHostCoreProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    {fuel largerFuel : Nat}
+    {finalContext :
+      HostStorageDriver.Context RollbackState TraceState}
+    {value : Core.Value}
+    {store : Core.Store}
+    (execution :
+      code.runWithStorage context fuel =
+        ⟨finalContext, .done value store⟩)
+    (more : fuel ≤ largerFuel) :
+    code.runWithStorage context largerFuel =
+      ⟨finalContext, .done value store⟩ := by
+  simpa only [runWithStorage] using
+    HostStorageDriver.run_done_stable
+      context
+      (Core.State.initial code.program.body Core.hostEnvironment)
+      execution more
 
 end CheckedHostCoreProgram
 
