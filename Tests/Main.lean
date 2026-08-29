@@ -94,6 +94,7 @@ import Solcore.Test.ParentIndexedFrameInitializationPresentStorageAccount
 import Solcore.Test.ParentIndexedSelectedExecutionContinuation
 import Solcore.Test.ParentIndexedFrameResolutionView
 import Solcore.Test.ParentIndexedFrameResolutionViewTrapReasonMap
+import Solcore.Test.ParentIndexedFrameResolutionFold
 import Solcore.Test.FrameCheckpointedWorkingPairStorageWrite
 import Solcore.Test.FrameCheckpointedWorkingPairStorageWriteAlgebra
 import Solcore.Test.FrameCheckpointedWorkingPairWithStorageAddress
@@ -4994,6 +4995,7 @@ def run : IO Unit := do
   testFrameStateResolution
   testParentIndexedFrameContinuationContext
   testParentIndexedFrameContinuationConstruction
+  testParentIndexedFrameResolutionFold
   testParentIndexedFrameTrapRollback
   testParentIndexedFrameTrapPropagationPayload
   testRuntimeScalars
