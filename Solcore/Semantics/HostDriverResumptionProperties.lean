@@ -132,6 +132,47 @@ theorem resumeWithFuel_run_add
       HostDriver.run handler context (fuel + first + second) state := by
   rw [resumeWithFuel_run, resumeWithFuel_run]
 
+/-- Resuming a typed result preserves its result type. -/
+theorem resumeWithFuel_hasType
+    {Context : Type u}
+    {definitions : Core.DataEnvironment}
+    {resultType : Core.Ty}
+    (result : HostDriverResult Context)
+    (handler : HostHandler Context)
+    (additional : Nat)
+    (typing : result.outcome.HasType resultType definitions) :
+    (result.resumeWithFuel handler additional).outcome.HasType
+      resultType definitions := by
+  cases result with
+  | mk context outcome =>
+      cases outcome with
+      | done value store =>
+          simpa only [resumeWithFuel_done] using typing
+      | outOfFuel state =>
+          simpa only [resumeWithFuel_outOfFuel] using
+            HostDriver.run_hasType handler context additional state typing
+      | fault error state =>
+          exact False.elim typing
+
+/-- Resuming a typed result cannot expose a raw machine fault. -/
+theorem resumeWithFuel_ne_fault
+    {Context : Type u}
+    {definitions : Core.DataEnvironment}
+    {resultType : Core.Ty}
+    (result : HostDriverResult Context)
+    (handler : HostHandler Context)
+    (additional : Nat)
+    (error : Core.MachineFault)
+    (faultState : Core.State)
+    (typing : result.outcome.HasType resultType definitions) :
+    (result.resumeWithFuel handler additional).outcome ≠
+      .fault error faultState := by
+  intro fault
+  have resumedTyping :=
+    resumeWithFuel_hasType result handler additional typing
+  rw [fault] at resumedTyping
+  exact resumedTyping
+
 end HostDriverResult
 
 end Solcore.Semantics
