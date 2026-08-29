@@ -47,6 +47,9 @@ reasons and preserves the exact rollback-selection component.
 [ADR-0129](adr/0129-parent-indexed-trap-aware-resolution-fold.md) completes the
 pure fold over the same context. Caller-owned functions receive one exact
 return, revert, or trap branch without parent or transaction execution.
+[ADR-0130](adr/0130-parent-indexed-resolution-fold-trap-reason-mapping-naturality.md)
+is active. It will prove that heterogeneous trap-reason mapping commutes with
+that fold by changing only the trap function.
 
 ## Completed foundation
 
@@ -180,11 +183,12 @@ These results remain regression obligations for every extension.
 | 110 | Parent-indexed resolution view | Complete | Pairs total return/revert/trap resolution with opt-in trap rollback selection without applying either result |
 | 111 | Resolution-view trap-reason mapping naturality | Complete | Maps only the total-resolution component and preserves exact optional rollback selection without adding an operation |
 | 112 | Parent-indexed trap-aware resolution fold | Complete | Selects one pure caller-owned function for each resolved branch without applying the supplied values |
-| 113 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
-| 114 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 115 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 116 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 117 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 113 | Resolution-fold trap-reason mapping naturality | In progress | Moves heterogeneous reason mapping through the existing fold without adding execution |
+| 114 | Further contract-entry input roles | Planned | Add caller, callee, data, value, or kind only when an identified Core consumer needs it |
+| 115 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 116 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 117 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 118 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -1884,6 +1888,20 @@ selection, resumes no parent, and defines no transaction boundary. Four exact
 non-simp laws, three runtime assertions, and six compile consumers pass the
 636-job build, 1,160-job test suite, trust-zero, metadata, kernel-policy, and
 independent audits.
+
+## Active resolution-fold trap-reason mapping naturality
+
+[ADR-0130](adr/0130-parent-indexed-resolution-fold-trap-reason-mapping-naturality.md)
+adds no operation. Its single proof obligation moves heterogeneous trap-reason
+mapping through the ADR-0129 fold by composing the mapper into only the trap
+function. Return and revert functions, resolved values, rollback selection,
+and the fold result type remain unchanged.
+
+Required compile consumers cover direct theorem use, identity mapping,
+two-stage heterogeneous composition, and a commuting square with ADR-0128's
+resolution-view naturality. The implementation must add no runtime fixture,
+branch duplicate, rollback application, parent resumption, transaction policy,
+or parser dependency.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

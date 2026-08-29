@@ -2286,6 +2286,19 @@ options. The 636-job build, 1,160-job test suite, trust-zero, metadata,
 semantic-kernel, and independent audits pass. Parser work and public formats
 remain unchanged.
 
+## Active resolution-fold trap-reason mapping naturality
+
+[ADR-0130](adr/0130-parent-indexed-resolution-fold-trap-reason-mapping-naturality.md)
+is a proof-only closure of ADR-0129. Its one planned simp law states that
+folding a context after heterogeneous trap-reason mapping equals folding the
+original context with the reason mapper composed into only the trap function.
+
+The implementation adds no operation or runtime branch. Compile consumers
+must cover direct use, identity, heterogeneous composition, and coherence with
+ADR-0128's mapped resolution view. Rollback application, parent execution,
+transaction finalization, parser work, and public formats remain outside this
+slice.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable

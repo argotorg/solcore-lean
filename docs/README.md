@@ -90,6 +90,11 @@ frame-local fold. Caller-owned functions consume exact return, revert, and trap
 values, and a coherence law reconstructs the full ADR-0127 view without
 applying rollback, resuming a parent, or defining a transaction boundary.
 
+[ADR-0130](adr/0130-parent-indexed-resolution-fold-trap-reason-mapping-naturality.md)
+is the active proof-only slice. It will make heterogeneous trap-reason mapping
+commute with the ADR-0129 fold by composing the mapper into only the trap
+function. It adds no runtime operation, rollback policy, or parser dependency.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
