@@ -2231,6 +2231,17 @@ found no correctness gap.
 This slice introduces no caller, current-contract, authority, call frame, ABI,
 or source-syntax meaning. Parser work remains paused.
 
+## Active parent-indexed resolution view
+
+[ADR-0127](adr/0127-parent-indexed-resolution-view.md) combines two existing
+observations of a completed parent-indexed frame: total return/revert/trap
+resolution and the opt-in rollback pair selected only for a trap.
+
+The operation is a pure read-only pairing. It does not apply rollback, resume a
+parent, deliver bytes, flatten ADR-0125's optional boundaries, or define
+transaction commit. Exact branch equations and compile consumers are the
+active implementation work.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable

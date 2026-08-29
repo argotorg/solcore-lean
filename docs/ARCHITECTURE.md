@@ -764,6 +764,12 @@ the existing continuation layers without changing their public optional
 shapes. Focused tests distinguish code and storage selectors and verify exact
 fuel boundaries, strict Address recovery, and completed-result stability.
 
+ADR-0127 connects two existing consumers of a completed parent-indexed frame.
+`resolveWithTrapRollback` returns the ordinary total resolution together with
+the optional rollback pair already selected for traps. It is a read-only view:
+the generic resolver remains reason-only on trap, no rollback is applied, and
+no parent machine or transaction boundary is introduced.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to
