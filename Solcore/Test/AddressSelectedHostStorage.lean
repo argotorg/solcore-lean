@@ -19,6 +19,7 @@ private def otherAddress : Address := ⟨0x30, by decide⟩
 private def maximumAddress : Address := ⟨addressModulus - 1, by decide⟩
 
 private def expectedStorageAddressWord : Word := ⟨0x20, by decide⟩
+private def expectedCodeAddressWord : Word := ⟨0x10, by decide⟩
 private def expectedMaximumAddressWord : Word :=
   ⟨addressModulus - 1, by decide⟩
 
@@ -131,6 +132,19 @@ private theorem storageAddressProgram_host_checked :
 
 private def storageAddressCode : CheckedHostCoreProgram :=
   ⟨storageAddressProgram, storageAddressProgram_host_checked⟩
+
+private def codeAddressProgram : Program := {
+  resultType := .word
+  body :=
+    .apply (.var HostFunction.codeAddress.index) .unit
+}
+
+private theorem codeAddressProgram_host_checked :
+    codeAddressProgram.checkHost = true := by
+  decide
+
+private def codeAddressCode : CheckedHostCoreProgram :=
+  ⟨codeAddressProgram, codeAddressProgram_host_checked⟩
 
 /-- Observe the selector, write its storage, then observe it again. -/
 private def observeWriteObserveProgram : Program := {
@@ -296,6 +310,11 @@ private def storageAddressRequestReady (state : State) : Bool :=
   | .suspended suspension => suspension.request == .storageAddress
   | _ => false
 
+private def codeAddressRequestReady (state : State) : Bool :=
+  match hostAdvance state with
+  | .suspended suspension => suspension.request == .codeAddress
+  | _ => false
+
 private def oneStepBeforeStorageAddressPair (state : State) : Bool :=
   match hostAdvance state with
   | .next next => next == State.final expectedStorageAddressPair
@@ -315,6 +334,7 @@ private def assertFixtureContext
 private def completionFuel : Nat := 28
 private def zeroCompletionFuel : Nat := 16
 private def storageAddressCompletionFuel : Nat := 5
+private def codeAddressCompletionFuel : Nat := 5
 private def observeWriteObserveSecondRequestFuel : Nat := 23
 private def observeWriteObserveCompletionFuel : Nat := 30
 
@@ -522,6 +542,24 @@ private theorem observeWriteObserveProgram_done_stable
     FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
       context codeAddress execution (by decide)⟩
 
+/-- The selected code observation retains its exact result with more fuel. -/
+private theorem codeAddressProgram_done_stable
+    {context : HostStorageDriver.Context Nat (List Nat)}
+    (selected :
+      (baseContextFor codeAddressCode).withPresentStorageAccount? =
+        some context)
+    {finalContext : HostStorageDriver.Context Nat (List Nat)}
+    (execution :
+      context.runCodeWithStorage? codeAddress codeAddressCompletionFuel =
+        some ⟨finalContext, .done (.word expectedCodeAddressWord) []⟩) :
+    (baseContextFor codeAddressCode).withPresentStorageAccount? =
+        some context ∧
+      context.runCodeWithStorage? codeAddress 32 =
+        some ⟨finalContext, .done (.word expectedCodeAddressWord) []⟩ := by
+  exact ⟨selected,
+    FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorage?_some_done_stable
+      context codeAddress execution (by decide)⟩
+
 def testAddressSelectedHostStorage : IO Unit := do
   assertTrue updateProgram.checkHost
     "the host checker rejected the read/write/read program"
@@ -531,12 +569,18 @@ def testAddressSelectedHostStorage : IO Unit := do
     "the host checker rejected the sparse-zero program"
   assertTrue storageAddressProgram.checkHost
     "the host checker rejected the storage-address program"
+  assertTrue codeAddressProgram.checkHost
+    "the host checker rejected the code-address program"
   assertTrue observeWriteObserveProgram.checkHost
     "the host checker rejected observe/write/observe"
   assertTrue (codeAddress != storageAddress)
     "the address fixture did not separate code and storage"
   assertTrue (addressToWord storageAddress == expectedStorageAddressWord)
     "the retained nontrivial Address did not widen exactly"
+  assertTrue (addressToWord codeAddress == expectedCodeAddressWord)
+    "the selected code Address did not widen exactly"
+  assertTrue (wordToAddress? expectedCodeAddressWord == some codeAddress)
+    "the selected code Address did not survive strict narrowing"
   assertTrue
     (wordToAddress? expectedStorageAddressWord == some storageAddress)
     "the retained nontrivial Address did not survive strict narrowing"
@@ -580,6 +624,42 @@ def testAddressSelectedHostStorage : IO Unit := do
           throw (IO.userError "fuel 5 lost the storage-address code")
       | _, none =>
           throw (IO.userError "additional fuel lost the storage-address code")
+
+  match (baseContextFor codeAddressCode).withPresentStorageAccount? with
+  | none =>
+      throw (IO.userError "the code-address storage Account was absent")
+  | some context =>
+      match context.runCodeWithStorage? codeAddress 4 with
+      | some { context := resultContext, outcome := .outOfFuel state } =>
+          assertTrue (codeAddressRequestReady state)
+            "fuel 4 did not stop at the code-address request"
+          assertFixtureContext resultContext codeAddressProgram oldValue
+            "fuel 4 code-address observation"
+      | some result =>
+          throw (IO.userError
+            s!"fuel 4 crossed the code-address boundary: {reprStr result.outcome}")
+      | none =>
+          throw (IO.userError "fuel 4 lost the code-address code")
+
+      match context.runCodeWithStorage? codeAddress codeAddressCompletionFuel,
+          context.runCodeWithStorage? codeAddress 32 with
+      | some result, some largerResult =>
+          assertTrue
+            (result.outcome == .done (.word expectedCodeAddressWord) [])
+            "fuel 5 returned the wrong code Address"
+          assertTrue
+            (result.outcome != .done (.word expectedStorageAddressWord) [])
+            "code-address observation returned the storage Address"
+          assertTrue (largerResult.outcome == result.outcome)
+            "additional fuel changed code-address observation"
+          assertFixtureContext result.context codeAddressProgram oldValue
+            "fuel 5 code-address observation"
+          assertFixtureContext largerResult.context codeAddressProgram oldValue
+            "fuel 32 code-address observation"
+      | none, _ =>
+          throw (IO.userError "fuel 5 lost the code-address code")
+      | _, none =>
+          throw (IO.userError "additional fuel lost the code-address code")
 
   match (baseContextFor observeWriteObserveCode).withPresentStorageAccount? with
   | none =>
