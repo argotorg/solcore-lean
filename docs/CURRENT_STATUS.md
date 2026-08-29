@@ -306,6 +306,12 @@ proven-present Account handler; implementation is complete.
 [ADR-0118](adr/0118-address-selected-host-code-driver.md) supersedes the
 Account carrier from ADR-0116 with host-checked code and completes
 fuel-preserving address-selected handled reads; implementation is complete.
+[ADR-0119](adr/0119-storage-write-capability-and-driver.md) completes the typed
+storage-write capability, the request-generic driver, and the combined
+address-selected storage API. Checked code can now read, update, and reread its
+selected working storage under one exact fuel budget. Parser work remains
+paused; the next semantics decision concerns contract-entry inputs and state
+lifecycle rather than concrete source syntax.
 
 ## Implementation status
 
@@ -319,8 +325,9 @@ fuel-preserving address-selected handled reads; implementation is complete.
 | Internal binary sums | Complete | Complete, including totality | Not published |
 | Internal first-order local cells | Complete | Complete, including store safety and totality | Not published |
 | Address-selected closed Core code | Complete historical foundation | Pure admission, completion, and stateful-run safety remain; Account association is superseded by ADR-0118 | Not published |
-| Typed Core storage-read suspension | Complete | Typed request/resume, exact boundary fuel, finite-run typing, and no-fault safety proved | Not published |
-| Address-selected host-code driver | Complete | Host Account association, separate code/storage selection, handled-step fuel accounting, typed outcomes, and no-fault safety proved | Not published |
+| Typed Core storage-read suspension | Complete foundation | Typed request/resume, exact boundary fuel, finite-run typing, and no-fault safety proved | Not published |
+| Address-selected host-code driver | Complete foundation | Separate code/storage selection and exact handled-step fuel accounting; its read-specific API is superseded by ADR-0119 | Not published |
+| Typed storage-write and combined storage driver | Complete | Append-only write capability, generic driver, combined read/write handler, address-selected API, safety, fuel, invariants, and regressions complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -454,8 +461,9 @@ language. The following remain:
   address-and-word bridge;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
-- contract entry and call semantics;
-- explicit state, storage, rollback, balances, logs, and creation;
+- complete contract-entry and call semantics;
+- commit/rollback lifecycle for the implemented working storage, plus balances,
+  logs, and creation;
 - ABI admissibility, encoding, decoding, and dispatch; and
 - versioned contract observations and EVM-revision policy.
 
@@ -536,7 +544,8 @@ but never copy the local store, so two closures containing the same reference
 share writes.
 
 The local store is explicit, append-only for allocation, and separate from
-future contract storage. Cell contents are restricted recursively to unit,
+the WorldState-backed contract storage implemented by ADR-0119. Cell contents
+are restricted recursively to unit,
 boolean, word, product, and sum data. Functions and cells are excluded as cell
 contents so that mutation cannot encode recursion before the separate
 recursion-and-divergence decision.
@@ -2008,10 +2017,10 @@ cover pure admission, eventual completion, no-fault safety, and exact execution.
 ## Completed typed Core storage-read suspension
 
 [ADR-0117](adr/0117-typed-core-storage-read-suspension.md) provides a
-syntax-independent storage-read request. Existing Core function application
-receives one runtime-only capability through a fixed typed context. Execution
-can return a first-order suspension that retains the exact CEK continuation and
-Core-local store, then resume with a typed Word response.
+syntax-independent storage-read request. It introduced the first runtime-only
+capability through Core's fixed typed context. Execution can return a
+first-order suspension that retains the exact CEK continuation and Core-local
+store, then resume with a typed Word response.
 
 The closed checker and its sufficient-fuel completion theorem remain unchanged.
 Every finite host-checked run instead has a typed done, out-of-fuel, or
@@ -2019,12 +2028,13 @@ suspended result, and machine faults are excluded. A Semantics handler reads
 the request through the proven-present working Account and resumes the typed
 state without changing the Account context or Core-local store.
 
-Core requests contain words only; WorldState, addresses, checkpoints, rollback,
-and commit policy stay in Semantics. ADR-0118 now supplies the address-selected
-read driver; storage write remains later work. Full validation and two
-independent audits pass.
+Core request payloads contain only Words; WorldState, addresses, checkpoints,
+rollback, and commit policy stay in Semantics. ADR-0118 supplied the first
+address-selected read driver. ADR-0119 preserves this boundary while adding a
+typed write request and superseding the read-specific execution API. Full
+validation and two independent audits pass for the ADR-0117 foundation.
 
-## Completed address-selected host-code driver
+## Completed address-selected host-code driver foundation
 
 [ADR-0118](adr/0118-address-selected-host-code-driver.md) stores
 `CheckedHostCoreProgram` in Account state and explicitly promotes a closed
@@ -2032,14 +2042,45 @@ checked program without changing its body. Code is selected from the working
 WorldState by `codeAddress`; requests read through the separately retained
 `storageAddress` and proven-present Account.
 
-The read-specific driver threads the complete context and exact remaining fuel
-until done or out of fuel. Its handled-step relation proves bounded terminal
-execution and exact exhaustion, and checked/address-selected runs cannot fault.
-Runtime regressions use distinct code, storage, and checkpoint Accounts; chain
-two dependent reads across exact fuel 11/12 boundaries; finish from zero
-remaining fuel; preserve a local cell; and show that changing working storage
-changes the returned value. Full build, test, trust-zero, metadata, and kernel
-checks pass together with three independent audits.
+Its original read-specific driver threads the complete context and exact
+remaining fuel until done or out of fuel. The handled-step relation proves
+bounded terminal execution and exact exhaustion, and checked/address-selected
+runs cannot fault. Runtime regressions use distinct code, storage, and
+checkpoint Accounts; chain two dependent reads across exact fuel 11/12
+boundaries; finish from zero remaining fuel; preserve a local cell; and show
+that changing working storage changes the returned value. ADR-0119 retains
+these results through a generic driver and replaces the read-specific public
+entry points.
+
+## Completed typed storage-write capability and combined driver
+
+[ADR-0119](adr/0119-storage-write-capability-and-driver.md) appends
+`storageWrite : (word × word) -> unit` without moving the existing read
+capability. Core emits a typed request containing the slot and value, resumes
+with Unit, and preserves the exact continuation and Core-local store. Progress,
+preservation, request/runner correspondence, typed outcomes, and fault
+unreachability cover both request kinds.
+
+Semantics now owns a request-generic handler and fuel-preserving driver, while
+Core remains independent of Account and WorldState. The concrete combined
+handler reads the proven-present Account or applies its existing total
+`writeStorage` operation. `runWithStorage` and `runCodeWithStorage?` expose the
+combined checked and address-selected path; code and storage addresses remain
+separate.
+
+Every suspension reuses Core's exact remaining fuel. Whole-run proofs cover
+typing, no-fault safety, handled-step accounting, and preservation of the
+storage address, checkpoint, working effects, checked code, and non-selected
+working Accounts. They deliberately do not claim equality of the complete
+context because successful writes update selected working storage.
+
+End-to-end regressions execute read-select, write, and reread with a retained
+local cell. Exact fuel 21/22/27/28 boundaries distinguish pre-write,
+post-write, pre-final-read, and completion states; a separate 15/16 boundary
+checks that writing zero removes the sparse entry. Code, unrelated Accounts,
+checkpoint state, effect journals, selector, and Core-local store remain
+observable and preserved. Commit/rollback, transaction visibility, nested
+calls, ABI behavior, and source syntax remain later decisions.
 
 ## Meaning of completion
 
