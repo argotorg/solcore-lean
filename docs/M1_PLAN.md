@@ -93,9 +93,10 @@ remain terminal. Sequential addition is required for arbitrary result values;
 zero is an identity only for actual run results, not arbitrary forged
 `outOfFuel` values.
 
-[ADR-0137](adr/0137-canonical-host-capability-registry.md) is active. It makes
-the existing nine-capability order canonical without adding a capability or
-changing execution. Indexes 0 through 8, table length 9, first-unbound index 9,
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) is complete. The
+existing nine-capability order is now canonical without adding a capability or
+changing execution. Both tables and arbitrary-list safety derive from the one
+registry, while explicit indexes 0 through 8, length 9, first-unbound index 9,
 and all public boundaries remain fixed. Parser and syntax proofs remain paused.
 
 ## Completed foundation
@@ -237,7 +238,7 @@ These results remain regression obligations for every extension.
 | 117 | Run-fixed input-size observation | Complete | Derives the exact bounded input length as a Word, exposes it at Core host index 7, and proves its boundary agrees with optional byte lookup |
 | 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
 | 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
-| 120 | Canonical host capability registry | In progress | Derives both nine-entry host tables and their safety proof from one order while preserving indexes, behavior, and compatibility theorems |
+| 120 | Canonical host capability registry | Complete | Derives both nine-entry host tables and arbitrary-list safety from one order, with exact finite laws and compatibility/runtime regressions |
 | 121 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
 | 122 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 123 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -2089,19 +2090,30 @@ and independent audits pass; the audit found no P0-P3 issue. Gas, persistence,
 handler/input replacement, nested calls, transactions, syntax, and publication
 are excluded.
 
-## Active canonical host capability registry
+## Completed canonical host capability registry
 
 [ADR-0137](adr/0137-canonical-host-capability-registry.md) replaces three
 hand-maintained copies of the host-capability order with one explicit registry.
-Both fixed tables become maps over that registry, and one list induction will
-provide their runtime typing proof. Generic laws will tie registry position to
-the independently explicit numeric index.
+It is the only production order literal. Both fixed tables are maps over it,
+and one list induction provides their runtime typing proof. Exact finite laws
+tie registry position to the independently explicit numeric index.
 
-The migration preserves all nine current capabilities at indexes 0 through 8,
-both table lengths at 9, index 9 as first unbound, named lookup and simplifier
-facts, and every checked runtime result. It changes no request, response, fuel,
-fault, Store effect, Wire or Oracle format, source form, or ABI. Parser and
-syntax proofs remain paused while syntax-independent semantics is completed.
+All eighteen old lookup facts, both length facts, nine `index_*` facts, and
+`hostEnvironment_hasTypes` retain their statements and simplifier attributes:
+all thirty declarations remain registered. The mapped tables are definitionally
+equal to the old literals. Numeric and runtime regressions preserve all nine
+capabilities at indexes 0 through 8, length 9, first-unbound index 9, and
+checked results.
+
+The 51-job focused build, 659-job full build, 1,206-job test executable build,
+full test run, four-root trust-zero and warning-as-error checks, metadata,
+semantic-kernel, diff, and axiom checks pass; theorem reports are axiom-free,
+use `propext`, or use `propext` with `Quot.sound`. The independent trust-zero audit
+confirmed the thirty simplifier registrations, old-table definitional
+equality, and single production literal, with no P0-P3 issue. No custom axiom
+or `sorry` remains. It changes no request, response, fuel, fault, Store effect,
+Wire or Oracle format, source form, or ABI. Parser and syntax proofs remain
+paused while syntax-independent semantics is completed.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

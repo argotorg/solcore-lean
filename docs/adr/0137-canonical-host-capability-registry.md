@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: one canonical ordering for the existing internal Core host capabilities
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -190,45 +190,31 @@ index coverage, exact table derivation, and the first-unbound boundary. Do not
 replace the numeric 0-through-8 assertions solely with abstract registry
 facts: the concrete values are the ABI regression.
 
-## Migration sequence
+## Implementation and validation
 
-Keep each implementation commit at or below 300 changed lines:
+`HostFunction.all` is now the only production literal that lists the nine
+capabilities. The explicit constructor-based `index` remains independent.
+Finite exact laws connect membership, uniqueness, lookup, index range, and
+list position so either declaration drifting from the other fails a proof.
 
-1. add `HostFunction.all` and prove its length, membership, no-duplicate,
-   lookup, index-range, injectivity, and exact-range laws;
-2. redefine `hostContext` and `hostEnvironment` as maps over `all`, then prove
-   generic lookup, length, bounds, and first-unbound laws;
-3. re-prove every existing individual lookup and length fact as a
-   compatibility alias without changing its statement;
-4. add the arbitrary-list runtime typing induction and specialize the current
-   fixed-environment theorem;
-5. add focused generic and numeric regressions without changing runtime test
-   fixtures; and
-6. run full validation and synchronize internal implementation documents.
+Both fixed host tables are maps over `all`. Generic lookup, bounds, length, and
+first-unbound theorems cover every capability and position. All eighteen old
+capability-specific lookup statements, both numeric length statements, and
+the nine `index_*` statements plus `hostEnvironment_hasTypes` retain their
+statements and `@[simp]` behavior: all thirty declarations remain in the global
+simplifier set. The mapped tables are definitionally equal to the old literals.
+Runtime typing is proved once for an arbitrary capability list and specialized
+to the fixed registry. Numeric and runtime regressions retain indexes 0 through
+8, length 9, first-unbound index 9, and existing checked execution behavior.
 
-Compile direct dependants at each stage. Remove temporary duplicate tables and
-proof helpers before acceptance.
-
-## Validation
-
-Acceptance requires:
-
-- focused builds of the registry, host table, host safety, checked-program,
-  driver, and Core host-machine test roots;
-- the full build and executable test suite;
-- zero-placeholder and warning-as-error checks on every changed Lean root;
-- an axiom audit of the registry, generic lookup, exact-range, and generic
-  runtime-typing theorems;
-- metadata, kernel, and whitespace/diff checks;
-- compile-time confirmation that all old lookup and length theorem statements
-  still typecheck unchanged and retain their simplification behavior;
-- executable confirmation of indexes 0 through 8, table length 9, and first
-  unbound index 9; and
-- an independent review for table duplication, accidental index computation,
-  theorem weakening, and scope expansion.
-
-No trust increase, placeholder proof, or new noncomputable dependency is
-accepted merely to prove the finite registry facts.
+The 51-job focused build, 659-job full build, 1,206-job test executable build,
+and full `lake test` run pass. All four changed Lean roots pass trust-zero with
+warnings as errors; metadata, semantic-kernel, and diff checks also pass. Main
+theorem reports are axiom-free, use only `propext`, or use `propext` with
+`Quot.sound`. There is no custom axiom or `sorry`. An independent trust-zero
+audit directly checked all thirty
+simplifier registrations, old-table definitional equality, and that `all` is
+the only production registry literal; it found no P0-P3 issue.
 
 ## Risks and mitigations
 

@@ -855,13 +855,17 @@ preserve checkpoint, effects, and unrelated Account across exhaustion. This
 adds no gas, persistence, handler/input replacement, call lifecycle, or public
 format.
 
-ADR-0137 is active as a structural normalization of the host boundary. One
-explicit registry will own the existing capability order; host types, runtime
-values, and their typing proof will be derived from it. The numeric index
-function remains an independent explicit declaration, with proofs tying it to
-the registry. All nine positions 0 through 8, length 9, first-unbound index 9,
-runtime behavior, and public boundaries remain unchanged. Parser and syntax
-proofs remain paused.
+ADR-0137 completes a structural normalization of the host boundary. One
+explicit registry is the only production capability-order literal; host types,
+runtime values, and arbitrary-list typing are derived from it. The numeric
+index remains an independent explicit declaration tied to the registry by
+finite exact laws. All eighteen named lookup facts, both length facts, and the
+nine numeric index facts plus fixed-environment typing theorem remain in the
+global simplifier set: thirty declarations in total. The mapped tables are
+definitionally equal to their old literals. All nine positions 0 through 8,
+length 9, first-unbound index 9, runtime behavior, and public boundaries remain
+unchanged. The independent audit found no P0-P3 issue. Parser and syntax proofs
+remain paused.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
