@@ -188,7 +188,7 @@ private theorem compileTimeSelectedEvidenceRegression
           code.program.resultType code.program.dataDefinitions) ∧
     (∃ code,
       context.context.values.working.1.code? inputs.codeAddress = some code ∧
-        HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+        HostStorageDriver.FuelSound result inputs fuel context
           (State.initial code.program.body hostEnvironment)) := by
   exact
     ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_some_hasType
@@ -208,7 +208,7 @@ private theorem compileTimeSelectedCompletenessRegression
     context.runCodeWithStorageWithInputs? inputs fuel = some result ↔
       ∃ code,
         context.context.values.working.1.code? inputs.codeAddress = some code ∧
-          HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+          HostStorageDriver.FuelSound result inputs fuel context
             (State.initial code.program.body hostEnvironment) :=
   FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageWithInputs?_eq_some_iff_fuelSound
     context inputs fuel result
@@ -226,7 +226,7 @@ private theorem compileTimeSelectedCompletenessForwardRegression
       context.runCodeWithStorageWithInputs? inputs fuel = some result) :
     ∃ code,
       context.context.values.working.1.code? inputs.codeAddress = some code ∧
-        HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+        HostStorageDriver.FuelSound result inputs fuel context
           (State.initial code.program.body hostEnvironment) :=
   (compileTimeSelectedCompletenessRegression
     context inputs fuel result).mp executed
@@ -244,7 +244,7 @@ private theorem compileTimeSelectedCompletenessReplayRegression
     (selected :
       context.context.values.working.1.code? inputs.codeAddress = some code)
     (sound :
-      HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+      HostStorageDriver.FuelSound result inputs fuel context
         (State.initial code.program.body hostEnvironment)) :
     context.runCodeWithStorageWithInputs? inputs fuel = some result :=
   (compileTimeSelectedCompletenessRegression
@@ -346,7 +346,7 @@ private theorem compileTimeStorageDriverCompletenessRegression
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
     HostStorageDriver.runWithInputs context inputs fuel state = result ↔
-      HostStorageDriver.FuelSoundWithInputs result inputs fuel context state :=
+      HostStorageDriver.FuelSound result inputs fuel context state :=
   HostStorageDriver.runWithInputs_eq_iff_fuelSound
     context inputs fuel state result
 
@@ -383,7 +383,7 @@ private theorem compileTimeCheckedCompletenessRegression
       HostDriverResult
         (HostStorageDriver.Context RollbackState TraceState)) :
     code.runWithStorageInputs context inputs fuel = result ↔
-      HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+      HostStorageDriver.FuelSound result inputs fuel context
         (State.initial code.program.body hostEnvironment) :=
   CheckedHostCoreProgram.runWithStorageInputs_eq_iff_fuelSound
     code context inputs fuel result

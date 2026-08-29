@@ -12,14 +12,14 @@ universe u v
 namespace HostStorageDriver
 
 /-- Handled transition segments under one exact immutable input. -/
-abbrev HandledStepsWithInputs
+abbrev HandledSteps
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs) :=
   HostDriver.HandledSteps
     (@handler RollbackState TraceState inputs)
 
 /-- Fuel soundness indexed by one exact immutable input. -/
-def FuelSoundWithInputs
+def FuelSound
     {RollbackState : Type u} {TraceState : Type v}
     (result : HostDriverResult (Context RollbackState TraceState))
     (inputs : ExecutionInputs)
@@ -30,7 +30,7 @@ def FuelSoundWithInputs
     (@handler RollbackState TraceState inputs)
     fuel startContext start
 
-namespace FuelSoundWithInputs
+namespace FuelSound
 
 /-- Prefix a sound suffix with one request handled under the same input. -/
 theorem prependRequest
@@ -48,16 +48,16 @@ theorem prependRequest
         (nextContext, resumed))
     (accounting : prefixSteps + remainingFuel + 1 = fuel)
     (suffixSound :
-      HostStorageDriver.FuelSoundWithInputs
+      HostStorageDriver.FuelSound
         result inputs remainingFuel nextContext resumed) :
-    HostStorageDriver.FuelSoundWithInputs
+    HostStorageDriver.FuelSound
       result inputs fuel context start := by
   apply HostDriverResult.FuelSoundWith.prependRequest
     prefixPath emission (accounting := accounting)
   · simpa only [handleSuspension] using handled
   · exact suffixSound
 
-end FuelSoundWithInputs
+end FuelSound
 
 theorem runWithInputs_fuelSound
     {RollbackState : Type u} {TraceState : Type v}
@@ -65,9 +65,9 @@ theorem runWithInputs_fuelSound
     (inputs : ExecutionInputs)
     (fuel : Nat)
     (state : Core.State) :
-    FuelSoundWithInputs (runWithInputs context inputs fuel state) inputs
+    FuelSound (runWithInputs context inputs fuel state) inputs
       fuel context state := by
-  simpa only [runWithInputs, FuelSoundWithInputs] using
+  simpa only [runWithInputs, FuelSound] using
     HostDriver.run_fuelSound
       (@handler RollbackState TraceState inputs)
       context fuel state
@@ -79,9 +79,9 @@ theorem runWithInputs_eq_of_fuelSound
     (fuel : Nat)
     (state : Core.State)
     (result : HostDriverResult (Context RollbackState TraceState))
-    (sound : FuelSoundWithInputs result inputs fuel context state) :
+    (sound : FuelSound result inputs fuel context state) :
     runWithInputs context inputs fuel state = result := by
-  simpa only [runWithInputs, FuelSoundWithInputs] using
+  simpa only [runWithInputs, FuelSound] using
     HostDriver.run_eq_of_fuelSoundWith
       (@handler RollbackState TraceState inputs)
       context fuel state result sound
@@ -94,8 +94,8 @@ theorem runWithInputs_eq_iff_fuelSound
     (state : Core.State)
     (result : HostDriverResult (Context RollbackState TraceState)) :
     runWithInputs context inputs fuel state = result ↔
-      FuelSoundWithInputs result inputs fuel context state := by
-  simpa only [runWithInputs, FuelSoundWithInputs] using
+      FuelSound result inputs fuel context state := by
+  simpa only [runWithInputs, FuelSound] using
     HostDriver.run_eq_iff_fuelSoundWith
       (@handler RollbackState TraceState inputs)
       context fuel state result
@@ -129,7 +129,7 @@ theorem runWithStorageInputs_fuelSound
     (context : HostStorageDriver.Context RollbackState TraceState)
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    HostStorageDriver.FuelSoundWithInputs
+    HostStorageDriver.FuelSound
       (code.runWithStorageInputs context inputs fuel) inputs fuel context
       (Core.State.initial code.program.body Core.hostEnvironment) := by
   exact HostStorageDriver.runWithInputs_fuelSound context inputs fuel _
@@ -143,7 +143,7 @@ theorem runWithStorageInputs_eq_iff_fuelSound
     (result :
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState)) :
     code.runWithStorageInputs context inputs fuel = result ↔
-      HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+      HostStorageDriver.FuelSound result inputs fuel context
         (Core.State.initial code.program.body Core.hostEnvironment) := by
   simpa only [runWithStorageInputs] using
     HostStorageDriver.runWithInputs_eq_iff_fuelSound context inputs fuel

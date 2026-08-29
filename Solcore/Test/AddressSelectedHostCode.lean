@@ -173,7 +173,7 @@ private theorem compileTimeFuelSoundRegression
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat)
     (state : State) :
-    HostStorageDriver.FuelSoundWithInputs
+    HostStorageDriver.FuelSound
       (HostStorageDriver.runWithInputs context inputs fuel state)
       inputs fuel context state :=
   HostStorageDriver.runWithInputs_fuelSound context inputs fuel state
@@ -203,7 +203,7 @@ private theorem compileTimeCheckedFuelSoundRegression
     (context : HostStorageDriver.Context Nat (List Nat))
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
-    HostStorageDriver.FuelSoundWithInputs
+    HostStorageDriver.FuelSound
       (code.runWithStorageInputs context inputs fuel) inputs
       fuel context (State.initial code.program.body hostEnvironment) :=
   code.runWithStorageInputs_fuelSound context inputs fuel

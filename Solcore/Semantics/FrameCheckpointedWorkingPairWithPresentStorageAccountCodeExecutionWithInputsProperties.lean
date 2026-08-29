@@ -79,7 +79,7 @@ theorem runCodeWithStorageWithInputs?_some_fuelSound
       context.runCodeWithStorageWithInputs? inputs fuel = some result) :
     ∃ code,
       context.context.values.working.1.code? inputs.codeAddress = some code ∧
-        HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+        HostStorageDriver.FuelSound result inputs fuel context
           (Core.State.initial code.program.body Core.hostEnvironment) := by
   unfold runCodeWithStorageWithInputs? at executed
   cases selected :
@@ -101,7 +101,7 @@ theorem runCodeWithStorageWithInputs?_eq_some_iff_fuelSound
     context.runCodeWithStorageWithInputs? inputs fuel = some result ↔
       ∃ code,
         context.context.values.working.1.code? inputs.codeAddress = some code ∧
-          HostStorageDriver.FuelSoundWithInputs result inputs fuel context
+          HostStorageDriver.FuelSound result inputs fuel context
             (Core.State.initial code.program.body Core.hostEnvironment) := by
   constructor
   · exact runCodeWithStorageWithInputs?_some_fuelSound
