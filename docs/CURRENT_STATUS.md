@@ -2194,7 +2194,7 @@ and completion stability from fuel 28 to 64. Full build, test, trust-zero,
 metadata, and semantic-kernel checks passed; independent audits found no
 P0-P3 issue.
 
-## Active parent-indexed selected execution continuation
+## Completed parent-indexed selected execution continuation
 
 [ADR-0125](adr/0125-parent-indexed-selected-execution-continuation.md) connects
 parent-indexed initialization, storage-Account refinement, code selection,
@@ -2205,6 +2205,11 @@ The resulting three optional layers distinguish storage absence, code absence,
 selected out-of-fuel, and normal completion. Only completion constructs the
 existing parent-indexed continuation context; no parent machine, scheduler,
 ABI, transaction policy, or new host input is introduced.
+
+All six public laws are consumed directly, including whole-context transport
+through resolution and continuation. The full 627-job build and 1,142-job test
+suite pass, as do trust-zero, warning, metadata, and semantic-kernel checks.
+Independent final audits found no P0-P3 issue.
 
 ## Meaning of completion
 

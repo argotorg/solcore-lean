@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: connect parent-indexed initialization to completed selected execution
-- Implementation: Not started
+- Implementation: Complete
 
 ## Context
 
@@ -208,6 +208,32 @@ Keep every green commit below roughly 300 changed lines:
    operations; and
 5. run full validation and independent audit, then synchronize acceptance
    evidence and current-facing internal documents.
+
+## Implementation record
+
+The completed implementation adds one nested-option adapter, four exact branch
+laws, whole-context parent/plain coherence, and exact completed-result fuel
+stability. Three production modules are re-exported from the semantics facade.
+
+A compile-only consumer applies every public law directly. It also transports
+the completed parent/plain equality through resolution and both continuation
+interfaces, then exercises the existing parent return, parent revert, trap
+rollback, trap propagation, and larger-fuel consumers. No duplicate runtime
+fixture was added: every executable branch below the pure parent reconstruction
+is already covered by ADR-0124.
+
+## Acceptance evidence
+
+- the full build completed 627 jobs;
+- the complete test suite completed 1,142 jobs and all runtime checks passed;
+- all six changed Lean modules compiled with trust zero and warnings as errors;
+- metadata and semantic-kernel policy checks passed;
+- each of the six public laws reports only `propext` and `Quot.sound`;
+- independent final audits found no P0-P3 issue; and
+- every implementation commit stayed below 300 changed lines.
+
+The parser, Surface, Core language, public formats, and root README did not
+change.
 
 ## Consequences
 
