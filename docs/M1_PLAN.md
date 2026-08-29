@@ -26,6 +26,10 @@ follow-on proof slice: handled paths are compositional and directly type-safe.
 All fuel-sound results are unique at one budget; done and raw-fault results are
 also unique across budgets. It does not claim that out-of-fuel is stable or that
 checked host code always terminates.
+[ADR-0124](adr/0124-completed-handled-execution-frame-continuation.md) is the
+active lifecycle connection. It adapts only normal handled completion through
+a caller-owned policy, preserves terminal frame values, and retains nested
+options so code absence and selected out-of-fuel cannot be confused.
 
 ## Completed foundation
 

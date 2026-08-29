@@ -2176,6 +2176,17 @@ cross-fuel out-of-fuel stability, normalization, lifecycle interpretation, and
 all parser or public-format changes. Full build, test, trust-zero, metadata, and
 semantic-kernel checks passed; independent audits found no P0-P3 issue.
 
+## Active completed-execution frame continuation
+
+[ADR-0124](adr/0124-completed-handled-execution-frame-continuation.md) connects
+only normal handled completion to the existing frame continuation model through
+caller-owned context projection and completion policy. The policy receives the
+terminal context, Core value, and local store.
+
+The address-selected lift keeps nested options: code-selection failure,
+selected out-of-fuel, and completed continuation remain distinct. Out-of-fuel
+and raw faults are not converted to frame traps.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable
