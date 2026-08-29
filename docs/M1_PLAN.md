@@ -63,6 +63,12 @@ unchanged with the same immutable input and is observed losslessly through
 internal `callerAddress : unit -> word` at index 5. The request needs no caller
 Account and leaves the complete host context unchanged. It defines no parent
 identity, authentication, origin, current/callee identity, or nested-call rule.
+[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) is the active
+slice. It appends one bounded `InputData` value to the immutable run input and
+exposes one optional byte through internal
+`inputDataByte? : word -> sum unit word` at index 6. The Unit branch means an absent
+index; the Word branch includes a present zero byte. Size, wider loads,
+endianness, padding, ABI, calldata, syntax, and publication remain separate.
 
 ## Completed foundation
 
@@ -199,11 +205,12 @@ These results remain regression obligations for every extension.
 | 113 | Resolution-fold trap-reason mapping naturality | Complete | Moves heterogeneous reason mapping through the existing fold without adding execution |
 | 114 | End-to-end call-value observation | Complete | Carries one explicit run-fixed Word through the internal Core request, handled execution, selected completion, and parent-indexed continuation; the value-derived result reaches the existing resolution fold without a balance-transfer claim |
 | 115 | Run-fixed caller-address observation | Complete | Carries one explicit caller-supplied Address through `ExecutionInputs` and exposes its exact lossless Word at Core host index 5 without broader caller semantics |
-| 116 | Further contract-entry input roles | Planned | Add current, callee, data, or kind only when an identified Core consumer and lifetime rule exist |
-| 117 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 118 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 119 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 120 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 116 | Bounded optional input-byte observation | Active | Carry one bounded run-fixed `InputData` value and expose one present byte or explicit absence at Core host index 6 |
+| 117 | Further contract-entry input roles | Planned | Add current, callee, size, wider data loads, or kind only when an identified Core consumer and lifetime rule exist |
+| 118 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 119 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 120 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 121 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.

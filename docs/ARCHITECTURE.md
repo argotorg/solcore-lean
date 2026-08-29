@@ -813,6 +813,15 @@ through parent-indexed completion and the resolution fold. The supplied Address
 does not identify a parent frame, authenticate a principal, define origin or
 current/callee identity, or determine how a nested call supplies its caller.
 
+ADR-0133 defines the next narrow input observation. One bounded `InputData`
+value is fixed for the whole handled run, separately from mutable storage.
+Internal Core receives append-only
+`inputDataByte? : word -> sum unit word` at index 6. The result uses Unit for an
+absent index and Word for a present byte, so a present input byte whose value is
+zero cannot be mistaken for absence. The slice deliberately adds no size
+observation, multi-byte or Word load, endianness, padding, ABI, calldata,
+parser, Wire, or public-runtime rule.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

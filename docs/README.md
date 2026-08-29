@@ -121,6 +121,14 @@ fold. Frozen Wire rejects the internal value. The feature does not authenticate
 anyone, identify a parent or origin, define current/callee identity, relate the
 caller to `callValue`, or specify caller derivation for nested calls.
 
+[ADR-0133](adr/0133-bounded-optional-input-byte-observation.md) is the active
+runtime slice. A bounded `InputData` value remains fixed for one handled run,
+and internal Core can request one byte by Word index through append-only
+`inputDataByte? : word -> sum unit word` at index 6. The result distinguishes an
+absent index from a present zero byte. This is not yet an input-size API, a
+multi-byte or Word loader, an endianness or padding rule, ABI calldata, source
+syntax, Wire encoding, or a published runtime interface.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
