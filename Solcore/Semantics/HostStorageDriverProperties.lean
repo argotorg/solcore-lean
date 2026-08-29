@@ -274,6 +274,73 @@ theorem run_of_suspended_inputDataSize
       run_of_suspended context inputs fuel remainingFuel state _ execution
     _ = _ := by rw [handleSuspension_inputDataSize]
 
+theorem run_of_suspended_inputDataWordBE?
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (offset : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended ⟨.inputDataWordBE? offset, continuation, store⟩ remainingFuel) :
+    run context inputs fuel state =
+      run context inputs remainingFuel
+        ((Core.HostSuspension.mk (.inputDataWordBE? offset) continuation store).resume
+          (inputs.inputData.wordBE? offset)) := by
+  calc
+    run context inputs fuel state =
+        run
+          (handleSuspension inputs context
+            ⟨.inputDataWordBE? offset, continuation, store⟩).1
+          inputs remainingFuel
+          (handleSuspension inputs context
+            ⟨.inputDataWordBE? offset, continuation, store⟩).2 :=
+      run_of_suspended context inputs fuel remainingFuel state _ execution
+    _ = _ := by rw [handleSuspension_inputDataWordBE?]
+
+theorem run_of_suspended_inputDataWordBE?_none
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (offset : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended ⟨.inputDataWordBE? offset, continuation, store⟩ remainingFuel)
+    (absent : inputs.inputData.wordBE? offset = none) :
+    run context inputs fuel state =
+      run context inputs remainingFuel
+        ⟨.ret (.inLeft .word .unit), continuation, store⟩ := by
+  rw [run_of_suspended_inputDataWordBE? context inputs fuel remainingFuel state
+    offset continuation store execution, absent]
+  rfl
+
+theorem run_of_suspended_inputDataWordBE?_some
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (offset word : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended ⟨.inputDataWordBE? offset, continuation, store⟩ remainingFuel)
+    (present : inputs.inputData.wordBE? offset = some word) :
+    run context inputs fuel state =
+      run context inputs remainingFuel
+        ⟨.ret (.inRight .unit (.word word)), continuation, store⟩ := by
+  rw [run_of_suspended_inputDataWordBE? context inputs fuel remainingFuel state
+    offset continuation store execution, present]
+  rfl
+
 @[simp] theorem run_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
@@ -398,6 +465,8 @@ theorem run_of_suspended_inputDataSize
           | inputDataByte? offset =>
               simp [handler, handleRequest]
           | inputDataSize =>
+              simp [handler, handleRequest]
+          | inputDataWordBE? offset =>
               simp [handler, handleRequest])
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved

@@ -213,6 +213,59 @@ theorem handleSuspension_inputDataByte?_some
         ⟨.ret (.word inputs.inputData.sizeWord), continuation, store⟩) :=
   rfl
 
+@[simp] theorem handleRequest_inputDataWordBE?
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word) :
+    handleRequest inputs context (.inputDataWordBE? offset) =
+      (context, inputs.inputData.wordBE? offset) :=
+  rfl
+
+@[simp] theorem handleSuspension_inputDataWordBE?
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension inputs context
+        ⟨.inputDataWordBE? offset, continuation, store⟩ =
+      (context,
+        (Core.HostSuspension.mk (.inputDataWordBE? offset) continuation store).resume
+          (inputs.inputData.wordBE? offset)) :=
+  rfl
+
+theorem handleSuspension_inputDataWordBE?_none
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (absent : inputs.inputData.wordBE? offset = none) :
+    handleSuspension inputs context
+        ⟨.inputDataWordBE? offset, continuation, store⟩ =
+      (context,
+        ⟨.ret (.inLeft .word .unit), continuation, store⟩) := by
+  rw [handleSuspension_inputDataWordBE?, absent]
+  rfl
+
+theorem handleSuspension_inputDataWordBE?_some
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset word : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (present : inputs.inputData.wordBE? offset = some word) :
+    handleSuspension inputs context
+        ⟨.inputDataWordBE? offset, continuation, store⟩ =
+      (context,
+        ⟨.ret (.inRight .unit (.word word)), continuation, store⟩) := by
+  rw [handleSuspension_inputDataWordBE?, present]
+  rfl
+
 @[simp] theorem handleSuspension_storageRead_context
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
@@ -565,6 +618,88 @@ theorem handleSuspension_inputDataSize_context_independent
     (continuation : List Core.Frame) (store : Core.Store) :
     (handleSuspension inputs context
       ⟨.inputDataSize, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store inputs context _
+
+@[simp] theorem handleSuspension_inputDataWordBE?_context
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataWordBE? offset, continuation, store⟩).1 = context := by
+  rw [handleSuspension_inputDataWordBE?]
+
+theorem handleSuspension_inputDataWordBE?_context_independent
+    {RollbackState : Type u} {TraceState : Type v}
+    (leftInputs rightInputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension leftInputs context
+        ⟨.inputDataWordBE? offset, continuation, store⟩).1 =
+      (handleSuspension rightInputs context
+        ⟨.inputDataWordBE? offset, continuation, store⟩).1 := by
+  simp
+
+@[simp] theorem handleSuspension_inputDataWordBE?_control
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataWordBE? offset, continuation, store⟩).2.control =
+        .ret ((Core.HostRequest.inputDataWordBE? offset).responseValue
+          (inputs.inputData.wordBE? offset)) := by
+  rw [handleSuspension_inputDataWordBE?]
+  rfl
+
+theorem handleSuspension_inputDataWordBE?_control_none
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store)
+    (absent : inputs.inputData.wordBE? offset = none) :
+    (handleSuspension inputs context
+      ⟨.inputDataWordBE? offset, continuation, store⟩).2.control =
+        .ret (.inLeft .word .unit) := by
+  rw [handleSuspension_inputDataWordBE?_none inputs context offset continuation
+    store absent]
+
+theorem handleSuspension_inputDataWordBE?_control_some
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset word : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store)
+    (present : inputs.inputData.wordBE? offset = some word) :
+    (handleSuspension inputs context
+      ⟨.inputDataWordBE? offset, continuation, store⟩).2.control =
+        .ret (.inRight .unit (.word word)) := by
+  rw [handleSuspension_inputDataWordBE?_some inputs context offset word
+    continuation store present]
+
+@[simp] theorem handleSuspension_inputDataWordBE?_continuation
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataWordBE? offset, continuation, store⟩).2.continuation =
+        continuation := by
+  exact handleSuspension_continuation inputs context _
+
+@[simp] theorem handleSuspension_inputDataWordBE?_store
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (offset : Core.Word)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.inputDataWordBE? offset, continuation, store⟩).2.store = store := by
   exact handleSuspension_store inputs context _
 
 @[simp] theorem wordToAddress?_handler_storageAddress
