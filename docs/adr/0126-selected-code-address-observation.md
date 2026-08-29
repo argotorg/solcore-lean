@@ -115,6 +115,10 @@ code.runWithStorage context codeAddress fuel
 by the same selector. Exact execution evidence therefore cannot silently
 switch the response Address while replaying a run.
 
+The low-level `runWithStorage` accepts a caller-supplied selector and makes no
+WorldState lookup claim. Lookup provenance is guaranteed only by the
+address-selected `runCodeWithStorage?` composition below.
+
 The address-selected public entry point keeps its existing shape:
 
 ```lean
@@ -151,8 +155,9 @@ The existing host-runner accounting applies:
 4. execution continues with exactly the remaining fuel reported by Core.
 
 The minimal observation is request-ready out of fuel at budget 4 and completes
-at budget 5. Completed and raw-fault results remain exact with more fuel.
-Out-of-fuel remains budget-relative and receives no stability law.
+at budget 5. The specialized storage interface preserves completed results
+with more fuel; generic `HostDriver` metatheory separately preserves raw
+faults. Out-of-fuel remains budget-relative and receives no stability law.
 
 ## Required proof interface
 
@@ -217,8 +222,8 @@ root README does not change.
 ## Non-goals
 
 This ADR does not define a current contract, `self`, callee, caller, origin,
-owner, authority, Account presence at the code selector, or equality with the
-storage selector.
+owner, authority, or equality with the storage selector. The observation adds
+no retained Account-presence evidence beyond the existing selected lookup.
 
 It adds no caller address, call value, calldata, call kind, balance, nonce,
 transfer, external call, creation, recursion, reentrancy, stack, depth,
@@ -234,8 +239,8 @@ specific handled run parameterized by it.
 Keep each green commit below roughly 300 changed lines:
 
 1. record and activate this exact selector observation;
-2. append the Core capability, request, machine, and safety branches;
-3. parameterize the storage handler and driver, preserving existing behavior;
+2. parameterize the storage handler and driver, preserving existing behavior;
+3. append the Core capability, request, machine, and safety branches;
 4. lift fuel soundness, completeness, and stability through the selector;
 5. update selected execution and continuation proofs without changing their
    high-level optional shapes;
