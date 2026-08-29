@@ -75,6 +75,36 @@ theorem run_of_suspended
       (@handler RollbackState TraceState)
       context fuel remainingFuel state suspension execution
 
+/--
+A storage-selector observation resumes with the exact widened Word and exactly
+the remaining fuel returned by Core.
+-/
+theorem run_of_suspended_storageAddress
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended ⟨.storageAddress, continuation, store⟩ remainingFuel) :
+    run context fuel state =
+      run context remainingFuel
+        ⟨.ret (.word (addressToWord context.context.storageAddress)),
+          continuation, store⟩ := by
+  calc
+    run context fuel state =
+        run
+          (handleSuspension context
+            ⟨.storageAddress, continuation, store⟩).1
+          remainingFuel
+          (handleSuspension context
+            ⟨.storageAddress, continuation, store⟩).2 :=
+      run_of_suspended context fuel remainingFuel state _ execution
+    _ = _ := by rw [handleSuspension_storageAddress]
+
 /-- A combined handled run retains the selected storage Address. -/
 @[simp] theorem run_storageAddress
     {RollbackState : Type u}

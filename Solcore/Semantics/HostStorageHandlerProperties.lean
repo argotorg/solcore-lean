@@ -1,3 +1,4 @@
+import Solcore.Semantics.AddressWordBridgeProperties
 import Solcore.Semantics.HostDriverProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageReadWriteProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWritePresenceProperties
@@ -94,6 +95,66 @@ universe u v
       ⟨.storageWrite slot value, continuation, store⟩).2.store = store := by
   exact handleSuspension_store context
     ⟨Core.HostRequest.storageWrite slot value, continuation, store⟩
+
+/-- A handled selector observation leaves the complete context unchanged. -/
+@[simp] theorem handleSuspension_storageAddress_context
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageAddress, continuation, store⟩).1 = context := by
+  rw [handleSuspension_storageAddress]
+
+/-- A selector observation resumes Core with its exact widened Word. -/
+@[simp] theorem handleSuspension_storageAddress_control
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageAddress, continuation, store⟩).2.control =
+        .ret (.word (addressToWord context.context.storageAddress)) := by
+  rw [handleSuspension_storageAddress]
+
+/-- A selector observation preserves the exact saved Core continuation. -/
+@[simp] theorem handleSuspension_storageAddress_continuation
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageAddress, continuation, store⟩).2.continuation =
+        continuation := by
+  exact handleSuspension_continuation context
+    ⟨Core.HostRequest.storageAddress, continuation, store⟩
+
+/-- A selector observation preserves the exact Core-local store. -/
+@[simp] theorem handleSuspension_storageAddress_store
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    (handleSuspension context
+      ⟨.storageAddress, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store context
+    ⟨Core.HostRequest.storageAddress, continuation, store⟩
+
+/-- The widened handler response narrows back to the retained selector. -/
+@[simp] theorem wordToAddress?_handler_storageAddress
+    {RollbackState : Type u}
+    {TraceState : Type v}
+    (context : Context RollbackState TraceState) :
+    wordToAddress? (handler.handle context .storageAddress).2 =
+      some context.context.storageAddress := by
+  change
+    wordToAddress? (addressToWord context.context.storageAddress) =
+      some context.context.storageAddress
+  exact wordToAddress?_addressToWord context.context.storageAddress
 
 /-- Reading the slot updated by the dependent handler observes its new value. -/
 @[simp] theorem handler_storageWrite_readStorage_same
