@@ -83,7 +83,7 @@ theorem Mode.rank_le_one
 /--
 One bounded execution result. The private constructor makes `run` and
 `resumeWithFuel` the only production paths; callers can inspect `view` but
-cannot wrap an arbitrary terminal value or replace a retained registry.
+cannot wrap an arbitrary terminal value or replace a retained environment.
 -/
 structure Result
     (initialWorld : WorldState)
@@ -109,10 +109,10 @@ def runMode
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry) :
+    (environment : ExecutionEnvironment) :
     (fuel : Nat) →
     (mode : Mode initialWorld rootContract rootInvocation) →
-    Reachable registry mode →
+    Reachable environment mode →
     Result initialWorld rootContract rootInvocation
   | fuel, .root frame, reachable =>
       match advanced : Core.hostAdvance frame.state with
@@ -123,22 +123,22 @@ def runMode
               frame.stateTyping advanced)
       | .next next =>
           match fuel with
-          | 0 => ⟨.outOfFuel registry (.root frame) reachable⟩
+          | 0 => ⟨.outOfFuel environment (.root frame) reachable⟩
           | remaining + 1 =>
-              runMode registry remaining
+              runMode environment remaining
                 (.root (frame.afterNext next advanced))
                 (.rootNext reachable advanced)
       | .suspended suspension =>
           match fuel with
-          | 0 => ⟨.outOfFuel registry (.root frame) reachable⟩
+          | 0 => ⟨.outOfFuel environment (.root frame) reachable⟩
           | remaining + 1 =>
-              runMode registry remaining
-                (frame.afterSuspension registry suspension advanced)
+              runMode environment remaining
+                (frame.afterSuspensionWithEnvironment environment suspension advanced)
                 (.rootSuspended reachable advanced)
   | fuel, .child frame, reachable =>
       match advanced : Core.hostAdvance frame.childState with
       | .done value =>
-          runMode registry fuel
+          runMode environment fuel
             (.root (frame.resumeRoot (frame.outcomeDone value advanced)))
             (.childDone reachable advanced)
       | .fault error =>
@@ -147,16 +147,16 @@ def runMode
               frame.childStateTyping advanced)
       | .next next =>
           match fuel with
-          | 0 => ⟨.outOfFuel registry (.child frame) reachable⟩
+          | 0 => ⟨.outOfFuel environment (.child frame) reachable⟩
           | remaining + 1 =>
-              runMode registry remaining
+              runMode environment remaining
                 (.child (frame.afterNext next advanced))
                 (.childNext reachable advanced)
       | .suspended suspension =>
           match fuel with
-          | 0 => ⟨.outOfFuel registry (.child frame) reachable⟩
+          | 0 => ⟨.outOfFuel environment (.child frame) reachable⟩
           | remaining + 1 =>
-              runMode registry remaining
+              runMode environment remaining
                 (.child (frame.afterHandledSuspension suspension advanced))
                 (.childSuspended reachable advanced)
 termination_by fuel mode _ => fuel * 2 + mode.rank
@@ -164,7 +164,7 @@ decreasing_by
   · simp [Mode.rank]
   · have bounded :=
       Mode.rank_le_one
-        (frame.afterSuspension registry suspension advanced)
+        (frame.afterSuspensionWithEnvironment environment suspension advanced)
     simp [Mode.rank] at bounded ⊢
     omega
   · simp [Mode.rank]
@@ -172,6 +172,36 @@ decreasing_by
   · simp [Mode.rank]
 
 /-- Execute an installed checked root with dynamic depth-one child dispatch. -/
+def runWithEnvironment
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (environment : ExecutionEnvironment)
+    (fuel : Nat) :
+    Result initialWorld rootContract rootInvocation :=
+  runMode environment fuel
+    (Mode.initialRoot rootContract rootInvocation installed)
+    (.initial installed)
+
+/-- Low-level calls-only compatibility wrapper. -/
+def runModeCallsOnly
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (registry : CheckedContractRegistry)
+    (fuel : Nat)
+    (mode : Mode initialWorld rootContract rootInvocation)
+    (reachable : Reachable (.callsOnly registry) mode) :
+    Result initialWorld rootContract rootInvocation :=
+  runMode (.callsOnly registry) fuel mode reachable
+
+/-- Explicit name for the canonical fixed-environment scheduler. -/
+abbrev runModeWithEnvironment := @runMode
+
+/-- Preserve the original calls-only execution API. -/
 def run
     {initialWorld : WorldState}
     (rootContract : CheckedCoreContract)
@@ -182,8 +212,7 @@ def run
     (registry : CheckedContractRegistry)
     (fuel : Nat) :
     Result initialWorld rootContract rootInvocation :=
-  runMode registry fuel
-    (Mode.initialRoot rootContract rootInvocation installed)
-    (.initial installed)
+  runWithEnvironment rootContract rootInvocation installed
+    (.callsOnly registry) fuel
 
 end Solcore.Semantics.OneLevelNestedExecution

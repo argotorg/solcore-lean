@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedContractRegistry
+import Solcore.Semantics.ExecutionEnvironment
 import Solcore.Semantics.OneLevelNestedExecutionReachability
 import Solcore.Semantics.WorldStateDelta
 
@@ -34,8 +34,8 @@ inductive ResultView
   | completed
       (terminal : TerminalResult initialWorld rootContract rootInvocation)
   | outOfFuel
-      (registry : CheckedContractRegistry)
+      (environment : ExecutionEnvironment)
       (mode : Mode initialWorld rootContract rootInvocation)
-      (reachable : Reachable registry mode)
+      (reachable : Reachable environment mode)
 
 end Solcore.Semantics.OneLevelNestedExecution

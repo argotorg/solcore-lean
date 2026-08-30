@@ -131,7 +131,7 @@ theorem observations_outOfFuel
     {rootInvocation : TopLevelInvocation}
     (result : Result initialWorld rootContract rootInvocation)
     (execution : OneLevelNestedExecution.Result initialWorld rootContract rootInvocation)
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (mode : OneLevelNestedExecution.Mode initialWorld rootContract rootInvocation)
     (reachable : OneLevelNestedExecution.Reachable registry mode)
     (outer : result.view = .execution execution)
@@ -156,7 +156,7 @@ theorem run_of_zero_value
       .execution
         (OneLevelNestedExecution.run rootContract rootInvocation installed
           registry fuel) := by
-  simp [run, zero]
+  simp [run, runWithEnvironment, OneLevelNestedExecution.run, zero]
 
 theorem run_of_transfer_failure
     {initialWorld : WorldState}
@@ -175,7 +175,7 @@ theorem run_of_transfer_failure
       .error failure) :
     (run rootContract rootInvocation installed registry fuel).view =
       .rejected (RejectedResult.ofFailure initialWorld failure) := by
-  unfold run
+  unfold run runWithEnvironment
   split
   · contradiction
   · split
@@ -205,13 +205,13 @@ theorem run_of_transfer_success
         .ok workingWorld) :
     (run rootContract rootInvocation installed registry fuel).view =
       .execution
-        (OneLevelNestedExecution.runMode registry fuel
+        (OneLevelNestedExecution.runMode (.callsOnly registry) fuel
           (OneLevelNestedExecution.Mode.preparedRoot rootContract
             rootInvocation
             (WorldState.transferBalance_preserves_installed transferred
               installed))
           (.balancedInitial installed transferred)) := by
-  unfold run
+  unfold run runWithEnvironment
   split
   · contradiction
   · split
@@ -265,11 +265,11 @@ theorem resumeWithFuel_run
         (run rootContract rootInvocation installed registry fuel) additional =
       run rootContract rootInvocation installed registry
         (fuel + additional) := by
-  unfold run
+  unfold run runWithEnvironment
   split
   · apply Result.eq_of_view_eq
     simp [resumeWithFuel,
-      OneLevelNestedExecution.resumeWithFuel_run]
+      OneLevelNestedExecution.resumeWithFuel_runWithEnvironment]
   · split
     · rfl
     · apply Result.eq_of_view_eq

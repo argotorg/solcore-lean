@@ -142,7 +142,7 @@ example
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (fuel additional : Nat)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode) :
@@ -154,7 +154,7 @@ example
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (fuel : Nat)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode) :
@@ -176,7 +176,7 @@ example
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (fuel first second : Nat)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode) :
@@ -200,7 +200,7 @@ example
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode)
     (result : Result initialWorld rootContract rootInvocation)

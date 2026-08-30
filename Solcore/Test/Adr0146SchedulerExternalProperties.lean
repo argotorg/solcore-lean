@@ -118,7 +118,7 @@ section ReachabilitySeal
 variable {initialWorld : WorldState}
 variable {rootContract : CheckedCoreContract}
 variable {rootInvocation : TopLevelInvocation}
-variable {registry : CheckedContractRegistry}
+variable {registry : ExecutionEnvironment}
 variable {mode : Mode initialWorld rootContract rootInvocation}
 
 example (reachable : Reachable registry mode) :
@@ -132,7 +132,7 @@ section ReachableRoot
 variable {initialWorld : WorldState}
 variable {rootContract : CheckedCoreContract}
 variable {rootInvocation : TopLevelInvocation}
-variable {registry : CheckedContractRegistry}
+variable {registry : ExecutionEnvironment}
 variable {frame : RootFrame initialWorld rootContract rootInvocation}
 variable (reachable : Reachable registry (.root frame))
 
@@ -151,7 +151,7 @@ section ReachableChild
 variable {initialWorld : WorldState}
 variable {rootContract : CheckedCoreContract}
 variable {rootInvocation : TopLevelInvocation}
-variable {registry : CheckedContractRegistry}
+variable {registry : ExecutionEnvironment}
 variable {frame : ChildFrame initialWorld rootContract rootInvocation}
 variable (reachable : Reachable registry (.child frame))
 
@@ -175,7 +175,7 @@ example :
   reachable.child_checkpointState
 
 example :
-    registry.resolve?
+    registry.callRegistry.resolve?
         frame.suspendedRoot.parentContext.context.values.working.1
         frame.childTarget =
       some ⟨frame.childContract, frame.preTransferInstalled⟩ :=

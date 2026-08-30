@@ -133,20 +133,20 @@ Zero value preserves the legacy boundary and does not require a present caller.
 Nonzero value either rejects before Core starts or prepares a working world
 whose original world remains the scheduler checkpoint.
 -/
-def run
+def runWithEnvironment
     {initialWorld : WorldState}
     (rootContract : CheckedCoreContract)
     (rootInvocation : TopLevelInvocation)
     (installed :
       InstalledCheckedCoreContract initialWorld rootInvocation.target
         rootContract)
-    (registry : CheckedContractRegistry)
+    (environment : ExecutionEnvironment)
     (fuel : Nat) :
     Result initialWorld rootContract rootInvocation :=
   if _zero : rootInvocation.callValue = Core.Word.zero then
     Result.ofExecution
-      (OneLevelNestedExecution.run rootContract rootInvocation installed
-        registry fuel)
+      (OneLevelNestedExecution.runWithEnvironment rootContract rootInvocation
+        installed environment fuel)
   else
     match transferred :
         initialWorld.transferBalance rootInvocation.caller
@@ -157,10 +157,24 @@ def run
         let workingInstalled :=
           WorldState.transferBalance_preserves_installed transferred installed
         Result.ofExecution <|
-          OneLevelNestedExecution.runMode registry fuel
+          OneLevelNestedExecution.runMode environment fuel
             (OneLevelNestedExecution.Mode.preparedRoot rootContract
               rootInvocation workingInstalled)
             (.balancedInitial installed transferred)
+
+/-- Preserve the original calls-only balanced execution API. -/
+def run
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (registry : CheckedContractRegistry)
+    (fuel : Nat) :
+    Result initialWorld rootContract rootInvocation :=
+  runWithEnvironment rootContract rootInvocation installed
+    (.callsOnly registry) fuel
 
 /-- Resume only the sealed nested execution branch; rejection is terminal. -/
 def resumeWithFuel

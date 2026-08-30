@@ -65,7 +65,7 @@ structure ChildAnchored
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (frame : ChildFrame initialWorld rootContract rootInvocation) : Prop where
   parentStorageAddress_eq :
     frame.suspendedRoot.parentContext.context.storageAddress =
@@ -79,7 +79,7 @@ structure ChildAnchored
     frame.childContext.context.values.checkpoint.state =
       frame.childInitialWorld
   registryResolution_eq :
-    registry.resolve?
+    registry.callRegistry.resolve?
         frame.suspendedRoot.parentContext.context.values.working.1
         frame.childTarget =
       some ⟨frame.childContract, frame.preTransferInstalled⟩
@@ -89,7 +89,7 @@ def Anchored
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry) :
+    (registry : ExecutionEnvironment) :
     Mode initialWorld rootContract rootInvocation → Prop
   | .root frame => RootAnchored frame
   | .child frame => ChildAnchored registry frame
@@ -98,17 +98,17 @@ private theorem rootAfterSuspension_anchored
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (frame : RootFrame initialWorld rootContract rootInvocation)
     (suspension : Core.HostSuspension)
     (advanced : Core.hostAdvance frame.state = .suspended suspension)
     (anchored : RootAnchored frame) :
     Anchored registry
-      (frame.afterSuspension registry suspension advanced) := by
+      (frame.afterSuspensionWithEnvironment registry suspension advanced) := by
   rcases suspension with ⟨request, continuation, store⟩
   cases request with
   | callContractWord target input =>
-      simp only [RootFrame.afterSuspension]
+      simp only [RootFrame.afterSuspensionWithEnvironment]
       split
       · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
       ·
@@ -117,7 +117,7 @@ private theorem rootAfterSuspension_anchored
         · exact ⟨anchored.storageAddress_eq,
             anchored.checkpointState_eq, rfl, rfl, by assumption⟩
   | callContractWordWithValue target value input =>
-      simp only [RootFrame.afterSuspension]
+      simp only [RootFrame.afterSuspensionWithEnvironment]
       split
       · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
       · split
@@ -165,7 +165,7 @@ theorem Reachable.anchored
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {mode : Mode initialWorld rootContract rootInvocation}
     (reachable : Reachable registry mode) :
     Anchored registry mode := by
@@ -228,7 +228,7 @@ theorem Reachable.root_storageAddress
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {frame : RootFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.root frame)) :
     frame.context.context.storageAddress = rootInvocation.target :=
@@ -238,7 +238,7 @@ theorem Reachable.root_checkpointState
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {frame : RootFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.root frame)) :
     frame.context.context.values.checkpoint.state = initialWorld :=
@@ -248,7 +248,7 @@ theorem Reachable.child_parentStorageAddress
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {frame : ChildFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.child frame)) :
     frame.suspendedRoot.parentContext.context.storageAddress =
@@ -259,7 +259,7 @@ theorem Reachable.child_parentCheckpointState
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {frame : ChildFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.child frame)) :
     frame.suspendedRoot.parentContext.context.values.checkpoint.state =
@@ -270,7 +270,7 @@ theorem Reachable.child_storageAddress
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {frame : ChildFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.child frame)) :
     frame.childContext.context.storageAddress = frame.childTarget :=
@@ -280,7 +280,7 @@ theorem Reachable.child_checkpointState
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {frame : ChildFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.child frame)) :
     frame.childContext.context.values.checkpoint.state =
@@ -292,10 +292,10 @@ theorem Reachable.child_registryResolution
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    {registry : CheckedContractRegistry}
+    {registry : ExecutionEnvironment}
     {frame : ChildFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.child frame)) :
-    registry.resolve?
+    registry.callRegistry.resolve?
         frame.suspendedRoot.parentContext.context.values.working.1
         frame.childTarget =
       some ⟨frame.childContract, frame.preTransferInstalled⟩ :=

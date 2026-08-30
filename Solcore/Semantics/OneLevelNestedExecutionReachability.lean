@@ -9,7 +9,7 @@ namespace Solcore.Semantics.OneLevelNestedExecution
 
 /--
 Evidence that an active scheduler mode was obtained from an installed root by
-only the transitions of the one-level executor under one fixed registry.
+only the transitions of the one-level executor under one fixed environment.
 
 This seal prevents low-level frame constructors and transition helpers from
 being used to manufacture a resumable state with an unrelated working world.
@@ -18,13 +18,13 @@ inductive Reachable
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry) :
+    (environment : ExecutionEnvironment) :
     Mode initialWorld rootContract rootInvocation → Prop where
   | initial
       (installed :
         InstalledCheckedCoreContract initialWorld rootInvocation.target
           rootContract) :
-      Reachable registry
+      Reachable environment
         (Mode.initialRoot rootContract rootInvocation installed)
   | balancedInitial
       {workingWorld : WorldState}
@@ -35,42 +35,42 @@ inductive Reachable
         initialWorld.transferBalance rootInvocation.caller
             rootInvocation.target rootInvocation.callValue =
           .ok workingWorld) :
-      Reachable registry
+      Reachable environment
         (Mode.preparedRoot rootContract rootInvocation
           (WorldState.transferBalance_preserves_installed transferred
             installed))
   | rootNext
       {frame : RootFrame initialWorld rootContract rootInvocation}
       {next : Core.State}
-      (prior : Reachable registry (.root frame))
+      (prior : Reachable environment (.root frame))
       (advanced : Core.hostAdvance frame.state = .next next) :
-      Reachable registry (.root (frame.afterNext next advanced))
+      Reachable environment (.root (frame.afterNext next advanced))
   | rootSuspended
       {frame : RootFrame initialWorld rootContract rootInvocation}
       {suspension : Core.HostSuspension}
-      (prior : Reachable registry (.root frame))
+      (prior : Reachable environment (.root frame))
       (advanced : Core.hostAdvance frame.state = .suspended suspension) :
-      Reachable registry
-        (frame.afterSuspension registry suspension advanced)
+      Reachable environment
+        (frame.afterSuspensionWithEnvironment environment suspension advanced)
   | childDone
       {frame : ChildFrame initialWorld rootContract rootInvocation}
       {value : Core.Value}
-      (prior : Reachable registry (.child frame))
+      (prior : Reachable environment (.child frame))
       (advanced : Core.hostAdvance frame.childState = .done value) :
-      Reachable registry
+      Reachable environment
         (.root (frame.resumeRoot (frame.outcomeDone value advanced)))
   | childNext
       {frame : ChildFrame initialWorld rootContract rootInvocation}
       {next : Core.State}
-      (prior : Reachable registry (.child frame))
+      (prior : Reachable environment (.child frame))
       (advanced : Core.hostAdvance frame.childState = .next next) :
-      Reachable registry (.child (frame.afterNext next advanced))
+      Reachable environment (.child (frame.afterNext next advanced))
   | childSuspended
       {frame : ChildFrame initialWorld rootContract rootInvocation}
       {suspension : Core.HostSuspension}
-      (prior : Reachable registry (.child frame))
+      (prior : Reachable environment (.child frame))
       (advanced : Core.hostAdvance frame.childState = .suspended suspension) :
-      Reachable registry
+      Reachable environment
         (.child (frame.afterHandledSuspension suspension advanced))
 
 end Solcore.Semantics.OneLevelNestedExecution

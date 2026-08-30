@@ -48,7 +48,7 @@ example :
         Core.State.initial rootContract.code.program.body Core.hostEnvironment :=
   RootFrame.prepared_state installed
 
-example (registry : CheckedContractRegistry)
+example (registry : ExecutionEnvironment)
     (transferred :
       checkpointWorld.transferBalance rootInvocation.caller
           rootInvocation.target rootInvocation.callValue =

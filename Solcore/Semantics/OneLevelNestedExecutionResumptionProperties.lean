@@ -11,7 +11,7 @@ theorem resumeWithFuel_runMode
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (fuel additional : Nat)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode) :
@@ -89,7 +89,7 @@ theorem resumeWithFuel_runMode
       have prefixEq :
           runMode registry remaining.succ (.root frame) reachable =
             runMode registry remaining
-              (frame.afterSuspension registry suspension stepEq)
+              (frame.afterSuspensionWithEnvironment registry suspension stepEq)
               (.rootSuspended reachable stepEq) := by
         apply Result.eq_of_view_eq
         rw [runMode.eq_1]
@@ -99,7 +99,7 @@ theorem resumeWithFuel_runMode
           runMode registry (remaining.succ + additional) (.root frame)
               reachable =
             runMode registry (remaining + additional)
-              (frame.afterSuspension registry suspension stepEq)
+              (frame.afterSuspensionWithEnvironment registry suspension stepEq)
               (.rootSuspended reachable stepEq) := by
         rw [Nat.succ_add]
         apply Result.eq_of_view_eq
@@ -204,6 +204,20 @@ theorem resumeWithFuel_runMode
       rw [prefixEq, summedEq]
       exact ih additional
 
+/-- Explicitly named form of the fixed-environment split-fuel law. -/
+theorem resumeWithFuel_runModeWithEnvironment
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (environment : ExecutionEnvironment)
+    (fuel additional : Nat)
+    (mode : Mode initialWorld rootContract rootInvocation)
+    (reachable : Reachable environment mode) :
+    resumeWithFuel
+        (runModeWithEnvironment environment fuel mode reachable) additional =
+      runModeWithEnvironment environment (fuel + additional) mode reachable :=
+  resumeWithFuel_runMode environment fuel additional mode reachable
+
 /-- A terminal nested result remains terminal under every added budget. -/
 @[simp] theorem resumeWithFuel_completed
     {initialWorld : WorldState}
@@ -221,7 +235,7 @@ theorem resumeWithFuel_runMode
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode)
     (result : Result initialWorld rootContract rootInvocation)
@@ -236,7 +250,7 @@ theorem resumeWithFuel_runMode
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (fuel : Nat)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode) :
@@ -267,7 +281,7 @@ theorem resumeWithFuel_runMode_add
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (registry : ExecutionEnvironment)
     (fuel first second : Nat)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode) :
@@ -277,6 +291,25 @@ theorem resumeWithFuel_runMode_add
   rw [resumeWithFuel_runMode, resumeWithFuel_runMode]
 
 /-- Splitting fuel at the installed-root API is exactly one larger run. -/
+theorem resumeWithFuel_runWithEnvironment
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (environment : ExecutionEnvironment)
+    (fuel additional : Nat) :
+    resumeWithFuel
+        (runWithEnvironment rootContract rootInvocation installed environment fuel)
+        additional =
+      runWithEnvironment rootContract rootInvocation installed environment
+        (fuel + additional) := by
+  exact resumeWithFuel_runMode environment fuel additional
+    (Mode.initialRoot rootContract rootInvocation installed)
+    (.initial installed)
+
+/-- Splitting fuel at the calls-only compatibility API is exact. -/
 theorem resumeWithFuel_run
     {initialWorld : WorldState}
     (rootContract : CheckedCoreContract)
@@ -290,7 +323,7 @@ theorem resumeWithFuel_run
         (run rootContract rootInvocation installed registry fuel) additional =
       run rootContract rootInvocation installed registry
         (fuel + additional) := by
-  exact resumeWithFuel_runMode registry fuel additional
+  exact resumeWithFuel_runMode (.callsOnly registry) fuel additional
     (Mode.initialRoot rootContract rootInvocation installed)
     (.initial installed)
 
