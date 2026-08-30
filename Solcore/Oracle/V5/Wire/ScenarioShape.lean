@@ -33,6 +33,15 @@ inductive RawQuery where
   | coreCheck (program : Lean.Json) (path : Path)
   | execute (scenario : RawScenario)
 
+namespace RawQuery
+
+def kind : RawQuery → QueryKind
+  | .capabilities => .capabilities
+  | .coreCheck .. => .coreCheck
+  | .execute .. => .execute
+
+end RawQuery
+
 def decodeStorageAt
     (path : Path)
     (json : Lean.Json) : DecodeResult StorageInput := do

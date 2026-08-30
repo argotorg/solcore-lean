@@ -9,10 +9,13 @@ namespace Solcore.Oracle.V5.Wire
 structure ShallowRequest where
   id : RequestId
   limits : Limits
+  limitsValid : limits.Valid
+  queryKind : QueryKind
 
 structure RawRequest where
   id : RequestId
   limits : Limits
+  limitsValid : limits.Valid
   query : RawQuery
 
 private def invalidIdentityAt {α : Type}
@@ -23,6 +26,36 @@ private def invalidIdentityAt {α : Type}
     ("expected", expected),
     ("actual", actual)
   ])
+
+private def decodeShallowProfileAt
+    (path : Path)
+    (json : Lean.Json) : DecodeResult ProfileRef := do
+  ensureExactObject path json ["digest", "id"] ["digest", "id"]
+  let actualDigest ← decodeStringAt (path.field "digest")
+    (← requireField path json "digest")
+  let actualId ← decodeStringAt (path.field "id")
+    (← requireField path json "id")
+  let expected := ProfileRef.canonical
+  unless actualId == expected.id && actualDigest == expected.digest do
+    failAt path .invalidProfile (.mkObj [
+      ("expectedId", expected.id),
+      ("expectedDigest", expected.digest),
+      ("actualId", actualId),
+      ("actualDigest", actualDigest)
+    ])
+  pure expected
+
+private def decodeShallowQueryKindAt
+    (path : Path)
+    (json : Lean.Json) : DecodeResult QueryKind := do
+  let kindPath := path.field "kind"
+  let kind ← decodeStringAt kindPath (← requireField path json "kind")
+  match kind with
+  | "capabilities" => pure .capabilities
+  | "coreCheck" => pure .coreCheck
+  | "execute" => pure .execute
+  | _ => invalidTagAt kindPath (.str kind) <|
+      .arr #["capabilities", "coreCheck", "execute"]
 
 def decodeLimitsAt
     (path : Path)
@@ -81,27 +114,30 @@ def decodeShallowRequest
     invalidIdentityAt schemaPath .invalidSchema schemaVersion actualSchema
   let id ← decodeRequestIdAt (path.field "id")
     (← requireField path json "id")
+  let _ ← decodeShallowProfileAt (path.field "profile")
+    (← requireField path json "profile")
   let limits ← decodeLimitsAt (path.field "limits")
     (← requireField path json "limits")
-  pure { id, limits }
+  let queryKind ← decodeShallowQueryKindAt (path.field "query")
+    (← requireField path json "query")
+  if valid : limits.calldataBytes < Core.wordModulus then
+    pure {
+      id
+      limits
+      limitsValid := by simpa [Limits.Valid] using valid
+      queryKind
+    }
+  else
+    failAt (path.field "limits" |>.field "calldataBytes") .invalidLimit
+      (.mkObj [
+        ("field", "calldataBytes"),
+        ("constraint", "strictly-less-than-2^256")
+      ])
 
 def decodeProfileAt
     (path : Path)
-    (json : Lean.Json) : DecodeResult ProfileRef := do
-  ensureExactObject path json ["digest", "id"] ["digest", "id"]
-  let actualDigest ← decodeStringAt (path.field "digest")
-    (← requireField path json "digest")
-  let actualId ← decodeStringAt (path.field "id")
-    (← requireField path json "id")
-  let expected := ProfileRef.canonical
-  unless actualId == expected.id && actualDigest == expected.digest do
-    failAt path .invalidProfile (.mkObj [
-      ("expectedId", expected.id),
-      ("expectedDigest", expected.digest),
-      ("actualId", actualId),
-      ("actualDigest", actualDigest)
-    ])
-  pure expected
+    (json : Lean.Json) : DecodeResult ProfileRef :=
+  decodeShallowProfileAt path json
 
 def decodeRawStaticMethodAt
     (path : Path)
@@ -119,21 +155,23 @@ def decodeRawContractAt
     (json : Lean.Json) : DecodeResult RawContract := do
   let kindPath := path.field "kind"
   let kind ← decodeStringAt kindPath (← requireField path json "kind")
-  let id ← decodeStringAt (path.field "id")
-    (← requireField path json "id")
-  let spec ← match kind with
+  let (id, spec) ← match kind with
   | "checkedCore" => do
       ensureExactObject path json
         ["id", "kind", "program"] ["id", "kind", "program"]
+      let id ← decodeStringAt (path.field "id")
+        (← requireField path json "id")
       let programPath := path.field "program"
       let program ← requireField path json "program"
-      pure (.checkedCore program programPath)
+      pure (id, .checkedCore program programPath)
   | "staticWordAbi" => do
       ensureExactObject path json
         ["id", "kind", "methods"] ["id", "kind", "methods"]
+      let id ← decodeStringAt (path.field "id")
+        (← requireField path json "id")
       let methods ← decodeArrayAt decodeRawStaticMethodAt
         (path.field "methods") (← requireField path json "methods")
-      pure (.staticWordAbi methods)
+      pure (id, .staticWordAbi methods)
   | _ => invalidTagAt kindPath (.str kind) <|
       .arr #["checkedCore", "staticWordAbi"]
   pure { id, spec }
@@ -194,6 +232,11 @@ def decodeRequestShape
     (← requireField path json "spec")
   unless actualSpec == Solcore.m3aLanguage.id do
     invalidIdentityAt specPath .invalidSpec Solcore.m3aLanguage.id actualSpec
-  pure { id := shallow.id, limits := shallow.limits, query }
+  pure {
+    id := shallow.id
+    limits := shallow.limits
+    limitsValid := shallow.limitsValid
+    query
+  }
 
 end Solcore.Oracle.V5.Wire

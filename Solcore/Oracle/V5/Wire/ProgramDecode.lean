@@ -15,6 +15,11 @@ inductive ProgramDecodeFailure where
 
 abbrev ProgramDecodeResult (α : Type) := Except ProgramDecodeFailure α
 
+/-- A complete typed request retaining the sole non-structural Limits proof. -/
+structure DecodedRequest where
+  value : Request
+  limitsValid : value.limits.Valid
+
 private def liftCore {α : Type}
     (result : V3.CoreDecodeResult α) : ProgramDecodeResult α :=
   result.mapError fun failure =>
@@ -116,8 +121,9 @@ def decodeQueryPrograms
 
 def decodeRequestPrograms
     (raw : RawRequest) :
-    ProgramDecodeResult (Request × V3.CoreBudgetState) := do
+    ProgramDecodeResult (DecodedRequest × V3.CoreBudgetState) := do
   let (query, state) ← decodeQueryPrograms raw.limits raw.query
-  pure ({ id := raw.id, limits := raw.limits, query }, state)
+  let value : Request := { id := raw.id, limits := raw.limits, query }
+  pure ({ value, limitsValid := raw.limitsValid }, state)
 
 end Solcore.Oracle.V5.Wire
