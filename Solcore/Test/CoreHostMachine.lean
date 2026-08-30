@@ -32,6 +32,7 @@ private def responseFor : (request : HostRequest) → request.Response
   | .inputDataSize => response
   | .inputDataWordBE? _ => some response
   | .currentAddress => response
+  | .callContractWord _ _ => .returned response
 
 private def storageReadProgram : Program := {
   resultType := .word
@@ -463,9 +464,19 @@ private theorem compileTimeCurrentAddressEnvironmentIndexRegression :
       some (.hostFunction .currentAddress) :=
   hostEnvironment_currentAddress
 
+private theorem compileTimeCallContractWordContextIndexRegression :
+    hostContext[HostFunction.callContractWord.index]? =
+      some (HostFunction.functionType .callContractWord) :=
+  hostContext_callContractWord
+
+private theorem compileTimeCallContractWordEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.callContractWord.index]? =
+      some (.hostFunction .callContractWord) :=
+  hostEnvironment_callContractWord
+
 private theorem compileTimeHostCapabilityLengths :
-    HostFunction.all.length = 10 ∧
-      hostContext.length = 10 ∧ hostEnvironment.length = 10 :=
+    HostFunction.all.length = 11 ∧
+      hostContext.length = 11 ∧ hostEnvironment.length = 11 :=
   ⟨HostFunction.all_length, hostContext_length, hostEnvironment_length⟩
 
 private theorem compileTimeFirstUnboundHostIndex :

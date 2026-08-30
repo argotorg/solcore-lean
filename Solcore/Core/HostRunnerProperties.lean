@@ -89,6 +89,14 @@ theorem hostAdvance_done_iff
                   cases returned <;> simp [hostAdvance] at advanced
               | currentAddress =>
                   cases returned <;> simp [hostAdvance] at advanced
+              | callContractWord =>
+                  cases returned with
+                  | pair left right =>
+                      cases left <;> cases right <;>
+                        simp [hostAdvance] at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩
     simp [hostAdvance, State.final, advance]
 

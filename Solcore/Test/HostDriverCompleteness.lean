@@ -143,6 +143,8 @@ private def changingHandler : Solcore.Semantics.HostHandler Nat where
     | .inputDataSize => (context + 1, Core.returned)
     | .inputDataWordBE? _ => (context + 1, some Core.returned)
     | .currentAddress => (context + 1, Core.returned)
+    | .callContractWord _ _ =>
+        (context + 1, .failed Core.returned)
 
 private theorem handled :
     changingHandler.handleSuspension 0 Core.suspension =

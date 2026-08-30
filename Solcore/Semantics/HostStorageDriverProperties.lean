@@ -495,6 +495,8 @@ theorem run_of_suspended_inputDataWordBE?_some
           | inputDataSize =>
               simp [handler, handleRequest]
           | inputDataWordBE? offset =>
+              simp [handler, handleRequest]
+          | callContractWord target input =>
               simp [handler, handleRequest])
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved

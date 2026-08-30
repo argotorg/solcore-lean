@@ -172,6 +172,25 @@ theorem typed_currentAddress_emits
   cases unitTyping
   exact ⟨⟨.currentAddress, continuation, store⟩, .currentAddress⟩
 
+/-- A well-typed target/input pair emits one contract-word call request. -/
+theorem typed_callContractWord_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.callContractWord.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .callContractWord :: continuation, store⟩
+        suspension := by
+  have pairTyping :
+      HostRuntimeValueHasType world value
+        (.product .word .word) definitions := by
+    simpa using valueTyping
+  obtain ⟨target, input, rfl⟩ := pairTyping.wordPair_shape
+  exact
+    ⟨⟨.callContractWord target input, continuation, store⟩,
+      .callContractWord⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -194,6 +213,7 @@ theorem typed_hostApplication_emits
   | inputDataSize => exact typed_inputDataSize_emits valueTyping
   | inputDataWordBE? => exact typed_inputDataWordBE?_emits valueTyping
   | currentAddress => exact typed_currentAddress_emits valueTyping
+  | callContractWord => exact typed_callContractWord_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}

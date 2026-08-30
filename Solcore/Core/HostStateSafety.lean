@@ -232,6 +232,12 @@ theorem HostRequest.responseValue_hasType
       | none => exact .inLeft .unit
       | some => exact .inRight .word
   | currentAddress => exact .word
+  | callContractWord =>
+      cases response with
+      | returned => exact .inLeft .word
+      | reverted => exact .inRight (.inLeft .word)
+      | trapped => exact .inRight (.inRight (.inLeft .word))
+      | failed => exact .inRight (.inRight (.inRight .word))
 
 theorem HostSuspensionHasType.resume {definitions : DataEnvironment}
     {suspension : HostSuspension} {resultType : Ty}

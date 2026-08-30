@@ -1,4 +1,5 @@
 import Solcore.Semantics.AddressWordBridge
+import Solcore.Semantics.ContractCallFailure
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageRead
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWrite
 import Solcore.Semantics.HostDriver
@@ -32,6 +33,8 @@ def handleRequest
   | .inputDataSize => (context, inputs.inputData.sizeWord)
   | .inputDataWordBE? offset => (context, inputs.inputData.wordBE? offset)
   | .currentAddress => (context, addressToWord inputs.currentAddress)
+  | .callContractWord _ _ =>
+      (context, ContractCallFailure.depthExceeded.result)
 
 /-- Current combined handler indexed by the complete run-fixed input. -/
 def handler

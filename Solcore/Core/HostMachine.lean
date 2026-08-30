@@ -7,6 +7,37 @@ set_option autoImplicit false
 
 namespace Solcore.Core
 
+/-- Typed, lossless result delivered to Core after one contract-word call. -/
+inductive ContractCallWordResult where
+  | returned (data : Word)
+  | reverted (data : Word)
+  | trapped (reason : Word)
+  | failed (reason : Word)
+  deriving Repr, BEq, DecidableEq
+
+namespace ContractCallWordResult
+
+/-- The fixed Core sum used by the internal contract-word call capability. -/
+def resultType : Ty :=
+  .sum .word (.sum .word (.sum .word .word))
+
+/-- Inject every call disposition into a distinct branch of the fixed sum. -/
+def value : ContractCallWordResult → Value
+  | .returned data =>
+      .inLeft (.sum .word (.sum .word .word)) (.word data)
+  | .reverted data =>
+      .inRight .word (.inLeft (.sum .word .word) (.word data))
+  | .trapped reason =>
+      .inRight .word (.inRight .word (.inLeft .word (.word reason)))
+  | .failed reason =>
+      .inRight .word (.inRight .word (.inRight .word (.word reason)))
+
+@[simp] theorem value_type (result : ContractCallWordResult) :
+    result.value.type = resultType := by
+  cases result <;> rfl
+
+end ContractCallWordResult
+
 inductive HostRequest where
   | storageRead (slot : Word)
   | storageWrite (slot value : Word)
@@ -18,6 +49,7 @@ inductive HostRequest where
   | inputDataSize
   | inputDataWordBE? (offset : Word)
   | currentAddress
+  | callContractWord (target input : Word)
   deriving Repr, BEq, DecidableEq
 
 namespace HostRequest
@@ -34,6 +66,7 @@ def Response : HostRequest → Type
   | .inputDataSize => Word
   | .inputDataWordBE? _ => Option Word
   | .currentAddress => Word
+  | .callContractWord _ _ => ContractCallWordResult
 
 /-- Core type injected when a request is resumed. -/
 def responseType : HostRequest → Ty
@@ -47,6 +80,7 @@ def responseType : HostRequest → Ty
   | .inputDataSize => .word
   | .inputDataWordBE? _ => .sum .unit .word
   | .currentAddress => .word
+  | .callContractWord _ _ => ContractCallWordResult.resultType
 
 /-- Convert an indexed host response back into a Core runtime value. -/
 def responseValue
@@ -69,6 +103,7 @@ def responseValue
       | none => .inLeft .word .unit
       | some word => .inRight .unit (.word word)
   | .currentAddress => .word response
+  | .callContractWord _ _ => response.value
 
 @[simp] theorem responseType_storageRead (slot : Word) :
     responseType (.storageRead slot) = .word :=
@@ -161,6 +196,17 @@ def responseValue
 
 @[simp] theorem responseValue_currentAddress (response : Word) :
     responseValue .currentAddress response = .word response :=
+  rfl
+
+@[simp] theorem responseType_callContractWord (target input : Word) :
+    responseType (.callContractWord target input) =
+      ContractCallWordResult.resultType :=
+  rfl
+
+@[simp] theorem responseValue_callContractWord
+    (target input : Word)
+    (response : ContractCallWordResult) :
+    responseValue (.callContractWord target input) response = response.value :=
   rfl
 
 @[simp] theorem responseValue_type
@@ -310,6 +356,16 @@ def resume
       ⟨.ret (.word response), continuation, store⟩ :=
   rfl
 
+@[simp] theorem resume_callContractWord
+    (target input : Word)
+    (response : ContractCallWordResult)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk (.callContractWord target input) continuation store).resume
+        response =
+      ⟨.ret response.value, continuation, store⟩ :=
+  rfl
+
 end HostSuspension
 
 /-- One executable step at the Core/host boundary. -/
@@ -446,6 +502,15 @@ def hostAdvance (state : State) : HostAdvanceResult :=
                 store := state.store
               }
           | actual => .fault (.invalidHostArgument .currentAddress actual)
+      | .callContractWord =>
+          match argument with
+          | .pair (.word target) (.word input) =>
+              .suspended {
+                request := .callContractWord target input
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .callContractWord actual)
   | _, _ => .ofAdvance (advance state)
 
 @[simp] theorem hostAdvance_begin_storageRead
@@ -794,5 +859,39 @@ def hostAdvance (state : State) : HostAdvanceResult :=
   | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
+
+@[simp] theorem hostAdvance_begin_callContractWord
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .callContractWord),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .callContractWord :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_callContractWord
+    (target input : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.pair (.word target) (.word input)),
+          .hostApply .callContractWord :: continuation, store⟩ =
+      .suspended ⟨.callContractWord target input, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_callContractWord_argument
+    (actual : Value)
+    (notWordPair :
+      ∀ target input, actual ≠ .pair (.word target) (.word input))
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .callContractWord :: continuation, store⟩ =
+      .fault (.invalidHostArgument .callContractWord actual) := by
+  cases actual <;> simp_all [hostAdvance]
 
 end Solcore.Core
