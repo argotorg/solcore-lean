@@ -80,7 +80,7 @@ private def codeProgram?
   let installed ← account.code?
   some installed.program
 
-private structure Snapshot where
+private structure WorldSnapshot where
   aPresent : Bool
   bPresent : Bool
   cPresent : Bool
@@ -93,7 +93,7 @@ private structure Snapshot where
   bCode : Option Program
   deriving BEq
 
-private def snapshot (state : WorldState) : Snapshot := {
+private def snapshot (state : WorldState) : WorldSnapshot := {
   aPresent := (state.account? addressA).isSome
   bPresent := (state.account? addressB).isSome
   cPresent := (state.account? addressC).isSome
@@ -106,7 +106,7 @@ private def snapshot (state : WorldState) : Snapshot := {
   bCode := codeProgram? state addressB
 }
 
-private def expectedSnapshot : Snapshot := {
+private def expectedSnapshot : WorldSnapshot := {
   aPresent := true
   bPresent := true
   cPresent := false

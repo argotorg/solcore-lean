@@ -91,6 +91,14 @@ def testCoreWireV3CodecFoundation : IO Unit := do
         (error.code == .expectedNatural && error.path.toPointer == "/index")
         "constructor identity fields are not decoded in canonical key order"
   | .ok _ => throw (IO.userError "invalid constructor identity unexpectedly decoded")
+  match decodeConstructorId (.mkObj [
+      ("index", Lean.toJson 0), ("zzz", .null)
+    ]) with
+  | .error error =>
+      assertTrue
+        (error.code == .missingField && error.path.toPointer == "/owner")
+        "exact object did not choose an earlier missing field"
+  | .ok _ => throw (IO.userError "inexact constructor identity unexpectedly decoded")
   match decodeDataDefinitionWithBudget limits (encodeDataDefinition definition) with
   | .ok decoded =>
       assertTrue (encodeDataDefinition decoded == encodeDataDefinition definition)
@@ -139,10 +147,10 @@ def testCoreWireV3CodecFoundation : IO Unit := do
           "expected-natural arguments are not JSON-kind exact"
     | _ => throw (IO.userError "non-natural JSON number unexpectedly decoded")
 
-  assertProtocol "missing field precedes later unknown field"
+  assertProtocol "tagged union prepass precedes variant missing fields"
     (decodeTypeWithBudget limits (.mkObj [
       ("tag", "product"), ("right", "word"), ("zzz", .null)
-    ])) .missingField "/left"
+    ])) .unknownField "/zzz"
   assertProtocol "earlier unknown field precedes missing field"
     (decodeTypeWithBudget limits (.mkObj [
       ("tag", "product"), ("right", "word"), ("aaa", .null)

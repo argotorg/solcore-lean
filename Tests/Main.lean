@@ -230,6 +230,36 @@ import Solcore.Test.SurfaceMultiFastParser
 import Solcore.Test.SurfaceMultiLocation
 import Solcore.Test.SurfaceMultiResourceBounds
 import Solcore.Test.SurfaceMultiStructure
+import Solcore.Test.CoreWireV3Codec
+import Solcore.Test.CoreWireV3CodecFoundation
+import Solcore.Test.CoreWireV3Conversions
+import Solcore.Test.CoreWireV3Host
+import Solcore.Test.CoreWireV3Public
+import Solcore.Test.OracleV5Capabilities
+import Solcore.Test.OracleV5CheckDiagnostic
+import Solcore.Test.OracleV5ContractAdmission
+import Solcore.Test.OracleV5ContractAdmissionDiagnostic
+import Solcore.Test.OracleV5EnvironmentMaterialization
+import Solcore.Test.OracleV5Execution
+import Solcore.Test.OracleV5Handler
+import Solcore.Test.OracleV5Input
+import Solcore.Test.OracleV5InvocationPreparation
+import Solcore.Test.OracleV5JsonBudget
+import Solcore.Test.OracleV5Observation
+import Solcore.Test.OracleV5ObservationCodec
+import Solcore.Test.OracleV5ObservationDecode
+import Solcore.Test.OracleV5ObservationValidity
+import Solcore.Test.OracleV5ProbeValidation
+import Solcore.Test.OracleV5Public
+import Solcore.Test.OracleV5ResponseEncode
+import Solcore.Test.OracleV5ResponseRefinement
+import Solcore.Test.OracleV5RootInstallation
+import Solcore.Test.OracleV5ScenarioDiagnostic
+import Solcore.Test.OracleV5ScenarioPreparation
+import Solcore.Test.OracleV5TypedHandler
+import Solcore.Test.OracleV5WireProtocol
+import Solcore.Test.OracleV5WireRequest
+import Solcore.Test.OracleV5WorldMaterialization
 
 set_option autoImplicit false
 
@@ -5165,6 +5195,11 @@ def run : IO Unit := do
   testSurfacePublicationParseResult
   testCoreWire
   testCoreWireV2
+  testCoreWireV3Codec
+  testCoreWireV3CodecFoundation
+  testCoreWireV3Conversions
+  testCoreWireV3Host
+  CoreWireV3Public.testCoreWireV3Public
   testDetailedCoreChecker
   testOracle
   testOracleV2
@@ -5173,6 +5208,31 @@ def run : IO Unit := do
   testOracleV4Codecs
   testOracleV4Handler
   testOracleV4StreamDispatch
+  OracleV5Capabilities.testOracleV5Capabilities
+  OracleV5CheckDiagnostic.testOracleV5CheckDiagnostic
+  OracleV5ContractAdmission.testOracleV5ContractAdmission
+  OracleV5ContractAdmissionDiagnostic.testOracleV5ContractAdmissionDiagnostic
+  testOracleV5EnvironmentMaterialization
+  OracleV5Execution.testOracleV5Execution
+  OracleV5Handler.testOracleV5Handler
+  testOracleV5Input
+  OracleV5InvocationPreparation.testOracleV5InvocationPreparation
+  OracleV5JsonBudget.testOracleV5JsonBudget
+  OracleV5Observation.testOracleV5Observation
+  OracleV5ObservationCodec.testOracleV5ObservationCodec
+  OracleV5ObservationDecode.testOracleV5ObservationDecode
+  OracleV5ObservationValidity.testOracleV5ObservationValidity
+  OracleV5ProbeValidation.testOracleV5ProbeValidation
+  testOracleV5Public
+  OracleV5ResponseEncode.testOracleV5ResponseEncode
+  OracleV5ResponseRefinement.testOracleV5ResponseRefinement
+  OracleV5RootInstallation.testOracleV5RootInstallation
+  OracleV5ScenarioDiagnostic.testOracleV5ScenarioDiagnostic
+  OracleV5ScenarioPreparation.testOracleV5ScenarioPreparation
+  OracleV5TypedHandler.testOracleV5TypedHandler
+  OracleV5WireProtocol.testOracleV5WireProtocol
+  testOracleV5WireRequest
+  testOracleV5WorldMaterialization
   testSurfaceLexer
   testSurfaceParserAst
   testSurfacePrecedence

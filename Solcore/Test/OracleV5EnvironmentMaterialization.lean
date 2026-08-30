@@ -95,7 +95,7 @@ private def mismatchWorld : WorldState :=
   WorldState.empty.putAccount addressA
     (Account.empty.withCode callee.code)
 
-private structure Snapshot where
+private structure EnvironmentSnapshot where
   callA : Option Program
   callB : Option Program
   callC : Option Program
@@ -110,7 +110,7 @@ private structure Snapshot where
   mismatchedWorldResolutionAbsent : Bool
   deriving BEq
 
-private def snapshot (environment : ExecutionEnvironment) : Snapshot := {
+private def snapshot (environment : ExecutionEnvironment) : EnvironmentSnapshot := {
   callA := callProgram? environment addressA
   callB := callProgram? environment addressB
   callC := callProgram? environment addressC
@@ -128,7 +128,7 @@ private def snapshot (environment : ExecutionEnvironment) : Snapshot := {
     (environment.callRegistry.resolve? mismatchWorld addressA).isNone
 }
 
-private def expectedSnapshot : Snapshot := {
+private def expectedSnapshot : EnvironmentSnapshot := {
   callA := some runtime.code.program
   callB := some callee.code.program
   callC := none

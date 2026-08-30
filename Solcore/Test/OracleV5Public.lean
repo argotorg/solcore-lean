@@ -1,5 +1,5 @@
 import Solcore
-import Solcore.Oracle.Main
+import Solcore.Oracle.Stream
 
 /-! Public-module and NDJSON-dispatch regressions for Oracle v5. -/
 
