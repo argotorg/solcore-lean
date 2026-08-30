@@ -50,6 +50,56 @@ def canonicalRoutes
     (routes : List CreationRouteInput) : List CreationRouteInput :=
   routes.mergeSort routeLE
 
+/-- Select the unique canonical nested-call binding for an Address. -/
+def callInput?
+    (input : EnvironmentInput)
+    (address : Address) : Option CallRegistryInput :=
+  (canonicalCalls input.callRegistry).find?
+    (fun binding => decide (binding.address = address))
+
+/-- Select the unique canonical creation template for a Word identifier. -/
+def templateInput?
+    (input : EnvironmentInput)
+    (templateId : Core.Word) : Option CreationTemplateInput :=
+  (canonicalTemplates input.creationTemplates).find?
+    (fun template => decide (template.templateId = templateId))
+
+/-- Select the unique canonical creation route for `(creator, nonce)`. -/
+def routeInput?
+    (input : EnvironmentInput)
+    (creator : Address)
+    (nonce : Core.Word) : Option CreationRouteInput :=
+  (canonicalRoutes input.creationAddressPolicy.routes).find?
+    (fun route => decide (
+      route.creator = creator ∧ route.nonce = nonce))
+
+/-- Exact checked contract named by one finite call-registry lookup. -/
+def callContractWith?
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (address : Address) : Option CheckedCoreContract := do
+  let binding ← callInput? input address
+  resolve binding.contract
+
+/-- Exact checked initializer/runtime pair named by one finite template. -/
+def creationTemplateWith?
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (templateId : Core.Word) : Option CheckedCreationTemplate := do
+  let template ← templateInput? input templateId
+  let initializer ← resolve template.initializer
+  let runtime ← resolve template.runtime
+  some { initializer, runtime }
+
+/-- Total creation Address selected by a finite route or its explicit default. -/
+def creationAddressOf
+    (input : EnvironmentInput)
+    (creator : Address)
+    (nonce : Core.Word) : Address :=
+  match routeInput? input creator nonce with
+  | some route => route.address
+  | none => input.creationAddressPolicy.defaultAddress
+
 private def firstDuplicateCall? :
     List CallRegistryInput → Option Address
   | []
@@ -197,6 +247,174 @@ def materializeWith
     creationAddressPolicy :=
       addressPolicyWith canonical.routes canonical.defaultAddress
   }
+
+private theorem validateWith_ok_eq_canonicalInput
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (canonical : CanonicalInput)
+    (accepted : validateWith resolve input = .ok canonical) :
+    canonical = {
+      calls := canonicalCalls input.callRegistry
+      templates := canonicalTemplates input.creationTemplates
+      routes := canonicalRoutes input.creationAddressPolicy.routes
+      defaultAddress := input.creationAddressPolicy.defaultAddress
+    } := by
+  unfold validateWith at accepted
+  dsimp only at accepted
+  repeat first | split at accepted | simp_all
+
+private theorem environment_eq_of_materializeWith
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment) :
+    environment = {
+      callRegistry :=
+        callRegistryWith resolve (canonicalCalls input.callRegistry)
+      creationTemplates :=
+        templateRegistryWith resolve
+          (canonicalTemplates input.creationTemplates)
+      creationAddressPolicy :=
+        addressPolicyWith
+          (canonicalRoutes input.creationAddressPolicy.routes)
+          input.creationAddressPolicy.defaultAddress
+    } := by
+  cases accepted : validateWith resolve input with
+  | error failure =>
+      unfold materializeWith at success
+      simp only [accepted, bind, Except.bind] at success
+      cases success
+  | ok canonical =>
+      have exactCanonical := validateWith_ok_eq_canonicalInput
+        resolve input canonical accepted
+      subst canonical
+      unfold materializeWith at success
+      simp only [accepted, bind, Except.bind, Except.ok.injEq] at success
+      exact success.symm
+
+/-- Every successful environment has exactly the finite call-registry lookup. -/
+theorem callRegistry_lookup_of_materializeWith
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (address : Address) :
+    environment.callRegistry.lookup address =
+      callContractWith? resolve input address := by
+  rw [environment_eq_of_materializeWith resolve input environment success]
+  rfl
+
+/-- A selected call binding resolves to exactly its named checked contract. -/
+theorem callRegistry_lookup_of_input
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (address : Address)
+    (binding : CallRegistryInput)
+    (selected : callInput? input address = some binding) :
+    environment.callRegistry.lookup address = resolve binding.contract := by
+  rw [callRegistry_lookup_of_materializeWith resolve input environment
+    success address]
+  simp [callContractWith?, selected]
+
+/-- No finite call binding means no checked contract registry entry. -/
+theorem callRegistry_lookup_eq_none_of_input_absent
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (address : Address)
+    (absent : callInput? input address = none) :
+    environment.callRegistry.lookup address = none := by
+  rw [callRegistry_lookup_of_materializeWith resolve input environment
+    success address]
+  simp [callContractWith?, absent]
+
+/-- Every successful environment has exactly the finite template lookup. -/
+theorem creationTemplates_lookup_of_materializeWith
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (templateId : Core.Word) :
+    environment.creationTemplates.lookup templateId =
+      creationTemplateWith? resolve input templateId := by
+  rw [environment_eq_of_materializeWith resolve input environment success]
+  rfl
+
+/-- A selected template preserves its exact initializer/runtime provenance. -/
+theorem creationTemplates_lookup_of_input
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (templateId : Core.Word)
+    (template : CreationTemplateInput)
+    (selected : templateInput? input templateId = some template) :
+    environment.creationTemplates.lookup templateId = (do
+      let initializer ← resolve template.initializer
+      let runtime ← resolve template.runtime
+      some { initializer, runtime }) := by
+  rw [creationTemplates_lookup_of_materializeWith resolve input environment
+    success templateId]
+  simp [creationTemplateWith?, selected]
+
+/-- No finite template entry means no checked creation capability. -/
+theorem creationTemplates_lookup_eq_none_of_input_absent
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (templateId : Core.Word)
+    (absent : templateInput? input templateId = none) :
+    environment.creationTemplates.lookup templateId = none := by
+  rw [creationTemplates_lookup_of_materializeWith resolve input environment
+    success templateId]
+  simp [creationTemplateWith?, absent]
+
+/-- Every successful environment has exactly the finite total Address policy. -/
+theorem creationAddressPolicy_derive_of_materializeWith
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (creator : Address)
+    (nonce : Core.Word) :
+    environment.creationAddressPolicy.derive creator nonce =
+      creationAddressOf input creator nonce := by
+  rw [environment_eq_of_materializeWith resolve input environment success]
+  rfl
+
+/-- A selected creation route preserves its exact output Address. -/
+theorem creationAddressPolicy_derive_of_input
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (creator : Address)
+    (nonce : Core.Word)
+    (route : CreationRouteInput)
+    (selected : routeInput? input creator nonce = some route) :
+    environment.creationAddressPolicy.derive creator nonce = route.address := by
+  rw [creationAddressPolicy_derive_of_materializeWith resolve input environment
+    success creator nonce]
+  simp [creationAddressOf, selected]
+
+/-- A missing route selects exactly the input's required default Address. -/
+theorem creationAddressPolicy_derive_of_input_absent
+    (resolve : String → Option CheckedCoreContract)
+    (input : EnvironmentInput)
+    (environment : ExecutionEnvironment)
+    (success : materializeWith resolve input = .ok environment)
+    (creator : Address)
+    (nonce : Core.Word)
+    (absent : routeInput? input creator nonce = none) :
+    environment.creationAddressPolicy.derive creator nonce =
+      input.creationAddressPolicy.defaultAddress := by
+  rw [creationAddressPolicy_derive_of_materializeWith resolve input environment
+    success creator nonce]
+  simp [creationAddressOf, absent]
 
 end EnvironmentMaterialization
 

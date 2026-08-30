@@ -242,6 +242,7 @@ import Solcore.Test.OracleV5ContractAdmissionDiagnostic
 import Solcore.Test.OracleV5CoreDiagnosticDecode
 import Solcore.Test.OracleV5DiagnosticValidity
 import Solcore.Test.OracleV5EnvironmentMaterialization
+import Solcore.Test.OracleV5EnvironmentMaterializationProperties
 import Solcore.Test.OracleV5Execution
 import Solcore.Test.OracleV5Handler
 import Solcore.Test.OracleV5Input
@@ -5228,6 +5229,7 @@ def run : IO Unit := do
   OracleV5CoreDiagnosticDecode.testOracleV5CoreDiagnosticDecode
   OracleV5DiagnosticValidity.testOracleV5DiagnosticValidity
   testOracleV5EnvironmentMaterialization
+  testOracleV5EnvironmentMaterializationProperties
   OracleV5Execution.testOracleV5Execution
   OracleV5Handler.testOracleV5Handler
   testOracleV5Input
