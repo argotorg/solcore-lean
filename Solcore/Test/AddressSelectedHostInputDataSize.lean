@@ -39,6 +39,7 @@ private def inputsFor
   callValue := callValue
   callerAddress := callerAddress
   inputData := inputData
+  currentAddress := codeAddress
 }
 
 private def emptyInputs := inputsFor emptyInput

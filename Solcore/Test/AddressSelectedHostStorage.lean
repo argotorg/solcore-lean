@@ -33,6 +33,7 @@ private def inputsFor
   callValue := suppliedCallValue
   callerAddress := callerAddress
   inputData := inputData
+  currentAddress := address
 }
 
 private def executionInputs : HostStorageDriver.ExecutionInputs :=

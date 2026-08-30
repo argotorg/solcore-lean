@@ -13,5 +13,6 @@ structure ExecutionInputs where
   callValue : Core.Word
   callerAddress : Address
   inputData : InputData
+  currentAddress : Address
 
 end Solcore.Semantics.HostStorageDriver

@@ -29,6 +29,7 @@ def executionInputs : HostStorageDriver.ExecutionInputs := {
   callValue := Word.zero
   callerAddress := callerAddress
   inputData := inputData
+  currentAddress := codeAddress
 }
 
 /-- Write working storage, then observe the immutable input size. -/

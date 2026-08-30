@@ -32,6 +32,7 @@ private def executionInputs : HostStorageDriver.ExecutionInputs := {
   callValue := ⟨0x73, by decide⟩
   callerAddress := callerAddress
   inputData := inputData
+  currentAddress := codeAddress
 }
 
 /-- Observe the exact size, write it, observe it again, and retain both Words. -/

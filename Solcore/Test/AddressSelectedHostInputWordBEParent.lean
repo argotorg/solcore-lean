@@ -39,6 +39,7 @@ private def inputsFor (inputData : HostStorageDriver.InputData) :
   callValue := ⟨0x73, by decide⟩
   callerAddress := callerAddress
   inputData := inputData
+  currentAddress := codeAddress
 }
 
 private def presentInputs := inputsFor presentInput

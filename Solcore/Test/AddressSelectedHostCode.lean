@@ -31,6 +31,7 @@ private def inputsFor
   callValue := suppliedCallValue
   callerAddress := callerAddress
   inputData := inputData
+  currentAddress := address
 }
 
 private def slotA : Word := ⟨0x41, by decide⟩

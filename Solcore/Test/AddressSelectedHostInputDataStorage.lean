@@ -51,6 +51,7 @@ private def inputsFor
   callValue := Word.zero
   callerAddress := callerAddress
   inputData := data
+  currentAddress := codeAddress
 }
 
 private def executionInputs : HostStorageDriver.ExecutionInputs :=

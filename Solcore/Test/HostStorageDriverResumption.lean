@@ -41,6 +41,7 @@ private def inputsFor
   callValue := Word.zero
   callerAddress := callerAddress
   inputData := inputData
+  currentAddress := codeAddress
 }
 
 private def executionInputs := inputsFor threeByteInput
