@@ -29,7 +29,7 @@ private theorem run_done_complete_of_steps
       exact Core.hostRun_done_complete_of_steps corePath terminal enough
   | @handle prefixSteps suffixSteps context nextContext finalContext
       start requestState resumed finish suspension prefixPath emission
-      handled suffix ih =>
+      supported handled suffix ih =>
       let remainingFuel := fuel - prefixSteps - 1
       have accounting :
           prefixSteps + remainingFuel + 1 = fuel := by
@@ -45,6 +45,7 @@ private theorem run_done_complete_of_steps
           prefixPath emission accounting
       rw [run_of_suspended handler context fuel remainingFuel start
         suspension execution]
+      rw [supported]
       rw [handled]
       exact ih terminal suffixEnough
 
@@ -86,7 +87,7 @@ theorem run_fault_complete
       exact Core.hostRun_fault_complete_of_steps corePath terminal enough
   | @handle prefixSteps suffixSteps context nextContext finalContext
       start requestState resumed finish suspension prefixPath emission
-      handled suffix ih =>
+      supported handled suffix ih =>
       let remainingFuel := fuel - prefixSteps - 1
       have accounting :
           prefixSteps + remainingFuel + 1 = fuel := by
@@ -102,6 +103,7 @@ theorem run_fault_complete
           prefixPath emission accounting
       rw [run_of_suspended handler context fuel remainingFuel start
         suspension execution]
+      rw [supported]
       rw [handled]
       exact ih terminal suffixEnough
 
@@ -128,7 +130,7 @@ theorem run_outOfFuel_complete
       exact Core.hostRun_outOfFuel_complete corePath ready
   | @handle prefixSteps suffixSteps context nextContext finalContext
       start requestState resumed finish suspension prefixPath emission
-      handled suffix ih =>
+      supported handled suffix ih =>
       have accounting :
           prefixSteps + suffixSteps + 1 =
             prefixSteps + 1 + suffixSteps := by
@@ -140,8 +142,48 @@ theorem run_outOfFuel_complete
           prefixPath emission accounting
       rw [run_of_suspended handler context
         (prefixSteps + 1 + suffixSteps) suffixSteps start suspension execution]
+      rw [supported]
       rw [handled]
       exact ih ready
+
+/-- An exact path to a policy-rejected request replays that rejection. -/
+theorem run_unsupported_complete
+    {Context : Type u}
+    (handler : HostHandler Context)
+    {spent fuel remainingFuel : Nat}
+    {startContext finalContext : Context}
+    {start requestState : Core.State}
+    {suspension : Core.HostSuspension}
+    (path :
+      HandledSteps handler spent startContext start finalContext requestState)
+    (emission : Core.HostRequestEmission requestState suspension)
+    (unsupported : handler.supports suspension.request = false)
+    (accounting : spent + remainingFuel + 1 = fuel) :
+    run handler startContext fuel start =
+      ⟨finalContext, .unsupported suspension remainingFuel⟩ := by
+  induction path generalizing fuel with
+  | core corePath =>
+      apply run_of_unsupported
+      · exact Core.hostRun_suspended_complete_of_steps
+          corePath emission accounting
+      · exact unsupported
+  | @handle prefixSteps suffixSteps context nextContext finalContext
+      start requestState' resumed finish emitted prefixPath requestEmission
+      supported handled suffix ih =>
+      let nextFuel := fuel - prefixSteps - 1
+      have outerAccounting : prefixSteps + nextFuel + 1 = fuel := by
+        dsimp [nextFuel]
+        omega
+      have suffixAccounting : suffixSteps + remainingFuel + 1 = nextFuel := by
+        dsimp [nextFuel]
+        omega
+      have execution :
+          Core.hostRun fuel start = .suspended emitted nextFuel :=
+        Core.hostRun_suspended_complete_of_steps
+          prefixPath requestEmission outerAccounting
+      rw [run_of_suspended handler context fuel nextFuel start emitted execution]
+      rw [supported, handled]
+      exact ih emission suffixAccounting
 
 /-- Any fuel-sound relational witness determines the executable driver result. -/
 theorem run_eq_of_fuelSoundWith
@@ -168,6 +210,12 @@ theorem run_eq_of_fuelSoundWith
           change ∃ spent, spent ≤ fuel ∧ _ ∧ _ at sound
           obtain ⟨spent, enough, path, terminal⟩ := sound
           exact run_fault_complete handler path terminal enough
+      | unsupported suspension remainingFuel =>
+          change ∃ spent requestState, _ at sound
+          obtain ⟨spent, requestState, accounting, path, emission,
+            unsupported⟩ := sound
+          exact run_unsupported_complete handler path emission unsupported
+            accounting
 
 /-- Executable generic driver results are exactly the fuel-sound results. -/
 theorem run_eq_iff_fuelSoundWith
