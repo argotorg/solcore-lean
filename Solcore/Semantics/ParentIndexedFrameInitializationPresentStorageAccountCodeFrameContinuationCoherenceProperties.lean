@@ -83,6 +83,7 @@ private theorem completedContinuation_eq_parentIndexed
           simp only [initialTraceExtension_toTrace]
           rw [finalCheckpoint, finalEffects]
           rfl
+      | unsupported suspension remainingFuel => simp at resultCompleted
       | outOfFuel exhausted => simp at resultCompleted
       | fault error faultState => simp at resultCompleted
 

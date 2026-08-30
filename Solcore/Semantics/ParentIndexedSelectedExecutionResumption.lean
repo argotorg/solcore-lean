@@ -14,8 +14,9 @@ variable {parentWorking :
   WorldState × FrameEffectJournal RollbackState (FrameTrace Event)}
 
 /--
-Continue only retained exhaustion. Absence, raw fault, and completion are
-terminal identities and do not invoke selection or the driver.
+Continue only retained exhaustion. Unsupported requests remain suspended and
+only accumulate offered fuel; they are never passed to the rejecting handler.
+Absence, raw fault, and completion are terminal identities.
 -/
 def resumeWithFuel
     (result : Result RollbackState Event TrapReason parentWorking)
@@ -31,6 +32,8 @@ def resumeWithFuel
   | .outOfFuel context state =>
       classify initialization doneOutcome
         (HostStorageDriver.run context inputs additional state)
+  | .unsupported context suspension remainingFuel =>
+      .unsupported context suspension (remainingFuel + additional)
   | terminal => terminal
 
 @[simp] theorem resumeWithFuel_storageAbsent
@@ -89,6 +92,22 @@ def resumeWithFuel
     resumeWithFuel (.fault context error state)
         initialization inputs doneOutcome additional =
       .fault context error state :=
+  rfl
+
+@[simp] theorem resumeWithFuel_unsupported
+    (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat)
+    (initialization : ParentIndexedFrameInitialization
+      RollbackState Event parentWorking)
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState (FrameTrace Event) →
+        Core.Value → Core.Store → FrameOutcome TrapReason)
+    (additional : Nat) :
+    resumeWithFuel (.unsupported context suspension remainingFuel)
+        initialization inputs doneOutcome additional =
+      .unsupported context suspension (remainingFuel + additional) :=
   rfl
 
 @[simp] theorem resumeWithFuel_completed

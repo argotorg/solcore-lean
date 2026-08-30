@@ -208,6 +208,8 @@ theorem runCodeWithStorageParentIndexedResult_eq_completed_iff
                   rfl
               | outOfFuel state => simp [classify, execution]
               | fault error state => simp [classify, execution]
+              | unsupported suspension remainingFuel =>
+                  simp [classify, execution]
 
 theorem runCodeWithStorageParentIndexedResult_ne_fault
     (initialization : ParentIndexedFrameInitialization

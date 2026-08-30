@@ -9,7 +9,7 @@ namespace Solcore.Semantics.HostDriverResult
 
 universe u v
 
-/-- For a typed Word result, failed projection means exact exhaustion. -/
+/-- A typed Word projection fails only at exhaustion or a policy boundary. -/
 theorem toWordReturnedFrameCompletion?_eq_none_iff_of_hasType
     {RollbackState : Type u} {TraceState : Type v}
     {definitions : Core.DataEnvironment}
@@ -17,8 +17,10 @@ theorem toWordReturnedFrameCompletion?_eq_none_iff_of_hasType
       HostDriverResult (HostStorageDriver.Context RollbackState TraceState))
     (typing : result.outcome.HasType .word definitions) :
     result.toWordReturnedFrameCompletion? = none ↔
-      ∃ context state,
-        result = ⟨context, .outOfFuel state⟩ := by
+      (∃ context state,
+        result = ⟨context, .outOfFuel state⟩) ∨
+      ∃ context suspension remainingFuel,
+        result = ⟨context, .unsupported suspension remainingFuel⟩ := by
   cases result with
   | mk context outcome =>
       cases outcome with
@@ -30,6 +32,7 @@ theorem toWordReturnedFrameCompletion?_eq_none_iff_of_hasType
           simp
       | fault error state =>
           exact False.elim typing
+      | unsupported suspension remainingFuel => simp
 
 /-- A successful projection is unchanged by any later fuel offer. -/
 theorem toWordReturnedFrameCompletion?_resumeWithFuel_of_some

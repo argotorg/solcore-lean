@@ -52,6 +52,9 @@ theorem resumeWithFuel_add
   | storageAbsent => rfl
   | codeAbsent => rfl
   | fault context error state => rfl
+  | unsupported context suspension remainingFuel =>
+      simp only [resumeWithFuel_unsupported]
+      rw [Nat.add_assoc]
   | completed context value store continuation => rfl
   | outOfFuel context state =>
       rw [resumeWithFuel, resumeWithFuel_classify]
@@ -100,5 +103,6 @@ theorem resumeWithFuel_outOfFuel_eq_completed_iff
           rfl
       | outOfFuel exhausted => simp [classify]
       | fault error faultState => simp [classify]
+      | unsupported suspension remainingFuel => simp [classify]
 
 end Solcore.Semantics.ParentIndexedSelectedExecutionResult

@@ -167,8 +167,10 @@ variable {definitions : Core.DataEnvironment}
 variable (typing : result.outcome.HasType .word definitions)
 
 example : result.toWordReturnedFrameCompletion? = none ↔
-    ∃ finalContext exhausted,
-      result = ⟨finalContext, .outOfFuel exhausted⟩ :=
+    (∃ finalContext exhausted,
+      result = ⟨finalContext, .outOfFuel exhausted⟩) ∨
+    ∃ finalContext suspension remainingFuel,
+      result = ⟨finalContext, .unsupported suspension remainingFuel⟩ :=
   HostDriverResult.toWordReturnedFrameCompletion?_eq_none_iff_of_hasType
     result typing
 
@@ -221,9 +223,13 @@ example :
 
 example :
     code.runWithStorageReturnedFrameCompletion? context inputs fuel = none ↔
-      ∃ retainedContext exhausted,
+      (∃ retainedContext exhausted,
         code.runWithStorage context inputs fuel =
-          ⟨retainedContext, .outOfFuel exhausted⟩ :=
+          ⟨retainedContext, .outOfFuel exhausted⟩) ∨
+      ∃ retainedContext suspension remainingFuel,
+        code.runWithStorage context inputs fuel =
+          ⟨retainedContext,
+            .unsupported suspension remainingFuel⟩ :=
   CheckedHostCoreWordProgram.runWithStorageReturnedFrameCompletion?_eq_none_iff
     code context inputs fuel
 

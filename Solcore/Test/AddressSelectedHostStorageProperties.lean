@@ -546,9 +546,12 @@ private theorem compileTimeCheckedFrameContinuationRegression
         Value → Store → FrameOutcome TrapReason) :
     (code.runWithStorage context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome = none ↔
-      ∃ finalContext exhausted,
+      (∃ finalContext exhausted,
         code.runWithStorage context inputs fuel =
-          ⟨finalContext, .outOfFuel exhausted⟩ :=
+          ⟨finalContext, .outOfFuel exhausted⟩) ∨
+      ∃ finalContext suspension remainingFuel,
+        code.runWithStorage context inputs fuel =
+          ⟨finalContext, .unsupported suspension remainingFuel⟩ :=
   code.runWithStorage_toFrameContinuationContext?_eq_none_iff
     context inputs fuel doneOutcome
 
@@ -592,9 +595,13 @@ private theorem compileTimeSelectedFrameContinuationBoundaryRegression
         context.context.values.working.1.code? inputs.codeAddress = none) ∧
       (context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some none ↔
-        ∃ resultContext exhausted,
+        (∃ resultContext exhausted,
           context.runCodeWithStorage? inputs fuel =
-            some ⟨resultContext, .outOfFuel exhausted⟩) := by
+            some ⟨resultContext, .outOfFuel exhausted⟩) ∨
+        ∃ resultContext suspension remainingFuel,
+          context.runCodeWithStorage? inputs fuel =
+            some ⟨resultContext,
+              .unsupported suspension remainingFuel⟩) := by
   exact
     ⟨FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_none_iff
         context inputs fuel doneOutcome,

@@ -90,11 +90,17 @@ theorem
         Core.Value → Core.Store → FrameOutcome TrapReason) :
     initialization.runCodeWithStorageParentIndexedContinuationContext?
           storageAddress inputs fuel doneOutcome = some (some none) ↔
-      ∃ context resultContext exhausted,
+      (∃ context resultContext exhausted,
         initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
             storageAddress = some context ∧
         context.runCodeWithStorage? inputs fuel =
-          some ⟨resultContext, .outOfFuel exhausted⟩ := by
+          some ⟨resultContext, .outOfFuel exhausted⟩) ∨
+      ∃ context resultContext suspension remainingFuel,
+        initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+            storageAddress = some context ∧
+        context.runCodeWithStorage? inputs fuel =
+          some ⟨resultContext,
+            .unsupported suspension remainingFuel⟩ := by
   unfold runCodeWithStorageParentIndexedContinuationContext?
   constructor
   · intro observed
@@ -105,19 +111,34 @@ theorem
     have completionEq : completion = none := by
       simpa only [Option.map_eq_none_iff] using built
     subst completion
-    obtain ⟨resultContext, exhausted, exactRun⟩ :=
+    rcases
       (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
-        context inputs fuel doneOutcome).mp ran
-    exact ⟨context, resultContext, exhausted, refined, exactRun⟩
-  · rintro ⟨context, resultContext, exhausted, refined, exactRun⟩
-    have selected :=
-      (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
-        context inputs fuel doneOutcome).mpr
-          ⟨resultContext, exhausted, exactRun⟩
-    rw [refined]
-    simp only [Option.map_some]
-    rw [selected]
-    rfl
+        context inputs fuel doneOutcome).mp ran with
+      ⟨⟨resultContext, exhausted, exactRun⟩⟩ |
+        ⟨resultContext, suspension, remainingFuel, exactRun⟩
+    · exact .inl ⟨context, resultContext, exhausted, refined, exactRun⟩
+    · exact .inr
+        ⟨context, resultContext, suspension, remainingFuel, refined, exactRun⟩
+  · intro observed
+    rcases observed with
+      ⟨context, resultContext, exhausted, refined, exactRun⟩ |
+      ⟨context, resultContext, suspension, remainingFuel, refined, exactRun⟩
+    · have selected :=
+        (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
+          context inputs fuel doneOutcome).mpr
+            (.inl ⟨resultContext, exhausted, exactRun⟩)
+      rw [refined]
+      simp only [Option.map_some]
+      rw [selected]
+      rfl
+    · have selected :=
+        (FrameCheckpointedWorkingPairWithPresentStorageAccount.runCodeWithStorageContinuationContext?_eq_some_none_iff
+          context inputs fuel doneOutcome).mpr
+            (.inr ⟨resultContext, suspension, remainingFuel, exactRun⟩)
+      rw [refined]
+      simp only [Option.map_some]
+      rw [selected]
+      rfl
 
 theorem
     runCodeWithStorageParentIndexedContinuationContext?_eq_some_some_some_iff

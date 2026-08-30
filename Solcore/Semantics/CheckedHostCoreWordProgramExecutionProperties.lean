@@ -91,7 +91,7 @@ theorem runWithStorageReturnedFrameCompletion?_eq_some_iff
   exact HostDriverResult.toWordReturnedFrameCompletion?_eq_some_iff
     (code.runWithStorage context inputs fuel) completion
 
-/-- For checked Word code, no projected success means exactly exhaustion. -/
+/-- A checked Word projection is absent at exhaustion or a policy boundary. -/
 theorem runWithStorageReturnedFrameCompletion?_eq_none_iff
     {RollbackState : Type u} {TraceState : Type v}
     (code : CheckedHostCoreWordProgram)
@@ -99,9 +99,12 @@ theorem runWithStorageReturnedFrameCompletion?_eq_none_iff
     (inputs : HostStorageDriver.ExecutionInputs)
     (fuel : Nat) :
     code.runWithStorageReturnedFrameCompletion? context inputs fuel = none ↔
-      ∃ finalContext exhausted,
+      (∃ finalContext exhausted,
         code.runWithStorage context inputs fuel =
-          ⟨finalContext, .outOfFuel exhausted⟩ := by
+          ⟨finalContext, .outOfFuel exhausted⟩) ∨
+      ∃ finalContext suspension remainingFuel,
+        code.runWithStorage context inputs fuel =
+          ⟨finalContext, .unsupported suspension remainingFuel⟩ := by
   exact
     HostDriverResult.toWordReturnedFrameCompletion?_eq_none_iff_of_hasType
       (code.runWithStorage context inputs fuel)

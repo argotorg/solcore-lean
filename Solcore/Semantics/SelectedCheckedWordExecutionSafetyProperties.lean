@@ -133,8 +133,8 @@ theorem completion?_eq_some_iff_selected_run
           ⟨selected, exactRun.symm⟩⟩
 
 /--
-Globally, missing completion means either no Word execution or exact exhaustion
-of the retained checked Word execution.
+Globally, missing completion means no Word execution, exact exhaustion, or an
+explicit unsupported-policy boundary.
 -/
 theorem completion?_eq_none_iff
     {RollbackState : Type u} {TraceState : Type v}
@@ -143,9 +143,13 @@ theorem completion?_eq_none_iff
     (execution : SelectedCheckedWordExecution initialContext inputs) :
     execution.completion? = none ↔
       execution.execution? = none ∨
-        ∃ code finalContext exhausted,
+        (∃ code finalContext exhausted,
           execution.execution? =
-            some (code, ⟨finalContext, .outOfFuel exhausted⟩) := by
+            some (code, ⟨finalContext, .outOfFuel exhausted⟩)) ∨
+        ∃ code finalContext suspension remainingFuel,
+          execution.execution? =
+            some (code,
+              ⟨finalContext, .unsupported suspension remainingFuel⟩) := by
   unfold completion?
   cases retained : execution.execution? with
   | none => simp
@@ -159,7 +163,7 @@ theorem completion?_eq_none_iff
             result typing]
           simp
 
-/-- Under an exact Word selection, missing completion means only exhaustion. -/
+/-- Under an exact Word selection, absence is exhaustion or policy rejection. -/
 theorem completion?_eq_none_iff_of_word
     {RollbackState : Type u} {TraceState : Type v}
     {initialContext : HostStorageDriver.Context RollbackState TraceState}
@@ -168,9 +172,13 @@ theorem completion?_eq_none_iff_of_word
     (code : CheckedHostCoreWordProgram)
     (selected : execution.selection = .word code) :
     execution.completion? = none ↔
-      ∃ finalContext exhausted,
+      (∃ finalContext exhausted,
         execution.execution? =
-          some (code, ⟨finalContext, .outOfFuel exhausted⟩) := by
+          some (code, ⟨finalContext, .outOfFuel exhausted⟩)) ∨
+      ∃ finalContext suspension remainingFuel,
+        execution.execution? =
+          some (code,
+            ⟨finalContext, .unsupported suspension remainingFuel⟩) := by
   unfold completion?
   rw [execution.execution?_eq_some_of_word code selected]
   simp only [Option.bind_some]
