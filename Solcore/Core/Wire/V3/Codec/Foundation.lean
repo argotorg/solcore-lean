@@ -114,6 +114,12 @@ private def expectedArguments
     ("actual", jsonKind actual)
   ]
 
+private def lexicographicMinimum? : List String → Option String
+  | [] => none
+  | first :: rest =>
+      some <| rest.foldl (fun current candidate =>
+        if (compare candidate current).isLE then candidate else current) first
+
 /-- Accept an object only when its key set is exactly the published one. -/
 def ensureExactObject
     (path : DecodePath)
@@ -124,14 +130,21 @@ def ensureExactObject
     match json with
     | .obj fields => pure fields
     | _ => failAt path .expectedObject (expectedArguments "object" json)
-  match fields.keys.find? (fun key => !allowed.contains key) with
-  | some key =>
+  let unknown? := lexicographicMinimum? <|
+    fields.keys.filter (fun key => !allowed.contains key)
+  let missing? := lexicographicMinimum? <|
+    required.filter (fun key => !fields.contains key)
+  match unknown?, missing? with
+  | none, none => pure ()
+  | some key, none =>
       failAt (path.field key) .unknownField (.mkObj [("field", key)])
-  | none =>
-      match required.find? (fun key => !fields.contains key) with
-      | some key =>
-          failAt (path.field key) .missingField (.mkObj [("field", key)])
-      | none => pure ()
+  | none, some key =>
+      failAt (path.field key) .missingField (.mkObj [("field", key)])
+  | some unknown, some missing =>
+      if (compare unknown missing).isLE then
+        failAt (path.field unknown) .unknownField (.mkObj [("field", unknown)])
+      else
+        failAt (path.field missing) .missingField (.mkObj [("field", missing)])
 
 def requireField
     (path : DecodePath)
@@ -168,7 +181,7 @@ def decodeNatAt
     DecodeResult Nat :=
   match Foundation.jsonNatural? json with
   | some value => pure value
-  | none => failAt path .expectedNatural (expectedArguments "natural" json)
+  | none => failAt path .expectedNatural (expectedArguments "number" json)
 
 def decodeListAt {α : Type}
     (decodeValue : DecodePath → Lean.Json → DecodeResult α)

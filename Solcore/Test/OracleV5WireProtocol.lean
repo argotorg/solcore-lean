@@ -106,11 +106,45 @@ private def directDecoderPreservesSuccess : Bool :=
   | .ok value => value == "{\"id\":\"request-id\"}"
   | .error _ => false
 
+private def expectedNaturalArgumentsExact : Bool :=
+  let invalid : List Lean.Json := [
+    .num { mantissa := -1, exponent := 0 },
+    .num { mantissa := 1, exponent := 1 }
+  ]
+  invalid.all fun json =>
+    match decodeNatAt (Path.root.field "value") json with
+    | .error (.oracle path .expectedNatural arguments) =>
+        path.toPointer == "/value" &&
+          arguments == .mkObj [
+            ("expected", "number"), ("actual", "number")
+          ]
+    | _ => false
+
+private def exactObjectFailureOrderingExact : Bool :=
+  let laterUnknown := ensureExactObject Path.root
+    (.mkObj [("id", "request-id"), ("zzz", .null)])
+    ["digest", "id"] ["digest", "id"]
+  let earlierUnknown := ensureExactObject Path.root
+    (.mkObj [("id", "request-id"), ("aaa", .null)])
+    ["digest", "id"] ["digest", "id"]
+  let missingFirst := match laterUnknown with
+    | .error (.oracle path .missingField arguments) =>
+        path.toPointer == "/digest" &&
+          arguments == .mkObj [("field", "digest")]
+    | _ => false
+  let unknownFirst := match earlierUnknown with
+    | .error (.oracle path .unknownField arguments) =>
+        path.toPointer == "/aaa" &&
+          arguments == .mkObj [("field", "aaa")]
+    | _ => false
+  missingFirst && unknownFirst
+
 private def allChecks : Bool :=
   requestIdRecoveryExact && oracleOwnershipExact && coreOwnershipExact &&
     malformedTextExact && duplicateKeyPreservesParserMessage &&
     directDecoderRecoversValidId && malformedTextNeverRecoversId &&
-    directDecoderPreservesSuccess
+    directDecoderPreservesSuccess && expectedNaturalArgumentsExact &&
+    exactObjectFailureOrderingExact
 
 private theorem allChecks_exact : allChecks = true := by
   native_decide

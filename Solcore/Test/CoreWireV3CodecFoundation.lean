@@ -114,4 +114,30 @@ def testCoreWireV3CodecFoundation : IO Unit := do
     ((canonicalizeDataTypeId noncanonicalNatural).toOption == some (Lean.toJson 1))
     "natural identity did not canonicalize"
 
+  let invalidNaturals : List Lean.Json := [
+    .num { mantissa := -1, exponent := 0 },
+    .num { mantissa := 1, exponent := 1 }
+  ]
+  for invalidNatural in invalidNaturals do
+    match decodeTypeWithBudget limits <| .mkObj [
+        ("dataType", invalidNatural), ("tag", "namedData")
+      ] with
+    | .error (.protocol error) =>
+        assertTrue
+          (error.code == .expectedNatural &&
+            error.arguments == .mkObj [
+              ("expected", "number"), ("actual", "number")
+            ])
+          "expected-natural arguments are not JSON-kind exact"
+    | _ => throw (IO.userError "non-natural JSON number unexpectedly decoded")
+
+  assertProtocol "missing field precedes later unknown field"
+    (decodeTypeWithBudget limits (.mkObj [
+      ("tag", "product"), ("right", "word"), ("zzz", .null)
+    ])) .missingField "/left"
+  assertProtocol "earlier unknown field precedes missing field"
+    (decodeTypeWithBudget limits (.mkObj [
+      ("tag", "product"), ("right", "word"), ("aaa", .null)
+    ])) .unknownField "/aaa"
+
 end Tests
