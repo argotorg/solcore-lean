@@ -370,8 +370,8 @@ formula, or a serialized resumption token.
 
 Oracle v5 is an executable formal-spec interface for the current checked Core
 and runtime semantics. It is not a claim of full Solidity or EVM compatibility.
-After this vertical milestone is complete, the next implementation direction is
-chosen separately; parser work remains paused until explicitly resumed.
+With this vertical milestone complete, any subsequent implementation direction
+is chosen separately; parser work remains paused until explicitly resumed.
 
 Publishing the full current Core algebra is deliberate. A smaller contract-only
 subset could exercise the present runtime, but it would not meet the accepted

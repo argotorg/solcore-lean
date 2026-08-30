@@ -9,7 +9,7 @@ The repository provides:
 
 - a checked Semantic Core language with executable typing and evaluation;
 - Oracle v5 execution of checked contracts from an explicit initial world;
-- commit on return and rollback on rejection, revert, or trap;
+- commit on return and rollback on balance-preflight rejection, revert, or trap;
 - observable state, return data, logs, balances, and contract creation;
 - versioned command-line interfaces for older Core languages and the supported
   single-file Surface parser; and
@@ -73,10 +73,18 @@ lake exe solcoreOracle < request.ndjson
 ```
 
 Oracle v5 also accepts `coreCheck` and `execute` queries. Execution requests
-include a checked-contract package, initial accounts and storage, nested-call
-and creation configuration, invocation data, fuel, and the state probes to
-return. Malformed JSON and invalid wire values produce protocol errors;
-well-formed programs that fail checking or admission produce typed rejections.
+include contract definitions expressed as Core Wire v3 programs, initial
+accounts and storage, nested-call and creation configuration, invocation data,
+fuel, and the state probes to return. Oracle v5 checks and admits those contract
+definitions before execution. Malformed JSON and invalid wire values produce
+protocol errors; well-formed programs that fail checking or admission produce
+typed rejections.
+
+Run the checked-in execution example directly with:
+
+```text
+lake exe solcoreOracle < Tests/golden/v5-execute-request.ndjson
+```
 
 Older capability reports remain available through `capabilities`,
 `capabilities-v2`, `capabilities-v3`, and `capabilities-v4`.

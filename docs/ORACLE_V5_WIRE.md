@@ -1014,8 +1014,9 @@ sorting table. Duplicate validation precedes other semantic validation for the
 same collection; a duplicate pair is the first and second equal entry in
 canonical order. These rules select duplicate storage before a zero value at
 the same key, and duplicate IDs before either contract's admission failure.
-They make repeated execution and input permutations agree after
-canonicalization.
+They make repeated execution agree exactly. Permutations of the keyed arrays
+listed above also agree after canonicalization; semantic-order arrays such as
+probes intentionally retain their order.
 
 ## Compact examples
 

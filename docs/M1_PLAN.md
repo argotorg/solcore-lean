@@ -92,8 +92,9 @@ State and effects follow one checkpoint discipline:
 - child return contributes its working changes to the parent;
 - child revert or trap restores the child checkpoint;
 - initializer failure removes provisional creation effects; and
-- fuel resumption does not replay already completed transfers, creations, or
-  logs.
+- internal fuel-resumption laws prove that completed transfers, creations, and
+  logs are not replayed. Oracle v5 exposes exhaustion only as `inconclusive`
+  and publishes no resume token.
 
 Oracle observations expose only caller-requested state endpoints plus terminal
 data and the committed journal. This keeps results finite while allowing tests
