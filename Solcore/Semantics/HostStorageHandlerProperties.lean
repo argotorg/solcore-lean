@@ -266,6 +266,27 @@ theorem handleSuspension_inputDataWordBE?_some
   rw [handleSuspension_inputDataWordBE?, present]
   rfl
 
+@[simp] theorem handleRequest_currentAddress
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState) :
+    handleRequest inputs context .currentAddress =
+      (context, addressToWord inputs.currentAddress) :=
+  rfl
+
+@[simp] theorem handleSuspension_currentAddress
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension inputs context
+        ⟨.currentAddress, continuation, store⟩ =
+      (context,
+        ⟨.ret (.word (addressToWord inputs.currentAddress)),
+          continuation, store⟩) :=
+  rfl
+
 @[simp] theorem handleSuspension_storageRead_context
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
@@ -702,6 +723,74 @@ theorem handleSuspension_inputDataWordBE?_control_some
       ⟨.inputDataWordBE? offset, continuation, store⟩).2.store = store := by
   exact handleSuspension_store inputs context _
 
+@[simp] theorem handleSuspension_currentAddress_context
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.currentAddress, continuation, store⟩).1 = context := by
+  rw [handleSuspension_currentAddress]
+
+theorem handleSuspension_currentAddress_context_independent
+    {RollbackState : Type u} {TraceState : Type v}
+    (leftInputs rightInputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension leftInputs context
+        ⟨.currentAddress, continuation, store⟩).1 =
+      (handleSuspension rightInputs context
+        ⟨.currentAddress, continuation, store⟩).1 := by
+  simp
+
+@[simp] theorem handleSuspension_currentAddress_control
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.currentAddress, continuation, store⟩).2.control =
+        .ret (.word (addressToWord inputs.currentAddress)) := by
+  rw [handleSuspension_currentAddress]
+
+theorem handleSuspension_currentAddress_control_eq_iff
+    {RollbackState : Type u} {TraceState : Type v}
+    (leftInputs rightInputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension leftInputs context
+        ⟨.currentAddress, continuation, store⟩).2.control =
+      (handleSuspension rightInputs context
+        ⟨.currentAddress, continuation, store⟩).2.control ↔
+      leftInputs.currentAddress = rightInputs.currentAddress := by
+  simp only [handleSuspension_currentAddress_control]
+  constructor
+  · intro equal
+    injection equal with valueEqual
+    injection valueEqual with wordEqual
+    exact addressToWord_injective wordEqual
+  · intro equal
+    rw [equal]
+
+@[simp] theorem handleSuspension_currentAddress_continuation
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.currentAddress, continuation, store⟩).2.continuation =
+        continuation := by
+  exact handleSuspension_continuation inputs context _
+
+@[simp] theorem handleSuspension_currentAddress_store
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (continuation : List Core.Frame) (store : Core.Store) :
+    (handleSuspension inputs context
+      ⟨.currentAddress, continuation, store⟩).2.store = store := by
+  exact handleSuspension_store inputs context _
+
 @[simp] theorem wordToAddress?_handler_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)
@@ -729,6 +818,15 @@ theorem handleSuspension_inputDataWordBE?_control_some
       some inputs.callerAddress := by
   change wordToAddress? (addressToWord inputs.callerAddress) = _
   exact wordToAddress?_addressToWord inputs.callerAddress
+
+@[simp] theorem wordToAddress?_handler_currentAddress
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState) :
+    wordToAddress? ((handler inputs).handle context .currentAddress).2 =
+      some inputs.currentAddress := by
+  change wordToAddress? (addressToWord inputs.currentAddress) = _
+  exact wordToAddress?_addressToWord inputs.currentAddress
 
 @[simp] theorem handler_storageWrite_readStorage_same
     {RollbackState : Type u} {TraceState : Type v}

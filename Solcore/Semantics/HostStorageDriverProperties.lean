@@ -182,6 +182,32 @@ theorem run_of_suspended_callerAddress
       run_of_suspended context inputs fuel remainingFuel state _ execution
     _ = _ := by rw [handleSuspension_callerAddress]
 
+theorem run_of_suspended_currentAddress
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended ⟨.currentAddress, continuation, store⟩ remainingFuel) :
+    run context inputs fuel state =
+      run context inputs remainingFuel
+        ⟨.ret (.word (addressToWord inputs.currentAddress)),
+          continuation, store⟩ := by
+  calc
+    run context inputs fuel state =
+        run
+          (handleSuspension inputs context
+            ⟨.currentAddress, continuation, store⟩).1
+          inputs remainingFuel
+          (handleSuspension inputs context
+            ⟨.currentAddress, continuation, store⟩).2 :=
+      run_of_suspended context inputs fuel remainingFuel state _ execution
+    _ = _ := by rw [handleSuspension_currentAddress]
+
 theorem run_of_suspended_inputDataByte?
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
@@ -461,6 +487,8 @@ theorem run_of_suspended_inputDataWordBE?_some
           | callValue =>
               simp [handler, handleRequest]
           | callerAddress =>
+              simp [handler, handleRequest]
+          | currentAddress =>
               simp [handler, handleRequest]
           | inputDataByte? offset =>
               simp [handler, handleRequest]
