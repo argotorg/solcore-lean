@@ -109,6 +109,9 @@ structure InitializerAnchored
   initializerCheckpointState_eq :
     frame.initializerContext.context.values.checkpoint.state =
       frame.prepared.statePreparation.postNonceWorld
+  initializerCheckpointJournal_eq :
+    frame.initializerContext.context.values.checkpoint.effects.rollback =
+      frame.suspendedRoot.parentContext.workingJournal
 
 /-- Mode-indexed form used for one induction over the transition closure. -/
 def Anchored
@@ -168,7 +171,7 @@ private theorem rootAfterSuspension_anchored
             (PreparedInitializerFrame.postNonce_checkpoint_eq _)).trans
             anchored.checkpointState_eq,
           PreparedInitializerFrame.initializer_storageAddress_eq _,
-          PreparedInitializerFrame.initializer_checkpointState_eq _⟩
+          PreparedInitializerFrame.initializer_checkpointState_eq _, rfl⟩
   | storageRead slot =>
       exact ⟨anchored.storageAddress_eq,
         anchored.checkpointState_eq⟩
@@ -286,7 +289,12 @@ theorem Reachable.anchored
         initializerCheckpointState_eq :=
           (congrArg FrameCheckpointSnapshot.state
             (transactionHandleRequest_checkpoint _ _ _)).trans
-            inductionHypothesis.initializerCheckpointState_eq }
+            inductionHypothesis.initializerCheckpointState_eq
+        initializerCheckpointJournal_eq :=
+          (congrArg
+            (fun checkpoint => checkpoint.effects.rollback)
+            (transactionHandleRequest_checkpoint _ _ _)).trans
+            inductionHypothesis.initializerCheckpointJournal_eq }
 
 theorem Reachable.root_storageAddress
     {initialWorld : WorldState}
@@ -376,5 +384,17 @@ theorem Reachable.child_registryResolution
         frame.childTarget =
       some ⟨frame.childContract, frame.preTransferInstalled⟩ :=
   reachable.anchored.registryResolution_eq
+
+/-- A live initializer rolls back to the exact journal prefix before creation. -/
+theorem Reachable.initializer_checkpointJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {environment : ExecutionEnvironment}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+    (reachable : Reachable environment (.initializer frame)) :
+    frame.initializerContext.context.values.checkpoint.effects.rollback =
+      frame.suspendedRoot.parentContext.workingJournal :=
+  reachable.anchored.initializerCheckpointJournal_eq
 
 end Solcore.Semantics.OneLevelNestedExecution
