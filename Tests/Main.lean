@@ -123,6 +123,8 @@ import Solcore.Test.Adr0148CheckedAccountCreation
 import Solcore.Test.Adr0148CheckedCreationPreflight
 import Solcore.Test.Adr0148CreationFailureBoundary
 import Solcore.Test.Adr0148NestedCreationLifecycle
+import Solcore.Test.Adr0148CreationEndToEnd
+import Solcore.Test.Adr0148CreationResumption
 import Solcore.Test.TopLevelExecution
 import Solcore.Test.TopLevelObservation
 import Solcore.Test.ContractCallWordBoundary
@@ -190,6 +192,7 @@ import Solcore.Test.WorldStateBalance
 import Solcore.Test.WorldStateNonce
 import Solcore.Test.AccountNonceIncrementProperties
 import Solcore.Test.Adr0148ExecutionEnvironment
+import Solcore.Test.BalancedExecutionEnvironment
 import Solcore.Test.ExecutionEnvironmentSeal
 import Solcore.Test.BalanceTransfer
 import Solcore.Test.BalanceTransferProperties
@@ -5092,6 +5095,8 @@ def run : IO Unit := do
   testAdr0148CheckedCreationPreflight
   Adr0148CreationFailureBoundary.testAdr0148CreationFailureBoundary
   testAdr0148NestedCreationLifecycle
+  testAdr0148CreationEndToEnd
+  Adr0148CreationResumption.testAdr0148CreationResumption
   testOneLevelNestedExecution
   testOneLevelNestedExecutionExtended
   testOneLevelNestedExecutionResumption
@@ -5102,6 +5107,7 @@ def run : IO Unit := do
   testWorldStateNonce
   AccountNonceIncrementProperties.testAccountNonceIncrement
   Adr0148ExecutionEnvironment.testAdr0148ExecutionEnvironment
+  BalancedExecutionEnvironment.runBalancedExecutionEnvironmentTests
   ExecutionEnvironmentSeal.runExecutionEnvironmentSealTests
   testBalanceTransfer
   testWorldStateDeltaBalance
