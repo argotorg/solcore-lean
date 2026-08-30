@@ -267,6 +267,7 @@ import Solcore.Test.OracleV5TypedHandler
 import Solcore.Test.OracleV5WireProtocol
 import Solcore.Test.OracleV5WireRequest
 import Solcore.Test.OracleV5WorldMaterialization
+import Solcore.Test.OracleV5WorldMaterializationProperties
 
 set_option autoImplicit false
 
@@ -5252,6 +5253,7 @@ def run : IO Unit := do
   OracleV5WireProtocol.testOracleV5WireProtocol
   testOracleV5WireRequest
   testOracleV5WorldMaterialization
+  testOracleV5WorldMaterializationProperties
   testSurfaceLexer
   testSurfaceParserAst
   testSurfacePrecedence

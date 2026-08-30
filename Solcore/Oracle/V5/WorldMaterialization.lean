@@ -454,6 +454,141 @@ private theorem exists_buildAccount_eq_ok_of_input
     (buildWorld_eq_ok_of_materializeWith resolveCode world state success)
     input member
 
+/--
+Every successful finite-world materialization has exactly the Account selected
+by the canonical input lookup, and no Account at any other Address.
+-/
+theorem account?_of_materializeWith
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (world : WorldInput)
+    (state : WorldState)
+    (success : materializeWith resolveCode world = .ok state)
+    (address : Address) :
+    state.account? address =
+      (accountInput? world address).bind
+        (accountOfInputWith? resolveCode) := by
+  exact account?_buildWorld resolveCode
+    (canonicalAccounts world.accounts) state
+    (buildWorld_eq_ok_of_materializeWith resolveCode world state success)
+    address
+
+/-- Every canonical input selected after acceptance constructed one Account. -/
+theorem exists_accountOfInputWith?_eq_some
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (world : WorldInput)
+    (state : WorldState)
+    (success : materializeWith resolveCode world = .ok state)
+    (address : Address)
+    (input : AccountInput)
+    (selected : accountInput? world address = some input) :
+    ∃ account, accountOfInputWith? resolveCode input = some account := by
+  rcases exists_buildAccount_eq_ok_of_input resolveCode world state success
+      address input selected with ⟨account, built⟩
+  exact ⟨account, by simp [accountOfInputWith?, built, Except.toOption]⟩
+
+/-- A successful materialization contains no Account outside its finite input. -/
+theorem account?_eq_none_of_input_absent
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (world : WorldInput)
+    (state : WorldState)
+    (success : materializeWith resolveCode world = .ok state)
+    (address : Address)
+    (absent : accountInput? world address = none) :
+    state.account? address = none := by
+  rw [account?_of_materializeWith resolveCode world state success address,
+    absent]
+  rfl
+
+/-- Every selected input Account preserves its exact balance. -/
+theorem balance?_of_input
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (world : WorldInput)
+    (state : WorldState)
+    (success : materializeWith resolveCode world = .ok state)
+    (address : Address)
+    (input : AccountInput)
+    (selected : accountInput? world address = some input) :
+    state.balance? address = some input.balance := by
+  rcases exists_buildAccount_eq_ok_of_input resolveCode world state success
+      address input selected with ⟨account, built⟩
+  have accountBuilt :
+      accountOfInputWith? resolveCode input = some account := by
+    simp [accountOfInputWith?, built, Except.toOption]
+  rw [WorldState.balance?,
+    account?_of_materializeWith resolveCode world state success address,
+    selected]
+  simp only [Option.bind_some]
+  rw [accountBuilt]
+  exact congrArg some (balance_buildAccount resolveCode input account built)
+
+/-- Every selected input Account preserves its exact creation nonce. -/
+theorem nonce?_of_input
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (world : WorldInput)
+    (state : WorldState)
+    (success : materializeWith resolveCode world = .ok state)
+    (address : Address)
+    (input : AccountInput)
+    (selected : accountInput? world address = some input) :
+    state.nonce? address = some input.nonce := by
+  rcases exists_buildAccount_eq_ok_of_input resolveCode world state success
+      address input selected with ⟨account, built⟩
+  have accountBuilt :
+      accountOfInputWith? resolveCode input = some account := by
+    simp [accountOfInputWith?, built, Except.toOption]
+  rw [WorldState.nonce?,
+    account?_of_materializeWith resolveCode world state success address,
+    selected]
+  simp only [Option.bind_some]
+  rw [accountBuilt]
+  exact congrArg some (nonce_buildAccount resolveCode input account built)
+
+/-- Every selected input Account has exactly the sparse storage it supplied. -/
+theorem storageValue?_of_input
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (world : WorldInput)
+    (state : WorldState)
+    (success : materializeWith resolveCode world = .ok state)
+    (address : Address)
+    (input : AccountInput)
+    (selected : accountInput? world address = some input)
+    (slot : Core.Word) :
+    (state.account? address).bind
+        (fun account => account.storageValue? slot) =
+      storageValueOf input slot := by
+  rcases exists_buildAccount_eq_ok_of_input resolveCode world state success
+      address input selected with ⟨account, built⟩
+  have accountBuilt :
+      accountOfInputWith? resolveCode input = some account := by
+    simp [accountOfInputWith?, built, Except.toOption]
+  rw [account?_of_materializeWith resolveCode world state success address,
+    selected]
+  simp only [Option.bind_some]
+  rw [accountBuilt]
+  exact storageValue?_buildAccount resolveCode input account built slot
+
+/-- Checked code is present exactly when the selected input names its source. -/
+theorem code?_of_input
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (world : WorldInput)
+    (state : WorldState)
+    (success : materializeWith resolveCode world = .ok state)
+    (address : Address)
+    (input : AccountInput)
+    (selected : accountInput? world address = some input) :
+    (state.account? address).bind Account.code? =
+      input.code.bind resolveCode := by
+  rcases exists_buildAccount_eq_ok_of_input resolveCode world state success
+      address input selected with ⟨account, built⟩
+  have accountBuilt :
+      accountOfInputWith? resolveCode input = some account := by
+    simp [accountOfInputWith?, built, Except.toOption]
+  rw [account?_of_materializeWith resolveCode world state success address,
+    selected]
+  simp only [Option.bind_some]
+  rw [accountBuilt]
+  exact code?_buildAccount resolveCode input account built
+
 end WorldMaterialization
 
 end Solcore.Oracle.V5
