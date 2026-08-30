@@ -57,7 +57,8 @@ and `namedData`. Expression tags are `unit`, `bool`, `word`, `var`, `pair`,
 `let`, and `if`. Operator names are the existing three unary, nineteen binary,
 and two ternary Core constructor names. Primitive types retain the v2 string
 form; composite types and expressions use tagged objects. A Program has exactly
-`schema`, `resultType`, `dataDefinitions`, and `body`.
+`schema`, `resultType`, `dataDefinitions`, and `body`. The complete field and
+operator catalog is frozen in [Core Wire v3](../CORE_WIRE_V3.md).
 
 Host capabilities are not a special wire expression. Wire v3 owns this exact
 index order: `storageRead`, `storageWrite`, `storageAddress`, `codeAddress`,
@@ -81,17 +82,19 @@ The wire-to-Core conversion is total. The Core-to-wire projection returns
 wire decision assigns it meaning. Prove wire/Core round trips for every covered
 type, definition, operator, expression, and program.
 
-Canonical JSON uses explicit tags, exact 64-digit lowercase Word text, exact
-40-digit lowercase Address text, `0x`-prefixed even-width lowercase Bytes, and
-arrays in semantic order. Natural-number decoding retains
+Canonical JSON uses explicit tags, `0x` plus exactly 64 lowercase Word digits,
+`0x` plus exactly 40 lowercase Address digits, `0x`-prefixed even-width
+lowercase Bytes, and arrays in semantic order. Natural-number decoding retains
 `Foundation.jsonNatural?` mathematical semantics; encoding emits an integer.
 Structural decoding rejects unknown or missing fields, invalid tags, and invalid
 scalars with an exact JSON-pointer path.
 
-Oracle limits are `coreDepth`, `coreNodes`, `scenarioEntries`,
-`identifierBytes`, `calldataBytes`, and `evaluationSteps`, with defaults 1024,
-1000000, 100000, 256, 1048576, and 1000000. Core nodes aggregate every Wire v3
-program in one request; scenario entries aggregate all non-byte finite lists;
+Oracle limits are `jsonDepth`, `jsonNodes`, `coreDepth`, `coreNodes`,
+`scenarioEntries`, `identifierBytes`, `calldataBytes`, and `evaluationSteps`,
+with defaults 2048, 2000000, 1024, 1000000, 100000, 256, 1048576, and 1000000.
+JSON limits apply to the complete parsed request, including unknown subtrees.
+Core limits independently aggregate every Wire v3 program in one request;
+scenario entries aggregate all non-byte finite lists;
 more precisely, scenario entries count lists outside Core Programs, whose inner
 lists are already counted as Core nodes. The identifier limit applies separately
 to each UTF-8 request ID, ASCII contract ID, and ASCII method name. Zero is a
@@ -100,7 +103,7 @@ the actual-size preflight this constructs `InputData` without a fallback.
 
 Exceeding a declared budget is `inconclusive`, not a protocol error. After the
 existing strict JSON parser identifies v5, a generic JSON preflight counts even
-unknown subtrees, so they cannot bypass declared depth/node budgets. This ADR
+unknown subtrees, so they cannot bypass declared JSON budgets. This ADR
 does not change the raw NDJSON transport behavior of older versions.
 Capabilities reports every limit and count rule.
 
@@ -142,8 +145,8 @@ and no proof or `Bool` witness crosses the wire.
 Every contract definition has a unique validated opaque identifier and one of
 two specifications:
 
-- `checkedCore`: one Wire v3 program whose checked result type determines an
-  existing supported `CoreContractEntryProfile`;
+- `checkedCore`: one Wire v3 program whose checked result type is exactly
+  `word` (`returnWord`) or `sum(word, sum(word, word))` (`wordOutcomeV1`);
 - `staticWordAbi`: a nonempty list of validated method names and Wire v3
   implementations, admitted by ADR-0150 as `uint256 -> uint256` methods.
 
@@ -152,12 +155,16 @@ output type, canonical signature, and selector are derived by ADR-0150 and are
 never accepted as redundant caller-controlled fields.
 
 Both variants first use the Wire v3 frozen-host checker and its proved promotion
-to `CheckedHostCoreProgram`. `checkedCore` then delegates to
-`CheckedCoreContract.ofCode?`. `staticWordAbi` delegates to
+to `CheckedHostCoreProgram`. For `checkedCore`, v5 owns the closed two-entry
+profile table above and constructs `CheckedCoreContract.returnWord` or
+`CheckedCoreContract.wordOutcomeV1` directly. It must not delegate profile
+selection to the future-growing `CheckedCoreContract.ofCode?` recognizer.
+`staticWordAbi` delegates to
 `WordImplementation.ofCode?` and `StaticWordContract.admit`. Unsupported entry
-result types, ill-typed method implementations, empty tables, duplicate
-signatures, and selector collisions are structured admission rejections. No
-runnable contract is produced on rejection.
+result types, ill-typed method implementations, a method result other than
+`word -> word`, nonempty method data definitions, empty tables, duplicate
+signatures, and selector collisions are distinct structured admission
+rejections. No runnable contract is produced on rejection.
 
 All later references use contract identifiers and resolve only against the
 admitted package. Duplicate identifiers and dangling references are rejected
@@ -274,8 +281,12 @@ Append exactly these v5-only normative Feature values: `coreProductsV1`,
 `coreExtendedWordOperationsV1`, `checkedContractExecutionV1`, and
 `staticWordAbiV1`. Do not change the maturity or rows of the older generic
 `functions`, `contracts`, `externalAbi`, or `storage` features. Define a v5-only
-feature matrix and fixed digest from the canonical profile. All older profile
-values and digest constants remain byte-for-byte unchanged.
+feature matrix. `knownFeatures` is `m1cAll` followed by those eight values;
+`enabledFeatures` is the nine existing normative M1c Core values followed by
+those eight values, in that order. The fixed digest covers the complete
+`SpecProfile` JSON using the existing `lean-json-compress-sha256-v1` manifest
+algorithm. All older profile values and digest constants remain byte-for-byte
+unchanged.
 
 ## Strict protocol and compatibility
 
@@ -344,5 +355,8 @@ chosen separately; parser work remains paused until explicitly resumed.
 
 Publishing the full current Core algebra is deliberate. A smaller contract-only
 subset could exercise the present runtime, but it would not meet the accepted
-goal of checking and synthesizing arbitrary well-typed Core programs for
-differential testing and would immediately require another Core wire version.
+goal of checking arbitrary Core candidates and executing every admitted
+contract profile for differential testing. Wire v3 also gives later synthesis
+work a complete target and a checker endpoint; this milestone does not itself
+generate programs. Arbitrary checker-valid non-contract result types are checked
+but are not executed until a matching execution profile is separately defined.
