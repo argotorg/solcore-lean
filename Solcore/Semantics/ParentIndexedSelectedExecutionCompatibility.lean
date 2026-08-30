@@ -20,6 +20,7 @@ def toLegacy : Result RollbackState Event TrapReason parentWorking →
   | .codeAbsent => some none
   | .outOfFuel _ _ => some (some none)
   | .fault _ _ _ => some (some none)
+  | .unsupported _ _ _ => some (some none)
   | .completed _ _ _ continuation => some (some (some continuation))
 
 @[simp] theorem toLegacy_storageAbsent :
@@ -45,6 +46,15 @@ def toLegacy : Result RollbackState Event TrapReason parentWorking →
     (error : Core.MachineFault)
     (state : Core.State) :
     (fault context error state : Result
+      RollbackState Event TrapReason parentWorking).toLegacy =
+      some (some none) :=
+  rfl
+
+@[simp] theorem toLegacy_unsupported
+    (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat) :
+    (unsupported context suspension remainingFuel : Result
       RollbackState Event TrapReason parentWorking).toLegacy =
       some (some none) :=
   rfl

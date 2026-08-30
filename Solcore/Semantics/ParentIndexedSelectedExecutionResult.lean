@@ -29,6 +29,10 @@ inductive ParentIndexedSelectedExecutionResult
       (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
       (error : Core.MachineFault)
       (state : Core.State)
+  | unsupported
+      (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
+      (suspension : Core.HostSuspension)
+      (remainingFuel : Nat)
   | completed
       (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
       (value : Core.Value)
@@ -84,6 +88,8 @@ def classify
         (completedContinuation initialization doneOutcome context value store)
   | ⟨context, .outOfFuel state⟩ => .outOfFuel context state
   | ⟨context, .fault error state⟩ => .fault context error state
+  | ⟨context, .unsupported suspension remainingFuel⟩ =>
+      .unsupported context suspension remainingFuel
 
 @[simp] theorem classify_done
     (initialization : ParentIndexedFrameInitialization
@@ -122,6 +128,20 @@ def classify
     (state : Core.State) :
     classify initialization doneOutcome ⟨context, .fault error state⟩ =
       .fault context error state :=
+  rfl
+
+@[simp] theorem classify_unsupported
+    (initialization : ParentIndexedFrameInitialization
+      RollbackState Event parentWorking)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState (FrameTrace Event) →
+        Core.Value → Core.Store → FrameOutcome TrapReason)
+    (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat) :
+    classify initialization doneOutcome
+        ⟨context, .unsupported suspension remainingFuel⟩ =
+      .unsupported context suspension remainingFuel :=
   rfl
 
 end ParentIndexedSelectedExecutionResult
