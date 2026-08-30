@@ -121,6 +121,25 @@ def runScenario
   runWithEnvironment (rootContract disposition) invocation
     (installedRoot disposition) (creationEnvironment initializerOutcome) fuel
 
+def runWithSelectedEnvironment
+    (disposition : RootDisposition)
+    (environment : ExecutionEnvironment)
+    (fuel : Nat) :
+    Result (creationWorld disposition) (rootContract disposition) invocation :=
+  runWithEnvironment (rootContract disposition) invocation
+    (installedRoot disposition) environment fuel
+
+def unavailableCreationEnvironment : ExecutionEnvironment :=
+  .callsOnly { lookup := fun _ => none }
+
+def collisionCreationEnvironment : ExecutionEnvironment :=
+  let base := creationEnvironment (.returned initializerInput)
+  { base with
+    creationAddressPolicy := {
+      derive := fun _creator _nonce => unrelated
+    }
+  }
+
 def successfulLogs : List CheckedCoreWordLog :=
   [rootLogBefore, initializerLogFirst, initializerLogSecond, rootLogAfter]
 
