@@ -141,6 +141,44 @@ def startChild
           parentPresence.present
   }
 
+@[simp] theorem startChild_checkpointJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (root : SuspendedRoot initialWorld rootContract rootInvocation)
+    (target : Address)
+    (targetAddress_eq : wordToAddress? root.call.target = some target)
+    (childContract : CheckedCoreContract)
+    (preTransferInstalled : InstalledCheckedCoreContract
+      root.parentContext.context.values.working.1 target childContract)
+    (childInitialWorld : WorldState)
+    (installed : InstalledCheckedCoreContract childInitialWorld target childContract)
+    (parentPresence : PresentAccountAt childInitialWorld
+      root.parentContext.context.storageAddress) :
+    (root.startChild target targetAddress_eq childContract preTransferInstalled
+      childInitialWorld installed parentPresence).childContext.context.values.checkpoint.effects.rollback =
+        root.parentContext.workingJournal := by
+  rfl
+
+@[simp] theorem startChild_workingJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (root : SuspendedRoot initialWorld rootContract rootInvocation)
+    (target : Address)
+    (targetAddress_eq : wordToAddress? root.call.target = some target)
+    (childContract : CheckedCoreContract)
+    (preTransferInstalled : InstalledCheckedCoreContract
+      root.parentContext.context.values.working.1 target childContract)
+    (childInitialWorld : WorldState)
+    (installed : InstalledCheckedCoreContract childInitialWorld target childContract)
+    (parentPresence : PresentAccountAt childInitialWorld
+      root.parentContext.context.storageAddress) :
+    (root.startChild target targetAddress_eq childContract preTransferInstalled
+      childInitialWorld installed parentPresence).childContext.workingJournal =
+        root.parentContext.workingJournal := by
+  rfl
+
 end SuspendedRoot
 
 namespace RootFrame

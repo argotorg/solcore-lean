@@ -57,6 +57,9 @@ structure RootAnchored
     frame.context.context.storageAddress = rootInvocation.target
   checkpointState_eq :
     frame.context.context.values.checkpoint.state = initialWorld
+  checkpointJournal_eq :
+    frame.context.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty
 
 /-- A reachable child retains both its root origin and its call checkpoint. -/
 structure ChildAnchored
@@ -71,6 +74,9 @@ structure ChildAnchored
   parentCheckpointState_eq :
     frame.suspendedRoot.parentContext.context.values.checkpoint.state =
       initialWorld
+  parentCheckpointJournal_eq :
+    frame.suspendedRoot.parentContext.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty
   childStorageAddress_eq :
     frame.childContext.context.storageAddress = frame.childTarget
   childCheckpointState_eq :
@@ -100,6 +106,9 @@ structure InitializerAnchored
   parentCheckpointState_eq :
     frame.suspendedRoot.parentContext.context.values.checkpoint.state =
       initialWorld
+  parentCheckpointJournal_eq :
+    frame.suspendedRoot.parentContext.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty
   postNonceStorageAddress_eq :
     frame.postNonceParentContext.context.storageAddress = rootInvocation.target
   postNonceCheckpointState_eq :
@@ -143,28 +152,36 @@ private theorem rootAfterSuspension_anchored
   | callContractWord target input =>
       simp only [RootFrame.afterSuspensionWithEnvironment]
       split
-      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+          anchored.checkpointJournal_eq⟩
       ·
         split
-        · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+        · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+            anchored.checkpointJournal_eq⟩
         · exact ⟨anchored.storageAddress_eq,
-            anchored.checkpointState_eq, rfl, rfl, rfl, by assumption⟩
+            anchored.checkpointState_eq, anchored.checkpointJournal_eq,
+            rfl, rfl, rfl, by assumption⟩
   | callContractWordWithValue target value input =>
       simp only [RootFrame.afterSuspensionWithEnvironment]
       split
-      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+          anchored.checkpointJournal_eq⟩
       · split
-        · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+        · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+            anchored.checkpointJournal_eq⟩
         · split
-          · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+          · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+              anchored.checkpointJournal_eq⟩
           · exact ⟨anchored.storageAddress_eq,
-              anchored.checkpointState_eq, rfl, rfl, rfl, by assumption⟩
+              anchored.checkpointState_eq, anchored.checkpointJournal_eq,
+              rfl, rfl, rfl, by assumption⟩
   | createContractWord templateId value input =>
       simp only [RootFrame.afterSuspensionWithEnvironment]
       split
-      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+          anchored.checkpointJournal_eq⟩
       · exact ⟨rfl, anchored.storageAddress_eq,
-          anchored.checkpointState_eq,
+          anchored.checkpointState_eq, anchored.checkpointJournal_eq,
           (PreparedInitializerFrame.postNonce_storageAddress_eq _).trans
             anchored.storageAddress_eq,
           (congrArg FrameCheckpointSnapshot.state
@@ -174,37 +191,37 @@ private theorem rootAfterSuspension_anchored
           PreparedInitializerFrame.initializer_checkpointState_eq _, rfl⟩
   | storageRead slot =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | storageWrite slot value =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | storageAddress =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | codeAddress =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | callValue =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | callerAddress =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | inputDataByte? offset =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | inputDataSize =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | inputDataWordBE? offset =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | currentAddress =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
   | emitLogWord topic payload =>
       exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+        anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩
 
 /-- Every scheduler-reachable mode retains its root and call-site anchors. -/
 theorem Reachable.anchored
@@ -217,18 +234,18 @@ theorem Reachable.anchored
     Anchored registry mode := by
   induction reachable with
   | initial installed =>
-      exact ⟨rfl, rfl⟩
+      exact ⟨rfl, rfl, rfl⟩
   | balancedInitial installed transferred =>
-      exact ⟨rfl, rfl⟩
+      exact ⟨rfl, rfl, rfl⟩
   | rootNext prior advanced inductionHypothesis =>
-      rcases inductionHypothesis with ⟨address, checkpoint⟩
-      exact ⟨address, checkpoint⟩
+      rcases inductionHypothesis with ⟨address, checkpoint, journal⟩
+      exact ⟨address, checkpoint, journal⟩
   | rootSuspended prior creatorAddress_eq advanced inductionHypothesis =>
       exact rootAfterSuspension_anchored _ _ _ advanced
         inductionHypothesis
   | childDone prior advanced inductionHypothesis =>
       rcases inductionHypothesis with
-        ⟨parentAddress, parentCheckpoint, childAddress, childCheckpoint,
+        ⟨parentAddress, parentCheckpoint, parentJournal, childAddress, childCheckpoint,
           childJournalCheckpoint, registryResolution⟩
       cases outcome : ChildFrame.outcomeDone _ _ advanced with
       | returned data =>
@@ -237,33 +254,42 @@ theorem Reachable.anchored
               SuspendedRoot.resumeWith] using parentAddress,
             by simpa [Anchored, ChildFrame.resumeRoot,
               ChildFrame.selectedParentContext, outcome,
-              SuspendedRoot.resumeWith] using parentCheckpoint⟩
+              SuspendedRoot.resumeWith] using parentCheckpoint,
+            by simpa [Anchored, ChildFrame.resumeRoot,
+              ChildFrame.selectedParentContext, outcome,
+              SuspendedRoot.resumeWith] using parentJournal⟩
       | reverted data =>
           exact ⟨by simpa [Anchored, ChildFrame.resumeRoot,
               ChildFrame.selectedParentContext, outcome,
               SuspendedRoot.resumeWith] using parentAddress,
             by simpa [Anchored, ChildFrame.resumeRoot,
               ChildFrame.selectedParentContext, outcome,
-              SuspendedRoot.resumeWith] using parentCheckpoint⟩
+              SuspendedRoot.resumeWith] using parentCheckpoint,
+            by simpa [Anchored, ChildFrame.resumeRoot,
+              ChildFrame.selectedParentContext, outcome,
+              SuspendedRoot.resumeWith] using parentJournal⟩
       | trapped reason =>
           exact ⟨by simpa [Anchored, ChildFrame.resumeRoot,
               ChildFrame.selectedParentContext, outcome,
               SuspendedRoot.resumeWith] using parentAddress,
             by simpa [Anchored, ChildFrame.resumeRoot,
               ChildFrame.selectedParentContext, outcome,
-              SuspendedRoot.resumeWith] using parentCheckpoint⟩
+              SuspendedRoot.resumeWith] using parentCheckpoint,
+            by simpa [Anchored, ChildFrame.resumeRoot,
+              ChildFrame.selectedParentContext, outcome,
+              SuspendedRoot.resumeWith] using parentJournal⟩
   | childNext prior advanced inductionHypothesis =>
       rcases inductionHypothesis with
-        ⟨parentAddress, parentCheckpoint, childAddress, childCheckpoint,
+        ⟨parentAddress, parentCheckpoint, parentJournal, childAddress, childCheckpoint,
           childJournalCheckpoint, registryResolution⟩
-      exact ⟨parentAddress, parentCheckpoint,
+      exact ⟨parentAddress, parentCheckpoint, parentJournal,
         childAddress, childCheckpoint, childJournalCheckpoint,
         registryResolution⟩
   | childSuspended prior advanced inductionHypothesis =>
       rcases inductionHypothesis with
-        ⟨parentAddress, parentCheckpoint, childAddress, childCheckpoint,
+        ⟨parentAddress, parentCheckpoint, parentJournal, childAddress, childCheckpoint,
           childJournalCheckpoint, registryResolution⟩
-      exact ⟨parentAddress, parentCheckpoint,
+      exact ⟨parentAddress, parentCheckpoint, parentJournal,
         (ChildFrame.afterHandledSuspension_storageAddress _ _ advanced).trans
           childAddress,
         (congrArg FrameCheckpointSnapshot.state
@@ -278,7 +304,11 @@ theorem Reachable.anchored
       exact ⟨InitializerCompletionResult.root_storageAddress _ |>.trans
           inductionHypothesis.parentStorageAddress_eq,
         InitializerCompletionResult.root_checkpointState _ |>.trans
-          inductionHypothesis.parentCheckpointState_eq⟩
+          inductionHypothesis.parentCheckpointState_eq,
+        (congrArg
+          (fun checkpoint => checkpoint.effects.rollback)
+          (InitializerCompletionResult.root_checkpoint _)).trans
+          inductionHypothesis.parentCheckpointJournal_eq⟩
   | initializerNext prior advanced inductionHypothesis =>
       exact { inductionHypothesis with }
   | initializerSuspended prior advanced inductionHypothesis =>
@@ -316,6 +346,18 @@ theorem Reachable.root_checkpointState
     frame.context.context.values.checkpoint.state = initialWorld :=
   reachable.anchored.checkpointState_eq
 
+/-- Every reachable root retains the empty transaction rollback journal. -/
+theorem Reachable.root_checkpointJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {registry : ExecutionEnvironment}
+    {frame : RootFrame initialWorld rootContract rootInvocation}
+    (reachable : Reachable registry (.root frame)) :
+    frame.context.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty :=
+  reachable.anchored.checkpointJournal_eq
+
 theorem Reachable.child_parentStorageAddress
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
@@ -337,6 +379,18 @@ theorem Reachable.child_parentCheckpointState
     frame.suspendedRoot.parentContext.context.values.checkpoint.state =
       initialWorld :=
   reachable.anchored.parentCheckpointState_eq
+
+/-- The suspended root behind a child retains the empty transaction checkpoint. -/
+theorem Reachable.child_parentCheckpointJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {registry : ExecutionEnvironment}
+    {frame : ChildFrame initialWorld rootContract rootInvocation}
+    (reachable : Reachable registry (.child frame)) :
+    frame.suspendedRoot.parentContext.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty :=
+  reachable.anchored.parentCheckpointJournal_eq
 
 theorem Reachable.child_storageAddress
     {initialWorld : WorldState}
@@ -396,5 +450,17 @@ theorem Reachable.initializer_checkpointJournal
     frame.initializerContext.context.values.checkpoint.effects.rollback =
       frame.suspendedRoot.parentContext.workingJournal :=
   reachable.anchored.initializerCheckpointJournal_eq
+
+/-- The suspended root behind an initializer retains the empty checkpoint. -/
+theorem Reachable.initializer_parentCheckpointJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {environment : ExecutionEnvironment}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+    (reachable : Reachable environment (.initializer frame)) :
+    frame.suspendedRoot.parentContext.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty :=
+  reachable.anchored.parentCheckpointJournal_eq
 
 end Solcore.Semantics.OneLevelNestedExecution
