@@ -1,82 +1,103 @@
 # solcore-lean
 
-solcore-lean is an executable formal specification of Solcore written in
-Lean 4. It is an independent reference implementation: neither the Haskell
-compiler nor the Rust compiler defines the language.
+`solcore-lean` is an executable formal specification of Solcore written in
+Lean 4. It provides an independent reference model for checking programs and
+running their semantics; neither the Haskell compiler nor the Rust compiler is
+treated as the language definition.
 
-The repository currently provides:
+The repository provides:
 
-- a versioned command-line Oracle for checking and evaluating Semantic Core
-  programs;
-- a versioned command-line Oracle for parsing the supported single-file
-  Solcore syntax;
-- Lean definitions for the language rules and executable procedures; and
-- machine-checked proofs connecting those procedures to the rules.
+- a checked Semantic Core language with executable typing and evaluation;
+- Oracle v5 execution of checked contracts from an explicit initial world;
+- commit on return and rollback on rejection, revert, or trap;
+- observable state, return data, logs, balances, and contract creation;
+- versioned command-line interfaces for older Core languages and the supported
+  single-file Surface parser; and
+- Lean proofs and executable tests for the modeled rules.
 
-The source parser is intentionally separate from the Semantic Core evaluator.
-Parsing a source file does not resolve imports or names, check source types,
-run a contract, or elaborate the file into Semantic Core.
+Oracle v5 consumes Semantic Core, not arbitrary Solcore source text. The
+published Surface parser is a separate interface: parsing does not resolve
+names, type-check source, elaborate it into Core, or execute a contract.
 
 ## Requirements
 
-- Lean 4.32.1, selected by the checked-in lean-toolchain file
+- Lean 4.32.1, selected by the checked-in `lean-toolchain` file
 - Lake, distributed with Lean
 - Node.js, used by repository validation scripts
 
+Clone the repository, enter its root directory, and let Lake use the pinned
+Lean toolchain. No separate package installation step is required.
+
 ## Build and test
 
-From the repository root:
+Run the complete local validation suite from the repository root:
 
-    lake build
-    lake test
-    node scripts/verify-metadata.mjs
-    node scripts/check-kernel.mjs
+```text
+lake build
+lake test
+node scripts/verify-metadata.mjs
+node scripts/check-kernel.mjs
+```
 
-## Run the Oracle
+Build and inspect the command-line Oracle with:
 
-Build and inspect the command-line interface:
+```text
+lake exe solcoreOracle --help
+```
 
-    lake exe solcoreOracle --help
+## Query Oracle v5
 
-The latest capability-report commands are:
+The simplest way to inspect the checked-contract interface is its capability
+report:
 
-| Command | Purpose |
-| --- | --- |
-| capabilities-v3 | Describe Semantic Core v2 checking and evaluation |
-| capabilities-v4 | Describe Surface v1 single-file parsing |
+```text
+lake exe solcoreOracle capabilities-v5
+```
 
-The Oracle reads newline-delimited JSON from standard input when no command is
-given. Each request produces exactly one response in the same order.
+The report identifies the exact Oracle, Core, specification, and profile
+versions; supported queries and contract profiles; observation kinds; and
+default resource limits.
 
-    lake exe solcoreOracle < Tests/golden/m1c-eval-operations-request.ndjson
+Without a command, the executable reads newline-delimited JSON from standard
+input. Each input line produces exactly one output line in the same order.
+This is a complete minimal Oracle v5 capabilities request:
 
-Requests must contain one compact JSON object per line. Malformed envelopes,
-unknown schemas, and invalid field shapes produce protocol errors rather than
-language results. Checked-in request and response examples are available in
-the [golden test directory](Tests/golden).
+```json
+{"schema":"solcore-oracle/v5","id":"readme-v5","spec":"solcore/0.1.0-draft.5","profile":{"id":"contract-m3a-v1","digest":"sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"},"limits":{"jsonDepth":2048,"jsonNodes":2000000,"coreDepth":1024,"coreNodes":1000000,"scenarioEntries":100000,"identifierBytes":256,"calldataBytes":1048576,"evaluationSteps":1000000},"query":{"kind":"capabilities"}}
+```
+
+Save that single line as `request.ndjson`, then run:
+
+```text
+lake exe solcoreOracle < request.ndjson
+```
+
+Oracle v5 also accepts `coreCheck` and `execute` queries. Execution requests
+include a checked-contract package, initial accounts and storage, nested-call
+and creation configuration, invocation data, fuel, and the state probes to
+return. Malformed JSON and invalid wire values produce protocol errors;
+well-formed programs that fail checking or admission produce typed rejections.
+
+Older capability reports remain available through `capabilities`,
+`capabilities-v2`, `capabilities-v3`, and `capabilities-v4`.
 
 ## Use as a Lean library
 
-Import the public umbrella module:
+Import the complete public library:
 
-    import Solcore
+```lean
+import Solcore
+```
 
-Or import an individual layer:
+Or import the checked-contract Oracle directly:
 
-    import Solcore.Core
-    import Solcore.Surface
-    import Solcore.Workspace
+```lean
+import Solcore.Oracle.V5
+```
 
-## Public schemas
+## Protocol documentation
 
-- [Oracle v1](schema/oracle-v1.schema.json)
-- [Oracle v2](schema/oracle-v2.schema.json)
-- [Oracle v3](schema/oracle-v3.schema.json)
-- [Oracle v4](schema/oracle-v4.schema.json)
-- [Semantic Core v1](schema/semantic-core-v1.schema.json)
-- [Semantic Core v2](schema/semantic-core-v2.schema.json)
-- [Surface v1](schema/surface-v1.schema.json)
-- [Parse result v1](schema/parse-result-v1.schema.json)
-
-The [documentation guide](docs/README.md) explains the specification,
-architecture, supported features, and development process.
+- [Oracle v5 request, response, and execution catalog](docs/ORACLE_V5_WIRE.md)
+- [Semantic Core Wire v3 catalog](docs/CORE_WIRE_V3.md)
+- [Current supported scope and limitations](docs/CURRENT_STATUS.md)
+- [Documentation guide](docs/README.md)
