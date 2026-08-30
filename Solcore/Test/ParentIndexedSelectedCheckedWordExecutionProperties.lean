@@ -152,9 +152,13 @@ example : entry.execution.completion? = some completion ↔
 
 example : entry.execution.completion? = none ↔
     entry.execution.execution? = none ∨
-      ∃ code finalContext exhausted,
+      (∃ code finalContext exhausted,
         entry.execution.execution? =
-          some (code, ⟨finalContext, .outOfFuel exhausted⟩) :=
+          some (code, ⟨finalContext, .outOfFuel exhausted⟩)) ∨
+      ∃ code finalContext suspension remainingFuel,
+        entry.execution.execution? =
+          some (code,
+            ⟨finalContext, .unsupported suspension remainingFuel⟩) :=
   completion?_eq_none_iff entry
 
 end Solcore.Test.ParentIndexedSelectedCheckedWordExecutionProperties
