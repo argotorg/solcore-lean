@@ -182,6 +182,7 @@ import Solcore.Test.ParentIndexedFrameTrapPropagationPayloadCoherence
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
 import Solcore.Test.WorldStateBalance
+import Solcore.Test.WorldStateNonce
 import Solcore.Test.BalanceTransfer
 import Solcore.Test.BalanceTransferProperties
 import Solcore.Test.BalanceTransferInstallationExternalProperties
@@ -5083,6 +5084,7 @@ def run : IO Unit := do
   testRuntimeScalars
   testWorldState
   testWorldStateBalance
+  testWorldStateNonce
   testBalanceTransfer
   testWorldStateDeltaBalance
   testWorldStateCode
