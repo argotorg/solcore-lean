@@ -1,7 +1,7 @@
 import Solcore.Semantics.HostStorageDriver
 import Solcore.Semantics.ParentIndexedSelectedExecutionResult
 
-/-! Out-of-fuel-only resumption for branch-complete selected execution. -/
+/-! Fuel continuation for branch-complete selected execution. -/
 
 set_option autoImplicit false
 

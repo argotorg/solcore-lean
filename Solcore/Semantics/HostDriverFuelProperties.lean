@@ -109,7 +109,8 @@ namespace HostDriverResult
 
 /--
 Completion and faults consume at most the supplied budget. Exhaustion consumes
-it exactly and retains a state ready for another transition or request.
+it exactly and retains a state ready for another transition or request. An
+unsupported result stops at the rejected request and retains the unused fuel.
 -/
 def FuelSoundWith
     {Context : Type u}

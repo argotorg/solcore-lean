@@ -1,6 +1,6 @@
 import Solcore.Semantics.HostDriver
 
-/-! Resumption of exhausted handled host execution with additional fuel. -/
+/-! Additional fuel for exhausted or unsupported handled host execution. -/
 
 set_option autoImplicit false
 
@@ -11,7 +11,8 @@ universe u
 namespace HostDriverResult
 
 /--
-Resume only an exhausted result. Completed and faulted results remain exact.
+Resume exhaustion by executing its retained state. An unsupported request stays
+suspended while its offered fuel grows. Completed and faulted results stay exact.
 -/
 def resumeWithFuel
     {Context : Type u}

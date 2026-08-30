@@ -8,7 +8,7 @@ namespace Solcore.Semantics
 
 universe u
 
-/-- A terminal result after every encountered host request is handled. -/
+/-- A total result after every supported host request encountered is handled. -/
 inductive HostDriverOutcome where
   | done (value : Core.Value) (store : Core.Store)
   | outOfFuel (state : Core.State)
