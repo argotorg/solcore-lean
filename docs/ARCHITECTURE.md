@@ -1018,6 +1018,24 @@ the transaction-aware policy supports it and attributes the log to the active
 `currentAddress`. Frozen Wire v1/v2 still reject the host value. ABI event
 encoding and public Oracle schemas remain separate layers.
 
+ADR-0150 adds a parser-independent ABI layer above this executor. A Static Word
+contract pairs validated `uint256 -> uint256` metadata with checked Core
+implementations. Admission derives Ethereum Keccak selectors, rejects duplicate
+signatures and selector collisions, generates one checked dispatcher, and
+retains exact provenance from the source method list through the admitted
+contract. Raw calldata and canonical method calls both delegate to the existing
+balanced top-level runner, so ABI routing does not introduce a second state or
+effect semantics.
+
+The ABI profile accepts exactly 36 required bytes plus an ignored suffix and
+returns exactly one 32-byte Word. Short input and unknown selectors are stable
+reverts, hence select the same root checkpoint as any other revert. Successful
+selected methods use the existing storage, nested-call, balance, creation, log,
+delta, and resumption rules. The next boundary serializes these inputs and
+total observations through a new Oracle version; frozen Oracle v1-v4 remain
+unchanged. Source field-to-slot layout is a later elaboration concern, not a
+prerequisite for executing or publishing exact Word-slot semantics.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

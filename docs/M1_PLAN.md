@@ -164,8 +164,11 @@ including rollback, exact deltas, and replay-free resumption.
 creation, initializer execution, runtime installation, and creation rollback.
 [ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md)
 completes ordered rollback-aware logs and successful-creation observations in
-the total execution result. ABI and storage layout are next. Proof-only
-extensions of the older selected-execution path are not separate milestones.
+the total execution result. [ADR-0150](adr/0150-static-word-abi.md) completes
+the internal Static Word ABI from metadata and Ethereum selectors through a
+generated checked dispatcher and balanced execution. The public Oracle
+execution boundary is next. Proof-only extensions of the older
+selected-execution path are not separate milestones.
 
 ## Completed foundation
 
@@ -320,9 +323,10 @@ These results remain regression obligations for every extension.
 | 131 | Balance semantics | Complete | Connects value-bearing calls to checked Account balance availability, atomic transfer, rollback, exact deltas, and replay-free resumption through ADR-0147 |
 | 132 | Contract creation | Complete | [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) adds checked nonce consumption, explicit address derivation, checked initializer/runtime templates, runtime installation, rollback, and fixed-environment resumption |
 | 133 | Logs and transaction observations | Complete | [ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md) adds ordered duplicate-preserving word logs, successful-creation enumeration, frame/root rollback, and exactly-once resumption |
-| 134 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 135 | Public Oracle execution | Planned | Publishes a versioned checked-Core execution request and total result only after internal semantics stabilizes |
-| 136 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 134 | Static Word ABI | Complete | ADR-0150 connects total codecs and collision-safe checked dispatch to the executable lifecycle |
+| 135 | Public Oracle execution | Active | Publishes a new versioned checked-Core/runtime request and total observation without changing v1-v4 |
+| 136 | Source storage layout | Planned | Maps future resolved fields to the already executable Word-slot semantics; not an Oracle prerequisite |
+| 137 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2402,9 +2406,11 @@ creation preflight rejection, and resumes without replay. Frozen Wire formats
 reject the internal capability. Full builds, tests, strict Lean validation,
 metadata, semantic-kernel, and diff checks pass.
 
-ABI and storage layout are the active next implementation milestone; Oracle
-publication follows later. Parser proofs remain paused, and the older
-proof-only selected-execution path is not resumed as an intermediate step.
+ADR-0150 completes the internal Static Word ABI. The public Oracle execution
+boundary is now active. Source storage layout remains a later elaboration
+decision and is not inserted between executable Core and Oracle publication.
+Parser proofs remain paused, and the older proof-only selected-execution path
+is not resumed as an intermediate step.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

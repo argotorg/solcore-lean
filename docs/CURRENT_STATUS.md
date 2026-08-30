@@ -30,9 +30,12 @@ initializer failure rolls back their journal entries, root failure rolls back
 the whole journal, and fuel-only resumption neither drops nor replays entries.
 
 This executable semantics remains internal. Frozen Wire v1/v2 reject the new
-log capability, and no existing Oracle or parser protocol changes. ABI support
-and then a versioned public Oracle execution interface are the next planned
-vertical milestones.
+log capability, and no existing Oracle or parser protocol changes. The
+internal Static Word ABI now admits checked `uint256 -> uint256` methods,
+derives Ethereum Keccak selectors, rejects duplicate signatures and selector
+collisions, generates a checked dispatcher, and exercises that dispatcher
+through the full lifecycle. A versioned public Oracle execution interface is
+the next vertical milestone.
 
 The explicit local-cell store accepted by ADR-0022 and the
 program-local named algebraic data and normalized constructor matching accepted
@@ -2918,9 +2921,19 @@ exactly-once fuel resumption. Frozen Wire formats reject the internal
 capability. Full builds, tests, strict Lean validation, metadata,
 semantic-kernel, and diff checks pass.
 
-ABI and storage-layout work is the next runtime milestone; public Oracle
-exposure follows as a separate slice. The paused parser-proof path does not
-become an intermediate semantics milestone.
+[ADR-0150](adr/0150-static-word-abi.md) is complete. It joins validated
+`uint256 -> uint256` metadata, Ethereum Keccak selectors, total call/result
+codecs, deterministic duplicate/collision rejection, checked dispatcher
+generation, and balanced top-level execution in one admitted contract.
+Effectful tests distinguish pre-dispatch, post-routing, and in-method fuel
+boundaries and cover exact resumption without duplicated balance, storage, or
+log effects.
+
+The versioned public Oracle execution interface is the next runtime milestone.
+Source storage layout is not its prerequisite: the current semantics already
+executes exact Word slots, while field-to-slot mapping belongs to a later
+resolved/source elaboration layer. The paused parser-proof path does not become
+an intermediate semantics milestone.
 
 ## Meaning of completion
 

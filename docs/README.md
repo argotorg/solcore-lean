@@ -40,9 +40,13 @@ word logs; logs and creation observations retain order and duplicates and use
 the same child, initializer, and root rollback rules as state. Fuel resumption
 does not replay them.
 
-This runtime is proved and tested but not published through Wire or the
-Oracle. ABI encoding and dispatch, gas, deeper call forms, and a versioned
-public execution command remain later work.
+The internal Static Word ABI is also complete for one `uint256` argument and
+one `uint256` result. It validates method metadata and checked implementations,
+derives Ethereum Keccak selectors, rejects duplicate signatures and selector
+collisions, generates a checked Core dispatcher, and runs it through the same
+commit/rollback lifecycle. This runtime is not yet published through Wire or
+the Oracle. A versioned public execution command is the next runtime milestone;
+gas and deeper call forms remain later work.
 
 ## Historical implementation notes
 
@@ -290,7 +294,10 @@ resumption. [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md)
 completes checked creation and initializer/runtime installation.
 [ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md)
 completes ordered rollback-aware logs and successful-creation observations.
-ABI and a versioned public Oracle execution command remain later decisions.
+[ADR-0150](adr/0150-static-word-abi.md) completes the internal Static Word ABI,
+including total codecs, collision rejection, checked dispatch generation, and
+effectful end-to-end execution. A versioned public Oracle execution command is
+the next runtime decision.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

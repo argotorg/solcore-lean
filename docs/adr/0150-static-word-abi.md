@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: parser-independent `uint256 -> uint256` external dispatch
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -113,9 +113,11 @@ these conditions holds:
 - two entries have the same canonical signature; or
 - distinct canonical signatures have the same four-byte selector.
 
-The rejection retains the conflicting entries, signatures, and selector so a
-caller can report the exact cause. It must be independent of input order. The
-known collision pair below is a required executable regression:
+The rejection retains the conflicting metadata entries, signatures, and
+selector so a caller can report the exact cause. Canonical ordering makes the
+selected cause deterministic across input order; the general proof contract
+also shows that reordering cannot change acceptance or the rejection class.
+The known collision pair below is a required executable regression:
 
 ```text
 f38491(uint256)  -> 77dbd42e
@@ -248,6 +250,26 @@ behavior.
 Storage layout is deliberately not a prerequisite for this slice: selected
 checked implementations already use the exact Word storage operations of the
 executable semantics. A later storage-layout milestone may map source-level
-fields into those slots without changing this ABI profile. Public Oracle
-exposure remains a separate boundary after the executable ABI and storage
-layout decisions are complete.
+fields into those slots without changing this ABI profile. The next runtime
+boundary is a versioned public Oracle execution interface; source-level storage
+layout remains independent and can follow with the future elaboration adapter.
+
+## Implementation evidence
+
+The implementation admits only validated ASCII metadata paired with a checked
+`word -> word` Core implementation. It computes Ethereum Keccak selectors,
+rejects duplicate signatures and selector collisions, generates and rechecks a
+single dispatcher, and runs the admitted contract through the balanced
+top-level lifecycle.
+
+Executable regressions cover exact calldata and returndata boundaries, the
+published collision pair in both input orders, two-method routing, suffix
+acceptance, short and unknown-selector rollback, state/balance/log commit, and
+fuel exhaustion before dispatch, after routing but before the first method
+effect, and inside the selected method. Resumption is compared with the exact
+one-shot budget and does not duplicate transfer, storage, or log effects.
+
+Keccak padding alignment, absorber read bounds, digest width, codec round trips,
+table uniqueness/provenance, generated checker acceptance, and ABI runner
+delegation are exposed to external proof consumers. Full build, executable
+tests, warnings-as-errors, and trust-zero checks pass at completion.
