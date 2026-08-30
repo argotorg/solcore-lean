@@ -882,6 +882,15 @@ All validation and the independent audit pass with no P0-P3 issue. Exhaustion
 and fault gain no frame meaning, and no gas, persistence, nested-call,
 transaction, parser, ABI, or public-format rule is added.
 
+ADR-0139 is the active planned extension of the immutable execution input. It
+adds one explicitly supplied `currentAddress` whose lifetime is one handled run
+and every same-input resumption of that run. Internal Core will observe its
+lossless Word through an append-only Unit-to-Word capability at index 9; the
+canonical host tables will therefore have length 10 and index 10 will be first
+unbound. The value is an independent current-context role: it does not select
+the storage Account or checked code, require an Account, identify the caller or
+a callee, or define call kind, nesting, authority, or transaction behavior.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

@@ -399,6 +399,12 @@ three-`Option` parent API remains unchanged and is recovered by explicit
 erasure. Parser and syntax proofs remain paused while syntax-independent
 semantics continues.
 
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is accepted and
+active, with implementation planned. It will add one explicitly supplied
+`currentAddress` to the immutable run input and expose its lossless Word through
+an internal capability at index 9. This role will not select code or storage and
+will not be inferred from the caller, a callee, an Account, or a call kind.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -426,6 +432,7 @@ semantics continues.
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
 | Canonical host capability registry | Complete | One canonical nine-entry registry derives both host tables and arbitrary-list safety; exact finite laws, all named compatibility facts, numeric boundaries, and runtime regressions are complete | Not published |
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
+| Run-fixed current-address observation | Active; implementation planned | Exact input lifetime, independent address roles, index-9 capability, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs are required | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |

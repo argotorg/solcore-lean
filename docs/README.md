@@ -185,6 +185,14 @@ and the independent audit pass with no P0-P3 issue. This adds no gas,
 persistence, nested-call, transaction, parser, syntax, ABI, Wire, Oracle, or
 public-interface policy.
 
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is the active
+planned slice. It will add one explicit `currentAddress` to the immutable run
+input and expose its exact widened Word through an internal Unit-to-Word
+capability at index 9. The value is fixed only for that run and same-input
+resumption. It will not choose code or storage, require an Account, identify a
+caller or callee, define call kind or authority, or change syntax and public
+formats.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

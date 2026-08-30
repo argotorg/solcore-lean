@@ -105,6 +105,12 @@ result and resumes only retained exhaustion. The existing nested-`Option` API
 stays unchanged through an explicit compatibility erasure. Parser and syntax
 proofs remain paused.
 
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is accepted and
+active, with implementation planned. One explicit `currentAddress` will be
+fixed for a handled run and its same-input resumptions, observed losslessly by
+Core at append-only host index 9, and kept independent from storage, code,
+caller, and future callee or call-kind roles.
+
 ## Completed foundation
 
 The current Core already has:
@@ -246,7 +252,7 @@ These results remain regression obligations for every extension.
 | 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
 | 120 | Canonical host capability registry | Complete | Derives both nine-entry host tables and arbitrary-list safety from one order, with exact finite laws and compatibility/runtime regressions |
 | 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all five exact branches, resumes only exhaustion with split/zero/add laws, and preserves the unchanged nested-`Option` and fold APIs |
-| 122 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
+| 122 | Run-fixed current-address observation | Active; implementation planned | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
 | 123 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 124 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 125 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
