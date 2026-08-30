@@ -24,7 +24,8 @@ private def validExpectedArguments
     (arguments : Lean.Json) : Bool :=
   match stringField? arguments "expected", stringField? arguments "actual" with
   | some actualExpected, some actual =>
-      actualExpected == expected && actual != expected &&
+      actualExpected == expected &&
+        (expected == "number" || actual != expected) &&
         isJsonKind actual && arguments == .mkObj [
           ("expected", actualExpected), ("actual", actual)]
   | _, _ => false

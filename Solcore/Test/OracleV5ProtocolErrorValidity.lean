@@ -141,6 +141,30 @@ private def allSchemaProducersDoNotFallback : Bool :=
   [schemaVersion, capabilitiesSchema, checkResultSchema,
     executionSchema, stateObservationSchema].all schemaProducerDoesNotFallback
 
+private def nonNaturalNumberDoesNotFallback (json : Lean.Json) : Bool :=
+  let oracleExact := match decodeNatAt (Path.root.field "limit") json with
+    | .error error =>
+        let sealed := error.toPublic
+        sealed.code == "oracle.wire.expected-natural" &&
+          sealed.arguments == .mkObj [
+            ("expected", "number"), ("actual", "number")]
+    | .ok _ => false
+  let coreExact := match Solcore.Core.Wire.V3.decodeNatAt
+      (Solcore.Core.Wire.V3.DecodePath.root.field "index") json with
+    | .error error =>
+        let sealed :=
+          (Solcore.Oracle.V5.Wire.ProtocolError.core error).toPublic
+        sealed.code == "core.wire.expected-natural" &&
+          sealed.arguments == .mkObj [
+            ("expected", "number"), ("actual", "number")]
+    | .ok _ => false
+  oracleExact && coreExact
+
+private def nonNaturalNumbersDoNotFallback : Bool :=
+  [Lean.Json.num { mantissa := -1, exponent := 0 },
+    Lean.Json.num { mantissa := 1, exponent := 1 }].all
+      nonNaturalNumberDoesNotFallback
+
 private def validRaw : Solcore.Oracle.V5.ProtocolError := {
   code := "oracle.wire.unknown-field"
   path := "/query/future"
@@ -158,10 +182,6 @@ private def invalidRaws : List Solcore.Oracle.V5.ProtocolError := [
   { validRaw with
       code := "oracle.wire.expected-natural"
       arguments := .mkObj [("expected", "natural"), ("actual", "null")]
-    },
-  { validRaw with
-      code := "oracle.wire.expected-natural"
-      arguments := .mkObj [("expected", "number"), ("actual", "number")]
     },
   { validRaw with
       code := "oracle.wire.invalid-schema"
@@ -265,8 +285,8 @@ private def sealedEncoderExact : Bool :=
 
 private def allChecks : Bool :=
   allCatalogProducersDoNotFallback && allSchemaProducersDoNotFallback &&
-    rawInvalidValuesRejected && malformedClosed && pointersClosed &&
-    sealedEncoderExact
+    nonNaturalNumbersDoNotFallback && rawInvalidValuesRejected &&
+    malformedClosed && pointersClosed && sealedEncoderExact
 
 private theorem allChecks_exact : allChecks = true := by
   native_decide
