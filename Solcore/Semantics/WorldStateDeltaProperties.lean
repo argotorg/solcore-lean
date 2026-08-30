@@ -33,6 +33,14 @@ theorem unique
         finalWorld.readStorage? address slot) := by
   rfl
 
+@[simp] theorem balanceEndpoints_exact
+    (initialWorld finalWorld : WorldState)
+    (address : Address) :
+    (WorldStateDelta.exact (initialWorld := initialWorld)
+      (finalWorld := finalWorld)).balanceEndpoints address =
+      (initialWorld.balance? address, finalWorld.balance? address) := by
+  rfl
+
 @[simp] theorem accountEndpoints_identity
     (world : WorldState)
     (address : Address) :
@@ -48,12 +56,25 @@ theorem unique
       (world.readStorage? address slot, world.readStorage? address slot) := by
   rfl
 
+@[simp] theorem balanceEndpoints_identity
+    (world : WorldState)
+    (address : Address) :
+    (identity world).balanceEndpoints address =
+      (world.balance? address, world.balance? address) := by
+  rfl
+
 @[simp] theorem slotChange?_identity
     (world : WorldState)
     (address : Address)
     (slot : Core.Word) :
     (identity world).slotChange? address slot = none := by
   simp [slotChange?, storageEndpoints]
+
+@[simp] theorem balanceChange?_identity
+    (world : WorldState)
+    (address : Address) :
+    (identity world).balanceChange? address = none := by
+  simp [balanceChange?, balanceEndpoints]
 
 theorem slotChange?_eq_none_iff
     {initialWorld finalWorld : WorldState}
@@ -90,6 +111,49 @@ theorem slotChange?_eq_some_iff
         congrArg Prod.fst endpointsEq
       have afterEq :
           (delta.storageEndpoints address slot).2 = after :=
+        congrArg Prod.snd endpointsEq
+      refine ⟨beforeEq, afterEq, ?_⟩
+      intro valuesEqual
+      apply same
+      exact beforeEq.trans (valuesEqual.trans afterEq.symm)
+    · rintro ⟨beforeEq, afterEq, _different⟩
+      apply Prod.ext
+      · exact beforeEq
+      · exact afterEq
+
+theorem balanceChange?_eq_none_iff
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) :
+    delta.balanceChange? address = none ↔
+      (delta.balanceEndpoints address).1 =
+        (delta.balanceEndpoints address).2 := by
+  simp [balanceChange?]
+
+theorem balanceChange?_eq_some_iff
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address)
+    (before after : Option Core.Word) :
+    delta.balanceChange? address = some (before, after) ↔
+      (delta.balanceEndpoints address).1 = before ∧
+      (delta.balanceEndpoints address).2 = after ∧
+      before ≠ after := by
+  unfold balanceChange?
+  by_cases same :
+      (delta.balanceEndpoints address).1 =
+        (delta.balanceEndpoints address).2
+  · simp [same]
+    intro beforeEq afterEq
+    exact beforeEq.symm.trans afterEq
+  · simp only [if_neg same, Option.some.injEq]
+    constructor
+    · intro endpointsEq
+      have beforeEq :
+          (delta.balanceEndpoints address).1 = before :=
+        congrArg Prod.fst endpointsEq
+      have afterEq :
+          (delta.balanceEndpoints address).2 = after :=
         congrArg Prod.snd endpointsEq
       refine ⟨beforeEq, afterEq, ?_⟩
       intro valuesEqual

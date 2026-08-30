@@ -1,4 +1,5 @@
 import Solcore.Semantics.WorldStateStorageRead
+import Solcore.Semantics.WorldStateBalanceProperties
 
 /-! Exact, queryable endpoint observations for arbitrary WorldState transitions. -/
 
@@ -43,6 +44,18 @@ def storageEndpoints
   (initialWorld.readStorage? address slot,
     finalWorld.readStorage? address slot)
 
+/--
+Observe exact balance endpoints at one address.
+
+`none` denotes an absent account and `some Core.Word.zero` denotes a present
+zero-balance account, so creation-era presence remains observable.
+-/
+def balanceEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option Core.Word × Option Core.Word :=
+  (initialWorld.balance? address, finalWorld.balance? address)
+
 /-- Return exact old/new storage endpoints only when the observation changed. -/
 def slotChange?
     {initialWorld finalWorld : WorldState}
@@ -50,6 +63,14 @@ def slotChange?
     (address : Address)
     (slot : Core.Word) : Option (Option Core.Word × Option Core.Word) :=
   let endpoints := delta.storageEndpoints address slot
+  if endpoints.1 = endpoints.2 then none else some endpoints
+
+/-- Return exact old/new balance endpoints only when the observation changed. -/
+def balanceChange?
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option (Option Core.Word × Option Core.Word) :=
+  let endpoints := delta.balanceEndpoints address
   if endpoints.1 = endpoints.2 then none else some endpoints
 
 end WorldStateDelta
