@@ -124,7 +124,7 @@ def decodeConstructorIdAt
     (path : DecodePath)
     (json : Lean.Json) :
     DecodeResult ConstructorId := do
-  ensureExactObject path json ["owner", "index"] ["owner", "index"]
+  ensureExactObject path json ["index", "owner"] ["index", "owner"]
   let owner ← decodeDataTypeIdAt (path.field "owner")
     (← requireField path json "owner")
   let index ← decodeNatAt (path.field "index")

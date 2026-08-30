@@ -30,8 +30,8 @@ def decodeProgramAtWithBudget
     (json : Lean.Json) : CoreDecodeResult (Program × CoreBudgetState) := do
   let state ← consumeCoreNode limits state 1
   liftProtocol <| ensureExactObject path json
-    ["schema", "resultType", "dataDefinitions", "body"]
-    ["schema", "resultType", "dataDefinitions", "body"]
+    ["body", "dataDefinitions", "resultType", "schema"]
+    ["body", "dataDefinitions", "resultType", "schema"]
 
   /- Schema is a scalar of the current Program node, so it precedes children. -/
   let schemaPath := path.field "schema"

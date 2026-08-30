@@ -94,8 +94,8 @@ private def decodeTypeAtFuel :
             (← liftProtocol <| requireField path json "tag")
           match tag with
           | "product" | "sum" =>
-              liftProtocol <| ensureExactObject path json ["tag", "left", "right"]
-                ["tag", "left", "right"]
+              liftProtocol <| ensureExactObject path json ["left", "right", "tag"]
+                ["left", "right", "tag"]
               let (left, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
                 (path.field "left")
                 (← liftProtocol <| requireField path json "left")
@@ -106,7 +106,7 @@ private def decodeTypeAtFuel :
               else pure (.sum left right, state)
           | "function" =>
               liftProtocol <| ensureExactObject path json
-                ["tag", "parameter", "result"] ["tag", "parameter", "result"]
+                ["parameter", "result", "tag"] ["parameter", "result", "tag"]
               let (parameter, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
                 (path.field "parameter")
                 (← liftProtocol <| requireField path json "parameter")
@@ -115,15 +115,15 @@ private def decodeTypeAtFuel :
                 (← liftProtocol <| requireField path json "result")
               pure (.function parameter result, state)
           | "cell" =>
-              liftProtocol <| ensureExactObject path json ["tag", "elementType"]
-                ["tag", "elementType"]
+              liftProtocol <| ensureExactObject path json ["elementType", "tag"]
+                ["elementType", "tag"]
               let (elementType, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
                 (path.field "elementType")
                 (← liftProtocol <| requireField path json "elementType")
               pure (.cell elementType, state)
           | "namedData" =>
-              liftProtocol <| ensureExactObject path json ["tag", "dataType"]
-                ["tag", "dataType"]
+              liftProtocol <| ensureExactObject path json ["dataType", "tag"]
+                ["dataType", "tag"]
               let dataType ← liftProtocol <| decodeDataTypeIdAt (path.field "dataType")
                 (← liftProtocol <| requireField path json "dataType")
               pure (.namedData dataType, state)

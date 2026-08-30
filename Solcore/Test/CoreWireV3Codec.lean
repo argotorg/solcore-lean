@@ -125,6 +125,9 @@ def testCoreWireV3Codec : IO Unit := do
       ("schema", schemaVersion), ("resultType", "word"),
       ("dataDefinitions", .arr #[])
     ])) .missingField "/body"
+  assertProtocol "lexicographically first missing Program field"
+    (decodeProgramWithBudget limits (.mkObj [("schema", schemaVersion)]))
+    .missingField "/body"
   assertProtocol "unknown expression field"
     (decodeExprWithBudget limits (.mkObj [
       ("tag", "unit"), ("future", .null)
@@ -136,6 +139,22 @@ def testCoreWireV3Codec : IO Unit := do
     (decodeExprWithBudget limits (.mkObj [
       ("tag", "bool"), ("value", "true")
     ])) .expectedBool "/value"
+  let invalidBinary := .mkObj [
+    ("tag", "binary"), ("op", "future"),
+    ("left", .mkObj [("tag", "future")]),
+    ("right", .mkObj [("tag", "future")])
+  ]
+  assertProtocol "operator scalar precedes unvisited children"
+    (decodeExprWithBudget { maxDepth := 1, maxNodes := 1 } invalidBinary)
+    .invalidTag "/op"
+  let invalidApply := .mkObj [
+    ("tag", "apply"),
+    ("function", .mkObj [("tag", "future")]),
+    ("argument", .mkObj [("tag", "future")])
+  ]
+  assertProtocol "child Core nodes use lexicographic fields"
+    (decodeExprWithBudget { maxDepth := 2, maxNodes := 3 } invalidApply)
+    .invalidTag "/argument/tag"
 
   assertTrue (programDepth minimalProgram == 2 && programNodes minimalProgram == 3)
     "minimal Program demand changed"

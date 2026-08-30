@@ -85,7 +85,7 @@ private def decodeExprAtFuel :
             (← liftProtocol <| requireField path json "value")
           pure (.word value, state)
       | "var" =>
-          liftProtocol <| ensureExactObject path json ["tag", "index"] ["tag", "index"]
+          liftProtocol <| ensureExactObject path json ["index", "tag"] ["index", "tag"]
           let index ← liftProtocol <| decodeNatAt (path.field "index")
             (← liftProtocol <| requireField path json "index")
           pure (.var index, state)
@@ -95,8 +95,12 @@ private def decodeExprAtFuel :
             | "apply" => ("argument", "function")
             | "storeCell" => ("reference", "value")
             | _ => ("body", "initializer")
-          liftProtocol <| ensureExactObject path json ["tag", firstName, secondName]
-            ["tag", firstName, secondName]
+          let fields := match tag with
+            | "pair" => ["left", "right", "tag"]
+            | "apply" => ["argument", "function", "tag"]
+            | "storeCell" => ["reference", "tag", "value"]
+            | _ => ["body", "initializer", "tag"]
+          liftProtocol <| ensureExactObject path json fields fields
           let (first, state) ← decodeChild state (path.field firstName)
             (← liftProtocol <| requireField path json firstName)
           let (second, state) ← decodeChild state (path.field secondName)
@@ -108,7 +112,9 @@ private def decodeExprAtFuel :
           | _ => pure (.letE second first, state)
       | "first" | "second" | "loadCell" =>
           let field := if tag == "loadCell" then "reference" else "operand"
-          liftProtocol <| ensureExactObject path json ["tag", field] ["tag", field]
+          let fields := if tag == "loadCell" then ["reference", "tag"]
+            else ["operand", "tag"]
+          liftProtocol <| ensureExactObject path json fields fields
           let (operand, state) ← decodeChild state (path.field field)
             (← liftProtocol <| requireField path json field)
           match tag with
@@ -117,8 +123,8 @@ private def decodeExprAtFuel :
           | _ => pure (.loadCell operand, state)
       | "lambda" =>
           liftProtocol <| ensureExactObject path json
-            ["tag", "parameterType", "resultType", "body"]
-            ["tag", "parameterType", "resultType", "body"]
+            ["body", "parameterType", "resultType", "tag"]
+            ["body", "parameterType", "resultType", "tag"]
           let (body, state) ← decodeChild state (path.field "body")
             (← liftProtocol <| requireField path json "body")
           let (parameterType, state) ← decodeTypeChild state (path.field "parameterType")
@@ -131,8 +137,11 @@ private def decodeExprAtFuel :
             | "inLeft" => ("rightType", "payload")
             | "inRight" => ("leftType", "payload")
             | _ => ("elementType", "initializer")
-          liftProtocol <| ensureExactObject path json ["tag", typeField, exprField]
-            ["tag", typeField, exprField]
+          let fields := match tag with
+            | "inLeft" => ["payload", "rightType", "tag"]
+            | "inRight" => ["leftType", "payload", "tag"]
+            | _ => ["elementType", "initializer", "tag"]
+          liftProtocol <| ensureExactObject path json fields fields
           let decodeExpressionFirst := exprField < typeField
           let (expression, type, state) ←
             if decodeExpressionFirst then do
@@ -153,8 +162,8 @@ private def decodeExprAtFuel :
           | _ => pure (.newCell type expression, state)
       | "case" =>
           liftProtocol <| ensureExactObject path json
-            ["tag", "scrutinee", "leftBranch", "rightBranch"]
-            ["tag", "scrutinee", "leftBranch", "rightBranch"]
+            ["leftBranch", "rightBranch", "scrutinee", "tag"]
+            ["leftBranch", "rightBranch", "scrutinee", "tag"]
           let (leftBranch, state) ← decodeChild state (path.field "leftBranch")
             (← liftProtocol <| requireField path json "leftBranch")
           let (rightBranch, state) ← decodeChild state (path.field "rightBranch")
@@ -163,8 +172,8 @@ private def decodeExprAtFuel :
             (← liftProtocol <| requireField path json "scrutinee")
           pure (.caseE scrutinee leftBranch rightBranch, state)
       | "construct" =>
-          liftProtocol <| ensureExactObject path json ["tag", "constructor", "payload"]
-            ["tag", "constructor", "payload"]
+          liftProtocol <| ensureExactObject path json ["constructor", "payload", "tag"]
+            ["constructor", "payload", "tag"]
           let constructor ← liftProtocol <| decodeConstructorIdAt
             (path.field "constructor")
             (← liftProtocol <| requireField path json "constructor")
@@ -173,8 +182,8 @@ private def decodeExprAtFuel :
           pure (.construct constructor payload, state)
       | "matchData" =>
           liftProtocol <| ensureExactObject path json
-            ["tag", "dataType", "resultType", "scrutinee", "branches"]
-            ["tag", "dataType", "resultType", "scrutinee", "branches"]
+            ["branches", "dataType", "resultType", "scrutinee", "tag"]
+            ["branches", "dataType", "resultType", "scrutinee", "tag"]
           let dataType ← liftProtocol <| decodeDataTypeIdAt (path.field "dataType")
             (← liftProtocol <| requireField path json "dataType")
           let (branches, state) ← decodeExprArrayAt decodeChild state
@@ -186,16 +195,16 @@ private def decodeExprAtFuel :
             (← liftProtocol <| requireField path json "scrutinee")
           pure (.matchData dataType resultType scrutinee branches, state)
       | "unary" =>
-          liftProtocol <| ensureExactObject path json ["tag", "op", "operand"]
-            ["tag", "op", "operand"]
+          liftProtocol <| ensureExactObject path json ["op", "operand", "tag"]
+            ["op", "operand", "tag"]
           let op ← liftProtocol <| decodeUnaryOpAt (path.field "op")
             (← liftProtocol <| requireField path json "op")
           let (operand, state) ← decodeChild state (path.field "operand")
             (← liftProtocol <| requireField path json "operand")
           pure (.unary op operand, state)
       | "binary" =>
-          liftProtocol <| ensureExactObject path json ["tag", "op", "left", "right"]
-            ["tag", "op", "left", "right"]
+          liftProtocol <| ensureExactObject path json ["left", "op", "right", "tag"]
+            ["left", "op", "right", "tag"]
           let op ← liftProtocol <| decodeBinaryOpAt (path.field "op")
             (← liftProtocol <| requireField path json "op")
           let (left, state) ← decodeChild state (path.field "left")
@@ -205,8 +214,8 @@ private def decodeExprAtFuel :
           pure (.binary op left right, state)
       | "ternary" =>
           liftProtocol <| ensureExactObject path json
-            ["tag", "op", "first", "second", "third"]
-            ["tag", "op", "first", "second", "third"]
+            ["first", "op", "second", "tag", "third"]
+            ["first", "op", "second", "tag", "third"]
           let op ← liftProtocol <| decodeTernaryOpAt (path.field "op")
             (← liftProtocol <| requireField path json "op")
           let (first, state) ← decodeChild state (path.field "first")
@@ -218,8 +227,8 @@ private def decodeExprAtFuel :
           pure (.ternary op first second third, state)
       | "if" =>
           liftProtocol <| ensureExactObject path json
-            ["tag", "condition", "thenBranch", "elseBranch"]
-            ["tag", "condition", "thenBranch", "elseBranch"]
+            ["condition", "elseBranch", "tag", "thenBranch"]
+            ["condition", "elseBranch", "tag", "thenBranch"]
           let (condition, state) ← decodeChild state (path.field "condition")
             (← liftProtocol <| requireField path json "condition")
           let (elseBranch, state) ← decodeChild state (path.field "elseBranch")
