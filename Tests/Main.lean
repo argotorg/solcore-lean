@@ -115,6 +115,7 @@ import Solcore.Test.Adr0146BoundaryExternalProperties
 import Solcore.Test.Adr0146SchedulerExternalProperties
 import Solcore.Test.Adr0147PreparedContextExternalProperties
 import Solcore.Test.Adr0147BalancedRootExternalProperties
+import Solcore.Test.Adr0147BalancedTopLevelExternalProperties
 import Solcore.Test.Adr0147ValueCallBoundary
 import Solcore.Test.TopLevelExecution
 import Solcore.Test.TopLevelObservation
@@ -180,6 +181,8 @@ import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
 import Solcore.Test.WorldStateBalance
 import Solcore.Test.BalanceTransfer
+import Solcore.Test.BalanceTransferProperties
+import Solcore.Test.BalanceTransferInstallationExternalProperties
 import Solcore.Test.WorldStateDeltaBalanceProperties
 import Solcore.Test.WorldStateCode
 import Solcore.Test.WorldStateStorageRead
