@@ -21,7 +21,11 @@ def inertCreationAddressPolicy : CreationAddressPolicy := {
   derive := fun _creator _nonce => ⟨0, by decide⟩
 }
 
-/-- Preserve the existing calls-only scheduler boundary with no templates. -/
+/--
+Enable checked calls while disabling root creation. The empty template registry
+makes every root creation request return the stable `unavailable` failure; the
+inert address policy is consequently never consulted by creation preflight.
+-/
 def callsOnly
     (callRegistry : CheckedContractRegistry) : ExecutionEnvironment := {
   callRegistry := callRegistry

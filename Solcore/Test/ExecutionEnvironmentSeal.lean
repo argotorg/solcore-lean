@@ -1,5 +1,6 @@
 import Solcore.Semantics.ExecutionEnvironmentProperties
 import Solcore.Semantics.OneLevelNestedExecutionResumptionProperties
+import Solcore.Test.Adr0148CreationEndToEndFixture
 import Solcore.Test.OneLevelNestedExecutionFixture
 
 /-! External regressions for the immutable nested-execution environment seal. -/
@@ -98,10 +99,35 @@ private theorem resumedAndOneShotCompleteIdentically_exact :
     resumedAndOneShotCompleteIdentically = true := by
   native_decide
 
+/-- Calls-only deliberately rejects the ADR-0148 root creation capability. -/
+private def callsOnlyCreationIsUnavailable : Bool :=
+  let creationRoot :=
+    Tests.Adr0148CreationEndToEndFixture.commitRoot
+  let result := OneLevelNestedExecution.run creationRoot
+    Tests.Adr0148CreationEndToEndFixture.invocation
+    Tests.Adr0148CreationEndToEndFixture.commitInstalled
+    Tests.Adr0148CreationEndToEndFixture.environment.callRegistry 512
+  match result.view with
+  | .outOfFuel _ _ _ => false
+  | .completed terminal =>
+      terminal.outcome ==
+        .trapped ContractCallFailure.unavailable.code &&
+      terminal.finalWorld.nonce?
+          Tests.Adr0148CreationEndToEndFixture.creator ==
+        some Tests.Adr0148CreationEndToEndFixture.oldNonce &&
+      (terminal.finalWorld.account?
+        Tests.Adr0148CreationEndToEndFixture.created).isNone
+
+private theorem callsOnlyCreationIsUnavailable_exact :
+    callsOnlyCreationIsUnavailable = true := by
+  native_decide
+
 def runExecutionEnvironmentSealTests : IO Unit := do
   unless outOfFuelRetainsFullEnvironment do
     throw (IO.userError "OOF did not retain the full execution environment")
   unless resumedAndOneShotCompleteIdentically do
     throw (IO.userError "retained-environment resumption differed from one-shot")
+  unless callsOnlyCreationIsUnavailable do
+    throw (IO.userError "calls-only creation did not return unavailable")
 
 end Tests.ExecutionEnvironmentSeal

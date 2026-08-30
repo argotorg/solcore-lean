@@ -107,8 +107,12 @@ template registry, and address policy for the whole run.
 
 The environment is retained by every out-of-fuel result. Compatibility runners
 construct a calls-only environment from the existing checked-contract registry
-and an empty creation registry. Existing programs and entry points therefore
-keep their behavior.
+and an empty creation registry. Programs that use only the pre-existing call
+and storage capabilities therefore keep their behavior. The newly introduced
+creation host capability is deliberately disabled at this boundary: every root
+creation request fails as `unavailable` (stable code 1). The earlier flat
+handler's depth-limit response was an integration scaffold, not a compatibility
+contract for the new host capability.
 
 ## Append-only host capability
 
