@@ -1,6 +1,6 @@
-import Solcore.Semantics.HostStorageDriverFuelProperties
 import Solcore.Semantics.TopLevelExecutionResumption
 import Solcore.Semantics.TopLevelStorageDeltaProperties
+import Solcore.Semantics.TransactionHostStorageDriverFuelProperties
 
 /-! Exact split-fuel laws for executable checked-Core top-level runs. -/
 
@@ -80,8 +80,8 @@ theorem resumeWithFuel_run
               have summedEq :
                   rawRun contract invocation installed (fuel + additional) =
                     ⟨context, .done value store⟩ := by
-                apply contract.code.runWithStorage_done_stable
-                  (context := initialContext installed)
+                apply contract.code.runWithTransactionStorage_done_stable
+                  (context := initialTransactionContext installed)
                   (inputs := invocation.executionInputs)
                   (by simpa [rawRun] using rawPrefixEq)
                 omega
@@ -114,10 +114,11 @@ theorem resumeWithFuel_run
                   congrArg ValidatedRawResult.result prefixEq
               have summedEq :
                   rawRun contract invocation installed (fuel + additional) =
-                    HostStorageDriver.run context invocation.executionInputs
+                    TransactionHostStorageDriver.run context
+                      invocation.executionInputs
                       additional exhausted := by
-                apply HostStorageDriver.run_additional_of_outOfFuel
-                  (context := initialContext installed)
+                apply TransactionHostStorageDriver.run_additional_of_outOfFuel
+                  (context := initialTransactionContext installed)
                   (nextContext := context)
                   (inputs := invocation.executionInputs)
                   (fuel := fuel)
@@ -125,7 +126,8 @@ theorem resumeWithFuel_run
                   (state := Core.State.initial contract.code.program.body
                     Core.hostEnvironment)
                   (exhausted := exhausted)
-                simpa [rawRun, CheckedHostCoreProgram.runWithStorage] using
+                simpa [rawRun,
+                  CheckedHostCoreProgram.runWithTransactionStorage] using
                   rawPrefixEq
               have resumedEq :
                   validatedResumedRawResult context exhausted storageAddress_eq

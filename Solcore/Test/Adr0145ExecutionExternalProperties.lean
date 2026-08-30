@@ -18,7 +18,7 @@ variable (installedAccount : Account)
 variable
   (installedAccount_present :
     initialWorld.account? invocation.target = some installedAccount)
-variable (context : HostStorageDriver.Context Unit Unit)
+variable (context : TransactionHostStorageDriver.Context)
 variable (value : Value)
 variable (store : Store)
 variable

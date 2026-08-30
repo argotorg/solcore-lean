@@ -1,6 +1,5 @@
-import Solcore.Semantics.HostStorageDriverProperties
-import Solcore.Semantics.HostStorageDriverSafetyProperties
 import Solcore.Semantics.TopLevelExecution
+import Solcore.Semantics.TransactionHostStorageDriverProperties
 
 /-! Fixed-input resumption for exhausted checked-Core top-level execution. -/
 
@@ -12,7 +11,7 @@ namespace Solcore.Semantics.TopLevelExecution
 def extendWorkingDelta
     {initialWorld : WorldState}
     {target : Address}
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (storageAddress_eq : context.context.storageAddress = target)
     (delta :
       TopLevelStorageDelta initialWorld
@@ -21,17 +20,17 @@ def extendWorkingDelta
     (fuel : Nat)
     (state : Core.State) :
     TopLevelStorageDelta initialWorld
-      (HostStorageDriver.run context inputs fuel state).context.context.values.working.1
+      (TransactionHostStorageDriver.run context inputs fuel state).context.context.values.working.1
       target := {
   initialAccount := delta.initialAccount
   finalAccount :=
-    (HostStorageDriver.run context inputs fuel state).context.storageAccount
+    (TransactionHostStorageDriver.run context inputs fuel state).context.storageAccount
   initialAccount_present := delta.initialAccount_present
   finalAccount_present := by
-    have finalAddress := HostStorageDriver.run_storageAddress
+    have finalAddress := TransactionHostStorageDriver.run_storageAddress
       context inputs fuel state
     have present :=
-      (HostStorageDriver.run context inputs fuel state).context.storageAccount_present
+      (TransactionHostStorageDriver.run context inputs fuel state).context.storageAccount_present
     rw [finalAddress, storageAddress_eq] at present
     exact present
   code_preserved := by
@@ -39,22 +38,22 @@ def extendWorkingDelta
         context.context.values.working.1.account? target =
           some context.storageAccount := by
       simpa [storageAddress_eq] using context.storageAccount_present
-    have finalAddress := HostStorageDriver.run_storageAddress
+    have finalAddress := TransactionHostStorageDriver.run_storageAddress
       context inputs fuel state
     have finalPresent :=
-      (HostStorageDriver.run context inputs fuel state).context.storageAccount_present
+      (TransactionHostStorageDriver.run context inputs fuel state).context.storageAccount_present
     rw [finalAddress, storageAddress_eq] at finalPresent
     have currentAccount_eq :
         delta.finalAccount = context.storageAccount := by
       apply Option.some.inj
       exact delta.finalAccount_present.symm.trans currentPresent
-    have suffix := HostStorageDriver.run_workingCode?
+    have suffix := TransactionHostStorageDriver.run_workingCode?
       context inputs fuel state target
     have suffix' :
-        (HostStorageDriver.run context inputs fuel state).context.storageAccount.code? =
+        (TransactionHostStorageDriver.run context inputs fuel state).context.storageAccount.code? =
           context.storageAccount.code? := by
       change
-        (HostStorageDriver.run context inputs fuel state).context.context.values.working.1.code?
+        (TransactionHostStorageDriver.run context inputs fuel state).context.context.values.working.1.code?
             target =
           context.context.values.working.1.code? target at suffix
       simp [WorldState.code?, finalPresent, currentPresent] at suffix
@@ -70,7 +69,7 @@ def extendWorkingDelta
       rw [← storageAddress_eq]
       exact same
     exact
-      (HostStorageDriver.run_workingAccount?_of_ne_storageAddress
+      (TransactionHostStorageDriver.run_workingAccount?_of_ne_storageAddress
         context inputs fuel state address differentCurrent).trans
         (delta.otherAccounts_preserved address different)
 }
@@ -80,7 +79,7 @@ def validatedResumedRawResult
     {initialWorld : WorldState}
     {contract : CheckedCoreContract}
     {invocation : TopLevelInvocation}
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (state : Core.State)
     (storageAddress_eq : context.context.storageAddress = invocation.target)
     (stateTyping :
@@ -92,14 +91,14 @@ def validatedResumedRawResult
     (additional : Nat) :
     ValidatedRawResult initialWorld contract invocation :=
   let result :=
-    HostStorageDriver.run context invocation.executionInputs additional state
+    TransactionHostStorageDriver.run context invocation.executionInputs additional state
   {
     result := result
     resultTyping := by
-      exact HostStorageDriver.run_hasType
+      exact TransactionHostStorageDriver.run_hasType
         context invocation.executionInputs additional state stateTyping
     storageAddress_eq := by
-      have preserved := HostStorageDriver.run_storageAddress
+      have preserved := TransactionHostStorageDriver.run_storageAddress
         context invocation.executionInputs additional state
       change result.context.context.storageAddress = invocation.target
       exact preserved.trans storageAddress_eq
