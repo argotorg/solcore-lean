@@ -894,13 +894,21 @@ The 676-job build, 1,240-job test suite, 33-root trust-zero sweep, and independe
 P0-P3 audit pass. The role does not select storage or code, identify caller or
 callee, or define call kind, nesting, authority, or transaction behavior.
 
-ADR-0140 is accepted and active, with implementation planned above ADR-0138's
-branch-complete result. A proof-refined session will retain one fixed
-initialization, storage Address, complete execution input, completion policy,
-cumulative provided-fuel budget, and exact result. Its certificate equates the
-stored result with one execution of that configuration at the cumulative
-budget. Closed resumption accepts only more fuel and advances the retained
-result; it cannot substitute another configuration.
+ADR-0140 completes a proof-refined session above ADR-0138's branch-complete
+result. It retains one fixed initialization, storage Address, complete
+execution input, completion policy, cumulative provided-fuel budget, and exact
+result. Its certificate equates that result with one execution of the fixed
+configuration at the cumulative budget. Closed resumption accepts only an
+additional `Nat`, advances the retained result, and cannot substitute another
+configuration. Whole-session canonicalization, zero, and addition preserve the
+certificate; all five branches, no-fault, legacy/plain views, and completed
+return/revert/trap folds remain exact.
+
+Measured regressions cover ADR-0138 fuel 9/10/15/16 with write non-replay and
+terminal budget 116, plus ADR-0139's 17+13=30 current-address session and
+terminal additional 7. A different current Address requires a distinct
+`start`. The 685-job build, 1,258-job test build, 11-root trust-zero sweep, and
+repository audits pass; one P3 documentation typo was corrected.
 
 The cumulative number describes budget offered, not fuel consumed, remaining
 gas, or a charging policy. The carrier adds no invocation transition, parent

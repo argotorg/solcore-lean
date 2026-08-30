@@ -406,12 +406,12 @@ have length 10 and index 10 is first unbound. The role neither selects code or
 storage nor derives from the caller, a callee, an Account, or a call kind.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
-is accepted and active, with implementation planned. One proof-refined session
-will retain the initialization, storage selector, complete execution inputs,
-completion policy, cumulative provided fuel, and exact branch-complete result.
-Resumption will accept only additional fuel and certify equality with one run
-of the fixed configuration at the new cumulative budget. This is not fuel
-consumption, nested invocation, ABI, parser work, or a public interface.
+is complete. One proof-refined session retains the initialization, storage
+selector, complete execution inputs, completion policy, cumulative provided
+fuel, and exact branch-complete result. Closed resumption accepts only
+additional fuel and preserves exact equality with one run of the fixed
+configuration at the cumulative budget. This is not fuel consumption, nested
+invocation, ABI, parser work, or a public interface.
 
 ## Implementation status
 
@@ -441,7 +441,7 @@ consumption, nested invocation, ABI, parser work, or a public interface.
 | Canonical host capability registry | Complete | One canonical registry now derives both ten-entry host tables and arbitrary-list safety; the original indexes 0 through 8 and appended current-address index 9 have exact finite laws | Not published |
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, index-9 capability, length-10 tables, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
-| Proof-refined parent-indexed selected-execution session | Planned, active | Accepted fixed-configuration carrier; cumulative provided-fuel invariant, closed resumption, algebra, no-fault, compatibility, and measured regressions remain to implement | Not published |
+| Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2646,21 +2646,31 @@ semantic-kernel, diff, axiom, compatibility, and independent P0-P3 audits pass.
 No callee, call-kind, nested-call, authority, parser, public-format, or root
 README change is included.
 
-## Active proof-refined selected-execution session
+## Completed proof-refined selected-execution session
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
-is accepted and implementation is planned. The carrier will bind one selected
-run's initialization, storage Address, immutable `ExecutionInputs`, completion
-policy, cumulative provided-fuel budget, and exact branch-complete result. Its
-proof field will state that the result equals the same fixed run executed once
-at that cumulative budget.
+binds one selected run's initialization, storage Address, immutable
+`ExecutionInputs`, completion policy, cumulative provided-fuel budget, and
+exact branch-complete result. `start` creates the certificate, while
+`resumeWithFuel` accepts only an additional `Nat`; replacement inputs and
+policies are not parameters. Every stored result is exactly the fixed
+configuration's one-shot run at `providedFuel`.
 
-Starting creates the certified session. Resuming accepts only an additional
-natural-number budget: replacement inputs or policy are not parameters. The
-implementation will reuse ADR-0138's retained-state resumption and split law,
-then prove whole-session zero and addition, no raw fault for checked starts,
-legacy erasure, and completed continuation/fold coherence. `providedFuel`
-records budget offered, not fuel consumed or gas charged.
+Whole-session canonicalization, zero, and addition are proved. All five exact
+branches, checked no-fault, legacy erasure, plain continuation, and completed
+return/revert/trap folds remain coherent. The ADR-0138 fixture follows exact
+fuel boundaries 9/10/15/16, detects write non-replay, and keeps a completed
+result terminal at total offered budget 116. The current-address fixture proves
+17+13 equals one-shot fuel 30, requires a separate start for the alternate
+address, and remains terminal after another 7 units.
+
+The 685-job build, 1,258-job test executable build, full test run, and 11-root
+trust-zero and warning-as-error sweep pass. Metadata, semantic-kernel, and diff
+checks pass. All 32 public theorem reports use only `propext` and `Quot.sound`.
+Independent audits found no P0-P2 issue; one P3 documentation typo was fixed.
+The root README and public Core, Wire, Oracle, and Surface boundaries are
+unchanged. `providedFuel` records budget offered, not fuel consumed or gas
+charged.
 
 This slice adds no child or parent transition, call stack, scheduling,
 transaction policy, ABI conversion, parser rule, Wire or Oracle format, or

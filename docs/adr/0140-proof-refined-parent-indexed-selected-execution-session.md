@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: bind one selected run's fixed configuration to every fuel resumption
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -61,7 +61,7 @@ or source construct created the session.
 
 ## Construction
 
-Add a `start` operation taking the six ordinary run inputs before `result`:
+Add a `start` operation taking the five ordinary run inputs before `result`:
 initialization, storage Address, complete `ExecutionInputs`, completion policy,
 and initial fuel. It performs exactly
 `runCodeWithStorageParentIndexedResult` and stores the result with an `rfl`
@@ -212,15 +212,40 @@ This ADR does not define or prove:
   or
 - a public compatibility promise or concrete syntax.
 
-## Planned sequence
+## Implemented sequence
 
-1. add this decision and mark the session slice active in internal docs;
-2. implement the proof-refined carrier and exact `start` projections;
-3. implement closed resumption and preserve the one-shot invariant;
-4. prove whole-session algebra, no-fault, compatibility, and completion
+1. added this decision and activated the session slice in internal docs;
+2. implemented the proof-refined carrier and exact `start` projections;
+3. implemented closed resumption and preserved the one-shot invariant;
+4. proved whole-session algebra, no-fault, compatibility, and completion
    coherence;
-5. add compile-time consumers and measured ADR-0138/ADR-0139 regressions; and
-6. run full validation, independent audit, and completion-doc synchronization.
+5. added compile-time consumers and measured ADR-0138/ADR-0139 regressions; and
+6. completed full validation, independent audit, and completion-doc
+   synchronization.
+
+## Implementation record
+
+The carrier, `start`, and closed `resumeWithFuel` are implemented. Resumption
+accepts only an additional `Nat`; the initialization, storage Address, complete
+execution inputs, completion policy, and parent index remain fixed. Every
+session certifies that its exact result is the stored configuration run once at
+`providedFuel`. Whole-session canonicalization, zero, and sequential-addition
+laws preserve that invariant, and all five result branches, checked no-fault,
+legacy and plain continuation views, and return/revert/trap folds are covered.
+
+The ADR-0138 regression starts at fuel 9, resumes through exact one-shot
+boundaries 10 and 15, and completes at 16 without replaying the handled write.
+A completed session offered another 100 units records total budget 116 while
+retaining its terminal result. The ADR-0139 regression resumes fuel 17 by 13 to
+the one-shot fuel-30 result; changing only `currentAddress` requires a distinct
+start, and another 7 units leave the completed result unchanged.
+
+The 685-job build, 1,258-job test executable build, and full test run pass. All
+11 changed Lean roots pass trust-zero with warnings as errors. Metadata,
+semantic-kernel, and diff checks pass; 32 public theorem reports use only
+`propext` and `Quot.sound`. Independent audits found no P0-P2 issue and the one
+P3 documentation typo was corrected. The root README and public Core, Wire,
+Oracle, and Surface boundaries remain unchanged.
 
 ## Consequences
 

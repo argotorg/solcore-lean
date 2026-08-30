@@ -112,11 +112,11 @@ independent from storage, code, caller, and future callee or call-kind roles.
 The canonical host tables now have length 10 and index 10 is first unbound.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
-is accepted and active, with implementation planned. It will bind the existing
-selected-run configuration to a branch-complete result and certify that result
-against one run at the session's cumulative provided-fuel budget. Resumption
-will accept only more fuel, preventing accidental input or completion-policy
-replacement. It adds no nested invocation, ABI, parser, or public boundary.
+is complete. It binds the existing selected-run configuration to a
+branch-complete result and certifies that result against one run at the
+session's cumulative provided-fuel budget. Resumption accepts only more fuel,
+preventing accidental input or completion-policy replacement. It adds no
+nested invocation, ABI, parser, or public boundary.
 
 ## Completed foundation
 
@@ -260,7 +260,7 @@ These results remain regression obligations for every extension.
 | 120 | Canonical host capability registry | Complete | Derives both host tables and arbitrary-list safety from one extensible order, with exact finite laws and compatibility/runtime regressions |
 | 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all five exact branches, resumes only exhaustion with split/zero/add laws, and preserves the unchanged nested-`Option` and fold APIs |
 | 122 | Run-fixed current-address observation | Complete | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
-| 123 | Proof-refined parent-indexed selected-execution session | Accepted, active | Binds fixed run configuration to each result and maintains exact one-shot equality at cumulative provided fuel; implementation and proofs are planned |
+| 123 | Proof-refined parent-indexed selected-execution session | Complete | Binds fixed run configuration to each result and preserves exact one-shot equality through closed fuel-only resumption, whole-session algebra, every branch, compatibility, and folds |
 | 124 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 125 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 126 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2185,22 +2185,27 @@ trust-zero and warning-as-error sweep, metadata, semantic-kernel, diff, axiom,
 compatibility, and independent P0-P3 audits pass. No call kind, nested call,
 authority, parser, public format, or root README change was added.
 
-## Active proof-refined selected-execution session
+## Completed proof-refined selected-execution session
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
-is accepted; implementation is the next active slice. A session will store one
-parent-indexed selected run's initialization, storage selector, complete
-execution inputs, completion policy, total supplied budget, and exact result.
-Its refinement certificate will equate that result to the fixed configuration
-run once with the stored cumulative budget.
+is complete. A session stores one parent-indexed selected run's initialization,
+storage selector, complete execution inputs, completion policy, total supplied
+budget, and exact result. Its certificate equates that result to the fixed
+configuration run once with the stored cumulative budget.
 
-`start` will construct the certificate directly. `resumeWithFuel` will accept
-only an additional budget, reuse the retained ADR-0138 result state, and update
-the total by addition. Planned proofs cover every projection, invariant
-preservation, whole-session zero and addition, checked no-fault, legacy
-nested-`Option` erasure, and completed continuation and resolution-fold
-coherence. Measured ADR-0138 and ADR-0139 regressions will ensure resumption
-does not replay earlier work or permit changed immutable inputs.
+`start` constructs the certificate directly. `resumeWithFuel` accepts only an
+additional `Nat`, reuses ADR-0138's retained result, and adds to the total.
+Whole-session canonicalization, zero, and addition preserve the invariant.
+Every result branch, checked no-fault, legacy and plain continuation views, and
+return/revert/trap folds are covered.
+
+Measured ADR-0138 regressions pass at fuel 9/10/15/16, including write
+non-replay and terminal total budget 116. ADR-0139's fixture proves 17+13 equals
+one-shot fuel 30; an alternate current Address requires its own start, and
+another 7 units preserve completion. The 685-job build, 1,258-job test build,
+full test run, 11-root trust-zero sweep, metadata, kernel, diff, and independent
+audits pass. Thirty-two public theorems use only `propext` and `Quot.sound`; the
+audits found no P0-P2 issue and the one P3 documentation typo was corrected.
 
 The budget is provided fuel, not a consumption or gas measure. This carrier is
 not a nested-call frame, scheduler, transaction, ABI conversion, parser

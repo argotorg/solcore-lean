@@ -196,11 +196,17 @@ pass. This does not choose code or storage, identify caller or callee, define
 call kind or authority, or change syntax and public formats.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
-is accepted and active, with implementation planned. It will package one fixed
-selected-run configuration with its exact branch-complete result and a proof
-that the result equals one execution at the cumulative provided-fuel budget.
-Resumption will accept only additional fuel, so immutable inputs and the
-completion policy cannot be replaced accidentally. The budget is not fuel
+is complete. It packages one fixed selected-run configuration with its exact
+branch-complete result and certifies equality with one execution at the
+cumulative provided-fuel budget. Resumption accepts only an additional natural
+number, so immutable inputs and the completion policy cannot be replaced
+accidentally. Whole-session zero and addition, every branch, no-fault,
+compatibility, continuations, and return/revert/trap folds are proved.
+
+Runtime tests cover fuel 9/10/15/16 with write non-replay and terminal budget
+116, plus current-address resumption at 17+13=30 and a terminal additional 7.
+The 685-job build, 1,258-job test build, full tests, 11-root trust-zero sweep,
+metadata, kernel, diff, and independent audits pass. The budget is not fuel
 consumption or gas. This adds no nested invocation, ABI, parser work, Wire or
 Oracle change, or public interface.
 
