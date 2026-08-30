@@ -855,17 +855,14 @@ preserve checkpoint, effects, and unrelated Account across exhaustion. This
 adds no gas, persistence, handler/input replacement, call lifecycle, or public
 format.
 
-ADR-0137 completes a structural normalization of the host boundary. One
-explicit registry is the only production capability-order literal; host types,
-runtime values, and arbitrary-list typing are derived from it. The numeric
-index remains an independent explicit declaration tied to the registry by
-finite exact laws. All eighteen named lookup facts, both length facts, and the
-nine numeric index facts plus fixed-environment typing theorem remain in the
-global simplifier set: thirty declarations in total. The mapped tables are
-definitionally equal to their old literals. All nine positions 0 through 8,
-length 9, first-unbound index 9, runtime behavior, and public boundaries remain
-unchanged. The independent audit found no P0-P3 issue. Parser and syntax proofs
-remain paused.
+ADR-0137 completed a structural normalization of the then-existing host
+boundary. One extensible registry remains the only production capability-order
+literal; host types, runtime values, and arbitrary-list typing derive from it.
+Numeric indexes remain independent declarations tied to registry positions by
+finite exact laws. The thirty compatibility declarations and length-9 boundary
+describe that nine-capability milestone. ADR-0139 subsequently extends the
+same derived tables to ten entries without changing indexes 0 through 8 or any
+public boundary. Parser and syntax proofs remain paused.
 
 ADR-0138 is complete above parent-indexed selected execution.
 Its internal five-way carrier preserves storage absence, code absence, exact
@@ -882,14 +879,20 @@ All validation and the independent audit pass with no P0-P3 issue. Exhaustion
 and fault gain no frame meaning, and no gas, persistence, nested-call,
 transaction, parser, ABI, or public-format rule is added.
 
-ADR-0139 is the active planned extension of the immutable execution input. It
-adds one explicitly supplied `currentAddress` whose lifetime is one handled run
-and every same-input resumption of that run. Internal Core will observe its
-lossless Word through an append-only Unit-to-Word capability at index 9; the
-canonical host tables will therefore have length 10 and index 10 will be first
-unbound. The value is an independent current-context role: it does not select
-the storage Account or checked code, require an Account, identify the caller or
-a callee, or define call kind, nesting, authority, or transaction behavior.
+ADR-0139 completes the next immutable execution-input extension. One explicitly
+supplied `currentAddress` lasts for one handled run and every same-input
+resumption of that run. Internal Core observes its exact widened Word through
+the tenth capability at index 9; both canonical tables have length 10 and index
+10 is first unbound. The read-only request preserves handler context,
+continuation, and Core Store, and strict narrowing recovers the Address.
+
+Measured direct fuel is 4/5; the observe/write/observe path measures
+16/17/23/29/30, with 17+13 and 23+7 agreeing with one-shot fuel 30. Tests keep
+current Accounts absent, vary only this input with exact context identity,
+retain the derived write and equal pair, and reach return/revert/trap folds.
+The 676-job build, 1,240-job test suite, 33-root trust-zero sweep, and independent
+P0-P3 audit pass. The role does not select storage or code, identify caller or
+callee, or define call kind, nesting, authority, or transaction behavior.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

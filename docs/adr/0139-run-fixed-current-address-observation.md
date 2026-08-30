@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: expose one explicit current-context Address to internal Core code
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -218,20 +218,42 @@ This ADR does not define or prove:
 - a public representation, compatibility promise, parser change, or Oracle
   behavior.
 
-## Planned sequence
+## Implemented sequence
 
-Implement the decision in bounded green commits:
+The decision was implemented in bounded green commits:
 
-1. record and activate this contract;
-2. append the required input field and migrate explicit constructors;
-3. append the Core capability and request, closing all exhaustive machine and
+1. recorded and activated this contract;
+2. appended the required input field and migrated explicit constructors;
+3. appended the Core capability and request, closing all exhaustive machine and
    safety proofs while retaining indexes 0 through 8;
-4. add exact handler, strict-recovery, and driver laws;
-5. add focused Core layout, admission, fault, suspension, fuel, and frozen-Wire
+4. added exact handler, strict-recovery, and driver laws;
+5. added focused Core layout, admission, fault, suspension, fuel, and frozen-Wire
    regressions;
-6. add end-to-end selected, storage, parent, fold, and resumption regressions;
-7. run full validation, audit the contract independently, and synchronize the
+6. added end-to-end selected, storage, parent, fold, and resumption regressions;
+7. ran full validation, audited the contract independently, and synchronized the
    completion record.
+
+## Implementation and validation
+
+`currentAddress` is the tenth canonical host capability: its stable index is
+9, both derived host tables have length 10, and index 10 is first unbound. The
+Unit request returns the exact widened run input, preserves the full handler
+context, continuation, and Core-local Store, and strict narrowing recovers the
+supplied Address. Existing indexes 0 through 8 and frozen Wire v1/v2 remain
+unchanged.
+
+Direct execution measures the exact request/completion boundary at fuel 4/5.
+The end-to-end observe/write/observe program measures fuel 16, 17, 23, 29,
+and 30; resumptions at 17+13 and 23+7 equal the one-shot fuel-30 completion.
+Its distinct address sentinels, absent current Accounts, exact current-only
+input variation, retained write, equal returned pair, and return/revert/trap
+folds make projection swaps, implicit lookup, request replay, and state loss
+observable.
+
+The 676-job build, 1,240-job test executable build, and full test run pass.
+All 33 changed Lean roots pass trust-zero with warnings as errors; metadata,
+semantic-kernel, diff, axiom, compatibility, and independent P0-P3 audits also
+pass. The root README and all published formats remain unchanged.
 
 ## Consequences
 

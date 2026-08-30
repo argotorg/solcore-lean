@@ -384,12 +384,12 @@ result whose retained state may already be terminal. Typed arbitrary results
 remain typed after resumption and cannot expose a raw machine fault.
 
 [ADR-0137](adr/0137-canonical-host-capability-registry.md) is complete. The
-existing host-capability order now has one production registry. The type table,
-value table, and runtime typing proof are derived from it while the explicit
-numeric index remains independent. The nine capabilities retain indexes 0
-through 8, both tables retain length 9, and index 9 remains first unbound.
-Runtime behavior and public formats do not change. Parser and syntax proofs
-remain paused.
+then-existing host-capability order gained one production registry. The type
+table, value table, and runtime typing proof derive from it while explicit
+numeric indexes remain independent. At that milestone the nine capabilities
+occupied indexes 0 through 8, both tables had length 9, and index 9 was first
+unbound. ADR-0139 has since appended a tenth entry without changing those
+historical positions. Runtime behavior and public formats do not change.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
 is complete. It adds an internal five-way carrier that keeps
@@ -399,11 +399,11 @@ three-`Option` parent API remains unchanged and is recovered by explicit
 erasure. Parser and syntax proofs remain paused while syntax-independent
 semantics continues.
 
-[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is accepted and
-active, with implementation planned. It will add one explicitly supplied
-`currentAddress` to the immutable run input and expose its lossless Word through
-an internal capability at index 9. This role will not select code or storage and
-will not be inferred from the caller, a callee, an Account, or a call kind.
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is complete. One
+explicitly supplied `currentAddress` is fixed in the immutable run input and
+exposed losslessly through internal host index 9. Both canonical tables now
+have length 10 and index 10 is first unbound. The role neither selects code or
+storage nor derives from the caller, a callee, an Account, or a call kind.
 
 ## Implementation status
 
@@ -430,9 +430,9 @@ will not be inferred from the caller, a callee, an Account, or a call kind.
 | Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
-| Canonical host capability registry | Complete | One canonical nine-entry registry derives both host tables and arbitrary-list safety; exact finite laws, all named compatibility facts, numeric boundaries, and runtime regressions are complete | Not published |
+| Canonical host capability registry | Complete | One canonical registry now derives both ten-entry host tables and arbitrary-list safety; the original indexes 0 through 8 and appended current-address index 9 have exact finite laws | Not published |
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
-| Run-fixed current-address observation | Active; implementation planned | Exact input lifetime, independent address roles, index-9 capability, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs are required | Not published |
+| Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, index-9 capability, length-10 tables, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2557,19 +2557,19 @@ introduced.
 
 ## Completed canonical host capability registry
 
-[ADR-0137](adr/0137-canonical-host-capability-registry.md) normalizes the
-existing nine internal host capabilities around one explicit ordered registry.
-It is the only production literal for that order. Both host tables are maps
-over it, and arbitrary-list induction supplies their runtime typing proof. The
-explicit numeric index remains separate and is tied to the registry by finite
-exact laws.
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) normalized the
+then-existing nine internal host capabilities around one explicit ordered
+registry. It remains the only production literal for that extensible order.
+Both host tables are maps over it, and arbitrary-list induction supplies their
+runtime typing proof. Explicit numeric indexes remain separate and are tied to
+the registry by finite exact laws.
 
 All eighteen old lookup statements, both length statements, nine `index_*`
 statements, and `hostEnvironment_hasTypes` retain their statements and
 `@[simp]` behavior: all thirty declarations remain registered. The derived
-tables are definitionally equal to the old literals. Numeric and runtime
-regressions preserve indexes 0 through 8, length 9, first-unbound index 9, and
-checked execution.
+tables are definitionally equal to the old literals. At that milestone, numeric
+and runtime regressions preserved indexes 0 through 8, length 9,
+first-unbound index 9, and checked execution.
 
 The 51-job focused build, 659-job full build, 1,206-job test executable build,
 full test run, four-root trust-zero and warning-as-error checks, metadata,
@@ -2578,8 +2578,9 @@ use only `propext`, sometimes with `Quot.sound`; no custom axiom or `sorry`
 remains. The independent trust-zero completion audit confirmed the thirty
 simplifier registrations,
 definitionally equal tables, and single production literal, and found no P0-P3
-issue. This adds no capability and publishes no registry or ABI. Parser and
-syntax proofs remain paused.
+issue. Those results describe the nine-entry ADR-0137 milestone; ADR-0139 now
+extends the same registry to ten entries while retaining indexes 0 through 8.
+No registry or ABI is published. Parser and syntax proofs remain paused.
 
 ## Completed branch-complete parent execution result
 
@@ -2611,6 +2612,30 @@ pass trust-zero with warnings as errors; metadata, semantic-kernel, and diff
 checks pass. All 21 audited theorem reports use only `propext` and `Quot.sound`,
 and the independent audit found no P0-P3 issue. The three legacy files and root
 README are unchanged.
+
+## Completed run-fixed current-address observation
+
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) adds one required
+`currentAddress` to immutable execution inputs and exposes its exact widened
+Word through the tenth canonical host capability. Its index is 9, both derived
+host tables have length 10, and index 10 is first unbound; indexes 0 through 8
+retain their existing meaning. The read-only handler preserves the complete
+mutable context, continuation, and Core-local Store, and strict narrowing
+recovers the supplied Address.
+
+Direct execution has an exact fuel 4/5 request/completion boundary. The
+end-to-end observe/write/observe program measures fuel 16/17/23/29/30, with
+17+13 and 23+7 resumptions equal to the one-shot fuel-30 completion. Distinct
+storage, code, caller, current, value, and input sentinels expose projection
+swaps. Tests also retain absent current Accounts, prove exact read-only
+current-only variation, preserve the current-derived storage write and equal
+result pair, and carry completion through return, revert, and trap folds.
+
+The 676-job build, 1,240-job test executable build, and full test run pass. All
+33 changed Lean roots pass trust-zero with warnings as errors; metadata,
+semantic-kernel, diff, axiom, compatibility, and independent P0-P3 audits pass.
+No callee, call-kind, nested-call, authority, parser, public-format, or root
+README change is included.
 
 ## Meaning of completion
 

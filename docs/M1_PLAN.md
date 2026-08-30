@@ -94,10 +94,10 @@ zero is an identity only for actual run results, not arbitrary forged
 `outOfFuel` values.
 
 [ADR-0137](adr/0137-canonical-host-capability-registry.md) is complete. The
-existing nine-capability order is now canonical without adding a capability or
-changing execution. Both tables and arbitrary-list safety derive from the one
-registry, while explicit indexes 0 through 8, length 9, first-unbound index 9,
-and all public boundaries remain fixed. Parser and syntax proofs remain paused.
+then-existing nine-capability order became canonical without adding a
+capability or changing execution. Both tables and arbitrary-list safety derive
+from the one registry. ADR-0139 has since appended index 9 while preserving the
+historical indexes 0 through 8 and all public boundaries.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
 is complete. It introduces a branch-complete internal parent
@@ -105,11 +105,11 @@ result and resumes only retained exhaustion. The existing nested-`Option` API
 stays unchanged through an explicit compatibility erasure. Parser and syntax
 proofs remain paused.
 
-[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is accepted and
-active, with implementation planned. One explicit `currentAddress` will be
-fixed for a handled run and its same-input resumptions, observed losslessly by
-Core at append-only host index 9, and kept independent from storage, code,
-caller, and future callee or call-kind roles.
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is complete. One
+explicit `currentAddress` is fixed for a handled run and its same-input
+resumptions, observed losslessly by Core at append-only host index 9, and kept
+independent from storage, code, caller, and future callee or call-kind roles.
+The canonical host tables now have length 10 and index 10 is first unbound.
 
 ## Completed foundation
 
@@ -250,9 +250,9 @@ These results remain regression obligations for every extension.
 | 117 | Run-fixed input-size observation | Complete | Derives the exact bounded input length as a Word, exposes it at Core host index 7, and proves its boundary agrees with optional byte lookup |
 | 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
 | 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
-| 120 | Canonical host capability registry | Complete | Derives both nine-entry host tables and arbitrary-list safety from one order, with exact finite laws and compatibility/runtime regressions |
+| 120 | Canonical host capability registry | Complete | Derives both host tables and arbitrary-list safety from one extensible order, with exact finite laws and compatibility/runtime regressions |
 | 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all five exact branches, resumes only exhaustion with split/zero/add laws, and preserves the unchanged nested-`Option` and fold APIs |
-| 122 | Run-fixed current-address observation | Active; implementation planned | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
+| 122 | Run-fixed current-address observation | Complete | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
 | 123 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 124 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 125 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2105,28 +2105,29 @@ are excluded.
 
 ## Completed canonical host capability registry
 
-[ADR-0137](adr/0137-canonical-host-capability-registry.md) replaces three
-hand-maintained copies of the host-capability order with one explicit registry.
-It is the only production order literal. Both fixed tables are maps over it,
-and one list induction provides their runtime typing proof. Exact finite laws
-tie registry position to the independently explicit numeric index.
+[ADR-0137](adr/0137-canonical-host-capability-registry.md) replaced three
+hand-maintained copies of the then-existing host-capability order with one
+explicit extensible registry. It remains the only production order literal.
+Both fixed tables are maps over it, and one list induction provides their
+runtime typing proof. Exact finite laws tie registry position to each
+independently explicit numeric index.
 
 All eighteen old lookup facts, both length facts, nine `index_*` facts, and
 `hostEnvironment_hasTypes` retain their statements and simplifier attributes:
 all thirty declarations remain registered. The mapped tables are definitionally
-equal to the old literals. Numeric and runtime regressions preserve all nine
-capabilities at indexes 0 through 8, length 9, first-unbound index 9, and
-checked results.
+equal to the old literals. At that milestone, numeric and runtime regressions
+preserved all nine capabilities at indexes 0 through 8, length 9,
+first-unbound index 9, and checked results.
 
 The 51-job focused build, 659-job full build, 1,206-job test executable build,
 full test run, four-root trust-zero and warning-as-error checks, metadata,
 semantic-kernel, diff, and axiom checks pass; theorem reports are axiom-free,
 use `propext`, or use `propext` with `Quot.sound`. The independent trust-zero audit
 confirmed the thirty simplifier registrations, old-table definitional
-equality, and single production literal, with no P0-P3 issue. No custom axiom
-or `sorry` remains. It changes no request, response, fuel, fault, Store effect,
-Wire or Oracle format, source form, or ABI. Parser and syntax proofs remain
-paused while syntax-independent semantics is completed.
+equality, and single production literal, with no P0-P3 issue. These counts and
+length-9 boundaries describe the ADR-0137 milestone; ADR-0139 now appends a
+tenth entry while retaining indexes 0 through 8. No custom axiom or `sorry`
+remains, and no registry, Wire, Oracle, source, or ABI format is published.
 
 ## Completed branch-complete parent execution result
 
@@ -2154,6 +2155,27 @@ trust-zero and warning-as-error checks, metadata, semantic-kernel, and diff
 checks pass. Twenty-one theorem reports use only `propext` and `Quot.sound`;
 the independent audit found no P0-P3 issue. The old three files and root README
 remain unchanged.
+
+## Completed run-fixed current-address observation
+
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) requires one
+explicit `currentAddress` in immutable execution inputs and appends its
+Unit-to-Word observation at stable host index 9. Both canonical host tables now
+have length 10 and index 10 is first unbound. Exact handler and driver laws
+make the observation read-only, recover the supplied Address by strict
+narrowing, and preserve the complete mutable context, continuation, and
+Core-local Store.
+
+Direct execution measures the exact 4/5 fuel boundary. The end-to-end
+observe/write/observe path measures 16/17/23/29/30; split resumptions at 17+13
+and 23+7 equal one-shot fuel 30. Regressions keep current Accounts absent,
+vary only `currentAddress` with exact context identity, preserve the derived
+storage write and equal returned pair, and exercise return/revert/trap folds.
+
+The 676-job build, 1,240-job test executable build, full test run, 33-root
+trust-zero and warning-as-error sweep, metadata, semantic-kernel, diff, axiom,
+compatibility, and independent P0-P3 audits pass. No call kind, nested call,
+authority, parser, public format, or root README change was added.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

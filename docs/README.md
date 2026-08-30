@@ -164,14 +164,13 @@ context. Typed results remain safe. This adds no gas model, persistence, nested
 call lifecycle, syntax, Wire encoding, or public interface.
 
 [ADR-0137](adr/0137-canonical-host-capability-registry.md) completes the
-internal host-table normalization. The existing nine capabilities now have one
-canonical production order; both tables and their general safety proof derive
-from it while explicit numeric indexes remain independently checked. Indexes 0
-through 8, table length 9, first-unbound index 9, old lookup interfaces, runtime
-behavior, and public formats stay unchanged. All thirty old simplifier facts
-remain registered, and the mapped tables are definitionally equal to the old
-literals. The independent audit found no P0-P3 issue. No new capability is
-published, and parser and syntax proofs remain paused.
+historical host-table normalization. The then-existing nine capabilities gained
+one canonical production order; both tables and their general safety proof
+derive from it while explicit numeric indexes remain independently checked.
+Its length-9 and first-unbound-index-9 facts describe that milestone. ADR-0139
+now extends the same registry to ten entries while indexes 0 through 8, old
+lookup interfaces, runtime behavior, and public formats remain compatible.
+Parser and syntax proofs remain paused.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
 is complete. It keeps storage absence, code absence,
@@ -185,13 +184,16 @@ and the independent audit pass with no P0-P3 issue. This adds no gas,
 persistence, nested-call, transaction, parser, syntax, ABI, Wire, Oracle, or
 public-interface policy.
 
-[ADR-0139](adr/0139-run-fixed-current-address-observation.md) is the active
-planned slice. It will add one explicit `currentAddress` to the immutable run
-input and expose its exact widened Word through an internal Unit-to-Word
-capability at index 9. The value is fixed only for that run and same-input
-resumption. It will not choose code or storage, require an Account, identify a
-caller or callee, define call kind or authority, or change syntax and public
-formats.
+[ADR-0139](adr/0139-run-fixed-current-address-observation.md) completes
+run-fixed current-address observation. One explicit `currentAddress` is part of
+the immutable run input and its exact widened Word is exposed through internal
+Unit-to-Word index 9. The canonical host tables now have length 10 and index 10
+is first unbound. Exact read-only variation, absent current Accounts, direct
+fuel 4/5, end-to-end fuel 16/17/23/29/30, 17+13 and 23+7 resumption, the
+current-derived write and pair, and return/revert/trap folds are tested. The
+676-job build, 1,240-job tests, 33-root trust-zero sweep, and independent audit
+pass. This does not choose code or storage, identify caller or callee, define
+call kind or authority, or change syntax and public formats.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
