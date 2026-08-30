@@ -16,11 +16,21 @@ private def responseFor (request : Request) (body : ResponseBody) : Response := 
 
 private def inconclusiveBody
     (query : Query)
-    (exhaustion : Exhaustion) : ResponseBody :=
+    (exhaustion : PreflightExhaustion) : ResponseBody :=
   match query with
   | .capabilities => .capabilities (.inconclusive exhaustion)
   | .coreCheck _ => .coreCheck (.inconclusive exhaustion)
-  | .execute _ => .execute (.inconclusive exhaustion)
+  | .execute _ => .execute (.inconclusive (.preflight exhaustion))
+
+private def coreCheckRejection (diagnostic : Diagnostic) : CoreCheckVerdict :=
+  match CoreCheckRejection.of? diagnostic with
+  | some rejection => .rejected rejection
+  | none => .internalError .oracleResponseInvariant
+
+private def executeRejection (diagnostic : Diagnostic) : ExecuteVerdict :=
+  match ExecuteRejection.of? diagnostic with
+  | some rejection => .rejected rejection
+  | none => .internalError .oracleResponseInvariant
 
 private def handleCoreCheck (program : Solcore.Core.Wire.V3.Program) :
     CoreCheckVerdict :=
@@ -28,7 +38,7 @@ private def handleCoreCheck (program : Solcore.Core.Wire.V3.Program) :
   | .ok _ => .accepted { resultType := program.resultType }
   | .error error =>
       match CheckDiagnostic.ofError .coreChecking ["program"] error with
-      | .ok diagnostic => .rejected diagnostic
+      | .ok diagnostic => coreCheckRejection diagnostic
       | .error internal => .internalError internal
 
 private def executeVerdict
@@ -36,10 +46,10 @@ private def executeVerdict
     (fuel : Nat) : ScenarioExecutionResult → ExecuteVerdict
   | .preparationRejected error =>
       match ScenarioDiagnostic.ofPreparationError error with
-      | .ok diagnostic => .rejected diagnostic
+      | .ok diagnostic => executeRejection diagnostic
       | .error internal => .internalError internal
   | .rootRejected reason =>
-      .rejected (ScenarioDiagnostic.ofRootRejection target reason)
+      executeRejection (ScenarioDiagnostic.ofRootRejection target reason)
   | .outOfFuel => .inconclusive (.evaluationSteps fuel)
   | .executed observation => .executed observation
   | .internalError error => .internalError error
@@ -64,7 +74,7 @@ def handle
   match accepted : TypedPreflight.check request with
   | some exhaustion =>
       responseFor request <|
-        inconclusiveBody request.query (.preflight exhaustion)
+        inconclusiveBody request.query exhaustion
   | none =>
       match queryEq : request.query with
       | .capabilities =>

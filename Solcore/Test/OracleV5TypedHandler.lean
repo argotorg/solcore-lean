@@ -75,7 +75,7 @@ private def capabilityEnvelopeBudgeted : Bool :=
     native_decide
   let response := TypedHandler.handle (requestWith .capabilities limits) valid
   match response.body with
-  | .capabilities (.inconclusive (.preflight exhaustion)) =>
+  | .capabilities (.inconclusive exhaustion) =>
       exhaustion.resource == .identifierBytes &&
         exhaustion.limit == 0 && exhaustion.consumed == 2
   | _ => false
@@ -91,9 +91,10 @@ private def coreCheckRejected : Bool :=
   let response := TypedHandler.handle (requestWith (.coreCheck badProgram))
     defaultValid
   match response.body with
-  | .coreCheck (.rejected diagnostic) =>
-      diagnostic.code == "core.check.unbound-variable" &&
-        diagnostic.phase == .coreChecking && diagnostic.path == ["program"]
+  | .coreCheck (.rejected rejection) =>
+      rejection.diagnostic.code == "core.check.unbound-variable" &&
+        rejection.diagnostic.phase == .coreChecking &&
+        rejection.diagnostic.path == ["program"]
   | _ => false
 
 private def executionAccepted : Bool :=

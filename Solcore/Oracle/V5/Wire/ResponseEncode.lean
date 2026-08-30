@@ -130,7 +130,7 @@ def encodeCapabilitiesVerdict : CapabilitiesVerdict → Lean.Json
       ("phase", "protocol"),
       ("result", encodeCapabilityResult report)
     ]
-  | .inconclusive exhaustion => encodeInconclusive exhaustion
+  | .inconclusive exhaustion => encodeInconclusive (.preflight exhaustion)
   | .internalError error => encodeInternalErrorVerdict error
 
 def encodeCoreCheckVerdict : CoreCheckVerdict → Lean.Json
@@ -139,12 +139,12 @@ def encodeCoreCheckVerdict : CoreCheckVerdict → Lean.Json
       ("phase", "coreChecking"),
       ("result", encodeCoreCheckResult result)
     ]
-  | .rejected diagnostic => encodeRejected diagnostic
-  | .inconclusive exhaustion => encodeInconclusive exhaustion
+  | .rejected rejection => encodeRejected rejection.diagnostic
+  | .inconclusive exhaustion => encodeInconclusive (.preflight exhaustion)
   | .internalError error => encodeInternalErrorVerdict error
 
 def encodeExecuteVerdict : ExecuteVerdict → Lean.Json
-  | .rejected diagnostic => encodeRejected diagnostic
+  | .rejected rejection => encodeRejected rejection.diagnostic
   | .inconclusive exhaustion => encodeInconclusive exhaustion
   | .executed observation => .mkObj [
       ("kind", "executed"),

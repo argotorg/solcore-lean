@@ -53,13 +53,21 @@ private def diagnostic : Diagnostic := {
   ]
 }
 
+private def executeRejection : ExecuteRejection :=
+  ⟨diagnostic, by
+    right
+    right
+    right
+    right
+    exact rfl⟩
+
 private def diagnosticAndRejectionExact : Bool :=
   (encodeDiagnostic diagnostic).compress ==
     "{\"arguments\":{\"target\":\"0x0000000000000000000000000000000000000001\"}," ++
     "\"code\":\"oracle.v5.root.target-absent\",\"display\":null," ++
     "\"path\":[\"world\",\"accounts\",\"0x0000000000000000000000000000000000000001\"]," ++
     "\"phase\":\"rootInstallation\",\"severity\":\"error\"}" &&
-  (encodeExecuteVerdict (.rejected diagnostic)).compress ==
+  (encodeExecuteVerdict (.rejected executeRejection)).compress ==
     "{\"diagnostics\":[" ++ (encodeDiagnostic diagnostic).compress ++
     "],\"kind\":\"rejected\",\"phase\":\"rootInstallation\"}"
 
@@ -78,8 +86,8 @@ private def coreAcceptedEnvelopeExact : Bool :=
     "\"result\":{\"schema\":\"solcore-core-check-result/v3\"," ++
     "\"value\":{\"resultType\":\"word\"}}}}"
 
-private def preflightExhaustion : Exhaustion :=
-  .preflight ⟨.jsonDepth, 5, 6, by decide⟩
+private def preflightExhaustion : PreflightExhaustion :=
+  ⟨.jsonDepth, 5, 6, by decide⟩
 
 private def inconclusiveVerdictsExact : Bool :=
   (encodeCoreCheckVerdict (.inconclusive preflightExhaustion)).compress ==
