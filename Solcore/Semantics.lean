@@ -219,6 +219,7 @@ import Solcore.Semantics.WorldStateDelta
 import Solcore.Semantics.WorldStateDeltaProperties
 import Solcore.Semantics.HostStorageAccountPresence
 import Solcore.Semantics.OneLevelNestedExecutionState
+import Solcore.Semantics.OneLevelNestedExecutionBalancedRootProperties
 import Solcore.Semantics.OneLevelNestedExecutionTransitions
 import Solcore.Semantics.OneLevelNestedExecutionReachability
 import Solcore.Semantics.OneLevelNestedExecutionReachabilityProperties

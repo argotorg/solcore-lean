@@ -35,6 +35,26 @@ def initial
   stateTyping := rootContract.code.initialState_hasType
 }
 
+/--
+Start a root from a prepared working world while retaining a distinct original
+world as the transaction checkpoint.
+-/
+def prepared
+    {checkpointWorld workingWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract workingWorld rootInvocation.target
+        rootContract) :
+    RootFrame checkpointWorld rootContract rootInvocation := {
+  context :=
+    TopLevelExecution.preparedContext
+      (checkpointWorld := checkpointWorld) installed
+  state :=
+    Core.State.initial rootContract.code.program.body Core.hostEnvironment
+  stateTyping := rootContract.code.initialState_hasType
+}
+
 end RootFrame
 
 /--
@@ -124,6 +144,20 @@ def initialRoot
         rootContract) :
     Mode initialWorld rootContract rootInvocation :=
   .root (RootFrame.initial rootContract rootInvocation installed)
+
+/-- Construct an active root over a prepared post-transfer working world. -/
+def preparedRoot
+    {checkpointWorld workingWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract workingWorld rootInvocation.target
+        rootContract) :
+    Mode checkpointWorld rootContract rootInvocation :=
+  .root
+    (RootFrame.prepared
+      (checkpointWorld := checkpointWorld) rootContract rootInvocation
+      installed)
 
 end Mode
 
