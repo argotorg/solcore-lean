@@ -95,6 +95,64 @@ private def padding (input : Bytes) : Bytes :=
       |>.append ((List.replicate (remaining - 2) 0).toByteArray)
       |>.push 0x80
 
+private theorem padding_size_of_remaining_eq_one
+    (input : Bytes)
+    (remainingEq : rateBytes - input.size % rateBytes = 1) :
+    (padding input).size = input.size + 1 := by
+  simp [padding, remainingEq]
+
+private theorem padding_size_of_remaining_ne_one
+    (input : Bytes)
+    (remainingNe : rateBytes - input.size % rateBytes ≠ 1) :
+    (padding input).size =
+      input.size + 1 + (rateBytes - input.size % rateBytes - 2) + 1 := by
+  simp [padding, remainingNe]
+
+private theorem padding_size_eq_rate_mul (input : Bytes) :
+    (padding input).size = rateBytes * (input.size / rateBytes + 1) := by
+  have remainderLt : input.size % rateBytes < rateBytes := by
+    exact Nat.mod_lt _ (by decide : 0 < rateBytes)
+  have reconstruction := Nat.mod_add_div input.size rateBytes
+  by_cases remainingEq : rateBytes - input.size % rateBytes = 1
+  · rw [padding_size_of_remaining_eq_one input remainingEq]
+    simp only [rateBytes] at remainderLt reconstruction remainingEq ⊢
+    omega
+  · rw [padding_size_of_remaining_ne_one input remainingEq]
+    simp only [rateBytes] at remainderLt reconstruction remainingEq ⊢
+    omega
+
+private theorem padding_size_mod_rateBytes_eq_zero_of_remaining_eq_one
+    (input : Bytes)
+    (remainingEq : rateBytes - input.size % rateBytes = 1) :
+    (padding input).size % rateBytes = 0 := by
+  rw [padding_size_of_remaining_eq_one input remainingEq]
+  have remainderLt : input.size % rateBytes < rateBytes := by
+    exact Nat.mod_lt _ (by decide : 0 < rateBytes)
+  have reconstruction := Nat.mod_add_div input.size rateBytes
+  simp only [rateBytes] at remainderLt reconstruction remainingEq ⊢
+  omega
+
+private theorem padding_size_mod_rateBytes_eq_zero_of_remaining_ne_one
+    (input : Bytes)
+    (remainingNe : rateBytes - input.size % rateBytes ≠ 1) :
+    (padding input).size % rateBytes = 0 := by
+  rw [padding_size_of_remaining_ne_one input remainingNe]
+  have remainderLt : input.size % rateBytes < rateBytes := by
+    exact Nat.mod_lt _ (by decide : 0 < rateBytes)
+  have reconstruction := Nat.mod_add_div input.size rateBytes
+  simp only [rateBytes] at remainderLt reconstruction remainingNe ⊢
+  omega
+
+private theorem padding_absorb_read_inBounds
+    (input : Bytes) (block lane index : Nat)
+    (blockLt : block < (padding input).size / rateBytes)
+    (laneLt : lane < 17)
+    (indexLt : index < 8) :
+    block * rateBytes + 8 * lane + index < (padding input).size := by
+  rw [padding_size_eq_rate_mul] at blockLt ⊢
+  simp only [rateBytes] at blockLt ⊢
+  omega
+
 private def absorb (input : Bytes) : State :=
   let padded := padding input
   (List.range (padded.size / rateBytes)).foldl
@@ -109,5 +167,10 @@ private def laneBytesLE (lane : UInt64) : List UInt8 :=
 def hash (input : Bytes) : Bytes :=
   let state := absorb input
   ((List.range 4).flatMap fun lane => laneBytesLE state[lane]!).toByteArray
+
+@[simp] theorem hash_size (input : Bytes) :
+    (hash input).size = 32 := by
+  simp [hash, laneBytesLE]
+  rfl
 
 end Solcore.Abi.V1.Keccak256
