@@ -115,6 +115,7 @@ import Solcore.Test.Adr0146BoundaryExternalProperties
 import Solcore.Test.Adr0146SchedulerExternalProperties
 import Solcore.Test.Adr0147PreparedContextExternalProperties
 import Solcore.Test.Adr0147BalancedRootExternalProperties
+import Solcore.Test.Adr0147ValueCallBoundary
 import Solcore.Test.TopLevelExecution
 import Solcore.Test.TopLevelObservation
 import Solcore.Test.ContractCallWordBoundary
@@ -5068,6 +5069,7 @@ def run : IO Unit := do
   testTopLevelExecution
   testTopLevelObservation
   testContractCallWordBoundary
+  Adr0147ValueCallBoundary.testAdr0147ValueCallBoundary
   testOneLevelNestedExecution
   testOneLevelNestedExecutionExtended
   testOneLevelNestedExecutionResumption
