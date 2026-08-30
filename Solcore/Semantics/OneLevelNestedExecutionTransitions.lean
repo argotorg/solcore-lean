@@ -11,6 +11,7 @@ import Solcore.Semantics.HostStorageAccountPresence
 import Solcore.Semantics.CheckedCreationPreflightFailure
 import Solcore.Semantics.OneLevelNestedCreationTransitions
 import Solcore.Semantics.OneLevelNestedExecutionMode
+import Solcore.Semantics.TransactionHostStorageHandler
 
 /-! Proof-preserving local transitions for the one-level nested scheduler. -/
 
@@ -45,7 +46,7 @@ def afterHandledSuspension
     (advanced : Core.hostAdvance frame.state = .suspended suspension) :
     RootFrame initialWorld rootContract rootInvocation :=
   let requestResult :=
-    HostStorageDriver.handleRequest rootInvocation.executionInputs
+    TransactionHostStorageDriver.handleRequest rootInvocation.executionInputs
       frame.context suspension.request
   let suspensionTyping :=
     Core.hostAdvance_suspended_hasType frame.stateTyping advanced
@@ -87,7 +88,7 @@ def resumeWith
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
     (root : SuspendedRoot initialWorld rootContract rootInvocation)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (response : Core.ContractCallWordResult) :
     RootFrame initialWorld rootContract rootInvocation := {
   context := context
@@ -112,7 +113,12 @@ def startChild
       root.parentContext.context.storageAddress) :
     ChildFrame initialWorld rootContract rootInvocation :=
   let invocation := root.call.invocation rootInvocation.executionInputs target
-  let childContext := TopLevelExecution.initialContext installed
+  let inheritedJournal := root.parentContext.workingJournal
+  let childContext :=
+    TopLevelExecution.preparedTransactionContextWithJournals
+      (checkpointWorld := childInitialWorld)
+      (workingWorld := childInitialWorld)
+      inheritedJournal inheritedJournal installed
   {
     suspendedRoot := root
     childTarget := target
@@ -129,8 +135,9 @@ def startChild
     childStateTyping := childContract.code.initialState_hasType
     parentStorageAccount := parentPresence.account
     parentStorageAccount_present := by
-      simpa [childContext, TopLevelExecution.initialContext,
-        TopLevelExecution.initialValues] using
+      simpa [childContext,
+        TopLevelExecution.preparedTransactionContextWithJournals,
+        TopLevelExecution.preparedTransactionValuesWithJournals] using
           parentPresence.present
   }
 
@@ -249,6 +256,9 @@ def afterSuspensionWithEnvironment
   | currentAddress =>
       exact .root (frame.afterHandledSuspension
         ⟨.currentAddress, continuation, store⟩ advanced)
+  | emitLogWord topic payload =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.emitLogWord topic payload, continuation, store⟩ advanced)
 
 /-- Preserve the calls-only registry boundary while environments are adopted. -/
 def afterSuspension
@@ -268,6 +278,55 @@ def afterSuspension
 end RootFrame
 
 namespace ChildFrame
+
+private def afterTransactionHandleRequestPresence
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (context : TransactionHostStorageDriver.Context)
+    (request : Core.HostRequest)
+    (address : Address)
+    (presence : PresentAccountAt context.context.values.working.1 address) :
+    PresentAccountAt
+      (TransactionHostStorageDriver.handleRequest inputs context request).1.context.values.working.1
+      address := by
+  cases request with
+  | storageRead slot =>
+      exact presence.afterHandleRequest inputs context (.storageRead slot) address
+  | storageWrite slot value =>
+      exact presence.afterHandleRequest inputs context
+        (.storageWrite slot value) address
+  | storageAddress =>
+      exact presence.afterHandleRequest inputs context .storageAddress address
+  | codeAddress =>
+      exact presence.afterHandleRequest inputs context .codeAddress address
+  | callValue =>
+      exact presence.afterHandleRequest inputs context .callValue address
+  | callerAddress =>
+      exact presence.afterHandleRequest inputs context .callerAddress address
+  | inputDataByte? offset =>
+      exact presence.afterHandleRequest inputs context
+        (.inputDataByte? offset) address
+  | inputDataSize =>
+      exact presence.afterHandleRequest inputs context .inputDataSize address
+  | inputDataWordBE? offset =>
+      exact presence.afterHandleRequest inputs context
+        (.inputDataWordBE? offset) address
+  | currentAddress =>
+      exact presence.afterHandleRequest inputs context .currentAddress address
+  | callContractWord target input =>
+      exact presence.afterHandleRequest inputs context
+        (.callContractWord target input) address
+  | callContractWordWithValue target value input =>
+      exact presence.afterHandleRequest inputs context
+        (.callContractWordWithValue target value input) address
+  | createContractWord templateId value input =>
+      exact presence.afterHandleRequest inputs context
+        (.createContractWord templateId value input) address
+  | emitLogWord topic payload =>
+      exact ⟨presence.account, by
+        simpa [TransactionHostStorageDriver.handleRequest,
+          TransactionHostStorageDriver.Context.recordLog,
+          TransactionHostStorageDriver.Context.withWorkingJournal] using
+            presence.present⟩
 
 /-- Strictly decode a typed child state reported done, retaining its Word. -/
 def outcomeDone
@@ -319,7 +378,8 @@ def afterHandledSuspension
     (advanced : Core.hostAdvance frame.childState = .suspended suspension) :
     ChildFrame initialWorld rootContract rootInvocation :=
   let requestResult :=
-    HostStorageDriver.handleRequest frame.childInvocation.executionInputs
+    TransactionHostStorageDriver.handleRequest
+      frame.childInvocation.executionInputs
       frame.childContext suspension.request
   let suspensionTyping :=
     Core.hostAdvance_suspended_hasType frame.childStateTyping advanced
@@ -327,10 +387,11 @@ def afterHandledSuspension
       PresentAccountAt frame.childContext.context.values.working.1
         frame.suspendedRoot.parentContext.context.storageAddress :=
     ⟨frame.parentStorageAccount, frame.parentStorageAccount_present⟩
-  let nextPresence := parentPresence.afterHandleRequest
+  let nextPresence := afterTransactionHandleRequestPresence
     frame.childInvocation.executionInputs frame.childContext
       suspension.request
       frame.suspendedRoot.parentContext.context.storageAddress
+      parentPresence
   {
     frame with
     childContext := requestResult.1
@@ -346,10 +407,11 @@ def selectedParentContext
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
     (frame : ChildFrame initialWorld rootContract rootInvocation) :
-    CheckedCoreWordOutcome → HostStorageDriver.Context Unit Unit
+    CheckedCoreWordOutcome → TransactionHostStorageDriver.Context
   | .returned _ =>
-      frame.suspendedRoot.parentContext.rebaseWorking
+      frame.suspendedRoot.parentContext.rebaseWorkingWithEffects
         frame.childContext.context.values.working.1
+        frame.childContext.context.values.working.2
         frame.parentStorageAccount frame.parentStorageAccount_present
   | .reverted _ => frame.suspendedRoot.parentContext
   | .trapped _ => frame.suspendedRoot.parentContext

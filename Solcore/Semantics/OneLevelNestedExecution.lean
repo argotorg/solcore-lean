@@ -27,12 +27,22 @@ def finalize
     | .returned _ => workingWorld
     | .reverted _ => initialWorld
     | .trapped _ => initialWorld
+  let workingJournal := frame.context.workingJournal
+  let committedJournal :=
+    match outcome with
+    | .returned _ => workingJournal
+    | .reverted _ => frame.context.context.values.checkpoint.effects.rollback
+    | .trapped _ => frame.context.context.values.checkpoint.effects.rollback
   {
     terminalContext := frame.context
     coreValue := value
     coreStore := store
     outcome := outcome
     finalWorld := finalWorld
+    workingJournal := workingJournal
+    workingJournal_eq := rfl
+    committedJournal := committedJournal
+    committedJournal_eq := by cases outcome <;> rfl
     workingDelta := .exact
     committedDelta := .exact
   }

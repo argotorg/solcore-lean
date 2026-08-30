@@ -16,11 +16,21 @@ structure TerminalResult
     (initialWorld : WorldState)
     (rootContract : CheckedCoreContract)
     (rootInvocation : TopLevelInvocation) where
-  terminalContext : HostStorageDriver.Context Unit Unit
+  terminalContext : TransactionHostStorageDriver.Context
   coreValue : Core.Value
   coreStore : Core.Store
   outcome : FrameOutcome Core.Word
   finalWorld : WorldState
+  workingJournal : TransactionJournal
+  workingJournal_eq :
+    workingJournal = terminalContext.workingJournal
+  committedJournal : TransactionJournal
+  committedJournal_eq :
+    committedJournal =
+      match outcome with
+      | .returned _ => terminalContext.workingJournal
+      | .reverted _ => terminalContext.context.values.checkpoint.effects.rollback
+      | .trapped _ => terminalContext.context.values.checkpoint.effects.rollback
   workingDelta :
     WorldStateDelta initialWorld
       terminalContext.context.values.working.1

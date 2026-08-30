@@ -9,7 +9,7 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics.OneLevelNestedExecution
 
-private theorem handleRequest_storageAddress
+private theorem genericHandleRequest_storageAddress
     {RollbackState TraceState : Type}
     (inputs : HostStorageDriver.ExecutionInputs)
     (context : HostStorageDriver.Context RollbackState TraceState)
@@ -18,12 +18,28 @@ private theorem handleRequest_storageAddress
       context.context.storageAddress := by
   cases request <;> rfl
 
-private theorem handleRequest_checkpoint
+private theorem genericHandleRequest_checkpoint
     {RollbackState TraceState : Type}
     (inputs : HostStorageDriver.ExecutionInputs)
     (context : HostStorageDriver.Context RollbackState TraceState)
     (request : Core.HostRequest) :
     (HostStorageDriver.handleRequest inputs context request).1.context.values.checkpoint =
+      context.context.values.checkpoint := by
+  cases request <;> rfl
+
+private theorem transactionHandleRequest_storageAddress
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (context : TransactionHostStorageDriver.Context)
+    (request : Core.HostRequest) :
+    (TransactionHostStorageDriver.handleRequest inputs context request).1.context.storageAddress =
+      context.context.storageAddress := by
+  cases request <;> rfl
+
+private theorem transactionHandleRequest_checkpoint
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (context : TransactionHostStorageDriver.Context)
+    (request : Core.HostRequest) :
+    (TransactionHostStorageDriver.handleRequest inputs context request).1.context.values.checkpoint =
       context.context.values.checkpoint := by
   cases request <;> rfl
 
@@ -36,7 +52,7 @@ private theorem ChildFrame.afterHandledSuspension_storageAddress
     (advanced : Core.hostAdvance frame.childState = .suspended suspension) :
     (frame.afterHandledSuspension suspension advanced).childContext.context.storageAddress =
       frame.childContext.context.storageAddress := by
-  exact handleRequest_storageAddress _ _ _
+  exact transactionHandleRequest_storageAddress _ _ _
 
 private theorem ChildFrame.afterHandledSuspension_checkpoint
     {initialWorld : WorldState}
@@ -47,7 +63,7 @@ private theorem ChildFrame.afterHandledSuspension_checkpoint
     (advanced : Core.hostAdvance frame.childState = .suspended suspension) :
     (frame.afterHandledSuspension suspension advanced).childContext.context.values.checkpoint =
       frame.childContext.context.values.checkpoint := by
-  exact handleRequest_checkpoint _ _ _
+  exact transactionHandleRequest_checkpoint _ _ _
 
 /-- A reachable root context remains anchored to its top-level invocation. -/
 structure RootAnchored
@@ -198,6 +214,9 @@ private theorem rootAfterSuspension_anchored
   | currentAddress =>
       exact ⟨anchored.storageAddress_eq,
         anchored.checkpointState_eq⟩
+  | emitLogWord topic payload =>
+      exact ⟨anchored.storageAddress_eq,
+        anchored.checkpointState_eq⟩
 
 /-- Every scheduler-reachable mode retains its root and call-site anchors. -/
 theorem Reachable.anchored
@@ -272,11 +291,11 @@ theorem Reachable.anchored
   | initializerSuspended prior advanced inductionHypothesis =>
       exact { inductionHypothesis with
         initializerStorageAddress_eq :=
-          (handleRequest_storageAddress _ _ _).trans
+          (genericHandleRequest_storageAddress _ _ _).trans
             inductionHypothesis.initializerStorageAddress_eq
         initializerCheckpointState_eq :=
           (congrArg FrameCheckpointSnapshot.state
-            (handleRequest_checkpoint _ _ _)).trans
+            (genericHandleRequest_checkpoint _ _ _)).trans
             inductionHypothesis.initializerCheckpointState_eq }
 
 theorem Reachable.root_storageAddress

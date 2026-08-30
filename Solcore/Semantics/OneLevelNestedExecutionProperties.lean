@@ -58,6 +58,47 @@ namespace RootFrame
     (frame.finalize value store outcome).workingDelta = .exact := by
   cases outcome <;> rfl
 
+@[simp] theorem finalize_workingJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (frame : RootFrame initialWorld rootContract rootInvocation)
+    (value : Core.Value) (store : Core.Store)
+    (outcome : FrameOutcome Core.Word) :
+    (frame.finalize value store outcome).workingJournal =
+      frame.context.workingJournal := by
+  cases outcome <;> rfl
+
+@[simp] theorem finalize_returned_committedJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (frame : RootFrame initialWorld rootContract rootInvocation)
+    (value : Core.Value) (store : Core.Store) (data : Bytes) :
+    (frame.finalize value store (.returned data)).committedJournal =
+      frame.context.workingJournal :=
+  rfl
+
+@[simp] theorem finalize_reverted_committedJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (frame : RootFrame initialWorld rootContract rootInvocation)
+    (value : Core.Value) (store : Core.Store) (data : Bytes) :
+    (frame.finalize value store (.reverted data)).committedJournal =
+      frame.context.context.values.checkpoint.effects.rollback :=
+  rfl
+
+@[simp] theorem finalize_trapped_committedJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (frame : RootFrame initialWorld rootContract rootInvocation)
+    (value : Core.Value) (store : Core.Store) (reason : Core.Word) :
+    (frame.finalize value store (.trapped reason)).committedJournal =
+      frame.context.context.values.checkpoint.effects.rollback :=
+  rfl
+
 end RootFrame
 
 namespace ChildFrame
@@ -70,6 +111,16 @@ namespace ChildFrame
     (data : Core.Word) :
     (frame.selectedParentContext (.returned data)).context.values.working.1 =
       frame.childContext.context.values.working.1 :=
+  rfl
+
+@[simp] theorem selectedParentContext_returned_workingJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (frame : ChildFrame initialWorld rootContract rootInvocation)
+    (data : Core.Word) :
+    (frame.selectedParentContext (.returned data)).workingJournal =
+      frame.childContext.workingJournal :=
   rfl
 
 @[simp] theorem selectedParentContext_reverted

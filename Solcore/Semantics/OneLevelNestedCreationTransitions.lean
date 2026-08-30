@@ -58,7 +58,7 @@ def resumeWith
     {initialWorld : WorldState} {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
     (root : SuspendedCreationRoot initialWorld rootContract rootInvocation)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (response : Core.ContractCallWordResult) :
     RootFrame initialWorld rootContract rootInvocation := {
   context := context
@@ -114,7 +114,7 @@ def startInitializer
       provisionalPresence
   let invocation := root.profile.initializerInvocation
     rootInvocation.executionInputs prepared.createdAddress
-  let initializerContext := TopLevelExecution.preparedContext
+  let initializerContext := TopLevelExecution.preparedTransactionContext
     (checkpointWorld := statePreparation.postNonceWorld)
     statePreparation.initializerInstalled
   exact {
@@ -130,7 +130,9 @@ def startInitializer
     postNonce_checkpoint_eq := rfl
     initializerContext := initializerContext
     initializer_storageAddress_eq := by
-      simpa [initializerContext, TopLevelExecution.preparedContext] using
+      simpa [initializerContext,
+        TopLevelExecution.preparedTransactionContext,
+        TopLevelExecution.preparedTransactionValues] using
         prepared.preparation_address_eq
     initializer_checkpointState_eq := rfl
     initializerState := Core.State.initial
@@ -140,8 +142,11 @@ def startInitializer
     parentAccount := initializerParentPresence.account
     parentAccount_present := by
       rw [← creatorAddress_eq]
-      simpa [initializerContext, TopLevelExecution.preparedContext,
-        TopLevelExecution.preparedValues] using initializerParentPresence.present
+      simpa [initializerContext,
+        TopLevelExecution.preparedTransactionContext,
+        TopLevelExecution.preparedTransactionValues,
+        TopLevelExecution.preparedTransactionValuesWithJournals] using
+          initializerParentPresence.present
   }
 
 end SuspendedCreationRoot

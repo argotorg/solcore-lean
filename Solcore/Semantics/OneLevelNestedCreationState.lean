@@ -78,7 +78,7 @@ structure SuspendedCreationRoot
     (initialWorld : WorldState)
     (rootContract : CheckedCoreContract)
     (rootInvocation : TopLevelInvocation) where
-  parentContext : HostStorageDriver.Context Unit Unit
+  parentContext : TransactionHostStorageDriver.Context
   profile : CreationProfile
   continuation : List Core.Frame
   store : Core.Store
@@ -128,7 +128,7 @@ structure PreparedInitializerFrame
     initializerInvocation =
       suspendedRoot.profile.initializerInvocation
         rootInvocation.executionInputs prepared.createdAddress
-  postNonceParentContext : HostStorageDriver.Context Unit Unit
+  postNonceParentContext : TransactionHostStorageDriver.Context
   postNonce_storageAddress_eq :
     postNonceParentContext.context.storageAddress =
       suspendedRoot.parentContext.context.storageAddress
@@ -138,7 +138,7 @@ structure PreparedInitializerFrame
   postNonce_checkpoint_eq :
     postNonceParentContext.context.values.checkpoint =
       suspendedRoot.parentContext.context.values.checkpoint
-  initializerContext : HostStorageDriver.Context Unit Unit
+  initializerContext : TransactionHostStorageDriver.Context
   initializer_storageAddress_eq :
     initializerContext.context.storageAddress = prepared.createdAddress
   initializer_checkpointState_eq :

@@ -7,12 +7,12 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics.OneLevelNestedExecution
 
-/-- A running root machine paired with its current storage-backed context. -/
+/-- A running root machine paired with its observable transaction context. -/
 structure RootFrame
     (initialWorld : WorldState)
     (rootContract : CheckedCoreContract)
     (rootInvocation : TopLevelInvocation) where
-  context : HostStorageDriver.Context Unit Unit
+  context : TransactionHostStorageDriver.Context
   state : Core.State
   stateTyping :
     Core.HostStateHasType state rootContract.code.program.resultType
@@ -29,7 +29,7 @@ def initial
       InstalledCheckedCoreContract initialWorld rootInvocation.target
         rootContract) :
     RootFrame initialWorld rootContract rootInvocation := {
-  context := TopLevelExecution.initialContext installed
+  context := TopLevelExecution.initialTransactionContext installed
   state :=
     Core.State.initial rootContract.code.program.body Core.hostEnvironment
   stateTyping := rootContract.code.initialState_hasType
@@ -48,7 +48,7 @@ def prepared
         rootContract) :
     RootFrame checkpointWorld rootContract rootInvocation := {
   context :=
-    TopLevelExecution.preparedContext
+    TopLevelExecution.preparedTransactionContext
       (checkpointWorld := checkpointWorld) installed
   state :=
     Core.State.initial rootContract.code.program.body Core.hostEnvironment
@@ -101,7 +101,7 @@ structure SuspendedRoot
     (initialWorld : WorldState)
     (rootContract : CheckedCoreContract)
     (rootInvocation : TopLevelInvocation) where
-  parentContext : HostStorageDriver.Context Unit Unit
+  parentContext : TransactionHostStorageDriver.Context
   call : CallProfile
   continuation : List Core.Frame
   store : Core.Store
@@ -151,7 +151,7 @@ structure ChildFrame
   childInvocation_eq :
     childInvocation =
       suspendedRoot.call.invocation rootInvocation.executionInputs childTarget
-  childContext : HostStorageDriver.Context Unit Unit
+  childContext : TransactionHostStorageDriver.Context
   childState : Core.State
   childStateTyping :
     Core.HostStateHasType childState childContract.code.program.resultType
