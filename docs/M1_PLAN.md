@@ -134,16 +134,22 @@ cumulative provided-fuel budget.
 Resumption is restricted to more fuel under the same initial context and
 immutable inputs. Completion reuses the existing canonical Word return frame;
 all proof consumers, runtime boundaries, validation, and audits pass.
-Storage-presence and parent-indexed integration are the next candidate;
+ADR-0144 now supplies storage-presence and parent-indexed integration;
 non-Word fallback remains separate work.
 
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
-Accepted and is the active slice. One outer option represents storage-Account
+complete. One outer option represents storage-Account
 absence; a present result retains the exact refined parent context and the
 complete ADR-0143 execution. Inner resumption is reused, and canonical Word
 success produces a proof-linked completion and parent-indexed returned
 continuation with exact plain coherence. Legacy coherence is intentionally
 conditional on the same successful Word return policy.
+
+The active milestone is now one executable top-level lifecycle: take an
+explicit initial `WorldState` and checked Core contract, run a direct
+invocation, commit return, roll back revert and trap, and report terminal data
+with an exact state observation. Proof-only extensions of the ADR-0144 path are
+not separate milestones.
 
 ## Completed foundation
 
@@ -291,11 +297,12 @@ These results remain regression obligations for every extension.
 | 124 | Checked Word completion to canonical return bytes | Complete | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
 | 125 | Branch-complete selected Word-code classification | Complete | Preserves existing checked-code lookup while separating absent, non-Word, and Word branches before execution |
 | 126 | Proof-refined selected checked Word execution | Complete | Executes only the selected Word branch, retains exact non-execution reasons, and proves fixed-input fuel resumption and canonical Word completion |
-| 127 | Parent-indexed selected checked Word execution | In progress | Adds exact storage-presence provenance and canonical returned-parent projection without duplicating inner branches |
+| 127 | Parent-indexed selected checked Word execution | Complete | Adds exact storage-presence provenance and canonical returned-parent projection without duplicating inner branches |
 | 128 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 129 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 130 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 131 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 129 | Executable checked-Core top-level lifecycle | Active | Runs an installed checked contract from explicit state and makes return commit and revert/trap rollback observable in one total result |
+| 130 | Nested invocation and external observations | Planned | Adds child inputs/results, active-frame transitions, scheduling, call depth, balance, creation, logs, and a public Oracle boundary |
+| 131 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 132 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2301,16 +2308,14 @@ tests cover absent/non-Word 0/64, Word 9/10/15/16, exact splits, Store/context,
 and canonical byte/decode/frame recovery. The 709-job build, 1,306-job test
 build, full tests, 10-root trust sweep, repository checks, theorem consumers,
 axiom reports, and independent audits pass. Storage-presence and parent-indexed
-integration are the next candidate; non-Word fallback, nested invocation, ABI,
-parser work, and publication remain deferred.
+integration are completed by ADR-0144; non-Word fallback, nested invocation,
+ABI, parser work, and publication remain deferred.
 
-## Active parent-indexed selected checked Word execution
+## Completed parent-indexed selected checked Word execution
 
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
-Accepted with implementation in progress. Its parent provenance carrier and
-exact storage-refined producer are implemented. It refines parent
-initialization at one storage Address before reusing ADR-0143 unchanged. The
-outer option means only
+complete. It refines parent initialization at one storage Address before
+reusing ADR-0143 unchanged. The outer option means only
 storage absence; every present result contains the exact refinement proof and
 the inner selected execution. Non-Word and raw execution branches are not
 copied into a second carrier.
@@ -2322,6 +2327,22 @@ from that pair and forgetting the parent index recovers the plain continuation.
 Legacy coherence is restricted to successful Word execution with an explicitly
 matching canonical return policy. This slice does not define nested invocation
 or child-result delivery.
+
+All 49 public theorems have external consumers. Runtime tests cover absent and
+non-executing branches, measured exhaustion/completion fuel boundaries, exact
+resumption splits, retained state and Store, canonical return bytes, parent
+resolution, and conditional legacy coherence. Full build, test, trust-zero,
+metadata, kernel, diff, axiom, coverage, and contract checks pass.
+
+## Active executable top-level lifecycle
+
+The next vertical milestone starts from an explicit initial `WorldState`, an
+installed checked Core contract, and a direct invocation. Bounded execution
+must remain total: exhaustion stays resumable, while terminal return selects
+the working state and terminal revert or trap selects the initial checkpoint.
+The result must retain return or revert data, trap information, and an exact
+state observation. Nested calls, balances, creation, logs, ABI, and the public
+Oracle attach only after this boundary is executable end to end.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

@@ -953,20 +953,20 @@ The raw branch remains `HostDriverResult`, and successful Word completion still
 uses `WordReturnedFrameCompletion` and its canonical 32-byte frame adapter.
 Consequently, no new execution-outcome or frame hierarchy is introduced.
 Selection also remains present when completion is absent, so non-execution is
-not confused with Word fuel exhaustion. Storage-presence and parent-indexed
-integration are deliberately deferred to a later layer.
+not confused with Word fuel exhaustion. ADR-0144 supplies the separate
+storage-presence and parent-indexed integration layer.
 
 All 32 public proof contracts and their consumers pass. Runtime boundaries,
 Store/context retention, canonical bytes, decoding, and frame projection are
 covered; full validation and independent coverage and contract audits pass.
-The next candidate integrates storage-presence and the parent-indexed boundary
-without duplicating this selection or execution layer.
+The parent-indexed boundary is now connected without duplicating this
+selection or execution layer.
 
-ADR-0144 is the active parent integration layer. It first applies the existing
-present-storage refinement to a parent-indexed initialization. Failure is the
-only outer `none`; success retains the exact context proof and embeds ADR-0143
-directly. Selection and `HostDriverResult` branches therefore remain owned by
-the inner layer, and fuel resumption delegates to it.
+ADR-0144 is the completed parent integration layer. It first applies the
+existing present-storage refinement to a parent-indexed initialization.
+Failure is the only outer `none`; success retains the exact context proof and
+embeds ADR-0143 directly. Selection and `HostDriverResult` branches therefore
+remain owned by the inner layer, and fuel resumption delegates to it.
 
 Canonical Word success yields one proof-guarded pair: the existing completion
 and a returned parent-indexed continuation built from the same initialization
@@ -975,6 +975,13 @@ and erasing its parent index recovers the exact plain continuation. A total
 mapping to older generic selected execution would change non-Word behavior or
 completion policy, so compatibility is proved only under a successful Word
 selection and matching canonical returned bytes.
+
+This boundary produces a canonical returned parent continuation but does not
+yet finalize a transaction. The active vertical layer starts from an explicit
+initial `WorldState` and installed checked Core contract, executes one direct
+top-level invocation, selects the working state on return, selects the initial
+checkpoint on revert or trap, and exposes terminal data with an exact state
+observation. Nested calls and child-result delivery remain above that layer.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

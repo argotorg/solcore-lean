@@ -424,6 +424,18 @@ complete. It classifies address-selected checked code as absent, non-Word, or
 Word without rerunning the checker or changing the existing
 `WorldState.code?` lookup.
 
+[ADR-0143](adr/0143-proof-refined-selected-checked-word-execution.md) is
+complete. It executes only the checked Word branch, retains the exact raw
+result and fixed inputs, and supports fuel-only resumption without collapsing
+code absence, non-Word selection, or exhaustion.
+
+[ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
+complete. It connects that execution to an exact parent/storage provenance and
+constructs the matching canonical returned parent continuation. Parser-proof
+work remains paused. The active target is now a single executable top-level
+lifecycle from explicit initial state and checked contract through
+commit/rollback and terminal observation.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -455,6 +467,8 @@ Word without rerunning the checker or changing the existing
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
 | Checked Word completion to canonical return bytes | Complete | Word refinement, success witness, exact raw projection/retraction, canonical returned frame, typed branch laws, stability, split fuel, and regressions are complete | Not published |
 | Branch-complete selected Word-code classification | Complete | Three-way classifier, bidirectional erasure round trips, injectivity, exact checked-code and Word projections, WorldState coherence, storage preservation, and regressions are complete | Not published |
+| Proof-refined selected checked Word execution | Complete | Exact selection, checked Word-only execution, raw/completion retention, fixed-input fuel resumption, theorem consumers, and measured regressions are complete | Not published |
+| Parent-indexed selected checked Word execution | Complete | Exact storage and parent provenance, delegated resumption, proof-linked canonical returned continuation, plain and conditional legacy coherence, consumers, and regressions are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2762,21 +2776,18 @@ data, decoding, and frame projection.
 The 709-job build, 1,306-job test build, full test run, 10-root trust-zero and
 warning-as-error sweep, metadata, kernel, and diff checks pass. Thirty-two
 public theorems have 32 consumers and use exactly `propext` and `Quot.sound`;
-independent coverage and contract audits found no P0-P3 issue. Storage-presence
-and parent-indexed integration are the next candidate. Non-Word policy, nested
-calls, ABI, parser work, and public formats remain separate.
+independent coverage and contract audits found no P0-P3 issue. ADR-0144 now
+provides storage-presence and parent-indexed integration. Non-Word policy,
+nested calls, ABI, parser work, and public formats remain separate.
 
-## Active parent-indexed selected checked Word execution
+## Completed parent-indexed selected checked Word execution
 
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
-Accepted with implementation in progress. The parent provenance carrier and
-its exact storage-refined `start?` producer are implemented; the proof,
-resumption, parent-return, and regression layers are being completed. The
-slice adds exactly one outer optional boundary to ADR-0143: `none` means that
-the parent initialization cannot refine the chosen storage Address to a
-present Account. A present value carries that
-exact context-refinement proof and the unchanged ADR-0143 execution, so code
-absence, non-Word selection, exhaustion, raw results, and completion are not
+complete. The slice adds exactly one outer optional boundary to ADR-0143:
+`none` means that the parent initialization cannot refine the chosen storage
+Address to a present Account. A present value carries that exact
+context-refinement proof and the unchanged ADR-0143 execution, so code absence,
+non-Word selection, exhaustion, raw results, and completion are not
 re-enumerated.
 
 Resumption delegates to the inner fixed-input execution. On canonical Word
@@ -2785,6 +2796,19 @@ the matching parent-indexed returned continuation. Its plain view recovers the
 existing continuation exactly. Coherence with legacy selected execution is
 limited to a successful Word branch whose completion policy returns the same
 canonical bytes; no total legacy erasure is claimed.
+
+All 49 public theorems have external compile consumers. Runtime tests cover
+storage absence and non-executing selections at fuel 0/64, Word exhaustion at
+9/10/15, completion at 16, exact 9+7, 10+6, and 15+1 splits, terminal
+stability, retained parent/state/Store data, canonical bytes, resolution, and
+conditional legacy coherence. The 723-job build, 1,334-job test build, full
+test run, 16-root trust-zero and warning-as-error sweep, metadata, kernel,
+diff, axiom, coverage, and contract checks pass.
+
+The active milestone is no longer another proof-only adapter on this path. It
+is an executable top-level lifecycle taking an explicit initial `WorldState`
+and checked Core contract, committing return, rolling back revert and trap,
+and returning terminal data with an exact state observation.
 
 ## Meaning of completion
 

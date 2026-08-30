@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: add storage-presence provenance and canonical parent return to ADR-0143
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -287,14 +287,27 @@ This ADR does not define or prove:
 - Solidity ABI encoding, arbitrary Core-value serialization, a public byte
   contract, external compatibility promise, or concrete syntax.
 
-## Planned sequence
+## Implemented sequence
 
-1. record and activate this storage-provenance and parent-return contract;
-2. implement the present parent-indexed carrier and exact `start?` branches;
-3. implement closed present resumption and optional-start algebra;
-4. implement canonical returned-parent projection and plain coherence;
-5. prove limited legacy coherence and add compile/runtime regressions; and
-6. complete full validation, independent audits, and documentation sync.
+1. recorded the storage-provenance and parent-return contract;
+2. added the present parent-indexed carrier and exact `start?` branches;
+3. added closed present resumption and optional-start algebra;
+4. added canonical returned-parent projection and plain coherence;
+5. proved limited legacy coherence and added compile/runtime regressions; and
+6. completed full validation, independent audits, and documentation sync.
+
+The implementation exposes 6 definitions and 49 public theorems. All 55
+public names are exercised from external test namespaces. Runtime regressions
+cover storage absence and non-executing selections at fuel 0 and 64, Word
+exhaustion at 9, 10, and 15, completion at 16, exact 9+7, 10+6, and 15+1
+resumption, zero/addition/terminal stability, canonical bytes, retained Store,
+parent checkpoint, final working storage, resolution, trace prefix, and the
+conditional legacy-success correspondence.
+
+The 723-job full build, 1,334-job test build, executable suite, and all 16
+changed Lean roots pass. The direct Lean checks use trust level zero and treat
+warnings as errors. Metadata, semantic-kernel, and diff checks pass. Every
+public theorem depends only on the accepted `propext` and `Quot.sound` axioms.
 
 ## Consequences
 
@@ -302,6 +315,8 @@ The canonical selected Word path can begin at parent-indexed initialization,
 retain storage and code non-execution reasons without branch duplication, and
 produce a returned parent continuation with exact canonical bytes.
 
-This is still not nested invocation. The next call-level slice must first fix
-how a parent suspension derives child inputs and how returned child bytes are
-delivered back to that exact suspended parent continuation.
+This is still not a top-level transaction or nested invocation. The next
+vertical slice starts from an explicit initial `WorldState` and checked Core
+contract, executes one top-level invocation, commits return, rolls back revert
+and trap, and returns terminal data together with an exact state observation.
+Nested calls and child-result delivery remain later work.

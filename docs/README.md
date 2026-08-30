@@ -249,19 +249,26 @@ cumulative fuel budget. Fuel-only resumption keeps the same context and inputs;
 exact splits reach the same completion as a one-shot run. Completion preserves
 the Store and host context and reuses the canonical 32-byte Word return. All 32
 public proof contracts, runtime boundaries, full validation, and independent
-audits pass. Storage-presence and parent-indexed integration are the next
-candidate; non-Word fallback, ABI, parser work, and public formats remain later
-decisions.
+audits pass. ADR-0144 now supplies storage-presence and parent-indexed
+integration; non-Word fallback, ABI, parser work, and public formats remain
+later decisions.
 
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is the
-active integration slice. Its outer option represents only a missing storage
-Account. A present value retains the exact refined context and the complete
-ADR-0143 execution, without repeating non-Word or raw-result branches. Inner
-fuel resumption remains unchanged. Successful canonical Word completion is
-paired, under its exact proof, with the matching parent-indexed returned
+completed integration slice. Its outer option represents only a missing
+storage Account. A present value retains the exact refined context and the
+complete ADR-0143 execution, without repeating non-Word or raw-result branches.
+Inner fuel resumption remains unchanged. Successful canonical Word completion
+is paired, under its exact proof, with the matching parent-indexed returned
 continuation; forgetting the parent index recovers the existing plain
 continuation. Compatibility with older execution paths is claimed only for a
 successful Word branch with the same canonical return policy.
+
+All 49 proof contracts have external consumers, and measured branch, fuel,
+split, state, Store, return-byte, resolution, and limited compatibility tests
+pass with the full repository checks. The active milestone is now an
+executable top-level lifecycle from explicit initial state and checked Core
+contract through return commit or revert/trap rollback. Nested invocation,
+balances, creation, logs, ABI, and the public Oracle follow later.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
