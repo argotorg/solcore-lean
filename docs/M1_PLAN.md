@@ -148,9 +148,14 @@ conditional on the same successful Word return policy.
 [ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) is complete.
 The executable boundary takes explicit state and an installed checked Core
 contract, runs a direct invocation, commits return, rolls back revert and trap,
-and reports terminal data with an exact queryable state observation. The next
-vertical milestone is nested checked-Core invocation; proof-only extensions of
-the older selected-execution path are not separate milestones.
+and reports terminal data with an exact queryable state observation.
+
+[ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) is complete. It
+adds typed depth-one child calls, dynamic checked-contract resolution, one
+shared resumable budget, scheduler-reachability sealing, child checkpoint
+handling, root commit/rollback, and arbitrary-address state-delta queries.
+Balance semantics is next. Proof-only extensions of the older
+selected-execution path are not separate milestones.
 
 ## Completed foundation
 
@@ -301,8 +306,8 @@ These results remain regression obligations for every extension.
 | 127 | Parent-indexed selected checked Word execution | Complete | Adds exact storage-presence provenance and canonical returned-parent projection without duplicating inner branches |
 | 128 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 129 | Executable checked-Core top-level lifecycle | Complete | Runs an installed checked contract from explicit state and makes return commit and revert/trap rollback observable in one total result |
-| 130 | Nested checked-Core invocation | Next | Adds child inputs/results, child checkpoints, result delivery, and explicit depth policy without folding in balances or creation |
-| 131 | Balance transfer | Planned | Connects value-bearing calls to checked Account balance transitions |
+| 130 | Nested checked-Core invocation | Complete | Adds typed child inputs/results, dynamic resolution, shared-fuel scheduling and resumption, sealed state provenance, child checkpoints, root commit/rollback, and global delta observations |
+| 131 | Balance semantics | Next | Connects value-bearing calls to checked Account balance availability and transfer rules |
 | 132 | Contract creation | Planned | Adds nonce, address derivation, initialization, and rollback policy |
 | 133 | Logs and transaction observations | Planned | Adds ordered rollback-aware events and transaction-wide results |
 | 134 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2348,10 +2353,27 @@ return selects the working state, and revert or trap selects the initial
 checkpoint. The result retains return/revert data or a trap reason together
 with exact queryable target-state observations.
 
-The next milestone adds nested checked-Core invocation across this boundary.
-Balance transfer, creation, logs, ABI, and Oracle publication remain later
-vertical slices so their policies cannot leak into basic child-call control
-flow.
+ADR-0146 now adds nested checked-Core invocation across this boundary without
+changing ADR-0145's direct-run contract. Balance semantics, creation, logs,
+ABI, and Oracle publication remain separate vertical slices.
+
+## Completed one-level nested checked-Core execution
+
+[ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) is complete.
+The append-only typed Word call resolves child code against the current working
+world and runs one active root or child under a shared budget. An exhausted
+result retains its registry, exact mode, and scheduler-generated `Reachable`
+proof, so resumption cannot restart a child or switch its resolution source.
+
+Child return rebases the parent's speculative world; child revert and trap use
+the call checkpoint. Root return commits all accumulated changes, while root
+revert and trap restore the initial world. Exact global delta queries and
+checked-program tests cover cross-account calls, self-calls, sequential calls,
+dispatch failures, rollback, and split-fuel resumption.
+
+Balance semantics is the next implementation milestone. Creation, logs, ABI,
+and Oracle publication follow later. Parser proofs remain paused, and the older
+proof-only selected-execution path is not resumed as an intermediate step.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

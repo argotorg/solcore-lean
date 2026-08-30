@@ -1,9 +1,9 @@
 # ADR-0146: One-level nested checked-Core execution
 
-- Status: Proposed
+- Status: Accepted
 - Decision date: 2026-08-30
 - Scope: execute depth-one checked-contract calls inside the top-level lifecycle
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -43,6 +43,21 @@ The public runner receives:
 Its result is total: either the root has completed with a selected final world,
 or an exact root-or-child scheduler configuration is retained for resumption.
 Checked execution exposes no raw machine-fault branch.
+
+## Implemented result
+
+The completed implementation provides one typed Word-call capability, resolves
+checked child code against the current working world, and runs the root and its
+active child under one shared fuel budget. Exhaustion retains the exact active
+machine and its registry for later resumption. A `Reachable` seal records that
+the retained mode came from an installed root through scheduler transitions,
+so callers cannot manufacture a resumable frame or swap registries.
+
+Child return rebases the parent's speculative working world; child revert and
+trap restore the call checkpoint. The later root result still owns the
+transaction decision: root return commits all accumulated changes, while root
+revert or trap restores the original world. Terminal results expose exact
+state-delta queries for any Address and storage slot.
 
 ## Typed call capability
 
@@ -136,7 +151,13 @@ suspended parent continuation and call checkpoint. Resumption continues that
 exact active mode. It must not rerun target resolution, restart the child,
 repeat a preceding host update, or deliver the parent response twice.
 
-Prove the split-budget law against a one-shot scheduler run:
+Each retained result also carries the registry used by the run and a
+`Reachable` proof generated from the installed root and the scheduler's own
+transitions. Resumption therefore cannot accept an unrelated registry or an
+arbitrarily assembled root or child frame.
+
+The implementation proves the split-budget law against a one-shot scheduler
+run:
 
 ```text
 resumeWithFuel (run fuel initialConfiguration) additional =
@@ -196,9 +217,9 @@ The function-valued world representation still cannot enumerate all changed
 Addresses or slots. No finite change list, completeness claim about such a
 list, or public serialization is introduced.
 
-## Required laws and regressions
+## Implemented laws and regressions
 
-The proof interface must establish:
+The proof interface establishes:
 
 - append-only host capability indices and exact request/response typing;
 - total, injective classification of the four nested response dispositions;
@@ -214,8 +235,8 @@ The proof interface must establish:
 - absence of raw faults for every checked root and resolved checked child; and
 - exact arbitrary-address/slot delta query laws.
 
-Executable tests use actual checker-accepted root and child programs. At
-minimum they cover:
+Executable tests use actual checker-accepted root and child programs. They
+cover:
 
 - child return after a storage write, observed by the resumed root;
 - child revert and trap after a write, with no child state committed;
@@ -230,11 +251,10 @@ minimum they cover:
 - global slot queries for the root target, child target, untouched Address,
   and identity rollback.
 
-All new public theorems require external compile consumers. Acceptance also
-requires focused and full builds, the executable suite, trust-zero and
-warning-as-error checks for every changed Lean root, metadata and semantic-
-kernel checks, diff hygiene, axiom reports, and an independent contract and
-coverage audit.
+The public theorems have external compile consumers. Focused and full builds,
+the executable suite, trust-zero and warning-as-error checks, metadata and
+semantic-kernel checks, diff hygiene, axiom reports, and independent contract
+and coverage audits complete the acceptance boundary.
 
 ## Non-goals and following milestones
 
@@ -250,9 +270,10 @@ This ADR does not add:
 - Surface syntax, grammar, parser proofs, or elaboration; or
 - a Wire tag, schema, public Oracle command, or compatibility promise.
 
-After this milestone, executable-semantics work proceeds through balance
-transfer, creation, logs, ABI, and the public Oracle. Parser-related proofs
-remain paused until the Solcore syntax direction stabilizes.
+The next implementation is balance semantics: checked balance availability and
+transfer for value-bearing calls. Creation, logs, ABI, and the public Oracle
+follow as later vertical slices. Parser-related proofs remain paused until the
+Solcore syntax direction stabilizes.
 
 ## Consequences
 

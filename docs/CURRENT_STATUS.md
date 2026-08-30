@@ -440,8 +440,15 @@ explicit initial state, executes one direct invocation, commits return, rolls
 back revert or trap, and retains typed out-of-fuel state for exact resumption.
 Its total terminal result contains canonical return/revert data or a trap
 reason, the selected final world, and queryable speculative and committed
-target-storage deltas. Nested checked-Core invocation is the next active
-implementation area.
+target-storage deltas.
+
+[ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) is complete.
+Checked root programs can make typed depth-one Word calls resolved from a
+dynamic checked-contract registry and the current working world. Root and child
+share one resumable fuel budget; retained modes carry a `Reachable` provenance
+seal. Child return/revert/trap compose with root commit/rollback, and terminal
+deltas are queryable at arbitrary Addresses and slots. Balance semantics is the
+next active implementation area.
 
 ## Implementation status
 
@@ -476,6 +483,9 @@ implementation area.
 | Branch-complete selected Word-code classification | Complete | Three-way classifier, bidirectional erasure round trips, injectivity, exact checked-code and Word projections, WorldState coherence, storage preservation, and regressions are complete | Not published |
 | Proof-refined selected checked Word execution | Complete | Exact selection, checked Word-only execution, raw/completion retention, fixed-input fuel resumption, theorem consumers, and measured regressions are complete | Not published |
 | Parent-indexed selected checked Word execution | Complete | Exact storage and parent provenance, delegated resumption, proof-linked canonical returned continuation, plain and conditional legacy coherence, consumers, and regressions are complete | Not published |
+| Executable checked-Core top-level lifecycle | Complete | Explicit initial state, checked root installation, total return/revert/trap result, exact resumption, commit/rollback, and state-delta observations are complete | Not published |
+| One-level nested checked-Core invocation | Complete | Typed call results, dynamic checked-code resolution, shared fuel, sealed resumable modes, child checkpoint handling, root commit/rollback, global delta queries, and executable regressions are complete | Not published |
+| Balance semantics | Next | Define checked balance availability and transfer for value-bearing calls without adding creation, logs, ABI, or parser dependencies | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2820,9 +2830,17 @@ pre/post-write fuel splits. Full build and tests, 20-root trust-zero checks,
 metadata and kernel policy, diff hygiene, and axiom reports pass; theorem
 dependencies are axiom-free or use only `propext` and `Quot.sound`.
 
-The next active implementation area is nested checked-Core invocation. Balance
-transfer, creation, logs, ABI, and public Oracle exposure remain separate later
-slices.
+[ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) is also
+complete. Its typed Word call resolves a checked child from the current working
+world, retains root or child exhaustion under one shared budget, and permits
+resumption only from scheduler-reachable states under the retained registry.
+Tests cover return/revert/trap, dispatch failure, self-call and cross-account
+rebasing, sequential calls, exact split fuel, root rollback, and global state
+queries.
+
+Balance semantics is next. Creation, logs, ABI, and public Oracle exposure
+remain separate later slices. The paused parser-proof path does not become an
+intermediate semantics milestone.
 
 ## Meaning of completion
 
