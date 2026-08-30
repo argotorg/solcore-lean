@@ -405,6 +405,14 @@ exposed losslessly through internal host index 9. Both canonical tables now
 have length 10 and index 10 is first unbound. The role neither selects code or
 storage nor derives from the caller, a callee, an Account, or a call kind.
 
+[ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
+is accepted and active, with implementation planned. One proof-refined session
+will retain the initialization, storage selector, complete execution inputs,
+completion policy, cumulative provided fuel, and exact branch-complete result.
+Resumption will accept only additional fuel and certify equality with one run
+of the fixed configuration at the new cumulative budget. This is not fuel
+consumption, nested invocation, ABI, parser work, or a public interface.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -433,6 +441,7 @@ storage nor derives from the caller, a callee, an Account, or a call kind.
 | Canonical host capability registry | Complete | One canonical registry now derives both ten-entry host tables and arbitrary-list safety; the original indexes 0 through 8 and appended current-address index 9 have exact finite laws | Not published |
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, index-9 capability, length-10 tables, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
+| Proof-refined parent-indexed selected-execution session | Planned, active | Accepted fixed-configuration carrier; cumulative provided-fuel invariant, closed resumption, algebra, no-fault, compatibility, and measured regressions remain to implement | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2636,6 +2645,26 @@ The 676-job build, 1,240-job test executable build, and full test run pass. All
 semantic-kernel, diff, axiom, compatibility, and independent P0-P3 audits pass.
 No callee, call-kind, nested-call, authority, parser, public-format, or root
 README change is included.
+
+## Active proof-refined selected-execution session
+
+[ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
+is accepted and implementation is planned. The carrier will bind one selected
+run's initialization, storage Address, immutable `ExecutionInputs`, completion
+policy, cumulative provided-fuel budget, and exact branch-complete result. Its
+proof field will state that the result equals the same fixed run executed once
+at that cumulative budget.
+
+Starting creates the certified session. Resuming accepts only an additional
+natural-number budget: replacement inputs or policy are not parameters. The
+implementation will reuse ADR-0138's retained-state resumption and split law,
+then prove whole-session zero and addition, no raw fault for checked starts,
+legacy erasure, and completed continuation/fold coherence. `providedFuel`
+records budget offered, not fuel consumed or gas charged.
+
+This slice adds no child or parent transition, call stack, scheduling,
+transaction policy, ABI conversion, parser rule, Wire or Oracle format, or
+public API. Those remain separate decisions.
 
 ## Meaning of completion
 

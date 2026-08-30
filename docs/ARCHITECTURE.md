@@ -894,6 +894,19 @@ The 676-job build, 1,240-job test suite, 33-root trust-zero sweep, and independe
 P0-P3 audit pass. The role does not select storage or code, identify caller or
 callee, or define call kind, nesting, authority, or transaction behavior.
 
+ADR-0140 is accepted and active, with implementation planned above ADR-0138's
+branch-complete result. A proof-refined session will retain one fixed
+initialization, storage Address, complete execution input, completion policy,
+cumulative provided-fuel budget, and exact result. Its certificate equates the
+stored result with one execution of that configuration at the cumulative
+budget. Closed resumption accepts only more fuel and advances the retained
+result; it cannot substitute another configuration.
+
+The cumulative number describes budget offered, not fuel consumed, remaining
+gas, or a charging policy. The carrier adds no invocation transition, parent
+delivery, stack, scheduler, transaction, ABI conversion, parser dependency, or
+public format. Those layers still require independent decisions.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

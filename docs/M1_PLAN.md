@@ -111,6 +111,13 @@ resumptions, observed losslessly by Core at append-only host index 9, and kept
 independent from storage, code, caller, and future callee or call-kind roles.
 The canonical host tables now have length 10 and index 10 is first unbound.
 
+[ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
+is accepted and active, with implementation planned. It will bind the existing
+selected-run configuration to a branch-complete result and certify that result
+against one run at the session's cumulative provided-fuel budget. Resumption
+will accept only more fuel, preventing accidental input or completion-policy
+replacement. It adds no nested invocation, ABI, parser, or public boundary.
+
 ## Completed foundation
 
 The current Core already has:
@@ -253,10 +260,11 @@ These results remain regression obligations for every extension.
 | 120 | Canonical host capability registry | Complete | Derives both host tables and arbitrary-list safety from one extensible order, with exact finite laws and compatibility/runtime regressions |
 | 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all five exact branches, resumes only exhaustion with split/zero/add laws, and preserves the unchanged nested-`Option` and fold APIs |
 | 122 | Run-fixed current-address observation | Complete | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
-| 123 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 124 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 125 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 126 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 123 | Proof-refined parent-indexed selected-execution session | Accepted, active | Binds fixed run configuration to each result and maintains exact one-shot equality at cumulative provided fuel; implementation and proofs are planned |
+| 124 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 125 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 126 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 127 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2176,6 +2184,27 @@ The 676-job build, 1,240-job test executable build, full test run, 33-root
 trust-zero and warning-as-error sweep, metadata, semantic-kernel, diff, axiom,
 compatibility, and independent P0-P3 audits pass. No call kind, nested call,
 authority, parser, public format, or root README change was added.
+
+## Active proof-refined selected-execution session
+
+[ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
+is accepted; implementation is the next active slice. A session will store one
+parent-indexed selected run's initialization, storage selector, complete
+execution inputs, completion policy, total supplied budget, and exact result.
+Its refinement certificate will equate that result to the fixed configuration
+run once with the stored cumulative budget.
+
+`start` will construct the certificate directly. `resumeWithFuel` will accept
+only an additional budget, reuse the retained ADR-0138 result state, and update
+the total by addition. Planned proofs cover every projection, invariant
+preservation, whole-session zero and addition, checked no-fault, legacy
+nested-`Option` erasure, and completed continuation and resolution-fold
+coherence. Measured ADR-0138 and ADR-0139 regressions will ensure resumption
+does not replay earlier work or permit changed immutable inputs.
+
+The budget is provided fuel, not a consumption or gas measure. This carrier is
+not a nested-call frame, scheduler, transaction, ABI conversion, parser
+adapter, Wire or Oracle version, or public interface.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
