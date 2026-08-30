@@ -985,9 +985,10 @@ on revert or trap, and exposes terminal data with an exact queryable target
 delta. Exhaustion retains a typed Core state and resumes under the same fixed
 inputs with exact summed-fuel equivalence.
 
-Nested invocation is the next layer. It must reuse this checkpoint and outcome
-model for child result delivery before balances, creation, logs, ABI, or public
-Oracle schemas are attached.
+ADR-0146 adds the next layer: depth-one checked child invocation reuses this
+checkpoint and outcome model, shares fuel with the root, and retains exact
+state for resumption. Balance semantics, creation, logs, ABI, and public Oracle
+schemas remain separate layers.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

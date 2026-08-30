@@ -23,26 +23,24 @@ available as versioned reference implementations, but new grammar-dependent
 proof work is paused. Active work is directed toward a syntax-independent
 Semantic Core and explicit runtime semantics.
 
-The current internal contract boundary can execute checker-accepted Core code
-selected by `codeAddress` from a working WorldState. Core supplies typed
-runtime-only storage read and write capabilities, plus a read-only observation
-of the retained storage selector and a separate observation of the selected
-code selector. The same immutable execution input also supplies a
-caller-chosen invocation-value Word, an explicitly supplied caller Address,
-and bounded input bytes. Internal `callValue` and
-`callerAddress : unit -> word` expose the first two values;
-`inputDataByte? : word -> sum unit word` at index 6 distinguishes an absent
-offset from every present byte, including zero. Each request suspends with its
-exact continuation, local cell store, and remaining fuel. A generic host driver
-delegates requests to a combined handler over the Account selected by a
-separate `storageAddress`; the code and storage roles are never equated.
-Reads and all six observations leave the complete host context unchanged,
-while writes update the returned working context and resume with Unit. Caller
-observation requires no caller Account. This boundary is proved and tested but
-unpublished: frozen Wire
-formats reject the host values, and source syntax, ABI, gas, calls,
-authorization, balances, transaction commit, and rollback remain separate
-work.
+The current internal runtime starts from an explicit `WorldState`, an installed
+checker-accepted Core contract, and explicit invocation inputs. It supports
+typed storage access and direct observations of the invocation context. A root
+may also make depth-one typed Word calls to checked contracts resolved from the
+current working world. Root and child share one resumable fuel budget.
+
+Child return keeps its working changes; child revert or trap restores the call
+checkpoint. Root return commits the accumulated world, while root revert or
+trap restores the original world. Terminal results expose exact state queries
+for arbitrary Addresses and storage slots. This runtime is proved and tested
+but not published through Wire or the Oracle. Balances, creation, logs, ABI,
+gas, and public execution commands remain later work.
+
+## Historical implementation notes
+
+The summaries below explain how the current layers were built. They describe
+the scope of each decision at the time it was accepted; the current status and
+next step are the ones stated above and in [Current status](CURRENT_STATUS.md).
 
 [ADR-0120](adr/0120-handled-execution-completeness-and-fuel-stability.md)
 completes the proof interface for this driver without changing its behavior.
@@ -187,8 +185,10 @@ public-interface policy.
 [ADR-0139](adr/0139-run-fixed-current-address-observation.md) completes
 run-fixed current-address observation. One explicit `currentAddress` is part of
 the immutable run input and its exact widened Word is exposed through internal
-Unit-to-Word index 9. The canonical host tables now have length 10 and index 10
-is first unbound. Exact read-only variation, absent current Accounts, direct
+Unit-to-Word index 9. At that milestone the host tables had length 10 and index
+10 was first unbound. ADR-0146 has since appended the typed call at index 10,
+making length 11 and index 11 first unbound. Exact read-only variation, absent
+current Accounts, direct
 fuel 4/5, end-to-end fuel 16/17/23/29/30, 17+13 and 23+7 resumption, the
 current-derived write and pair, and return/revert/trap folds are tested. The
 676-job build, 1,240-job tests, 33-root trust-zero sweep, and independent audit
@@ -270,8 +270,10 @@ rolls back revert or trap, retains resumable exhaustion, and exposes terminal
 data plus exact queryable target-state changes. Actual Core programs cover
 mutation, rollback, no-write execution, and direct host-input observations.
 
-Nested checked-Core invocation is next. Balances, creation, logs, ABI, and a
-versioned public Oracle execution command remain later, separate decisions.
+[ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) completes
+depth-one nested checked-Core invocation with shared-fuel resumption and
+transaction-wide commit/rollback. Balance semantics is next. Creation, logs,
+ABI, and a versioned public Oracle execution command remain later decisions.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

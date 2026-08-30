@@ -401,9 +401,10 @@ semantics continues.
 
 [ADR-0139](adr/0139-run-fixed-current-address-observation.md) is complete. One
 explicitly supplied `currentAddress` is fixed in the immutable run input and
-exposed losslessly through internal host index 9. Both canonical tables now
-have length 10 and index 10 is first unbound. The role neither selects code or
-storage nor derives from the caller, a callee, an Account, or a call kind.
+exposed losslessly through internal host index 9. ADR-0146 later appended the
+typed call at index 10, so both canonical tables now have length 11 and index
+11 is first unbound. The current-address role neither selects code or storage
+nor derives from the caller, a callee, an Account, or a call kind.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
 is complete. One proof-refined session retains the initialization, storage
@@ -2671,8 +2672,9 @@ README are unchanged.
 [ADR-0139](adr/0139-run-fixed-current-address-observation.md) adds one required
 `currentAddress` to immutable execution inputs and exposes its exact widened
 Word through the tenth canonical host capability. Its index is 9, both derived
-host tables have length 10, and index 10 is first unbound; indexes 0 through 8
-retain their existing meaning. The read-only handler preserves the complete
+host tables had length 10, and index 10 was first unbound at that milestone;
+indexes 0 through 8 retain their existing meaning. The read-only handler
+preserves the complete
 mutable context, continuation, and Core-local Store, and strict narrowing
 recovers the supplied Address.
 

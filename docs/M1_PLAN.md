@@ -109,7 +109,8 @@ proofs remain paused.
 explicit `currentAddress` is fixed for a handled run and its same-input
 resumptions, observed losslessly by Core at append-only host index 9, and kept
 independent from storage, code, caller, and future callee or call-kind roles.
-The canonical host tables now have length 10 and index 10 is first unbound.
+ADR-0146 has since appended the typed call at index 10. The canonical host
+tables now have length 11 and index 11 is first unbound.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
 is complete. It binds the existing selected-run configuration to a
