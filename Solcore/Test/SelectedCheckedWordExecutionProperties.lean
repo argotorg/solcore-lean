@@ -144,15 +144,23 @@ example : execution.completion? = some completion ↔
 
 example : execution.completion? = none ↔
     execution.execution? = none ∨
-      ∃ code finalContext exhausted,
+      (∃ code finalContext exhausted,
         execution.execution? =
-          some (code, ⟨finalContext, .outOfFuel exhausted⟩) :=
+          some (code, ⟨finalContext, .outOfFuel exhausted⟩)) ∨
+      ∃ code finalContext suspension remainingFuel,
+        execution.execution? =
+          some (code,
+            ⟨finalContext, .unsupported suspension remainingFuel⟩) :=
   completion?_eq_none_iff execution
 
 example : execution.completion? = none ↔
-    ∃ finalContext exhausted,
+    (∃ finalContext exhausted,
       execution.execution? =
-        some (wordCode, ⟨finalContext, .outOfFuel exhausted⟩) :=
+        some (wordCode, ⟨finalContext, .outOfFuel exhausted⟩)) ∨
+    ∃ finalContext suspension remainingFuel,
+      execution.execution? =
+        some (wordCode,
+          ⟨finalContext, .unsupported suspension remainingFuel⟩) :=
   completion?_eq_none_iff_of_word execution wordCode selectedWord
 
 example : (execution.resumeWithFuel additional).providedFuel =

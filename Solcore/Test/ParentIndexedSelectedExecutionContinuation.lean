@@ -40,11 +40,17 @@ private example
           context.context.values.working.1.code? inputs.codeAddress = none) ∧
       (initialization.runCodeWithStorageParentIndexedContinuationContext?
             storageAddress inputs fuel doneOutcome = some (some none) ↔
-        ∃ context resultContext exhausted,
+        (∃ context resultContext exhausted,
           initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
               storageAddress = some context ∧
           context.runCodeWithStorage? inputs fuel =
-            some ⟨resultContext, .outOfFuel exhausted⟩) ∧
+            some ⟨resultContext, .outOfFuel exhausted⟩) ∨
+        ∃ context resultContext suspension remainingFuel,
+          initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+              storageAddress = some context ∧
+          context.runCodeWithStorage? inputs fuel =
+            some ⟨resultContext,
+              .unsupported suspension remainingFuel⟩) ∧
       (initialization.runCodeWithStorageParentIndexedContinuationContext?
             storageAddress inputs fuel doneOutcome =
           some (some (some parentContinuation)) ↔

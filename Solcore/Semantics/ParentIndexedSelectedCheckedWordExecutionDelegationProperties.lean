@@ -75,7 +75,7 @@ theorem completion?_eq_some_iff
           some (code, completion.toHostDriverResult) :=
   entry.execution.completion?_eq_some_iff completion
 
-/-- Missing completion retains every non-execution or exhausted Word cause. -/
+/-- Missing completion retains absence, exhaustion, and policy rejection. -/
 theorem completion?_eq_none_iff
     {RollbackState : Type u} {Event : Type v}
     {parentWorking :
@@ -88,9 +88,13 @@ theorem completion?_eq_none_iff
       initialization storageAddress inputs) :
     entry.execution.completion? = none ↔
       entry.execution.execution? = none ∨
-        ∃ code finalContext exhausted,
+        (∃ code finalContext exhausted,
           entry.execution.execution? =
-            some (code, ⟨finalContext, .outOfFuel exhausted⟩) :=
+            some (code, ⟨finalContext, .outOfFuel exhausted⟩)) ∨
+        ∃ code finalContext suspension remainingFuel,
+          entry.execution.execution? =
+            some (code,
+              ⟨finalContext, .unsupported suspension remainingFuel⟩) :=
   entry.execution.completion?_eq_none_iff
 
 end Solcore.Semantics.ParentIndexedSelectedCheckedWordExecution
