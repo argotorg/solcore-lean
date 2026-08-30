@@ -46,6 +46,18 @@ private def requireScenarioPhase
       else
         invalidTagAt path code expectedScenarioDiagnosticCodes
 
+private def scenarioPathValid
+    (code : String)
+    (semanticPath : List String)
+    (arguments : Lean.Json) : Bool :=
+  let validAt (phase : Phase) :=
+    ({ code, phase, path := semanticPath, arguments } : Diagnostic).isValidExecute
+  match fixedScenarioPhase? code with
+  | some phase => validAt phase
+  | none =>
+      code == "oracle.v5.reference.dangling-contract" &&
+        (validAt .worldValidation || validAt .environmentValidation)
+
 private def decodeScenarioDiagnosticAt
     (path : Path)
     (json : Lean.Json) : DecodeResult Diagnostic := do
@@ -71,6 +83,9 @@ private def decodeScenarioDiagnosticAt
   let semanticPathJson ← requireField path json "path"
   let semanticPath ← decodeArrayAt decodeStringAt
     (path.field "path") semanticPathJson
+  unless scenarioPathValid code semanticPath arguments do
+    invalidTagAt (path.field "path") semanticPathJson <|
+      .mkObj [("constraint", "canonical-path-for-" ++ code)]
   let phasePath := path.field "phase"
   let phase ← decodePhaseAt phasePath (← requireField path json "phase")
   requireScenarioPhase code phasePath phase
