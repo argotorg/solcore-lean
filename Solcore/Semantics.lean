@@ -109,6 +109,8 @@ import Solcore.Semantics.WorldState
 import Solcore.Semantics.AccountCodeProperties
 import Solcore.Semantics.AccountBalanceProperties
 import Solcore.Semantics.WorldStateBalanceProperties
+import Solcore.Semantics.AccountNonceProperties
+import Solcore.Semantics.WorldStateNonceProperties
 import Solcore.Semantics.BalanceTransfer
 import Solcore.Semantics.BalanceTransferProperties
 import Solcore.Semantics.BalanceTransferInstallationProperties
