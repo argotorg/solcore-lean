@@ -90,6 +90,16 @@ example :
 variable (result : HostDriverResult (Context RollbackState TraceState))
 variable (completion : Completion RollbackState TraceState)
 
+example : (WordReturnedFrameCompletion.mk context word store).context =
+    context :=
+  WordReturnedFrameCompletion.mk_context context word store
+
+example : (WordReturnedFrameCompletion.mk context word store).word = word :=
+  WordReturnedFrameCompletion.mk_word context word store
+
+example : (WordReturnedFrameCompletion.mk context word store).store = store :=
+  WordReturnedFrameCompletion.mk_store context word store
+
 example : result.toWordReturnedFrameCompletion? = some completion ↔
     result = completion.toHostDriverResult :=
   HostDriverResult.toWordReturnedFrameCompletion?_eq_some_iff

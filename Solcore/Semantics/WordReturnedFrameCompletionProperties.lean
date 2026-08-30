@@ -75,6 +75,27 @@ end HostDriverResult
 
 namespace WordReturnedFrameCompletion
 
+@[simp] theorem mk_context
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (word : Core.Word) (store : Core.Store) :
+    (WordReturnedFrameCompletion.mk context word store).context = context :=
+  rfl
+
+@[simp] theorem mk_word
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (word : Core.Word) (store : Core.Store) :
+    (WordReturnedFrameCompletion.mk context word store).word = word :=
+  rfl
+
+@[simp] theorem mk_store
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (word : Core.Word) (store : Core.Store) :
+    (WordReturnedFrameCompletion.mk context word store).store = store :=
+  rfl
+
 @[simp] theorem toWordReturnedFrameCompletion?_toHostDriverResult
     {RollbackState : Type u} {TraceState : Type v}
     (completion : WordReturnedFrameCompletion RollbackState TraceState) :
