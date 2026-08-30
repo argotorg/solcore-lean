@@ -198,6 +198,51 @@ def startInitializer
           initializerParentPresence.present
   }
 
+@[simp] theorem startInitializer_postNonce_workingJournal
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (root : SuspendedCreationRoot initialWorld rootContract rootInvocation)
+    (environment : ExecutionEnvironment)
+    (prepared : PreparedCheckedCreation
+      root.parentContext.context.values.working.1 environment
+      rootInvocation.executionInputs.currentAddress root.profile.templateId
+      root.profile.value)
+    (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
+      root.parentContext.context.storageAddress) :
+    (root.startInitializer environment prepared creatorAddress_eq).postNonceParentContext.workingJournal =
+      root.parentContext.workingJournal := by
+  rfl
+
+@[simp] theorem startInitializer_initializer_checkpointJournal
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (root : SuspendedCreationRoot initialWorld rootContract rootInvocation)
+    (environment : ExecutionEnvironment)
+    (prepared : PreparedCheckedCreation
+      root.parentContext.context.values.working.1 environment
+      rootInvocation.executionInputs.currentAddress root.profile.templateId
+      root.profile.value)
+    (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
+      root.parentContext.context.storageAddress) :
+    (root.startInitializer environment prepared creatorAddress_eq).initializerContext.context.values.checkpoint.effects.rollback =
+      root.parentContext.workingJournal := by
+  rfl
+
+@[simp] theorem startInitializer_initializer_workingJournal
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (root : SuspendedCreationRoot initialWorld rootContract rootInvocation)
+    (environment : ExecutionEnvironment)
+    (prepared : PreparedCheckedCreation
+      root.parentContext.context.values.working.1 environment
+      rootInvocation.executionInputs.currentAddress root.profile.templateId
+      root.profile.value)
+    (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
+      root.parentContext.context.storageAddress) :
+    (root.startInitializer environment prepared creatorAddress_eq).initializerContext.workingJournal =
+      root.parentContext.workingJournal := by
+  rfl
+
 end SuspendedCreationRoot
 
 namespace PreparedInitializerFrame

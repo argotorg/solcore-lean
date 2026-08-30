@@ -1,4 +1,5 @@
 import Solcore.Semantics.OneLevelNestedCreationTransitions
+import Solcore.Semantics.TransactionJournalProperties
 
 /-! Terminal resolution for one prepared checked contract initializer. -/
 
@@ -212,6 +213,33 @@ def complete
       .trapped reason root rfl rfl
 
 end PreparedInitializerFrame
+
+namespace DeployedInitializerResult
+
+@[simp] theorem resumedRoot_logList
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+    (result :
+      DeployedInitializerResult initialWorld rootContract rootInvocation frame) :
+    result.resumedRoot.context.workingJournal.logList =
+      frame.initializerContext.workingJournal.logList := by
+  rw [result.resumedRoot_workingJournal_eq]
+  simp
+
+@[simp] theorem resumedRoot_createdContractList
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+    (result :
+      DeployedInitializerResult initialWorld rootContract rootInvocation frame) :
+    result.resumedRoot.context.workingJournal.createdContractList =
+      frame.initializerContext.workingJournal.createdContractList ++
+        [frame.prepared.createdAddress] := by
+  rw [result.resumedRoot_workingJournal_eq]
+  simp
+
+end DeployedInitializerResult
 
 namespace InitializerCompletionResult
 
