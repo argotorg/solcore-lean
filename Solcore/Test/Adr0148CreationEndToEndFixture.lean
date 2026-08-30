@@ -1,5 +1,6 @@
 import Solcore.Semantics.ExecutionEnvironment
-import Solcore.Test.OneLevelNestedExecutionFixture
+import Solcore.Semantics.CheckedCoreWordOutcome
+import Solcore.Semantics.ContractWordCallInput
 
 /-! Reusable checked programs and explicit state for creation E2E tests. -/
 
@@ -9,7 +10,6 @@ namespace Tests.Adr0148CreationEndToEndFixture
 
 open Solcore.Core
 open Solcore.Semantics
-open Tests.OneLevelNestedExecutionFixture
 
 def creator : Address := ⟨0x2480, by decide⟩
 def created : Address := ⟨0x2481, by decide⟩
@@ -117,7 +117,13 @@ def observeAndWrite
         (.pair (.word slot) (.var 0)))
       rest)
 
-def observerTail (depth : Nat) : Expr :=
+def initializerTerminal : CheckedCoreWordOutcome → Expr
+  | .returned payload => returned (.word payload)
+  | .reverted payload => reverted (.word payload)
+  | .trapped reason => trapped (.word reason)
+
+def observerTailFor
+    (outcome : CheckedCoreWordOutcome) (depth : Nat) : Expr :=
   observeAndWrite depth HostFunction.callerAddress.index .unit callerSlot
     (observeAndWrite (depth + 2) HostFunction.callValue.index .unit valueSlot
       (observeAndWrite (depth + 4) HostFunction.inputDataSize.index .unit inputSizeSlot
@@ -126,10 +132,15 @@ def observerTail (depth : Nat) : Expr :=
           (observeAndWrite (depth + 8) HostFunction.currentAddress.index .unit
             currentAddressSlot
             (observeAndWrite (depth + 10) HostFunction.codeAddress.index .unit
-              codeAddressSlot (returned (.word initializerInput)))))))
+              codeAddressSlot (initializerTerminal outcome))))))
+
+/-- Preserve the original returning observer expression. -/
+def observerTail (depth : Nat) : Expr :=
+  observerTailFor (.returned initializerInput) depth
 
 /-- Observe input word zero and every initializer execution identity field. -/
-def observerInitializerProgram : Program := {
+def observerInitializerProgramFor
+    (outcome : CheckedCoreWordOutcome) : Program := {
   resultType := CoreContractEntryProfile.wordOutcomeV1.resultType
   body :=
     .caseE
@@ -138,15 +149,35 @@ def observerInitializerProgram : Program := {
       (.letE
         (.apply (.var (HostFunction.storageWrite.index + 1))
           (.pair (.word inputWordSlot) (.var 0)))
-        (observerTail 2))
+        (observerTailFor outcome 2))
 }
 
+def observerInitializerProgram : Program :=
+  observerInitializerProgramFor (.returned initializerInput)
+
+theorem observerInitializerProgramFor_checked
+    (outcome : CheckedCoreWordOutcome) :
+    (observerInitializerProgramFor outcome).checkHost = true := by
+  cases outcome <;> rfl
+
 theorem observerInitializerProgram_checked :
-    observerInitializerProgram.checkHost = true := by native_decide
+    observerInitializerProgram.checkHost = true :=
+  observerInitializerProgramFor_checked _
+
+def observerInitializerFor
+    (outcome : CheckedCoreWordOutcome) : CheckedCoreContract :=
+  CheckedCoreContract.wordOutcomeV1
+    ⟨observerInitializerProgramFor outcome,
+      observerInitializerProgramFor_checked outcome⟩ rfl
 
 def observerInitializer : CheckedCoreContract :=
-  CheckedCoreContract.wordOutcomeV1
-    ⟨observerInitializerProgram, observerInitializerProgram_checked⟩ rfl
+  observerInitializerFor (.returned initializerInput)
+
+def revertingObserverInitializer : CheckedCoreContract :=
+  observerInitializerFor (.reverted initializerInput)
+
+def trappingObserverInitializer : CheckedCoreContract :=
+  observerInitializerFor (.trapped initializerInput)
 
 /-- Deployed runtime leaves an observable write and returns a sentinel. -/
 def runtimeProgram : Program := {
@@ -165,23 +196,34 @@ def runtime : CheckedCoreContract :=
   CheckedCoreContract.wordOutcomeV1
     ⟨runtimeProgram, runtimeProgram_checked⟩ rfl
 
-def template : CheckedCreationTemplate := {
-  initializer := observerInitializer
+def templateFor (initializer : CheckedCoreContract) : CheckedCreationTemplate := {
+  initializer := initializer
   runtime := runtime
 }
 
-def environment : ExecutionEnvironment := {
+def template : CheckedCreationTemplate := templateFor observerInitializer
+
+def environmentFor (initializer : CheckedCoreContract) : ExecutionEnvironment := {
   callRegistry := {
     lookup := fun address => if address = created then some runtime else none
   }
   creationTemplates := {
-    lookup := fun identifier => if identifier = templateId then some template else none
+    lookup := fun identifier =>
+      if identifier = templateId then some (templateFor initializer) else none
   }
   creationAddressPolicy := {
     derive := fun actualCreator nonce =>
       if actualCreator = creator ∧ nonce = oldNonce then created else unrelated
   }
 }
+
+def environment : ExecutionEnvironment := environmentFor observerInitializer
+
+def revertingInitializerEnvironment : ExecutionEnvironment :=
+  environmentFor revertingObserverInitializer
+
+def trappingInitializerEnvironment : ExecutionEnvironment :=
+  environmentFor trappingObserverInitializer
 
 def rootAccount (contract : CheckedCoreContract) : Account :=
   Account.empty.withBalance creatorBalance |>.withNonce oldNonce
@@ -208,5 +250,32 @@ def invocation : TopLevelInvocation := {
   callValue := Word.zero
   inputData := HostStorageDriver.InputData.ofWord initializerInput
 }
+
+/-- Ready-to-run aliases keep terminal lifecycle tests declarative. -/
+def commitRoot : CheckedCoreContract := rootCreationContract .commit
+def revertRoot : CheckedCoreContract := rootCreationContract .revert
+def trapRoot : CheckedCoreContract := rootCreationContract .trap
+def sameRootCallRoot : CheckedCoreContract := rootCreateThenCallContract
+
+def commitWorld : WorldState := initialWorld commitRoot
+def revertWorld : WorldState := initialWorld revertRoot
+def trapWorld : WorldState := initialWorld trapRoot
+def sameRootCallWorld : WorldState := initialWorld sameRootCallRoot
+
+def commitInstalled :
+    InstalledCheckedCoreContract commitWorld creator commitRoot :=
+  rootInstalled commitRoot
+
+def revertInstalled :
+    InstalledCheckedCoreContract revertWorld creator revertRoot :=
+  rootInstalled revertRoot
+
+def trapInstalled :
+    InstalledCheckedCoreContract trapWorld creator trapRoot :=
+  rootInstalled trapRoot
+
+def sameRootCallInstalled :
+    InstalledCheckedCoreContract sameRootCallWorld creator sameRootCallRoot :=
+  rootInstalled sameRootCallRoot
 
 end Tests.Adr0148CreationEndToEndFixture
