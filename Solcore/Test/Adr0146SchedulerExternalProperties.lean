@@ -11,6 +11,14 @@ open Solcore.Core
 open Solcore.Semantics
 open OneLevelNestedExecution
 
+example
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (mode : Mode initialWorld rootContract rootInvocation) :
+    mode.rank ≤ 1 :=
+  Mode.rank_le_one mode
+
 section RootFinalization
 
 variable {initialWorld : WorldState}
