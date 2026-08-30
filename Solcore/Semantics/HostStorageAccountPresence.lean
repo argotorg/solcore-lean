@@ -96,6 +96,9 @@ def afterHandleRequest
   | callContractWord target input =>
       exact ⟨presence.account, by
         simpa [HostStorageDriver.handleRequest] using presence.present⟩
+  | callContractWordWithValue target value input =>
+      exact ⟨presence.account, by
+        simpa [HostStorageDriver.handleRequest] using presence.present⟩
 
 end PresentAccountAt
 

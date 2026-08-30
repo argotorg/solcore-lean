@@ -19,6 +19,14 @@ theorem result_injective : Function.Injective result := by
   intro left right equal
   cases left <;> cases right <;> simp_all [result, code]
 
+@[simp] theorem code_insufficientBalance :
+    insufficientBalance.code = ⟨3, by decide⟩ :=
+  rfl
+
+@[simp] theorem code_balanceOverflow :
+    balanceOverflow.code = ⟨4, by decide⟩ :=
+  rfl
+
 @[simp] theorem result_value (failure : ContractCallFailure) :
     failure.result.value =
       .inRight .word

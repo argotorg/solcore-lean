@@ -33,6 +33,17 @@ def childWord
   inputData := HostStorageDriver.InputData.ofWord input
 }
 
+/-- Derive a value-bearing child invocation in target/value/input order. -/
+def childWordWithValue
+    (parentInputs : HostStorageDriver.ExecutionInputs)
+    (target : Address)
+    (value input : Core.Word) : TopLevelInvocation := {
+  target := target
+  caller := parentInputs.currentAddress
+  callValue := value
+  inputData := HostStorageDriver.InputData.ofWord input
+}
+
 @[simp] theorem childWord_target
     (parentInputs : HostStorageDriver.ExecutionInputs)
     (target : Address) (input : Core.Word) :
@@ -65,6 +76,44 @@ def childWord
     (childWord parentInputs target input).executionInputs = {
       codeAddress := target
       callValue := Core.Word.zero
+      callerAddress := parentInputs.currentAddress
+      inputData := HostStorageDriver.InputData.ofWord input
+      currentAddress := target
+    } :=
+  rfl
+
+@[simp] theorem childWordWithValue_target
+    (parentInputs : HostStorageDriver.ExecutionInputs)
+    (target : Address) (value input : Core.Word) :
+    (childWordWithValue parentInputs target value input).target = target :=
+  rfl
+
+@[simp] theorem childWordWithValue_caller
+    (parentInputs : HostStorageDriver.ExecutionInputs)
+    (target : Address) (value input : Core.Word) :
+    (childWordWithValue parentInputs target value input).caller =
+      parentInputs.currentAddress :=
+  rfl
+
+@[simp] theorem childWordWithValue_callValue
+    (parentInputs : HostStorageDriver.ExecutionInputs)
+    (target : Address) (value input : Core.Word) :
+    (childWordWithValue parentInputs target value input).callValue = value :=
+  rfl
+
+@[simp] theorem childWordWithValue_inputBytes
+    (parentInputs : HostStorageDriver.ExecutionInputs)
+    (target : Address) (value input : Core.Word) :
+    (childWordWithValue parentInputs target value input).inputData.bytes =
+      encodeWordBytesBE input :=
+  rfl
+
+@[simp] theorem childWordWithValue_executionInputs
+    (parentInputs : HostStorageDriver.ExecutionInputs)
+    (target : Address) (value input : Core.Word) :
+    (childWordWithValue parentInputs target value input).executionInputs = {
+      codeAddress := target
+      callValue := value
       callerAddress := parentInputs.currentAddress
       inputData := HostStorageDriver.InputData.ofWord input
       currentAddress := target
