@@ -14,6 +14,7 @@ private def help : String :=
     "  solcore-oracle capabilities-v2 Print the Semantic Core v1 capability report",
     "  solcore-oracle capabilities-v3 Print the Semantic Core v2 capability report",
     "  solcore-oracle capabilities-v4 Print the Surface v1 parser capability report",
+    "  solcore-oracle capabilities-v5 Print the checked-contract execution capability report",
     "  solcore-oracle --version       Print the legacy Oracle v1 specification version",
     "  solcore-oracle --help          Print this help"
   ]
@@ -81,6 +82,15 @@ private def capabilitiesV4Request : V4.Request := {
   query := .capabilities
 }
 
+private def capabilitiesV5Request : V5.Request := {
+  id := {
+    value := "capabilities-v5"
+    valid := by decide
+  }
+  limits := V5.Limits.default
+  query := .capabilities
+}
+
 def run (args : List String) : IO UInt32 := do
   match args with
   | ["--help"] | ["-h"] =>
@@ -115,6 +125,9 @@ def run (args : List String) : IO UInt32 := do
           return 1
   | ["capabilities-v4"] =>
       emitJson (V4.encodeResponse (V4.handle capabilitiesV4Request))
+      return 0
+  | ["capabilities-v5"] =>
+      emitJson (V5.processJson (V5.Wire.encodeRequest capabilitiesV5Request))
       return 0
   | [] =>
       serve (← IO.getStdin)

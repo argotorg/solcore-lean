@@ -3,6 +3,7 @@ import Solcore.Oracle.StrictJson
 import Solcore.Oracle.V2.Handler
 import Solcore.Oracle.V3.Handler
 import Solcore.Oracle.V4
+import Solcore.Oracle.V5
 
 set_option autoImplicit false
 
@@ -62,7 +63,9 @@ def processJsonLine (line : String) : Lean.Json :=
   | .ok json =>
       match json.getObjVal? "schema" >>= Lean.Json.getStr? with
       | .ok schema =>
-          if schema == V4.schemaVersion then
+          if schema == V5.schemaVersion then
+            V5.processJson json
+          else if schema == V4.schemaVersion then
             processV4Json json
           else if schema == V3.schemaVersion then
             processV3Json json
