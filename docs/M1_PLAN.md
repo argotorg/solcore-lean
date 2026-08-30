@@ -100,7 +100,7 @@ registry, while explicit indexes 0 through 8, length 9, first-unbound index 9,
 and all public boundaries remain fixed. Parser and syntax proofs remain paused.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
-is accepted and in progress. It introduces a branch-complete internal parent
+is complete. It introduces a branch-complete internal parent
 result and resumes only retained exhaustion. The existing nested-`Option` API
 stays unchanged through an explicit compatibility erasure. Parser and syntax
 proofs remain paused.
@@ -245,7 +245,7 @@ These results remain regression obligations for every extension.
 | 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
 | 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
 | 120 | Canonical host capability registry | Complete | Derives both nine-entry host tables and arbitrary-list safety from one order, with exact finite laws and compatibility/runtime regressions |
-| 121 | Branch-complete resumable parent-indexed selected execution | In progress | Retains all five internal branches, resumes only exact exhaustion, and erases to the unchanged nested-`Option` API |
+| 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all five exact branches, resumes only exhaustion with split/zero/add laws, and preserves the unchanged nested-`Option` and fold APIs |
 | 122 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
 | 123 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 124 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
@@ -2122,7 +2122,7 @@ or `sorry` remains. It changes no request, response, fuel, fault, Store effect,
 Wire or Oracle format, source form, or ABI. Parser and syntax proofs remain
 paused while syntax-independent semantics is completed.
 
-## In-progress branch-complete parent execution result
+## Completed branch-complete parent execution result
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
 adds a total internal result for storage absence, code absence, exhaustion,
@@ -2135,6 +2135,19 @@ operation and theorems remain unchanged. The new boundary gives no resolution
 meaning to absence, exhaustion, or fault and adds no gas, persistence, nested
 invocation, transaction, parser, syntax, ABI, Wire, Oracle, or publication
 policy.
+
+The proof interface includes five exact branch equivalences, checked no-fault,
+whole legacy equality, split/zero/add resumption and completion inversion, plus
+exact plain-continuation, legacy, return/revert/trap fold, and completed-fold
+identity laws. Fuel 9/10/15/16 regressions cover absence, retained write
+effects, request non-replay, exhaustion, completion, synthetic fault, and every
+fold branch.
+
+The 673-job build, 1,234-job test executable build, full test run, 16-root
+trust-zero and warning-as-error checks, metadata, semantic-kernel, and diff
+checks pass. Twenty-one theorem reports use only `propext` and `Quot.sound`;
+the independent audit found no P0-P3 issue. The old three files and root README
+remain unchanged.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

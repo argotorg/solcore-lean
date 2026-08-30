@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-29
 - Scope: retain and resume every internal branch of parent-indexed selected execution
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -267,6 +267,28 @@ and runtime regressions when necessary:
 6. add focused compile-time and executable regressions;
 7. run validation and independent P0-P3 audits; and
 8. synchronize acceptance evidence and current-facing internal documents.
+
+## Implementation evidence
+
+The implementation provides the exact five-way carrier, five whole-branch
+equivalences, and the checked no-fault theorem. Explicit compatibility erasure
+equals the unchanged nested-`Option` producer as a whole. Resumption invokes
+the driver only for `outOfFuel`; exact split/summed-budget, actual-run zero,
+sequential addition, and completed-result inversion laws retain the same
+initialization, immutable inputs, and completion policy.
+
+Completion coherence recovers the exact existing plain continuation and legacy
+result. Return, revert, and trap use the existing parent fold with their exact
+inputs, and resuming a completed carrier preserves the continuation and every
+fold result. Executable regressions measure fuel 9, 10, 15, and 16 and cover
+both absence branches, retained exhaustion, request non-replay, synthetic fault
+identity, completion, and all three fold outcomes.
+
+The 673-job full build, 1,234-job test executable build, and full test run pass.
+All 16 changed Lean roots pass trust-zero with warnings as errors; metadata,
+semantic-kernel, and diff checks pass. The 21 audited theorem reports use only
+`propext` and `Quot.sound`. The independent audit found no P0-P3 issue. The
+three legacy implementation/proof files and root README remain unchanged.
 
 ## Non-goals
 

@@ -392,12 +392,12 @@ Runtime behavior and public formats do not change. Parser and syntax proofs
 remain paused.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
-is accepted and in progress. It adds an internal five-way carrier that keeps
+is complete. It adds an internal five-way carrier that keeps
 storage absence, code absence, exhaustion, raw fault, and completion distinct.
 Only exhaustion resumes from its retained context and Core state. The existing
 three-`Option` parent API remains unchanged and is recovered by explicit
-erasure. Parser and syntax proofs remain paused while this syntax-independent
-boundary is completed.
+erasure. Parser and syntax proofs remain paused while syntax-independent
+semantics continues.
 
 ## Implementation status
 
@@ -425,7 +425,7 @@ boundary is completed.
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
 | Canonical host capability registry | Complete | One canonical nine-entry registry derives both host tables and arbitrary-list safety; exact finite laws, all named compatibility facts, numeric boundaries, and runtime regressions are complete | Not published |
-| Branch-complete resumable parent-indexed selected execution | In progress | Adds an internal five-way result, compatibility erasure, and out-of-fuel-only resumption while preserving the existing parent API | Not published |
+| Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2574,7 +2574,7 @@ definitionally equal tables, and single production literal, and found no P0-P3
 issue. This adds no capability and publishes no registry or ABI. Parser and
 syntax proofs remain paused.
 
-## In-progress branch-complete parent execution result
+## Completed branch-complete parent execution result
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
 retains every internal branch of parent-indexed selected execution in a total
@@ -2588,6 +2588,22 @@ The old nested-`Option` operation and all of its behavior remain unchanged;
 the new carrier erases back to it explicitly. Exhaustion and raw fault gain no
 frame-resolution meaning. This work adds no gas, persistence, nested calls,
 transaction policy, ABI, parser, syntax, Wire, Oracle, or public protocol.
+
+Five exact branch equivalences and checked no-fault preserve every carried
+field. Whole-result erasure equals the old API, while resumption proves exact
+split, actual-run zero, arbitrary sequential addition, and retained completion
+inversion. Completed producers recover the exact old plain and legacy contexts;
+return, revert, and trap use the existing fold, which completed resumption
+leaves unchanged.
+
+Runtime tests measure fuel 9/10/15/16 and cover both absence branches,
+exhaustion before and after a handled write, request non-replay, completion,
+synthetic terminal fault, and return/revert/trap folds. The 673-job build,
+1,234-job test executable build, and full test run pass. Sixteen changed roots
+pass trust-zero with warnings as errors; metadata, semantic-kernel, and diff
+checks pass. All 21 audited theorem reports use only `propext` and `Quot.sound`,
+and the independent audit found no P0-P3 issue. The three legacy files and root
+README are unchanged.
 
 ## Meaning of completion
 

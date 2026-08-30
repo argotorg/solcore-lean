@@ -174,12 +174,16 @@ literals. The independent audit found no P0-P3 issue. No new capability is
 published, and parser and syntax proofs remain paused.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
-is accepted and in progress. It keeps storage absence, code absence,
+is complete. It keeps storage absence, code absence,
 exhaustion, raw fault, and completion distinct at the internal parent boundary.
 Only exhaustion resumes from its exact retained context and Core state; the
 existing nested-`Option` operation remains unchanged and is recovered by
-explicit erasure. This adds no gas, persistence, nested-call, transaction,
-parser, syntax, ABI, Wire, Oracle, or public-interface policy.
+explicit whole-result erasure. Exact split, zero, addition, completion
+inversion, plain-continuation, and existing return/revert/trap fold coherence
+are proved. Fuel 9/10/15/16 and all terminal branches are tested. Validation
+and the independent audit pass with no P0-P3 issue. This adds no gas,
+persistence, nested-call, transaction, parser, syntax, ABI, Wire, Oracle, or
+public-interface policy.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
