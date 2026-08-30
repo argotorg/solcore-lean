@@ -1,5 +1,7 @@
 import Solcore.Core.HostProgress
 import Solcore.Core.HostRunner
+import Solcore.Core.Wire
+import Solcore.Core.Wire.V2
 
 /-! Executable and proof-contract checks for the append-only log boundary. -/
 
@@ -25,6 +27,9 @@ example := hostAdvance_begin_emitLogWord
 example := hostAdvance_suspend_emitLogWord
 example := hostAdvance_invalid_emitLogWord_argument
 example := @typed_emitLogWord_emits
+
+example : Wire.V1.Value.ofCore? (.hostFunction .emitLogWord) = none := rfl
+example : Wire.V2.Value.ofCore? (.hostFunction .emitLogWord) = none := rfl
 
 private def topic : Word := ⟨0x149, by decide⟩
 private def payload : Word := ⟨0xfeed, by decide⟩
@@ -52,6 +57,14 @@ private theorem illTypedEmitProgram_rejected :
     illTypedEmitProgram.checkHost = false := by
   decide
 
+private theorem frozenWireV1_rejects_emitProgram :
+    Wire.V1.Program.ofCore? emitProgram = none := by
+  decide
+
+private theorem frozenWireV2_rejects_emitProgram :
+    Wire.V2.Program.ofCore? emitProgram = none := by
+  decide
+
 private def emitsExactRequestAndResumes : Bool :=
   match emitProgram.runHostStateful 32 with
   | .suspended
@@ -75,8 +88,15 @@ private def appendOnlyRegistryExact : Bool :=
     hostEnvironment[13]? == some (.hostFunction .emitLogWord) &&
     hostContext[14]? == none && hostEnvironment[14]? == none
 
+private def frozenWireRejectsEmit : Bool :=
+  (Wire.V1.Value.ofCore? (.hostFunction .emitLogWord)).isNone &&
+    (Wire.V2.Value.ofCore? (.hostFunction .emitLogWord)).isNone &&
+    (Wire.V1.Program.ofCore? emitProgram).isNone &&
+    (Wire.V2.Program.ofCore? emitProgram).isNone
+
 private theorem compileTimeBoundaryExact :
-    emitsExactRequestAndResumes && appendOnlyRegistryExact = true := by
+    emitsExactRequestAndResumes && appendOnlyRegistryExact &&
+      frozenWireRejectsEmit = true := by
   native_decide
 
 def testAdr0149EmitLogWordBoundary : IO Unit := do
@@ -84,5 +104,7 @@ def testAdr0149EmitLogWordBoundary : IO Unit := do
     "checked emit-log did not preserve topic/payload order and unit resumption"
   assertTrue appendOnlyRegistryExact
     "emit-log did not occupy the append-only host index 13"
+  assertTrue frozenWireRejectsEmit
+    "a frozen Core wire profile accepted the new emit-log capability"
 
 end Tests.Adr0149EmitLogWordBoundary

@@ -1085,7 +1085,7 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (hostContext[HostFunction.all.length]?.isNone &&
       hostEnvironment[HostFunction.all.length]?.isNone)
-    "host index eleven is no longer the first unbound position"
+    "the append-only host registry no longer exposes its first unbound index"
   assertTrue
     (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
     "checked host admission retained a program rejected by the host checker"
