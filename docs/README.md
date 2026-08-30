@@ -210,6 +210,15 @@ metadata, kernel, diff, and independent audits pass. The budget is not fuel
 consumption or gas. This adds no nested invocation, ABI, parser work, Wire or
 Oracle change, or public interface.
 
+[ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md) is
+Accepted and active, with implementation planned. It will refine checked Word
+completion into a success witness that retains the exact terminal context,
+Word, and Core Store, then construct the existing returned frame with the
+canonical 32-byte big-endian encoding. The branch-complete raw carrier remains
+`HostDriverResult`; for checked Word execution, no projected success means
+exactly exhaustion. Non-Word fallback, selected-code refinement, ABI, parser
+work, and public-format changes remain out of scope.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
