@@ -40,6 +40,14 @@ inductive Feature where
   | coreWordComparison
   | coreWordBitwise
   | surfaceGrammar
+  | coreProductsV1
+  | coreFunctionsV1
+  | coreSumsV1
+  | coreLocalCellsV1
+  | coreNamedDataV1
+  | coreExtendedWordOperationsV1
+  | checkedContractExecutionV1
+  | staticWordAbiV1
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
 inductive SpecMaturity where
@@ -96,7 +104,19 @@ def m2bAll : Array Feature :=
     .surfaceGrammar
   ]
 
-def all : Array Feature := m2bAll
+def m3aAll : Array Feature :=
+  m2bAll ++ #[
+    .coreProductsV1,
+    .coreFunctionsV1,
+    .coreSumsV1,
+    .coreLocalCellsV1,
+    .coreNamedDataV1,
+    .coreExtendedWordOperationsV1,
+    .checkedContractExecutionV1,
+    .staticWordAbiV1
+  ]
+
+def all : Array Feature := m3aAll
 
 def specMaturity : Feature → SpecMaturity
   | .coreUnit
@@ -108,7 +128,15 @@ def specMaturity : Feature → SpecMaturity
   | .coreWordArithmetic
   | .coreWordComparison
   | .coreWordBitwise
-  | .surfaceGrammar => .normative
+  | .surfaceGrammar
+  | .coreProductsV1
+  | .coreFunctionsV1
+  | .coreSumsV1
+  | .coreLocalCellsV1
+  | .coreNamedDataV1
+  | .coreExtendedWordOperationsV1
+  | .checkedContractExecutionV1
+  | .staticWordAbiV1 => .normative
   | .corePrimitives
   | .functions
   | .lambdas
@@ -146,6 +174,7 @@ inductive ObservationPolicy where
   | valueV1
   | evmStateV1
   | evmStateWithGasV1
+  | checkedCoreStateV1
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
 inductive SpanUnit where
@@ -205,17 +234,25 @@ private def hasDuplicates {α : Type} [BEq α] : List α → Bool
   | [] => false
   | item :: rest => rest.contains item || hasDuplicates rest
 
-private def runtimeMatchesScope
-    (scope : ProfileScope)
+def ObservationPolicy.matchesScope
     (observation : ObservationPolicy)
+    (scope : ProfileScope)
     (runtime : Option ContractRuntimeProfile) : Bool :=
   match scope, observation, runtime with
   | .frontend, .staticVerdictV1, none => true
   | .core, .staticVerdictV1, none => true
   | .core, .valueV1, none => true
+  | .contract, .checkedCoreStateV1, none => true
   | .contract, .evmStateV1, some _ => true
   | .contract, .evmStateWithGasV1, some runtime => runtime.gasSchedule.isSome
   | _, _, _ => false
+
+theorem ObservationPolicy.checkedCoreStateV1_matchesScope_iff
+    (scope : ProfileScope)
+    (runtime : Option ContractRuntimeProfile) :
+    ObservationPolicy.checkedCoreStateV1.matchesScope scope runtime = true ↔
+      scope = .contract ∧ runtime = none := by
+  cases scope <;> cases runtime <;> simp [ObservationPolicy.matchesScope]
 
 def StdFileDigest.validationErrors (file : StdFileDigest) : List String :=
   let pathErrors :=
@@ -273,7 +310,7 @@ def SpecProfile.validationErrors (profile : SpecProfile) : List String :=
     else
       ["enabled features must have complete normative specifications"])
   let scopeErrors :=
-    if runtimeMatchesScope profile.scope profile.observation profile.contractRuntime then
+    if profile.observation.matchesScope profile.scope profile.contractRuntime then
       []
     else
       ["observation policy is incompatible with profile scope"]
@@ -484,6 +521,51 @@ def m2bFrontendProfileDigest : String :=
 
 theorem m2bFrontendProfile_valid : m2bFrontendProfile.Valid := by
   change m2bFrontendProfile.validationErrors = []
+  native_decide
+
+def m3aLanguage : LanguageVersion := {
+  id := "solcore/0.1.0-draft.5"
+  release := {
+    major := 0
+    minor := 1
+    patch := 0
+    prerelease := some "draft.5"
+  }
+  grammarVersion := none
+  staticSemanticsVersion := some 3
+  dynamicSemanticsVersion := some 3
+  abiVersion := some 1
+  storageLayoutVersion := none
+  standardLibrary := canonicalStd
+  knownFeatures := Feature.m3aAll
+}
+
+def m3aContractProfile : SpecProfile := {
+  id := "contract-m3a-v1"
+  language := m3aLanguage
+  scope := .contract
+  enabledFeatures := #[
+    .coreProductsV1,
+    .coreFunctionsV1,
+    .coreSumsV1,
+    .coreLocalCellsV1,
+    .coreNamedDataV1,
+    .coreExtendedWordOperationsV1,
+    .checkedContractExecutionV1,
+    .staticWordAbiV1
+  ]
+  solver := .tabled
+  observation := .checkedCoreStateV1
+  contractRuntime := none
+  spanUnit := .utf8Byte
+  sourceEncoding := "UTF-8"
+}
+
+def m3aContractProfileDigest : String :=
+  "sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46"
+
+theorem m3aContractProfile_valid : m3aContractProfile.Valid := by
+  change m3aContractProfile.validationErrors = []
   native_decide
 
 end Solcore

@@ -25,6 +25,12 @@
       "spec": "solcore/0.1.0-draft.4",
       "path": "profiles/solcore-0.1.0-draft.4-frontend-m2b.json",
       "digest": "sha256:292e8c423bfc2d7e77f7a9756e743af473f6a952073e590c62a05c676e3bf33a"
+    },
+    {
+      "id": "contract-m3a-v1",
+      "spec": "solcore/0.1.0-draft.5",
+      "path": "profiles/solcore-0.1.0-draft.5-contract-m3a.json",
+      "digest": "sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46"
     }
   ]
 }
