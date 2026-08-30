@@ -1,4 +1,5 @@
 import Solcore.Core.ContractCallWordResultProperties
+import Solcore.Core.HostProgress
 import Solcore.Semantics.CheckedContractRegistryProperties
 import Solcore.Semantics.CheckedCoreWordOutcomeProperties
 import Solcore.Semantics.ContractCallFailureProperties
@@ -16,6 +17,21 @@ namespace Tests.Adr0146BoundaryExternalProperties
 example := Solcore.Core.ContractCallWordResult.ofValue?_value
 example := Solcore.Core.ContractCallWordResult.value_injective
 example := Solcore.Core.ContractCallWordResult.value_eq_iff
+example := Solcore.Core.ContractCallWordResult.value_type
+
+example := Solcore.Core.HostFunction.parameterType_callContractWord
+example := Solcore.Core.HostFunction.resultType_callContractWord
+example := Solcore.Core.HostFunction.index_callContractWord
+example := Solcore.Core.hostContext_callContractWord
+example := Solcore.Core.hostEnvironment_callContractWord
+
+example := Solcore.Core.HostRequest.responseType_callContractWord
+example := Solcore.Core.HostRequest.responseValue_callContractWord
+example := Solcore.Core.HostSuspension.resume_callContractWord
+example := Solcore.Core.hostAdvance_begin_callContractWord
+example := Solcore.Core.hostAdvance_suspend_callContractWord
+example := Solcore.Core.hostAdvance_invalid_callContractWord_argument
+example := @Solcore.Core.typed_callContractWord_emits
 
 example := Solcore.Semantics.ContractCallFailure.code_injective
 example := Solcore.Semantics.ContractCallFailure.code_eq_iff
@@ -91,6 +107,11 @@ example := Solcore.Semantics.TopLevelInvocation.childWord_caller
 example := Solcore.Semantics.TopLevelInvocation.childWord_callValue
 example := Solcore.Semantics.TopLevelInvocation.childWord_inputBytes
 example := Solcore.Semantics.TopLevelInvocation.childWord_executionInputs
+
+example := Solcore.Semantics.CheckedCoreWordOutcome.toContractCallResult
+example := Solcore.Semantics.HostStorageDriver.InputData.ofWord_bytes
+example := Solcore.Semantics.HostStorageDriver.InputData.ofWord_sizeWord_val
+example := Solcore.Semantics.HostStorageDriver.InputData.ofWord_wordBE?_zero
 
 example :=
   @Solcore.Semantics.HostStorageDriver.Context.rebaseWorking_storageAddress
