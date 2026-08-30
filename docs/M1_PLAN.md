@@ -124,8 +124,8 @@ canonical returned frame while leaving the existing raw driver result
 branch-complete.
 
 [ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
-accepted and active, with implementation planned next. It separates unavailable
-selected code from available checked non-Word and Word code before execution.
+complete. It separates unavailable selected code from available checked
+non-Word and Word code before execution.
 
 ## Completed foundation
 
@@ -271,7 +271,7 @@ These results remain regression obligations for every extension.
 | 122 | Run-fixed current-address observation | Complete | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
 | 123 | Proof-refined parent-indexed selected-execution session | Complete | Binds fixed run configuration to each result and preserves exact one-shot equality through closed fuel-only resumption, whole-session algebra, every branch, compatibility, and folds |
 | 124 | Checked Word completion to canonical return bytes | Complete | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
-| 125 | Branch-complete selected Word-code classification | Active | Preserves existing checked-code lookup while separating absent, non-Word, and Word branches before execution |
+| 125 | Branch-complete selected Word-code classification | Complete | Preserves existing checked-code lookup while separating absent, non-Word, and Word branches before execution |
 | 126 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 127 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 128 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2244,19 +2244,25 @@ Core Store remains retained but unencoded. Thirty-five public theorems have
 matching compile consumers. The 695-job build, 1,278-job test build, full test
 run, 12-root trust-zero sweep, metadata, kernel, diff, and axiom checks pass.
 
-## Active selected Word-code classification
+## Completed selected Word-code classification
 
 [ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
-accepted and planned next. A single total classifier will consume the existing
-optional `WorldState.code?` result and retain one of three exact branches:
-absent, checked non-Word code, or checked Word code. Checked-code erasure will
-recover the original lookup, and Word projection will agree with ADR-0141's
+complete. A single total classifier consumes the existing optional
+`WorldState.code?` result and retains one of three exact branches: absent,
+checked non-Word code, or checked Word code. Checked-code erasure recovers the
+original lookup, and Word projection agrees with ADR-0141's
 optional refinement.
 
 The WorldState adapter depends only on the working state and code Address. It
 does not add code storage to Account, require a storage-host Context, execute
 the selected code, or assign a fallback outcome to non-Word code. Parent-indexed
 execution, ABI, parser work, and publication remain later decisions.
+
+Both erasure round trips, injectivity, every exact branch, and Account storage
+preservation are proved and consumed externally. Empty/no-code/non-Word/Word
+runtime regressions pass. The 701-job build, 1,290-job test build, full test
+run, eight-root trust-zero sweep, metadata, kernel, diff, axiom, and independent
+P0-P3 audits pass across 31 public theorems and 31 consumers.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

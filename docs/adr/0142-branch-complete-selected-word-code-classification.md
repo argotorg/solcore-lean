@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: classify address-selected checked code without conflating non-Word code with absence
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -184,13 +184,32 @@ This ADR does not define or prove:
 - Solidity ABI encoding, arbitrary Core-value serialization, a public byte
   contract, external compatibility promise, or concrete syntax.
 
-## Planned sequence
+## Implemented sequence
 
-1. record and activate this internal selected-code classification contract;
-2. implement the generic three-way classifier and exact projections;
-3. implement the WorldState adapter and exact coherence laws;
-4. add compile-time consumers and executable three-branch regressions; and
-5. run full validation, independent audit, and completion-doc synchronization.
+1. recorded and activated this internal selected-code classification contract;
+2. implemented the generic three-way classifier and exact projections;
+3. implemented the WorldState adapter and exact coherence laws;
+4. added compile-time consumers and executable three-branch regressions; and
+5. completed full validation, independent audit, and documentation sync.
+
+## Implementation record
+
+The generic classifier has exactly three branches and preserves the selected
+checked code through both classification/erasure round trips. Checked-code
+erasure is injective, and Word projection agrees exactly with the ADR-0141
+optional refinement. The WorldState adapter recovers both the existing checked
+code lookup and its Word projection without adding another store or lookup.
+
+Thirty-one public theorems—20 generic and 11 WorldState laws—have 31 matching
+compile-only consumers. Executable regressions cover empty WorldState, a present
+Account without code, checked non-Word and Word programs, both projections, and
+classification preservation across an actual Account storage write.
+
+The 701-job full build, 1,290-job test executable build, and full test run pass.
+All eight changed Lean roots pass trust-zero with warnings as errors. Metadata,
+semantic-kernel, and diff checks pass. Every public theorem reports only
+`propext`; the independent audit found no P0-P3 issue. No public format or root
+README changed.
 
 ## Consequences
 

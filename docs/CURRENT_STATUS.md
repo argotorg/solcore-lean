@@ -420,9 +420,9 @@ successful context, Word, and Core Store, and maps that success to the canonical
 existing `HostDriverResult`.
 
 [ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
-accepted and active, with implementation planned next. It will classify
-address-selected checked code as absent, non-Word, or Word without rerunning
-the checker or changing the existing `WorldState.code?` lookup.
+complete. It classifies address-selected checked code as absent, non-Word, or
+Word without rerunning the checker or changing the existing
+`WorldState.code?` lookup.
 
 ## Implementation status
 
@@ -454,7 +454,7 @@ the checker or changing the existing `WorldState.code?` lookup.
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, index-9 capability, length-10 tables, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
 | Checked Word completion to canonical return bytes | Complete | Word refinement, success witness, exact raw projection/retraction, canonical returned frame, typed branch laws, stability, split fuel, and regressions are complete | Not published |
-| Branch-complete selected Word-code classification | Active | Accepted three-way classifier, exact checked-code and Word projections, WorldState adapter, coherence laws, and regressions are planned | Not published |
+| Branch-complete selected Word-code classification | Complete | Three-way classifier, bidirectional erasure round trips, injectivity, exact checked-code and Word projections, WorldState coherence, storage preservation, and regressions are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2715,20 +2715,26 @@ This is not Solidity ABI encoding and does not refine selected Account code,
 resume a parent, add parser or syntax work, or change Wire, Oracle, schemas,
 profiles, metadata capabilities, or any other public boundary.
 
-## Active selected Word-code classification
+## Completed selected Word-code classification
 
 [ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
-accepted, with implementation planned next. One pure classifier will preserve
-all information from the existing optional checked-code lookup while making
-three cases explicit: no available code, available checked non-Word code, and
-available checked Word code.
+complete. One pure classifier preserves all information from the existing
+optional checked-code lookup while making three cases explicit: no available
+code, available checked non-Word code, and available checked Word code.
 
 The absent branch deliberately continues to cover both a missing Account and a
 present Account without code. The non-Word branch retains the exact checked
 program and its result-type evidence. The Word branch retains ADR-0141's exact
 checked Word refinement. Erasing the classification must recover
-`WorldState.code?`; projecting Word code must agree with applying the existing
+`WorldState.code?`; projecting Word code agrees with applying the existing
 optional Word refinement.
+
+Both classification/erasure round trips and checked-code erasure injectivity
+are proved. Regressions cover empty state, a present Account without code,
+checked non-Word and Word code, both projections, and storage-write
+preservation. Thirty-one public theorems have matching consumers. The 701-job
+build, 1,290-job test build, full test run, eight-root trust-zero sweep,
+metadata, kernel, diff, axiom, and independent P0-P3 audits pass.
 
 This slice classifies only. It adds no selected execution, fuel behavior,
 parent result, fallback for non-Word code, ABI, parser work, or public format.

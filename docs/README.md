@@ -225,16 +225,21 @@ diff, and axiom checks pass. Non-Word fallback, selected-code refinement, ABI,
 parser work, and public-format changes remain out of scope.
 
 [ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
-Accepted and active, with implementation planned next. It will classify the
-existing address-selected checked-code lookup into three explicit cases:
-unavailable code, available non-Word code, and available Word code. Both present
-branches retain the exact checked program, and the Word branch reuses ADR-0141's
-refinement.
+complete. It classifies the existing address-selected checked-code lookup into
+three explicit cases: unavailable code, available non-Word code, and available
+Word code. Both present branches retain the exact checked program, and the Word
+branch reuses ADR-0141's refinement.
 
-Erasing the classifier will recover `WorldState.code?` exactly. The unavailable
+Erasing the classifier recovers `WorldState.code?` exactly. The unavailable
 branch still treats a missing Account and a present Account without code alike.
 This adds no execution result, non-Word fallback, parent continuation, ABI,
 parser work, or public-format change.
+
+Both erasure round trips, injectivity, exact WorldState projection, and storage
+preservation are proved. Empty/no-code/non-Word/Word runtime regressions pass.
+Thirty-one public theorems have matching consumers; the 701-job build,
+1,290-job test build, full test run, eight-root trust-zero sweep, metadata,
+kernel, diff, axiom, and independent P0-P3 audits pass.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
