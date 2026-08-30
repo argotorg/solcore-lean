@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics.WorldStateDelta
 
-/-- The indexed endpoint worlds admit exactly one WorldStateDelta value. -/
+/-- The indexed endpoint worlds determine exactly one WorldStateDelta value. -/
 theorem unique
     {initialWorld finalWorld : WorldState}
     (left right : WorldStateDelta initialWorld finalWorld) :
