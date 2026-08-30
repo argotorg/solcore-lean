@@ -315,8 +315,9 @@ The canonical selected Word path can begin at parent-indexed initialization,
 retain storage and code non-execution reasons without branch duplication, and
 produce a returned parent continuation with exact canonical bytes.
 
-This is still not a top-level transaction or nested invocation. The next
-vertical slice starts from an explicit initial `WorldState` and checked Core
-contract, executes one top-level invocation, commits return, rolls back revert
-and trap, and returns terminal data together with an exact state observation.
-Nested calls and child-result delivery remain later work.
+This is still not a top-level transaction or nested invocation.
+[ADR-0145](0145-executable-checked-core-top-level-lifecycle.md) starts from an
+explicit initial `WorldState` and checked Core contract, executes one top-level
+invocation, commits return, rolls back revert and trap, and returns terminal
+data together with an exact state observation. Nested calls and child-result
+delivery remain later work.

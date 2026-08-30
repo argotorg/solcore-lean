@@ -977,11 +977,13 @@ completion policy, so compatibility is proved only under a successful Word
 selection and matching canonical returned bytes.
 
 This boundary produces a canonical returned parent continuation but does not
-yet finalize a transaction. The active vertical layer starts from an explicit
-initial `WorldState` and installed checked Core contract, executes one direct
-top-level invocation, selects the working state on return, selects the initial
-checkpoint on revert or trap, and exposes terminal data with an exact state
-observation. Nested calls and child-result delivery remain above that layer.
+yet finalize a transaction.
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) is the
+active vertical layer. It starts from an explicit initial `WorldState` and
+installed checked Core contract, executes one direct top-level invocation,
+selects the working state on return, selects the initial checkpoint on revert
+or trap, and exposes terminal data with an exact state observation. Nested
+calls and child-result delivery remain above that layer.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

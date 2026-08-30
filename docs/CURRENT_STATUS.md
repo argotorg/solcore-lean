@@ -433,8 +433,10 @@ code absence, non-Word selection, or exhaustion.
 complete. It connects that execution to an exact parent/storage provenance and
 constructs the matching canonical returned parent continuation. Parser-proof
 work remains paused. The active target is now a single executable top-level
-lifecycle from explicit initial state and checked contract through
-commit/rollback and terminal observation.
+lifecycle, fixed by
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md), from
+explicit initial state and checked contract through commit/rollback and
+terminal observation.
 
 ## Implementation status
 
@@ -2806,9 +2808,10 @@ test run, 16-root trust-zero and warning-as-error sweep, metadata, kernel,
 diff, axiom, coverage, and contract checks pass.
 
 The active milestone is no longer another proof-only adapter on this path. It
-is an executable top-level lifecycle taking an explicit initial `WorldState`
-and checked Core contract, committing return, rolling back revert and trap,
-and returning terminal data with an exact state observation.
+is [ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md): an
+executable top-level lifecycle taking an explicit initial `WorldState` and
+checked Core contract, committing return, rolling back revert and trap, and
+returning terminal data with an exact state observation.
 
 ## Meaning of completion
 

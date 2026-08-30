@@ -266,9 +266,11 @@ successful Word branch with the same canonical return policy.
 All 49 proof contracts have external consumers, and measured branch, fuel,
 split, state, Store, return-byte, resolution, and limited compatibility tests
 pass with the full repository checks. The active milestone is now an
-executable top-level lifecycle from explicit initial state and checked Core
-contract through return commit or revert/trap rollback. Nested invocation,
-balances, creation, logs, ABI, and the public Oracle follow later.
+executable top-level lifecycle specified by
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md), from
+explicit initial state and checked Core contract through return commit or
+revert/trap rollback. Nested invocation, balances, creation, logs, ABI, and the
+public Oracle follow later.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

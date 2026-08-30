@@ -145,11 +145,12 @@ success produces a proof-linked completion and parent-indexed returned
 continuation with exact plain coherence. Legacy coherence is intentionally
 conditional on the same successful Word return policy.
 
-The active milestone is now one executable top-level lifecycle: take an
-explicit initial `WorldState` and checked Core contract, run a direct
-invocation, commit return, roll back revert and trap, and report terminal data
-with an exact state observation. Proof-only extensions of the ADR-0144 path are
-not separate milestones.
+The active milestone is now
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md), one
+executable top-level lifecycle: take an explicit initial `WorldState` and
+checked Core contract, run a direct invocation, commit return, roll back revert
+and trap, and report terminal data with an exact state observation. Proof-only
+extensions of the ADR-0144 path are not separate milestones.
 
 ## Completed foundation
 
@@ -2336,13 +2337,14 @@ metadata, kernel, diff, axiom, coverage, and contract checks pass.
 
 ## Active executable top-level lifecycle
 
-The next vertical milestone starts from an explicit initial `WorldState`, an
-installed checked Core contract, and a direct invocation. Bounded execution
-must remain total: exhaustion stays resumable, while terminal return selects
-the working state and terminal revert or trap selects the initial checkpoint.
-The result must retain return or revert data, trap information, and an exact
-state observation. Nested calls, balances, creation, logs, ABI, and the public
-Oracle attach only after this boundary is executable end to end.
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) starts from
+an explicit initial `WorldState`, an installed checked Core contract, and a
+direct invocation. Bounded execution must remain total: exhaustion stays
+resumable, while terminal return selects the working state and terminal revert
+or trap selects the initial checkpoint. The result must retain return or
+revert data, trap information, and an exact state observation. Nested calls,
+balances, creation, logs, ABI, and the public Oracle attach only after this
+boundary is executable end to end.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
