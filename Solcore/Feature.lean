@@ -85,6 +85,25 @@ def m2bFrontendFeatureMatrix : Array FeatureRow := #[
       "The closed Surface grammar, UTF-8 spans, lexer, and parser are normative."⟩
   ]
 
+def m3aContractFeatureMatrix : Array FeatureRow := #[
+  ⟨.coreProductsV1, .normative, "M3a", .implemented, some "0151",
+    "Checked Core products and projections are published by Core Wire v3."⟩,
+  ⟨.coreFunctionsV1, .normative, "M3a", .implemented, some "0151",
+    "Checked Core lambdas, application, and lexical closures are published."⟩,
+  ⟨.coreSumsV1, .normative, "M3a", .implemented, some "0151",
+    "Checked Core sums, injections, and case analysis are published."⟩,
+  ⟨.coreLocalCellsV1, .normative, "M3a", .implemented, some "0151",
+    "Checked Core local cell allocation, reads, and writes are published."⟩,
+  ⟨.coreNamedDataV1, .normative, "M3a", .implemented, some "0151",
+    "Checked named data construction and matching are published."⟩,
+  ⟨.coreExtendedWordOperationsV1, .normative, "M3a", .implemented, some "0151",
+    "The complete current checked Word operator algebra is published."⟩,
+  ⟨.checkedContractExecutionV1, .normative, "M3a", .implemented, some "0151",
+    "Checked contracts execute through the balanced state lifecycle."⟩,
+  ⟨.staticWordAbiV1, .normative, "M3a", .implemented, some "0151",
+    "Static uint256-to-uint256 ABI dispatch is published."⟩
+]
+
 private def hasDuplicates {α : Type} [BEq α] : List α → Bool
   | [] => false
   | item :: rest => rest.contains item || hasDuplicates rest
@@ -119,6 +138,24 @@ def m2bFrontendFeatureMatrixIsComplete : Bool :=
     m2bFrontendFeatureMatrix.all fun row =>
       row.specStatus == row.feature.specMaturity
 
+def m3aContractFeatureMatrixIsComplete : Bool :=
+  let expected := #[
+    .coreProductsV1,
+    .coreFunctionsV1,
+    .coreSumsV1,
+    .coreLocalCellsV1,
+    .coreNamedDataV1,
+    .coreExtendedWordOperationsV1,
+    .checkedContractExecutionV1,
+    .staticWordAbiV1
+  ]
+  let features := m3aContractFeatureMatrix.toList.map (·.feature)
+  !hasDuplicates features &&
+    expected.all features.contains &&
+    features.all expected.contains &&
+    m3aContractFeatureMatrix.all fun row =>
+      row.specStatus == row.feature.specMaturity
+
 def rowsRespectProfile (rows : Array FeatureRow) (profile : SpecProfile) : Bool :=
   rows.all fun row =>
     if row.leanStatus == .implemented then
@@ -137,6 +174,9 @@ def m1cFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
 
 def m2bFrontendFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
   rowsRespectProfile m2bFrontendFeatureMatrix profile
+
+def m3aContractFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
+  rowsRespectProfile m3aContractFeatureMatrix profile
 
 theorem featureMatrix_complete : featureMatrixIsComplete = true := by
   native_decide
@@ -165,6 +205,14 @@ theorem m2bFrontendFeatureMatrix_complete :
 
 theorem m2bFrontendFeatureMatrix_respectsProfile :
     m2bFrontendFeatureMatrixRespectsProfile m2bFrontendProfile = true := by
+  native_decide
+
+theorem m3aContractFeatureMatrix_complete :
+    m3aContractFeatureMatrixIsComplete = true := by
+  native_decide
+
+theorem m3aContractFeatureMatrix_respectsProfile :
+    m3aContractFeatureMatrixRespectsProfile m3aContractProfile = true := by
   native_decide
 
 end Solcore
