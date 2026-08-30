@@ -853,6 +853,14 @@ theorem typing_deterministic
 
 namespace Program
 
+/-- Declarative program validity under an initial typing context. -/
+structure WellTypedIn (program : Program) (context : Context) : Prop where
+  dataDefinitionsWellFormed : program.dataDefinitions.WellFormed
+  resultTypeWellFormed : Ty.WellFormed program.dataDefinitions program.resultType
+  bodyHasType :
+    HasType context program.body program.resultType program.dataDefinitions
+
+
 structure WellTyped (program : Program) : Prop where
   dataDefinitionsWellFormed : program.dataDefinitions.WellFormed
   resultTypeWellFormed : Ty.WellFormed program.dataDefinitions program.resultType
@@ -860,10 +868,11 @@ structure WellTyped (program : Program) : Prop where
     HasType [] program.body program.resultType program.dataDefinitions
 
 
-def check (program : Program) : Bool :=
+/-- Check a Core program under an initial typing context. -/
+def checkIn (program : Program) (context : Context) : Bool :=
   if program.dataDefinitions.isWellFormed then
     if program.resultType.isWellFormed program.dataDefinitions then
-      match infer? [] program.body program.dataDefinitions with
+      match infer? context program.body program.dataDefinitions with
       | some inferredType => decide (inferredType = program.resultType)
       | none => false
     else
@@ -872,19 +881,20 @@ def check (program : Program) : Bool :=
     false
 
 
-theorem check_full_sound
+theorem checkIn_full_sound
+    {context : Context}
     {program : Program}
-    (checked : program.check = true) :
-    program.WellTyped := by
+    (checked : program.checkIn context = true) :
+    program.WellTypedIn context := by
   by_cases definitionsAccepted : program.dataDefinitions.isWellFormed = true
   · by_cases resultAccepted :
         program.resultType.isWellFormed program.dataDefinitions = true
-    · cases inferred : infer? [] program.body program.dataDefinitions with
+    · cases inferred : infer? context program.body program.dataDefinitions with
       | none =>
-          simp [Program.check, definitionsAccepted, resultAccepted, inferred] at checked
+          simp [checkIn, definitionsAccepted, resultAccepted, inferred] at checked
       | some inferredType =>
           have typeEquality : inferredType = program.resultType := by
-            simpa [Program.check, definitionsAccepted, resultAccepted, inferred]
+            simpa [checkIn, definitionsAccepted, resultAccepted, inferred]
               using checked
           subst inferredType
           exact ⟨
@@ -892,8 +902,64 @@ theorem check_full_sound
             Ty.isWellFormed_sound resultAccepted,
             infer_sound inferred
           ⟩
-    · simp [Program.check, definitionsAccepted, resultAccepted] at checked
-  · simp [Program.check, definitionsAccepted] at checked
+    · simp [checkIn, definitionsAccepted, resultAccepted] at checked
+  · simp [checkIn, definitionsAccepted] at checked
+
+
+theorem checkIn_sound
+    {context : Context}
+    {program : Program}
+    (checked : program.checkIn context = true) :
+    HasType context program.body program.resultType program.dataDefinitions :=
+  (checkIn_full_sound checked).bodyHasType
+
+
+theorem checkIn_complete
+    {context : Context}
+    {program : Program}
+    (wellTyped : program.WellTypedIn context) :
+    program.checkIn context = true := by
+  simp [
+    checkIn,
+    DataEnvironment.isWellFormed_complete wellTyped.dataDefinitionsWellFormed,
+    Ty.isWellFormed_complete wellTyped.resultTypeWellFormed,
+    infer_complete wellTyped.bodyHasType
+  ]
+
+
+theorem checkIn_iff_wellTyped
+    {context : Context}
+    {program : Program} :
+    program.checkIn context = true ↔ program.WellTypedIn context :=
+  ⟨checkIn_full_sound, checkIn_complete⟩
+
+
+/-- The historical program checker is the empty-context specialization. -/
+def check (program : Program) : Bool :=
+  program.checkIn []
+
+
+@[simp] theorem checkIn_nil (program : Program) :
+    program.checkIn [] = program.check :=
+  rfl
+
+
+theorem wellTypedIn_nil_iff {program : Program} :
+    program.WellTypedIn [] ↔ program.WellTyped := by
+  constructor
+  · intro wellTyped
+    exact ⟨wellTyped.dataDefinitionsWellFormed,
+      wellTyped.resultTypeWellFormed, wellTyped.bodyHasType⟩
+  · intro wellTyped
+    exact ⟨wellTyped.dataDefinitionsWellFormed,
+      wellTyped.resultTypeWellFormed, wellTyped.bodyHasType⟩
+
+
+theorem check_full_sound
+    {program : Program}
+    (checked : program.check = true) :
+    program.WellTyped :=
+  wellTypedIn_nil_iff.mp (checkIn_full_sound checked)
 
 
 theorem check_sound
@@ -906,13 +972,8 @@ theorem check_sound
 theorem check_complete
     {program : Program}
     (wellTyped : program.WellTyped) :
-    program.check = true := by
-  simp [
-    Program.check,
-    DataEnvironment.isWellFormed_complete wellTyped.dataDefinitionsWellFormed,
-    Ty.isWellFormed_complete wellTyped.resultTypeWellFormed,
-    infer_complete wellTyped.bodyHasType
-  ]
+    program.check = true :=
+  checkIn_complete (wellTypedIn_nil_iff.mpr wellTyped)
 
 
 theorem check_iff_wellTyped

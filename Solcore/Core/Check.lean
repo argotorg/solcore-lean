@@ -617,10 +617,13 @@ theorem inferDetailed_iff_typing
       HasType context expr type definitions := by
   rw [inferDetailed_iff_infer, typing_iff_infer]
 
-def Program.checkDetailed (program : Program) : Except CheckError Ty :=
+/-- Check a Core program with diagnostics under an initial typing context. -/
+def Program.checkDetailedIn
+    (program : Program)
+    (context : Context) : Except CheckError Ty :=
   if program.dataDefinitions.isWellFormed then
     if program.resultType.isWellFormed program.dataDefinitions then
-      match inferDetailed [] [] program.body program.dataDefinitions with
+      match inferDetailed context [] program.body program.dataDefinitions with
       | .error error => .error error
       | .ok inferredType =>
           if inferredType = program.resultType then
@@ -637,24 +640,26 @@ def Program.checkDetailed (program : Program) : Except CheckError Ty :=
   else
     .error (definitionTableError program.dataDefinitions)
 
-theorem Program.checkDetailed_iff_check {program : Program} :
-    program.checkDetailed = .ok program.resultType ↔
-      program.check = true := by
+theorem Program.checkDetailedIn_iff_checkIn
+    {program : Program}
+    {context : Context} :
+    program.checkDetailedIn context = .ok program.resultType ↔
+      program.checkIn context = true := by
   by_cases definitionsAccepted :
       program.dataDefinitions.isWellFormed = true
   · by_cases resultAccepted :
         program.resultType.isWellFormed program.dataDefinitions = true
     · cases detailed :
-        inferDetailed [] [] program.body program.dataDefinitions with
+        inferDetailed context [] program.body program.dataDefinitions with
       | error error =>
           have notInferred :
-              infer? [] program.body program.dataDefinitions = none := by
+              infer? context program.body program.dataDefinitions = none := by
             simpa [detailed, Except.toOption] using
               (inferDetailed_toOption
-                [] [] program.body program.dataDefinitions).symm
+                context [] program.body program.dataDefinitions).symm
           simp [
-            Program.checkDetailed,
-            Program.check,
+            Program.checkDetailedIn,
+            Program.checkIn,
             definitionsAccepted,
             resultAccepted,
             detailed,
@@ -662,24 +667,24 @@ theorem Program.checkDetailed_iff_check {program : Program} :
           ]
       | ok inferredType =>
           have inferred :
-              infer? [] program.body program.dataDefinitions =
+              infer? context program.body program.dataDefinitions =
                 some inferredType := by
             simpa [detailed, Except.toOption] using
               (inferDetailed_toOption
-                [] [] program.body program.dataDefinitions).symm
+                context [] program.body program.dataDefinitions).symm
           by_cases equalTypes : inferredType = program.resultType
           · subst inferredType
             simp [
-              Program.checkDetailed,
-              Program.check,
+              Program.checkDetailedIn,
+              Program.checkIn,
               definitionsAccepted,
               resultAccepted,
               detailed,
               inferred
             ]
           · simp [
-              Program.checkDetailed,
-              Program.check,
+              Program.checkDetailedIn,
+              Program.checkIn,
               definitionsAccepted,
               resultAccepted,
               detailed,
@@ -687,12 +692,60 @@ theorem Program.checkDetailed_iff_check {program : Program} :
               equalTypes
             ]
     · simp [
-        Program.checkDetailed,
-        Program.check,
+        Program.checkDetailedIn,
+        Program.checkIn,
         definitionsAccepted,
         resultAccepted
       ]
-  · simp [Program.checkDetailed, Program.check, definitionsAccepted]
+  · simp [Program.checkDetailedIn, Program.checkIn, definitionsAccepted]
+
+theorem Program.checkDetailedIn_iff_wellTyped
+    {program : Program}
+    {context : Context} :
+    program.checkDetailedIn context = .ok program.resultType ↔
+      program.WellTypedIn context := by
+  rw [Program.checkDetailedIn_iff_checkIn, Program.checkIn_iff_wellTyped]
+
+theorem Program.checkDetailedIn_iff_typing
+    {program : Program}
+    {context : Context} :
+    program.checkDetailedIn context = .ok program.resultType ↔
+      program.WellTypedIn context :=
+  Program.checkDetailedIn_iff_wellTyped
+
+theorem Program.checkDetailedIn_full_sound
+    {program : Program}
+    {context : Context}
+    (checked : program.checkDetailedIn context = .ok program.resultType) :
+    program.WellTypedIn context :=
+  Program.checkDetailedIn_iff_wellTyped.mp checked
+
+theorem Program.checkDetailedIn_sound
+    {program : Program}
+    {context : Context}
+    (checked : program.checkDetailedIn context = .ok program.resultType) :
+    HasType context program.body program.resultType program.dataDefinitions :=
+  (Program.checkDetailedIn_full_sound checked).bodyHasType
+
+theorem Program.checkDetailedIn_complete
+    {program : Program}
+    {context : Context}
+    (wellTyped : program.WellTypedIn context) :
+    program.checkDetailedIn context = .ok program.resultType :=
+  Program.checkDetailedIn_iff_wellTyped.mpr wellTyped
+
+/-- The historical detailed checker is the empty-context specialization. -/
+def Program.checkDetailed (program : Program) : Except CheckError Ty :=
+  program.checkDetailedIn []
+
+@[simp] theorem Program.checkDetailedIn_nil (program : Program) :
+    program.checkDetailedIn [] = program.checkDetailed :=
+  rfl
+
+theorem Program.checkDetailed_iff_check {program : Program} :
+    program.checkDetailed = .ok program.resultType ↔
+      program.check = true :=
+  Program.checkDetailedIn_iff_checkIn
 
 theorem Program.checkDetailed_iff_wellTyped {program : Program} :
     program.checkDetailed = .ok program.resultType ↔ program.WellTyped := by

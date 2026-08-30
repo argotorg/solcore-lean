@@ -1,3 +1,4 @@
+import Solcore.Core.Check
 import Solcore.Core.HostMachineProperties
 import Solcore.Core.HostRunner
 import Solcore.Core.Wire
@@ -1019,7 +1020,72 @@ private theorem twoStorageReadProgram_host_checked :
     twoStorageReadProgram.checkHost = true := by
   decide
 
+private def unshiftedStorageReadUnderLetProgram : Program := {
+  resultType := .word
+  body :=
+    .letE .unit
+      (.apply (.var HostFunction.storageRead.index) (.word slot))
+}
+
+private theorem storageReadProgram_context_checked :
+    storageReadProgram.checkIn hostContext = true := by
+  decide
+
+private theorem storageReadProgram_context_detailed :
+    storageReadProgram.checkDetailedIn hostContext = .ok .word := by
+  rfl
+
+private theorem cellStorageReadProgram_context_detailed :
+    cellStorageReadProgram.checkDetailedIn hostContext = .ok .word := by
+  rfl
+
+private theorem unshiftedStorageReadUnderLetProgram_context_detailed :
+    unshiftedStorageReadUnderLetProgram.checkDetailedIn hostContext =
+      .error {
+        path := [.letBody, .applyFunction]
+        data := .expectedFunction .unit
+      } := by
+  rfl
+
+private theorem storageReadProgram_empty_context_compatibility :
+    storageReadProgram.checkDetailedIn [] = storageReadProgram.checkDetailed :=
+  Program.checkDetailedIn_nil storageReadProgram
+
+private def testContextualProgramChecking : IO Unit := do
+  assertTrue (storageReadProgram.checkIn hostContext)
+    "the context-parametric checker rejected a host-context consumer"
+  assertTrue
+    (storageReadProgram.checkIn hostContext == storageReadProgram.checkHost)
+    "the context-parametric Boolean checker disagreed with the host checker"
+  match storageReadProgram.checkDetailedIn hostContext with
+  | .ok type =>
+      assertTrue (type == .word)
+        "the detailed checker inferred the wrong host-consumer result type"
+  | .error error =>
+      throw (IO.userError
+        s!"the detailed checker rejected a host consumer: {reprStr error}")
+  match cellStorageReadProgram.checkDetailedIn hostContext with
+  | .ok type =>
+      assertTrue (type == .word)
+        "a let binder changed the shifted host-consumer result type"
+  | .error error =>
+      throw (IO.userError
+        s!"a let binder did not shift the host index: {reprStr error}")
+  match unshiftedStorageReadUnderLetProgram.checkDetailedIn hostContext with
+  | .ok type =>
+      throw (IO.userError
+        s!"an unshifted host index unexpectedly checked as {reprStr type}")
+  | .error error =>
+      assertTrue
+        (error.path == [.letBody, .applyFunction] &&
+          error.data == .expectedFunction .unit)
+        "an unshifted host index under a let binder did not resolve to the local"
+  assertTrue
+    (storageReadProgram.checkIn [] == storageReadProgram.check)
+    "the historical checkers changed at the empty-context specialization"
+
 def testCoreHostMachine : IO Unit := do
+  testContextualProgramChecking
   assertTrue storageReadProgram.checkHost
     "the host checker rejected a storage-read program"
   assertTrue (!storageReadProgram.check)
