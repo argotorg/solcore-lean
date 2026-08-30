@@ -29,6 +29,12 @@ structure DeployedInitializerResult
   resumedRoot : RootFrame initialWorld rootContract rootInvocation
   resumedRoot_contextWorld_eq :
     resumedRoot.context.context.values.working.1 = deployedWorld
+  resumedRoot_storageAddress_eq :
+    resumedRoot.context.context.storageAddress =
+      frame.suspendedRoot.parentContext.context.storageAddress
+  resumedRoot_checkpointState_eq :
+    resumedRoot.context.context.values.checkpoint.state =
+      frame.suspendedRoot.parentContext.context.values.checkpoint.state
   resumedRoot_response_eq :
     resumedRoot.state = frame.suspendedRoot.suspension.resume
       (frame.suspendedRoot.profile.response
@@ -172,6 +178,9 @@ def completeReturned
     runtimeInstalled := installed
     resumedRoot := root
     resumedRoot_contextWorld_eq := rfl
+    resumedRoot_storageAddress_eq := frame.postNonce_storageAddress_eq
+    resumedRoot_checkpointState_eq :=
+      congrArg FrameCheckpointSnapshot.state frame.postNonce_checkpoint_eq
     resumedRoot_response_eq := rfl
   }
 
@@ -192,4 +201,48 @@ def complete
       .trapped reason root rfl rfl
 
 end PreparedInitializerFrame
+
+namespace InitializerCompletionResult
+
+@[simp] theorem root_storageAddress
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+    (result :
+      InitializerCompletionResult initialWorld rootContract rootInvocation frame) :
+    result.root.context.context.storageAddress =
+      frame.suspendedRoot.parentContext.context.storageAddress := by
+  cases result with
+  | returned deployed =>
+      exact deployed.resumedRoot_storageAddress_eq
+  | reverted data resumed context_eq response_eq =>
+      simp only [root]
+      rw [context_eq]
+      exact frame.postNonce_storageAddress_eq
+  | trapped reason resumed context_eq response_eq =>
+      simp only [root]
+      rw [context_eq]
+      exact frame.postNonce_storageAddress_eq
+
+@[simp] theorem root_checkpointState
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+    (result :
+      InitializerCompletionResult initialWorld rootContract rootInvocation frame) :
+    result.root.context.context.values.checkpoint.state =
+      frame.suspendedRoot.parentContext.context.values.checkpoint.state := by
+  cases result with
+  | returned deployed =>
+      exact deployed.resumedRoot_checkpointState_eq
+  | reverted data resumed context_eq response_eq =>
+      simp only [root]
+      rw [context_eq]
+      exact congrArg FrameCheckpointSnapshot.state frame.postNonce_checkpoint_eq
+  | trapped reason resumed context_eq response_eq =>
+      simp only [root]
+      rw [context_eq]
+      exact congrArg FrameCheckpointSnapshot.state frame.postNonce_checkpoint_eq
+
+end InitializerCompletionResult
 end Solcore.Semantics.OneLevelNestedExecution

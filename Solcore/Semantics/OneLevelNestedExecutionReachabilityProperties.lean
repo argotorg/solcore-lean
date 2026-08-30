@@ -84,6 +84,31 @@ structure ChildAnchored
         frame.childTarget =
       some ⟨frame.childContract, frame.preTransferInstalled⟩
 
+/-- A prepared initializer retains its fixed environment and transaction roots. -/
+structure InitializerAnchored
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (environment : ExecutionEnvironment)
+    (frame : PreparedInitializerFrame initialWorld rootContract rootInvocation) :
+    Prop where
+  environment_eq : frame.environment = environment
+  parentStorageAddress_eq :
+    frame.suspendedRoot.parentContext.context.storageAddress =
+      rootInvocation.target
+  parentCheckpointState_eq :
+    frame.suspendedRoot.parentContext.context.values.checkpoint.state =
+      initialWorld
+  postNonceStorageAddress_eq :
+    frame.postNonceParentContext.context.storageAddress = rootInvocation.target
+  postNonceCheckpointState_eq :
+    frame.postNonceParentContext.context.values.checkpoint.state = initialWorld
+  initializerStorageAddress_eq :
+    frame.initializerContext.context.storageAddress = frame.prepared.createdAddress
+  initializerCheckpointState_eq :
+    frame.initializerContext.context.values.checkpoint.state =
+      frame.prepared.statePreparation.postNonceWorld
+
 /-- Mode-indexed form used for one induction over the transition closure. -/
 def Anchored
     {initialWorld : WorldState}
@@ -93,7 +118,7 @@ def Anchored
     Mode initialWorld rootContract rootInvocation → Prop
   | .root frame => RootAnchored frame
   | .child frame => ChildAnchored registry frame
-  | .initializer _ => False
+  | .initializer frame => InitializerAnchored registry frame
 
 private theorem rootAfterSuspension_anchored
     {initialWorld : WorldState}
@@ -105,7 +130,10 @@ private theorem rootAfterSuspension_anchored
     (advanced : Core.hostAdvance frame.state = .suspended suspension)
     (anchored : RootAnchored frame) :
     Anchored registry
-      (frame.afterSuspensionWithEnvironment registry suspension advanced) := by
+      (frame.afterSuspensionWithEnvironment registry
+        (by rw [TopLevelInvocation.executionInputs_currentAddress]
+            exact anchored.storageAddress_eq.symm)
+        suspension advanced) := by
   rcases suspension with ⟨request, continuation, store⟩
   cases request with
   | callContractWord target input =>
@@ -128,8 +156,18 @@ private theorem rootAfterSuspension_anchored
           · exact ⟨anchored.storageAddress_eq,
               anchored.checkpointState_eq, rfl, rfl, by assumption⟩
   | createContractWord templateId value input =>
-      exact ⟨anchored.storageAddress_eq,
-        anchored.checkpointState_eq⟩
+      simp only [RootFrame.afterSuspensionWithEnvironment]
+      split
+      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+      · exact ⟨rfl, anchored.storageAddress_eq,
+          anchored.checkpointState_eq,
+          (PreparedInitializerFrame.postNonce_storageAddress_eq _).trans
+            anchored.storageAddress_eq,
+          (congrArg FrameCheckpointSnapshot.state
+            (PreparedInitializerFrame.postNonce_checkpoint_eq _)).trans
+            anchored.checkpointState_eq,
+          PreparedInitializerFrame.initializer_storageAddress_eq _,
+          PreparedInitializerFrame.initializer_checkpointState_eq _⟩
   | storageRead slot =>
       exact ⟨anchored.storageAddress_eq,
         anchored.checkpointState_eq⟩
@@ -178,7 +216,7 @@ theorem Reachable.anchored
   | rootNext prior advanced inductionHypothesis =>
       rcases inductionHypothesis with ⟨address, checkpoint⟩
       exact ⟨address, checkpoint⟩
-  | rootSuspended prior advanced inductionHypothesis =>
+  | rootSuspended prior creatorAddress_eq advanced inductionHypothesis =>
       exact rootAfterSuspension_anchored _ _ _ advanced
         inductionHypothesis
   | childDone prior advanced inductionHypothesis =>
@@ -225,11 +263,21 @@ theorem Reachable.anchored
           childCheckpoint,
         registryResolution⟩
   | initializerDone prior advanced inductionHypothesis =>
-      exact False.elim inductionHypothesis
+      exact ⟨InitializerCompletionResult.root_storageAddress _ |>.trans
+          inductionHypothesis.parentStorageAddress_eq,
+        InitializerCompletionResult.root_checkpointState _ |>.trans
+          inductionHypothesis.parentCheckpointState_eq⟩
   | initializerNext prior advanced inductionHypothesis =>
-      exact inductionHypothesis
+      exact { inductionHypothesis with }
   | initializerSuspended prior advanced inductionHypothesis =>
-      exact inductionHypothesis
+      exact { inductionHypothesis with
+        initializerStorageAddress_eq :=
+          (handleRequest_storageAddress _ _ _).trans
+            inductionHypothesis.initializerStorageAddress_eq
+        initializerCheckpointState_eq :=
+          (congrArg FrameCheckpointSnapshot.state
+            (handleRequest_checkpoint _ _ _)).trans
+            inductionHypothesis.initializerCheckpointState_eq }
 
 theorem Reachable.root_storageAddress
     {initialWorld : WorldState}

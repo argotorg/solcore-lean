@@ -1,5 +1,6 @@
 import Solcore.Core.HostRunnerProperties
 import Solcore.Semantics.OneLevelNestedExecutionResult
+import Solcore.Semantics.OneLevelNestedExecutionReachabilityProperties
 import Solcore.Semantics.OneLevelNestedExecutionTransitions
 
 /-! Shared-fuel execution for one root and one active leaf child. -/
@@ -115,9 +116,15 @@ def runMode
           match fuel with
           | 0 => ⟨.outOfFuel environment (.root frame) reachable⟩
           | remaining + 1 =>
+              have creatorAddress_eq :
+                  rootInvocation.executionInputs.currentAddress =
+                    frame.context.context.storageAddress := by
+                rw [TopLevelInvocation.executionInputs_currentAddress]
+                exact reachable.root_storageAddress.symm
               runMode environment remaining
-                (frame.afterSuspensionWithEnvironment environment suspension advanced)
-                (.rootSuspended reachable advanced)
+                (frame.afterSuspensionWithEnvironment environment
+                  creatorAddress_eq suspension advanced)
+                (.rootSuspended reachable creatorAddress_eq advanced)
   | fuel, .child frame, reachable =>
       match advanced : Core.hostAdvance frame.childState with
       | .done value =>
@@ -172,7 +179,8 @@ decreasing_by
   · simp [Mode.rank]
   · have bounded :=
       Mode.rank_le_one
-        (frame.afterSuspensionWithEnvironment environment suspension advanced)
+        (frame.afterSuspensionWithEnvironment environment creatorAddress_eq
+          suspension advanced)
     simp [Mode.rank] at bounded ⊢
     omega
   · simp [Mode.rank]

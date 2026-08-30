@@ -83,14 +83,15 @@ theorem resumeWithFuel_runMode
         all_goals cases branchEq.symm.trans stepEq <;> rfl
       apply Result.eq_of_view_eq
       simp [resumeWithFuel, prefixView]
-  | case5 frame reachable suspension stepEq remaining active ih =>
+  | case5 frame reachable suspension stepEq remaining creatorAddress_eq active ih =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
       have prefixEq :
           runMode registry remaining.succ (.root frame) reachable =
             runMode registry remaining
-              (frame.afterSuspensionWithEnvironment registry suspension stepEq)
-              (.rootSuspended reachable stepEq) := by
+              (frame.afterSuspensionWithEnvironment registry creatorAddress_eq
+                suspension stepEq)
+              (.rootSuspended reachable creatorAddress_eq stepEq) := by
         apply Result.eq_of_view_eq
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
@@ -99,8 +100,9 @@ theorem resumeWithFuel_runMode
           runMode registry (remaining.succ + additional) (.root frame)
               reachable =
             runMode registry (remaining + additional)
-              (frame.afterSuspensionWithEnvironment registry suspension stepEq)
-              (.rootSuspended reachable stepEq) := by
+              (frame.afterSuspensionWithEnvironment registry creatorAddress_eq
+                suspension stepEq)
+              (.rootSuspended reachable creatorAddress_eq stepEq) := by
         rw [Nat.succ_add]
         apply Result.eq_of_view_eq
         rw [runMode.eq_1]

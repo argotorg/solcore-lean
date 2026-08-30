@@ -8,6 +8,8 @@ import Solcore.Semantics.BalanceTransferPresenceProperties
 import Solcore.Semantics.ContractCallFailure
 import Solcore.Semantics.ExecutionEnvironment
 import Solcore.Semantics.HostStorageAccountPresence
+import Solcore.Semantics.CheckedCreationPreflightFailure
+import Solcore.Semantics.OneLevelNestedCreationTransitions
 import Solcore.Semantics.OneLevelNestedExecutionMode
 
 /-! Proof-preserving local transitions for the one-level nested scheduler. -/
@@ -143,6 +145,8 @@ def afterSuspensionWithEnvironment
     {rootInvocation : TopLevelInvocation}
     (environment : ExecutionEnvironment)
     (frame : RootFrame initialWorld rootContract rootInvocation)
+    (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
+      frame.context.context.storageAddress)
     (suspension : Core.HostSuspension)
     (advanced : Core.hostAdvance frame.state = .suspended suspension) :
     Mode initialWorld rootContract rootInvocation := by
@@ -202,9 +206,19 @@ def afterSuspensionWithEnvironment
                   exact .child (suspended.startChild address addressEq resolved.1 resolved.2
                     childWorld installed parentPresence)
   | createContractWord templateId value input =>
-      exact .root (frame.afterHandledSuspension
-        ⟨.createContractWord templateId value input,
-          continuation, store⟩ advanced)
+      let profile : CreationProfile := ⟨templateId, value, input⟩
+      let suspended :=
+        frame.suspendCreation profile continuation store advanced
+      match prepared : CheckedCreationPreflight.prepare
+          suspended.parentContext.context.values.working.1 environment
+          rootInvocation.executionInputs.currentAddress templateId value with
+      | .error failure =>
+          exact .root
+            (suspended.resumeWith suspended.parentContext
+              failure.toContractCallResult)
+      | .ok creation =>
+          exact .initializer
+            (suspended.startInitializer environment creation creatorAddress_eq)
   | storageRead slot =>
       exact .root (frame.afterHandledSuspension
         ⟨.storageRead slot, continuation, store⟩ advanced)
@@ -243,10 +257,13 @@ def afterSuspension
     {rootInvocation : TopLevelInvocation}
     (registry : CheckedContractRegistry)
     (frame : RootFrame initialWorld rootContract rootInvocation)
+    (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
+      frame.context.context.storageAddress)
     (suspension : Core.HostSuspension)
     (advanced : Core.hostAdvance frame.state = .suspended suspension) :
     Mode initialWorld rootContract rootInvocation :=
-  frame.afterSuspensionWithEnvironment (.callsOnly registry) suspension advanced
+  frame.afterSuspensionWithEnvironment (.callsOnly registry) creatorAddress_eq
+    suspension advanced
 
 end RootFrame
 

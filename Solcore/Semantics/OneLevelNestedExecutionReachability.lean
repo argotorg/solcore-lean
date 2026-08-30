@@ -50,9 +50,12 @@ inductive Reachable
       {frame : RootFrame initialWorld rootContract rootInvocation}
       {suspension : Core.HostSuspension}
       (prior : Reachable environment (.root frame))
+      (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
+        frame.context.context.storageAddress)
       (advanced : Core.hostAdvance frame.state = .suspended suspension) :
       Reachable environment
-        (frame.afterSuspensionWithEnvironment environment suspension advanced)
+        (frame.afterSuspensionWithEnvironment environment creatorAddress_eq
+          suspension advanced)
   | childDone
       {frame : ChildFrame initialWorld rootContract rootInvocation}
       {value : Core.Value}
