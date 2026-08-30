@@ -31,6 +31,7 @@ private def responseFor : (request : HostRequest) → request.Response
   | .inputDataByte? _ => some response
   | .inputDataSize => response
   | .inputDataWordBE? _ => some response
+  | .currentAddress => response
 
 private def storageReadProgram : Program := {
   resultType := .word
@@ -175,6 +176,28 @@ private theorem illTypedCallerAddressProgram_host_rejected :
     illTypedCallerAddressProgram.checkHost = false := by
   decide
 
+private def currentAddressProgram : Program := {
+  resultType := .word
+  body := .apply (.var HostFunction.currentAddress.index) .unit
+}
+
+private theorem currentAddressProgram_host_checked :
+    currentAddressProgram.checkHost = true := by
+  decide
+
+private theorem currentAddressProgram_closed_rejected :
+    currentAddressProgram.check = false := by
+  decide
+
+private def illTypedCurrentAddressProgram : Program := {
+  resultType := .word
+  body := .apply (.var HostFunction.currentAddress.index) (.bool true)
+}
+
+private theorem illTypedCurrentAddressProgram_host_rejected :
+    illTypedCurrentAddressProgram.checkHost = false := by
+  decide
+
 private def inputOffset : Word := ⟨1, by decide⟩
 
 private def inputDataByteProgram : Program := {
@@ -269,6 +292,9 @@ private def checkedCallValueProgram : CheckedHostCoreProgram :=
 private def checkedCallerAddressProgram : CheckedHostCoreProgram :=
   ⟨callerAddressProgram, callerAddressProgram_host_checked⟩
 
+private def checkedCurrentAddressProgram : CheckedHostCoreProgram :=
+  ⟨currentAddressProgram, currentAddressProgram_host_checked⟩
+
 private def checkedInputDataByteProgram : CheckedHostCoreProgram :=
   ⟨inputDataByteProgram, inputDataByteProgram_host_checked⟩
 
@@ -318,7 +344,8 @@ private theorem compileTimeHostCapabilityIndexes :
       HostFunction.callerAddress.index = 5 ∧
       HostFunction.inputDataByte?.index = 6 ∧
       HostFunction.inputDataSize.index = 7 ∧
-      HostFunction.inputDataWordBE?.index = 8 := by
+      HostFunction.inputDataWordBE?.index = 8 ∧
+      HostFunction.currentAddress.index = 9 := by
   decide
 
 private theorem compileTimeHostCapabilityRegistry :
@@ -426,9 +453,19 @@ private theorem compileTimeInputDataWordBEEnvironmentIndexRegression :
       some (.hostFunction .inputDataWordBE?) :=
   hostEnvironment_inputDataWordBE?
 
+private theorem compileTimeCurrentAddressContextIndexRegression :
+    hostContext[HostFunction.currentAddress.index]? =
+      some (HostFunction.functionType .currentAddress) :=
+  hostContext_currentAddress
+
+private theorem compileTimeCurrentAddressEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.currentAddress.index]? =
+      some (.hostFunction .currentAddress) :=
+  hostEnvironment_currentAddress
+
 private theorem compileTimeHostCapabilityLengths :
-    HostFunction.all.length = 9 ∧
-      hostContext.length = 9 ∧ hostEnvironment.length = 9 :=
+    HostFunction.all.length = 10 ∧
+      hostContext.length = 10 ∧ hostEnvironment.length = 10 :=
   ⟨HostFunction.all_length, hostContext_length, hostEnvironment_length⟩
 
 private theorem compileTimeFirstUnboundHostIndex :
@@ -512,6 +549,19 @@ private def inputDataWordBERequestState : State :=
 private def inputDataWordBESuspension : HostSuspension :=
   ⟨.inputDataWordBE? inputOffset, [], []⟩
 
+private def currentAddressBeginState : State :=
+  ⟨.ret (.hostFunction .currentAddress),
+    [.applyArgument .unit hostEnvironment], []⟩
+
+private def currentAddressArgumentState : State :=
+  ⟨.eval .unit hostEnvironment, [.hostApply .currentAddress], []⟩
+
+private def currentAddressRequestState : State :=
+  ⟨.ret .unit, [.hostApply .currentAddress], []⟩
+
+private def currentAddressSuspension : HostSuspension :=
+  ⟨.currentAddress, [], []⟩
+
 private theorem compileTimeBeginCorrespondenceRegression :
     HostTransition beginState argumentState := by
   apply hostAdvance_next_iff.mp
@@ -572,6 +622,16 @@ private theorem compileTimeInputDataWordBEEmissionRegression :
   apply hostAdvance_suspended_iff.mp
   exact hostAdvance_suspend_inputDataWordBE? inputOffset [] []
 
+private theorem compileTimeCurrentAddressBeginRegression :
+    HostTransition currentAddressBeginState currentAddressArgumentState := by
+  apply hostAdvance_next_iff.mp
+  exact hostAdvance_begin_currentAddress .unit hostEnvironment [] []
+
+private theorem compileTimeCurrentAddressEmissionRegression :
+    HostRequestEmission currentAddressRequestState currentAddressSuspension := by
+  apply hostAdvance_suspended_iff.mp
+  exact hostAdvance_suspend_currentAddress [] []
+
 private theorem compileTimeTransitionDeterminismRegression
     {next : State}
     (step : HostTransition beginState next) :
@@ -611,6 +671,19 @@ private def retainedInputDataSizeSuspension : HostSuspension :=
 
 private def retainedInputDataWordBESuspension : HostSuspension :=
   ⟨.inputDataWordBE? inputOffset, retainedContinuation, retainedStore⟩
+
+private def retainedCurrentAddressSuspension : HostSuspension :=
+  ⟨.currentAddress, retainedContinuation, retainedStore⟩
+
+private def retainedCurrentAddressRequestState : State :=
+  ⟨.ret .unit,
+    .hostApply .currentAddress :: retainedContinuation, retainedStore⟩
+
+private theorem compileTimeRetainedCurrentAddressEmissionRegression :
+    HostRequestEmission
+      retainedCurrentAddressRequestState retainedCurrentAddressSuspension := by
+  apply hostAdvance_suspended_iff.mp
+  exact hostAdvance_suspend_currentAddress retainedContinuation retainedStore
 
 private theorem compileTimeInputDataWordBEResponseNoneRegression :
     HostRequest.responseValue (.inputDataWordBE? inputOffset) none =
@@ -686,6 +759,12 @@ private theorem compileTimeInputDataWordBEResumeSomeRegression :
   HostSuspension.resume_inputDataWordBE?_some
     inputOffset response retainedContinuation retainedStore
 
+private theorem compileTimeCurrentAddressResumeRegression :
+    retainedCurrentAddressSuspension.resume response =
+      ⟨.ret (.word response), retainedContinuation, retainedStore⟩ :=
+  HostSuspension.resume_currentAddress
+    response retainedContinuation retainedStore
+
 private theorem compileTimeSuspensionTypingRegression :
     HostSuspensionHasType requestSuspension .word [] := by
   apply CheckedHostCoreProgram.runStateful_suspended_hasType
@@ -751,6 +830,12 @@ private theorem compileTimeCheckedCallerAddressNeverFaults
     checkedCallerAddressProgram.runStateful fuel ≠ .fault error faultState :=
   CheckedHostCoreProgram.runStateful_ne_fault
     checkedCallerAddressProgram fuel error faultState
+
+private theorem compileTimeCheckedCurrentAddressNeverFaults
+    (fuel : Nat) (error : MachineFault) (faultState : State) :
+    checkedCurrentAddressProgram.runStateful fuel ≠ .fault error faultState :=
+  CheckedHostCoreProgram.runStateful_ne_fault
+    checkedCurrentAddressProgram fuel error faultState
 
 private theorem compileTimeCheckedInputDataByteNeverFaults
     (fuel : Nat) (error : MachineFault) (faultState : State) :
@@ -856,6 +941,16 @@ private theorem compileTimeInputDataWordBEWireV2RejectionRegression :
       (.hostFunction .inputDataWordBE?) = none :=
   rfl
 
+private theorem compileTimeCurrentAddressWireV1RejectionRegression :
+    Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .currentAddress) = none :=
+  rfl
+
+private theorem compileTimeCurrentAddressWireV2RejectionRegression :
+    Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .currentAddress) = none :=
+  rfl
+
 private def cellStorageReadProgram : Program := {
   resultType := .word
   body :=
@@ -917,6 +1012,12 @@ def testCoreHostMachine : IO Unit := do
     "the closed checker accepted the caller-address capability"
   assertTrue (!illTypedCallerAddressProgram.checkHost)
     "the host checker accepted a non-Unit caller-address argument"
+  assertTrue currentAddressProgram.checkHost
+    "the host checker rejected current-address observation"
+  assertTrue (!currentAddressProgram.check)
+    "the closed checker accepted the current-address capability"
+  assertTrue (!illTypedCurrentAddressProgram.checkHost)
+    "the host checker accepted a non-Unit current-address argument"
   assertTrue inputDataByteProgram.checkHost
     "the host checker rejected optional input-byte observation"
   assertTrue (!inputDataByteProgram.check)
@@ -940,7 +1041,7 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (hostContext[HostFunction.all.length]?.isNone &&
       hostEnvironment[HostFunction.all.length]?.isNone)
-    "host index nine is no longer the first unbound position"
+    "host index ten is no longer the first unbound position"
   assertTrue
     (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
     "checked host admission retained a program rejected by the host checker"
@@ -971,7 +1072,7 @@ def testCoreHostMachine : IO Unit := do
     (HostFunction.all ==
         [.storageRead, .storageWrite, .storageAddress, .codeAddress,
           .callValue, .callerAddress, .inputDataByte?, .inputDataSize,
-          .inputDataWordBE?] &&
+          .inputDataWordBE?, .currentAddress] &&
       HostFunction.all.all (fun function =>
         HostFunction.all[function.index]? == some function) &&
       HostFunction.all.all (fun function =>
@@ -987,8 +1088,9 @@ def testCoreHostMachine : IO Unit := do
       HostFunction.inputDataByte?.index == 6 &&
       HostFunction.inputDataSize.index == 7 &&
       HostFunction.inputDataWordBE?.index == 8 &&
-      HostFunction.all.length == 9 &&
-      hostContext.length == 9 && hostEnvironment.length == 9)
+      HostFunction.currentAddress.index == 9 &&
+      HostFunction.all.length == 10 &&
+      hostContext.length == 10 && hostEnvironment.length == 10)
     "the append-only host capability layout changed"
   assertTrue
     (hostContext[HostFunction.storageAddress.index]? ==
@@ -1032,6 +1134,12 @@ def testCoreHostMachine : IO Unit := do
       hostEnvironment[HostFunction.inputDataWordBE?.index]? ==
         some (.hostFunction .inputDataWordBE?))
     "the optional input-word capability is absent from index eight"
+  assertTrue
+    (hostContext[HostFunction.currentAddress.index]? ==
+        some (HostFunction.functionType .currentAddress) &&
+      hostEnvironment[HostFunction.currentAddress.index]? ==
+        some (.hostFunction .currentAddress))
+    "the current-address capability is absent from index nine"
 
   assertTrue (hostAdvance beginState == .next argumentState)
     "host application did not begin by evaluating its argument"
@@ -1115,6 +1223,18 @@ def testCoreHostMachine : IO Unit := do
         ⟨.ret (.bool true), [.hostApply .inputDataWordBE?], []⟩ ==
       .fault (.invalidHostArgument .inputDataWordBE? (.bool true)))
     "a non-Word input-word offset did not retain the raw machine fault"
+  assertTrue
+    (hostAdvance currentAddressBeginState == .next currentAddressArgumentState)
+    "current-address application did not evaluate Unit"
+  assertTrue
+    (hostAdvance currentAddressRequestState ==
+      .suspended currentAddressSuspension)
+    "Unit did not emit the exact current-address request"
+  assertTrue
+    (hostAdvance
+        ⟨.ret (.bool true), [.hostApply .currentAddress], []⟩ ==
+      .fault (.invalidHostArgument .currentAddress (.bool true)))
+    "a non-Unit current-address argument did not retain the raw machine fault"
 
   assertTrue
     (retainedSuspension.resume response ==
@@ -1159,6 +1279,14 @@ def testCoreHostMachine : IO Unit := do
       ⟨.ret (.inRight .unit (.word response)),
         retainedContinuation, retainedStore⟩)
     "a present input word lost its value, continuation, or Core-local store"
+  assertTrue
+    (retainedCurrentAddressSuspension.resume response ==
+      ⟨.ret (.word response), retainedContinuation, retainedStore⟩)
+    "current-address resume changed the Word, continuation, or Core-local store"
+  assertTrue
+    (hostAdvance retainedCurrentAddressRequestState ==
+      .suspended retainedCurrentAddressSuspension)
+    "current-address emission changed the continuation or Core-local store"
 
   assertTrue
     (checkedStorageReadProgram.runStateful 4 == .outOfFuel requestState)
@@ -1227,6 +1355,14 @@ def testCoreHostMachine : IO Unit := do
     (inputDataWordBEProgram.runHostStateful 5 ==
       .suspended inputDataWordBESuspension 0)
     "input-word execution changed its exact request budget"
+  assertTrue
+    (currentAddressProgram.runHostStateful 4 ==
+      .outOfFuel currentAddressRequestState)
+    "current-address execution moved its pre-request fuel boundary"
+  assertTrue
+    (currentAddressProgram.runHostStateful 5 ==
+      .suspended currentAddressSuspension 0)
+    "current-address execution changed its exact request budget"
 
   match cellStorageReadProgram.runHostStateful 32 with
   | .suspended suspension remainingFuel =>
@@ -1318,5 +1454,13 @@ def testCoreHostMachine : IO Unit := do
     (Solcore.Core.Wire.V2.Value.ofCore?
       (.hostFunction .inputDataWordBE?)).isNone
     "Core wire v2 encoded the optional input-word host value"
+  assertTrue
+    (Solcore.Core.Wire.V1.Value.ofCore?
+      (.hostFunction .currentAddress)).isNone
+    "Core wire v1 encoded the current-address host value"
+  assertTrue
+    (Solcore.Core.Wire.V2.Value.ofCore?
+      (.hostFunction .currentAddress)).isNone
+    "Core wire v2 encoded the current-address host value"
 
 end Tests

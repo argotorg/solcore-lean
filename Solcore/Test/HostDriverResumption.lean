@@ -44,6 +44,7 @@ private def countingHandler : HostHandler Nat where
     | .inputDataByte? _ => (count + 1, some returned)
     | .inputDataSize => (count + 1, returned)
     | .inputDataWordBE? _ => (count + 1, some returned)
+    | .currentAddress => (count + 1, returned)
 
 /-- A request followed by exactly two ordinary Core transitions. -/
 private def requestReady : State :=
