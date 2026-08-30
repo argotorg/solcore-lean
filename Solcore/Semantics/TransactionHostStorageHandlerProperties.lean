@@ -8,6 +8,12 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics.TransactionHostStorageDriver
 
+@[simp] theorem handler_supports
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (request : Core.HostRequest) :
+    (handler inputs).supports request = true :=
+  rfl
+
 /-- Every non-log request is delegated to the canonical storage handler. -/
 theorem handleRequest_eq_generic_of_not_emitLogWord
     (inputs : HostStorageDriver.ExecutionInputs)

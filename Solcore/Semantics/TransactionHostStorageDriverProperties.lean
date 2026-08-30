@@ -62,8 +62,9 @@ theorem run_of_suspended
       run (handleSuspension inputs context suspension).1 inputs remainingFuel
         (handleSuspension inputs context suspension).2 := by
   simpa only [run, handleSuspension] using
-    HostDriver.run_of_suspended (handler inputs)
+    (HostDriver.run_of_suspended (handler inputs)
       context fuel remainingFuel state suspension execution
+      |>.trans (by rw [if_pos (handler_supports inputs suspension.request)]))
 
 theorem run_of_suspended_emitLogWord
     (context : Context)
@@ -243,6 +244,21 @@ theorem run_ne_fault
     HostDriver.run_ne_fault (handler inputs)
       context fuel state faultState error stateTyping
 
+/-- The transaction policy supports every request, including logs. -/
+theorem run_ne_unsupported
+    (context : Context)
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (fuel : Nat)
+    (state : Core.State)
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat) :
+    (run context inputs fuel state).outcome ≠
+      .unsupported suspension remainingFuel := by
+  simpa only [run] using
+    HostDriver.run_ne_unsupported_of_supports_all
+      (handler inputs) (handler_supports inputs) context fuel state
+      suspension remainingFuel
+
 end TransactionHostStorageDriver
 
 namespace CheckedHostCoreProgram
@@ -268,6 +284,18 @@ theorem runWithTransactionStorage_ne_fault
       .fault error faultState := by
   exact TransactionHostStorageDriver.run_ne_fault
     context inputs fuel _ faultState error code.initialState_hasType
+
+theorem runWithTransactionStorage_ne_unsupported
+    (code : CheckedHostCoreProgram)
+    (context : TransactionHostStorageDriver.Context)
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (fuel : Nat)
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat) :
+    (code.runWithTransactionStorage context inputs fuel).outcome ≠
+      .unsupported suspension remainingFuel := by
+  exact TransactionHostStorageDriver.run_ne_unsupported
+    context inputs fuel _ suspension remainingFuel
 
 end CheckedHostCoreProgram
 
