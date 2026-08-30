@@ -28,12 +28,12 @@ open CheckedHostCoreWordCodeSelection
         CheckedHostCoreWordProgram.ofChecked? := by
   exact toWordCode?_classify (state.code? codeAddress)
 
-theorem selectWordCode_eq_absent_iff
+theorem selectWordCode_eq_codeAbsent_iff
     (state : WorldState)
     (codeAddress : Address) :
-    state.selectWordCode codeAddress = .absent ↔
+    state.selectWordCode codeAddress = .codeAbsent ↔
       state.code? codeAddress = none := by
-  exact classify_eq_absent_iff (state.code? codeAddress)
+  exact classify_eq_codeAbsent_iff (state.code? codeAddress)
 
 theorem selectWordCode_eq_nonWord_iff
     (state : WorldState)
@@ -57,8 +57,8 @@ theorem selectWordCode_eq_word_iff
     (state : WorldState)
     (codeAddress : Address)
     (absent : state.account? codeAddress = none) :
-    state.selectWordCode codeAddress = .absent := by
-  apply (state.selectWordCode_eq_absent_iff codeAddress).2
+    state.selectWordCode codeAddress = .codeAbsent := by
+  apply (state.selectWordCode_eq_codeAbsent_iff codeAddress).2
   exact state.code?_of_absent codeAddress absent
 
 @[simp] theorem selectWordCode_of_account_without_code
@@ -67,8 +67,8 @@ theorem selectWordCode_eq_word_iff
     (account : Account)
     (present : state.account? codeAddress = some account)
     (withoutCode : account.code? = none) :
-    state.selectWordCode codeAddress = .absent := by
-  apply (state.selectWordCode_eq_absent_iff codeAddress).2
+    state.selectWordCode codeAddress = .codeAbsent := by
+  apply (state.selectWordCode_eq_codeAbsent_iff codeAddress).2
   exact state.code?_of_account_without_code
     codeAddress account present withoutCode
 

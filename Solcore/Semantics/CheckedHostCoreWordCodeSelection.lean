@@ -8,7 +8,7 @@ namespace Solcore.Semantics
 
 /-- Exact absence, non-Word code, or Word-refined checked code. -/
 inductive CheckedHostCoreWordCodeSelection where
-  | absent
+  | codeAbsent
   | nonWord
       (code : CheckedHostCoreProgram)
       (resultType_ne_word : code.program.resultType ≠ .word)
@@ -21,7 +21,7 @@ def classify
     (selected : Option CheckedHostCoreProgram) :
     CheckedHostCoreWordCodeSelection :=
   match selected with
-  | none => .absent
+  | none => .codeAbsent
   | some code =>
       if resultTypeEq : code.program.resultType = .word then
         .word ⟨code, resultTypeEq⟩
@@ -31,7 +31,7 @@ def classify
 /-- Erase only the Word-result refinement and recover existing code selection. -/
 def toCheckedCode? :
     CheckedHostCoreWordCodeSelection → Option CheckedHostCoreProgram
-  | .absent => none
+  | .codeAbsent => none
   | .nonWord code _ => some code
   | .word code => some code.code
 
@@ -39,7 +39,7 @@ def toCheckedCode? :
 def toWordCode? :
     CheckedHostCoreWordCodeSelection → Option CheckedHostCoreWordProgram
   | .word code => some code
-  | .absent | .nonWord .. => none
+  | .codeAbsent | .nonWord .. => none
 
 end CheckedHostCoreWordCodeSelection
 

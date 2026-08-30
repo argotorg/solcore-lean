@@ -28,14 +28,15 @@ Add one pure branch-complete classifier:
 
 ```lean
 inductive CheckedHostCoreWordCodeSelection where
-  | absent
+  | codeAbsent
   | nonWord
       (code : CheckedHostCoreProgram)
       (resultType_ne_word : code.program.resultType ≠ .word)
   | word (code : CheckedHostCoreWordProgram)
 ```
 
-`absent` has exactly the meaning of the existing `WorldState.code? = none`.
+`codeAbsent` has exactly the meaning of the existing
+`WorldState.code? = none`.
 It deliberately continues to combine an absent Account with a present Account
 that has no code. This ADR separates only the new distinction introduced by
 Word refinement.
@@ -54,7 +55,7 @@ def CheckedHostCoreWordCodeSelection.classify
     CheckedHostCoreWordCodeSelection
 ```
 
-It maps `none` to `absent`. For `some code`, it decides only
+It maps `none` to `codeAbsent`. For `some code`, it decides only
 `code.program.resultType = .word`, producing `word` or `nonWord` with the
 corresponding proof. It does not rerun either Core checker.
 
@@ -68,14 +69,15 @@ def toWordCode? :
   CheckedHostCoreWordCodeSelection → Option CheckedHostCoreWordProgram
 ```
 
-The checked-code erasure returns `none` only for `absent`, and returns the exact
-selected checked code from both present branches. The Word projection succeeds
-only for `word`.
+The checked-code erasure returns `none` only for `codeAbsent`, and returns the
+exact selected checked code from both present branches. The Word projection
+succeeds only for `word`.
 
 Prove for every optional selected code:
 
 ```text
 (classify selected).toCheckedCode? = selected
+classify selection.toCheckedCode? = selection
 (classify selected).toWordCode? =
   selected.bind CheckedHostCoreWordProgram.ofChecked?
 ```
@@ -103,7 +105,8 @@ WorldState and code Address and should not acquire an unrelated storage-
 presence precondition.
 
 The exact checked-code erasure from `selectWordCode` must equal
-`state.code? codeAddress`.
+`state.code? codeAddress`. Its Word projection must equal optional ADR-0141
+refinement of that same lookup.
 
 ## Exact proof interface
 
@@ -111,17 +114,18 @@ Expose laws for:
 
 - all three generic classifier constructor equations;
 - both projections on all three constructors;
-- checked-code erasure and ADR-0141 optional-refinement coherence;
-- `classify selected = absent` iff `selected = none`;
+- both classification/checked-code-erasure round trips, erasure injectivity,
+  and ADR-0141 optional-refinement coherence;
+- `classify selected = codeAbsent` iff `selected = none`;
 - exact `nonWord` classification iff the selected value is the retained code,
   given its non-Word proof;
 - exact `word` classification iff the selected value is the wrapped checked
   code;
 - pairwise branch disjointness and branch exhaustiveness;
 - WorldState checked-code erasure;
-- WorldState `absent`, `nonWord`, and `word` exact branch laws;
+- WorldState `codeAbsent`, `nonWord`, and `word` exact branch laws;
 - Account-absent and present-Account-without-code specialization to the same
-  `absent` code-selection branch; and
+  `codeAbsent` selection branch; and
 - exact present checked non-Word and Word specialization through existing
   `WorldState.code?` laws.
 
@@ -136,8 +140,8 @@ law from an external namespace.
 
 Executable regressions must cover:
 
-- `WorldState.empty` at an arbitrary Address as `absent`;
-- a present `Account.empty` at that Address as the same `absent` code branch;
+- `WorldState.empty` at an arbitrary Address as `codeAbsent`;
+- a present `Account.empty` at that Address as the same `codeAbsent` branch;
 - a present checked Bool-result program as `nonWord`, retaining the exact code;
 - a present checked Word-result program as `word`, retaining the exact
   ADR-0141 wrapper;
@@ -167,6 +171,8 @@ kernel checks, diff hygiene, axiom reports, and an independent contract audit.
 This ADR does not define or prove:
 
 - selected code execution, fuel resumption, or a new execution result;
+- changes to existing `runCodeWithStorage?`,
+  `ParentIndexedSelectedExecutionResult`, or the ADR-0140 session;
 - successful Word completion, return bytes, or frame construction beyond
   reusing the ADR-0141 refinement;
 - a parent-indexed result, parent continuation, child-result delivery, call
@@ -188,12 +194,13 @@ This ADR does not define or prove:
 
 ## Consequences
 
-Later selected Word execution can distinguish unavailable code from available
-but unsupported result type before any fuel is spent. It can route only the
-`word` branch into ADR-0141 while retaining the exact generic checked code in
-the `nonWord` branch.
+Later selected Word execution can distinguish unavailable code from code whose
+result is unsupported by the Word-return bridge before any fuel is spent. It
+can route only the `word` branch into ADR-0141 while retaining the exact generic
+checked code in the `nonWord` branch.
 
 The next integration slice may add a specialized selected-execution carrier.
-If it does, it should store this classification and reuse `HostDriverResult`,
-`WordReturnedFrameCompletion`, and existing parent continuation types rather
-than duplicating their branch structure.
+If it does, it should store this classification and embed or reference the
+existing `HostDriverResult`, `WordReturnedFrameCompletion`, and parent
+continuation types. It must not re-enumerate their exhaustion, completion,
+fault, or resolution branches.
