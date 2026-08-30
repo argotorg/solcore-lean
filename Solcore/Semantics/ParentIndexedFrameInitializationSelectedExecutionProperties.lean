@@ -27,15 +27,24 @@ variable {parentWorking :
         Core.Value → Core.Store → FrameOutcome TrapReason) :
     initialization.runCodeWithStorageParentIndexedResult
         storageAddress inputs fuel doneOutcome = .storageAbsent ↔
-      initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
-        storageAddress = none := by
-  unfold runCodeWithStorageParentIndexedResult
-  cases refined :
-      initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
-        storageAddress with
-  | none => simp
-  | some context =>
+      initialization.initialWorld.account? storageAddress = none := by
+  cases observed : initialization.initialWorld.account? storageAddress with
+  | none =>
+      unfold runCodeWithStorageParentIndexedResult
+      rw [toCheckpointedWorkingPairWithPresentStorageAccount?_of_absent
+        initialization storageAddress observed]
+      simp
+  | some account =>
+      unfold runCodeWithStorageParentIndexedResult
+      rw [toCheckpointedWorkingPairWithPresentStorageAccount?_of_present
+        initialization storageAddress account observed]
       simp only
+      let context : HostStorageDriver.Context
+          RollbackState (FrameTrace Event) :=
+        ⟨initialization.toCheckpointedWorkingPairWithStorageAddress
+            storageAddress,
+          account,
+          observed⟩
       cases execution : context.runCodeWithStorage? inputs fuel with
       | none => simp
       | some result =>

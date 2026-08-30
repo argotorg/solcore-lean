@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameResolutionFoldProperties
+import Solcore.Semantics.ParentIndexedFrameResolutionFold
 import Solcore.Semantics.ParentIndexedSelectedExecutionContinuationCoherenceProperties
 import Solcore.Semantics.ParentIndexedSelectedExecutionResumption
 
