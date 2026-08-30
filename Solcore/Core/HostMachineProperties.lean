@@ -124,6 +124,14 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
           .hostApply .createContractWord :: continuation, store⟩
         ⟨.createContractWord templateId value input,
           continuation, store⟩
+  | emitLogWord
+      {topic payload : Word}
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret (.pair (.word topic) (.word payload)),
+          .hostApply .emitLogWord :: continuation, store⟩
+        ⟨.emitLogWord topic payload, continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -222,16 +230,24 @@ theorem hostRequestEmission_iff
                               suspension =
                                 ⟨.callContractWordWithValue target value input,
                                   continuation, store⟩) ∨
-                              ∃ templateId value input continuation store,
-                                state =
-                                  ⟨.ret
-                                      (.pair (.word templateId)
-                                        (.pair (.word value) (.word input))),
-                                    .hostApply .createContractWord ::
-                                      continuation, store⟩ ∧
-                                suspension =
-                                  ⟨.createContractWord templateId value input,
-                                    continuation, store⟩ := by
+                              (∃ templateId value input continuation store,
+                                  state =
+                                    ⟨.ret
+                                        (.pair (.word templateId)
+                                          (.pair (.word value) (.word input))),
+                                      .hostApply .createContractWord ::
+                                        continuation, store⟩ ∧
+                                  suspension =
+                                    ⟨.createContractWord templateId value input,
+                                      continuation, store⟩) ∨
+                                ∃ topic payload continuation store,
+                                  state =
+                                    ⟨.ret (.pair (.word topic) (.word payload)),
+                                      .hostApply .emitLogWord :: continuation,
+                                      store⟩ ∧
+                                  suspension =
+                                    ⟨.emitLogWord topic payload, continuation,
+                                      store⟩ := by
   constructor
   · intro emission
     cases emission with
@@ -271,7 +287,12 @@ theorem hostRequestEmission_iff
         exact
           .inr (.inr (.inr (.inr (.inr (.inr (.inr
             (.inr (.inr (.inr (.inr
-              (.inr ⟨_, _, _, _, _, rfl, rfl⟩)))))))))))
+              (.inr (.inl ⟨_, _, _, _, _, rfl, rfl⟩))))))))))))
+    | emitLogWord =>
+        exact
+          .inr (.inr (.inr (.inr (.inr (.inr (.inr
+            (.inr (.inr (.inr (.inr
+              (.inr (.inr ⟨_, _, _, _, rfl, rfl⟩))))))))))))
   · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
         ⟨slot, value, continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
@@ -284,7 +305,8 @@ theorem hostRequestEmission_iff
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨target, input, continuation, store, rfl, rfl⟩ |
         ⟨target, value, input, continuation, store, rfl, rfl⟩ |
-        ⟨templateId, value, input, continuation, store, rfl, rfl⟩)
+        ⟨templateId, value, input, continuation, store, rfl, rfl⟩ |
+        ⟨topic, payload, continuation, store, rfl, rfl⟩)
     · exact .storageRead
     · exact .storageWrite
     · exact .storageAddress
@@ -298,6 +320,7 @@ theorem hostRequestEmission_iff
     · exact .callContractWord
     · exact .callContractWordWithValue
     · exact .createContractWord
+    · exact .emitLogWord
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -408,6 +431,14 @@ theorem hostAdvance_next_iff
                       | unit | bool | hostFunction | pair | closure | inLeft |
                           inRight | cellRef | constructed =>
                           simp [hostAdvance] at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp [hostAdvance] at advanced
+              | emitLogWord =>
+                  cases value with
+                  | pair left right =>
+                      cases left <;> cases right <;>
+                        simp [hostAdvance] at advanced
                   | unit | bool | word | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
@@ -574,6 +605,17 @@ theorem hostAdvance_suspended_iff
                       | unit | bool | hostFunction | pair | closure | inLeft |
                           inRight | cellRef | constructed =>
                           simp at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | emitLogWord =>
+                  cases value with
+                  | pair left right =>
+                      cases left <;> cases right <;>
+                        simp at advanced
+                      case word.word topic payload =>
+                        cases advanced
+                        exact .emitLogWord
                   | unit | bool | word | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced

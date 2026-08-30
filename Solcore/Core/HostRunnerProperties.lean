@@ -129,6 +129,14 @@ theorem hostAdvance_done_iff
                   | unit | bool | word | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
+              | emitLogWord =>
+                  cases returned with
+                  | pair topic payload =>
+                      cases topic <;> cases payload <;>
+                        simp [hostAdvance] at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩
     simp [hostAdvance, State.final, advance]
 

@@ -235,6 +235,25 @@ theorem typed_createContractWord_emits
         continuation, store⟩,
       .createContractWord⟩
 
+/-- A well-typed topic/payload pair emits one log request. -/
+theorem typed_emitLogWord_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.emitLogWord.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .emitLogWord :: continuation, store⟩
+        suspension := by
+  have pairTyping :
+      HostRuntimeValueHasType world value
+        (.product .word .word) definitions := by
+    simpa using valueTyping
+  obtain ⟨topic, payload, rfl⟩ := pairTyping.wordPair_shape
+  exact
+    ⟨⟨.emitLogWord topic payload, continuation, store⟩,
+      .emitLogWord⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -262,6 +281,8 @@ theorem typed_hostApplication_emits
       exact typed_callContractWordWithValue_emits valueTyping
   | createContractWord =>
       exact typed_createContractWord_emits valueTyping
+  | emitLogWord =>
+      exact typed_emitLogWord_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}
