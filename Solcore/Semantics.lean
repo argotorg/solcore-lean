@@ -109,6 +109,7 @@ import Solcore.Semantics.WorldState
 import Solcore.Semantics.AccountCodeProperties
 import Solcore.Semantics.AccountBalanceProperties
 import Solcore.Semantics.WorldStateBalanceProperties
+import Solcore.Semantics.BalanceTransfer
 import Solcore.Semantics.WorldStateCode
 import Solcore.Semantics.WorldStateWordCodeSelection
 import Solcore.Semantics.WorldStateWordCodeSelectionProperties
