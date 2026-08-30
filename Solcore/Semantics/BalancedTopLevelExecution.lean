@@ -53,8 +53,8 @@ structure Result
 
 namespace Result
 
-/-- Safely lift an already sealed nested execution result. -/
-def ofExecution
+/-- Internally lift an already sealed nested execution result. -/
+private abbrev ofExecution
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}

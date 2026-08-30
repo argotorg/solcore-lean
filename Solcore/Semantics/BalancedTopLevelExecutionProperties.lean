@@ -27,19 +27,102 @@ namespace RejectedResult
     (ofFailure initialWorld failure).committedDelta = .exact := by
   rfl
 
+theorem committedDelta_accountEndpoints_identity
+    {initialWorld : WorldState}
+    (rejected : RejectedResult initialWorld)
+    (address : Address) :
+    rejected.committedDelta.accountEndpoints address =
+      (initialWorld.account? address, initialWorld.account? address) := by
+  simp [WorldStateDelta.accountEndpoints, rejected.finalWorld_eq]
+
+theorem committedDelta_storageEndpoints_identity
+    {initialWorld : WorldState}
+    (rejected : RejectedResult initialWorld)
+    (address : Address)
+    (slot : Core.Word) :
+    rejected.committedDelta.storageEndpoints address slot =
+      (initialWorld.readStorage? address slot,
+        initialWorld.readStorage? address slot) := by
+  simp [WorldStateDelta.storageEndpoints, rejected.finalWorld_eq]
+
 end RejectedResult
 
 namespace Result
 
-@[simp] theorem ofExecution_view
-    {initialWorld : WorldState}
-    {rootContract : CheckedCoreContract}
+theorem finalWorld?_rejected
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (execution :
-      OneLevelNestedExecution.Result initialWorld rootContract
-        rootInvocation) :
-    (ofExecution execution).view = .execution execution := by
-  rfl
+    (result : Result initialWorld rootContract rootInvocation)
+    (rejected : RejectedResult initialWorld)
+    (observed : result.view = .rejected rejected) :
+    result.finalWorld? = some rejected.finalWorld := by
+  simp [finalWorld?, observed]
+
+theorem terminalStatus?_rejected
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (rejected : RejectedResult initialWorld)
+    (observed : result.view = .rejected rejected) :
+    result.terminalStatus? = some (.error rejected.failure) := by
+  simp [terminalStatus?, observed]
+
+theorem committedWorld?_rejected
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (rejected : RejectedResult initialWorld)
+    (observed : result.view = .rejected rejected) :
+    result.committedWorld? =
+      some ⟨rejected.finalWorld, rejected.committedDelta⟩ := by
+  simp [committedWorld?, observed]
+
+theorem finalWorld?_completed
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (execution : OneLevelNestedExecution.Result initialWorld rootContract rootInvocation)
+    (terminal : OneLevelNestedExecution.TerminalResult initialWorld rootContract rootInvocation)
+    (outer : result.view = .execution execution)
+    (inner : execution.view = .completed terminal) :
+    result.finalWorld? = some terminal.finalWorld := by
+  simp [finalWorld?, outer, inner]
+
+theorem terminalStatus?_completed
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (execution : OneLevelNestedExecution.Result initialWorld rootContract rootInvocation)
+    (terminal : OneLevelNestedExecution.TerminalResult initialWorld rootContract rootInvocation)
+    (outer : result.view = .execution execution)
+    (inner : execution.view = .completed terminal) :
+    result.terminalStatus? = some (.ok terminal.outcome) := by
+  simp [terminalStatus?, outer, inner]
+
+theorem committedWorld?_completed
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (execution : OneLevelNestedExecution.Result initialWorld rootContract rootInvocation)
+    (terminal : OneLevelNestedExecution.TerminalResult initialWorld rootContract rootInvocation)
+    (outer : result.view = .execution execution)
+    (inner : execution.view = .completed terminal) :
+    result.committedWorld? = some ⟨terminal.finalWorld, terminal.committedDelta⟩ := by
+  simp [committedWorld?, outer, inner]
+
+theorem observations_outOfFuel
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (execution : OneLevelNestedExecution.Result initialWorld rootContract rootInvocation)
+    (registry : CheckedContractRegistry)
+    (mode : OneLevelNestedExecution.Mode initialWorld rootContract rootInvocation)
+    (reachable : OneLevelNestedExecution.Reachable registry mode)
+    (outer : result.view = .execution execution)
+    (inner : execution.view = .outOfFuel registry mode reachable) :
+    result.finalWorld? = none ∧ result.terminalStatus? = none ∧
+      result.committedWorld? = none := by
+  simp [finalWorld?, terminalStatus?, committedWorld?, outer, inner]
 
 end Result
 
@@ -147,8 +230,8 @@ theorem resumeWithFuel_execution
         rootInvocation)
     (observed : result.view = .execution execution)
     (additional : Nat) :
-    resumeWithFuel result additional =
-      Result.ofExecution
+    (resumeWithFuel result additional).view =
+      .execution
         (OneLevelNestedExecution.resumeWithFuel execution additional) := by
   simp [resumeWithFuel, observed]
 
