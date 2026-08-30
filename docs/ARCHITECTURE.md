@@ -962,6 +962,20 @@ covered; full validation and independent coverage and contract audits pass.
 The next candidate integrates storage-presence and the parent-indexed boundary
 without duplicating this selection or execution layer.
 
+ADR-0144 is the active parent integration layer. It first applies the existing
+present-storage refinement to a parent-indexed initialization. Failure is the
+only outer `none`; success retains the exact context proof and embeds ADR-0143
+directly. Selection and `HostDriverResult` branches therefore remain owned by
+the inner layer, and fuel resumption delegates to it.
+
+Canonical Word success yields one proof-guarded pair: the existing completion
+and a returned parent-indexed continuation built from the same initialization
+and completion. The continuation-only projection is derived from that pair,
+and erasing its parent index recovers the exact plain continuation. A total
+mapping to older generic selected execution would change non-Word behavior or
+completion policy, so compatibility is proved only under a successful Word
+selection and matching canonical returned bytes.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

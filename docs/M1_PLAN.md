@@ -137,6 +137,14 @@ all proof consumers, runtime boundaries, validation, and audits pass.
 Storage-presence and parent-indexed integration are the next candidate;
 non-Word fallback remains separate work.
 
+[ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
+Accepted and is the active slice. One outer option represents storage-Account
+absence; a present result retains the exact refined parent context and the
+complete ADR-0143 execution. Inner resumption is reused, and canonical Word
+success produces a proof-linked completion and parent-indexed returned
+continuation with exact plain coherence. Legacy coherence is intentionally
+conditional on the same successful Word return policy.
+
 ## Completed foundation
 
 The current Core already has:
@@ -283,10 +291,11 @@ These results remain regression obligations for every extension.
 | 124 | Checked Word completion to canonical return bytes | Complete | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
 | 125 | Branch-complete selected Word-code classification | Complete | Preserves existing checked-code lookup while separating absent, non-Word, and Word branches before execution |
 | 126 | Proof-refined selected checked Word execution | Complete | Executes only the selected Word branch, retains exact non-execution reasons, and proves fixed-input fuel resumption and canonical Word completion |
-| 127 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 128 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 129 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 130 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 127 | Parent-indexed selected checked Word execution | Accepted / Planned | Adds exact storage-presence provenance and canonical returned-parent projection without duplicating inner branches |
+| 128 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 129 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 130 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 131 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2294,6 +2303,23 @@ build, full tests, 10-root trust sweep, repository checks, theorem consumers,
 axiom reports, and independent audits pass. Storage-presence and parent-indexed
 integration are the next candidate; non-Word fallback, nested invocation, ABI,
 parser work, and publication remain deferred.
+
+## Active parent-indexed selected checked Word execution
+
+[ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
+Accepted with implementation planned. It refines parent initialization at one
+storage Address before reusing ADR-0143 unchanged. The outer option means only
+storage absence; every present result contains the exact refinement proof and
+the inner selected execution. Non-Word and raw execution branches are not
+copied into a second carrier.
+
+Present resumption delegates to the inner fuel algebra. Canonical Word success
+is projected as a proof-linked pair of the exact completion and its
+parent-indexed returned continuation. The continuation-only view is derived
+from that pair and forgetting the parent index recovers the plain continuation.
+Legacy coherence is restricted to successful Word execution with an explicitly
+matching canonical return policy. This slice does not define nested invocation
+or child-result delivery.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

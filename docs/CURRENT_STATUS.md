@@ -2766,6 +2766,23 @@ independent coverage and contract audits found no P0-P3 issue. Storage-presence
 and parent-indexed integration are the next candidate. Non-Word policy, nested
 calls, ABI, parser work, and public formats remain separate.
 
+## Active parent-indexed selected checked Word execution
+
+[ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
+Accepted with implementation planned. It adds exactly one outer optional
+boundary to ADR-0143: `none` means that the parent initialization cannot refine
+the chosen storage Address to a present Account. A present value carries that
+exact context-refinement proof and the unchanged ADR-0143 execution, so code
+absence, non-Word selection, exhaustion, raw results, and completion are not
+re-enumerated.
+
+Resumption delegates to the inner fixed-input execution. On canonical Word
+success, a proof-guarded projection retains both the exact Word completion and
+the matching parent-indexed returned continuation. Its plain view recovers the
+existing continuation exactly. Coherence with legacy selected execution is
+limited to a successful Word branch whose completion policy returns the same
+canonical bytes; no total legacy erasure is claimed.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable
