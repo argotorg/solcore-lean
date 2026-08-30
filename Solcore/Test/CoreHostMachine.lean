@@ -1052,7 +1052,7 @@ def testCoreHostMachine : IO Unit := do
   assertTrue
     (hostContext[HostFunction.all.length]?.isNone &&
       hostEnvironment[HostFunction.all.length]?.isNone)
-    "host index ten is no longer the first unbound position"
+    "host index eleven is no longer the first unbound position"
   assertTrue
     (CheckedHostCoreProgram.ofProgram? illTypedStorageReadProgram).isNone
     "checked host admission retained a program rejected by the host checker"
@@ -1083,7 +1083,7 @@ def testCoreHostMachine : IO Unit := do
     (HostFunction.all ==
         [.storageRead, .storageWrite, .storageAddress, .codeAddress,
           .callValue, .callerAddress, .inputDataByte?, .inputDataSize,
-          .inputDataWordBE?, .currentAddress] &&
+          .inputDataWordBE?, .currentAddress, .callContractWord] &&
       HostFunction.all.all (fun function =>
         HostFunction.all[function.index]? == some function) &&
       HostFunction.all.all (fun function =>
@@ -1100,8 +1100,9 @@ def testCoreHostMachine : IO Unit := do
       HostFunction.inputDataSize.index == 7 &&
       HostFunction.inputDataWordBE?.index == 8 &&
       HostFunction.currentAddress.index == 9 &&
-      HostFunction.all.length == 10 &&
-      hostContext.length == 10 && hostEnvironment.length == 10)
+      HostFunction.callContractWord.index == 10 &&
+      HostFunction.all.length == 11 &&
+      hostContext.length == 11 && hostEnvironment.length == 11)
     "the append-only host capability layout changed"
   assertTrue
     (hostContext[HostFunction.storageAddress.index]? ==
