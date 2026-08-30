@@ -109,6 +109,8 @@ import Solcore.Test.HostDriverCompleteness
 import Solcore.Test.HostDriverResumption
 import Solcore.Test.HostStorageDriverResumption
 import Solcore.Test.HostStorageInputData
+import Solcore.Test.TopLevelExecution
+import Solcore.Test.TopLevelObservation
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameCheckpointSnapshot
 import Solcore.Test.FrameCheckpointedWorkingPair
@@ -5050,6 +5052,8 @@ def run : IO Unit := do
   testHostDriverResumption
   testHostStorageDriverResumption
   testHostStorageInputData
+  testTopLevelExecution
+  testTopLevelObservation
   testRuntimeScalars
   testWorldState
   testWorldStateCode

@@ -191,6 +191,18 @@ import Solcore.Semantics.FrameCheckpointedWorkingPairStorageWriteAlgebraProperti
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddressStorageWriteAlgebraProperties
 import Solcore.Semantics.WorldStateStorageReadWriteProperties
 import Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddressStorageReadWriteProperties
+import Solcore.Semantics.CoreContractEntryProfile
+import Solcore.Semantics.CoreContractEntryProfileProperties
+import Solcore.Semantics.CheckedCoreContract
+import Solcore.Semantics.TopLevelExecutionContext
+import Solcore.Semantics.TopLevelExecutionContextProperties
+import Solcore.Semantics.TopLevelStorageDelta
+import Solcore.Semantics.TopLevelStorageDeltaProperties
+import Solcore.Semantics.TopLevelExecutionResult
+import Solcore.Semantics.TopLevelExecution
+import Solcore.Semantics.TopLevelExecutionProperties
+import Solcore.Semantics.TopLevelExecutionResumption
+import Solcore.Semantics.TopLevelExecutionResumptionProperties
 
 /-!
 Umbrella module for syntax-independent runtime values, observations, and their
