@@ -231,6 +231,7 @@ theorem HostRequest.responseValue_hasType
       cases response with
       | none => exact .inLeft .unit
       | some => exact .inRight .word
+  | currentAddress => exact .word
 
 theorem HostSuspensionHasType.resume {definitions : DataEnvironment}
     {suspension : HostSuspension} {resultType : Ty}

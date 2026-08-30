@@ -90,6 +90,12 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
         ⟨.ret (.word offset),
           .hostApply .inputDataWordBE? :: continuation, store⟩
         ⟨.inputDataWordBE? offset, continuation, store⟩
+  | currentAddress
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret .unit, .hostApply .currentAddress :: continuation, store⟩
+        ⟨.currentAddress, continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -158,12 +164,18 @@ theorem hostRequestEmission_iff
                             .hostApply .inputDataSize :: continuation, store⟩ ∧
                         suspension =
                           ⟨.inputDataSize, continuation, store⟩) ∨
-                      ∃ offset continuation store,
-                        state =
-                          ⟨.ret (.word offset),
-                            .hostApply .inputDataWordBE? :: continuation, store⟩ ∧
-                        suspension =
-                          ⟨.inputDataWordBE? offset, continuation, store⟩ := by
+                      (∃ offset continuation store,
+                          state =
+                            ⟨.ret (.word offset),
+                              .hostApply .inputDataWordBE? :: continuation, store⟩ ∧
+                          suspension =
+                            ⟨.inputDataWordBE? offset, continuation, store⟩) ∨
+                        ∃ continuation store,
+                          state =
+                            ⟨.ret .unit,
+                              .hostApply .currentAddress :: continuation, store⟩ ∧
+                          suspension =
+                            ⟨.currentAddress, continuation, store⟩ := by
   constructor
   · intro emission
     cases emission with
@@ -185,7 +197,11 @@ theorem hostRequestEmission_iff
     | inputDataWordBE? =>
         exact
           .inr (.inr (.inr (.inr (.inr (.inr (.inr
-            (.inr ⟨_, _, _, rfl, rfl⟩)))))))
+            (.inr (.inl ⟨_, _, _, rfl, rfl⟩))))))))
+    | currentAddress =>
+        exact
+          .inr (.inr (.inr (.inr (.inr (.inr (.inr
+            (.inr (.inr ⟨_, _, rfl, rfl⟩))))))))
   · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
         ⟨slot, value, continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
@@ -194,7 +210,8 @@ theorem hostRequestEmission_iff
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨offset, continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
-        ⟨offset, continuation, store, rfl, rfl⟩)
+        ⟨offset, continuation, store, rfl, rfl⟩ |
+        ⟨continuation, store, rfl, rfl⟩)
     · exact .storageRead
     · exact .storageWrite
     · exact .storageAddress
@@ -204,6 +221,7 @@ theorem hostRequestEmission_iff
     · exact .inputDataByte?
     · exact .inputDataSize
     · exact .inputDataWordBE?
+    · exact .currentAddress
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -270,6 +288,8 @@ theorem hostAdvance_next_iff
               | inputDataSize =>
                   cases value <;> simp [hostAdvance] at advanced
               | inputDataWordBE? =>
+                  cases value <;> simp [hostAdvance] at advanced
+              | currentAddress =>
                   cases value <;> simp [hostAdvance] at advanced
   · intro step
     cases step with
@@ -374,6 +394,14 @@ theorem hostAdvance_suspended_iff
                       cases suspensionEquality
                       exact .inputDataWordBE?
                   | unit | bool | hostFunction | pair | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | currentAddress =>
+                  cases value with
+                  | unit =>
+                      cases advanced
+                      exact .currentAddress
+                  | bool | word | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
   · intro emission

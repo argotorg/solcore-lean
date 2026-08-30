@@ -156,6 +156,22 @@ theorem typed_inputDataWordBE?_emits
     ⟨⟨.inputDataWordBE? offset, continuation, store⟩,
       .inputDataWordBE?⟩
 
+/-- A well-typed current-address observation emits its argument-free request. -/
+theorem typed_currentAddress_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.currentAddress.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value, .hostApply .currentAddress :: continuation, store⟩
+        suspension := by
+  have unitTyping :
+      HostRuntimeValueHasType world value .unit definitions := by
+    simpa using valueTyping
+  cases unitTyping
+  exact ⟨⟨.currentAddress, continuation, store⟩, .currentAddress⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -177,6 +193,7 @@ theorem typed_hostApplication_emits
   | inputDataByte? => exact typed_inputDataByte?_emits valueTyping
   | inputDataSize => exact typed_inputDataSize_emits valueTyping
   | inputDataWordBE? => exact typed_inputDataWordBE?_emits valueTyping
+  | currentAddress => exact typed_currentAddress_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}

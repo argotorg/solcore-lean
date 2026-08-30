@@ -17,6 +17,7 @@ inductive HostRequest where
   | inputDataByte? (offset : Word)
   | inputDataSize
   | inputDataWordBE? (offset : Word)
+  | currentAddress
   deriving Repr, BEq, DecidableEq
 
 namespace HostRequest
@@ -32,6 +33,7 @@ def Response : HostRequest → Type
   | .inputDataByte? _ => Option Word
   | .inputDataSize => Word
   | .inputDataWordBE? _ => Option Word
+  | .currentAddress => Word
 
 /-- Core type injected when a request is resumed. -/
 def responseType : HostRequest → Ty
@@ -44,6 +46,7 @@ def responseType : HostRequest → Ty
   | .inputDataByte? _ => .sum .unit .word
   | .inputDataSize => .word
   | .inputDataWordBE? _ => .sum .unit .word
+  | .currentAddress => .word
 
 /-- Convert an indexed host response back into a Core runtime value. -/
 def responseValue
@@ -65,6 +68,7 @@ def responseValue
       match response with
       | none => .inLeft .word .unit
       | some word => .inRight .unit (.word word)
+  | .currentAddress => .word response
 
 @[simp] theorem responseType_storageRead (slot : Word) :
     responseType (.storageRead slot) = .word :=
@@ -149,6 +153,14 @@ def responseValue
     (offset word : Word) :
     responseValue (.inputDataWordBE? offset) (some word) =
       .inRight .unit (.word word) :=
+  rfl
+
+@[simp] theorem responseType_currentAddress :
+    responseType .currentAddress = .word :=
+  rfl
+
+@[simp] theorem responseValue_currentAddress (response : Word) :
+    responseValue .currentAddress response = .word response :=
   rfl
 
 @[simp] theorem responseValue_type
@@ -290,6 +302,14 @@ def resume
       ⟨.ret (.inRight .unit (.word word)), continuation, store⟩ :=
   rfl
 
+@[simp] theorem resume_currentAddress
+    (response : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk .currentAddress continuation store).resume response =
+      ⟨.ret (.word response), continuation, store⟩ :=
+  rfl
+
 end HostSuspension
 
 /-- One executable step at the Core/host boundary. -/
@@ -417,6 +437,15 @@ def hostAdvance (state : State) : HostAdvanceResult :=
                 store := state.store
               }
           | actual => .fault (.invalidHostArgument .inputDataWordBE? actual)
+      | .currentAddress =>
+          match argument with
+          | .unit =>
+              .suspended {
+                request := .currentAddress
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .currentAddress actual)
   | _, _ => .ofAdvance (advance state)
 
 @[simp] theorem hostAdvance_begin_storageRead
@@ -730,5 +759,40 @@ def hostAdvance (state : State) : HostAdvanceResult :=
         ⟨.ret actual, .hostApply .inputDataWordBE? :: continuation, store⟩ =
       .fault (.invalidHostArgument .inputDataWordBE? actual) := by
   cases actual <;> simp_all [hostAdvance]
+
+@[simp] theorem hostAdvance_begin_currentAddress
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .currentAddress),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .currentAddress :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_currentAddress
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret .unit, .hostApply .currentAddress :: continuation, store⟩ =
+      .suspended ⟨.currentAddress, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_currentAddress_argument
+    (actual : Value)
+    (notUnit : actual ≠ .unit)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .currentAddress :: continuation, store⟩ =
+      .fault (.invalidHostArgument .currentAddress actual) := by
+  cases actual with
+  | unit => exact (notUnit rfl).elim
+  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+      constructed =>
+      rfl
 
 end Solcore.Core

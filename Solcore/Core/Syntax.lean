@@ -120,6 +120,7 @@ inductive HostFunction where
   | inputDataByte?
   | inputDataSize
   | inputDataWordBE?
+  | currentAddress
   deriving Repr, BEq, DecidableEq
 
 namespace HostFunction
@@ -134,6 +135,7 @@ def parameterType : HostFunction → Ty
   | .inputDataByte? => .word
   | .inputDataSize => .unit
   | .inputDataWordBE? => .word
+  | .currentAddress => .unit
 
 def resultType : HostFunction → Ty
   | .storageRead => .word
@@ -145,6 +147,7 @@ def resultType : HostFunction → Ty
   | .inputDataByte? => .sum .unit .word
   | .inputDataSize => .word
   | .inputDataWordBE? => .sum .unit .word
+  | .currentAddress => .word
 
 @[simp] def functionType (function : HostFunction) : Ty :=
   .function function.parameterType function.resultType
@@ -221,13 +224,21 @@ def resultType : HostFunction → Ty
     resultType .inputDataWordBE? = .sum .unit .word :=
   rfl
 
+@[simp] theorem parameterType_currentAddress :
+    parameterType .currentAddress = .unit :=
+  rfl
+
+@[simp] theorem resultType_currentAddress :
+    resultType .currentAddress = .word :=
+  rfl
+
 /-- Canonical append-only order of internal host capabilities. -/
 def all : List HostFunction :=
   [.storageRead, .storageWrite, .storageAddress, .codeAddress,
     .callValue, .callerAddress, .inputDataByte?, .inputDataSize,
-    .inputDataWordBE?]
+    .inputDataWordBE?, .currentAddress]
 
-@[simp] theorem all_length : all.length = 9 :=
+@[simp] theorem all_length : all.length = 10 :=
   rfl
 
 theorem mem_all (function : HostFunction) : function ∈ all := by
@@ -247,6 +258,7 @@ def index : HostFunction → Nat
   | .inputDataByte? => 6
   | .inputDataSize => 7
   | .inputDataWordBE? => 8
+  | .currentAddress => 9
 
 @[simp] theorem index_storageRead : index .storageRead = 0 :=
   rfl
@@ -273,6 +285,9 @@ def index : HostFunction → Nat
   rfl
 
 @[simp] theorem index_inputDataWordBE? : index .inputDataWordBE? = 8 :=
+  rfl
+
+@[simp] theorem index_currentAddress : index .currentAddress = 9 :=
   rfl
 
 @[simp] theorem getElem?_all_index (function : HostFunction) :

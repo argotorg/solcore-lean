@@ -140,10 +140,20 @@ theorem hostEnvironment_lookup_isSome_iff (position : Nat) :
       some (.hostFunction .inputDataWordBE?) :=
   hostEnvironment_lookup .inputDataWordBE?
 
-@[simp] theorem hostContext_length : hostContext.length = 9 :=
+@[simp] theorem hostContext_currentAddress :
+    hostContext[HostFunction.currentAddress.index]? =
+      some (HostFunction.functionType .currentAddress) :=
+  hostContext_lookup .currentAddress
+
+@[simp] theorem hostEnvironment_currentAddress :
+    hostEnvironment[HostFunction.currentAddress.index]? =
+      some (.hostFunction .currentAddress) :=
+  hostEnvironment_lookup .currentAddress
+
+@[simp] theorem hostContext_length : hostContext.length = 10 :=
   hostContext_length_all.trans HostFunction.all_length
 
-@[simp] theorem hostEnvironment_length : hostEnvironment.length = 9 :=
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 10 :=
   hostEnvironment_length_all.trans HostFunction.all_length
 
 namespace Program
