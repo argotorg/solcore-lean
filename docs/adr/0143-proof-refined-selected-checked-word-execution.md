@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: connect branch-complete selected Word code to checked storage execution
-- Implementation: Planned
+- Implementation: In progress
 
 ## Context
 

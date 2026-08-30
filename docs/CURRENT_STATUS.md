@@ -2739,6 +2739,26 @@ metadata, kernel, diff, axiom, and independent P0-P3 audits pass.
 This slice classifies only. It adds no selected execution, fuel behavior,
 parent result, fallback for non-Word code, ABI, parser work, or public format.
 
+## Active proof-refined selected checked Word execution
+
+[ADR-0143](adr/0143-proof-refined-selected-checked-word-execution.md) is
+Accepted and implementation is in progress. The next slice retains ADR-0142's
+exact selection and runs only a selected checked Word program through
+ADR-0141's storage execution. Absent and non-Word selections remain explicit
+and perform no Core execution.
+
+The resulting proof-refined value keeps the initial context and immutable
+execution inputs fixed, records cumulative provided fuel, and certifies its
+optional raw result against the canonical one-shot run. Its completion view
+reuses the existing Word completion and 32-byte returned frame. Missing global
+completion therefore means either that no Word program ran or that the Word
+run exhausted fuel; it must not collapse those cases.
+
+Fuel-only resumption will preserve selection and inputs, agree with one run at
+the summed budget, and satisfy zero and addition laws. This slice does not add
+storage-absence or parent-indexed integration, a non-Word execution policy,
+nested calls, ABI, parser work, or a public format.
+
 ## Meaning of completion
 
 A Core feature is complete only when its declarative rules, total executable

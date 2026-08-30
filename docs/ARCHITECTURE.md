@@ -941,6 +941,20 @@ continues to combine a missing Account with a present Account without code.
 Execution, parent continuation, and unsupported-result policy remain outside
 this completed slice.
 
+ADR-0143 is the active integration boundary above those two completed layers.
+A proof-refined value retains ADR-0142's exact three-way selection and carries
+an optional raw execution derived from it: absent and non-Word selections do
+not execute, while the Word selection runs ADR-0141's checked storage path.
+The initial context and execution inputs are fixed for the value's lifetime;
+resumption can add fuel but cannot replace either.
+
+The raw branch remains `HostDriverResult`, and successful Word completion still
+uses `WordReturnedFrameCompletion` and its canonical 32-byte frame adapter.
+Consequently, no new execution-outcome or frame hierarchy is introduced.
+Selection also remains present when completion is absent, so non-execution is
+not confused with Word fuel exhaustion. Storage-presence and parent-indexed
+integration are deliberately deferred to a later layer.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

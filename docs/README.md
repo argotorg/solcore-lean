@@ -241,6 +241,16 @@ Thirty-one public theorems have matching consumers; the 701-job build,
 1,290-job test build, full test run, eight-root trust-zero sweep, metadata,
 kernel, diff, axiom, and independent P0-P3 audits pass.
 
+[ADR-0143](adr/0143-proof-refined-selected-checked-word-execution.md) is the
+active implementation slice. It keeps ADR-0142's absent, non-Word, and Word
+selection visible, executes only the Word branch through ADR-0141's checked
+storage runner, and retains the exact raw result beside the cumulative fuel
+budget. Completion reuses the existing canonical 32-byte Word return; a missing
+completion still distinguishes code that was not run from a Word run that
+exhausted fuel. Resumption accepts only more fuel for the same initial context
+and immutable inputs. Parent integration, non-Word fallback, ABI, parser work,
+and public formats remain later decisions.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
