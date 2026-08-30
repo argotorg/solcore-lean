@@ -12,6 +12,7 @@ structure Account where private mk ::
     ∀ slot value, storage slot = some value → value ≠ Core.Word.zero
   private code : Option CheckedHostCoreProgram
   private balanceValue : Core.Word
+  private nonceValue : Core.Word
 
 /-- Semantic lookup for an explicitly present or absent account. -/
 structure WorldState where private mk ::
@@ -21,17 +22,29 @@ namespace Account
 
 /-- The present account with neither code nor stored values. -/
 def empty : Account :=
-  ⟨fun _ => none, by simp, none, Core.Word.zero⟩
+  ⟨fun _ => none, by simp, none, Core.Word.zero, Core.Word.zero⟩
 
 /-- Observe the account's exact unsigned 256-bit balance. -/
 def balance (account : Account) : Core.Word :=
   account.balanceValue
 
+/-- Observe the exact unsigned 256-bit creation nonce. -/
+def nonce (account : Account) : Core.Word :=
+  account.nonceValue
+
 /-- Replace the balance while preserving storage and checked code. -/
 def withBalance
     (account : Account)
     (balance : Core.Word) : Account :=
-  ⟨account.storage, account.storage_nonzero, account.code, balance⟩
+  ⟨account.storage, account.storage_nonzero, account.code, balance,
+    account.nonceValue⟩
+
+/-- Replace the creation nonce while preserving storage, code, and balance. -/
+def withNonce
+    (account : Account)
+    (nonce : Core.Word) : Account :=
+  ⟨account.storage, account.storage_nonzero, account.code,
+    account.balanceValue, nonce⟩
 
 /-- Observe the host-checker-accepted code associated with this Account. -/
 def code? (account : Account) : Option CheckedHostCoreProgram :=
@@ -42,7 +55,7 @@ def withCode
     (account : Account)
     (code : CheckedHostCoreProgram) : Account :=
   ⟨account.storage, account.storage_nonzero, some code,
-    account.balanceValue⟩
+    account.balanceValue, account.nonceValue⟩
 
 /-- Observe whether a semantic nonzero storage value exists. -/
 def storageValue?
@@ -66,7 +79,8 @@ def storageWrite
         · contradiction
         · exact account.storage_nonzero current stored present,
       account.code,
-      account.balanceValue⟩
+      account.balanceValue,
+      account.nonceValue⟩
   else
     ⟨fun current => if current = slot then some value else account.storage current,
       by
@@ -76,7 +90,8 @@ def storageWrite
           exact zero ((Option.some.inj present).trans stored_zero)
         · exact account.storage_nonzero current stored present,
       account.code,
-      account.balanceValue⟩
+      account.balanceValue,
+      account.nonceValue⟩
 
 end Account
 
@@ -122,6 +137,21 @@ def writeBalance?
     (balance : Core.Word) : Option WorldState := do
   let account ← state.account? address
   some (state.putAccount address (account.withBalance balance))
+
+/-- Observe a nonce without conflating an absent account with nonce zero. -/
+def nonce?
+    (state : WorldState)
+    (address : Address) : Option Core.Word := do
+  let account ← state.account? address
+  some account.nonce
+
+/-- Replace a nonce only when the addressed account exists. -/
+def writeNonce?
+    (state : WorldState)
+    (address : Address)
+    (nonce : Core.Word) : Option WorldState := do
+  let account ← state.account? address
+  some (state.putAccount address (account.withNonce nonce))
 
 end WorldState
 
