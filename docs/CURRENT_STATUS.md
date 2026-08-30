@@ -403,8 +403,9 @@ semantics continues.
 explicitly supplied `currentAddress` is fixed in the immutable run input and
 exposed losslessly through internal host index 9. ADR-0146 later appended the
 typed call at index 10, and ADR-0147 appended its value-bearing counterpart at
-index 11. Both canonical tables now have length 12 and index 12 is first
-unbound. The current-address role neither selects code or storage
+index 11. ADR-0148 appends checked creation at index 12. Both canonical tables
+now have length 13 and index 13 is first unbound. The current-address role
+neither selects code or storage
 nor derives from the caller, a callee, an Account, or a call kind.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
@@ -451,7 +452,7 @@ share one resumable fuel budget; retained modes carry a `Reachable` provenance
 seal. Child return/revert/trap compose with root commit/rollback, and terminal
 deltas are queryable at arbitrary Addresses and slots.
 
-[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is in progress.
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is complete.
 Accounts now carry explicit balances; checked transfer rejects absence,
 underflow, and overflow without wrapping or implicit creation. Exact balance
 deltas, transfer preservation laws, installation transport, a distinct
@@ -459,6 +460,15 @@ checkpoint/working root context, and the append-only value-call capability at
 index 11 are implemented. Nested and top-level transfer commit/rollback,
 sealed preflight rejection, exact balance deltas, and replay-free split-fuel
 resumption are complete and covered by end-to-end checked-program regressions.
+
+[ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) is complete. One
+fixed `ExecutionEnvironment` carries checked call contracts, checked creation
+templates, and deterministic address derivation through execution and
+resumption. Root creation performs checked nonce increment, collision and value
+preflight, runs a checked initializer under shared fuel, installs checked
+runtime code on return, and applies call-site and root-wide rollback on failure.
+Exact nonce, code, account-creation, storage, and balance endpoints remain
+queryable without publishing an enumerable state-diff schema.
 
 ## Implementation status
 
@@ -485,7 +495,7 @@ resumption are complete and covered by end-to-end checked-program regressions.
 | Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
-| Canonical host capability registry | Complete | One canonical registry derives both 12-entry host tables and arbitrary-list safety; indexes 0 through 9 remain unchanged, checked call is index 10, value-bearing checked call is index 11, and index 12 is first unbound | Not published |
+| Canonical host capability registry | Complete | One canonical registry derives both 13-entry host tables and arbitrary-list safety; indexes 0 through 9 remain unchanged, checked call is index 10, value-bearing checked call is index 11, checked creation is index 12, and index 13 is first unbound | Not published |
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, stable index-9 capability, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
@@ -496,6 +506,7 @@ resumption are complete and covered by end-to-end checked-program regressions.
 | Executable checked-Core top-level lifecycle | Complete | Explicit initial state, checked root installation, total return/revert/trap result, exact resumption, commit/rollback, and state-delta observations are complete | Not published |
 | One-level nested checked-Core invocation | Complete | Typed call results, dynamic checked-code resolution, shared fuel, sealed resumable modes, child checkpoint handling, root commit/rollback, global delta queries, and executable regressions are complete | Not published |
 | Balance semantics | Complete | [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) implements explicit balances, checked atomic transfer, balance deltas, installation preservation, prepared root checkpoints, an append-only value-call boundary, nested and top-level rollback, sealed rejection, and exact resumption. Actual checked-Core regressions cover all transfer branches and replay-free root, child, and post-child fuel splits | Not published |
+| Checked contract creation | Complete | [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) implements checked non-wrapping nonce consumption, explicit address policy, checked initializer/runtime templates, provisional creation state, runtime installation, call-site and root rollback, full-environment sealed resumption, and exact nonce/code/creation delta queries | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2844,7 +2855,8 @@ dependencies are axiom-free or use only `propext` and `Quot.sound`.
 [ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) is also
 complete. Its typed Word call resolves a checked child from the current working
 world, retains root or child exhaustion under one shared budget, and permits
-resumption only from scheduler-reachable states under the retained registry.
+resumption only from scheduler-reachable states under the retained fixed
+execution environment.
 Tests cover return/revert/trap, dispatch failure, self-call and cross-account
 rebasing, sequential calls, exact split fuel, root rollback, and global state
 queries.
@@ -2856,9 +2868,22 @@ as storage. Actual checked-Core programs cover transfer failures, successful
 value calls, child and root rollback, depth rejection, invalid and unavailable
 targets, and root, child, and post-child exhaustion without replaying effects.
 
-Contract creation is the next runtime milestone. Logs, ABI, and public Oracle
-exposure follow as separate slices. The paused parser-proof path does not
-become an intermediate semantics milestone.
+[ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) is complete. Root
+creation uses an explicit checked template registry and address policy,
+consumes a checked nonce, runs initializer code under shared fuel, installs the
+checked runtime on return, and preserves both call-site and transaction-wide
+rollback. Out-of-fuel retains the complete execution environment, so resumed
+execution cannot replace its call registry, templates, or address policy.
+
+The full 836-job build, 1,556-job test build, and runtime suite pass. All 80
+changed Lean roots pass warnings-as-errors and trust-zero validation; metadata,
+semantic-kernel, and diff checks pass. Axiom reports contain only `propext`,
+`Quot.sound`, and, in some execution and resumption proofs,
+`Classical.choice`; there is no `sorry`, `admit`, or `unsafe` declaration.
+
+Logs and transaction observations are the next runtime milestone; ABI and
+public Oracle exposure follow as separate slices. The paused parser-proof path
+does not become an intermediate semantics milestone.
 
 ## Meaning of completion
 

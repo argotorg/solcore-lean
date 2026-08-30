@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: create and initialize checked contracts inside the executable lifecycle
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -251,3 +251,16 @@ cover:
 - private result construction and fixed-environment reachability sealing; and
 - full build, runtime suite, trust-zero, kernel-policy, metadata, and axiom
   audits for the new semantic roots.
+
+The executable lifecycle now covers these acceptance cases with checked Core
+programs and proof consumers. Initializer return installs the checked runtime;
+initializer revert and trap restore the call-site state while retaining the
+consumed nonce; a later root revert or trap restores the original world.
+Creation exhaustion resumes under the same fixed environment and agrees with a
+one-shot run, including creation followed by a same-root runtime call.
+
+The full 836-job build, 1,556-job test build, and runtime suite pass. All 80
+changed Lean roots pass warnings-as-errors and trust-zero validation. Metadata,
+semantic-kernel, and diff checks pass. Axiom reports contain only `propext`,
+`Quot.sound`, and, for some execution and resumption proofs,
+`Classical.choice`; there is no `sorry`, `admit`, or `unsafe` declaration.
