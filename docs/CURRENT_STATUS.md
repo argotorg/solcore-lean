@@ -414,10 +414,10 @@ configuration at the cumulative budget. This is not fuel consumption, nested
 invocation, ABI, parser work, or a public interface.
 
 [ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md) is
-accepted and active, with implementation planned. It refines checked programs
-whose declared result is Word, retains successful context, Word, and Core
-Store, and maps that success to the canonical 32-byte big-endian returned
-frame. The branch-complete raw result remains the existing `HostDriverResult`.
+complete. It refines checked programs whose declared result is Word, retains
+successful context, Word, and Core Store, and maps that success to the canonical
+32-byte big-endian returned frame. The branch-complete raw result remains the
+existing `HostDriverResult`.
 
 ## Implementation status
 
@@ -448,7 +448,7 @@ frame. The branch-complete raw result remains the existing `HostDriverResult`.
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, index-9 capability, length-10 tables, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
-| Checked Word completion to canonical return bytes | Active | Accepted contract; Word refinement, success witness, raw projection/retraction, canonical returned frame, checked branch laws, and regressions are planned | Not published |
+| Checked Word completion to canonical return bytes | Complete | Word refinement, success witness, exact raw projection/retraction, canonical returned frame, typed branch laws, stability, split fuel, and regressions are complete | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2683,23 +2683,31 @@ This slice adds no child or parent transition, call stack, scheduling,
 transaction policy, ABI conversion, parser rule, Wire or Oracle format, or
 public API. Those remain separate decisions.
 
-## Active checked Word completion bridge
+## Completed checked Word completion bridge
 
 [ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md) is
-accepted; implementation is active and planned. A checked Word-result
-refinement will project only successful `.word` completion from the existing
-branch-complete `HostDriverResult`. Its success witness retains the exact
-terminal host context, Word, and complete Core-local Store.
+complete. A checked Word-result refinement projects only successful `.word`
+completion from the existing branch-complete `HostDriverResult`. Its success
+witness retains the exact terminal host context, Word, and complete Core-local
+Store.
 
-That witness will build an existing frame continuation with exactly the
+That witness builds an existing frame continuation with exactly the
 canonical 32-byte big-endian Word encoding. For the checked Word specialization,
 projection is `none` exactly when execution exhausts its fuel; the raw result
 continues to carry the resumable state. No fallback meaning is assigned to a
 non-Word completion, fault, or arbitrary raw projection failure.
 
-This work is not Solidity ABI encoding and does not refine selected Account
-code, resume a parent, add parser or syntax work, or change Wire, Oracle,
-schemas, profiles, metadata capabilities, or any other public boundary.
+Fuel 9, 10, and 15 retain the exact pre-write, post-write, and input-request
+exhaustion states; fuel 16 completes, and exact 9+7 and 10+6 splits and larger
+fuel agree. Frame regressions cover Word zero, `0x1234`, and maximum, while a
+cell-bearing program retains a nonempty Core Store without serializing it.
+Thirty-five public theorems have matching compile consumers. The 695-job build,
+1,278-job test build, full test run, 12-root trust-zero sweep, metadata, kernel,
+diff, and axiom checks pass.
+
+This is not Solidity ABI encoding and does not refine selected Account code,
+resume a parent, add parser or syntax work, or change Wire, Oracle, schemas,
+profiles, metadata capabilities, or any other public boundary.
 
 ## Meaning of completion
 

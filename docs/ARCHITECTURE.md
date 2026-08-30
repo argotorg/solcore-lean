@@ -915,11 +915,11 @@ gas, or a charging policy. The carrier adds no invocation transition, parent
 delivery, stack, scheduler, transaction, ABI conversion, parser dependency, or
 public format. Those layers still require independent decisions.
 
-ADR-0141 is the accepted active bridge from checked Word completion to the
-existing frame layer. A checked refinement identifies programs whose declared
-result is Word. Successful projection from the existing `HostDriverResult`
-retains the terminal host context, exact Word, and complete Core Store; it does
-not replace the raw carrier or its exhaustion and fault branches.
+ADR-0141 completes the bridge from checked Word completion to the existing
+frame layer. A checked refinement identifies programs whose declared result is
+Word. Successful projection from the existing `HostDriverResult` retains the
+terminal host context, exact Word, and complete Core Store; it does not replace
+the raw carrier or its exhaustion and fault branches.
 
 The projected success constructs a returned frame using the existing canonical
 32-byte big-endian Word encoding. For checked Word execution, absence of that

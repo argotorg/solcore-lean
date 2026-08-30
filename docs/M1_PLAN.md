@@ -119,9 +119,9 @@ preventing accidental input or completion-policy replacement. It adds no
 nested invocation, ABI, parser, or public boundary.
 
 [ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md) is
-accepted and active, with implementation planned next. It narrows checked Word
-completion into a success witness and canonical returned frame while leaving
-the existing raw driver result branch-complete.
+complete. It narrows checked Word completion into a success witness and
+canonical returned frame while leaving the existing raw driver result
+branch-complete.
 
 ## Completed foundation
 
@@ -266,7 +266,7 @@ These results remain regression obligations for every extension.
 | 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all five exact branches, resumes only exhaustion with split/zero/add laws, and preserves the unchanged nested-`Option` and fold APIs |
 | 122 | Run-fixed current-address observation | Complete | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
 | 123 | Proof-refined parent-indexed selected-execution session | Complete | Binds fixed run configuration to each result and preserves exact one-shot equality through closed fuel-only resumption, whole-session algebra, every branch, compatibility, and folds |
-| 124 | Checked Word completion to canonical return bytes | Active | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
+| 124 | Checked Word completion to canonical return bytes | Complete | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
 | 125 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 126 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 127 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2217,20 +2217,27 @@ The budget is provided fuel, not a consumption or gas measure. This carrier is
 not a nested-call frame, scheduler, transaction, ABI conversion, parser
 adapter, Wire or Oracle version, or public interface.
 
-## Active checked Word completion bridge
+## Completed checked Word completion bridge
 
 [ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md) is
-accepted and its implementation is planned next. The slice will add a checked
-Word-result refinement and a success-only witness retaining the exact terminal
-context, Word, and complete Core Store. A pure projection and retraction reuse
-the existing branch-complete `HostDriverResult` rather than replacing it.
+complete. The slice adds a checked Word-result refinement and a success-only
+witness retaining the exact terminal context, Word, and complete Core Store. A
+pure projection and retraction reuse the existing branch-complete
+`HostDriverResult` rather than replacing it.
 
-Successful projection will construct the existing returned-frame continuation
+Successful projection constructs the existing returned-frame continuation
 with exactly 32 canonical big-endian bytes. In the checked Word specialization,
-`none` will mean exactly fuel exhaustion; the retained raw result remains the
+`none` means exactly fuel exhaustion; the retained raw result remains the
 resumption path. Arbitrary non-Word completion receives no fallback, and this
 slice adds no ABI, selected-code refinement, parser work, or public-format
 change.
+
+Regressions retain exact exhaustion at fuel 9, 10, and 15, complete at fuel 16,
+preserve the write, and prove exact 9+7 and 10+6 splits and larger-fuel
+stability. The frame bridge covers Word zero, `0x1234`, and maximum; a nonempty
+Core Store remains retained but unencoded. Thirty-five public theorems have
+matching compile consumers. The 695-job build, 1,278-job test build, full test
+run, 12-root trust-zero sweep, metadata, kernel, diff, and axiom checks pass.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

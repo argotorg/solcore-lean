@@ -211,13 +211,18 @@ consumption or gas. This adds no nested invocation, ABI, parser work, Wire or
 Oracle change, or public interface.
 
 [ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md) is
-Accepted and active, with implementation planned. It will refine checked Word
-completion into a success witness that retains the exact terminal context,
-Word, and Core Store, then construct the existing returned frame with the
-canonical 32-byte big-endian encoding. The branch-complete raw carrier remains
-`HostDriverResult`; for checked Word execution, no projected success means
-exactly exhaustion. Non-Word fallback, selected-code refinement, ABI, parser
-work, and public-format changes remain out of scope.
+complete. It refines checked Word completion into a success witness retaining
+the exact terminal context, Word, and Core Store, then constructs the existing
+returned frame with the canonical 32-byte big-endian encoding. The
+branch-complete raw carrier remains `HostDriverResult`; for checked Word
+execution, no projected success means exactly exhaustion.
+
+Fuel 9/10/15/16, exact split and larger-fuel stability,
+zero/nontrivial/maximum frame bytes, and nonempty-Store retention are tested.
+Thirty-five public theorems have matching compile consumers. The 695-job build,
+1,278-job test build, full test run, 12-root trust-zero sweep, metadata, kernel,
+diff, and axiom checks pass. Non-Word fallback, selected-code refinement, ABI,
+parser work, and public-format changes remain out of scope.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

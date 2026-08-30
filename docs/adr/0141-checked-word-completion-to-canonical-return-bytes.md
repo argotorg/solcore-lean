@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: connect typed handled Word completion to one canonical returned frame
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -216,14 +216,33 @@ This ADR does not define or prove:
   transaction commit, rollback application, or persistence;
 - a public byte contract, external compatibility promise, or concrete syntax.
 
-## Planned sequence
+## Implemented sequence
 
-1. record and activate this internal completion contract;
-2. add the checked Word refinement and success-only completion carrier;
-3. add exact raw projection/retraction and canonical frame conversion;
-4. prove checked Word branch, safety, stability, and split-fuel laws;
-5. add compile-time and measured executable regressions; and
-6. run full validation, independent audits, and completion-doc synchronization.
+1. recorded and activated this internal completion contract;
+2. added the checked Word refinement and success-only completion carrier;
+3. added exact raw projection/retraction and canonical frame conversion;
+4. proved checked Word branch, safety, stability, and split-fuel laws;
+5. added compile-time and measured executable regressions; and
+6. completed full validation, independent audits, and documentation sync.
+
+## Implementation record
+
+Seven focused Semantics modules implement the wrapper, execution adapter,
+success carrier, raw projection and retraction, frame conversion, and their
+proof interfaces. Thirty-five public theorems have thirty-five compile-only
+consumers. Their reported axioms are subsets of `propext` and `Quot.sound`.
+
+Executable regressions retain exact exhaustion before the write at fuel 9,
+after it at fuel 10, and at the input-size request at fuel 15. Fuel 16
+completes; exact 9+7 and 10+6 split laws and larger fuel preserve completion.
+The returned frame contains the exact terminal state and effects and canonical
+bytes. Synthetic bridge tests cover Word zero, `0x1234`, and the maximum Word.
+A cell-bearing program retains a nonempty Core Store while the frame conversion
+remains Store-independent.
+
+The 695-job full build, 1,278-job test executable build, and full test run pass.
+All 12 changed Lean roots pass trust-zero with warnings as errors. Metadata,
+semantic-kernel, and diff checks pass. No public format or root README changed.
 
 ## Consequences
 
