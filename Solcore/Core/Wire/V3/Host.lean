@@ -23,11 +23,40 @@ def functions : List CoreHostFunction :=
 
 /-- The exact root typing context published by Semantic Core Wire v3. -/
 def context : Solcore.Core.Context :=
-  functions.map Solcore.Core.HostFunction.functionType
+  [.function .word .word,
+    .function (.product .word .word) .unit,
+    .function .unit .word,
+    .function .unit .word,
+    .function .unit .word,
+    .function .unit .word,
+    .function .word (.sum .unit .word),
+    .function .unit .word,
+    .function .word (.sum .unit .word),
+    .function .unit .word,
+    .function (.product .word .word)
+      (.sum .word (.sum .word (.sum .word .word))),
+    .function (.product .word (.product .word .word))
+      (.sum .word (.sum .word (.sum .word .word))),
+    .function (.product .word (.product .word .word))
+      (.sum .word (.sum .word (.sum .word .word))),
+    .function (.product .word .word) .unit]
 
 /-- The runtime values corresponding positionally to `context`. -/
 def environment : Solcore.Core.Environment :=
-  functions.map fun function => .hostFunction function
+  [.hostFunction .storageRead,
+    .hostFunction .storageWrite,
+    .hostFunction .storageAddress,
+    .hostFunction .codeAddress,
+    .hostFunction .callValue,
+    .hostFunction .callerAddress,
+    .hostFunction .inputDataByte?,
+    .hostFunction .inputDataSize,
+    .hostFunction .inputDataWordBE?,
+    .hostFunction .currentAddress,
+    .hostFunction .callContractWord,
+    .hostFunction .callContractWordWithValue,
+    .hostFunction .createContractWord,
+    .hostFunction .emitLogWord]
 
 @[simp] theorem functions_length : functions.length = 14 :=
   rfl
@@ -72,7 +101,7 @@ theorem functions_prefix_current :
 
 theorem context_eq_current :
     context = Solcore.Core.hostContext := by
-  rw [context, Solcore.Core.hostContext, functions_eq_current]
+  rfl
 
 theorem context_prefix_current :
     context <+: Solcore.Core.hostContext := by
@@ -93,7 +122,7 @@ theorem context_respects_current :
 
 theorem environment_eq_current :
     environment = Solcore.Core.hostEnvironment := by
-  rw [environment, Solcore.Core.hostEnvironment, functions_eq_current]
+  rfl
 
 theorem environment_prefix_current :
     environment <+: Solcore.Core.hostEnvironment := by
