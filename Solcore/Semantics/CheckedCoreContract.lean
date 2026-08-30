@@ -1,4 +1,5 @@
 import Solcore.Semantics.CheckedHostCoreProgram
+import Solcore.Semantics.CheckedHostCoreWordProgram
 import Solcore.Semantics.CoreContractEntryProfile
 import Solcore.Semantics.HostStorageExecutionInputs
 import Solcore.Semantics.WorldState
@@ -18,6 +19,19 @@ structure CheckedCoreContract where
 
 namespace CheckedCoreContract
 
+/-- Reuse the established checked-Word refinement as a return-Word contract. -/
+def returnWord (code : CheckedHostCoreWordProgram) : CheckedCoreContract :=
+  ⟨code.code, .returnWord, code.resultType_eq_word⟩
+
+/-- Bind checked code with the exact typed three-way Word outcome convention. -/
+def wordOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (resultType_eq :
+      code.program.resultType =
+        CoreContractEntryProfile.wordOutcomeV1.resultType) :
+    CheckedCoreContract :=
+  ⟨code, .wordOutcomeV1, resultType_eq⟩
+
 /-- Admit checked code only when its result type has a supported entry profile. -/
 def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
   let profile ← CoreContractEntryProfile.ofResultType? code.program.resultType
@@ -25,6 +39,20 @@ def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
     some ⟨code, profile, compatible⟩
   else
     none
+
+/-- Decode an exact typed completion using the convention owned by the contract. -/
+def decodeCompletion
+    (contract : CheckedCoreContract)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    (typing :
+      Core.HostRuntimeValueHasType world value
+        contract.code.program.resultType
+        contract.code.program.dataDefinitions) :
+    FrameOutcome Core.Word :=
+  contract.entryProfile.decodeTyped (by
+    rw [← contract.resultType_eq]
+    exact typing)
 
 end CheckedCoreContract
 

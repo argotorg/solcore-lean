@@ -16,6 +16,13 @@ namespace TopLevelExecution
     (initialContext installed).context.storageAddress = target := by
   rfl
 
+@[simp] theorem initialContext_storageAccount
+    {initialWorld : WorldState} {target : Address}
+    {contract : CheckedCoreContract}
+    (installed : InstalledCheckedCoreContract initialWorld target contract) :
+    (initialContext installed).storageAccount = installed.account := by
+  rfl
+
 @[simp] theorem initialContext_checkpointState
     {initialWorld : WorldState} {target : Address}
     {contract : CheckedCoreContract}

@@ -34,11 +34,11 @@ def decode?
   match profile, value with
   | .returnWord, .word word =>
       some (.returned (encodeWordBytesBE word))
-  | .wordOutcomeV1, .inLeft _ (.word word) =>
+  | .wordOutcomeV1, .inLeft (.sum .word .word) (.word word) =>
       some (.returned (encodeWordBytesBE word))
-  | .wordOutcomeV1, .inRight _ (.inLeft _ (.word word)) =>
+  | .wordOutcomeV1, .inRight .word (.inLeft .word (.word word)) =>
       some (.reverted (encodeWordBytesBE word))
-  | .wordOutcomeV1, .inRight _ (.inRight _ (.word reason)) =>
+  | .wordOutcomeV1, .inRight .word (.inRight .word (.word reason)) =>
       some (.trapped reason)
   | _, _ => none
 
@@ -68,6 +68,30 @@ theorem decode?_ne_none_of_hasType
           | inRight innerTyping =>
               cases innerTyping with
               | word => simp [decode?]
+
+/-- The typed decoder's executable option is always populated. -/
+theorem decode?_isSome_of_hasType
+    (profile : CoreContractEntryProfile)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    {definitions : Core.DataEnvironment}
+    (typing :
+      Core.HostRuntimeValueHasType world value profile.resultType definitions) :
+    (profile.decode? value).isSome = true :=
+  Option.isSome_iff_ne_none.mpr
+    (profile.decode?_ne_none_of_hasType typing)
+
+/-- Decode a well-typed completion without an invalid-value fallback branch. -/
+def decodeTyped
+    (profile : CoreContractEntryProfile)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    {definitions : Core.DataEnvironment}
+    (typing :
+      Core.HostRuntimeValueHasType world value profile.resultType definitions) :
+    FrameOutcome Core.Word :=
+  (profile.decode? value).get
+    (profile.decode?_isSome_of_hasType typing)
 
 end CoreContractEntryProfile
 
