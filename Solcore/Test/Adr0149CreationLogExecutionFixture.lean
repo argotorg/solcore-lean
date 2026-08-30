@@ -127,4 +127,67 @@ def successfulLogs : List CheckedCoreWordLog :=
 def failedInitializerLogs : List CheckedCoreWordLog :=
   [rootLogBefore, rootLogAfter]
 
+def secondCreated : Address := ⟨0x2484, by decide⟩
+
+/-- Run a second creation only after the first one returned successfully. -/
+def sequentialCreationProgram : Program := {
+  resultType := CoreContractEntryProfile.wordOutcomeV1.resultType
+  body :=
+    .caseE creationExpr
+      (consumeResult .commit (creationExpr 1))
+      (.caseE (.var 0)
+        (reverted (.var 0))
+        (.caseE (.var 0)
+          (trapped (.var 0))
+          (trapped (.var 0))))
+}
+
+theorem sequentialCreationProgram_checked :
+    sequentialCreationProgram.checkHost = true := by
+  native_decide
+
+def sequentialCreationRoot : CheckedCoreContract :=
+  CheckedCoreContract.wordOutcomeV1
+    ⟨sequentialCreationProgram, sequentialCreationProgram_checked⟩ rfl
+
+def sequentialCreationWorld : WorldState :=
+  Adr0148CreationEndToEndFixture.initialWorld sequentialCreationRoot
+
+def sequentialCreationInstalled :
+    InstalledCheckedCoreContract sequentialCreationWorld creator
+      sequentialCreationRoot :=
+  Adr0148CreationEndToEndFixture.rootInstalled sequentialCreationRoot
+
+def successfulInitializerOutcome : CheckedCoreWordOutcome :=
+  .returned initializerInput
+
+def sequentialCreationEnvironment : ExecutionEnvironment := {
+  callRegistry := (environmentFor
+    (initializerContract successfulInitializerOutcome)).callRegistry
+  creationTemplates := (environmentFor
+    (initializerContract successfulInitializerOutcome)).creationTemplates
+  creationAddressPolicy := {
+    derive := fun actualCreator nonce =>
+      if actualCreator = creator ∧ nonce = oldNonce then created
+      else if actualCreator = creator ∧ nonce = ⟨8, by decide⟩ then
+        secondCreated
+      else unrelated
+  }
+}
+
+def runSequentialCreations (fuel : Nat) :
+    Result sequentialCreationWorld sequentialCreationRoot invocation :=
+  runWithEnvironment sequentialCreationRoot invocation
+    sequentialCreationInstalled sequentialCreationEnvironment fuel
+
+def secondInitializerLogFirst : CheckedCoreWordLog :=
+  ⟨secondCreated, initializerTopicFirst, initializerPayloadFirst⟩
+
+def secondInitializerLogSecond : CheckedCoreWordLog :=
+  ⟨secondCreated, initializerTopicSecond, initializerPayloadSecond⟩
+
+def sequentialInitializerLogs : List CheckedCoreWordLog :=
+  [initializerLogFirst, initializerLogSecond,
+    secondInitializerLogFirst, secondInitializerLogSecond]
+
 end Tests.Adr0149CreationLogExecutionFixture
