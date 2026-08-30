@@ -35,6 +35,61 @@ def display (_diagnostic : Diagnostic) : Option String := none
 
 end Diagnostic
 
+/-- A Core-check rejection can only originate in the Core checking phase. -/
+structure CoreCheckRejection where
+  diagnostic : Diagnostic
+  phase_eq : diagnostic.phase = .coreChecking
+
+namespace CoreCheckRejection
+
+instance : BEq CoreCheckRejection :=
+  ⟨fun left right => left.diagnostic == right.diagnostic⟩
+
+def of? (diagnostic : Diagnostic) : Option CoreCheckRejection :=
+  if phase_eq : diagnostic.phase = .coreChecking then
+    some ⟨diagnostic, phase_eq⟩
+  else
+    none
+
+end CoreCheckRejection
+
+/-- Closed semantic phases allowed to reject an execution query. -/
+def ExecuteRejectionPhaseAllowed (phase : Phase) : Prop :=
+  phase = .contractAdmission ∨ phase = .worldValidation ∨
+    phase = .environmentValidation ∨ phase = .probeValidation ∨
+    phase = .rootInstallation
+
+instance (phase : Phase) : Decidable (ExecuteRejectionPhaseAllowed phase) := by
+  unfold ExecuteRejectionPhaseAllowed
+  infer_instance
+
+def executeRejectionPhaseAllowed (phase : Phase) : Bool :=
+  decide (ExecuteRejectionPhaseAllowed phase)
+
+@[simp] theorem executeRejectionPhaseAllowed_eq_true_iff
+    (phase : Phase) :
+    executeRejectionPhaseAllowed phase = true ↔
+      ExecuteRejectionPhaseAllowed phase := by
+  simp [executeRejectionPhaseAllowed]
+
+/-- An execution rejection carries evidence that its phase is query-valid. -/
+structure ExecuteRejection where
+  diagnostic : Diagnostic
+  phase_allowed : ExecuteRejectionPhaseAllowed diagnostic.phase
+
+namespace ExecuteRejection
+
+instance : BEq ExecuteRejection :=
+  ⟨fun left right => left.diagnostic == right.diagnostic⟩
+
+def of? (diagnostic : Diagnostic) : Option ExecuteRejection :=
+  if allowed : ExecuteRejectionPhaseAllowed diagnostic.phase then
+    some ⟨diagnostic, allowed⟩
+  else
+    none
+
+end ExecuteRejection
+
 /-- The capabilities document is a single derived value, never caller data. -/
 inductive CapabilityReport where
   | canonical
@@ -47,7 +102,7 @@ structure CoreCheckResult where
 
 inductive CapabilitiesVerdict where
   | accepted (report : CapabilityReport)
-  | inconclusive (exhaustion : Exhaustion)
+  | inconclusive (exhaustion : PreflightExhaustion)
   | internalError (error : InternalError)
   deriving Repr, BEq, DecidableEq
 
@@ -67,8 +122,8 @@ end CapabilitiesVerdict
 
 inductive CoreCheckVerdict where
   | accepted (result : CoreCheckResult)
-  | rejected (diagnostic : Diagnostic)
-  | inconclusive (exhaustion : Exhaustion)
+  | rejected (rejection : CoreCheckRejection)
+  | inconclusive (exhaustion : PreflightExhaustion)
   | internalError (error : InternalError)
   deriving BEq
 
@@ -82,14 +137,14 @@ def kind : CoreCheckVerdict → VerdictKind
 
 def phase : CoreCheckVerdict → Option Phase
   | .accepted _ => some .coreChecking
-  | .rejected diagnostic => some diagnostic.phase
+  | .rejected rejection => some rejection.diagnostic.phase
   | .inconclusive exhaustion => some exhaustion.phase
   | .internalError error => error.phase
 
 end CoreCheckVerdict
 
 inductive ExecuteVerdict where
-  | rejected (diagnostic : Diagnostic)
+  | rejected (rejection : ExecuteRejection)
   | inconclusive (exhaustion : Exhaustion)
   | executed (observation : ValidExecutionObservation)
   | internalError (error : InternalError)
@@ -104,7 +159,7 @@ def kind : ExecuteVerdict → VerdictKind
   | .internalError _ => .internalError
 
 def phase : ExecuteVerdict → Option Phase
-  | .rejected diagnostic => some diagnostic.phase
+  | .rejected rejection => some rejection.diagnostic.phase
   | .inconclusive exhaustion => some exhaustion.phase
   | .executed _ => some .contractExecution
   | .internalError error => error.phase
