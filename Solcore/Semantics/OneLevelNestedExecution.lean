@@ -189,12 +189,12 @@ def runMode
               frame.stateTyping advanced)
       | .next next =>
           match fuel with
-          | 0 => .outOfFuel (.root frame)
+          | 0 => .outOfFuel registry (.root frame)
           | remaining + 1 =>
               runMode registry remaining (.root (frame.afterNext next advanced))
       | .suspended suspension =>
           match fuel with
-          | 0 => .outOfFuel (.root frame)
+          | 0 => .outOfFuel registry (.root frame)
           | remaining + 1 =>
               runMode registry remaining
                 (frame.afterSuspension registry suspension advanced)
@@ -209,12 +209,12 @@ def runMode
               frame.childStateTyping advanced)
       | .next next =>
           match fuel with
-          | 0 => .outOfFuel (.child frame)
+          | 0 => .outOfFuel registry (.child frame)
           | remaining + 1 =>
               runMode registry remaining (.child (frame.afterNext next advanced))
       | .suspended suspension =>
           match fuel with
-          | 0 => .outOfFuel (.child frame)
+          | 0 => .outOfFuel registry (.child frame)
           | remaining + 1 =>
               runMode registry remaining
                 (.child (frame.afterHandledSuspension suspension advanced))

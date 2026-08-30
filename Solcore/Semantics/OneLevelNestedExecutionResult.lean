@@ -1,3 +1,4 @@
+import Solcore.Semantics.CheckedContractRegistry
 import Solcore.Semantics.OneLevelNestedExecutionState
 import Solcore.Semantics.WorldStateDelta
 
@@ -36,6 +37,7 @@ inductive Result
   | completed
       (terminal : TerminalResult initialWorld rootContract rootInvocation)
   | outOfFuel
+      (registry : CheckedContractRegistry)
       (mode : Mode initialWorld rootContract rootInvocation)
 
 end Solcore.Semantics.OneLevelNestedExecution
