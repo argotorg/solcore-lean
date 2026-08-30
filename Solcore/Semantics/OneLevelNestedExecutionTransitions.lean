@@ -1,8 +1,10 @@
-import Solcore.Core.HostProgress
+import Solcore.Core.HostRunnerProperties
 import Solcore.Core.HostTransitionSafety
+import Solcore.Semantics.CheckedCoreWordOutcomeProperties
 import Solcore.Semantics.CheckedContractRegistry
+import Solcore.Semantics.ContractCallFailure
 import Solcore.Semantics.HostStorageAccountPresence
-import Solcore.Semantics.OneLevelNestedExecutionResult
+import Solcore.Semantics.OneLevelNestedExecutionState
 
 /-! Proof-preserving local transitions for the one-level nested scheduler. -/
 
@@ -125,7 +127,97 @@ def startChild
 
 end SuspendedRoot
 
+namespace RootFrame
+
+/-- Intercept a root call, or delegate every other request to the flat handler. -/
+def afterSuspension
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (registry : CheckedContractRegistry)
+    (frame : RootFrame initialWorld rootContract rootInvocation)
+    (suspension : Core.HostSuspension)
+    (advanced : Core.hostAdvance frame.state = .suspended suspension) :
+    Mode initialWorld rootContract rootInvocation := by
+  rcases suspension with ⟨request, continuation, store⟩
+  cases request with
+  | callContractWord target input =>
+      let suspended :=
+        frame.suspendCall target input continuation store advanced
+      match addressEq : wordToAddress? target with
+      | none =>
+          exact .root
+            (suspended.resumeWith suspended.parentContext
+              ContractCallFailure.invalidAddress.result)
+      | some address =>
+          match resolvedEq :
+              registry.resolve?
+                suspended.parentContext.context.values.working.1 address with
+          | none =>
+              exact .root
+                (suspended.resumeWith suspended.parentContext
+                  ContractCallFailure.unavailable.result)
+          | some resolved =>
+              exact .child (suspended.startChild address addressEq resolved)
+  | storageRead slot =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.storageRead slot, continuation, store⟩ advanced)
+  | storageWrite slot value =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.storageWrite slot value, continuation, store⟩ advanced)
+  | storageAddress =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.storageAddress, continuation, store⟩ advanced)
+  | codeAddress =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.codeAddress, continuation, store⟩ advanced)
+  | callValue =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.callValue, continuation, store⟩ advanced)
+  | callerAddress =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.callerAddress, continuation, store⟩ advanced)
+  | inputDataByte? offset =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.inputDataByte? offset, continuation, store⟩ advanced)
+  | inputDataSize =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.inputDataSize, continuation, store⟩ advanced)
+  | inputDataWordBE? offset =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.inputDataWordBE? offset, continuation, store⟩ advanced)
+  | currentAddress =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.currentAddress, continuation, store⟩ advanced)
+
+end RootFrame
+
 namespace ChildFrame
+
+/-- Strictly decode a typed child state reported done, retaining its Word. -/
+def outcomeDone
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (frame : ChildFrame initialWorld rootContract rootInvocation)
+    (value : Core.Value)
+    (advanced : Core.hostAdvance frame.childState = .done value) :
+    CheckedCoreWordOutcome := by
+  have decodedNeNone :
+      frame.childContract.decodeWordOutcome? value ≠ none := by
+    obtain ⟨store, stateEq⟩ := Core.hostAdvance_done_iff.mp advanced
+    have typing := frame.childStateTyping
+    rw [stateEq] at typing
+    cases typing with
+    | ret _storeTyping valueTyping continuationTyping =>
+        cases continuationTyping with
+        | nil =>
+            apply CoreContractEntryProfile.decodeWordOutcome?_ne_none_of_hasType
+            rw [← frame.childContract.resultType_eq]
+            exact valueTyping
+  match decodedEq : frame.childContract.decodeWordOutcome? value with
+  | some outcome => exact outcome
+  | none => exact False.elim (decodedNeNone decodedEq)
 
 /-- Advance one ordinary child Core transition without changing host state. -/
 def afterNext

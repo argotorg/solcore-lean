@@ -1,5 +1,5 @@
 import Solcore.Semantics.CheckedContractRegistry
-import Solcore.Semantics.OneLevelNestedExecutionState
+import Solcore.Semantics.OneLevelNestedExecutionReachability
 import Solcore.Semantics.WorldStateDelta
 
 /-! Total bounded results for one-level nested checked-Core execution. -/
@@ -39,5 +39,6 @@ inductive Result
   | outOfFuel
       (registry : CheckedContractRegistry)
       (mode : Mode initialWorld rootContract rootInvocation)
+      (reachable : Reachable registry mode)
 
 end Solcore.Semantics.OneLevelNestedExecution
