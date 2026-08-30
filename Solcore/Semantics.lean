@@ -230,6 +230,7 @@ import Solcore.Semantics.OneLevelNestedExecution
 import Solcore.Semantics.OneLevelNestedExecutionProperties
 import Solcore.Semantics.OneLevelNestedExecutionResumption
 import Solcore.Semantics.OneLevelNestedExecutionResumptionProperties
+import Solcore.Semantics.BalancedTopLevelExecution
 
 /-!
 Umbrella module for syntax-independent runtime values, observations, and their
