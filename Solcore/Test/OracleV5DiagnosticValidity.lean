@@ -34,9 +34,22 @@ private def staticChecker : Diagnostic := {
   arguments := .mkObj []
 }
 
+private def falseSelectorCollision : Diagnostic := {
+  code := "oracle.v5.abi.selector-collision"
+  phase := .contractAdmission
+  path := ["contracts", "root", "methods"]
+  arguments := .mkObj [
+    ("selector", "00000000"),
+    ("firstSignature", "f(uint256)"),
+    ("secondSignature", "foo(uint256)")
+  ]
+}
+
 private def allChecks : Bool :=
   duplicateSignature.isValidExecute && danglingRawId.isValidExecute &&
     staticChecker.isValidExecute &&
+    Diagnostic.selectorTextForSignature "f(uint256)" == "b3de648b" &&
+    !falseSelectorCollision.isValidExecute &&
     !({ staticChecker with
       path := ["contracts", "root", "methods", "not valid", "implementation"]
     }).isValidExecute &&

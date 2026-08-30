@@ -29,6 +29,22 @@ private def lowerHexDigit (character : Char) : Bool :=
 private def validSelectorText (value : String) : Bool :=
   value.toList.length == 8 && value.toList.all lowerHexDigit
 
+private def methodNameFromSignature?
+    (signature : String) : Option Solcore.Abi.V1.MethodName := do
+  let suffix := "(uint256)".toList
+  let characters := signature.toList
+  if characters.length ≤ suffix.length then
+    none
+  else if characters.drop (characters.length - suffix.length) != suffix then
+    none
+  else
+    Solcore.Abi.V1.validateMethodName? <|
+      String.ofList (characters.take (characters.length - suffix.length))
+
+def selectorTextForSignature (signature : String) : String :=
+  let selector := Solcore.Abi.V1.selectorFromSignatureBytes signature.toUTF8
+  ((Solcore.Semantics.encodeBytesText selector.encode).drop 2).toString
+
 private def exactStringField?
     (arguments : Lean.Json)
     (name : String) : Option String := do
@@ -151,6 +167,10 @@ private def validSelectorCollision
       "selector" "firstSignature" "secondSignature" with
   | some (selector, first, second) =>
       validSelectorText selector && first != second &&
+        (methodNameFromSignature? first).isSome &&
+        (methodNameFromSignature? second).isSome &&
+        selectorTextForSignature first == selector &&
+        selectorTextForSignature second == selector &&
         validContractPath path ["methods"]
   | none => false
 
