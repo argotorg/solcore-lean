@@ -60,6 +60,13 @@ theorem run_additional_of_outOfFuel
           obtain ⟨spent, bound, suffix, terminal⟩ := suffixSound
           exact ⟨fuel + spent, Nat.add_le_add_left bound fuel,
             prefixPath.trans suffix, terminal⟩
+      | unsupported suspension remainingFuel =>
+          change ∃ spent requestState, _ at suffixSound
+          change ∃ spent requestState, _
+          obtain ⟨spent, requestState, accounting, suffix, emission,
+            unsupported⟩ := suffixSound
+          exact ⟨fuel + spent, requestState, by omega,
+            prefixPath.trans suffix, emission, unsupported⟩
 
 end HostDriver
 
@@ -90,6 +97,15 @@ theorem resumeWithFuel_run
           simp only [resumeWithFuel_fault]
           exact
             (HostDriver.run_fault_stable handler execution (by omega)).symm
+      | unsupported suspension remainingFuel =>
+          simp only [resumeWithFuel_unsupported]
+          have sound := HostDriver.run_fuelSound handler context fuel state
+          rw [execution] at sound
+          change ∃ spent requestState, _ at sound
+          obtain ⟨spent, requestState, accounting, path, emission,
+            unsupported⟩ := sound
+          exact (HostDriver.run_unsupported_complete handler path emission
+            unsupported (by omega)).symm
 
 /-- Zero additional fuel is an identity for every actual driver result. -/
 @[simp] theorem resumeWithFuel_run_zero
@@ -117,6 +133,9 @@ theorem resumeWithFuel_add
       | outOfFuel state =>
           exact resumeWithFuel_run handler context first second state
       | fault error state => rfl
+      | unsupported suspension remainingFuel =>
+          simp only [resumeWithFuel_unsupported]
+          rw [Nat.add_assoc]
 
 /-- Two additions after an actual run equal the corresponding one-shot run. -/
 theorem resumeWithFuel_run_add
@@ -153,6 +172,9 @@ theorem resumeWithFuel_hasType
             HostDriver.run_hasType handler context additional state typing
       | fault error state =>
           exact False.elim typing
+      | unsupported suspension remainingFuel =>
+          simpa only [resumeWithFuel_unsupported,
+            HostDriverOutcome.unsupported_hasType_iff] using typing
 
 /-- Resuming a typed result cannot expose a raw machine fault. -/
 theorem resumeWithFuel_ne_fault
