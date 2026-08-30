@@ -97,7 +97,7 @@ private def decodeCapabilitiesVerdictAt
     (json : Lean.Json) : DecodeResult CapabilitiesVerdict := do
   let allowedFields := [
     "code", "consumed", "kind", "limit", "phase", "resource", "result"]
-  ensureExactObject path json allowedFields ["kind"]
+  ensureExactObject path json allowedFields ["kind", "phase"]
   let kind ← decodeVerdictKindAt (path.field "kind")
     (← requireField path json "kind")
     #["accepted", "inconclusive", "internalError"]
@@ -120,7 +120,7 @@ private def decodeCoreVerdictAt
   let allowedFields := [
     "code", "consumed", "diagnostics", "kind", "limit", "phase",
     "resource", "result"]
-  ensureExactObject path json allowedFields ["kind"]
+  ensureExactObject path json allowedFields ["kind", "phase"]
   let kind ← decodeVerdictKindAt (path.field "kind")
     (← requireField path json "kind")
     #["accepted", "rejected", "inconclusive", "internalError"]

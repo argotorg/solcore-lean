@@ -126,6 +126,22 @@ private def unknownFieldBeforeKind : Bool :=
   errorAt (decodeResponseValue <| encoded.setObjVal! "verdict" verdict)
     "/verdict/zzz" .unknownField
 
+private def commonPhaseBeforeKind : Bool :=
+  let capability := encodeResponse capabilityAcceptedResponse
+  let capabilityVerdict := capability.getObjValD "verdict"
+  let capabilityMissing := capability.setObjVal! "verdict" <| .mkObj [
+    ("kind", "future"),
+    ("result", capabilityVerdict.getObjValD "result")]
+  let core := encodeResponse <| response
+    (.coreCheck (.accepted { resultType := .word }))
+  let coreVerdict := core.getObjValD "verdict"
+  let coreMissing := core.setObjVal! "verdict" <| .mkObj [
+    ("kind", "future"), ("result", coreVerdict.getObjValD "result")]
+  errorAt (decodeResponseValue capabilityMissing)
+      "/verdict/phase" .missingField &&
+    errorAt (decodeResponseValue coreMissing)
+      "/verdict/phase" .missingField
+
 private def rejectedPrecedenceAndPhase : Bool :=
   let encoded := encodeResponse <| response (.coreCheck (.rejected coreRejection))
   let verdict := encoded.getObjValD "verdict"
@@ -192,7 +208,8 @@ private def publicBoundaryRecoversId : Bool :=
 
 private def allChecks : Bool :=
   roundTrips && envelopePrecedence && crossQueryRejection &&
-    unknownFieldBeforeKind && rejectedPrecedenceAndPhase &&
+    unknownFieldBeforeKind && commonPhaseBeforeKind &&
+    rejectedPrecedenceAndPhase &&
     rollbackObservationRejected && canonicalizesNaturalsAndText &&
     publicBoundaryRecoversId
 
