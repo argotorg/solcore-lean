@@ -167,6 +167,38 @@ theorem idByCode?_of_lookupEntry?_eq_some
     (mem_of_lookupEntry?_eq_some found),
     id_eq_of_lookupEntry?_eq_some found]
 
+/-- Runnable lookup always round-trips through the canonical checked-code ID. -/
+theorem idByCode?_of_lookup?_eq_some
+    {package : ContractPackage}
+    {id : ContractId}
+    {contract : Solcore.Semantics.CheckedCoreContract}
+    (found : package.lookup? id = some contract) :
+    package.idByCode? contract.code = some id := by
+  unfold lookup? at found
+  rcases Option.map_eq_some_iff.mp found with
+    ⟨entry, entryFound, contractEq⟩
+  subst contract
+  exact idByCode?_of_lookupEntry?_eq_some entryFound
+
+/-- Forward and reverse package resolution identify the same exact Program. -/
+theorem program_eq_of_idByProgram?_and_lookupEntry?
+    {package : ContractPackage}
+    {program : Solcore.Core.Program}
+    {id : ContractId}
+    {entry : AdmittedEntry}
+    (reverse : package.idByProgram? program = some id)
+    (forward : package.lookupEntry? id = some entry) :
+    program = entry.program := by
+  rcases program_eq_of_idByProgram?_eq_some reverse with
+    ⟨candidate, candidateMember, candidateId, candidateProgram⟩
+  have candidateLookup :=
+    lookupEntry?_of_mem package candidateMember
+  rw [candidateId] at candidateLookup
+  have sameEntry : candidate = entry :=
+    Option.some.inj (candidateLookup.symm.trans forward)
+  subst entry
+  exact candidateProgram.symm
+
 end ContractPackage
 
 end Solcore.Oracle.V5.ContractAdmission
