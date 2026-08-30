@@ -127,28 +127,37 @@ than rerunning from the program entry.
 
 ## Canonical returned parent continuation
 
-For any `TrapReason`, first define the pure parent constructor:
+For any `TrapReason`, define a proof-guarded parent constructor:
 
 ```lean
-def ParentIndexedFrameInitialization.toReturnedWordContinuation
-    (initialization : ParentIndexedFrameInitialization
-      RollbackState Event parentWorking)
+def ParentIndexedSelectedCheckedWordExecution.toReturnedContinuation
+    (execution : ParentIndexedSelectedCheckedWordExecution
+      initialization storageAddress inputs)
     (completion :
-      WordReturnedFrameCompletion RollbackState (FrameTrace Event)) :
+      WordReturnedFrameCompletion RollbackState (FrameTrace Event))
+    (completed : execution.execution.completion? = some completion) :
     ParentIndexedFrameContinuationContext
       RollbackState Event TrapReason parentWorking
 ```
 
-Then define a projection from a present parent-indexed execution:
+Requiring the exact inner completion proof prevents unrelated completion data
+from being assigned the carrier's parent provenance. Then define the primary
+optional projection by matching the inner completion, supplying that match
+equation, and retaining both existing values:
 
 ```lean
-def ParentIndexedSelectedCheckedWordExecution.returnedContinuation? :
+def ParentIndexedSelectedCheckedWordExecution.returnedCompletion? :
     Option
-      (ParentIndexedFrameContinuationContext
-        RollbackState Event TrapReason parentWorking)
+      (WordReturnedFrameCompletion RollbackState (FrameTrace Event) ×
+        ParentIndexedFrameContinuationContext
+          RollbackState Event TrapReason parentWorking)
 ```
 
-It maps only `execution.completion?`. For a successful completion it builds:
+The continuation-only convenience view is exactly
+`returnedCompletion?.map Prod.snd`; it is not a second producer.
+
+The primary view matches only `execution.execution.completion?`. For a
+successful completion it pairs that exact completion with:
 
 ```text
 ParentIndexedFrameContinuationContext.fromTraceExtension
@@ -205,7 +214,7 @@ Expose laws for:
 - inner selection, raw execution, completion, and missing-completion delegation;
 - present-carrier resumption projections, one-shot equality, zero, addition,
   and optional-start resumption;
-- exact returned-parent-continuation construction;
+- exact returned-completion and returned-parent-continuation construction;
 - parent-to-plain continuation coherence;
 - returned resolution data, final working values, and trace prefix;
 - successful parent-continuation stability after further fuel; and
