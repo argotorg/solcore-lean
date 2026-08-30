@@ -21,6 +21,8 @@ def resumeWithFuel
   match result with
   | ⟨context, .outOfFuel exhausted⟩ =>
       HostDriver.run handler context additional exhausted
+  | ⟨context, .unsupported suspension remainingFuel⟩ =>
+      ⟨context, .unsupported suspension (remainingFuel + additional)⟩
   | terminal => terminal
 
 @[simp] theorem resumeWithFuel_outOfFuel
@@ -53,6 +55,18 @@ def resumeWithFuel
     (additional : Nat) :
     resumeWithFuel ⟨context, .fault error state⟩ handler additional =
       ⟨context, .fault error state⟩ := by
+  rfl
+
+@[simp] theorem resumeWithFuel_unsupported
+    {Context : Type u}
+    (context : Context)
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat)
+    (handler : HostHandler Context)
+    (additional : Nat) :
+    resumeWithFuel ⟨context, .unsupported suspension remainingFuel⟩
+        handler additional =
+      ⟨context, .unsupported suspension (remainingFuel + additional)⟩ := by
   rfl
 
 end HostDriverResult
