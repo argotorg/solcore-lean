@@ -239,6 +239,8 @@ import Solcore.Test.OracleV5Capabilities
 import Solcore.Test.OracleV5CheckDiagnostic
 import Solcore.Test.OracleV5ContractAdmission
 import Solcore.Test.OracleV5ContractAdmissionDiagnostic
+import Solcore.Test.OracleV5CoreDiagnosticDecode
+import Solcore.Test.OracleV5DiagnosticValidity
 import Solcore.Test.OracleV5EnvironmentMaterialization
 import Solcore.Test.OracleV5Execution
 import Solcore.Test.OracleV5Handler
@@ -250,11 +252,16 @@ import Solcore.Test.OracleV5ObservationCodec
 import Solcore.Test.OracleV5ObservationDecode
 import Solcore.Test.OracleV5ObservationValidity
 import Solcore.Test.OracleV5ProbeValidation
+import Solcore.Test.OracleV5ProtocolErrorDecode
+import Solcore.Test.OracleV5ProtocolErrorValidity
 import Solcore.Test.OracleV5Public
+import Solcore.Test.OracleV5ResponseDecode
 import Solcore.Test.OracleV5ResponseEncode
 import Solcore.Test.OracleV5ResponseRefinement
+import Solcore.Test.OracleV5ResponseShape
 import Solcore.Test.OracleV5RootInstallation
 import Solcore.Test.OracleV5ScenarioDiagnostic
+import Solcore.Test.OracleV5ScenarioDiagnosticDecode
 import Solcore.Test.OracleV5ScenarioPreparation
 import Solcore.Test.OracleV5TypedHandler
 import Solcore.Test.OracleV5WireProtocol
@@ -5217,6 +5224,8 @@ def run : IO Unit := do
   OracleV5CheckDiagnostic.testOracleV5CheckDiagnostic
   OracleV5ContractAdmission.testOracleV5ContractAdmission
   OracleV5ContractAdmissionDiagnostic.testOracleV5ContractAdmissionDiagnostic
+  OracleV5CoreDiagnosticDecode.testOracleV5CoreDiagnosticDecode
+  OracleV5DiagnosticValidity.testOracleV5DiagnosticValidity
   testOracleV5EnvironmentMaterialization
   OracleV5Execution.testOracleV5Execution
   OracleV5Handler.testOracleV5Handler
@@ -5228,11 +5237,16 @@ def run : IO Unit := do
   OracleV5ObservationDecode.testOracleV5ObservationDecode
   OracleV5ObservationValidity.testOracleV5ObservationValidity
   OracleV5ProbeValidation.testOracleV5ProbeValidation
+  OracleV5ProtocolErrorDecode.testOracleV5ProtocolErrorDecode
+  OracleV5ProtocolErrorValidity.testOracleV5ProtocolErrorValidity
   testOracleV5Public
+  OracleV5ResponseDecode.testOracleV5ResponseDecode
   OracleV5ResponseEncode.testOracleV5ResponseEncode
   OracleV5ResponseRefinement.testOracleV5ResponseRefinement
+  OracleV5ResponseShape.testOracleV5ResponseShape
   OracleV5RootInstallation.testOracleV5RootInstallation
   OracleV5ScenarioDiagnostic.testOracleV5ScenarioDiagnostic
+  OracleV5ScenarioDiagnosticDecode.testOracleV5ScenarioDiagnosticDecode
   OracleV5ScenarioPreparation.testOracleV5ScenarioPreparation
   OracleV5TypedHandler.testOracleV5TypedHandler
   OracleV5WireProtocol.testOracleV5WireProtocol
