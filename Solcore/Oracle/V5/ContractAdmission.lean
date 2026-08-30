@@ -182,9 +182,9 @@ private def admitMethod
     (ContractAdmissionError.coreCheckFailed
       (.staticMethod id method.name.text))
   let code := checked.code
-  if _definitionsEq : code.program.dataDefinitions = [] then
-    if _resultTypeEq :
-        code.program.resultType = .function .word .word then
+  if _resultTypeEq :
+      code.program.resultType = .function .word .word then
+    if _definitionsEq : code.program.dataDefinitions = [] then
       match Solcore.Abi.V1.WordImplementation.ofCode? code with
       | some implementation => .ok {
           metadata := .staticWord method.name
@@ -193,11 +193,11 @@ private def admitMethod
       | none => .error (.methodResultTypeMismatch id method.name.text
           code.program.resultType)
     else
-      .error (.methodResultTypeMismatch id method.name.text
-        code.program.resultType)
+      .error (.methodDataDefinitionsNonempty id method.name.text
+        code.program.dataDefinitions.length)
   else
-    .error (.methodDataDefinitionsNonempty id method.name.text
-      code.program.dataDefinitions.length)
+    .error (.methodResultTypeMismatch id method.name.text
+      code.program.resultType)
 
 private def admitMethods
     (id : ContractId) :
