@@ -43,6 +43,19 @@ theorem classifyRawResult_unique
   subst right
   rfl
 
+/-- A terminal total result remains terminal under every additional budget. -/
+@[simp] theorem resumeWithFuel_completed
+    {initialWorld : WorldState}
+    {contract : CheckedCoreContract}
+    {invocation : TopLevelInvocation}
+    (result : TopLevelTerminalResult initialWorld invocation.target)
+    (additional : Nat) :
+    resumeWithFuel
+        (TopLevelRunResult.completed (contract := contract) result)
+        additional =
+      TopLevelRunResult.completed result := by
+  rfl
+
 /-- Resuming an initial run agrees exactly with one summed-fuel run. -/
 theorem resumeWithFuel_run
     {initialWorld : WorldState}

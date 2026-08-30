@@ -157,4 +157,21 @@ theorem rawRun_working_code?
     (workingDelta contract invocation installed fuel).finalWorld_code?_target.trans
       (initialWorld_code? installed)
 
+/-- The checked raw execution hidden by the total runner cannot fault. -/
+theorem rawRun_ne_fault
+    {initialWorld : WorldState}
+    (contract : CheckedCoreContract)
+    (invocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld invocation.target contract)
+    (fuel : Nat)
+    (error : Core.MachineFault)
+    (faultState : Core.State) :
+    (rawRun contract invocation installed fuel).outcome ≠
+      .fault error faultState := by
+  simpa [rawRun] using
+    contract.code.runWithStorage_ne_fault
+      (initialContext installed) invocation.executionInputs fuel
+      error faultState
+
 end Solcore.Semantics.TopLevelExecution
