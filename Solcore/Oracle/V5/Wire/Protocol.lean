@@ -1,5 +1,5 @@
 import Solcore.Oracle.StrictJson
-import Solcore.Oracle.V5.Response
+import Solcore.Oracle.V5.ProtocolErrorValidity
 import Solcore.Oracle.V5.Wire.Foundation
 
 /-! Public Oracle v5 protocol-error adaptation for direct wire decoding. -/
@@ -20,27 +20,26 @@ namespace ProtocolError
 def toPublic
     (error : ProtocolError)
     (id : Option RequestId := none) :
-    Solcore.Oracle.V5.ProtocolError := {
-  id
-  code := error.code
-  path := error.path.toPointer
-  arguments := error.arguments
-  display := error.display
-}
+    Solcore.Oracle.V5.ValidProtocolError :=
+  Solcore.Oracle.V5.ValidProtocolError.fromRaw {
+    id
+    code := error.code
+    path := error.path.toPointer
+    arguments := error.arguments
+    display := error.display
+  }
 
 end ProtocolError
 
 /-- Malformed text has no recoverable ID or typed-decoder ownership prefix. -/
 def malformedJsonProtocolError
-    (message : String) : Solcore.Oracle.V5.ProtocolError := {
-  code := "malformed-json"
-  display := message
-}
+    (message : String) : Solcore.Oracle.V5.ValidProtocolError :=
+  Solcore.Oracle.V5.ValidProtocolError.malformedJson message
 
 /-- Parse the direct v5 codec with duplicate-key rejection. -/
 def parseDirectText
     (text : String) :
-    Except Solcore.Oracle.V5.ProtocolError Lean.Json :=
+    Except Solcore.Oracle.V5.ValidProtocolError Lean.Json :=
   match Solcore.Oracle.StrictJson.parse text with
   | .ok json => .ok json
   | .error message => .error (malformedJsonProtocolError message)
@@ -51,7 +50,7 @@ the successfully parsed root value.
 -/
 def decodeDirectTextWith {α : Type}
     (decode : Lean.Json → DecodeResult α)
-    (text : String) : Except Solcore.Oracle.V5.ProtocolError α :=
+    (text : String) : Except Solcore.Oracle.V5.ValidProtocolError α :=
   match parseDirectText text with
   | .error error => .error error
   | .ok json =>

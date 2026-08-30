@@ -30,12 +30,12 @@ def handleDecoded : Wire.DecodeOutcome → Response
 
 /-- Strict handling for an already parsed JSON value. -/
 def handleJson
-    (json : Lean.Json) : Except ProtocolError Response :=
+    (json : Lean.Json) : Except ValidProtocolError Response :=
   handleDecoded <$> Wire.decodeJson json
 
 /-- Direct strict-text handling, including duplicate-key rejection. -/
 def handleText
-    (text : String) : Except ProtocolError Response :=
+    (text : String) : Except ValidProtocolError Response :=
   handleDecoded <$> Wire.decodeText text
 
 /-- Encode the complete v5 result partition for an already parsed value. -/

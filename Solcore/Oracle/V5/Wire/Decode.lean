@@ -41,7 +41,7 @@ whole-tree JSON budgets, Oracle shape, canonical Core Programs, then typed sizes
 -/
 def decodeJson
     (json : Lean.Json) :
-    Except Solcore.Oracle.V5.ProtocolError DecodeOutcome := do
+    Except Solcore.Oracle.V5.ValidProtocolError DecodeOutcome := do
   let recoveredId := recoverRequestId? json
   let shallow ← (decodeShallowRequest json).mapError
     (fun error => error.toPublic recoveredId)
@@ -66,7 +66,7 @@ def decodeJson
 /-- Direct text entry point using the duplicate-rejecting strict parser. -/
 def decodeText
     (text : String) :
-    Except Solcore.Oracle.V5.ProtocolError DecodeOutcome :=
+    Except Solcore.Oracle.V5.ValidProtocolError DecodeOutcome :=
   match parseDirectText text with
   | .error error => .error error
   | .ok json => decodeJson json
@@ -74,7 +74,7 @@ def decodeText
 /-- Re-encode only a fully decoded request; inconclusive demand has no request. -/
 def canonicalizeText
     (text : String) :
-    Except Solcore.Oracle.V5.ProtocolError (Option String) := do
+    Except Solcore.Oracle.V5.ValidProtocolError (Option String) := do
   match ← decodeText text with
   | .request decoded => pure (some (encodeRequestText decoded.value))
   | .inconclusive _ _ _ => pure none

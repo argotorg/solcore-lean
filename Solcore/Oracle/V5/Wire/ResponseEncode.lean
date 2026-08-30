@@ -1,5 +1,6 @@
 import Solcore.Oracle.V5.Capabilities
 import Solcore.Oracle.V5.ObservationCodec
+import Solcore.Oracle.V5.ProtocolErrorValidity
 import Solcore.Oracle.V5.Wire.Encode
 
 /-! Canonical JSON encoding for typed Oracle v5 responses. -/
@@ -173,7 +174,7 @@ def encodeResponseText (response : Response) : String :=
   (encodeResponse response).compress
 
 def encodeProtocolError
-    (error : Solcore.Oracle.V5.ProtocolError) : Lean.Json :=
+    (error : Solcore.Oracle.V5.ValidProtocolError) : Lean.Json :=
   .mkObj [
     ("kind", error.kind),
     ("schema", error.schema),
@@ -187,7 +188,7 @@ def encodeProtocolError
   ]
 
 def encodeProtocolErrorText
-    (error : Solcore.Oracle.V5.ProtocolError) : String :=
+    (error : Solcore.Oracle.V5.ValidProtocolError) : String :=
   (encodeProtocolError error).compress
 
 end Solcore.Oracle.V5.Wire
