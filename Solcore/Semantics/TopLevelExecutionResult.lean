@@ -38,6 +38,8 @@ inductive TopLevelRunResult
   | outOfFuel
       (context : HostStorageDriver.Context Unit Unit)
       (state : Core.State)
+      (storageAddress_eq :
+        context.context.storageAddress = invocation.target)
       (stateTyping :
         Core.HostStateHasType state contract.code.program.resultType
           contract.code.program.dataDefinitions)

@@ -23,25 +23,28 @@ def rawRun
   contract.code.runWithStorage
     (initialContext installed) invocation.executionInputs fuel
 
-/-- Every initial run has an exact queryable delta for its speculative world. -/
-def workingDelta
+/-- Build the speculative delta from the already evaluated raw run. -/
+def workingDeltaOfRawRun
     {initialWorld : WorldState}
     (contract : CheckedCoreContract)
     (invocation : TopLevelInvocation)
     (installed :
       InstalledCheckedCoreContract initialWorld invocation.target contract)
-    (fuel : Nat) :
+    (fuel : Nat)
+    (result : HostDriverResult (HostStorageDriver.Context Unit Unit))
+    (result_eq : rawRun contract invocation installed fuel = result) :
     TopLevelStorageDelta initialWorld
-      (rawRun contract invocation installed fuel).context.context.values.working.1
+      result.context.context.values.working.1
       invocation.target := {
   initialAccount := installed.account
-  finalAccount :=
-    (rawRun contract invocation installed fuel).context.storageAccount
+  finalAccount := result.context.storageAccount
   initialAccount_present := installed.account_present
   finalAccount_present := by
+    subst result
     simpa [rawRun, CheckedHostCoreProgram.runWithStorage] using
       (rawRun contract invocation installed fuel).context.storageAccount_present
   code_preserved := by
+    subst result
     have finalPresent :
         (rawRun contract invocation installed fuel).context.context.values.working.1.account?
             invocation.target =
@@ -60,6 +63,7 @@ def workingDelta
     simp [WorldState.code?, finalPresent, installed.account_present] at preserved'
     exact preserved'
   otherAccounts_preserved := by
+    subst result
     intro address different
     have preserved := HostStorageDriver.run_workingAccount?_of_ne_storageAddress
       (initialContext installed) invocation.executionInputs fuel
@@ -67,6 +71,20 @@ def workingDelta
       address (by simpa using different)
     simpa [rawRun, CheckedHostCoreProgram.runWithStorage] using preserved
 }
+
+/-- Every initial run has an exact queryable delta for its speculative world. -/
+def workingDelta
+    {initialWorld : WorldState}
+    (contract : CheckedCoreContract)
+    (invocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld invocation.target contract)
+    (fuel : Nat) :
+    TopLevelStorageDelta initialWorld
+      (rawRun contract invocation installed fuel).context.context.values.working.1
+      invocation.target :=
+  workingDeltaOfRawRun contract invocation installed fuel
+    (rawRun contract invocation installed fuel) rfl
 
 /-- Select the committed or rolled-back world from a decoded terminal outcome. -/
 def finalize
@@ -126,30 +144,38 @@ def run
     (fuel : Nat) :
     TopLevelRunResult initialWorld contract invocation :=
   let result := rawRun contract invocation installed fuel
+  let delta := workingDeltaOfRawRun contract invocation installed fuel result rfl
   match outcomeEq : result.outcome with
   | .done value store =>
       have typed := contract.code.runWithStorage_done_hasType
         (initialContext installed) invocation.executionInputs (by
           simpa [result, rawRun] using outcomeEq)
       have decodedNeNone :
-          contract.entryProfile.decode? value ≠ none := by
+          contract.decodeCompletion? value ≠ none := by
         obtain ⟨world, _storeTyping, valueTyping⟩ := typed
         apply contract.entryProfile.decode?_ne_none_of_hasType
         rw [← contract.resultType_eq]
         exact valueTyping
-      match decodedEq : contract.entryProfile.decode? value with
+      match decodedEq : contract.decodeCompletion? value with
       | some outcome =>
           .completed
             (finalize invocation installed.account installed.account_present
               result.context value store outcome
-              (workingDelta contract invocation installed fuel))
+              delta)
       | none => False.elim (decodedNeNone decodedEq)
   | .outOfFuel state =>
       have stateTyping := contract.code.runWithStorage_outOfFuel_hasType
         (initialContext installed) invocation.executionInputs (by
           simpa [result, rawRun] using outcomeEq)
-      .outOfFuel result.context state stateTyping
-        (workingDelta contract invocation installed fuel)
+      have storageAddress_eq :
+          result.context.context.storageAddress = invocation.target := by
+        have preserved := HostStorageDriver.run_storageAddress
+          (initialContext installed) invocation.executionInputs fuel
+          (Core.State.initial contract.code.program.body Core.hostEnvironment)
+        change result.context.context.storageAddress = invocation.target at preserved
+        exact preserved
+      .outOfFuel result.context state storageAddress_eq stateTyping
+        delta
   | .fault error state =>
       False.elim
         (contract.code.runWithStorage_ne_fault

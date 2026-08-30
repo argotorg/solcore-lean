@@ -1,3 +1,4 @@
+import Solcore.Semantics.TopLevelExecutionResumption
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! Executable end-to-end regressions for ADR-0145 top-level finalization. -/
@@ -22,7 +23,7 @@ private def codeMatches
 
 private def testWriteBoundaries : IO Unit := do
   match runWith returnSelector writeRequestFuel with
-  | .outOfFuel context _ _ delta =>
+  | .outOfFuel context _ _ _ delta =>
       assertTrue
         (storageValueAt? context.context.values.working.1
           targetAddress targetSlot == some oldValue)
@@ -33,7 +34,7 @@ private def testWriteBoundaries : IO Unit := do
       throw (IO.userError "fuel 9 must not complete top-level execution")
 
   match runWith returnSelector postWriteFuel with
-  | .outOfFuel context _ _ delta =>
+  | .outOfFuel context _ _ _ delta =>
       assertTrue
         (storageValueAt? context.context.values.working.1
           targetAddress targetSlot == some writtenValue)
@@ -46,12 +47,12 @@ private def testWriteBoundaries : IO Unit := do
 
 private def testReturnedCommit : IO Unit := do
   match runWith returnSelector (returnCompletionFuel - 1) with
-  | .outOfFuel _ _ _ _ => pure ()
+  | .outOfFuel _ _ _ _ _ => pure ()
   | .completed _ =>
       throw (IO.userError "return must not complete one fuel unit early")
 
   match runWith returnSelector returnCompletionFuel with
-  | .outOfFuel _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ =>
       throw (IO.userError "return must complete at its measured boundary")
   | .completed result =>
       assertTrue
@@ -82,14 +83,39 @@ private def testReturnedCommit : IO Unit := do
       assertTrue (codeMatches result.finalWorld targetAddress)
         "return must preserve the installed target code"
 
+private def testCallValueBoundaries : IO Unit := do
+  match runWith returnSelector callValueRequestFuel with
+  | .outOfFuel context state _ _ delta =>
+      assertTrue
+        (storageValueAt? context.context.values.working.1
+          targetAddress targetSlot == some writtenValue)
+        "fuel 16 must retain the earlier storage write"
+      assertTrue
+        (match hostAdvance state with
+          | .suspended suspension => suspension.request == .callValue
+          | _ => false)
+        "fuel 16 must stop at the call-value request"
+      assertTrue
+        (delta.slotChange? targetSlot == some (oldValue, writtenValue))
+        "call-value suspension must retain the speculative delta"
+  | .completed _ =>
+      throw (IO.userError "fuel 16 must remain resumable")
+
+  match runWith returnSelector postCallValueFuel with
+  | .outOfFuel _ state _ _ _ =>
+      assertTrue (state.control == .ret (.word returnSelector))
+        "fuel 17 must have injected the exact call value"
+  | .completed _ =>
+      throw (IO.userError "fuel 17 must remain resumable")
+
 private def testRevertedRollback : IO Unit := do
   match runWith revertSelector (revertTrapCompletionFuel - 1) with
-  | .outOfFuel _ _ _ _ => pure ()
+  | .outOfFuel _ _ _ _ _ => pure ()
   | .completed _ =>
       throw (IO.userError "revert must not complete one fuel unit early")
 
   match runWith revertSelector revertTrapCompletionFuel with
-  | .outOfFuel _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ =>
       throw (IO.userError "revert must complete at its measured boundary")
   | .completed result =>
       assertTrue
@@ -110,12 +136,12 @@ private def testRevertedRollback : IO Unit := do
 
 private def testTrappedRollback : IO Unit := do
   match runWith trapSelector (revertTrapCompletionFuel - 1) with
-  | .outOfFuel _ _ _ _ => pure ()
+  | .outOfFuel _ _ _ _ _ => pure ()
   | .completed _ =>
       throw (IO.userError "trap must not complete one fuel unit early")
 
   match runWith trapSelector revertTrapCompletionFuel with
-  | .outOfFuel _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ =>
       throw (IO.userError "trap must complete at its measured boundary")
   | .completed result =>
       assertTrue (result.outcome == .trapped trapCode)
@@ -149,11 +175,66 @@ private def testDirectInputs : IO Unit := do
   assertTrue (inputs.inputData.bytes == inputData.bytes)
     "direct-call input bytes must remain explicit"
 
+private def expectReturned
+    (execution :
+      TopLevelRunResult initialWorld contract returnedInvocation)
+    (message : String) : IO Unit := do
+  match execution with
+  | .outOfFuel _ _ _ _ _ => throw (IO.userError message)
+  | .completed result =>
+      assertTrue
+        (result.outcome == .returned (encodeWordBytesBE returnPayload) &&
+          finalTargetValue result == some writtenValue)
+        message
+
+private def testResumption : IO Unit := do
+  expectReturned
+    (TopLevelExecution.resumeWithFuel
+      (runWith returnSelector writeRequestFuel)
+      (returnCompletionFuel - writeRequestFuel))
+    "fuel split 9+19 must reach the exact returned commit"
+  expectReturned
+    (TopLevelExecution.resumeWithFuel
+      (runWith returnSelector postWriteFuel)
+      (returnCompletionFuel - postWriteFuel))
+    "fuel split 10+18 must reach the exact returned commit"
+
+  match TopLevelExecution.resumeWithFuel
+      (runWith revertSelector writeRequestFuel)
+      (revertTrapCompletionFuel - writeRequestFuel) with
+  | .outOfFuel _ _ _ _ _ =>
+      throw (IO.userError "fuel split 9+28 must complete revert")
+  | .completed result =>
+      assertTrue
+        (result.outcome == .reverted (encodeWordBytesBE revertPayload) &&
+          finalTargetValue result == some oldValue &&
+          result.committedDelta.slotChange? targetSlot == none)
+        "resumed revert must roll back the speculative write"
+
+  match TopLevelExecution.resumeWithFuel
+      (runWith trapSelector postWriteFuel)
+      (revertTrapCompletionFuel - postWriteFuel) with
+  | .outOfFuel _ _ _ _ _ =>
+      throw (IO.userError "fuel split 10+27 must complete trap")
+  | .completed result =>
+      assertTrue
+        (result.outcome == .trapped trapCode &&
+          finalTargetValue result == some oldValue &&
+          result.committedDelta.slotChange? targetSlot == none)
+        "resumed trap must roll back the speculative write"
+
+  expectReturned
+    (TopLevelExecution.resumeWithFuel
+      (runWith returnSelector returnCompletionFuel) 64)
+    "a completed top-level return must remain terminal"
+
 def testTopLevelExecution : IO Unit := do
   testWriteBoundaries
+  testCallValueBoundaries
   testReturnedCommit
   testRevertedRollback
   testTrappedRollback
   testDirectInputs
+  testResumption
 
 end Tests

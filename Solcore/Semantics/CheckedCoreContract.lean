@@ -40,6 +40,12 @@ def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
   else
     none
 
+/-- Execute the contract-owned decoder before using runtime typing to totalize it. -/
+def decodeCompletion?
+    (contract : CheckedCoreContract)
+    (value : Core.Value) : Option (FrameOutcome Core.Word) :=
+  contract.entryProfile.decode? value
+
 /-- Decode an exact typed completion using the convention owned by the contract. -/
 def decodeCompletion
     (contract : CheckedCoreContract)
@@ -50,7 +56,8 @@ def decodeCompletion
         contract.code.program.resultType
         contract.code.program.dataDefinitions) :
     FrameOutcome Core.Word :=
-  contract.entryProfile.decodeTyped (by
+  (contract.decodeCompletion? value).get (by
+    apply contract.entryProfile.decode?_isSome_of_hasType
     rw [← contract.resultType_eq]
     exact typing)
 
