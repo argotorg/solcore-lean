@@ -55,9 +55,17 @@ private def preparationWrapperExact : Bool :=
         diagnostic.phase == .worldValidation &&
         diagnostic.path == ["world", "accounts", addressWire]
 
+private def rootCodeAbsentExact : Bool :=
+  ScenarioDiagnostic.ofRootRejection address .targetCodeAbsent == {
+    code := "oracle.v5.root.target-code-absent"
+    phase := .rootInstallation
+    path := ["world", "accounts", addressWire, "code"]
+    arguments := .mkObj [("target", addressWire)]
+  }
+
 private def allChecks : Bool :=
   zeroStorageExact && danglingRuntimeExact && duplicateProbeExact &&
-    preparationWrapperExact
+    preparationWrapperExact && rootCodeAbsentExact
 
 private theorem allChecks_exact : allChecks = true := by
   native_decide

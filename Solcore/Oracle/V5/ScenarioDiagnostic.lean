@@ -1,4 +1,5 @@
 import Solcore.Oracle.V5.ContractAdmissionDiagnostic
+import Solcore.Oracle.V5.RootInstallation
 import Solcore.Oracle.V5.ScenarioPreparation
 import Solcore.Semantics.RuntimeScalars.TextProperties
 
@@ -91,6 +92,17 @@ def ofProbeError (duplicate : DuplicateProbe) : Diagnostic :=
       ("firstIndex", Lean.toJson duplicate.firstIndex),
       ("secondIndex", Lean.toJson duplicate.secondIndex)
     ])
+
+def ofRootRejection
+    (target : Address) : RootInstallationRejection → Diagnostic
+  | .targetAbsent => diagnostic .rootInstallation
+      "oracle.v5.root.target-absent"
+      ["world", "accounts", addressText target]
+      (.mkObj [("target", addressText target)])
+  | .targetCodeAbsent => diagnostic .rootInstallation
+      "oracle.v5.root.target-code-absent"
+      ["world", "accounts", addressText target, "code"]
+      (.mkObj [("target", addressText target)])
 
 /-- Collapse the preparation sum while retaining checker projection failures. -/
 def ofPreparationError :
