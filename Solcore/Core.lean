@@ -4,6 +4,7 @@ import Solcore.Core.Check
 import Solcore.Core.Host
 import Solcore.Core.HostSafety
 import Solcore.Core.HostMachine
+import Solcore.Core.ContractCallWordResultProperties
 import Solcore.Core.HostStateSafety
 import Solcore.Core.HostCoreTransitionSafety
 import Solcore.Core.HostMachineProperties
