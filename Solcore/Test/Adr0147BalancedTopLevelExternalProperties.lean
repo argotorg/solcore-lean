@@ -14,6 +14,8 @@ example := @RejectedResult.ofFailure_finalWorld
 example := @RejectedResult.ofFailure_committedDelta
 example := @RejectedResult.committedDelta_accountEndpoints_identity
 example := @RejectedResult.committedDelta_storageEndpoints_identity
+example := @RejectedResult.committedDelta_balanceEndpoints_identity
+example := @RejectedResult.committedDelta_balanceChange?_identity
 
 example := @Result.eq_of_view_eq
 example := @Result.finalWorld?_rejected

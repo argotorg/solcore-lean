@@ -45,6 +45,22 @@ theorem committedDelta_storageEndpoints_identity
         initialWorld.readStorage? address slot) := by
   simp [WorldStateDelta.storageEndpoints, rejected.finalWorld_eq]
 
+theorem committedDelta_balanceEndpoints_identity
+    {initialWorld : WorldState}
+    (rejected : RejectedResult initialWorld)
+    (address : Address) :
+    rejected.committedDelta.balanceEndpoints address =
+      (initialWorld.balance? address, initialWorld.balance? address) := by
+  simp [WorldStateDelta.balanceEndpoints, rejected.finalWorld_eq]
+
+theorem committedDelta_balanceChange?_identity
+    {initialWorld : WorldState}
+    (rejected : RejectedResult initialWorld)
+    (address : Address) :
+    rejected.committedDelta.balanceChange? address = none := by
+  simp [WorldStateDelta.balanceChange?,
+    committedDelta_balanceEndpoints_identity]
+
 end RejectedResult
 
 namespace Result
