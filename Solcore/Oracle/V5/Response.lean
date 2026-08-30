@@ -159,4 +159,21 @@ def phase (response : Response) : Option Phase := response.body.phase
 
 end Response
 
+/-- A strict transport failure outside the typed response union. -/
+structure ProtocolError where
+  id : Option RequestId := none
+  code : String
+  path : String := ""
+  arguments : Lean.Json := .null
+  display : String
+  deriving BEq
+
+namespace ProtocolError
+
+def kind (_error : ProtocolError) : String := "protocolError"
+
+def schema (_error : ProtocolError) : String := schemaVersion
+
+end ProtocolError
+
 end Solcore.Oracle.V5
