@@ -19,6 +19,7 @@ def resumeWithFuel
     Result initialWorld rootContract rootInvocation :=
   match result with
   | .completed terminal => .completed terminal
-  | .outOfFuel registry mode => runMode registry additional mode
+  | .outOfFuel registry mode reachable =>
+      runMode registry additional mode reachable
 
 end Solcore.Semantics.OneLevelNestedExecution
