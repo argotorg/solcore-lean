@@ -52,6 +52,7 @@ inductive HostRequest where
   | callContractWord (target input : Word)
   | callContractWordWithValue (target value input : Word)
   | createContractWord (templateId value input : Word)
+  | emitLogWord (topic payload : Word)
   deriving Repr, BEq, DecidableEq
 
 namespace HostRequest
@@ -71,6 +72,7 @@ def Response : HostRequest → Type
   | .callContractWord _ _ => ContractCallWordResult
   | .callContractWordWithValue _ _ _ => ContractCallWordResult
   | .createContractWord _ _ _ => ContractCallWordResult
+  | .emitLogWord _ _ => Unit
 
 /-- Core type injected when a request is resumed. -/
 def responseType : HostRequest → Ty
@@ -87,6 +89,7 @@ def responseType : HostRequest → Ty
   | .callContractWord _ _ => ContractCallWordResult.resultType
   | .callContractWordWithValue _ _ _ => ContractCallWordResult.resultType
   | .createContractWord _ _ _ => ContractCallWordResult.resultType
+  | .emitLogWord _ _ => .unit
 
 /-- Convert an indexed host response back into a Core runtime value. -/
 def responseValue
@@ -112,6 +115,7 @@ def responseValue
   | .callContractWord _ _ => response.value
   | .callContractWordWithValue _ _ _ => response.value
   | .createContractWord _ _ _ => response.value
+  | .emitLogWord _ _ => .unit
 
 @[simp] theorem responseType_storageRead (slot : Word) :
     responseType (.storageRead slot) = .word :=
@@ -241,6 +245,16 @@ def responseValue
     (response : ContractCallWordResult) :
     responseValue (.createContractWord templateId value input) response =
       response.value :=
+  rfl
+
+@[simp] theorem responseType_emitLogWord (topic payload : Word) :
+    responseType (.emitLogWord topic payload) = .unit :=
+  rfl
+
+@[simp] theorem responseValue_emitLogWord
+    (topic payload : Word)
+    (response : Unit) :
+    responseValue (.emitLogWord topic payload) response = .unit :=
   rfl
 
 @[simp] theorem responseValue_type
@@ -422,6 +436,16 @@ def resume
       ⟨.ret response.value, continuation, store⟩ :=
   rfl
 
+@[simp] theorem resume_emitLogWord
+    (topic payload : Word)
+    (response : Unit)
+    (continuation : List Frame)
+    (store : Store) :
+    (HostSuspension.mk
+        (.emitLogWord topic payload) continuation store).resume response =
+      ⟨.ret .unit, continuation, store⟩ :=
+  rfl
+
 end HostSuspension
 
 /-- One executable step at the Core/host boundary. -/
@@ -587,6 +611,15 @@ def hostAdvance (state : State) : HostAdvanceResult :=
               }
           | actual =>
               .fault (.invalidHostArgument .createContractWord actual)
+      | .emitLogWord =>
+          match argument with
+          | .pair (.word topic) (.word payload) =>
+              .suspended {
+                request := .emitLogWord topic payload
+                continuation
+                store := state.store
+              }
+          | actual => .fault (.invalidHostArgument .emitLogWord actual)
   | _, _ => .ofAdvance (advance state)
 
 @[simp] theorem hostAdvance_begin_storageRead
@@ -1049,6 +1082,41 @@ def hostAdvance (state : State) : HostAdvanceResult :=
         ⟨.ret actual,
           .hostApply .createContractWord :: continuation, store⟩ =
       .fault (.invalidHostArgument .createContractWord actual) := by
+  cases actual <;> simp_all [hostAdvance]
+
+@[simp] theorem hostAdvance_begin_emitLogWord
+    (argument : Expr)
+    (environment : Environment)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.hostFunction .emitLogWord),
+          .applyArgument argument environment :: continuation, store⟩ =
+      .next
+        ⟨.eval argument environment,
+          .hostApply .emitLogWord :: continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_suspend_emitLogWord
+    (topic payload : Word)
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret (.pair (.word topic) (.word payload)),
+          .hostApply .emitLogWord :: continuation, store⟩ =
+      .suspended ⟨.emitLogWord topic payload, continuation, store⟩ :=
+  rfl
+
+@[simp] theorem hostAdvance_invalid_emitLogWord_argument
+    (actual : Value)
+    (notWordPair :
+      ∀ topic payload,
+        actual ≠ .pair (.word topic) (.word payload))
+    (continuation : List Frame)
+    (store : Store) :
+    hostAdvance
+        ⟨.ret actual, .hostApply .emitLogWord :: continuation, store⟩ =
+      .fault (.invalidHostArgument .emitLogWord actual) := by
   cases actual <;> simp_all [hostAdvance]
 
 end Solcore.Core
