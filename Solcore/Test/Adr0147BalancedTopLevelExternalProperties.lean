@@ -29,9 +29,13 @@ example := @Result.observations_outOfFuel
 example := @run_of_zero_value
 example := @run_of_transfer_failure
 example := @run_of_transfer_success
+example := @runWithEnvironment_of_zero_value
+example := @runWithEnvironment_of_transfer_failure
+example := @runWithEnvironment_of_transfer_success
 example := @resumeWithFuel_rejected
 example := @resumeWithFuel_execution
 example := @resumeWithFuel_run
+example := @resumeWithFuel_runWithEnvironment
 example := @resumeWithFuel_run_zero
 
 end Tests.Adr0147BalancedTopLevelExternalProperties

@@ -142,6 +142,92 @@ theorem observations_outOfFuel
 
 end Result
 
+/-- Zero value enters the scheduler under the exact fixed environment. -/
+theorem runWithEnvironment_of_zero_value
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (environment : ExecutionEnvironment)
+    (fuel : Nat)
+    (zero : rootInvocation.callValue = Core.Word.zero) :
+    (runWithEnvironment rootContract rootInvocation installed environment fuel).view =
+      .execution
+        (OneLevelNestedExecution.runWithEnvironment rootContract rootInvocation
+          installed environment fuel) := by
+  simp [runWithEnvironment, zero]
+
+/-- A failed preflight rejects without replacing or consulting the environment. -/
+theorem runWithEnvironment_of_transfer_failure
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (environment : ExecutionEnvironment)
+    (fuel : Nat)
+    (failure : BalanceTransferFailure)
+    (nonzero : rootInvocation.callValue ≠ Core.Word.zero)
+    (failed :
+      initialWorld.transferBalance rootInvocation.caller
+          rootInvocation.target rootInvocation.callValue =
+        .error failure) :
+    (runWithEnvironment rootContract rootInvocation installed environment fuel).view =
+      .rejected (RejectedResult.ofFailure initialWorld failure) := by
+  unfold runWithEnvironment
+  split
+  · contradiction
+  · split
+    · rename_i actualFailure branchEq
+      have equal : actualFailure = failure := by
+        exact Except.error.inj (branchEq.symm.trans failed)
+      subst actualFailure
+      rfl
+    · rename_i actualWorld branchEq
+      have impossible : False := by
+        cases failed.symm.trans branchEq
+      contradiction
+
+/-- A successful preflight enters the prepared root under the same environment. -/
+theorem runWithEnvironment_of_transfer_success
+    {initialWorld workingWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (environment : ExecutionEnvironment)
+    (fuel : Nat)
+    (nonzero : rootInvocation.callValue ≠ Core.Word.zero)
+    (transferred :
+      initialWorld.transferBalance rootInvocation.caller
+          rootInvocation.target rootInvocation.callValue =
+        .ok workingWorld) :
+    (runWithEnvironment rootContract rootInvocation installed environment fuel).view =
+      .execution
+        (OneLevelNestedExecution.runMode environment fuel
+          (OneLevelNestedExecution.Mode.preparedRoot rootContract
+            rootInvocation
+            (WorldState.transferBalance_preserves_installed transferred
+              installed))
+          (.balancedInitial installed transferred)) := by
+  unfold runWithEnvironment
+  split
+  · contradiction
+  · split
+    · rename_i actualFailure branchEq
+      have impossible : False := by
+        cases transferred.symm.trans branchEq
+      contradiction
+    · rename_i actualWorld branchEq
+      have equal : actualWorld = workingWorld := by
+        exact Except.ok.inj (branchEq.symm.trans transferred)
+      subst actualWorld
+      rfl
+
 theorem run_of_zero_value
     {initialWorld : WorldState}
     (rootContract : CheckedCoreContract)
@@ -250,6 +336,32 @@ theorem resumeWithFuel_execution
       .execution
         (OneLevelNestedExecution.resumeWithFuel execution additional) := by
   simp [resumeWithFuel, observed]
+
+/-- Splitting fuel preserves one fixed environment and never repeats preflight. -/
+theorem resumeWithFuel_runWithEnvironment
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (environment : ExecutionEnvironment)
+    (fuel additional : Nat) :
+    resumeWithFuel
+        (runWithEnvironment rootContract rootInvocation installed environment fuel)
+        additional =
+      runWithEnvironment rootContract rootInvocation installed environment
+        (fuel + additional) := by
+  unfold runWithEnvironment
+  split
+  · apply Result.eq_of_view_eq
+    simp [resumeWithFuel,
+      OneLevelNestedExecution.resumeWithFuel_runWithEnvironment]
+  · split
+    · rfl
+    · apply Result.eq_of_view_eq
+      simp [resumeWithFuel,
+        OneLevelNestedExecution.resumeWithFuel_runMode]
 
 /-- Splitting fuel never repeats top-level transfer preflight. -/
 theorem resumeWithFuel_run
