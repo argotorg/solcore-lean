@@ -80,7 +80,9 @@ def observedResultExpr : Expr :=
 Observe caller, input size, one optional input byte, and all three direct-call
 target roles. The program performs no storage write and returns their modular
 weighted sum, or `missingByteResult` when the byte is absent. Distinct weights
-make the runtime variants sensitive to projection swaps.
+separate caller, size, byte, and target variation. In a direct call the three
+target roles intentionally have the same value; their individual derivation
+laws complement this runtime observation.
 -/
 def program : Program := {
   resultType := .word
