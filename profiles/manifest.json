@@ -30,7 +30,7 @@
       "id": "contract-m3a-v1",
       "spec": "solcore/0.1.0-draft.5",
       "path": "profiles/solcore-0.1.0-draft.5-contract-m3a.json",
-      "digest": "sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46"
+      "digest": "sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"
     }
   ]
 }

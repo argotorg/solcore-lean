@@ -1,6 +1,15 @@
 {
   "contractRuntime": null,
   "enabledFeatures": [
+    "coreUnit",
+    "coreBool",
+    "coreWord",
+    "coreImmutableLet",
+    "coreConditional",
+    "coreBoolNot",
+    "coreWordArithmetic",
+    "coreWordComparison",
+    "coreWordBitwise",
     "coreProductsV1",
     "coreFunctionsV1",
     "coreSumsV1",
@@ -45,7 +54,6 @@
       "coreWordArithmetic",
       "coreWordComparison",
       "coreWordBitwise",
-      "surfaceGrammar",
       "coreProductsV1",
       "coreFunctionsV1",
       "coreSumsV1",

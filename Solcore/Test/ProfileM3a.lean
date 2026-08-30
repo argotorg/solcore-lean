@@ -19,6 +19,18 @@ private def expectedFeatures : Array Feature := #[
   .staticWordAbiV1
 ]
 
+private def expectedEnabledFeatures : Array Feature := #[
+  .coreUnit,
+  .coreBool,
+  .coreWord,
+  .coreImmutableLet,
+  .coreConditional,
+  .coreBoolNot,
+  .coreWordArithmetic,
+  .coreWordComparison,
+  .coreWordBitwise
+] ++ expectedFeatures
+
 private theorem compileTimeObservationBoundary
     (scope : ProfileScope)
     (runtime : Option ContractRuntimeProfile) :
@@ -57,10 +69,10 @@ private def profileShapeIsExact : Bool :=
   m3aLanguage.dynamicSemanticsVersion == some 3 &&
   m3aLanguage.abiVersion == some 1 &&
   m3aLanguage.storageLayoutVersion.isNone &&
-  m3aLanguage.knownFeatures == Feature.m2bAll ++ expectedFeatures &&
+  m3aLanguage.knownFeatures == Feature.m1cAll ++ expectedFeatures &&
   m3aContractProfile.id == "contract-m3a-v1" &&
   m3aContractProfile.scope == .contract &&
-  m3aContractProfile.enabledFeatures == expectedFeatures &&
+  m3aContractProfile.enabledFeatures == expectedEnabledFeatures &&
   m3aContractProfile.observation == .checkedCoreStateV1 &&
   m3aContractProfile.contractRuntime.isNone &&
   m3aContractProfile.validationErrors.isEmpty

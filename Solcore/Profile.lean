@@ -105,7 +105,7 @@ def m2bAll : Array Feature :=
   ]
 
 def m3aAll : Array Feature :=
-  m2bAll ++ #[
+  m1cAll ++ #[
     .coreProductsV1,
     .coreFunctionsV1,
     .coreSumsV1,
@@ -545,6 +545,15 @@ def m3aContractProfile : SpecProfile := {
   language := m3aLanguage
   scope := .contract
   enabledFeatures := #[
+    .coreUnit,
+    .coreBool,
+    .coreWord,
+    .coreImmutableLet,
+    .coreConditional,
+    .coreBoolNot,
+    .coreWordArithmetic,
+    .coreWordComparison,
+    .coreWordBitwise,
     .coreProductsV1,
     .coreFunctionsV1,
     .coreSumsV1,
@@ -562,7 +571,7 @@ def m3aContractProfile : SpecProfile := {
 }
 
 def m3aContractProfileDigest : String :=
-  "sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46"
+  "sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"
 
 theorem m3aContractProfile_valid : m3aContractProfile.Valid := by
   change m3aContractProfile.validationErrors = []
