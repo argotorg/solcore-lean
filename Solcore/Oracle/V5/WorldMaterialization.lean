@@ -33,6 +33,13 @@ private def storageLE (left right : StorageInput) : Bool :=
 def canonicalStorage (storage : List StorageInput) : List StorageInput :=
   storage.mergeSort storageLE
 
+/-- Select the unique canonical input Account for an Address, when present. -/
+def accountInput?
+    (world : WorldInput)
+    (address : Address) : Option AccountInput :=
+  (canonicalAccounts world.accounts).find?
+    (fun account => decide (account.address = address))
+
 private def firstDuplicateAccount? :
     List AccountInput → Option Address
   | []
@@ -117,6 +124,22 @@ private def buildStorage
     (fun current entry => current.storageWrite entry.slot entry.value)
     account
 
+private def observeStorageStep
+    (slot : Core.Word)
+    (current : Option Core.Word)
+    (entry : StorageInput) : Option Core.Word :=
+  if entry.slot = slot then
+    if entry.value = Core.Word.zero then none else some entry.value
+  else
+    current
+
+/-- Exact sparse-slot observation produced by canonical Account construction. -/
+def storageValueOf
+    (input : AccountInput)
+    (slot : Core.Word) : Option Core.Word :=
+  (canonicalStorage input.storage).foldl
+    (observeStorageStep slot) none
+
 private def buildAccount
     (resolveCode : String → Option CheckedHostCoreProgram)
     (input : AccountInput) :
@@ -131,6 +154,12 @@ private def buildAccount
       match resolveCode id with
       | some code => .ok (account.withCode code)
       | none => .error (.danglingContract input.address id)
+
+/-- Canonical semantic Account produced from one finite input entry. -/
+def accountOfInputWith?
+    (resolveCode : String → Option CheckedHostCoreProgram)
+    (input : AccountInput) : Option Account :=
+  (buildAccount resolveCode input).toOption
 
 private def buildWorld
     (resolveCode : String → Option CheckedHostCoreProgram) :
