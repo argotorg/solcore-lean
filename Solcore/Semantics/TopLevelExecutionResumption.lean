@@ -88,6 +88,9 @@ def validatedResumedRawResult
     (delta :
       TopLevelStorageDelta initialWorld
         context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty)
     (additional : Nat) :
     ValidatedRawResult initialWorld contract invocation :=
   let result :=
@@ -105,6 +108,15 @@ def validatedResumedRawResult
     workingDelta :=
       extendWorkingDelta context storageAddress_eq delta
         invocation.executionInputs additional state
+    checkpointJournal_eq := by
+      calc
+        result.context.context.values.checkpoint.effects.rollback =
+            context.context.values.checkpoint.effects.rollback :=
+          congrArg
+            (fun checkpoint => checkpoint.effects.rollback)
+            (TransactionHostStorageDriver.run_checkpoint context
+              invocation.executionInputs additional state)
+        _ = TransactionJournal.empty := checkpointJournal_eq
   }
 
 /-- Resume only the out-of-fuel branch under the same contract invocation. -/
@@ -117,9 +129,10 @@ def resumeWithFuel
     TopLevelRunResult initialWorld contract invocation :=
   match execution with
   | .completed result => .completed result
-  | .outOfFuel context state storageAddress_eq stateTyping delta =>
+  | .outOfFuel context state storageAddress_eq stateTyping delta
+      checkpointJournal_eq =>
       classifyRawResult contract invocation
         (validatedResumedRawResult context state storageAddress_eq stateTyping
-          delta additional)
+          delta checkpointJournal_eq additional)
 
 end Solcore.Semantics.TopLevelExecution

@@ -101,6 +101,9 @@ structure ValidatedRawResult
   workingDelta :
     TopLevelStorageDelta initialWorld
       result.context.context.values.working.1 invocation.target
+  checkpointJournal_eq :
+    result.context.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty
 
 /-- Package one initial raw run with its checked invariants and exact delta. -/
 def validatedRawRun
@@ -130,6 +133,16 @@ def validatedRawRun
     storageAddress_eq := storageAddress_eq
     workingDelta :=
       workingDeltaOfRawRun contract invocation installed fuel result rfl
+    checkpointJournal_eq := by
+      calc
+        result.context.context.values.checkpoint.effects.rollback =
+            (initialTransactionContext installed).context.values.checkpoint.effects.rollback :=
+          congrArg
+            (fun checkpoint => checkpoint.effects.rollback)
+            (TransactionHostStorageDriver.run_checkpoint
+              (initialTransactionContext installed) invocation.executionInputs fuel
+              (Core.State.initial contract.code.program.body Core.hostEnvironment))
+        _ = TransactionJournal.empty := rfl
   }
 
 /-- Select the committed or rolled-back world from a decoded terminal outcome. -/
@@ -145,29 +158,38 @@ def finalize
     (outcome : FrameOutcome Core.Word)
     (workingDelta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     TopLevelTerminalResult initialWorld invocation.target :=
   match outcome with
   | .returned data => {
       terminalContext := context
+      checkpointJournal_eq := checkpointJournal_eq
       coreValue := value
       coreStore := store
       outcome := .returned data
       finalWorld := context.context.values.working.1
       workingJournal := context.workingJournal
+      workingJournal_eq := rfl
       committedJournal := context.workingJournal
+      committedJournal_eq := rfl
       workingDelta := workingDelta
       committedDelta := workingDelta
     }
   | .reverted data => {
       terminalContext := context
+      checkpointJournal_eq := checkpointJournal_eq
       coreValue := value
       coreStore := store
       outcome := .reverted data
       finalWorld := initialWorld
       workingJournal := context.workingJournal
+      workingJournal_eq := rfl
       committedJournal :=
         context.context.values.checkpoint.effects.rollback
+      committedJournal_eq := rfl
       workingDelta := workingDelta
       committedDelta :=
         TopLevelStorageDelta.identity initialWorld invocation.target
@@ -175,13 +197,16 @@ def finalize
     }
   | .trapped reason => {
       terminalContext := context
+      checkpointJournal_eq := checkpointJournal_eq
       coreValue := value
       coreStore := store
       outcome := .trapped reason
       finalWorld := initialWorld
       workingJournal := context.workingJournal
+      workingJournal_eq := rfl
       committedJournal :=
         context.context.values.checkpoint.effects.rollback
+      committedJournal_eq := rfl
       workingDelta := workingDelta
       committedDelta :=
         TopLevelStorageDelta.identity initialWorld invocation.target
@@ -211,7 +236,7 @@ def classifyRawResult
             (finalize invocation raw.workingDelta.initialAccount
               raw.workingDelta.initialAccount_present
               raw.result.context value store outcome
-              raw.workingDelta)
+              raw.workingDelta raw.checkpointJournal_eq)
       | none => False.elim (decodedNeNone decodedEq)
   | .outOfFuel state =>
       have stateTyping :
@@ -221,7 +246,7 @@ def classifyRawResult
         rw [outcomeEq] at resultTyping
         exact resultTyping
       .outOfFuel raw.result.context state raw.storageAddress_eq stateTyping
-        raw.workingDelta
+        raw.workingDelta raw.checkpointJournal_eq
   | .fault _error _state =>
       have impossible : False := by
         have resultTyping := raw.resultTyping

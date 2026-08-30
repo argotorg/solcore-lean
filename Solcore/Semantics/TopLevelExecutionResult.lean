@@ -14,14 +14,26 @@ structure TopLevelTerminalResult
     (initialWorld : WorldState)
     (target : Address) where
   terminalContext : TransactionHostStorageDriver.Context
+  checkpointJournal_eq :
+    terminalContext.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty
   coreValue : Core.Value
   coreStore : Core.Store
   outcome : FrameOutcome Core.Word
   finalWorld : WorldState
   /-- All rollback-scoped observations produced by speculative execution. -/
   workingJournal : TransactionJournal
+  workingJournal_eq : workingJournal = terminalContext.workingJournal
   /-- Root-selected observations: committed on return, checkpoint on failure. -/
   committedJournal : TransactionJournal
+  committedJournal_eq :
+    committedJournal =
+      match outcome with
+      | .returned _ => terminalContext.workingJournal
+      | .reverted _ =>
+          terminalContext.context.values.checkpoint.effects.rollback
+      | .trapped _ =>
+          terminalContext.context.values.checkpoint.effects.rollback
   workingDelta :
     TopLevelStorageDelta initialWorld
       terminalContext.context.values.working.1 target
@@ -50,5 +62,36 @@ inductive TopLevelRunResult
       (workingDelta :
         TopLevelStorageDelta initialWorld
           context.context.values.working.1 invocation.target)
+      (checkpointJournal_eq :
+        context.context.values.checkpoint.effects.rollback =
+          TransactionJournal.empty)
+
+namespace TopLevelRunResult
+
+/-- The root rollback journal retained by either terminal or resumable output. -/
+def rootCheckpointJournal
+    {initialWorld : WorldState}
+    {contract : CheckedCoreContract}
+    {invocation : TopLevelInvocation} :
+    TopLevelRunResult initialWorld contract invocation → TransactionJournal
+  | .completed result =>
+      result.terminalContext.context.values.checkpoint.effects.rollback
+  | .outOfFuel context _ _ _ _ _ =>
+      context.context.values.checkpoint.effects.rollback
+
+/-- Every public top-level result retains the empty root rollback checkpoint. -/
+@[simp] theorem rootCheckpointJournal_eq_empty
+    {initialWorld : WorldState}
+    {contract : CheckedCoreContract}
+    {invocation : TopLevelInvocation}
+    (execution : TopLevelRunResult initialWorld contract invocation) :
+    execution.rootCheckpointJournal = TransactionJournal.empty := by
+  cases execution with
+  | completed result =>
+      exact result.checkpointJournal_eq
+  | outOfFuel context state address typing delta checkpointJournal_eq =>
+      exact checkpointJournal_eq
+
+end TopLevelRunResult
 
 end Solcore.Semantics
