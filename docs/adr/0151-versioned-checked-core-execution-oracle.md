@@ -132,6 +132,9 @@ The schema discriminator is `solcore-oracle/v5`. Its query kinds are:
 - `execute`: admit a finite contract package and explicit runtime scenario,
   then run one top-level invocation.
 
+The complete request, response, diagnostic, and observation field catalog is
+frozen in [Oracle v5 wire catalog](../ORACLE_V5_WIRE.md).
+
 `coreCheck` accepts any checker-valid host-aware Core program, including a
 `word -> word` method implementation that is not itself a contract entry. A
 rejection carries the existing detailed checker path and reason. Acceptance

@@ -88,8 +88,10 @@ malformed natural is `oracle.wire.missing-field` or
   `coreNodes` is the sum for every Program in the request. `coreDepth` is the
   greatest Program-to-Core-node nesting depth among them, with the Program at
   depth one. The Core decoder consumes the depth and node budget before
-  validating the node at that position. Thus a malformed node exactly at a
-  budget boundary selects `inconclusive`, not a protocol error.
+  validating the node at that position. If counting an expected Core node would
+  make demand exceed the limit, that inconclusive result precedes validation of
+  the node; demand equal to the limit still validates it and may produce a
+  protocol error.
 - `scenarioEntries` is the sum of the lengths of `contracts`, every
   `staticWordAbi.methods`, `world.accounts`, every account's `storage`,
   `callRegistry`, `creationTemplates`, `creationAddressPolicy.routes`, and
@@ -111,8 +113,8 @@ Resource and structural selection is ordered as follows:
 6. perform semantic checking, admission, materialization, and execution.
 
 Execution fuel is considered only after admission. A structural error found in
-step 3 precedes the later typed-size measurements; a Core budget exhausted at
-the same node as a Core structural error precedes that error.
+step 3 precedes the later typed-size measurements; a Core budget overrun at the
+same position as a Core structural error precedes that error.
 
 ## Queries
 
