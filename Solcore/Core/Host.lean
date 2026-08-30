@@ -180,10 +180,20 @@ theorem hostEnvironment_lookup_isSome_iff (position : Nat) :
       some (.hostFunction .createContractWord) :=
   hostEnvironment_lookup .createContractWord
 
-@[simp] theorem hostContext_length : hostContext.length = 13 :=
+@[simp] theorem hostContext_emitLogWord :
+    hostContext[HostFunction.emitLogWord.index]? =
+      some (HostFunction.functionType .emitLogWord) :=
+  hostContext_lookup .emitLogWord
+
+@[simp] theorem hostEnvironment_emitLogWord :
+    hostEnvironment[HostFunction.emitLogWord.index]? =
+      some (.hostFunction .emitLogWord) :=
+  hostEnvironment_lookup .emitLogWord
+
+@[simp] theorem hostContext_length : hostContext.length = 14 :=
   hostContext_length_all.trans HostFunction.all_length
 
-@[simp] theorem hostEnvironment_length : hostEnvironment.length = 13 :=
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 14 :=
   hostEnvironment_length_all.trans HostFunction.all_length
 
 namespace Program
