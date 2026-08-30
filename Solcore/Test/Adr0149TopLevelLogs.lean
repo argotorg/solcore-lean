@@ -29,7 +29,7 @@ private def assertExactWorkingLogs
 
 private def testReturnedLogs : IO Unit := do
   match runWith returnSelector 256 with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "returning log program must complete")
   | .completed result =>
       assertTrue
@@ -42,7 +42,7 @@ private def testReturnedLogs : IO Unit := do
 
 private def testRevertedLogs : IO Unit := do
   match runWith revertSelector 256 with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "reverting log program must complete")
   | .completed result =>
       assertTrue
@@ -55,7 +55,7 @@ private def testRevertedLogs : IO Unit := do
 
 private def testTrappedLogs : IO Unit := do
   match runWith trapSelector 256 with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "trapping log program must complete")
   | .completed result =>
       assertTrue (result.outcome == .trapped trapReason)
@@ -71,7 +71,7 @@ private def findOneLogSplit : Nat → Nat → Option Nat
   | fuel, remaining + 1 =>
       match runWith returnSelector fuel with
       | .completed _ => none
-      | .outOfFuel context _ _ _ _ =>
+      | .outOfFuel context _ _ _ _ _ =>
           if context.workingJournal.logList == [firstLog]
             then some fuel
             else findOneLogSplit (fuel + 1) remaining
@@ -87,11 +87,11 @@ private def testOutOfFuelExactlyOnce : IO Unit := do
   match prefixRun with
   | .completed _ =>
       throw (IO.userError "selected log split must remain exhausted")
-  | .outOfFuel context _ _ _ _ =>
+  | .outOfFuel context _ _ _ _ _ =>
       assertTrue (context.workingJournal.logList == [firstLog])
         "exhausted context must retain the first log exactly once"
       match TopLevelExecution.resumeWithFuel prefixRun 256 with
-      | .outOfFuel _ _ _ _ _ =>
+      | .outOfFuel _ _ _ _ _ _ =>
           throw (IO.userError "resumed log program must complete")
       | .completed resumed =>
           assertTrue (resumed.workingJournal.logList == expectedLogs)
@@ -99,7 +99,7 @@ private def testOutOfFuelExactlyOnce : IO Unit := do
           assertTrue (resumed.committedJournal.logList == expectedLogs)
             "resumed return must commit the exact once-only log sequence"
           match runWith returnSelector 256 with
-          | .outOfFuel _ _ _ _ _ =>
+          | .outOfFuel _ _ _ _ _ _ =>
               throw (IO.userError "one-shot comparison must complete")
           | .completed oneShot =>
               assertTrue

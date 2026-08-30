@@ -25,64 +25,110 @@ variable
   (delta :
     TopLevelStorageDelta initialWorld
       context.context.values.working.1 invocation.target)
+variable
+  (checkpointJournal_eq :
+    context.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty)
 
 example (outcome : FrameOutcome Word) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store outcome delta).outcome =
+      installedAccount_present context value store outcome delta
+        checkpointJournal_eq).outcome =
         outcome :=
   TopLevelExecution.outcome_finalize invocation installedAccount
     installedAccount_present context value store outcome delta
+      checkpointJournal_eq
 
 example (outcome : FrameOutcome Word) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store outcome delta).terminalContext =
+      installedAccount_present context value store outcome delta
+        checkpointJournal_eq).terminalContext =
         context :=
   TopLevelExecution.terminalContext_finalize invocation installedAccount
     installedAccount_present context value store outcome delta
+      checkpointJournal_eq
 
 example (data : Bytes) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store (.returned data) delta).finalWorld =
+      installedAccount_present context value store (.returned data) delta
+        checkpointJournal_eq).finalWorld =
         context.context.values.working.1 :=
   TopLevelExecution.finalWorld_finalize_returned invocation installedAccount
-    installedAccount_present context value store data delta
+    installedAccount_present context value store data delta checkpointJournal_eq
 
 example (data : Bytes) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store (.reverted data) delta).finalWorld =
+      installedAccount_present context value store (.reverted data) delta
+        checkpointJournal_eq).finalWorld =
         initialWorld :=
   TopLevelExecution.finalWorld_finalize_reverted invocation installedAccount
-    installedAccount_present context value store data delta
+    installedAccount_present context value store data delta checkpointJournal_eq
 
 example (reason : Word) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store (.trapped reason) delta).finalWorld =
+      installedAccount_present context value store (.trapped reason) delta
+        checkpointJournal_eq).finalWorld =
         initialWorld :=
   TopLevelExecution.finalWorld_finalize_trapped invocation installedAccount
-    installedAccount_present context value store reason delta
+    installedAccount_present context value store reason delta checkpointJournal_eq
 
 example (data : Bytes) (slot : Word) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store (.returned data) delta).committedDelta.slotChange?
+      installedAccount_present context value store (.returned data) delta
+        checkpointJournal_eq).committedDelta.slotChange?
         slot = delta.slotChange? slot :=
   TopLevelExecution.committedSlotChange?_finalize_returned invocation
-    installedAccount installedAccount_present context value store data delta slot
+    installedAccount installedAccount_present context value store data delta
+      checkpointJournal_eq slot
 
 example (data : Bytes) (slot : Word) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store (.reverted data) delta).committedDelta.slotChange?
+      installedAccount_present context value store (.reverted data) delta
+        checkpointJournal_eq).committedDelta.slotChange?
         slot = none :=
   TopLevelExecution.committedSlotChange?_finalize_reverted invocation
-    installedAccount installedAccount_present context value store data delta slot
+    installedAccount installedAccount_present context value store data delta
+      checkpointJournal_eq slot
 
 example (reason : Word) (slot : Word) :
     (TopLevelExecution.finalize invocation installedAccount
-      installedAccount_present context value store (.trapped reason) delta).committedDelta.slotChange?
+      installedAccount_present context value store (.trapped reason) delta
+        checkpointJournal_eq).committedDelta.slotChange?
         slot = none :=
   TopLevelExecution.committedSlotChange?_finalize_trapped invocation
-    installedAccount installedAccount_present context value store reason delta slot
+    installedAccount installedAccount_present context value store reason delta
+      checkpointJournal_eq slot
 
 end Finalization
+
+section JournalSeals
+
+variable {initialWorld : WorldState}
+variable {contract : CheckedCoreContract}
+variable {invocation : TopLevelInvocation}
+
+example
+    (result : TopLevelTerminalResult initialWorld invocation.target) :
+    result.workingJournal = result.terminalContext.workingJournal :=
+  result.workingJournal_eq
+
+example
+    (result : TopLevelTerminalResult initialWorld invocation.target) :
+    result.committedJournal =
+      match result.outcome with
+      | .returned _ => result.terminalContext.workingJournal
+      | .reverted _ =>
+          result.terminalContext.context.values.checkpoint.effects.rollback
+      | .trapped _ =>
+          result.terminalContext.context.values.checkpoint.effects.rollback :=
+  result.committedJournal_eq
+
+example
+    (execution : TopLevelRunResult initialWorld contract invocation) :
+    execution.rootCheckpointJournal = TransactionJournal.empty :=
+  execution.rootCheckpointJournal_eq_empty
+
+end JournalSeals
 
 section RawRun
 

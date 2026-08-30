@@ -19,9 +19,12 @@ namespace Solcore.Semantics.TopLevelExecution
     (outcome : FrameOutcome Core.Word)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store outcome delta).outcome = outcome := by
+      context value store outcome delta checkpointJournal_eq).outcome = outcome := by
   cases outcome <;> rfl
 
 @[simp] theorem terminalContext_finalize
@@ -36,9 +39,12 @@ namespace Solcore.Semantics.TopLevelExecution
     (outcome : FrameOutcome Core.Word)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store outcome delta).terminalContext = context := by
+      context value store outcome delta checkpointJournal_eq).terminalContext = context := by
   cases outcome <;> rfl
 
 @[simp] theorem workingJournal_finalize
@@ -53,9 +59,12 @@ namespace Solcore.Semantics.TopLevelExecution
     (outcome : FrameOutcome Core.Word)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store outcome delta).workingJournal =
+      context value store outcome delta checkpointJournal_eq).workingJournal =
         context.workingJournal := by
   cases outcome <;> rfl
 
@@ -69,9 +78,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (value : Core.Value) (store : Core.Store) (data : Bytes)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.returned data) delta).committedJournal =
+      context value store (.returned data) delta
+        checkpointJournal_eq).committedJournal =
         context.workingJournal := by
   rfl
 
@@ -85,9 +98,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (value : Core.Value) (store : Core.Store) (data : Bytes)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.reverted data) delta).committedJournal =
+      context value store (.reverted data) delta
+        checkpointJournal_eq).committedJournal =
         context.context.values.checkpoint.effects.rollback := by
   rfl
 
@@ -101,9 +118,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (value : Core.Value) (store : Core.Store) (reason : Core.Word)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.trapped reason) delta).committedJournal =
+      context value store (.trapped reason) delta
+        checkpointJournal_eq).committedJournal =
         context.context.values.checkpoint.effects.rollback := by
   rfl
 
@@ -119,9 +140,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (data : Bytes)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.returned data) delta).finalWorld =
+      context value store (.returned data) delta
+        checkpointJournal_eq).finalWorld =
         context.context.values.working.1 := by
   rfl
 
@@ -137,9 +162,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (data : Bytes)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.reverted data) delta).finalWorld = initialWorld := by
+      context value store (.reverted data) delta
+        checkpointJournal_eq).finalWorld = initialWorld := by
   rfl
 
 @[simp] theorem finalWorld_finalize_trapped
@@ -154,9 +183,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (reason : Core.Word)
     (delta :
       TopLevelStorageDelta initialWorld
-        context.context.values.working.1 invocation.target) :
+        context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.trapped reason) delta).finalWorld = initialWorld := by
+      context value store (.trapped reason) delta
+        checkpointJournal_eq).finalWorld = initialWorld := by
   rfl
 
 @[simp] theorem committedSlotChange?_finalize_returned
@@ -170,9 +203,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (delta :
       TopLevelStorageDelta initialWorld
         context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty)
     (slot : Core.Word) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.returned data) delta).committedDelta.slotChange? slot =
+      context value store (.returned data) delta
+        checkpointJournal_eq).committedDelta.slotChange? slot =
         delta.slotChange? slot := by
   rfl
 
@@ -187,9 +224,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (delta :
       TopLevelStorageDelta initialWorld
         context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty)
     (slot : Core.Word) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.reverted data) delta).committedDelta.slotChange? slot =
+      context value store (.reverted data) delta
+        checkpointJournal_eq).committedDelta.slotChange? slot =
         none := by
   exact TopLevelStorageDelta.slotChange?_identity _ _ _ _ _
 
@@ -204,9 +245,13 @@ namespace Solcore.Semantics.TopLevelExecution
     (delta :
       TopLevelStorageDelta initialWorld
         context.context.values.working.1 invocation.target)
+    (checkpointJournal_eq :
+      context.context.values.checkpoint.effects.rollback =
+        TransactionJournal.empty)
     (slot : Core.Word) :
     (finalize invocation installedAccount installedAccount_present
-      context value store (.trapped reason) delta).committedDelta.slotChange? slot =
+      context value store (.trapped reason) delta
+        checkpointJournal_eq).committedDelta.slotChange? slot =
         none := by
   exact TopLevelStorageDelta.slotChange?_identity _ _ _ _ _
 

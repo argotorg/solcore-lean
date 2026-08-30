@@ -47,7 +47,7 @@ private def assertObservation
     s!"{label}: optional input byte was not retained"
 
   match TopLevelExecution.run contract invocation installed completionFuel with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError s!"{label}: read-only observation did not complete")
   | .completed result =>
       assertTrue (result.coreValue == .word expected)

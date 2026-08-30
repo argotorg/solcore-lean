@@ -23,7 +23,7 @@ private def codeMatches
 
 private def testWriteBoundaries : IO Unit := do
   match runWith returnSelector writeRequestFuel with
-  | .outOfFuel context _ _ _ delta =>
+  | .outOfFuel context _ _ _ delta _ =>
       assertTrue
         (storageValueAt? context.context.values.working.1
           targetAddress targetSlot == some oldValue)
@@ -34,7 +34,7 @@ private def testWriteBoundaries : IO Unit := do
       throw (IO.userError "fuel 9 must not complete top-level execution")
 
   match runWith returnSelector postWriteFuel with
-  | .outOfFuel context _ _ _ delta =>
+  | .outOfFuel context _ _ _ delta _ =>
       assertTrue
         (storageValueAt? context.context.values.working.1
           targetAddress targetSlot == some writtenValue)
@@ -47,12 +47,12 @@ private def testWriteBoundaries : IO Unit := do
 
 private def testReturnedCommit : IO Unit := do
   match runWith returnSelector (returnCompletionFuel - 1) with
-  | .outOfFuel _ _ _ _ _ => pure ()
+  | .outOfFuel _ _ _ _ _ _ => pure ()
   | .completed _ =>
       throw (IO.userError "return must not complete one fuel unit early")
 
   match runWith returnSelector returnCompletionFuel with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "return must complete at its measured boundary")
   | .completed result =>
       assertTrue
@@ -85,7 +85,7 @@ private def testReturnedCommit : IO Unit := do
 
 private def testCallValueBoundaries : IO Unit := do
   match runWith returnSelector callValueRequestFuel with
-  | .outOfFuel context state _ _ delta =>
+  | .outOfFuel context state _ _ delta _ =>
       assertTrue
         (storageValueAt? context.context.values.working.1
           targetAddress targetSlot == some writtenValue)
@@ -102,7 +102,7 @@ private def testCallValueBoundaries : IO Unit := do
       throw (IO.userError "fuel 16 must remain resumable")
 
   match runWith returnSelector postCallValueFuel with
-  | .outOfFuel _ state _ _ _ =>
+  | .outOfFuel _ state _ _ _ _ =>
       assertTrue (state.control == .ret (.word returnSelector))
         "fuel 17 must have injected the exact call value"
   | .completed _ =>
@@ -110,12 +110,12 @@ private def testCallValueBoundaries : IO Unit := do
 
 private def testRevertedRollback : IO Unit := do
   match runWith revertSelector (revertTrapCompletionFuel - 1) with
-  | .outOfFuel _ _ _ _ _ => pure ()
+  | .outOfFuel _ _ _ _ _ _ => pure ()
   | .completed _ =>
       throw (IO.userError "revert must not complete one fuel unit early")
 
   match runWith revertSelector revertTrapCompletionFuel with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "revert must complete at its measured boundary")
   | .completed result =>
       assertTrue
@@ -136,12 +136,12 @@ private def testRevertedRollback : IO Unit := do
 
 private def testTrappedRollback : IO Unit := do
   match runWith trapSelector (revertTrapCompletionFuel - 1) with
-  | .outOfFuel _ _ _ _ _ => pure ()
+  | .outOfFuel _ _ _ _ _ _ => pure ()
   | .completed _ =>
       throw (IO.userError "trap must not complete one fuel unit early")
 
   match runWith trapSelector revertTrapCompletionFuel with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "trap must complete at its measured boundary")
   | .completed result =>
       assertTrue (result.outcome == .trapped trapCode)
@@ -180,7 +180,7 @@ private def expectReturned
       TopLevelRunResult initialWorld contract returnedInvocation)
     (message : String) : IO Unit := do
   match execution with
-  | .outOfFuel _ _ _ _ _ => throw (IO.userError message)
+  | .outOfFuel _ _ _ _ _ _ => throw (IO.userError message)
   | .completed result =>
       assertTrue
         (result.outcome == .returned (encodeWordBytesBE returnPayload) &&
@@ -202,7 +202,7 @@ private def testResumption : IO Unit := do
   match TopLevelExecution.resumeWithFuel
       (runWith revertSelector writeRequestFuel)
       (revertTrapCompletionFuel - writeRequestFuel) with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "fuel split 9+28 must complete revert")
   | .completed result =>
       assertTrue
@@ -214,7 +214,7 @@ private def testResumption : IO Unit := do
   match TopLevelExecution.resumeWithFuel
       (runWith trapSelector postWriteFuel)
       (revertTrapCompletionFuel - postWriteFuel) with
-  | .outOfFuel _ _ _ _ _ =>
+  | .outOfFuel _ _ _ _ _ _ =>
       throw (IO.userError "fuel split 10+27 must complete trap")
   | .completed result =>
       assertTrue

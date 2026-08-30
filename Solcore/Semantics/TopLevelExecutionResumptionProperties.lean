@@ -19,9 +19,9 @@ theorem eq_of_result_eq
     (result_eq : left.result = right.result) :
     left = right := by
   cases left with
-  | mk leftResult leftTyping leftAddress leftDelta =>
+  | mk leftResult leftTyping leftAddress leftDelta leftCheckpointJournal =>
       cases right with
-      | mk rightResult rightTyping rightAddress rightDelta =>
+      | mk rightResult rightTyping rightAddress rightDelta rightCheckpointJournal =>
           dsimp only at result_eq
           subst rightResult
           have delta_eq := TopLevelStorageDelta.unique leftDelta rightDelta
@@ -67,7 +67,7 @@ theorem resumeWithFuel_run
     resumeWithFuel (run contract invocation installed fuel) additional =
       run contract invocation installed (fuel + additional) := by
   cases prefixEq : validatedRawRun contract invocation installed fuel with
-  | mk result resultTyping storageAddress_eq delta =>
+  | mk result resultTyping storageAddress_eq delta checkpointJournal_eq =>
       cases result with
       | mk context outcome =>
           cases outcome with
@@ -131,7 +131,7 @@ theorem resumeWithFuel_run
                   rawPrefixEq
               have resumedEq :
                   validatedResumedRawResult context exhausted storageAddress_eq
-                      resultTyping delta additional =
+                      resultTyping delta checkpointJournal_eq additional =
                     validatedRawRun contract invocation installed
                       (fuel + additional) := by
                 apply ValidatedRawResult.eq_of_result_eq
@@ -142,7 +142,8 @@ theorem resumeWithFuel_run
               change
                 classifyRawResult contract invocation
                     (validatedResumedRawResult context exhausted
-                      storageAddress_eq resultTyping delta additional) =
+                      storageAddress_eq resultTyping delta checkpointJournal_eq
+                      additional) =
                   classifyRawResult contract invocation
                     (validatedRawRun contract invocation installed
                       (fuel + additional))
