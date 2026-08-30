@@ -1,6 +1,7 @@
 import Solcore.Baseline
 import Solcore.Spec
 import Solcore.Workspace
+import Solcore.Abi
 import Solcore.Oracle.Capabilities
 import Solcore.Oracle.StrictJson
 import Solcore.Oracle.V2

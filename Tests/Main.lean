@@ -9,6 +9,17 @@ import Solcore.Standard.CanonicalData
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
+import Solcore.Test.AbiKeccak256
+import Solcore.Test.AbiStaticWordMetadata
+import Solcore.Test.AbiStaticWordMetadataProperties
+import Solcore.Test.AbiStaticWordCodec
+import Solcore.Test.AbiStaticWordImplementation
+import Solcore.Test.AbiStaticWordMethodTable
+import Solcore.Test.AbiStaticWordMethodTableProperties
+import Solcore.Test.AbiStaticWordDispatcher
+import Solcore.Test.AbiStaticWordContract
+import Solcore.Test.AbiStaticWordEndToEndFixture
+import Solcore.Test.AbiStaticWordEndToEnd
 import Solcore.Test.CoreArithmeticShift
 import Solcore.Test.CoreArithmeticShiftWire
 import Solcore.Test.CoreBooleanConnectives
@@ -4982,6 +4993,15 @@ def testCanonicalRawLexing : IO Unit := do
 def run : IO Unit := do
   testProfile
   testFeatureMatrix
+  testAbiKeccak256
+  testAbiStaticWordMetadata
+  testAbiStaticWordMetadataProperties
+  testAbiStaticWordCodec
+  testAbiStaticWordMethodTable
+  testAbiStaticWordMethodTableProperties
+  testAbiStaticWordDispatcher
+  testAbiStaticWordContract
+  AbiStaticWordEndToEnd.testAbiStaticWordEndToEnd
   testSemanticCore
   testPrimitiveAlgebra
   testM1cKernel
