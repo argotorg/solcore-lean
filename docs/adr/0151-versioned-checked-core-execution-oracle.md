@@ -107,8 +107,10 @@ the shallow schema, request ID, profile, and complete limits object. Generic
 JSON depth and node traversal then counts even unknown subtrees, so they cannot
 bypass declared JSON budgets. Exact Oracle structure and scalar decoding comes
 next. The Core decoder consumes one typed depth/node unit before validating each
-expected Program, DataDefinition, Type, or Expression node; a limit reached at
-the same node as a malformed Core value therefore wins as `inconclusive`.
+expected Program, DataDefinition, Type, or Expression node. If counting that
+node would make demand exceed the limit, `inconclusive` precedes validation of
+the node; demand equal to the limit still validates it and may produce a
+protocol error.
 Scenario-entry, identifier-byte, and calldata-byte measurements follow complete
 structural decoding and precede semantic admission. This ADR does not change the
 raw NDJSON transport behavior of older versions. Capabilities reports every
