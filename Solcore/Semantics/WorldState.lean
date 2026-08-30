@@ -153,6 +153,14 @@ def writeNonce?
   let account ← state.account? address
   some (state.putAccount address (account.withNonce nonce))
 
+/-- Replace checked code only when the addressed account exists. -/
+def writeCode?
+    (state : WorldState)
+    (address : Address)
+    (code : CheckedHostCoreProgram) : Option WorldState := do
+  let account ← state.account? address
+  some (state.putAccount address (account.withCode code))
+
 end WorldState
 
 end Solcore.Semantics

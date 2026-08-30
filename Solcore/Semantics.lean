@@ -122,6 +122,7 @@ import Solcore.Semantics.BalanceTransferPresenceProperties
 import Solcore.Semantics.BalanceTransferCallFailure
 import Solcore.Semantics.BalanceTransferCallFailureProperties
 import Solcore.Semantics.WorldStateCode
+import Solcore.Semantics.WorldStateCodeWriteProperties
 import Solcore.Semantics.WorldStateWordCodeSelection
 import Solcore.Semantics.WorldStateWordCodeSelectionProperties
 import Solcore.Semantics.SelectedCheckedWordExecution
