@@ -152,6 +152,13 @@
       "stdin": "Tests/golden/v5-core-check-request.ndjson",
       "expected": "Tests/golden/v5-core-check-response.ndjson",
       "sha256": "f0963c526314562f6e603d23a790339fe28eff978116170246119c8968dd4831"
+    },
+    {
+      "id": "v5-execute",
+      "arguments": [],
+      "stdin": "Tests/golden/v5-execute-request.ndjson",
+      "expected": "Tests/golden/v5-execute-response.ndjson",
+      "sha256": "8fde569cf05962e94bb9b6b6d4f6daaf7fa34241a1bd19994c70f4829014f87c"
     }
   ]
 }
