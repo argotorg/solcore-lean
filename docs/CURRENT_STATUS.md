@@ -402,8 +402,9 @@ semantics continues.
 [ADR-0139](adr/0139-run-fixed-current-address-observation.md) is complete. One
 explicitly supplied `currentAddress` is fixed in the immutable run input and
 exposed losslessly through internal host index 9. ADR-0146 later appended the
-typed call at index 10, so both canonical tables now have length 11 and index
-11 is first unbound. The current-address role neither selects code or storage
+typed call at index 10, and ADR-0147 appended its value-bearing counterpart at
+index 11. Both canonical tables now have length 12 and index 12 is first
+unbound. The current-address role neither selects code or storage
 nor derives from the caller, a callee, an Account, or a call kind.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
@@ -448,8 +449,16 @@ Checked root programs can make typed depth-one Word calls resolved from a
 dynamic checked-contract registry and the current working world. Root and child
 share one resumable fuel budget; retained modes carry a `Reachable` provenance
 seal. Child return/revert/trap compose with root commit/rollback, and terminal
-deltas are queryable at arbitrary Addresses and slots. Balance semantics is the
-next active implementation area.
+deltas are queryable at arbitrary Addresses and slots.
+
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is in progress.
+Accounts now carry explicit balances; checked transfer rejects absence,
+underflow, and overflow without wrapping or implicit creation. Exact balance
+deltas, transfer preservation laws, installation transport, a distinct
+checkpoint/working root context, and the append-only value-call capability at
+index 11 are implemented. Nested transfer commit/rollback, sealed top-level
+preflight rejection, and exact split-fuel resumption are connected. End-to-end
+checked-program regressions and final acceptance validation are active work.
 
 ## Implementation status
 
@@ -486,7 +495,7 @@ next active implementation area.
 | Parent-indexed selected checked Word execution | Complete | Exact storage and parent provenance, delegated resumption, proof-linked canonical returned continuation, plain and conditional legacy coherence, consumers, and regressions are complete | Not published |
 | Executable checked-Core top-level lifecycle | Complete | Explicit initial state, checked root installation, total return/revert/trap result, exact resumption, commit/rollback, and state-delta observations are complete | Not published |
 | One-level nested checked-Core invocation | Complete | Typed call results, dynamic checked-code resolution, shared fuel, sealed resumable modes, child checkpoint handling, root commit/rollback, global delta queries, and executable regressions are complete | Not published |
-| Balance semantics | Next | Define checked balance availability and transfer for value-bearing calls without adding creation, logs, ABI, or parser dependencies | Not published |
+| Balance semantics | In progress | [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) implements explicit balances, checked atomic transfer, balance deltas, installation preservation, prepared root checkpoints, an append-only value-call boundary, nested rollback, sealed top-level rejection, and exact resumption. End-to-end checked-program regressions and acceptance validation are active | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2840,8 +2849,9 @@ Tests cover return/revert/trap, dispatch failure, self-call and cross-account
 rebasing, sequential calls, exact split fuel, root rollback, and global state
 queries.
 
-Balance semantics is next. Creation, logs, ABI, and public Oracle exposure
-remain separate later slices. The paused parser-proof path does not become an
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is the active
+balance milestone. Creation, logs, ABI, and public Oracle exposure remain
+separate later slices. The paused parser-proof path does not become an
 intermediate semantics milestone.
 
 ## Meaning of completion

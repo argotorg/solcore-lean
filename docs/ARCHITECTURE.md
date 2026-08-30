@@ -987,8 +987,10 @@ inputs with exact summed-fuel equivalence.
 
 ADR-0146 adds the next layer: depth-one checked child invocation reuses this
 checkpoint and outcome model, shares fuel with the root, and retains exact
-state for resumption. Balance semantics, creation, logs, ABI, and public Oracle
-schemas remain separate layers.
+state for resumption. ADR-0147 adds explicit balances, non-wrapping atomic
+transfer, a value-bearing call at append-only host index 11, and a root context
+whose original checkpoint is distinct from its post-transfer working world.
+Creation, logs, ABI, and public Oracle schemas remain separate layers.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

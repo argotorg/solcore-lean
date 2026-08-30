@@ -187,7 +187,8 @@ run-fixed current-address observation. One explicit `currentAddress` is part of
 the immutable run input and its exact widened Word is exposed through internal
 Unit-to-Word index 9. At that milestone the host tables had length 10 and index
 10 was first unbound. ADR-0146 has since appended the typed call at index 10,
-making length 11 and index 11 first unbound. Exact read-only variation, absent
+and ADR-0147 appends the value-bearing call at index 11, making length 12 and
+index 12 first unbound. Exact read-only variation, absent
 current Accounts, direct
 fuel 4/5, end-to-end fuel 16/17/23/29/30, 17+13 and 23+7 resumption, the
 current-derived write and pair, and return/revert/trap folds are tested. The
@@ -272,8 +273,11 @@ mutation, rollback, no-write execution, and direct host-input observations.
 
 [ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) completes
 depth-one nested checked-Core invocation with shared-fuel resumption and
-transaction-wide commit/rollback. Balance semantics is next. Creation, logs,
-ABI, and a versioned public Oracle execution command remain later decisions.
+transaction-wide commit/rollback.
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) connects
+checked balances and value transfer to that lifecycle; its end-to-end
+acceptance work is in progress. Creation, logs, ABI, and a versioned public
+Oracle execution command remain later decisions.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

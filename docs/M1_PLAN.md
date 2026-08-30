@@ -109,8 +109,9 @@ proofs remain paused.
 explicit `currentAddress` is fixed for a handled run and its same-input
 resumptions, observed losslessly by Core at append-only host index 9, and kept
 independent from storage, code, caller, and future callee or call-kind roles.
-ADR-0146 has since appended the typed call at index 10. The canonical host
-tables now have length 11 and index 11 is first unbound.
+ADR-0146 has since appended the typed call at index 10, and ADR-0147 appends
+its value-bearing counterpart at index 11. The canonical host tables now have
+length 12 and index 12 is first unbound.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
 is complete. It binds the existing selected-run configuration to a
@@ -155,8 +156,9 @@ and reports terminal data with an exact queryable state observation.
 adds typed depth-one child calls, dynamic checked-contract resolution, one
 shared resumable budget, scheduler-reachability sealing, child checkpoint
 handling, root commit/rollback, and arbitrary-address state-delta queries.
-Balance semantics is next. Proof-only extensions of the older
-selected-execution path are not separate milestones.
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is the active
+balance milestone. Proof-only extensions of the older selected-execution path
+are not separate milestones.
 
 ## Completed foundation
 
@@ -308,7 +310,7 @@ These results remain regression obligations for every extension.
 | 128 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 129 | Executable checked-Core top-level lifecycle | Complete | Runs an installed checked contract from explicit state and makes return commit and revert/trap rollback observable in one total result |
 | 130 | Nested checked-Core invocation | Complete | Adds typed child inputs/results, dynamic resolution, shared-fuel scheduling and resumption, sealed state provenance, child checkpoints, root commit/rollback, and global delta observations |
-| 131 | Balance semantics | Next | Connects value-bearing calls to checked Account balance availability and transfer rules |
+| 131 | Balance semantics | In progress | Connects value-bearing calls to checked Account balance availability, atomic transfer, rollback, and resumption rules through ADR-0147 |
 | 132 | Contract creation | Planned | Adds nonce, address derivation, initialization, and rollback policy |
 | 133 | Logs and transaction observations | Planned | Adds ordered rollback-aware events and transaction-wide results |
 | 134 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2372,9 +2374,10 @@ revert and trap restore the initial world. Exact global delta queries and
 checked-program tests cover cross-account calls, self-calls, sequential calls,
 dispatch failures, rollback, and split-fuel resumption.
 
-Balance semantics is the next implementation milestone. Creation, logs, ABI,
-and Oracle publication follow later. Parser proofs remain paused, and the older
-proof-only selected-execution path is not resumed as an intermediate step.
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is the active
+balance implementation milestone. Creation, logs, ABI, and Oracle publication
+follow later. Parser proofs remain paused, and the older proof-only
+selected-execution path is not resumed as an intermediate step.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
