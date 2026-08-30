@@ -432,11 +432,16 @@ code absence, non-Word selection, or exhaustion.
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
 complete. It connects that execution to an exact parent/storage provenance and
 constructs the matching canonical returned parent continuation. Parser-proof
-work remains paused. The active target is now a single executable top-level
-lifecycle, fixed by
-[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md), from
-explicit initial state and checked contract through commit/rollback and
-terminal observation.
+work remains paused.
+
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) is complete.
+The syntax-independent runner accepts an installed checked Core contract over
+explicit initial state, executes one direct invocation, commits return, rolls
+back revert or trap, and retains typed out-of-fuel state for exact resumption.
+Its total terminal result contains canonical return/revert data or a trap
+reason, the selected final world, and queryable speculative and committed
+target-storage deltas. Nested checked-Core invocation is the next active
+implementation area.
 
 ## Implementation status
 
@@ -2807,11 +2812,17 @@ conditional legacy coherence. The 723-job build, 1,334-job test build, full
 test run, 16-root trust-zero and warning-as-error sweep, metadata, kernel,
 diff, axiom, coverage, and contract checks pass.
 
-The active milestone is no longer another proof-only adapter on this path. It
-is [ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md): an
-executable top-level lifecycle taking an explicit initial `WorldState` and
-checked Core contract, committing return, rolling back revert and trap, and
-returning terminal data with an exact state observation.
+The direct executable lifecycle in
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) is complete.
+All 45 theorem contracts have external compile consumers. Runtime tests execute
+checked Core programs through return, revert, trap, no-write observation, and
+pre/post-write fuel splits. Full build and tests, 20-root trust-zero checks,
+metadata and kernel policy, diff hygiene, and axiom reports pass; theorem
+dependencies are axiom-free or use only `propext` and `Quot.sound`.
+
+The next active implementation area is nested checked-Core invocation. Balance
+transfer, creation, logs, ABI, and public Oracle exposure remain separate later
+slices.
 
 ## Meaning of completion
 

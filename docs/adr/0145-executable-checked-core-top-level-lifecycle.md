@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: execute one installed checked Core contract from an explicit state
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -257,6 +257,31 @@ This ADR does not add:
 After this lifecycle is complete, nested call, balance, creation, logs, ABI,
 and the public Oracle can connect to one executable transaction boundary in
 that order or in smaller vertical slices chosen at that time.
+
+## Implementation result
+
+The accepted lifecycle is implemented as a pure, syntax-independent API. A
+checked contract owns its completion decoder, an installation witness ties its
+exact code to the initial world, and the runner constructs the root checkpoint
+internally. The total result has only `completed` and `outOfFuel` branches; raw
+machine faults are excluded by checked execution.
+
+Return selects the terminal working world. Revert and trap select the original
+world while retaining the speculative terminal context. Both speculative and
+committed target-storage deltas remain queryable by slot, and code plus every
+non-target Account are preserved.
+
+Fuel resumption reuses one validated raw-result classifier. It is proved equal
+to a one-shot run at the summed budget, including the complete dependent result
+and state delta. Runtime fixtures exercise write/return, write/revert,
+write/trap, pre-write and post-write exhaustion, terminal stability, and a
+read-only program that observes caller, input size and byte, and all three
+direct target address roles.
+
+All 45 theorem contracts introduced by this milestone have external compile
+consumers. Full build and runtime tests, trust-zero compilation, metadata and
+kernel-policy checks, diff hygiene, and axiom reports pass. The only reported
+Lean axioms are the repository-accepted `propext` and `Quot.sound`.
 
 ## Consequences
 

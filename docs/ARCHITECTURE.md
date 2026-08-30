@@ -976,14 +976,18 @@ mapping to older generic selected execution would change non-Word behavior or
 completion policy, so compatibility is proved only under a successful Word
 selection and matching canonical returned bytes.
 
-This boundary produces a canonical returned parent continuation but does not
-yet finalize a transaction.
-[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) is the
-active vertical layer. It starts from an explicit initial `WorldState` and
-installed checked Core contract, executes one direct top-level invocation,
-selects the working state on return, selects the initial checkpoint on revert
-or trap, and exposes terminal data with an exact state observation. Nested
-calls and child-result delivery remain above that layer.
+This boundary produces a canonical returned parent continuation.
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) now adds the
+complete direct top-level layer above it. The layer starts from an explicit
+initial `WorldState` and installed checked Core contract, executes one direct
+invocation, selects the working state on return, selects the initial checkpoint
+on revert or trap, and exposes terminal data with an exact queryable target
+delta. Exhaustion retains a typed Core state and resumes under the same fixed
+inputs with exact summed-fuel equivalence.
+
+Nested invocation is the next layer. It must reuse this checkpoint and outcome
+model for child result delivery before balances, creation, logs, ABI, or public
+Oracle schemas are attached.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

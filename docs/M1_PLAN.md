@@ -145,12 +145,12 @@ success produces a proof-linked completion and parent-indexed returned
 continuation with exact plain coherence. Legacy coherence is intentionally
 conditional on the same successful Word return policy.
 
-The active milestone is now
-[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md), one
-executable top-level lifecycle: take an explicit initial `WorldState` and
-checked Core contract, run a direct invocation, commit return, roll back revert
-and trap, and report terminal data with an exact state observation. Proof-only
-extensions of the ADR-0144 path are not separate milestones.
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) is complete.
+The executable boundary takes explicit state and an installed checked Core
+contract, runs a direct invocation, commits return, rolls back revert and trap,
+and reports terminal data with an exact queryable state observation. The next
+vertical milestone is nested checked-Core invocation; proof-only extensions of
+the older selected-execution path are not separate milestones.
 
 ## Completed foundation
 
@@ -300,10 +300,14 @@ These results remain regression obligations for every extension.
 | 126 | Proof-refined selected checked Word execution | Complete | Executes only the selected Word branch, retains exact non-execution reasons, and proves fixed-input fuel resumption and canonical Word completion |
 | 127 | Parent-indexed selected checked Word execution | Complete | Adds exact storage-presence provenance and canonical returned-parent projection without duplicating inner branches |
 | 128 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 129 | Executable checked-Core top-level lifecycle | Active | Runs an installed checked contract from explicit state and makes return commit and revert/trap rollback observable in one total result |
-| 130 | Nested invocation and external observations | Planned | Adds child inputs/results, active-frame transitions, scheduling, call depth, balance, creation, logs, and a public Oracle boundary |
-| 131 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 132 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 129 | Executable checked-Core top-level lifecycle | Complete | Runs an installed checked contract from explicit state and makes return commit and revert/trap rollback observable in one total result |
+| 130 | Nested checked-Core invocation | Next | Adds child inputs/results, child checkpoints, result delivery, and explicit depth policy without folding in balances or creation |
+| 131 | Balance transfer | Planned | Connects value-bearing calls to checked Account balance transitions |
+| 132 | Contract creation | Planned | Adds nonce, address derivation, initialization, and rollback policy |
+| 133 | Logs and transaction observations | Planned | Adds ordered rollback-aware events and transaction-wide results |
+| 134 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 135 | Public Oracle execution | Planned | Publishes a versioned checked-Core execution request and total result only after internal semantics stabilizes |
+| 136 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2335,16 +2339,19 @@ resumption splits, retained state and Store, canonical return bytes, parent
 resolution, and conditional legacy coherence. Full build, test, trust-zero,
 metadata, kernel, diff, axiom, coverage, and contract checks pass.
 
-## Active executable top-level lifecycle
+## Completed executable top-level lifecycle
 
-[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) starts from
-an explicit initial `WorldState`, an installed checked Core contract, and a
-direct invocation. Bounded execution must remain total: exhaustion stays
-resumable, while terminal return selects the working state and terminal revert
-or trap selects the initial checkpoint. The result must retain return or
-revert data, trap information, and an exact state observation. Nested calls,
-balances, creation, logs, ABI, and the public Oracle attach only after this
-boundary is executable end to end.
+[ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) now starts
+from an explicit initial `WorldState`, an installed checked Core contract, and
+a direct invocation. Bounded execution is total: exhaustion stays resumable,
+return selects the working state, and revert or trap selects the initial
+checkpoint. The result retains return/revert data or a trap reason together
+with exact queryable target-state observations.
+
+The next milestone adds nested checked-Core invocation across this boundary.
+Balance transfer, creation, logs, ABI, and Oracle publication remain later
+vertical slices so their policies cannot leak into basic child-call control
+flow.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 
