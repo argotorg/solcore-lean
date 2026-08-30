@@ -1,4 +1,5 @@
 import Lean.Data.Json
+import Solcore.Oracle.V5.DiagnosticExecutionValidity
 import Solcore.Oracle.V5.ObservationValidity
 
 /-! Typed, query-indexed response values for Oracle v5. -/
@@ -16,29 +17,11 @@ inductive VerdictKind where
   | internalError
   deriving Repr, BEq, DecidableEq
 
-/--
-One canonical semantic rejection. The response codec wraps this value in the
-required singleton `diagnostics` array and emits a null display string.
--/
-structure Diagnostic where
-  code : String
-  phase : Phase
-  path : List String
-  arguments : Lean.Json
-  deriving BEq
-
-namespace Diagnostic
-
-def severity (_diagnostic : Diagnostic) : String := "error"
-
-def display (_diagnostic : Diagnostic) : Option String := none
-
-end Diagnostic
-
-/-- A Core-check rejection can only originate in the Core checking phase. -/
+/-- A Core-check rejection belongs to the complete closed diagnostic catalog. -/
 structure CoreCheckRejection where
+  private mk ::
   diagnostic : Diagnostic
-  phase_eq : diagnostic.phase = .coreChecking
+  valid : diagnostic.ValidCoreCheck
 
 namespace CoreCheckRejection
 
@@ -46,8 +29,8 @@ instance : BEq CoreCheckRejection :=
   ⟨fun left right => left.diagnostic == right.diagnostic⟩
 
 def of? (diagnostic : Diagnostic) : Option CoreCheckRejection :=
-  if phase_eq : diagnostic.phase = .coreChecking then
-    some ⟨diagnostic, phase_eq⟩
+  if valid : diagnostic.isValidCoreCheck = true then
+    some (.mk diagnostic valid)
   else
     none
 
@@ -72,10 +55,11 @@ def executeRejectionPhaseAllowed (phase : Phase) : Bool :=
       ExecuteRejectionPhaseAllowed phase := by
   simp [executeRejectionPhaseAllowed]
 
-/-- An execution rejection carries evidence that its phase is query-valid. -/
+/-- An execution rejection belongs to the complete closed diagnostic catalog. -/
 structure ExecuteRejection where
+  private mk ::
   diagnostic : Diagnostic
-  phase_allowed : ExecuteRejectionPhaseAllowed diagnostic.phase
+  valid : diagnostic.ValidExecute
 
 namespace ExecuteRejection
 
@@ -83,8 +67,8 @@ instance : BEq ExecuteRejection :=
   ⟨fun left right => left.diagnostic == right.diagnostic⟩
 
 def of? (diagnostic : Diagnostic) : Option ExecuteRejection :=
-  if allowed : ExecuteRejectionPhaseAllowed diagnostic.phase then
-    some ⟨diagnostic, allowed⟩
+  if valid : diagnostic.isValidExecute = true then
+    some (.mk diagnostic valid)
   else
     none
 

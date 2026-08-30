@@ -54,12 +54,7 @@ private def diagnostic : Diagnostic := {
 }
 
 private def executeRejection : ExecuteRejection :=
-  ⟨diagnostic, by
-    right
-    right
-    right
-    right
-    exact rfl⟩
+  (ExecuteRejection.of? diagnostic).get (by native_decide)
 
 private def diagnosticAndRejectionExact : Bool :=
   (encodeDiagnostic diagnostic).compress ==
